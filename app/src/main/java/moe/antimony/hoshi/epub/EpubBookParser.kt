@@ -7,6 +7,7 @@ import java.io.File
 data class EpubBook(
     val title: String,
     val chapters: List<EpubChapter>,
+    val coverHref: String? = null,
     private val resources: Map<String, EpubResource> = emptyMap(),
     private val rootDirectory: File? = null,
 ) {
@@ -83,6 +84,7 @@ class EpubBookParser {
 
         return EpubBook(
             title = title()?.ifBlank { null } ?: root.nameWithoutExtension,
+            coverHref = coverHref()?.normalizeResourceHref(),
             chapters = chapters,
             resources = resources,
             rootDirectory = root,

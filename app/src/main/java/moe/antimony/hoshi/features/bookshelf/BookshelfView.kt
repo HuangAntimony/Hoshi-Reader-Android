@@ -39,6 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.BookEntry
+import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
@@ -55,23 +57,46 @@ fun BookshelfView(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
-    var bookFile by remember { mutableStateOf<File?>(null) }
+    var bookEntries by remember { mutableStateOf<List<BookEntry>>(emptyList()) }
+    var selectedBookRoot by remember { mutableStateOf<File?>(null) }
     var book by remember { mutableStateOf<EpubBook?>(null) }
     var bookmark by remember { mutableStateOf<Bookmark?>(null) }
     var isReading by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun parseBook(file: File, openReader: Boolean) {
+    fun reloadBookEntries() {
+        bookEntries = bookStorage.loadBookEntries()
+    }
+
+    fun saveMetadata(root: File, parsedBook: EpubBook, previous: BookMetadata? = null) {
+        val metadata = BookMetadata(
+            id = previous?.id ?: root.name,
+            title = parsedBook.title,
+            cover = parsedBook.coverHref,
+            folder = root.name,
+            lastAccess = bookStorage.currentAppleReferenceDateSeconds(),
+        )
+        bookStorage.saveMetadata(root, metadata)
+    }
+
+    fun parseBook(file: File, openReader: Boolean, refreshAccess: Boolean) {
         scope.launch {
             isLoading = true
             errorMessage = null
             runCatching {
-                withContext(Dispatchers.IO) { EpubBookParser().parse(file) }
-            }.onSuccess {
-                bookFile = file
-                book = it
+                withContext(Dispatchers.IO) {
+                    val parsedBook = EpubBookParser().parse(file)
+                    if (refreshAccess) {
+                        saveMetadata(file, parsedBook, bookStorage.loadMetadata(file))
+                    }
+                    parsedBook
+                }
+            }.onSuccess { parsedBook ->
+                selectedBookRoot = file
+                book = parsedBook
                 bookmark = bookStorage.loadBookmark(file)
+                reloadBookEntries()
                 isReading = openReader
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to open EPUB."
@@ -80,47 +105,52 @@ fun BookshelfView(
         }
     }
 
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+    fun importBook(uri: Uri) {
         scope.launch {
             isLoading = true
             errorMessage = null
             runCatching {
                 withContext(Dispatchers.IO) {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
-                    bookStorage.importBook(context.contentResolver, uri)
+                    val root = bookStorage.importBook(context.contentResolver, uri)
+                    val parsedBook = EpubBookParser().parse(root)
+                    saveMetadata(root, parsedBook)
+                    root to parsedBook
                 }
-            }.onSuccess { parseBook(it, openReader = true) }
-                .onFailure {
-                    errorMessage = it.localizedMessage ?: "Failed to import EPUB."
-                    isLoading = false
-                }
+            }.onSuccess { (root, parsedBook) ->
+                selectedBookRoot = root
+                book = parsedBook
+                bookmark = bookStorage.loadBookmark(root)
+                reloadBookEntries()
+                isReading = true
+                isLoading = false
+            }.onFailure {
+                errorMessage = it.localizedMessage ?: "Failed to import EPUB."
+                isLoading = false
+            }
+        }
+    }
+
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            importBook(uri)
         }
     }
 
     LaunchedEffect(Unit) {
-        bookStorage.loadAllBooks().firstOrNull()?.let { parseBook(it, openReader = false) }
+        reloadBookEntries()
     }
 
     LaunchedEffect(pendingImportUri) {
         val uri = pendingImportUri ?: return@LaunchedEffect
-        isLoading = true
-        errorMessage = null
-        runCatching {
-            withContext(Dispatchers.IO) {
-                bookStorage.importBook(context.contentResolver, uri)
-            }
-        }.onSuccess {
-            onPendingImportConsumed()
-            parseBook(it, openReader = true)
-        }.onFailure {
-            onPendingImportConsumed()
-            errorMessage = it.localizedMessage ?: "Failed to import EPUB."
-            isLoading = false
-        }
+        onPendingImportConsumed()
+        importBook(uri)
     }
 
     if (isReading && book != null) {
@@ -129,7 +159,7 @@ fun BookshelfView(
             initialChapterIndex = bookmark?.chapterIndex ?: 0,
             initialProgress = bookmark?.progress ?: 0.0,
             onSaveBookmark = { chapterIndex, progress ->
-                val file = bookFile ?: return@ReaderWebView
+                val file = selectedBookRoot ?: return@ReaderWebView
                 val savedBookmark = Bookmark(
                     chapterIndex = chapterIndex,
                     progress = progress,
@@ -170,21 +200,25 @@ fun BookshelfView(
                 isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                book == null -> EmptyBooksView(
+                bookEntries.isEmpty() -> EmptyBooksView(
                     errorMessage = errorMessage,
                     onImport = { importer.launch(arrayOf("application/epub+zip", "application/octet-stream")) },
                 )
                 else -> Column(Modifier.fillMaxSize()) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = requireNotNull(book).title,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        },
-                        supportingContent = { Text(bookFile?.name ?: "EPUB") },
-                        modifier = Modifier.clickable { isReading = true },
-                    )
+                    bookEntries.forEach { entry ->
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = entry.metadata.title ?: entry.root.name,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            },
+                            supportingContent = { Text(entry.metadata.folder ?: entry.root.name) },
+                            modifier = Modifier.clickable {
+                                parseBook(entry.root, openReader = true, refreshAccess = true)
+                            },
+                        )
+                    }
                     if (errorMessage != null) {
                         Text(
                             text = requireNotNull(errorMessage),

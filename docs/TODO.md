@@ -20,10 +20,13 @@
    - Keep reverse chapter transitions landing at the previous chapter end.
    - Verified on emulator with `testdata/test.epub`: saved `chapterIndex=9`, `progress=0.2734952481520591`, relaunched app, reopened reader, restored to `item/xhtml/p-003.xhtml` with `scrollTop=1668` and matching progress.
 
-2. `todo` - Bookshelf and book metadata
-   - Move from a single `current.epub` directory to multi-book storage.
-   - Persist title, cover, folder, last access, and reading progress.
-   - Align bookshelf layout, sorting, deletion, and open behavior with iOS.
+2. `in_progress` - Bookshelf and book metadata
+   - `done` - Move from a single `current.epub` directory to multi-book storage.
+   - `done` - Persist title, cover path, folder, and last access in iOS-shaped `metadata.json`.
+   - `done` - Open imported/listed books from their independent storage directories.
+   - `todo` - Render cover thumbnails in the bookshelf.
+   - `todo` - Align bookshelf sorting, deletion, and selection behavior with iOS.
+   - Verified on emulator with `testdata/test.epub`: cleared app data, imported the EPUB twice through DocumentsUI, confirmed two shelf rows and two independent `files/Books/<uuid>/metadata.json` files, then opened a listed book into the reader.
 
 3. `todo` - Reader settings
    - Implement iOS-aligned theme, font, font size, line spacing, and margin controls.
