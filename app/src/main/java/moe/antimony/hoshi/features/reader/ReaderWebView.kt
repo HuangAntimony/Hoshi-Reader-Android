@@ -35,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.features.dictionary.LookupPopupState
+import moe.antimony.hoshi.features.dictionary.LookupPopupView
 
 data class ReaderSelectionData(
     val text: String,
@@ -66,6 +69,12 @@ fun ReaderWebView(
 ) {
     var effectiveSettings by remember(readerSettings) { mutableStateOf(readerSettings) }
     var showAppearance by remember { mutableStateOf(false) }
+    var lookupPopup by remember { mutableStateOf<LookupPopupState?>(null) }
+    val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
+        val results = runCatching { LookupEngine.lookup(selection.text) }.getOrDefault(emptyList())
+        lookupPopup = if (results.isEmpty()) null else LookupPopupState(selection, results)
+        onTextSelected(selection) ?: results.firstOrNull()?.matched?.codePointCount()
+    }
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
     var chapterPosition by remember(book) {
         mutableStateOf(
@@ -134,9 +143,15 @@ fun ReaderWebView(
                     onSaveBookmark(chapterPosition.index, progress)
                 },
                 readerSettings = effectiveSettings,
-                onTextSelected = onTextSelected,
+                onTextSelected = handleTextSelected,
                 modifier = Modifier.fillMaxSize(),
             )
+            lookupPopup?.let { popup ->
+                LookupPopupView(
+                    state = popup,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             webView?.let { _ -> Unit }
         }
     }
@@ -437,3 +452,6 @@ private const val MAX_SELECTION_LENGTH = 16
 
 internal fun androidPixelsToCssPixels(value: Float, density: Float): Float =
     value / density.coerceAtLeast(1f)
+
+private fun String.codePointCount(): Int =
+    codePointCount(0, length)

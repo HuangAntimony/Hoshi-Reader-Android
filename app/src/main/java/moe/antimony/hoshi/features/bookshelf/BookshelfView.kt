@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
@@ -73,6 +74,7 @@ fun BookshelfView(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
+    val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
     val readerSettingsStore = remember { ReaderSettingsStore(context) }
     var readerSettings by remember { mutableStateOf(readerSettingsStore.load()) }
     var bookEntries by remember { mutableStateOf<List<BookEntry>>(emptyList()) }
@@ -168,6 +170,9 @@ fun BookshelfView(
 
     LaunchedEffect(Unit) {
         reloadBookEntries()
+        withContext(Dispatchers.IO) {
+            runCatching { dictionaryRepository.rebuildLookupQuery() }
+        }
     }
 
     LaunchedEffect(pendingImportUri) {
