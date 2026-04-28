@@ -77,6 +77,10 @@ internal object ReaderContentStyles {
         rt {
             font-size: 0.45em;
         }
+        ::highlight(hoshi-selection) {
+            background-color: rgba(160, 160, 160, 0.4) !important;
+            color: inherit;
+        }
         a {
             color: rgba(66, 108, 245, 1) !important;
         }

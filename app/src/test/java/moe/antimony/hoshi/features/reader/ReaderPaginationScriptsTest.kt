@@ -116,5 +116,7 @@ class ReaderPaginationScriptsTest {
         assertTrue(css.contains("max-width: var(--hoshi-image-max-width, 95vw) !important"))
         assertTrue(css.contains("width: var(--hoshi-image-max-width, 95vw) !important"))
         assertTrue(css.contains("height: var(--hoshi-image-max-height, calc(var(--page-height, 100vh) - 22px)) !important"))
+        assertTrue(css.contains("::highlight(hoshi-selection)"))
+        assertTrue(css.contains("background-color: rgba(160, 160, 160, 0.4) !important"))
     }
 }
