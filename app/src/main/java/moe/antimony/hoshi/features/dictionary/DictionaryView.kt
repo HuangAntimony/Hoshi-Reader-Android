@@ -56,7 +56,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
@@ -560,13 +559,6 @@ private fun DictionaryRow(
         ) {
             ListItem(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Rounded.DragIndicator,
-                        contentDescription = "Reorder",
-                        tint = DictionarySecondaryTextColor,
-                    )
-                },
                 headlineContent = {
                     Text(
                         text = dictionary.index.title,

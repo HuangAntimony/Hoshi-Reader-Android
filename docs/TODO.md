@@ -100,6 +100,7 @@
    - Verified dictionary ordering on emulator with existing `明鏡国語辞典 第三版` and `JMdict [2026-04-27]`: long-pressed and dragged the first Term dictionary down with `adb input draganddrop`, confirmed `Dictionaries/config.json` rewrote the order, then dragged it back and confirmed the original order was restored.
    - Verified dictionary lookup on emulator with existing Term/Frequency/Pitch dictionaries and query `test`: Dictionary tab rendered the MK3 result through the WebView popup renderer while the app process stayed alive and crash log remained empty. During this verification, stale dictionary mmap offsets exposed a native crash path; fixed `hoshidicts` query rebuilding/lifetime and added mmap/hash bounds validation so invalid imported dictionaries are skipped instead of crashing lookup.
    - Verified dictionary management UI on emulator without clearing app data: opened Settings -> Dictionaries and dictionary Settings, confirmed the pages now use Material 3 app bars, native icon buttons, grouped list cards, neutral segmented controls, green switches, swipe-delete rows, and compact icon steppers while preserving the iOS page structure.
+   - Verified dictionary row affordance on emulator without clearing app data: removed the misleading always-visible reorder handle, kept whole-row long-press drag ordering, and confirmed `Dictionaries/config.json` order still changes and can be restored.
 
 7. `todo` - Highlights and notes foundation
    - Store highlight anchors based on WebView range data.
