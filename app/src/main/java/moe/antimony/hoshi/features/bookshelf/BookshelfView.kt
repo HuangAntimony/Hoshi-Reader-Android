@@ -57,6 +57,7 @@ import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.features.dictionary.DictionaryView
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderSettingsStore
 import moe.antimony.hoshi.features.reader.ReaderWebView
@@ -82,6 +83,7 @@ fun BookshelfView(
     var selectedBookRoot by remember { mutableStateOf<File?>(null) }
     var book by remember { mutableStateOf<EpubBook?>(null) }
     var bookmark by remember { mutableStateOf<Bookmark?>(null) }
+    var isShowingDictionaries by remember { mutableStateOf(false) }
     var isReading by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -203,12 +205,23 @@ fun BookshelfView(
         return
     }
 
+    if (isShowingDictionaries) {
+        DictionaryView(
+            onClose = { isShowingDictionaries = false },
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = { Text("Books") },
                 actions = {
+                    TextButton(onClick = { isShowingDictionaries = true }) {
+                        Text("Dict")
+                    }
                     Box {
                         TextButton(onClick = { sortMenuExpanded = true }) {
                             Text(if (sortOption == BookSortOption.Recent) "Recent" else "Title")

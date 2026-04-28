@@ -31,6 +31,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+        externalNativeBuild {
+            cmake {
+                targets += "hoshidicts_jni"
+            }
+        }
     }
 
     buildTypes {
@@ -49,6 +57,12 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
     sourceSets["main"].java.directories.add(uniffiOutDir.absolutePath)
     sourceSets["main"].jniLibs.directories.add(rustJniLibsDir.absolutePath)

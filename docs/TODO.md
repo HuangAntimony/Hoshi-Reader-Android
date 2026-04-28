@@ -49,10 +49,13 @@
    - Trigger lookup from WebView selection results.
    - Align popup presentation, dismissal, and layering with iOS.
 
-6. `todo` - Dictionary import and management
-   - Import `testdata/JMdict_english.zip` through the GPLv3 `hoshidicts` bridge.
-   - Implement dictionary list, enable/disable, delete, and import state.
+6. `in_progress` - Dictionary import and management
+   - `done` - Build Android native `hoshidicts_jni` from `third_party/hoshidicts-kotlin-bridge` while linking to `third_party/hoshidicts-gplv3`.
+   - `done` - Import `testdata/JMdict_english.zip` through the GPLv3 `hoshidicts` bridge.
+   - `done` - Persist iOS-shaped `Dictionaries/config.json` and list imported term dictionaries.
+   - `todo` - Align enable/disable, delete, type picker, reordering, and import state with iOS `DictionaryView`.
    - Do not reimplement Yomitan import or dictionary media handling outside the bridge.
+   - Verified on emulator with `testdata/JMdict_english.zip`: imported through DocumentsUI, confirmed dictionary list shows `JMdict [2026-04-27]`, confirmed private files `Dictionaries/Term/JMdict [2026-04-27]/index.json`, `blobs.bin`, `hash.table`, and `Dictionaries/config.json`, and temporarily verified native lookup query returned `猫` for lookup text `猫` before removing the debug UI.
 
 7. `todo` - Highlights and notes foundation
    - Store highlight anchors based on WebView range data.
