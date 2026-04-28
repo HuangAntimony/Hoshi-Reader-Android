@@ -96,14 +96,14 @@ git -C third_party/hoshidicts-gplv3 submodule update --init --recursive
 - 排查“滑动直接换章节”时，先确认 WebView 内 `scrollTop` / `scrollHeight` / `clientHeight` 是否真的还能继续页内滚动；如果还能滚动却切章节，说明 native 手势和 JS 分页边界判断不一致。
 - 排查“往后跨章节多出空白页”时，重点看当前章节末尾的 `scrollHeight` 是否比整页高度多出极小尾差，图片、封面、spacer、column gap 都可能触发 Android WebView 额外生成一页。
 - 图片渲染异常不要只看是否加载成功，还要检查竖排列宽下的 `max-width` / `max-height` / `object-fit` / physical size 是否会撑出额外 column。
-- 使用模拟器验证 EPUB 导入时，优先通过系统文件选择器选择 `test.epub`。直接 `file:///sdcard/...` 或 shell 拼出的 `content://` grant 不能代表真实 SAF 导入路径，容易被 Android 权限模型拦住。
+- 使用模拟器验证 EPUB 导入时，必须走真实 Android Storage Access Framework 流程：通过系统文件选择器/DocumentsUI 选择 EPUB，或使用等价的已授权 `content://` URI。不要用 `file:///sdcard/...` 触发导入；shell 拼出的 `content://com.android.externalstorage.documents/...` 也不会自动给 app 授权，常见结果是 `EACCES` 或 `SecurityException`，不能代表真实导入行为。
 - 手工验证阅读器时，至少覆盖：封面图片页、包含多张图的图版页、长文本章节页内翻页、章节末尾往后翻、章节开头往前翻、反向跨章节落点。
 - 调试 WebView 分页可用 Chrome DevTools Protocol 或 WebView inspection 读取当前 DOM 状态，记录章节 id、`scrollTop`、`scrollHeight`、`clientHeight`，不要只凭截图判断。
 - EPUB reader 的手工验证样本使用 `testdata/test.epub`；不要再假设测试 EPUB 位于仓库根目录。
 
 ## 测试数据
 
-- EPUB 测试书籍：`testdata/test.epub`
+- EPUB 测试书籍：`testdata/test.epub`、`testdata/test2.epub`
 - Yomitan 测试辞典：`testdata/JMdict_english.zip`
 - 调试导入流程时，应通过 Android 系统文件选择器选择 `testdata` 中的文件；需要命令行辅助时，先把样本推送到模拟器 Downloads，再通过 DocumentsUI 选择。
 

@@ -16,9 +16,15 @@ abstract class SwipePageTouchListener(context: Context) : View.OnTouchListener {
 
     open fun onLeftSwipe() = Unit
     open fun onRightSwipe() = Unit
+    open fun onTap(x: Float, y: Float) = Unit
 
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(event: MotionEvent): Boolean = true
+
+        override fun onSingleTapUp(event: MotionEvent): Boolean {
+            onTap(event.x, event.y)
+            return true
+        }
 
         override fun onFling(
             downEvent: MotionEvent?,

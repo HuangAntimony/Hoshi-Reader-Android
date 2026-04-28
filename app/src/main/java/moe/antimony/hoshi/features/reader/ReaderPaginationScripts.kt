@@ -24,6 +24,8 @@ internal object ReaderPaginationScripts {
           pageHeight: 0,
           pageWidth: 0,
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
+          ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
+          nodeStartOffsets: new WeakMap(),
           isVertical: function() {
             return window.getComputedStyle(document.body).writingMode === "vertical-rl";
           },
@@ -37,6 +39,9 @@ internal object ReaderPaginationScripts {
           countChars: function(text) {
             return Array.from(this.normalizeText(text)).length;
           },
+          isMatchableChar: function(char) {
+            return this.ttuRegex.test(char || '');
+          },
           createWalker: function(rootNode) {
             var root = rootNode || document.body;
             return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -46,6 +51,17 @@ internal object ReaderPaginationScripts {
           getRect: function(target) {
             var rect = target.getClientRects()[0];
             return rect || target.getBoundingClientRect();
+          },
+          buildNodeOffsets: function() {
+            var offsets = new WeakMap();
+            var walker = this.createWalker();
+            var count = 0;
+            var node;
+            while (node = walker.nextNode()) {
+              offsets.set(node, count);
+              count += this.countChars(node.textContent);
+            }
+            this.nodeStartOffsets = offsets;
           },
           getScrollContext: function() {
             var vertical = this.isVertical();
@@ -194,6 +210,7 @@ internal object ReaderPaginationScripts {
           Promise.all(imagePromises).then(function() {
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
+            window.hoshiReader.buildNodeOffsets();
             window.hoshiReader.restoreProgress($initialProgress);
           });
         });

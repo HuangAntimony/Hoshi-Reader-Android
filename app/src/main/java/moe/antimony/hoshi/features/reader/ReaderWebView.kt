@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import android.annotation.SuppressLint
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -23,7 +24,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
+
+data class ReaderSelectionData(
+    val text: String,
+    val sentence: String,
+    val rect: ReaderSelectionRect,
+    val normalizedOffset: Int?,
+)
+
+data class ReaderSelectionRect(
+    val x: Double,
+    val y: Double,
+    val width: Double,
+    val height: Double,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +49,7 @@ fun ReaderWebView(
     initialChapterIndex: Int = 0,
     initialProgress: Double = 0.0,
     onSaveBookmark: (chapterIndex: Int, progress: Double) -> Unit = { _, _ -> },
+    onTextSelected: (ReaderSelectionData) -> Int? = { null },
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -97,6 +115,7 @@ fun ReaderWebView(
                 onSaveBookmark = { progress ->
                     onSaveBookmark(chapterPosition.index, progress)
                 },
+                onTextSelected = onTextSelected,
                 modifier = Modifier.fillMaxSize(),
             )
             webView?.let { _ -> Unit }
@@ -113,6 +132,7 @@ private fun ChapterWebView(
     onNextChapter: () -> Boolean,
     onPreviousChapter: () -> Boolean,
     onSaveBookmark: (progress: Double) -> Unit,
+    onTextSelected: (ReaderSelectionData) -> Int?,
     modifier: Modifier = Modifier,
 ) {
     val chapter = book.chapters[chapterPosition.index]
@@ -132,8 +152,21 @@ private fun ChapterWebView(
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                addJavascriptInterface(ReaderSelectionBridge(this, onTextSelected), "HoshiTextSelection")
                 webViewClient = EpubWebViewClient(book)
                 setOnTouchListener(object : SwipePageTouchListener(context) {
+                    override fun onTap(x: Float, y: Float) {
+                        val density = resources.displayMetrics.density
+                        evaluateJavascript(
+                            ReaderSelectionScripts.selectInvocation(
+                                x = androidPixelsToCssPixels(x, density),
+                                y = androidPixelsToCssPixels(y, density),
+                                maxLength = MAX_SELECTION_LENGTH,
+                            ),
+                            null,
+                        )
+                    }
+
                     override fun onLeftSwipe() {
                         navigatePage(ReaderNavigationDirection.Backward, onPreviousChapter, onSaveBookmark)
                     }
@@ -165,9 +198,10 @@ private class EpubWebViewClient(private val book: EpubBook) : WebViewClient() {
 private fun String.injectReaderShell(initialProgress: Double): String {
     val css = ReaderContentStyles.styleTag()
     val script = ReaderPaginationScripts.shellScript(initialProgress)
-    return replace("</head>", "$css\n$script\n</head>", ignoreCase = true)
+    val selectionScript = ReaderSelectionScripts.script()
+    return replace("</head>", "$css\n$script\n$selectionScript\n</head>", ignoreCase = true)
         .takeIf { it != this }
-        ?: "$css\n$script\n$this"
+        ?: "$css\n$script\n$selectionScript\n$this"
 }
 
 private fun WebView.navigatePage(
@@ -185,3 +219,51 @@ private fun WebView.navigatePage(
         }
     }
 }
+
+private class ReaderSelectionBridge(
+    private val webView: WebView,
+    private val onTextSelected: (ReaderSelectionData) -> Int?,
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @JavascriptInterface
+    fun postMessage(message: String) {
+        val payload = runCatching { json.decodeFromString<ReaderSelectionPayload>(message) }.getOrNull() ?: return
+        val data = ReaderSelectionData(
+            text = payload.text,
+            sentence = payload.sentence,
+            rect = ReaderSelectionRect(
+                x = payload.rect.x,
+                y = payload.rect.y,
+                width = payload.rect.width,
+                height = payload.rect.height,
+            ),
+            normalizedOffset = payload.normalizedOffset,
+        )
+        webView.post {
+            val highlightCount = onTextSelected(data) ?: return@post
+            webView.evaluateJavascript(ReaderSelectionScripts.highlightInvocation(highlightCount), null)
+        }
+    }
+}
+
+@Serializable
+private data class ReaderSelectionPayload(
+    val text: String,
+    val sentence: String,
+    val rect: ReaderSelectionPayloadRect,
+    val normalizedOffset: Int? = null,
+)
+
+@Serializable
+private data class ReaderSelectionPayloadRect(
+    val x: Double,
+    val y: Double,
+    val width: Double,
+    val height: Double,
+)
+
+private const val MAX_SELECTION_LENGTH = 16
+
+internal fun androidPixelsToCssPixels(value: Float, density: Float): Float =
+    value / density.coerceAtLeast(1f)

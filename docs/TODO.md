@@ -7,7 +7,7 @@
 
 - iOS is the only source of truth for user-visible UI and interaction behavior.
 - If Android behavior differs from iOS, inspect the iOS implementation first and remove the difference instead of adding isolated compatibility patches.
-- Use `testdata/test.epub` for EPUB reader validation and `testdata/JMdict_english.zip` for Yomitan dictionary validation.
+- Use `testdata/test.epub` and `testdata/test2.epub` for EPUB reader validation and `testdata/JMdict_english.zip` for Yomitan dictionary validation.
 - Each implemented feature must be verified in an Android emulator before commit.
 - Each implemented feature commit must include the matching status update in this file.
 - If a feature is blocked, mark it as `blocked`, record the blocker, and continue with the next feasible item.
@@ -36,9 +36,10 @@
    - Implement iOS-aligned theme, font, font size, line spacing, and margin controls.
    - Apply settings through WebView CSS/JS without changing reader interaction logic.
 
-4. `todo` - WebView selection bridge
-   - Implement JS-side text selection, selected text extraction, range data, and popup anchor rectangles.
-   - Keep native Android as the receiver of JS results instead of reimplementing DOM logic.
+4. `done` - WebView selection bridge
+   - `done` - Implement JS-side text selection, selected text extraction, range data, and popup anchor rectangles.
+   - `done` - Keep native Android as the receiver of JS results instead of reimplementing DOM logic.
+   - Verified on emulator with `testdata/test.epub`: imported through DocumentsUI, opened a vertical text chapter in WebView, confirmed `window.hoshiSelection` and `HoshiTextSelection` are injected, performed a real tap on正文 text, and observed JS selection data returning selected text `見です` with sentence `「そこまでは俺も同意見です。`.
 
 5. `todo` - Dictionary lookup popup
    - Connect lookup to `third_party/hoshidicts-kotlin-bridge`.
