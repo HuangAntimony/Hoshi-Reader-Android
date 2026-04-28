@@ -57,11 +57,12 @@
    - `done` - Add iOS-aligned Dictionary tab lookup: submit a search query, use `LookupEngine`, and render results through the existing popup WebView HTML/JS/CSS pipeline.
    - `done` - Align Dictionary tab search chrome with iOS: floating glass-style search capsule, search icon, compact circular clear button, and WebView result spacer so entries do not render under the search field.
    - `done` - Align Dictionary tab popup interaction with iOS `PopupWebView`: intercept internal `hoshi-popup://` messages, inject iOS `selection.js`, and support nested lookup popups from selected definition text.
+   - `done` - Share the iOS-style lookup popup stack between Dictionary and Reader, including child popup dismissal and popup-local selection coordinate conversion.
    - `done` - Add first-pass popup positioning using iOS `PopupLayout` geometry.
    - `done` - Close lookup popup from the same Reader-level tap-outside and page-turn paths as iOS, and add popup-level horizontal swipe dismissal for gestures that start on the popup itself.
    - `done` - Replace raw Compose glossary text with a popup WebView renderer that expands Yomitan structured-content JSON into HTML without adding search or other extra capabilities.
    - `done` - Copy iOS `popup.js` and `popup.css` into Android assets and render lookup entries through the same `entries-container` / `renderPopup()` pipeline and `lookupEntries` data shape as iOS.
-   - `todo` - Wire remaining iOS `PopupWebView` behaviors: dictionary media scheme, nested lookups, audio controls, Anki mining, and user-configurable popup settings.
+   - `todo` - Wire remaining iOS `PopupWebView` behaviors: dictionary media scheme, audio controls, Anki mining, and user-configurable popup settings.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: opened a vertical text chapter, tapped `お冷や`, and confirmed a popup appears over the reader with `お冷や`, reading `おひや`, and JMdict glossary content.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, confirmed the popup reading `ひや` appears, then confirmed popup-level horizontal swipe, tap outside the popup, and Reader page swipe each dismiss the popup without leaving the reading node visible.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, inspected the popup WebView through Chrome DevTools Protocol, and confirmed it renders `冷や`, `ひや`, `cold water`, and `JMdict [2026-04-27]` as HTML while no longer showing raw `structured-content` JSON; also rechecked popup WebView horizontal swipe dismissal.
@@ -69,6 +70,7 @@
    - Verified on emulator with `testdata/MK3.zip`: cleared app data, imported MK3 through Android DocumentsUI, opened Dictionary tab, searched `test`, and confirmed the result WebView renders `テスト [test]` with `明鏡国語辞典 第三版` glossary content.
    - Verified on emulator with imported `testdata/MK3.zip`: searched `test` again after the search chrome change and confirmed the first result starts below the search capsule while the clear affordance renders as a compact circular x.
    - Verified on emulator with imported `testdata/MK3.zip`: searched `test`, tapped definition text to open a nested `試験` popup, tapped inside that popup to open a second nested popup, and confirmed tap-outside no longer navigates to `hoshi-popup://tapOutside` or shows `Webpage not available`.
+   - Verified on emulator with imported `testdata/MK3.zip` and `testdata/test.epub`: opened the reader, tapped vertical正文 `える` to create the root popup, tapped popup definition text `簡にして要を得る` to create a second popup, then tapped `要点` in that popup to create a third popup without the stack closing unexpectedly.
 
 6. `in_progress` - Dictionary import and management
    - `done` - Build Android native `hoshidicts_jni` from `third_party/hoshidicts-kotlin-bridge` while linking to `third_party/hoshidicts-gplv3`.

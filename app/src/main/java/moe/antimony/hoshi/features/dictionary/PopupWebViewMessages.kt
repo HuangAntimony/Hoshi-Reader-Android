@@ -41,6 +41,8 @@ internal class PopupMessageWebViewClient(
 internal class PopupWebViewBridge(
     private val webView: WebView,
     private val callbacks: PopupWebViewCallbacks,
+    private val selectionOffsetX: Double = 0.0,
+    private val selectionOffsetY: Double = 0.0,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -49,9 +51,12 @@ internal class PopupWebViewBridge(
         val payload = runCatching { JSONObject(message) }.getOrNull() ?: return
         when (payload.optString("name")) {
             "openLink" -> payload.optString("body").takeIf { it.isNotBlank() }?.let(callbacks.onOpenLink)
-            "tapOutside" -> mainHandler.post(callbacks.onTapOutside)
+            "tapOutside" -> mainHandler.post {
+                callbacks.onTapOutside()
+                webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
+            }
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
-            "textSelected" -> payload.optJSONObject("body")?.toSelectionData()?.let { selection ->
+            "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetX, selectionOffsetY)?.let { selection ->
                 mainHandler.post {
                     val highlightCount = callbacks.onTextSelected(selection) ?: return@post
                     webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
@@ -61,14 +66,17 @@ internal class PopupWebViewBridge(
     }
 }
 
-private fun JSONObject.toSelectionData(): ReaderSelectionData? {
+private fun JSONObject.toSelectionData(
+    offsetX: Double,
+    offsetY: Double,
+): ReaderSelectionData? {
     val rect = optJSONObject("rect") ?: return null
     return ReaderSelectionData(
         text = optString("text"),
         sentence = optString("sentence"),
         rect = ReaderSelectionRect(
-            x = rect.optDouble("x"),
-            y = rect.optDouble("y"),
+            x = offsetX + rect.optDouble("x"),
+            y = offsetY + rect.optDouble("y"),
             width = rect.optDouble("width"),
             height = rect.optDouble("height"),
         ),

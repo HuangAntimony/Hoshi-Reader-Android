@@ -65,11 +65,13 @@ fun LookupPopupView(
             topInset = state.topInset,
             bottomInset = state.bottomInset,
         ).calculate()
+        val frameX = frame.centerX - frame.width / 2
+        val frameY = frame.centerY - frame.height / 2
         Surface(
             modifier = Modifier
                 .absoluteOffset(
-                    x = (frame.centerX - frame.width / 2).dp,
-                    y = (frame.centerY - frame.height / 2).dp,
+                    x = frameX.dp,
+                    y = frameY.dp,
                 )
                 .width(frame.width.dp)
                 .height(frame.height.dp)
@@ -80,6 +82,8 @@ fun LookupPopupView(
         ) {
             LookupPopupWebView(
                 html = html,
+                selectionOffsetX = frameX,
+                selectionOffsetY = frameY,
                 callbacks = PopupWebViewCallbacks(
                     onTapOutside = onTapOutside,
                     onSwipeDismiss = onSwipeDismiss,
@@ -94,6 +98,8 @@ fun LookupPopupView(
 @Composable
 private fun LookupPopupWebView(
     html: String,
+    selectionOffsetX: Double,
+    selectionOffsetY: Double,
     callbacks: PopupWebViewCallbacks,
 ) {
     AndroidView(
@@ -109,7 +115,15 @@ private fun LookupPopupWebView(
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                addJavascriptInterface(PopupWebViewBridge(this, callbacks), "HoshiPopup")
+                addJavascriptInterface(
+                    PopupWebViewBridge(
+                        webView = this,
+                        callbacks = callbacks,
+                        selectionOffsetX = selectionOffsetX,
+                        selectionOffsetY = selectionOffsetY,
+                    ),
+                    "HoshiPopup",
+                )
                 webViewClient = PopupMessageWebViewClient(callbacks)
                 setOnTouchListener(PopupWebViewSwipeListener(callbacks.onSwipeDismiss))
             }

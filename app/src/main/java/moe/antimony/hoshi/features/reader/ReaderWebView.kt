@@ -60,10 +60,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.epub.EpubBook
-import moe.antimony.hoshi.features.dictionary.LookupPopupState
-import moe.antimony.hoshi.features.dictionary.LookupPopupView
+import moe.antimony.hoshi.features.dictionary.LookupPopupItem
+import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
+import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
+import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 
 data class ReaderSelectionData(
     val text: String,
@@ -95,14 +96,30 @@ fun ReaderWebView(
     var effectiveSettings by remember(readerSettings) { mutableStateOf(readerSettings) }
     var showAppearance by remember { mutableStateOf(false) }
     var showReaderMenu by remember { mutableStateOf(false) }
-    var lookupPopup by remember { mutableStateOf<LookupPopupState?>(null) }
+    var lookupPopups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     val context = LocalContext.current
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
+    fun lookupRootPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
+        createLookupPopupItem(
+            selection = selection,
+            options = LookupPopupOptions(isVertical = effectiveSettings.verticalWriting),
+        )
+    fun lookupChildPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
+        createLookupPopupItem(
+            selection = selection,
+            options = LookupPopupOptions(isVertical = false),
+        )
     val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
-        val results = runCatching { LookupEngine.lookup(selection.text) }.getOrDefault(emptyList())
-        lookupPopup = if (results.isEmpty()) null else LookupPopupState(selection, results)
-        onTextSelected(selection) ?: results.firstOrNull()?.matched?.codePointCount()
+        lookupPopups = emptyList()
+        val lookup = lookupRootPopup(selection)
+        if (lookup != null) {
+            val (popup, highlightCount) = lookup
+            lookupPopups = listOf(popup)
+            onTextSelected(selection) ?: highlightCount
+        } else {
+            onTextSelected(selection)
+        }
     }
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
     var chapterPosition by remember(book) {
@@ -179,7 +196,7 @@ fun ReaderWebView(
             },
             readerSettings = effectiveSettings,
             onTextSelected = handleTextSelected,
-            onClearLookupPopup = { lookupPopup = null },
+            onClearLookupPopup = { lookupPopups = emptyList() },
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
@@ -206,13 +223,12 @@ fun ReaderWebView(
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-        lookupPopup?.let { popup ->
-            LookupPopupView(
-                state = popup,
-                onSwipeDismiss = { lookupPopup = null },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        LookupPopupStackView(
+            popups = lookupPopups,
+            onPopupsChange = { lookupPopups = it },
+            lookupChildPopup = ::lookupChildPopup,
+            modifier = Modifier.fillMaxSize(),
+        )
         webView?.let { _ -> Unit }
     }
     if (showAppearance) {

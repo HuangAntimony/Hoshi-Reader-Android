@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,8 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.LookupEngine
-import moe.antimony.hoshi.features.reader.ReaderSelectionData
-import java.util.UUID
 
 private const val DictionarySearchTopSpacerPx = 118
 private const val DictionaryPopupTopInset = 118.0
@@ -104,11 +101,6 @@ internal object DictionarySearchContent {
     }
 }
 
-private data class DictionaryPopupItem(
-    val id: String = UUID.randomUUID().toString(),
-    val state: LookupPopupState,
-)
-
 @Composable
 fun DictionarySearchView(
     modifier: Modifier = Modifier,
@@ -123,25 +115,18 @@ fun DictionarySearchView(
     var isSearching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var dictionaryStyles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var popups by remember { mutableStateOf<List<DictionaryPopupItem>>(emptyList()) }
-
-    fun lookupPopup(selection: ReaderSelectionData): Pair<DictionaryPopupItem, Int>? {
-        val results = LookupEngine.lookup(selection.text)
-        val first = results.firstOrNull() ?: return null
-        return DictionaryPopupItem(
-            state = LookupPopupState(
-                selection = selection,
-                results = results,
-                dictionaryStyles = dictionaryStyles,
-                isVertical = false,
-                topInset = DictionaryPopupTopInset,
-                bottomInset = DictionaryPopupBottomInset,
-            ),
-        ) to first.matched.codePointCount(0, first.matched.length)
-    }
-
-    fun closeChildPopups(parentIndex: Int) {
-        popups = popups.take(parentIndex + 1)
+    var popups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
+    val popupOptions = LookupPopupOptions(
+        isVertical = false,
+        topInset = DictionaryPopupTopInset,
+        bottomInset = DictionaryPopupBottomInset,
+    )
+    val lookupPopup = { selection: moe.antimony.hoshi.features.reader.ReaderSelectionData ->
+        createLookupPopupItem(
+            selection = selection,
+            options = popupOptions,
+            dictionaryStyles = dictionaryStyles,
+        )
     }
 
     fun runLookup() {
@@ -151,7 +136,7 @@ fun DictionarySearchView(
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.rebuildLookupQuery()
-                    val styles = LookupEngine.getStyles().associate { it.dictName to it.styles }
+                    val styles = currentDictionaryStyles()
                     DictionarySearchContent.runLookup(
                         query = query,
                         lookup = { LookupEngine.lookup(it) },
@@ -221,29 +206,12 @@ fun DictionarySearchView(
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp),
         )
-        popups.forEachIndexed { index, popup ->
-            key(popup.id) {
-                LookupPopupView(
-                    state = popup.state,
-                    onTapOutside = { closeChildPopups(index) },
-                    onSwipeDismiss = {
-                        if (index == 0) {
-                            popups = emptyList()
-                        } else {
-                            closeChildPopups(index - 1)
-                        }
-                    },
-                    onTextSelected = { selection ->
-                        closeChildPopups(index)
-                        lookupPopup(selection)?.let { (childPopup, highlightCount) ->
-                            popups = popups + childPopup
-                            highlightCount
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
+        LookupPopupStackView(
+            popups = popups,
+            onPopupsChange = { popups = it },
+            lookupChildPopup = lookupPopup,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
