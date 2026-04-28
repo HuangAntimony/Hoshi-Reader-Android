@@ -11,7 +11,7 @@ import org.junit.Test
 
 class LookupPopupHtmlTest {
     @Test
-    fun rendersStructuredGlossaryContentInsteadOfRawJson() {
+    fun rendersThroughIosPopupJavascriptPipeline() {
         val html = LookupPopupHtml.render(
             listOf(
                 lookupResult(
@@ -22,29 +22,48 @@ class LookupPopupHtmlTest {
                     """.trimIndent(),
                 ),
             ),
-        )
-
-        assertTrue(html.contains("冷や"))
-        assertTrue(html.contains("ひや"))
-        assertTrue(html.contains("<li>cold water</li>"))
-        assertFalse(html.contains("structured-content"))
-    }
-
-    @Test
-    fun escapesPlainGlossaryHtml() {
-        val html = LookupPopupHtml.render(
-            listOf(
-                lookupResult(
-                    expression = "<猫>",
-                    reading = "",
-                    glossary = "<b>cat</b>",
-                ),
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".entry-header {}",
             ),
         )
 
-        assertTrue(html.contains("&lt;猫&gt;"))
-        assertTrue(html.contains("&lt;b&gt;cat&lt;/b&gt;"))
-        assertFalse(html.contains("<b>cat</b>"))
+        assertTrue(html.contains("<style>.entry-header {}</style>"))
+        assertTrue(html.contains("<script>window.renderPopup = function() {};</script>"))
+        assertTrue(html.contains("""<div id="entries-container"></div>"""))
+        assertTrue(html.contains("window.renderPopup();"))
+        assertFalse(html.contains("""<section class="entry">"""))
+    }
+
+    @Test
+    fun serializesLookupEntriesUsingIosPopupShape() {
+        val html = LookupPopupHtml.render(
+            listOf(
+                lookupResult(
+                    expression = "冷や",
+                    reading = "ひや",
+                    glossary = "<b>cold water</b>",
+                ),
+            ),
+            assets = LookupPopupAssets(
+                popupJs = "",
+                popupCss = "",
+            ),
+        )
+
+        assertTrue(html.contains("window.lookupEntries = ["))
+        assertTrue(html.contains(""""expression":"冷や""""))
+        assertTrue(html.contains(""""reading":"ひや""""))
+        assertTrue(html.contains(""""matched":"冷や""""))
+        assertTrue(html.contains(""""deinflectionTrace":[]"""))
+        assertTrue(html.contains(""""glossaries":[{""""))
+        assertTrue(html.contains(""""dictionary":"JMdict""""))
+        assertTrue(html.contains(""""content":"<b>cold water</b>""""))
+        assertTrue(html.contains(""""definitionTags":""""))
+        assertTrue(html.contains(""""termTags":""""))
+        assertTrue(html.contains(""""frequencies":[]"""))
+        assertTrue(html.contains(""""pitches":[]"""))
+        assertTrue(html.contains(""""rules":[]"""))
     }
 
     private fun lookupResult(

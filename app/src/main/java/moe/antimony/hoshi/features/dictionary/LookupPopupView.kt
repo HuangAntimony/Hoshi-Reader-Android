@@ -1,8 +1,13 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,10 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
+import org.json.JSONObject
 
 data class LookupPopupState(
     val selection: ReaderSelectionData,
@@ -35,7 +42,9 @@ fun LookupPopupView(
     modifier: Modifier = Modifier,
 ) {
     if (state.results.isEmpty()) return
-    val html = remember(state.results) { LookupPopupHtml.render(state.results) }
+    val context = LocalContext.current
+    val assets = remember(context) { LookupPopupAssets.load(context) }
+    val html = remember(state.results, assets) { LookupPopupHtml.render(state.results, assets) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val frame = LookupPopupLayout(
@@ -61,7 +70,7 @@ fun LookupPopupView(
         ) {
             LookupPopupWebView(
                 html = html,
-                onSwipeDismiss = onSwipeDismiss,
+                onDismiss = onSwipeDismiss,
             )
         }
     }
@@ -71,7 +80,7 @@ fun LookupPopupView(
 @Composable
 private fun LookupPopupWebView(
     html: String,
-    onSwipeDismiss: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     AndroidView(
         modifier = Modifier
@@ -86,7 +95,9 @@ private fun LookupPopupWebView(
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                setOnTouchListener(PopupWebViewSwipeListener(onSwipeDismiss))
+                addJavascriptInterface(PopupWebViewBridge(onDismiss), "HoshiPopup")
+                webViewClient = PopupWebViewClient(onDismiss)
+                setOnTouchListener(PopupWebViewSwipeListener(onDismiss))
             }
         },
         update = { webView ->
@@ -101,6 +112,37 @@ private fun LookupPopupWebView(
     )
 }
 
+private class PopupWebViewClient(
+    private val onDismiss: () -> Unit,
+) : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+        handlePopupUrl(request.url.scheme)
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
+        handlePopupUrl(android.net.Uri.parse(url).scheme)
+
+    private fun handlePopupUrl(scheme: String?): Boolean {
+        if (scheme != "hoshi-popup") return false
+        onDismiss()
+        return true
+    }
+}
+
+private class PopupWebViewBridge(
+    private val onDismiss: () -> Unit,
+) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun postMessage(message: String) {
+        val name = runCatching { JSONObject(message).optString("name") }.getOrNull()
+        if (name == "tapOutside" || name == "swipeDismiss") {
+            mainHandler.post(onDismiss)
+        }
+    }
+}
+
 private class PopupWebViewSwipeListener(
     private val onSwipeDismiss: () -> Unit,
 ) : android.view.View.OnTouchListener {
@@ -113,7 +155,7 @@ private class PopupWebViewSwipeListener(
                 startX = event.x
                 startY = event.y
             }
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val dx = event.x - startX
                 val dy = event.y - startY
                 if (kotlin.math.abs(dx) > POPUP_SWIPE_DISMISS_THRESHOLD_PX &&

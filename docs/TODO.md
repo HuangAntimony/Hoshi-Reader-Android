@@ -50,10 +50,12 @@
    - `done` - Add first-pass popup positioning using iOS `PopupLayout` geometry.
    - `done` - Close lookup popup from the same Reader-level tap-outside and page-turn paths as iOS, and add popup-level horizontal swipe dismissal for gestures that start on the popup itself.
    - `done` - Replace raw Compose glossary text with a popup WebView renderer that expands Yomitan structured-content JSON into HTML without adding search or other extra capabilities.
-   - `todo` - Align popup rendering with iOS `PopupWebView` for dictionary CSS, media, nested lookups, audio controls, and Anki mining.
+   - `done` - Copy iOS `popup.js` and `popup.css` into Android assets and render lookup entries through the same `entries-container` / `renderPopup()` pipeline and `lookupEntries` data shape as iOS.
+   - `todo` - Wire remaining iOS `PopupWebView` behaviors: dictionary media scheme, nested lookups, audio controls, Anki mining, and user-configurable popup settings.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: opened a vertical text chapter, tapped `お冷や`, and confirmed a popup appears over the reader with `お冷や`, reading `おひや`, and JMdict glossary content.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, confirmed the popup reading `ひや` appears, then confirmed popup-level horizontal swipe, tap outside the popup, and Reader page swipe each dismiss the popup without leaving the reading node visible.
    - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, inspected the popup WebView through Chrome DevTools Protocol, and confirmed it renders `冷や`, `ひや`, `cold water`, and `JMdict [2026-04-27]` as HTML while no longer showing raw `structured-content` JSON; also rechecked popup WebView horizontal swipe dismissal.
+   - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: inspected the popup WebView DOM and confirmed iOS-generated structure is present (`.entry-header`, `.expression ruby`, `details.glossary-group`, `.dict-label .dict-name`, `.glossary-content`, `.mine-button`) and raw `structured-content` JSON is absent; rechecked popup horizontal swipe dismissal after switching to the iOS JS/CSS pipeline.
 
 6. `in_progress` - Dictionary import and management
    - `done` - Build Android native `hoshidicts_jni` from `third_party/hoshidicts-kotlin-bridge` while linking to `third_party/hoshidicts-gplv3`.

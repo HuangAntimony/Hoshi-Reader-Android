@@ -1,186 +1,195 @@
 package moe.antimony.hoshi.features.dictionary
 
-import de.manhhao.hoshi.GlossaryEntry
+import android.content.Context
 import de.manhhao.hoshi.LookupResult
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+
+internal data class LookupPopupAssets(
+    val popupJs: String,
+    val popupCss: String,
+) {
+    companion object {
+        fun load(context: Context): LookupPopupAssets = LookupPopupAssets(
+            popupJs = context.assets.open("hoshi-popup/popup.js")
+                .bufferedReader()
+                .use { it.readText() },
+            popupCss = context.assets.open("hoshi-popup/popup.css")
+                .bufferedReader()
+                .use { it.readText() },
+        )
+    }
+}
 
 internal object LookupPopupHtml {
-    private val json = Json { ignoreUnknownKeys = true }
-
-    fun render(results: List<LookupResult>): String = """
-        <!doctype html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            :root {
-              color-scheme: light dark;
-              font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
-              font-size: 15px;
-              line-height: 1.4;
-            }
-            * { box-sizing: border-box; }
-            body {
-              margin: 0;
-              padding: 10px 12px 14px;
-              color: #202124;
-              background: transparent;
-              overflow-x: hidden;
-              -webkit-text-size-adjust: none;
-            }
-            .entry { padding: 4px 0 12px; border-bottom: 1px solid rgba(0,0,0,0.08); }
-            .entry:last-child { border-bottom: 0; }
-            .expression { font-size: 18px; font-weight: 650; line-height: 1.25; }
-            .reading { color: #5f6368; margin-top: 2px; }
-            .glossary { margin-top: 8px; }
-            ul, ol { margin: 0.35em 0 0.35em 1.25em; padding: 0; }
-            li { margin: 0.2em 0; }
-            a { color: inherit; text-decoration: underline; text-decoration-thickness: 0.08em; }
-            .dictionary { color: #6f7378; font-size: 12px; margin-top: 6px; }
-            @media (prefers-color-scheme: dark) {
-              body { color: #f1f3f4; }
-              .reading, .dictionary { color: #bdc1c6; }
-              .entry { border-bottom-color: rgba(255,255,255,0.14); }
-            }
-          </style>
-        </head>
-        <body>
-          ${results.take(MAX_POPUP_RESULTS).joinToString(separator = "\n") { renderResult(it) }}
-        </body>
-        </html>
-    """.trimIndent()
-
-    private fun renderResult(result: LookupResult): String {
-        val term = result.term
-        val reading = term.reading.takeIf { it.isNotBlank() && it != term.expression }
-            ?.let { """<div class="reading">${escapeHtml(it)}</div>""" }
-            .orEmpty()
-        val glossaries = term.glossaries.take(MAX_GLOSSARIES_PER_RESULT)
-            .joinToString(separator = "\n") { renderGlossary(it) }
-
+    fun render(
+        results: List<LookupResult>,
+        assets: LookupPopupAssets,
+    ): String {
+        val entries = entriesJson(results)
         return """
-            <section class="entry">
-              <div class="expression">${escapeHtml(term.expression)}</div>
-              $reading
-              <div class="glossary">$glossaries</div>
-            </section>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <style>${assets.popupCss}</style>
+                <script>${assets.popupJs.escapeScriptEnd()}</script>
+            </head>
+            <body>
+                <script>
+                    window.HoshiAndroidPopup = window.HoshiAndroidPopup || {
+                        postMessage: function(name, body) {
+                            try {
+                                if (window.HoshiPopup && window.HoshiPopup.postMessage) {
+                                    window.HoshiPopup.postMessage(JSON.stringify({ name: name, body: body || null }));
+                                }
+                            } catch (e) {
+                                console.warn('HoshiPopup bridge failed', e);
+                            }
+                            if (name === 'tapOutside' || name === 'swipeDismiss') {
+                                window.location.href = 'hoshi-popup://' + name;
+                            }
+                        }
+                    };
+                    window.webkit = {
+                        messageHandlers: {
+                            openLink: { postMessage: function(url) { window.HoshiAndroidPopup.postMessage('openLink', url); } },
+                            textSelected: { postMessage: function(selection) { window.HoshiAndroidPopup.postMessage('textSelected', selection); } },
+                            tapOutside: { postMessage: function() { window.HoshiAndroidPopup.postMessage('tapOutside'); } },
+                            swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
+                            playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
+                            mineEntry: { postMessage: async function() { return false; } },
+                            duplicateCheck: { postMessage: async function() { return false; } },
+                            getEntry: { postMessage: async function(index) { return window.lookupEntries[index]; } }
+                        }
+                    };
+                    window.hoshiSelection = window.hoshiSelection || {
+                        selectText: function() { return null; },
+                        clearSelection: function() {}
+                    };
+                    window.collapseDictionaries = false;
+                    window.compactGlossaries = true;
+                    window.showExpressionTags = false;
+                    window.harmonicFrequency = false;
+                    window.deduplicatePitchAccents = false;
+                    window.audioSources = [];
+                    window.audioEnableAutoplay = false;
+                    window.audioPlaybackMode = "interrupt";
+                    window.needsAudio = false;
+                    window.allowDupes = false;
+                    window.useAnkiConnect = false;
+                    window.embedMedia = false;
+                    window.compactGlossariesAnki = false;
+                    window.customCSS = "";
+                    window.swipeThreshold = 80;
+                    window.dictionaryStyles = {};
+                    window.lookupEntries = $entries;
+                    window.entryCount = window.lookupEntries.length;
+                </script>
+                <div id="entries-container"></div>
+                <script>
+                    (function() {
+                        var startX, startY;
+                        document.addEventListener('touchstart', function(e) {
+                            startX = e.touches[0].clientX;
+                            startY = e.touches[0].clientY;
+                        });
+                        document.addEventListener('touchend', function(e) {
+                            var dx = e.changedTouches[0].clientX - startX;
+                            var dy = e.changedTouches[0].clientY - startY;
+                            var hasSelection = window.getSelection().toString();
+                            if (Math.abs(dx) > window.swipeThreshold && Math.abs(dy) < 20 && !hasSelection) {
+                                webkit.messageHandlers.swipeDismiss.postMessage(null);
+                            }
+                        });
+                    })();
+                </script>
+                <div class="overlay">
+                    <div class="overlay-close" onclick="closeOverlay()">x</div>
+                    <div class="overlay-content"></div>
+                </div>
+                <script>window.renderPopup();</script>
+            </body>
+            </html>
         """.trimIndent()
     }
 
-    private fun renderGlossary(entry: GlossaryEntry): String {
-        val content = parseStructuredContent(entry.glossary)
-            ?.let(::renderElement)
-            ?: "<p>${escapeHtml(entry.glossary)}</p>"
-        val dictionary = entry.dictName.takeIf { it.isNotBlank() }
-            ?.let { """<div class="dictionary">${escapeHtml(it)}</div>""" }
-            .orEmpty()
-        return "$content$dictionary"
-    }
+    private fun entriesJson(results: List<LookupResult>): JsonArray =
+        buildJsonArray {
+            results.forEach { result ->
+                add(result.toEntryJson())
+            }
+        }
 
-    private fun parseStructuredContent(value: String): JsonElement? =
-        runCatching { json.parseToJsonElement(value) }.getOrNull()
-
-    private fun renderElement(element: JsonElement): String = when (element) {
-        is JsonArray -> element.joinToString(separator = "") { renderElement(it) }
-        is JsonObject -> renderObject(element)
-        is JsonPrimitive -> escapeHtml(element.contentOrNull.orEmpty())
-    }
-
-    private fun renderObject(value: JsonObject): String {
-        val content = value["content"]
-        val tag = value["tag"]?.jsonPrimitive?.contentOrNull
-        val renderedContent = content?.let(::renderContent) ?: ""
-        val safeTag = tag?.takeIf { it in SAFE_TAGS }
-
-        return if (safeTag == null) {
-            renderedContent
-        } else {
-            val attributes = buildAttributes(value)
-            "<$safeTag$attributes>$renderedContent</$safeTag>"
+    private fun LookupResult.toEntryJson(): JsonObject = buildJsonObject {
+        put("expression", term.expression)
+        put("reading", term.reading)
+        put("matched", matched)
+        putJsonArray("deinflectionTrace") {
+            process.reversedArray().forEach { name ->
+                add(
+                    buildJsonObject {
+                        put("name", name)
+                        put("description", "")
+                    },
+                )
+            }
+        }
+        putJsonArray("glossaries") {
+            term.glossaries.forEach { glossary ->
+                add(
+                    buildJsonObject {
+                        put("dictionary", glossary.dictName)
+                        put("content", glossary.glossary)
+                        put("definitionTags", glossary.definitionTags)
+                        put("termTags", glossary.termTags)
+                    },
+                )
+            }
+        }
+        putJsonArray("frequencies") {
+            term.frequencies.forEach { frequency ->
+                add(
+                    buildJsonObject {
+                        put("dictionary", frequency.dictName)
+                        putJsonArray("frequencies") {
+                            frequency.frequencies.forEach { tag ->
+                                add(
+                                    buildJsonObject {
+                                        put("value", tag.value)
+                                        put("displayValue", tag.displayValue)
+                                    },
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        putJsonArray("pitches") {
+            term.pitches.forEach { pitch ->
+                add(
+                    buildJsonObject {
+                        put("dictionary", pitch.dictName)
+                        putJsonArray("pitchPositions") {
+                            pitch.pitchPositions.distinct().forEach { add(JsonPrimitive(it)) }
+                        }
+                    },
+                )
+            }
+        }
+        putJsonArray("rules") {
+            term.rules.splitToSequence(' ')
+                .filter { it.isNotBlank() }
+                .forEach { add(JsonPrimitive(it)) }
         }
     }
 
-    private fun renderContent(content: JsonElement): String = when (content) {
-        is JsonArray -> content.jsonArray.joinToString(separator = "") { renderElement(it) }
-        is JsonObject -> renderObject(content.jsonObject)
-        is JsonPrimitive -> escapeHtml(content.contentOrNull.orEmpty())
-    }
-
-    private fun buildAttributes(value: JsonObject): String {
-        val style = value["style"]?.jsonObject
-            ?.mapNotNull { (key, rawValue) ->
-                val cssKey = STYLE_KEYS[key] ?: return@mapNotNull null
-                val cssValue = rawValue.jsonPrimitive.contentOrNull
-                    ?.takeIf(::isSafeCssValue)
-                    ?: return@mapNotNull null
-                "$cssKey: $cssValue"
-            }
-            ?.takeIf { it.isNotEmpty() }
-            ?.joinToString(separator = "; ")
-            ?.let { " style=\"${escapeHtml(it)}\"" }
-            .orEmpty()
-        val href = value["href"]?.jsonPrimitive?.contentOrNull
-            ?.takeIf { it.startsWith("?") }
-            ?.let { " href=\"${escapeHtml(it)}\"" }
-            .orEmpty()
-        return style + href
-    }
-
-    private fun isSafeCssValue(value: String): Boolean =
-        value.none { it == '<' || it == '>' || it == '"' || it == '\'' || it == ';' || it == '\\' }
-
-    private fun escapeHtml(value: String): String = buildString(value.length) {
-        value.forEach { char ->
-            when (char) {
-                '&' -> append("&amp;")
-                '<' -> append("&lt;")
-                '>' -> append("&gt;")
-                '"' -> append("&quot;")
-                '\'' -> append("&#39;")
-                else -> append(char)
-            }
-        }
-    }
-
-    private val SAFE_TAGS = setOf(
-        "a",
-        "b",
-        "br",
-        "div",
-        "em",
-        "i",
-        "li",
-        "ol",
-        "p",
-        "ruby",
-        "rp",
-        "rt",
-        "span",
-        "strong",
-        "table",
-        "tbody",
-        "td",
-        "th",
-        "thead",
-        "tr",
-        "ul",
-    )
-
-    private val STYLE_KEYS = mapOf(
-        "fontSize" to "font-size",
-        "fontWeight" to "font-weight",
-        "listStyleType" to "list-style-type",
-        "verticalAlign" to "vertical-align",
-    )
-
-    private const val MAX_POPUP_RESULTS = 3
-    private const val MAX_GLOSSARIES_PER_RESULT = 4
+    private fun String.escapeScriptEnd(): String =
+        replace("</script>", "<\\/script>")
 }
