@@ -1,10 +1,14 @@
 package moe.antimony.hoshi.features.bookshelf
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -207,6 +214,12 @@ fun BookshelfView(
                 else -> Column(Modifier.fillMaxSize()) {
                     bookEntries.forEach { entry ->
                         ListItem(
+                            leadingContent = {
+                                BookCoverThumbnail(
+                                    entry = entry,
+                                    bookStorage = bookStorage,
+                                )
+                            },
                             headlineContent = {
                                 Text(
                                     text = entry.metadata.title ?: entry.root.name,
@@ -228,6 +241,32 @@ fun BookshelfView(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BookCoverThumbnail(entry: BookEntry, bookStorage: BookStorage) {
+    val coverFile = remember(entry) { bookStorage.coverFile(entry) }
+    val bitmap = remember(coverFile) {
+        coverFile?.absolutePath?.let(BitmapFactory::decodeFile)
+    }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+    Box(
+        modifier = Modifier
+            .height(78.dp)
+            .aspectRatio(0.709f)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

@@ -84,7 +84,9 @@ class EpubBookParser {
 
         return EpubBook(
             title = title()?.ifBlank { null } ?: root.nameWithoutExtension,
-            coverHref = coverHref()?.normalizeResourceHref(),
+            coverHref = coverHref()
+                ?.let { contentDirectory.resolve(it).relativeHref(root) }
+                ?: resources.entries.firstOrNull { (_, resource) -> resource.mediaType.startsWith("image/") }?.key,
             chapters = chapters,
             resources = resources,
             rootDirectory = root,

@@ -24,9 +24,10 @@
    - `done` - Move from a single `current.epub` directory to multi-book storage.
    - `done` - Persist title, cover path, folder, and last access in iOS-shaped `metadata.json`.
    - `done` - Open imported/listed books from their independent storage directories.
-   - `todo` - Render cover thumbnails in the bookshelf.
+   - `done` - Render cover thumbnails in the bookshelf.
    - `todo` - Align bookshelf sorting, deletion, and selection behavior with iOS.
    - Verified on emulator with `testdata/test.epub`: cleared app data, imported the EPUB twice through DocumentsUI, confirmed two shelf rows and two independent `files/Books/<uuid>/metadata.json` files, then opened a listed book into the reader.
+   - Verified cover thumbnails on emulator with `testdata/test.epub`: imported through DocumentsUI, confirmed `metadata.cover` is `item/image/cover.jpg`, and visually checked the real cover image renders in the shelf row.
 
 3. `todo` - Reader settings
    - Implement iOS-aligned theme, font, font size, line spacing, and margin controls.

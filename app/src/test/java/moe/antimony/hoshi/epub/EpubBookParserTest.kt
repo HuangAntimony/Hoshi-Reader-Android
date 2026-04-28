@@ -26,6 +26,7 @@ class EpubBookParserTest {
         assertEquals("chapter-2", book.chapters.first().id)
         assertEquals("application/xhtml+xml", book.chapters.first().mediaType)
         assertEquals("<html><body>Second</body></html>", book.chapters.first().html)
+        assertEquals("OPS/images/cover.jpg", book.coverHref)
         assertArrayEquals("body {}".toByteArray(), book.readResource("/OPS/styles/book.css"))
         assertEquals("text/css", book.mediaType("OPS/styles/book.css"))
         assertEquals("image/jpeg", book.mediaType("OPS/images/cover.jpg"))

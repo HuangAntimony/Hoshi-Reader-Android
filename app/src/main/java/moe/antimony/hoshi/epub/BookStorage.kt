@@ -81,6 +81,14 @@ class BookStorage(private val filesDir: File) {
         bookRoot.resolve(METADATA_FILE_NAME).writeText(json.encodeToString(metadata))
     }
 
+    fun coverFile(entry: BookEntry): File? {
+        val cover = entry.metadata.cover?.takeIf { it.isNotBlank() } ?: return null
+        val root = entry.root.canonicalFile
+        val file = root.resolve(cover).canonicalFile
+        if (file.path != root.path && !file.path.startsWith(root.path + File.separator)) return null
+        return file.takeIf { it.isFile }
+    }
+
     fun loadBookmark(bookRoot: File): Bookmark? {
         val file = bookRoot.resolve(BOOKMARK_FILE_NAME)
         if (!file.isFile) return null
