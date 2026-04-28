@@ -347,6 +347,9 @@ private fun DictionaryResultWebView(
     callbacks: PopupWebViewCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
+    callbackHolder.callbacks = callbacks
+    var loadedHtml by remember { mutableStateOf<String?>(null) }
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
@@ -358,22 +361,26 @@ private fun DictionaryResultWebView(
                 settings.allowContentAccess = false
                 isVerticalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                addJavascriptInterface(PopupWebViewBridge(this, callbacks), "HoshiPopup")
-                webViewClient = PopupMessageWebViewClient(callbacks, audioRequestHandler)
+                addJavascriptInterface(PopupWebViewBridge(this, callbackHolder), "HoshiPopup")
+                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler)
             }
         },
         update = { webView ->
+            callbackHolder.callbacks = callbacks
             webView.webViewClient = PopupMessageWebViewClient(
-                callbacks,
+                callbackHolder,
                 AudioRequestHandler(LocalAudioRepository(webView.context.filesDir)),
             )
-            webView.loadDataWithBaseURL(
-                "https://hoshi.local/dictionary/",
-                html,
-                "text/html",
-                "UTF-8",
-                null,
-            )
+            if (loadedHtml != html) {
+                loadedHtml = html
+                webView.loadDataWithBaseURL(
+                    "https://hoshi.local/dictionary/",
+                    html,
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
+            }
         },
     )
 }

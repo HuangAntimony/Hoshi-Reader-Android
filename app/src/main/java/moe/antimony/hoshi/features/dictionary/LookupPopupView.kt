@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -131,6 +134,9 @@ private fun LookupPopupWebView(
     selectionOffsetY: Double,
     callbacks: PopupWebViewCallbacks,
 ) {
+    val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
+    callbackHolder.callbacks = callbacks
+    var loadedHtml by remember { mutableStateOf<String?>(null) }
     AndroidView(
         modifier = Modifier
             .fillMaxSize()
@@ -148,24 +154,28 @@ private fun LookupPopupWebView(
                 addJavascriptInterface(
                     PopupWebViewBridge(
                         webView = this,
-                        callbacks = callbacks,
+                        callbackHolder = callbackHolder,
                         selectionOffsetX = selectionOffsetX,
                         selectionOffsetY = selectionOffsetY,
                     ),
                     "HoshiPopup",
                 )
-                webViewClient = PopupMessageWebViewClient(callbacks, audioRequestHandler)
+                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler)
             }
         },
         update = { webView ->
+            callbackHolder.callbacks = callbacks
             webView.setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            webView.loadDataWithBaseURL(
-                "https://hoshi.local/popup/",
-                html,
-                "text/html",
-                "UTF-8",
-                null,
-            )
+            if (loadedHtml != html) {
+                loadedHtml = html
+                webView.loadDataWithBaseURL(
+                    "https://hoshi.local/popup/",
+                    html,
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
+            }
         },
     )
 }

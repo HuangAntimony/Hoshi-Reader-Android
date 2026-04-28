@@ -22,8 +22,12 @@ internal class PopupWebViewCallbacks(
     val onPlayWordAudio: (String, AudioPlaybackMode) -> Unit = { _, _ -> },
 )
 
+internal class PopupWebViewCallbackHolder(
+    var callbacks: PopupWebViewCallbacks,
+)
+
 internal class PopupMessageWebViewClient(
-    private val callbacks: PopupWebViewCallbacks,
+    private val callbackHolder: PopupWebViewCallbackHolder,
     private val audioRequestHandler: AudioRequestHandler? = null,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
@@ -43,8 +47,8 @@ internal class PopupMessageWebViewClient(
     private fun handlePopupUrl(uri: Uri): Boolean {
         if (uri.scheme != "hoshi-popup") return false
         when (uri.host) {
-            "tapOutside" -> callbacks.onTapOutside()
-            "swipeDismiss" -> callbacks.onSwipeDismiss()
+            "tapOutside" -> callbackHolder.callbacks.onTapOutside()
+            "swipeDismiss" -> callbackHolder.callbacks.onSwipeDismiss()
         }
         return true
     }
@@ -52,7 +56,7 @@ internal class PopupMessageWebViewClient(
 
 internal class PopupWebViewBridge(
     private val webView: WebView,
-    private val callbacks: PopupWebViewCallbacks,
+    private val callbackHolder: PopupWebViewCallbackHolder,
     private val selectionOffsetX: Double = 0.0,
     private val selectionOffsetY: Double = 0.0,
 ) {
@@ -61,6 +65,7 @@ internal class PopupWebViewBridge(
     @JavascriptInterface
     fun postMessage(message: String) {
         val payload = runCatching { JSONObject(message) }.getOrNull() ?: return
+        val callbacks = callbackHolder.callbacks
         when (payload.optString("name")) {
             "openLink" -> payload.optString("body").takeIf { it.isNotBlank() }?.let(callbacks.onOpenLink)
             "tapOutside" -> mainHandler.post {
