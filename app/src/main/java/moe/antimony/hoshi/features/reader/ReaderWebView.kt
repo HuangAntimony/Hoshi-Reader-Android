@@ -4,12 +4,16 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,6 +34,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -45,6 +50,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +64,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
@@ -65,6 +74,7 @@ import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
+import java.io.File
 
 data class ReaderSelectionData(
     val text: String,
@@ -98,6 +108,7 @@ fun ReaderWebView(
     var showReaderMenu by remember { mutableStateOf(false) }
     var lookupPopups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     val context = LocalContext.current
+    val fontManager = remember { ReaderFontManager(context.filesDir) }
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
     fun lookupRootPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
@@ -204,6 +215,7 @@ fun ReaderWebView(
                 readerSettings = effectiveSettings,
                 onTextSelected = handleTextSelected,
                 onClearLookupPopup = { lookupPopups = emptyList() },
+                fontManager = fontManager,
                 modifier = Modifier.fillMaxSize(),
             )
             LookupPopupStackView(
@@ -242,6 +254,7 @@ fun ReaderWebView(
                 effectiveSettings = it
                 onReaderSettingsChange(it)
             },
+            fontManager = fontManager,
             onDismiss = { showAppearance = false },
         )
     }
@@ -373,13 +386,18 @@ private fun ChapterWebView(
     readerSettings: ReaderSettings,
     onTextSelected: (ReaderSelectionData) -> Int?,
     onClearLookupPopup: () -> Unit,
+    fontManager: ReaderFontManager,
     modifier: Modifier = Modifier,
 ) {
     val chapter = book.chapters[chapterPosition.index]
-    val html = remember(chapter, chapterPosition.progress, readerSettings) {
+    val fontFaceUrl = remember(readerSettings.selectedFont) {
+        fontManager.webViewFontUrl(readerSettings.selectedFont)
+    }
+    val html = remember(chapter, chapterPosition.progress, readerSettings, fontFaceUrl) {
         chapter.html.injectReaderShell(
             initialProgress = chapterPosition.progress,
             settings = readerSettings,
+            fontFaceUrl = fontFaceUrl,
         )
     }
     val baseUrl = remember(chapter) { "https://hoshi.local/epub/${chapter.href}" }
@@ -398,7 +416,7 @@ private fun ChapterWebView(
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(ReaderSelectionBridge(this, onTextSelected), "HoshiTextSelection")
                 addJavascriptInterface(ReaderRestoreBridge(this), "HoshiReaderRestore")
-                webViewClient = EpubWebViewClient(book)
+                webViewClient = EpubWebViewClient(book, fontManager)
                 setOnTouchListener(object : SwipePageTouchListener(context) {
                     override fun onTap(x: Float, y: Float) {
                         val density = resources.displayMetrics.density
@@ -434,7 +452,7 @@ private fun ChapterWebView(
                 webView.tag = loadKey
                 webView.animate().cancel()
                 webView.alpha = 0f
-                webView.webViewClient = EpubWebViewClient(book)
+                webView.webViewClient = EpubWebViewClient(book, fontManager)
                 webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
             }
         },
@@ -446,8 +464,37 @@ private fun ChapterWebView(
 private fun ReaderAppearanceSheet(
     settings: ReaderSettings,
     onSettingsChange: (ReaderSettings) -> Unit,
+    fontManager: ReaderFontManager,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var importedFonts by remember { mutableStateOf(fontManager.storedFonts()) }
+    var fontMenuExpanded by remember { mutableStateOf(false) }
+    var fontToDelete by remember { mutableStateOf<String?>(null) }
+    var isImportingFont by remember { mutableStateOf(false) }
+    val fontImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        scope.launch {
+            isImportingFont = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    fontManager.importFont(context.contentResolver, uri)
+                }
+            }
+            importedFonts = fontManager.storedFonts()
+            isImportingFont = false
+        }
+    }
+    val fontOptions = remember(importedFonts, settings.selectedFont) {
+        (ReaderFontManager.defaultFonts + importedFonts.map { it.name } + settings.selectedFont)
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -474,6 +521,45 @@ private fun ReaderAppearanceSheet(
                     onSettingsChange(settings.copy(verticalWriting = label == "縦"))
                 },
             )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Font", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box {
+                        TextButton(onClick = { fontMenuExpanded = true }) {
+                            Text(settings.selectedFont)
+                        }
+                        DropdownMenu(
+                            expanded = fontMenuExpanded,
+                            onDismissRequest = { fontMenuExpanded = false },
+                        ) {
+                            fontOptions.forEach { fontName ->
+                                DropdownMenuItem(
+                                    text = { Text(fontName) },
+                                    onClick = {
+                                        fontMenuExpanded = false
+                                        onSettingsChange(settings.copy(selectedFont = fontName))
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    if (!fontManager.isDefaultFont(settings.selectedFont)) {
+                        TextButton(onClick = { fontToDelete = settings.selectedFont }) {
+                            Text("Delete")
+                        }
+                    }
+                }
+                Button(
+                    onClick = { fontImporter.launch(fontMimeTypes) },
+                    enabled = !isImportingFont,
+                ) {
+                    Text(if (isImportingFont) "Importing..." else "Import Font")
+                }
+            }
             StepperRow(
                 label = "Font Size",
                 value = settings.fontSize.toString(),
@@ -526,7 +612,40 @@ private fun ReaderAppearanceSheet(
             }
         }
     }
+    fontToDelete?.let { fontName ->
+        AlertDialog(
+            onDismissRequest = { fontToDelete = null },
+            title = { Text("Delete \"$fontName\"?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        fontManager.deleteFont(fontName)
+                        importedFonts = fontManager.storedFonts()
+                        onSettingsChange(settings.copy(selectedFont = ReaderFontManager.defaultFonts.first()))
+                        fontToDelete = null
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { fontToDelete = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 }
+
+private val fontMimeTypes = arrayOf(
+    "font/ttf",
+    "font/otf",
+    "application/x-font-ttf",
+    "application/x-font-otf",
+    "application/vnd.ms-opentype",
+    "application/octet-stream",
+    "*/*",
+)
 
 @Composable
 private fun SegmentedRow(
@@ -578,23 +697,43 @@ private fun StepperRow(
     }
 }
 
-private class EpubWebViewClient(private val book: EpubBook) : WebViewClient() {
+private class EpubWebViewClient(
+    private val book: EpubBook,
+    private val fontManager: ReaderFontManager,
+) : WebViewClient() {
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val uri = request.url ?: return null
         if (uri.host != "hoshi.local") return null
+        if (uri.path.orEmpty().startsWith("/fonts/")) {
+            val fileName = Uri.decode(uri.path.orEmpty().removePrefix("/fonts/"))
+            val fontFile = fontManager.fontFileForRequest(fileName) ?: return null
+            return WebResourceResponse(fontFile.mediaType(), null, fontFile.inputStream())
+        }
         val path = uri.path.orEmpty().removePrefix("/epub/")
         val data = book.readResource(path) ?: return null
         return WebResourceResponse(book.mediaType(path), null, data.inputStream())
     }
 }
 
-private fun String.injectReaderShell(initialProgress: Double, settings: ReaderSettings): String {
-    val css = ReaderContentStyles.styleTag(settings)
+private fun String.injectReaderShell(
+    initialProgress: Double,
+    settings: ReaderSettings,
+    fontFaceUrl: String?,
+): String {
+    val css = ReaderContentStyles.styleTag(settings, fontFaceUrl)
     val script = ReaderPaginationScripts.shellScript(initialProgress, settings)
     val selectionScript = ReaderSelectionScripts.script()
     return replace("</head>", "$css\n$script\n$selectionScript\n</head>", ignoreCase = true)
         .takeIf { it != this }
         ?: "$css\n$script\n$selectionScript\n$this"
+}
+
+private fun File.mediaType(): String = when (extension.lowercase()) {
+    "ttf" -> "font/ttf"
+    "otf" -> "font/otf"
+    "woff" -> "font/woff"
+    "woff2" -> "font/woff2"
+    else -> "application/octet-stream"
 }
 
 private fun WebView.navigatePage(

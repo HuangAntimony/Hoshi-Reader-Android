@@ -6,6 +6,7 @@ import java.util.Locale
 data class ReaderSettings(
     val theme: ReaderTheme = ReaderTheme.System,
     val verticalWriting: Boolean = true,
+    val selectedFont: String = "Hiragino Mincho ProN",
     val fontSize: Int = 22,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
@@ -80,6 +81,7 @@ class ReaderSettingsStore(context: Context) {
             ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
             ?: ReaderTheme.System,
         verticalWriting = preferences.getBoolean("verticalWriting", true),
+        selectedFont = preferences.getString("selectedFont", null) ?: "Hiragino Mincho ProN",
         fontSize = preferences.getInt("fontSize", 22),
         horizontalPadding = preferences.getInt("layoutHorizontalPadding", 5),
         verticalPadding = preferences.getInt("layoutVerticalPadding", 0),
@@ -90,6 +92,7 @@ class ReaderSettingsStore(context: Context) {
         preferences.edit()
             .putString("theme", settings.theme.label)
             .putBoolean("verticalWriting", settings.verticalWriting)
+            .putString("selectedFont", settings.selectedFont)
             .putInt("fontSize", settings.fontSize)
             .putInt("layoutHorizontalPadding", settings.horizontalPadding)
             .putInt("layoutVerticalPadding", settings.verticalPadding)

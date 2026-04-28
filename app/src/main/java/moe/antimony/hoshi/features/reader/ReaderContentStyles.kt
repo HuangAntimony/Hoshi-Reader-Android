@@ -18,15 +18,28 @@ internal object ReaderLayoutDefaults {
 }
 
 internal object ReaderContentStyles {
-    fun styleTag(settings: ReaderSettings = ReaderSettings()): String {
+    fun styleTag(
+        settings: ReaderSettings = ReaderSettings(),
+        fontFaceUrl: String? = null,
+    ): String {
         val textColor = settings.textColorCss ?: "var(--hoshi-system-text-color)"
         val backgroundColor = when (settings.theme) {
             ReaderTheme.Dark -> "#000"
             ReaderTheme.Sepia -> "#F2E2C9"
             else -> "#fff"
         }
+        val fontFamily = settings.selectedFont.cssString()
+        val fontFaceCss = fontFaceUrl?.let { url ->
+            """
+            @font-face {
+                font-family: $fontFamily;
+                src: url('${url.cssSingleQuotedUrl()}');
+            }
+            """.trimIndent()
+        }.orEmpty()
         return """
         <style>
+        $fontFaceCss
         @media (prefers-color-scheme: light) { :root { --hoshi-system-text-color: #000; } }
         @media (prefers-color-scheme: dark) { :root { --hoshi-system-text-color: #fff; } }
         html, body {
@@ -40,7 +53,7 @@ internal object ReaderContentStyles {
             writing-mode: ${settings.writingModeCss} !important;
         }
         body {
-            font-family: serif !important;
+            font-family: $fontFamily, serif !important;
             font-size: ${settings.fontSize}px !important;
             line-height: ${settings.lineHeight} !important;
             box-sizing: border-box !important;
@@ -88,3 +101,9 @@ internal object ReaderContentStyles {
         """.trimIndent()
     }
 }
+
+private fun String.cssString(): String =
+    "'${replace("\\", "\\\\").replace("'", "\\'")}'"
+
+private fun String.cssSingleQuotedUrl(): String =
+    replace("\\", "\\\\").replace("'", "\\'")
