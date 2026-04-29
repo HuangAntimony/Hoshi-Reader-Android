@@ -57,6 +57,26 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun readerCssPreservesImageAspectRatio() {
+        val css = ReaderContentStyles.styleTag()
+        val imageCss = css.substringAfter("img.block-img {").substringBefore("}")
+        val svgCss = css.substringAfter("svg {").substringBefore("}")
+
+        assertTrue(css.contains("img.block-img"))
+        assertTrue(imageCss.contains("max-width: var(--hoshi-image-max-width"))
+        assertTrue(imageCss.contains("max-height: var(--hoshi-image-max-height"))
+        assertTrue(imageCss.contains("width: auto !important;"))
+        assertTrue(imageCss.contains("height: auto !important;"))
+        assertTrue(imageCss.contains("object-fit: contain !important;"))
+        assertFalse(imageCss.contains("\n            width: var(--hoshi-image-max-width"))
+        assertFalse(imageCss.contains("\n            height: var(--hoshi-image-max-height"))
+        assertTrue(svgCss.contains("width: auto !important;"))
+        assertTrue(svgCss.contains("height: auto !important;"))
+        assertFalse(svgCss.contains("width: 100% !important;"))
+        assertFalse(svgCss.contains("height: 100% !important;"))
+    }
+
+    @Test
     fun appInterfaceThemeMatchesIosColorSchemeMapping() {
         assertFalse(ReaderSettings(theme = ReaderTheme.Light).usesDarkInterface(systemDark = true))
         assertTrue(ReaderSettings(theme = ReaderTheme.Dark).usesDarkInterface(systemDark = false))
