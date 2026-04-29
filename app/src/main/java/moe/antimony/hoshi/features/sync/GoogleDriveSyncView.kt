@@ -19,8 +19,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import moe.antimony.hoshi.R
 
 @Composable
 fun GoogleDriveSyncView(
@@ -44,10 +46,10 @@ fun GoogleDriveSyncView(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         TextButton(onClick = onClose) {
-            Text("Done")
+            Text(stringResource(R.string.common_done))
         }
         Text(
-            text = "Google Drive Sync",
+            text = stringResource(R.string.google_drive_sync_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -62,28 +64,28 @@ fun GoogleDriveSyncView(
                 onClick = onSignIn,
                 enabled = authState == GoogleDriveAuthState.Configured,
             ) {
-                Text("Sign in")
+                Text(stringResource(R.string.google_drive_sync_sign_in))
             }
             TextButton(
                 onClick = onSignOut,
                 enabled = isSignedIn,
             ) {
-                Text("Sign out")
+                Text(stringResource(R.string.google_drive_sync_sign_out))
             }
         }
         SyncToggleRow(
-            label = "Enable sync",
+            label = stringResource(R.string.google_drive_sync_enable),
             checked = settings.isEnabled,
             onCheckedChange = { onSettingsChange(settings.copy(isEnabled = it)) },
         )
         SyncToggleRow(
-            label = "Sync when opening a book",
+            label = stringResource(R.string.google_drive_sync_on_open),
             checked = settings.autoSyncOnOpen,
             enabled = settings.isEnabled,
             onCheckedChange = { onSettingsChange(settings.copy(autoSyncOnOpen = it)) },
         )
         SyncToggleRow(
-            label = "Sync after saving progress",
+            label = stringResource(R.string.google_drive_sync_on_bookmark),
             checked = settings.autoSyncOnBookmark,
             enabled = settings.isEnabled,
             onCheckedChange = { onSettingsChange(settings.copy(autoSyncOnBookmark = it)) },
@@ -93,7 +95,7 @@ fun GoogleDriveSyncView(
             enabled = settings.isEnabled && isSignedIn,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Sync all books")
+            Text(stringResource(R.string.google_drive_sync_all_books))
         }
         settings.lastStatus?.let {
             Spacer(Modifier.height(6.dp))
@@ -132,14 +134,15 @@ private fun SyncToggleRow(
     }
 }
 
+@Composable
 private fun statusText(
     authState: GoogleDriveAuthState,
     isSignedIn: Boolean,
     accountEmail: String?,
 ): String =
     when {
-        authState == GoogleDriveAuthState.MissingClientId -> "Google client id is not configured."
-        authState == GoogleDriveAuthState.InvalidClientId -> "Google client id is invalid."
-        isSignedIn -> "Signed in as ${accountEmail.orEmpty()}"
-        else -> "Sign in to sync reading progress through Google Drive."
+        authState == GoogleDriveAuthState.MissingClientId -> stringResource(R.string.google_drive_sync_missing_client_id)
+        authState == GoogleDriveAuthState.InvalidClientId -> stringResource(R.string.google_drive_sync_invalid_client_id)
+        isSignedIn -> stringResource(R.string.google_drive_sync_signed_in_as, accountEmail.orEmpty())
+        else -> stringResource(R.string.google_drive_sync_sign_in_description)
     }

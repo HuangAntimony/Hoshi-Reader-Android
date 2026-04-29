@@ -131,6 +131,25 @@ fun BookshelfView(
 ) {
     val context = LocalContext.current
     val googleClientId = stringResource(R.string.google_client_id)
+    val booksErrorOpenEpub = stringResource(R.string.books_error_open_epub)
+    val booksErrorImportEpub = stringResource(R.string.books_error_import_epub)
+    val driveSyncUiStrings = DriveSyncUiStrings(
+        failedGeneric = stringResource(R.string.google_drive_sync_failed_generic),
+        signedInAsSentence = stringResource(R.string.google_drive_sync_signed_in_as_sentence),
+        signInFailed = stringResource(R.string.google_drive_sync_sign_in_failed),
+        signInUnavailable = stringResource(R.string.google_drive_sync_sign_in_unavailable),
+        signedOut = stringResource(R.string.google_drive_sync_signed_out),
+        configured = stringResource(R.string.google_drive_sync_configured),
+        invalidClientId = stringResource(R.string.google_drive_sync_invalid_client_id),
+        missingClientId = stringResource(R.string.google_drive_sync_missing_client_id),
+        bookFallback = stringResource(R.string.google_drive_sync_book_fallback),
+        exportedStatus = stringResource(R.string.google_drive_sync_exported_status),
+        failedStatus = stringResource(R.string.google_drive_sync_failed_status),
+        importedStatus = stringResource(R.string.google_drive_sync_imported_status),
+        skippedStatus = stringResource(R.string.google_drive_sync_skipped_status),
+        syncedStatus = stringResource(R.string.google_drive_sync_synced_status),
+        summaryStatus = stringResource(R.string.google_drive_sync_summary_status),
+    )
     val scope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
     val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
@@ -190,9 +209,9 @@ fun BookshelfView(
         val metadata = bookStorage.loadMetadata(root) ?: return
         scope.launch(Dispatchers.IO) {
             val result = runCatching { driveSyncManager.syncBook(metadata) }
-                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: "Sync failed.") }
+                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: driveSyncUiStrings.failedGeneric) }
             withContext(Dispatchers.Main) {
-                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText()))
+                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText(driveSyncUiStrings)))
                 bookmark = bookStorage.loadBookmark(root)
             }
         }
@@ -236,7 +255,7 @@ fun BookshelfView(
                     syncBookInBackground(file)
                 }
             }.onFailure {
-                errorMessage = it.localizedMessage ?: "Failed to open EPUB."
+                errorMessage = it.localizedMessage ?: booksErrorOpenEpub
             }
             isLoading = false
         }
@@ -266,7 +285,7 @@ fun BookshelfView(
                 }
                 isLoading = false
             }.onFailure {
-                errorMessage = it.localizedMessage ?: "Failed to import EPUB."
+                errorMessage = it.localizedMessage ?: booksErrorImportEpub
                 isLoading = false
             }
         }
@@ -289,10 +308,14 @@ fun BookshelfView(
         val account = runCatching {
             GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
         }.getOrNull()
-        val updated = if (account?.email != null) {
-            driveSyncSettings.copy(accountEmail = account.email, lastStatus = "Signed in as ${account.email}.")
+        val accountEmail = account?.email
+        val updated = if (accountEmail != null) {
+            driveSyncSettings.copy(
+                accountEmail = accountEmail,
+                lastStatus = driveSyncUiStrings.signedInAsSentence.formatString(accountEmail),
+            )
         } else {
-            driveSyncSettings.copy(lastStatus = "Google sign-in was cancelled or failed.")
+            driveSyncSettings.copy(lastStatus = driveSyncUiStrings.signInFailed)
         }
         updateDriveSyncSettings(updated)
     }
@@ -341,9 +364,9 @@ fun BookshelfView(
                         val metadata = bookStorage.loadMetadata(file)
                         if (metadata != null) {
                             val result = runCatching { driveSyncManager.syncBook(metadata) }
-                                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: "Sync failed.") }
+                                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: driveSyncUiStrings.failedGeneric) }
                             withContext(Dispatchers.Main) {
-                                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText()))
+                                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText(driveSyncUiStrings)))
                             }
                         }
                     }
@@ -395,9 +418,9 @@ fun BookshelfView(
                 val authState = driveAuthRepository.validateConfiguration()
                 val activity = context.findActivity()
                 if (authState != GoogleDriveAuthState.Configured) {
-                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = authState.configurationMessage()))
+                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = authState.configurationMessage(driveSyncUiStrings)))
                 } else if (activity == null) {
-                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = "Unable to open Google sign-in."))
+                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = driveSyncUiStrings.signInUnavailable))
                 } else {
                     googleSignInLauncher.launch(
                         googleDriveSignInClient(
@@ -411,13 +434,13 @@ fun BookshelfView(
                 context.findActivity()?.let {
                     googleDriveSignInClient(it, googleClientId).signOut()
                 }
-                updateDriveSyncSettings(DriveSyncSettings(lastStatus = "Signed out."))
+                updateDriveSyncSettings(DriveSyncSettings(lastStatus = driveSyncUiStrings.signedOut))
             },
             onSyncAll = {
                 scope.launch(Dispatchers.IO) {
                     val results = driveSyncManager.syncAll(bookEntries.map { it.metadata })
                     withContext(Dispatchers.Main) {
-                        updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = results.summaryText()))
+                        updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = results.summaryText(driveSyncUiStrings)))
                         selectedBookRoot?.let { bookmark = bookStorage.loadBookmark(it) }
                         reloadBookEntries()
                     }
@@ -488,10 +511,10 @@ fun BookshelfView(
         AlertDialog(
             onDismissRequest = { settingsDestination = null },
             title = { Text(destination.placeholderTitle()) },
-            text = { Text("This settings page is not implemented yet.") },
+            text = { Text(stringResource(R.string.settings_page_not_implemented)) },
             confirmButton = {
                 TextButton(onClick = { settingsDestination = null }) {
-                    Text("OK")
+                    Text(stringResource(R.string.common_ok))
                 }
             },
         )
@@ -500,7 +523,7 @@ fun BookshelfView(
     deleteCandidate?.let { candidate ->
         AlertDialog(
             onDismissRequest = { deleteCandidate = null },
-            title = { Text("Delete \"${candidate.metadata.title ?: ""}\"?") },
+            title = { Text(stringResource(R.string.books_delete_title, candidate.metadata.title ?: "")) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -519,12 +542,12 @@ fun BookshelfView(
                         }
                     },
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.common_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteCandidate = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -611,7 +634,7 @@ private fun BooksTab(
                                 onDismissRequest = { onContextMenuEntryChange(null) },
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Delete") },
+                                    text = { Text(stringResource(R.string.common_delete)) },
                                     onClick = {
                                         contextMenuEntry?.let(onDeleteCandidate)
                                         onContextMenuEntryChange(null)
@@ -670,11 +693,11 @@ private fun BooksTopChrome(
                     onDismissRequest = { onSortMenuExpandedChange(false) },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Recent") },
+                        text = { Text(stringResource(R.string.books_sort_recent)) },
                         onClick = { onSortChange(BookSortOption.Recent) },
                     )
                     DropdownMenuItem(
-                        text = { Text("Title") },
+                        text = { Text(stringResource(R.string.books_sort_title)) },
                         onClick = { onSortChange(BookSortOption.Title) },
                     )
                 }
@@ -685,7 +708,7 @@ private fun BooksTopChrome(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            text = "Books",
+            text = stringResource(R.string.main_tab_books),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.Bold,
@@ -833,7 +856,7 @@ private fun SettingsTab(
     ) {
         item {
             Text(
-                text = "Settings",
+                text = stringResource(R.string.main_tab_settings),
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -893,7 +916,7 @@ private fun SettingsRow(row: SettingsRowModel, onClick: () -> Unit) {
         SettingsGlyph(row.destination, tint, Modifier.size(32.dp))
         Spacer(Modifier.width(26.dp))
         Text(
-            text = row.label,
+            text = stringResource(row.labelRes),
             style = MaterialTheme.typography.headlineSmall,
             color = tint,
         )
@@ -943,7 +966,7 @@ private fun HoshiBottomTabs(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         BottomTabGlyph(tab, Modifier.size(28.dp))
                         Text(
-                            text = tab.label,
+                            text = stringResource(tab.labelRes),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -1027,21 +1050,21 @@ private fun EmptyBooksView(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "No Books",
+            text = stringResource(R.string.books_empty_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "Import an EPUB using the + button to start reading.",
+            text = stringResource(R.string.books_empty_message),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth()) {
             Button(onClick = onImport) {
-                Text("Import EPUB")
+                Text(stringResource(R.string.books_import_epub))
             }
         }
         if (errorMessage != null) {
@@ -1146,27 +1169,48 @@ private fun ChevronRightGlyph(color: Color, modifier: Modifier = Modifier) {
 private fun Float.formatOneDecimal(): String =
     String.format(java.util.Locale.US, "%.1f", this)
 
-private fun SyncResult.statusText(): String = when (this) {
-    is SyncResult.Exported -> "Exported \"$title\" progress to Google Drive."
-    is SyncResult.Failed -> "Failed to sync ${title ?: "book"}: $message"
-    is SyncResult.Imported -> "Imported \"$title\" progress from Google Drive."
-    is SyncResult.Skipped -> "Skipped ${title ?: "book"}: $reason"
-    is SyncResult.Synced -> "\"$title\" is already synced."
+private data class DriveSyncUiStrings(
+    val failedGeneric: String,
+    val signedInAsSentence: String,
+    val signInFailed: String,
+    val signInUnavailable: String,
+    val signedOut: String,
+    val configured: String,
+    val invalidClientId: String,
+    val missingClientId: String,
+    val bookFallback: String,
+    val exportedStatus: String,
+    val failedStatus: String,
+    val importedStatus: String,
+    val skippedStatus: String,
+    val syncedStatus: String,
+    val summaryStatus: String,
+)
+
+private fun SyncResult.statusText(strings: DriveSyncUiStrings): String = when (this) {
+    is SyncResult.Exported -> strings.exportedStatus.formatString(title)
+    is SyncResult.Failed -> strings.failedStatus.formatString(title ?: strings.bookFallback, message)
+    is SyncResult.Imported -> strings.importedStatus.formatString(title)
+    is SyncResult.Skipped -> strings.skippedStatus.formatString(title ?: strings.bookFallback, reason)
+    is SyncResult.Synced -> strings.syncedStatus.formatString(title)
 }
 
-private fun List<SyncResult>.summaryText(): String {
+private fun List<SyncResult>.summaryText(strings: DriveSyncUiStrings): String {
     val imported = count { it is SyncResult.Imported }
     val exported = count { it is SyncResult.Exported }
     val failed = count { it is SyncResult.Failed }
     val skipped = count { it is SyncResult.Skipped }
-    return "Sync complete: $imported imported, $exported exported, $skipped skipped, $failed failed."
+    return strings.summaryStatus.formatString(imported, exported, skipped, failed)
 }
 
-private fun GoogleDriveAuthState.configurationMessage(): String = when (this) {
-    GoogleDriveAuthState.Configured -> "Google Drive is configured."
-    GoogleDriveAuthState.InvalidClientId -> "Google client id is invalid."
-    GoogleDriveAuthState.MissingClientId -> "Google client id is not configured."
+private fun GoogleDriveAuthState.configurationMessage(strings: DriveSyncUiStrings): String = when (this) {
+    GoogleDriveAuthState.Configured -> strings.configured
+    GoogleDriveAuthState.InvalidClientId -> strings.invalidClientId
+    GoogleDriveAuthState.MissingClientId -> strings.missingClientId
 }
+
+private fun String.formatString(vararg args: Any): String =
+    String.format(java.util.Locale.getDefault(), this, *args)
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
