@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -7,8 +9,12 @@ plugins {
 val rustProjectDir = file("src/main/rust/hoshiepub")
 val uniffiOutDir = layout.buildDirectory.dir("generated/source/uniffi/main/kotlin").get().asFile
 val rustJniLibsDir = layout.buildDirectory.dir("jniLibs").get().asFile
-val cargo = System.getenv("HOME") + "/.cargo/bin/cargo"
-val androidNdkHome = System.getenv("ANDROID_NDK_HOME") ?: "/opt/homebrew/share/android-ndk"
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
 val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
@@ -30,10 +36,53 @@ if (isReleaseSigningRequested && !isReleaseSigningConfigured) {
     )
 }
 
+val osName = System.getProperty("os.name").lowercase()
+val isWindows = osName.contains("win")
+val sdkDir = localProperties.getProperty("sdk.dir")?.takeIf { it.isNotBlank() }
+    ?: providers.environmentVariable("ANDROID_HOME").orNull?.takeIf { it.isNotBlank() }
+    ?: providers.environmentVariable("ANDROID_SDK_ROOT").orNull?.takeIf { it.isNotBlank() }
+fun androidRevisionParts(directory: File): List<Int> =
+    Regex("\\d+").findAll(directory.name).map { it.value.toInt() }.toList()
+
+fun compareAndroidRevisions(left: File, right: File): Int {
+    val leftParts = androidRevisionParts(left)
+    val rightParts = androidRevisionParts(right)
+    for (index in 0 until maxOf(leftParts.size, rightParts.size)) {
+        val comparison = leftParts.getOrElse(index) { 0 }.compareTo(rightParts.getOrElse(index) { 0 })
+        if (comparison != 0) return comparison
+    }
+    return left.name.compareTo(right.name)
+}
+
+val androidNdkHome = providers.environmentVariable("ANDROID_NDK_HOME").orNull?.takeIf { it.isNotBlank() }
+    ?: localProperties.getProperty("ndk.dir")?.takeIf { it.isNotBlank() }
+    ?: sdkDir
+        ?.let { file("$it/ndk") }
+        ?.takeIf { it.isDirectory }
+        ?.listFiles()
+        ?.filter { it.isDirectory }
+        ?.maxWithOrNull(::compareAndroidRevisions)
+        ?.absolutePath
+    ?: "/opt/homebrew/share/android-ndk"
+val cargoBinaryName = if (isWindows) "cargo.exe" else "cargo"
+val cargo = providers.environmentVariable("CARGO").orNull?.takeIf { it.isNotBlank() }
+    ?: listOfNotNull(
+        System.getenv("HOME"),
+        System.getenv("USERPROFILE"),
+    ).asSequence()
+        .map { file("$it/.cargo/bin/$cargoBinaryName") }
+        .firstOrNull { it.isFile }
+        ?.absolutePath
+    ?: cargoBinaryName
+
 val hostLibExtension = when {
-    System.getProperty("os.name").lowercase().contains("mac") -> "dylib"
-    System.getProperty("os.name").lowercase().contains("win") -> "dll"
+    osName.contains("mac") -> "dylib"
+    isWindows -> "dll"
     else -> "so"
+}
+val hostLibName = when {
+    isWindows -> "hoshiepub.$hostLibExtension"
+    else -> "libhoshiepub.$hostLibExtension"
 }
 
 android {
@@ -135,7 +184,7 @@ val generateUniffiKotlin by tasks.registering(Exec::class) {
     dependsOn(buildRustHost)
     workingDir = rustProjectDir
 
-    val hostLibPath = rustProjectDir.resolve("target/debug/libhoshiepub.$hostLibExtension")
+    val hostLibPath = rustProjectDir.resolve("target/debug/$hostLibName")
 
     commandLine(
         cargo,

@@ -151,6 +151,8 @@
 
 11. `todo` - Regression coverage and release hardening
     - `done` - Add GitHub Actions signed APK release workflow for `v*` tags and manual dispatch, using repository signing secrets and uploading the APK plus GPLv3 `LICENSE` to the GitHub Release.
+    - `done` - Make Rust, UniFFI, and Android NDK Gradle paths portable across Windows and Unix hosts by resolving Cargo, SDK, NDK, and host library names from local properties and environment variables.
+    - Verified on Windows host and Android emulator: ran `.\gradlew.bat check --console=plain --stacktrace`, `.\gradlew.bat :app:assembleDebug --console=plain --stacktrace`, and `.\gradlew.bat :app:installDebug --console=plain --stacktrace`; launched `moe.antimony.hoshi/.MainActivity` on `emulator-5554` and confirmed the app stayed running on the Books screen without native library load failures.
     - Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
     - Expand WebView pagination regression checks.
     - Keep Gradle `test`, `assembleDebug`, and `lint` passing before release-facing changes.
