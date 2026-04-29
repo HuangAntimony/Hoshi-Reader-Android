@@ -65,6 +65,7 @@ internal fun ReaderChapterSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {},
     ) {
         LazyColumn(
@@ -91,6 +92,7 @@ internal fun ReaderChapterSheet(
                             .padding(top = 26.dp),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Surface(
                         modifier = Modifier.align(Alignment.CenterEnd),
@@ -173,6 +175,7 @@ private fun ReaderChapterBookHeader(
                 text = book.title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
             )
             Text(

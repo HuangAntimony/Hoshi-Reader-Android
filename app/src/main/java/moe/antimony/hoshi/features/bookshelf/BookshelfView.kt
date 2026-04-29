@@ -896,6 +896,7 @@ private fun EmptyBooksView(
             text = "No Books",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(10.dp))
         Text(
