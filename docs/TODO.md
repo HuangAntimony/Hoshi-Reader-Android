@@ -154,3 +154,4 @@
     - Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
     - Expand WebView pagination regression checks.
     - Keep Gradle `test`, `assembleDebug`, and `lint` passing before release-facing changes.
+    - `done` - Add Android CI workflow coverage for pull requests, running Gradle validation and debug APK assembly with the project native/Rust build requirements.
