@@ -19,6 +19,9 @@ val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE")
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val googleClientId = providers.environmentVariable("HOSHI_GOOGLE_CLIENT_ID").orNull
+    ?: localProperties.getProperty("googleClientId")
+    ?: ""
 val releaseSigningValues = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -96,6 +99,7 @@ android {
                 targets += "hoshidicts_jni"
             }
         }
+        resValue("string", "google_client_id", googleClientId)
     }
 
     if (isReleaseSigningConfigured) {
@@ -128,6 +132,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
     externalNativeBuild {
         cmake {
@@ -151,6 +156,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.play.services.auth)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     testImplementation(libs.junit)
     testRuntimeOnly("net.java.dev.jna:jna:${libs.versions.jna.get()}@jar")
