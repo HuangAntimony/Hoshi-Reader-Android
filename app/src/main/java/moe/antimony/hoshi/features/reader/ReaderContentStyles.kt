@@ -108,8 +108,8 @@ internal object ReaderContentStyles {
         img.block-img {
             max-width: var(--hoshi-image-max-width, ${settings.imageMaxWidthFallbackCss}) !important;
             max-height: var(--hoshi-image-max-height, ${settings.imageMaxHeightFallbackCss}) !important;
-            width: var(--hoshi-image-max-width, ${settings.imageMaxWidthFallbackCss}) !important;
-            height: var(--hoshi-image-max-height, ${settings.imageMaxHeightFallbackCss}) !important;
+            width: auto !important;
+            height: auto !important;
             display: block !important;
             margin: auto !important;
             break-inside: avoid !important;
@@ -119,8 +119,8 @@ internal object ReaderContentStyles {
         svg {
             max-width: var(--hoshi-image-max-width, ${settings.imageMaxWidthFallbackCss}) !important;
             max-height: var(--hoshi-image-max-height, ${settings.imageMaxHeightFallbackCss}) !important;
-            width: 100% !important;
-            height: 100% !important;
+            width: auto !important;
+            height: auto !important;
             display: block !important;
             margin: auto !important;
             break-inside: avoid !important;
