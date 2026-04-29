@@ -62,6 +62,20 @@ class GoogleDriveClientTest {
     }
 
     @Test
+    fun ensureBookFolderPersistsCreatedFolderThroughCacheSetter() {
+        val transport = FakeDriveTransport(
+            listResponses = ArrayDeque(listOf(emptyList())),
+            createResponses = ArrayDeque(listOf(DriveFile(id = "book-id", name = "Book"))),
+        )
+        val cache = CopyingDriveCache()
+        val client = GoogleDriveClient(transport = transport, cache = cache)
+
+        assertEquals("book-id", client.ensureBookFolder("token", "root", "Book"))
+
+        assertEquals(mapOf("Book" to "book-id"), cache.persistedTitleToFolderId)
+    }
+
+    @Test
     fun uploadProgressCreatesMultipartFileWhenFileIdMissing() {
         val transport = FakeDriveTransport(uploadResponses = ArrayDeque(listOf(DriveFile(id = "progress-id", name = "progress"))))
         val client = GoogleDriveClient(transport = transport, cache = InMemoryDriveCache())
@@ -142,5 +156,21 @@ private class InMemoryDriveCache(
         didClear = true
         rootFolderId = null
         titleToFolderId.clear()
+    }
+}
+
+private class CopyingDriveCache : DriveFolderCache {
+    override var rootFolderId: String? = null
+    var persistedTitleToFolderId: Map<String, String> = emptyMap()
+
+    override var titleToFolderId: MutableMap<String, String>
+        get() = persistedTitleToFolderId.toMutableMap()
+        set(value) {
+            persistedTitleToFolderId = value.toMap()
+        }
+
+    override fun clear() {
+        rootFolderId = null
+        persistedTitleToFolderId = emptyMap()
     }
 }

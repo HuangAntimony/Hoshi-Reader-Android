@@ -73,7 +73,9 @@ class GoogleDriveClient(
         val query = "trashed=false and '$rootFolderId' in parents and mimeType='application/vnd.google-apps.folder' and name=\"$sanitizedTitle\""
         val existing = listFiles(accessToken, query).firstOrNull()
         val folderId = existing?.id ?: createFolder(accessToken, sanitizedTitle, rootFolderId).id
-        cache.titleToFolderId[sanitizedTitle] = folderId
+        cache.titleToFolderId = cache.titleToFolderId.apply {
+            put(sanitizedTitle, folderId)
+        }
         return folderId
     }
 
