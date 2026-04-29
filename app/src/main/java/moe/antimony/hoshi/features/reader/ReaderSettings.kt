@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import android.content.Context
+import kotlin.math.ceil
 import java.util.Locale
 
 data class ReaderSettings(
@@ -29,6 +30,13 @@ data class ReaderSettings(
     val bottomOverlapPx: Int
         get() = if (verticalWriting) fontSize else 0
 
+    val horizontalGlyphGuardPx: Int
+        get() = if (verticalWriting) {
+            0
+        } else {
+            ceil((fontSize * 0.4).coerceIn(10.0, 24.0)).toInt()
+        }
+
     val writingModeCss: String
         get() = if (verticalWriting) "vertical-rl" else "horizontal-tb"
 
@@ -40,6 +48,23 @@ data class ReaderSettings(
             val unit = if (verticalWriting) "vh" else "vw"
             val value = if (verticalWriting) verticalPadding else horizontalPadding
             return "calc(${value}${unit} + ${bottomOverlapPx}px)"
+        }
+
+    val columnWidthCss: String
+        get() = if (verticalWriting) {
+            "var(--page-width, 100vw)"
+        } else {
+            "calc(var(--page-width, 100vw) - ${horizontalPadding.toDouble().cssNumber()}vw)"
+        }
+
+    val bodyHeightCss: String
+        get() = "var(--content-height, ${bodyHeightFallbackCss})"
+
+    val bodyHeightFallbackCss: String
+        get() = if (horizontalGlyphGuardPx > 0) {
+            "calc(var(--page-height, 100vh) - ${horizontalGlyphGuardPx}px)"
+        } else {
+            "var(--page-height, 100vh)"
         }
 
     val pagePaddingCss: String

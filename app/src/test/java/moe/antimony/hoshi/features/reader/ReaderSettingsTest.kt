@@ -51,9 +51,18 @@ class ReaderSettingsTest {
 
     @Test
     fun horizontalReaderCssUsesIosWritingModeMapping() {
-        val css = ReaderContentStyles.styleTag(ReaderSettings(verticalWriting = false))
+        val settings = ReaderSettings(verticalWriting = false)
+        val css = ReaderContentStyles.styleTag(settings)
+        val script = ReaderPaginationScripts.shellScript(settings = settings)
 
         assertTrue(css.contains("writing-mode: horizontal-tb !important;"))
+        assertEquals(10, settings.horizontalGlyphGuardPx)
+        assertTrue(css.contains("height: var(--content-height, calc(var(--page-height, 100vh) - 10px)) !important;"))
+        assertTrue(css.contains("column-width: calc(var(--page-width, 100vw) - 5.0vw) !important;"))
+        assertTrue(css.contains("column-fill: auto !important;"))
+        assertTrue(css.contains("overflow-wrap: anywhere !important;"))
+        assertTrue(script.contains("var contentHeight = Math.max(1, window.innerHeight - 10);"))
+        assertTrue(script.contains("--content-height"))
     }
 
     @Test

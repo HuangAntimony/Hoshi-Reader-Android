@@ -189,8 +189,10 @@ internal object ReaderPaginationScripts {
           document.head.appendChild(newViewport);
           var pageHeight = window.innerHeight + ${settings.bottomOverlapPx};
           var pageWidth = window.innerWidth;
+          var contentHeight = Math.max(1, window.innerHeight - ${settings.horizontalGlyphGuardPx});
           document.documentElement.style.setProperty('--page-height', pageHeight + 'px');
           document.documentElement.style.setProperty('--page-width', pageWidth + 'px');
+          document.documentElement.style.setProperty('--content-height', contentHeight + 'px');
           document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(pageWidth * ${settings.imageWidthViewportRatio})) + 'px');
           document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, pageHeight - ${settings.bottomOverlapPx}) + 'px');
           window.hoshiReader.pageHeight = pageHeight;

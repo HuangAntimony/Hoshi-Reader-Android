@@ -83,9 +83,12 @@ internal object ReaderContentStyles {
         $pageBreakCss
         @media (prefers-color-scheme: light) { :root { --hoshi-system-text-color: #000; } }
         @media (prefers-color-scheme: dark) { :root { --hoshi-system-text-color: #fff; } }
+        * {
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
         html, body {
             overflow: hidden !important;
-            height: var(--page-height, 100vh) !important;
             width: var(--page-width, 100vw) !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -93,17 +96,42 @@ internal object ReaderContentStyles {
             color: $textColor !important;
             writing-mode: ${settings.writingModeCss} !important;
         }
+        html {
+            height: var(--page-height, 100vh) !important;
+        }
         body {
+            height: ${settings.bodyHeightCss} !important;
             font-family: $fontFamily, serif !important;
             font-size: ${settings.fontSize}px !important;
             $textSpacingCss
             box-sizing: border-box !important;
-            column-width: var(--page-width, 100vw) !important;
+            column-width: ${settings.columnWidthCss} !important;
             column-gap: ${settings.columnGapCss};
+            column-fill: auto !important;
+            -webkit-column-fill: auto !important;
+            overflow-wrap: anywhere !important;
+            word-break: normal !important;
+            orphans: 1;
+            widows: 1;
             padding: ${settings.pagePaddingCss} !important;
             padding-bottom: ${settings.bottomPaddingCss} !important;
             $gridCss
             text-orientation: mixed;
+        }
+        p, div, span, li {
+            break-inside: auto !important;
+            -webkit-column-break-inside: auto !important;
+            overflow-wrap: anywhere !important;
+            word-break: normal !important;
+        }
+        pre, code {
+            white-space: pre-wrap !important;
+            overflow-wrap: anywhere !important;
+        }
+        table {
+            table-layout: fixed !important;
+            width: 100% !important;
+            overflow-wrap: anywhere !important;
         }
         img.block-img {
             max-width: var(--hoshi-image-max-width, ${settings.imageMaxWidthFallbackCss}) !important;
