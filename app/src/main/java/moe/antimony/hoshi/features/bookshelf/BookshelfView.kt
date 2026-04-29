@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -129,6 +130,7 @@ fun BookshelfView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val googleClientId = stringResource(R.string.google_client_id)
     val scope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
     val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
@@ -138,9 +140,9 @@ fun BookshelfView(
     }
     var driveSyncSettings by remember { mutableStateOf(driveSyncSettingsStore.load()) }
     val driveSyncCache = remember { DriveFolderFileCache(File(context.filesDir, "drive-sync-cache.json")) }
-    val driveAuthRepository = remember {
+    val driveAuthRepository = remember(googleClientId) {
         GoogleDriveAuthRepository(
-            clientIdProvider = { context.getString(R.string.google_client_id) },
+            clientIdProvider = { googleClientId },
             tokenProvider = GooglePlayServicesDriveTokenProvider(context.applicationContext),
         )
     }
@@ -400,14 +402,14 @@ fun BookshelfView(
                     googleSignInLauncher.launch(
                         googleDriveSignInClient(
                             activity = activity,
-                            clientId = context.getString(R.string.google_client_id),
+                            clientId = googleClientId,
                         ).signInIntent,
                     )
                 }
             },
             onSignOut = {
                 context.findActivity()?.let {
-                    googleDriveSignInClient(it, context.getString(R.string.google_client_id)).signOut()
+                    googleDriveSignInClient(it, googleClientId).signOut()
                 }
                 updateDriveSyncSettings(DriveSyncSettings(lastStatus = "Signed out."))
             },
