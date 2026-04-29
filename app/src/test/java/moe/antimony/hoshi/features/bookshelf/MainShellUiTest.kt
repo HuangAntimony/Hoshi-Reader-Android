@@ -17,10 +17,15 @@ class MainShellUiTest {
         val groups = settingsGroups()
 
         assertEquals(
-            listOf("Dictionaries", "Anki", "Appearance", "Advanced"),
+            listOf("Dictionaries", "Anki", "Appearance", "Advanced", "Google Drive Sync"),
             groups.first().map { it.label },
         )
         assertEquals(listOf("Report an Issue", "About"), groups.last().map { it.label })
+    }
+
+    @Test
+    fun googleDriveSyncDestinationTitleIsStable() {
+        assertEquals("Google Drive Sync", SettingsDestination.GoogleDriveSync.placeholderTitle())
     }
 
     @Test

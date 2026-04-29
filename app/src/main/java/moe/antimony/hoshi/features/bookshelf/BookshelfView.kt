@@ -81,6 +81,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookSortOption
@@ -96,6 +97,11 @@ import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import moe.antimony.hoshi.features.sync.DriveSyncSettings
+import moe.antimony.hoshi.features.sync.DriveSyncSettingsStore
+import moe.antimony.hoshi.features.sync.GoogleDriveAccessTokenProvider
+import moe.antimony.hoshi.features.sync.GoogleDriveAuthRepository
+import moe.antimony.hoshi.features.sync.GoogleDriveSyncView
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -112,6 +118,19 @@ fun BookshelfView(
     val bookStorage = remember { BookStorage(context.filesDir) }
     val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
     val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
+    val driveSyncSettingsStore = remember {
+        DriveSyncSettingsStore(File(context.filesDir, "drive-sync-settings.json"))
+    }
+    var driveSyncSettings by remember { mutableStateOf(driveSyncSettingsStore.load()) }
+    val driveAuthRepository = remember {
+        GoogleDriveAuthRepository(
+            clientIdProvider = { context.getString(R.string.google_client_id) },
+            tokenProvider = object : GoogleDriveAccessTokenProvider {
+                override fun accountEmail(): String? = driveSyncSettings.accountEmail
+                override fun accessTokenOrNull(): String? = null
+            },
+        )
+    }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
     var selectedTab by remember {
         mutableStateOf(
@@ -289,6 +308,37 @@ fun BookshelfView(
 
     if (settingsDestination == SettingsDestination.Advanced) {
         AdvancedSettingsView(
+            onClose = { settingsDestination = null },
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
+
+    if (settingsDestination == SettingsDestination.GoogleDriveSync) {
+        GoogleDriveSyncView(
+            settings = driveSyncSettings,
+            authState = driveAuthRepository.validateConfiguration(),
+            isSignedIn = driveAuthRepository.isSignedIn(),
+            accountEmail = driveAuthRepository.accountEmail(),
+            onSettingsChange = {
+                driveSyncSettings = it
+                driveSyncSettingsStore.save(it)
+            },
+            onSignIn = {
+                val updated = driveSyncSettings.copy(lastStatus = "Google sign-in is ready once a client id is configured.")
+                driveSyncSettings = updated
+                driveSyncSettingsStore.save(updated)
+            },
+            onSignOut = {
+                val updated = DriveSyncSettings()
+                driveSyncSettings = updated
+                driveSyncSettingsStore.save(updated)
+            },
+            onSyncAll = {
+                val updated = driveSyncSettings.copy(lastStatus = "Sync all will run after sign-in is connected.")
+                driveSyncSettings = updated
+                driveSyncSettingsStore.save(updated)
+            },
             onClose = { settingsDestination = null },
             modifier = modifier.fillMaxSize(),
         )
@@ -939,6 +989,7 @@ private fun SettingsGlyph(destination: SettingsDestination, color: Color, modifi
         SettingsDestination.Anki -> Icons.Rounded.Inventory2
         SettingsDestination.Appearance -> Icons.Rounded.Palette
         SettingsDestination.Advanced -> Icons.Rounded.Settings
+        SettingsDestination.GoogleDriveSync -> Icons.Rounded.FolderOpen
         SettingsDestination.ReportIssue -> Icons.Rounded.ReportProblem
         SettingsDestination.About -> Icons.Rounded.Info
     }
@@ -1006,15 +1057,6 @@ private fun ChevronRightGlyph(color: Color, modifier: Modifier = Modifier) {
         tint = color,
         modifier = modifier,
     )
-}
-
-private fun SettingsDestination.placeholderTitle(): String = when (this) {
-    SettingsDestination.Anki -> "Anki"
-    SettingsDestination.Appearance -> "Appearance"
-    SettingsDestination.Advanced -> "Advanced"
-    SettingsDestination.About -> "About"
-    SettingsDestination.Dictionaries -> "Dictionaries"
-    SettingsDestination.ReportIssue -> "Report an Issue"
 }
 
 private fun Float.formatOneDecimal(): String =

@@ -13,6 +13,7 @@ enum class SettingsDestination {
     Anki,
     Appearance,
     Advanced,
+    GoogleDriveSync,
     ReportIssue,
     About,
 }
@@ -35,6 +36,7 @@ fun settingsGroups(): List<List<SettingsRowModel>> = listOf(
         SettingsRowModel("Anki", SettingsDestination.Anki),
         SettingsRowModel("Appearance", SettingsDestination.Appearance),
         SettingsRowModel("Advanced", SettingsDestination.Advanced),
+        SettingsRowModel("Google Drive Sync", SettingsDestination.GoogleDriveSync),
     ),
     listOf(
         SettingsRowModel("Report an Issue", SettingsDestination.ReportIssue),
@@ -48,3 +50,13 @@ fun bookshelfSections(entries: List<BookEntry>): List<BookshelfSectionModel> =
     } else {
         listOf(BookshelfSectionModel("Unshelved", entries))
     }
+
+fun SettingsDestination.placeholderTitle(): String = when (this) {
+    SettingsDestination.Anki -> "Anki"
+    SettingsDestination.Appearance -> "Appearance"
+    SettingsDestination.Advanced -> "Advanced"
+    SettingsDestination.About -> "About"
+    SettingsDestination.Dictionaries -> "Dictionaries"
+    SettingsDestination.GoogleDriveSync -> "Google Drive Sync"
+    SettingsDestination.ReportIssue -> "Report an Issue"
+}
