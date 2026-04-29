@@ -1,5 +1,10 @@
+@file:Suppress("DEPRECATION")
+
 package moe.antimony.hoshi.features.bookshelf
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -77,6 +82,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,11 +104,19 @@ import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import moe.antimony.hoshi.features.sync.BookStorageSyncAdapter
+import moe.antimony.hoshi.features.sync.DriveFolderFileCache
+import moe.antimony.hoshi.features.sync.DriveSyncManager
 import moe.antimony.hoshi.features.sync.DriveSyncSettings
 import moe.antimony.hoshi.features.sync.DriveSyncSettingsStore
-import moe.antimony.hoshi.features.sync.GoogleDriveAccessTokenProvider
 import moe.antimony.hoshi.features.sync.GoogleDriveAuthRepository
+import moe.antimony.hoshi.features.sync.GoogleDriveAuthState
+import moe.antimony.hoshi.features.sync.GoogleDriveClient
+import moe.antimony.hoshi.features.sync.GoogleDriveSyncGateway
 import moe.antimony.hoshi.features.sync.GoogleDriveSyncView
+import moe.antimony.hoshi.features.sync.GooglePlayServicesDriveTokenProvider
+import moe.antimony.hoshi.features.sync.SyncResult
+import moe.antimony.hoshi.features.sync.googleDriveSignInClient
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -122,13 +137,18 @@ fun BookshelfView(
         DriveSyncSettingsStore(File(context.filesDir, "drive-sync-settings.json"))
     }
     var driveSyncSettings by remember { mutableStateOf(driveSyncSettingsStore.load()) }
+    val driveSyncCache = remember { DriveFolderFileCache(File(context.filesDir, "drive-sync-cache.json")) }
     val driveAuthRepository = remember {
         GoogleDriveAuthRepository(
             clientIdProvider = { context.getString(R.string.google_client_id) },
-            tokenProvider = object : GoogleDriveAccessTokenProvider {
-                override fun accountEmail(): String? = driveSyncSettings.accountEmail
-                override fun accessTokenOrNull(): String? = null
-            },
+            tokenProvider = GooglePlayServicesDriveTokenProvider(context.applicationContext),
+        )
+    }
+    val driveSyncManager = remember {
+        DriveSyncManager(
+            tokenProvider = driveAuthRepository,
+            drive = GoogleDriveSyncGateway(GoogleDriveClient(cache = driveSyncCache)),
+            storage = BookStorageSyncAdapter(context.filesDir),
         )
     }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
@@ -154,8 +174,26 @@ fun BookshelfView(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    fun updateDriveSyncSettings(settings: DriveSyncSettings) {
+        driveSyncSettings = settings
+        driveSyncSettingsStore.save(settings)
+    }
+
     fun reloadBookEntries() {
         bookEntries = bookStorage.loadBookEntries(sortOption)
+    }
+
+    fun syncBookInBackground(root: File) {
+        if (!driveSyncSettings.isEnabled) return
+        val metadata = bookStorage.loadMetadata(root) ?: return
+        scope.launch(Dispatchers.IO) {
+            val result = runCatching { driveSyncManager.syncBook(metadata) }
+                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: "Sync failed.") }
+            withContext(Dispatchers.Main) {
+                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText()))
+                bookmark = bookStorage.loadBookmark(root)
+            }
+        }
     }
 
     fun saveMetadata(root: File, parsedBook: EpubBook, previous: BookMetadata? = null) {
@@ -192,6 +230,9 @@ fun BookshelfView(
                 bookmark = bookStorage.loadBookmark(file)
                 reloadBookEntries()
                 isReading = openReader
+                if (openReader && driveSyncSettings.autoSyncOnOpen) {
+                    syncBookInBackground(file)
+                }
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to open EPUB."
             }
@@ -218,6 +259,9 @@ fun BookshelfView(
                 reloadBookEntries()
                 selectedTab = MainTab.Books
                 isReading = true
+                if (driveSyncSettings.autoSyncOnOpen) {
+                    syncBookInBackground(root)
+                }
                 isLoading = false
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to import EPUB."
@@ -237,6 +281,18 @@ fun BookshelfView(
             }
             importBook(uri)
         }
+    }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val account = runCatching {
+            GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
+        }.getOrNull()
+        val updated = if (account?.email != null) {
+            driveSyncSettings.copy(accountEmail = account.email, lastStatus = "Signed in as ${account.email}.")
+        } else {
+            driveSyncSettings.copy(lastStatus = "Google sign-in was cancelled or failed.")
+        }
+        updateDriveSyncSettings(updated)
     }
 
     fun launchBookImporter() {
@@ -279,6 +335,16 @@ fun BookshelfView(
                 bookmark = savedBookmark
                 scope.launch(Dispatchers.IO) {
                     bookStorage.saveBookmark(file, savedBookmark)
+                    if (driveSyncSettings.isEnabled && driveSyncSettings.autoSyncOnBookmark) {
+                        val metadata = bookStorage.loadMetadata(file)
+                        if (metadata != null) {
+                            val result = runCatching { driveSyncManager.syncBook(metadata) }
+                                .getOrElse { SyncResult.Failed(metadata.title, it.message ?: "Sync failed.") }
+                            withContext(Dispatchers.Main) {
+                                updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = result.statusText()))
+                            }
+                        }
+                    }
                 }
             },
             onClose = { isReading = false },
@@ -321,23 +387,39 @@ fun BookshelfView(
             isSignedIn = driveAuthRepository.isSignedIn(),
             accountEmail = driveAuthRepository.accountEmail(),
             onSettingsChange = {
-                driveSyncSettings = it
-                driveSyncSettingsStore.save(it)
+                updateDriveSyncSettings(it)
             },
             onSignIn = {
-                val updated = driveSyncSettings.copy(lastStatus = "Google sign-in is ready once a client id is configured.")
-                driveSyncSettings = updated
-                driveSyncSettingsStore.save(updated)
+                val authState = driveAuthRepository.validateConfiguration()
+                val activity = context.findActivity()
+                if (authState != GoogleDriveAuthState.Configured) {
+                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = authState.configurationMessage()))
+                } else if (activity == null) {
+                    updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = "Unable to open Google sign-in."))
+                } else {
+                    googleSignInLauncher.launch(
+                        googleDriveSignInClient(
+                            activity = activity,
+                            clientId = context.getString(R.string.google_client_id),
+                        ).signInIntent,
+                    )
+                }
             },
             onSignOut = {
-                val updated = DriveSyncSettings()
-                driveSyncSettings = updated
-                driveSyncSettingsStore.save(updated)
+                context.findActivity()?.let {
+                    googleDriveSignInClient(it, context.getString(R.string.google_client_id)).signOut()
+                }
+                updateDriveSyncSettings(DriveSyncSettings(lastStatus = "Signed out."))
             },
             onSyncAll = {
-                val updated = driveSyncSettings.copy(lastStatus = "Sync all will run after sign-in is connected.")
-                driveSyncSettings = updated
-                driveSyncSettingsStore.save(updated)
+                scope.launch(Dispatchers.IO) {
+                    val results = driveSyncManager.syncAll(bookEntries.map { it.metadata })
+                    withContext(Dispatchers.Main) {
+                        updateDriveSyncSettings(driveSyncSettings.copy(lastStatus = results.summaryText()))
+                        selectedBookRoot?.let { bookmark = bookStorage.loadBookmark(it) }
+                        reloadBookEntries()
+                    }
+                }
             },
             onClose = { settingsDestination = null },
             modifier = modifier.fillMaxSize(),
@@ -1061,3 +1143,31 @@ private fun ChevronRightGlyph(color: Color, modifier: Modifier = Modifier) {
 
 private fun Float.formatOneDecimal(): String =
     String.format(java.util.Locale.US, "%.1f", this)
+
+private fun SyncResult.statusText(): String = when (this) {
+    is SyncResult.Exported -> "Exported \"$title\" progress to Google Drive."
+    is SyncResult.Failed -> "Failed to sync ${title ?: "book"}: $message"
+    is SyncResult.Imported -> "Imported \"$title\" progress from Google Drive."
+    is SyncResult.Skipped -> "Skipped ${title ?: "book"}: $reason"
+    is SyncResult.Synced -> "\"$title\" is already synced."
+}
+
+private fun List<SyncResult>.summaryText(): String {
+    val imported = count { it is SyncResult.Imported }
+    val exported = count { it is SyncResult.Exported }
+    val failed = count { it is SyncResult.Failed }
+    val skipped = count { it is SyncResult.Skipped }
+    return "Sync complete: $imported imported, $exported exported, $skipped skipped, $failed failed."
+}
+
+private fun GoogleDriveAuthState.configurationMessage(): String = when (this) {
+    GoogleDriveAuthState.Configured -> "Google Drive is configured."
+    GoogleDriveAuthState.InvalidClientId -> "Google client id is invalid."
+    GoogleDriveAuthState.MissingClientId -> "Google client id is not configured."
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}

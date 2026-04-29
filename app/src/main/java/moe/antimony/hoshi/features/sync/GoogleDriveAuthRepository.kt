@@ -25,7 +25,7 @@ interface GoogleDriveAccessTokenProvider {
 class GoogleDriveAuthRepository(
     private val clientIdProvider: () -> String,
     private val tokenProvider: GoogleDriveAccessTokenProvider,
-) {
+) : SyncAccessTokenProvider {
     fun validateConfiguration(): GoogleDriveAuthState {
         val clientId = clientIdProvider().trim()
         if (clientId.isBlank()) return GoogleDriveAuthState.MissingClientId
@@ -34,11 +34,11 @@ class GoogleDriveAuthRepository(
     }
 
     fun isSignedIn(): Boolean =
-        accountEmail() != null && accessTokenOrNull() != null
+        accountEmail() != null
 
     fun accountEmail(): String? = tokenProvider.accountEmail()
 
-    fun accessTokenOrNull(): String? = tokenProvider.accessTokenOrNull()
+    override fun accessTokenOrNull(): String? = tokenProvider.accessTokenOrNull()
 
     companion object {
         const val DriveFileScope = "https://www.googleapis.com/auth/drive.file"
