@@ -24,6 +24,14 @@ class MainShellUiTest {
     }
 
     @Test
+    fun reportIssueUrlPointsAtAndroidRepository() {
+        assertEquals(
+            "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues",
+            ReportIssueUrl,
+        )
+    }
+
+    @Test
     fun importedBooksAreDisplayedInUnshelvedSection() {
         val entries = listOf(
             BookEntry(

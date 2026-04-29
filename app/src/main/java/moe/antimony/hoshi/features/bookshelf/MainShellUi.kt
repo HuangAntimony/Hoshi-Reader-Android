@@ -17,6 +17,8 @@ enum class SettingsDestination {
     About,
 }
 
+const val ReportIssueUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues"
+
 data class SettingsRowModel(
     val label: String,
     val destination: SettingsDestination,

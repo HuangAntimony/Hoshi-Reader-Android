@@ -336,7 +336,7 @@ fun BookshelfView(
                         SettingsDestination.ReportIssue -> context.startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/Manhhao/Hoshi-Reader/issues"),
+                                Uri.parse(ReportIssueUrl),
                             ),
                         )
                         else -> settingsDestination = destination
