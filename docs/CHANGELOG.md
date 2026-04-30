@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.1.2] - 2026-04-30
+
 ### Fixed
 
 - Preserve embedded cover image ratios for Calibre SVG cover wrappers instead of stretching the cover image. #4
