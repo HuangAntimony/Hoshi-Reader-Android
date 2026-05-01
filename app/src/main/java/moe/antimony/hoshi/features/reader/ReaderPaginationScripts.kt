@@ -184,7 +184,8 @@ internal object ReaderPaginationScripts {
             }
             return totalChars > 0 ? exploredChars / totalChars : 0;
           },
-          restoreProgress: function(progress) {
+          restoreProgress: async function(progress) {
+            await document.fonts.ready;
             var context = this.getScrollContext();
             if (context.pageSize <= 0 || progress <= 0) {
               var firstPage = this.contentFirstPageScroll(context);
@@ -194,8 +195,12 @@ internal object ReaderPaginationScripts {
             }
             if (progress >= 0.99) {
               var lastPage = this.contentLastPageScroll(context);
-              this.setPagePosition(context, Math.max(0, lastPage));
-              this.notifyRestoreComplete();
+              lastPage = Math.max(0, lastPage);
+              this.setPagePosition(context, lastPage);
+              requestAnimationFrame(() => {
+                this.setPagePosition(context, lastPage);
+                requestAnimationFrame(() => this.notifyRestoreComplete());
+              });
               return;
             }
             var walker = this.createWalker();
@@ -218,17 +223,22 @@ internal object ReaderPaginationScripts {
             if (targetNode) {
               var range = document.createRange();
               range.setStart(targetNode, 0);
-              range.setEnd(targetNode, Math.min(1, targetNode.textContent.length));
+              range.setEnd(targetNode, 1);
               var rect = this.getRect(range);
               var currentScroll = this.getPagePosition(context);
               var anchor = (context.vertical ? rect.top : rect.left) + currentScroll;
               var targetScroll = this.alignToPage(context, anchor);
               this.setPagePosition(context, targetScroll);
+              requestAnimationFrame(() => {
+                this.setPagePosition(context, targetScroll);
+              });
             } else {
               var firstPage = this.contentFirstPageScroll(context);
               this.setPagePosition(context, firstPage);
             }
-            this.notifyRestoreComplete();
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => this.notifyRestoreComplete());
+            });
           },
           paginate: function(direction) {
             var context = this.getScrollContext();
