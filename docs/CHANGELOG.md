@@ -8,6 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Fixed
 
 - Reduce extra top and bottom spacing in the reader so page content uses more of the visible reading area. #29
+- Prevent the reader from briefly flashing the start of a chapter before restoring the saved reading position. #30
 
 ## [v0.1.4] - 2026-05-01
 
