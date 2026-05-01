@@ -258,7 +258,7 @@ fun ReaderWebView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 22.dp, start = 96.dp, end = 96.dp),
+                .padding(start = 96.dp, end = 96.dp),
         )
         if (!effectiveSettings.showProgressTop) {
             ReaderBottomProgress(
@@ -769,8 +769,8 @@ private data class ReaderSelectionPayloadRect(
 )
 
 private const val MAX_SELECTION_LENGTH = 16
-private val ReaderWebViewTopPadding = 72.dp
-private val ReaderWebViewBottomPadding = 76.dp
+private val ReaderWebViewTopPadding = 44.dp
+private val ReaderWebViewBottomPadding = 56.dp
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
