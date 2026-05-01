@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -67,11 +68,9 @@ fun LookupPopupView(
         state.swipeThreshold,
         state.darkMode,
         state.audioSettings,
-        assets,
     ) {
         LookupPopupHtml.render(
             results = state.results,
-            assets = assets,
             dictionaryStyles = state.dictionaryStyles,
             settings = state.dictionarySettings,
             swipeToDismiss = state.swipeToDismiss,
@@ -80,6 +79,7 @@ fun LookupPopupView(
             audioSettings = state.audioSettings,
         )
     }
+    var contentReady by remember(html) { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val frame = LookupPopupLayout(
@@ -105,6 +105,7 @@ fun LookupPopupView(
                 )
                 .width(frame.width.dp)
                 .height(frame.height.dp)
+                .alpha(if (contentReady) 1f else 0f)
                 .zIndex(2f),
             shape = RoundedCornerShape(8.dp),
             color = popupBackground,
@@ -114,6 +115,8 @@ fun LookupPopupView(
         ) {
             LookupPopupWebView(
                 html = html,
+                results = state.results,
+                assets = assets,
                 audioSettings = state.audioSettings,
                 darkMode = state.darkMode,
                 selectionOffsetX = frameX,
@@ -126,6 +129,9 @@ fun LookupPopupView(
                     onPlayWordAudio = { url, mode ->
                         WordAudioPlayer.get(context).play(url, mode)
                     },
+                    onContentReady = {
+                        contentReady = true
+                    },
                 ),
             )
         }
@@ -136,6 +142,8 @@ fun LookupPopupView(
 @Composable
 private fun LookupPopupWebView(
     html: String,
+    results: List<LookupResult>,
+    assets: LookupPopupAssets,
     audioSettings: AudioSettings,
     darkMode: Boolean,
     selectionOffsetX: Double,
@@ -145,6 +153,8 @@ private fun LookupPopupWebView(
 ) {
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
     callbackHolder.callbacks = callbacks
+    val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
+    lookupResultsHolder.results = results
     var loadedHtml by remember { mutableStateOf<String?>(null) }
     var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
     AndroidView(
@@ -168,12 +178,13 @@ private fun LookupPopupWebView(
                     PopupWebViewBridge(
                         webView = this,
                         callbackHolder = callbackHolder,
+                        lookupResultsHolder = lookupResultsHolder,
                         selectionOffsetX = selectionOffsetX,
                         selectionOffsetY = selectionOffsetY,
                     ),
                     "HoshiPopup",
                 )
-                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler)
+                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler, assets)
             }
         },
         update = { webView ->
