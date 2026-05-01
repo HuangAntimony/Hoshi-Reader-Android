@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +73,13 @@ fun AdvancedSettingsView(
     var destination by remember { mutableStateOf<AdvancedDestination?>(null) }
     if (destination == AdvancedDestination.Audio) {
         AudioSettingsView(
+            onClose = { destination = null },
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == AdvancedDestination.Sasayaki) {
+        SasayakiSettingsView(
             onClose = { destination = null },
             modifier = modifier,
         )
@@ -114,7 +122,8 @@ fun AdvancedSettingsView(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         leadingContent = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
                         headlineContent = { Text("Sasayaki (Audiobooks)") },
-                        supportingContent = { Text("Not implemented yet") },
+                        supportingContent = { Text("Read along with matched audiobook subtitles") },
+                        modifier = Modifier.clickable { destination = AdvancedDestination.Sasayaki },
                     )
                 }
             }
@@ -510,6 +519,7 @@ private fun BackIconButton(onClick: () -> Unit) {
 
 private enum class AdvancedDestination {
     Audio,
+    Sasayaki,
 }
 
 private const val ProgressUpdateBytes = 64L * 1024L * 1024L

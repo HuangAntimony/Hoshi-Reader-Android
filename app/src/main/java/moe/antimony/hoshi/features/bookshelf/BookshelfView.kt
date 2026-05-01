@@ -115,6 +115,10 @@ import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatcher
+import moe.antimony.hoshi.features.sasayaki.SasayakiParser
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
+import moe.antimony.hoshi.features.sasayaki.matchRateText
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.io.File
@@ -136,6 +140,7 @@ fun BookshelfView(
     val bookStorage = remember { BookStorage(context.filesDir) }
     val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
     val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
+    val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
     var selectedTab by remember {
         mutableStateOf(
@@ -152,6 +157,10 @@ fun BookshelfView(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var contextMenuEntry by remember { mutableStateOf<BookEntry?>(null) }
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
+    var sasayakiMatchCandidate by remember { mutableStateOf<BookEntry?>(null) }
+    var sasayakiMatchMessage by remember { mutableStateOf<String?>(null) }
+    var sasayakiEnabled by remember { mutableStateOf(sasayakiSettingsStore.load().enabled) }
+    var isMatchingSasayaki by remember { mutableStateOf(false) }
     var bookProgressById by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var selectedBookRoot by remember { mutableStateOf<File?>(null) }
     var book by remember { mutableStateOf<EpubBook?>(null) }
@@ -252,6 +261,36 @@ fun BookshelfView(
         }
     }
 
+    val sasayakiMatcher = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
+        val candidate = sasayakiMatchCandidate
+        sasayakiMatchCandidate = null
+        if (uri == null || candidate == null || isMatchingSasayaki) return@rememberLauncherForActivityResult
+        scope.launch {
+            isMatchingSasayaki = true
+            errorMessage = null
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val srtBytes = context.contentResolver.openInputStream(uri).use { input ->
+                        requireNotNull(input) { "Unable to open selected SRT." }.readBytes()
+                    }
+                    val parsedBook = EpubBookParser().parse(candidate.root)
+                    val match = SasayakiMatcher.match(
+                        book = parsedBook,
+                        cues = SasayakiParser.parseCues(srtBytes),
+                        searchWindow = 200,
+                    )
+                    bookStorage.saveSasayakiMatch(candidate.root, match)
+                    match
+                }
+            }.onSuccess { match ->
+                sasayakiMatchMessage = "Match Rate: ${match.matchRateText()}"
+            }.onFailure { error ->
+                sasayakiMatchMessage = error.localizedMessage ?: "Failed to match Sasayaki subtitles."
+            }
+            isMatchingSasayaki = false
+        }
+    }
+
     fun launchBookImporter() {
         importer.launch(arrayOf("application/epub+zip", "application/octet-stream"))
     }
@@ -276,6 +315,7 @@ fun BookshelfView(
     if (isReading && book != null) {
         ReaderWebView(
             book = requireNotNull(book),
+            bookRoot = selectedBookRoot,
             initialChapterIndex = bookmark?.chapterIndex ?: 0,
             initialProgress = bookmark?.progress ?: 0.0,
             readerSettings = readerSettings,
@@ -329,7 +369,10 @@ fun BookshelfView(
 
     if (settingsDestination == SettingsDestination.Advanced) {
         AdvancedSettingsView(
-            onClose = { settingsDestination = null },
+            onClose = {
+                sasayakiEnabled = sasayakiSettingsStore.load().enabled
+                settingsDestination = null
+            },
             modifier = modifier.fillMaxSize(),
         )
         return
@@ -373,6 +416,12 @@ fun BookshelfView(
                 contextMenuEntry = contextMenuEntry,
                 onContextMenuEntryChange = { contextMenuEntry = it },
                 onDeleteCandidate = { deleteCandidate = it },
+                sasayakiEnabled = sasayakiEnabled,
+                isMatchingSasayaki = isMatchingSasayaki,
+                onMatchSasayaki = { entry ->
+                    sasayakiMatchCandidate = entry
+                    sasayakiMatcher.launch(arrayOf("application/x-subrip", "text/plain", "application/octet-stream", "*/*"))
+                },
             )
             MainTab.Dictionary -> DictionarySearchView(
                 readerSettings = readerSettings,
@@ -442,6 +491,19 @@ fun BookshelfView(
             dismissButton = {
                 TextButton(onClick = { deleteCandidate = null }) {
                     Text("Cancel")
+                }
+            },
+        )
+    }
+
+    sasayakiMatchMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { sasayakiMatchMessage = null },
+            title = { Text("Sasayaki Match") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { sasayakiMatchMessage = null }) {
+                    Text("OK")
                 }
             },
         )
@@ -601,6 +663,9 @@ private fun BooksTab(
     contextMenuEntry: BookEntry?,
     onContextMenuEntryChange: (BookEntry?) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
+    sasayakiEnabled: Boolean,
+    isMatchingSasayaki: Boolean,
+    onMatchSasayaki: (BookEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sections = remember(bookEntries) { bookshelfSections(bookEntries) }
@@ -695,6 +760,16 @@ private fun BooksTab(
                                                 onContextMenuEntryChange(null)
                                             },
                                         )
+                                        if (sasayakiEnabled) {
+                                            DropdownMenuItem(
+                                                text = { Text(if (isMatchingSasayaki) "Matching Sasayaki…" else "Match Sasayaki") },
+                                                enabled = !isMatchingSasayaki,
+                                                onClick = {
+                                                    contextMenuEntry?.let(onMatchSasayaki)
+                                                    onContextMenuEntryChange(null)
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }

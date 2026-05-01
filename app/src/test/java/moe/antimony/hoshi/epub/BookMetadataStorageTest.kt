@@ -4,6 +4,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -93,5 +96,29 @@ class BookMetadataStorageTest {
 
         assertEquals("屍人荘_の_殺人", first.name)
         assertEquals(first.canonicalFile, second.canonicalFile)
+    }
+
+    @Test
+    fun savesAndLoadsIosCompatibleSasayakiSidecars() {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-sasayaki-sidecars").toFile())
+        val root = storage.createBookDirectory("book")
+        val match = SasayakiMatchData(
+            matches = listOf(SasayakiMatch("0", 1.0, 2.0, "本文", chapterIndex = 3, start = 10, length = 2)),
+            unmatched = 4,
+        )
+        val playback = SasayakiPlaybackData(
+            lastPosition = 12.5,
+            delay = -0.15,
+            rate = 1.1f,
+            audioUri = "content://audio/test.m4b",
+        )
+
+        storage.saveSasayakiMatch(root, match)
+        storage.saveSasayakiPlayback(root, playback)
+
+        assertEquals(match, storage.loadSasayakiMatch(root))
+        assertEquals(playback, storage.loadSasayakiPlayback(root))
+        assertEquals(true, root.resolve("sasayaki_match.json").isFile)
+        assertEquals(true, root.resolve("sasayaki_playback.json").isFile)
     }
 }

@@ -35,7 +35,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -46,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,15 +65,24 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.features.audio.AudioSettingsStore
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsStore
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
+import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
+import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
 import java.io.File
 
@@ -91,6 +104,7 @@ data class ReaderSelectionRect(
 @Composable
 fun ReaderWebView(
     book: EpubBook,
+    bookRoot: File? = null,
     initialChapterIndex: Int = 0,
     initialProgress: Double = 0.0,
     readerSettings: ReaderSettings = ReaderSettings(),
@@ -103,6 +117,7 @@ fun ReaderWebView(
     var effectiveSettings by remember(readerSettings) { mutableStateOf(readerSettings) }
     var showAppearance by remember { mutableStateOf(false) }
     var showChapters by remember { mutableStateOf(false) }
+    var showSasayaki by remember { mutableStateOf(false) }
     var showReaderMenu by remember { mutableStateOf(false) }
     var lookupPopups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -111,6 +126,12 @@ fun ReaderWebView(
     val fontManager = remember { ReaderFontManager(context.filesDir) }
     val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
     val audioSettingsStore = remember { AudioSettingsStore(context) }
+    val bookStorage = remember { BookStorage(context.filesDir) }
+    val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
+    var sasayakiSettings by remember { mutableStateOf(sasayakiSettingsStore.load()) }
+    val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookStorage::loadSasayakiMatch) }
+    val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
+    var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
     fun lookupRootPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
@@ -153,6 +174,9 @@ fun ReaderWebView(
         lookupPopups = emptyList()
     }
     val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
+        if (sasayakiSettings.enabled && sasayakiSettings.autoPause) {
+            sasayakiPlayer?.takeIf { it.isPlaying }?.pausePlayback()
+        }
         lookupPopups = emptyList()
         val lookup = lookupRootPopup(selection)
         if (lookup != null) {
@@ -181,6 +205,41 @@ fun ReaderWebView(
             totalCharacters = book.bookInfo.characterCount,
         )
     }
+    LaunchedEffect(bookRoot, sasayakiMatchData) {
+        sasayakiPlayer?.release()
+        sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null) {
+            SasayakiPlayer(
+                context = context,
+                bookRoot = bookRoot,
+                bookStorage = bookStorage,
+                matchData = sasayakiMatchData,
+                getCurrentChapterIndex = { readerPosition.displayedPosition.index },
+                onCue = { cue, reveal ->
+                    webView?.evaluateJavascript(
+                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal),
+                        null,
+                    )
+                },
+                onClearCue = {
+                    webView?.evaluateJavascript(ReaderPaginationScripts.clearSasayakiCueInvocation(), null)
+                },
+                onLoadChapter = { chapterIndex ->
+                    val target = ReaderChapterPosition(index = chapterIndex, progress = 0.0)
+                    readerPosition = readerPosition.jumpTo(target)
+                    onSaveBookmark(target.index, target.progress)
+                },
+            )
+        } else {
+            null
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { sasayakiPlayer?.release() }
+    }
+    LaunchedEffect(showReaderMenu, showSasayaki) {
+        sasayakiSettings = sasayakiSettingsStore.load()
+    }
+    sasayakiPlayer?.autoScroll = sasayakiSettings.autoScroll
 
     BackHandler(onBack = onClose)
     val useLightSystemBars = when (effectiveSettings.theme) {
@@ -252,6 +311,9 @@ fun ReaderWebView(
                     onSaveBookmark(updatedPosition.displayedPosition.index, updatedPosition.displayedPosition.progress)
                 },
                 readerSettings = effectiveSettings,
+                sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
+                sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                 onTextSelected = handleTextSelected,
                 onClearLookupPopup = ::closeLookupPopupsAndSelection,
                 fontManager = fontManager,
@@ -301,6 +363,18 @@ fun ReaderWebView(
                 showReaderMenu = false
                 showAppearance = true
             },
+            onSasayaki = if (sasayakiSettings.enabled && sasayakiMatchData != null) {
+                {
+                    showReaderMenu = false
+                    showSasayaki = true
+                }
+            } else {
+                null
+            },
+            onSasayakiToggle = sasayakiPlayer
+                ?.takeIf { sasayakiSettings.enabled && sasayakiSettings.showReaderToggle && it.hasAudio }
+                ?.let { player -> ({ player.togglePlayback() }) },
+            sasayakiPlaying = sasayakiPlayer?.isPlaying == true,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         webView?.let { _ -> Unit }
@@ -328,6 +402,13 @@ fun ReaderWebView(
                 showChapters = false
             },
             onDismiss = { showChapters = false },
+        )
+    }
+    if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
+        SasayakiSheet(
+            player = requireNotNull(sasayakiPlayer),
+            audioRepository = sasayakiAudioRepository,
+            onDismiss = { showSasayaki = false },
         )
     }
 }
@@ -391,6 +472,9 @@ private fun BoxScope.ReaderBottomChrome(
     onDismissMenu: () -> Unit,
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
+    onSasayaki: (() -> Unit)?,
+    onSasayakiToggle: (() -> Unit)?,
+    sasayakiPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (menuExpanded) {
@@ -404,6 +488,7 @@ private fun BoxScope.ReaderBottomChrome(
             colors = colors,
             onChapters = onChapters,
             onAppearance = onAppearance,
+            onSasayaki = onSasayaki,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
@@ -426,6 +511,17 @@ private fun BoxScope.ReaderBottomChrome(
             )
         }
         Spacer(Modifier.weight(1f))
+        if (onSasayakiToggle != null) {
+            ReaderGlassButton(colors = colors, onClick = onSasayakiToggle) {
+                Icon(
+                    imageVector = if (sasayakiPlaying) Icons.Rounded.Pause else Icons.Rounded.GraphicEq,
+                    contentDescription = if (sasayakiPlaying) "Pause Sasayaki" else "Play Sasayaki",
+                    modifier = Modifier.size(26.dp),
+                    tint = Color(colors.buttonContent),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+        }
         ReaderGlassButton(colors = colors, onClick = onMenu) {
             Icon(
                 imageVector = Icons.Rounded.Tune,
@@ -442,6 +538,7 @@ private fun ReaderMenuCard(
     colors: ReaderChromeColors,
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
+    onSasayaki: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -484,6 +581,24 @@ private fun ReaderMenuCard(
                 colors = colors,
                 onClick = onAppearance,
             )
+            if (onSasayaki != null) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 22.dp),
+                    color = Color(colors.menuBorder),
+                )
+                ReaderMenuItem(
+                    text = "Sasayaki",
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            tint = Color(colors.menuContent),
+                        )
+                    },
+                    colors = colors,
+                    onClick = onSasayaki,
+                )
+            }
         }
     }
 }
@@ -554,6 +669,9 @@ private fun ChapterWebView(
     onPreviousChapter: () -> Boolean,
     onSaveBookmark: (progress: Double) -> Unit,
     readerSettings: ReaderSettings,
+    sasayakiCuesJson: String?,
+    sasayakiTextColor: Long,
+    sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData) -> Int?,
     onClearLookupPopup: () -> Unit,
     fontManager: ReaderFontManager,
@@ -566,12 +684,24 @@ private fun ChapterWebView(
         fontManager.webViewFontUrl(readerSettings.selectedFont)
     }
     val baseUrl = remember(chapter) { "https://hoshi.local/epub/${chapter.href}" }
-    val readerSetupScript = remember(chapter, chapterPosition.progress, readerSettings, fontFaceUrl, systemDark) {
+    val readerSetupScript = remember(
+        chapter,
+        chapterPosition.progress,
+        readerSettings,
+        fontFaceUrl,
+        systemDark,
+        sasayakiCuesJson,
+        sasayakiTextColor,
+        sasayakiBackgroundColor,
+    ) {
         readerSetupScript(
             initialProgress = chapterPosition.progress,
             settings = readerSettings,
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
+            sasayakiCuesJson = sasayakiCuesJson,
+            sasayakiTextColor = sasayakiTextColor,
+            sasayakiBackgroundColor = sasayakiBackgroundColor,
         )
     }
 
@@ -681,10 +811,23 @@ private fun readerSetupScript(
     settings: ReaderSettings,
     fontFaceUrl: String?,
     systemDark: Boolean,
+    sasayakiCuesJson: String?,
+    sasayakiTextColor: Long,
+    sasayakiBackgroundColor: Long,
 ): String {
-    val css = ReaderContentStyles.css(settings, fontFaceUrl, systemDark).javaScriptStringLiteral()
+    val css = ReaderContentStyles.css(
+        settings = settings,
+        fontFaceUrl = fontFaceUrl,
+        systemDark = systemDark,
+        sasayakiTextColor = sasayakiTextColor,
+        sasayakiBackgroundColor = sasayakiBackgroundColor,
+    ).javaScriptStringLiteral()
     val selectionScript = ReaderSelectionScripts.source()
-    val paginationScript = ReaderPaginationScripts.shellScript(initialProgress, settings).scriptTagBody()
+    val paginationScript = ReaderPaginationScripts.shellScript(
+        initialProgress = initialProgress,
+        settings = settings,
+        sasayakiCuesJson = sasayakiCuesJson,
+    ).scriptTagBody()
     return """
         (function() {
           var style = document.createElement('style');
@@ -801,6 +944,13 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+private fun SasayakiMatchData.cuesJsonForChapter(chapterIndex: Int): String {
+    val cues = matches
+        .filter { it.chapterIndex == chapterIndex }
+        .map { SasayakiCueRange(id = it.id, start = it.start, length = it.length) }
+    return Json.encodeToString(ListSerializer(SasayakiCueRange.serializer()), cues)
 }
 
 internal fun androidPixelsToCssPixels(value: Float, density: Float): Float =

@@ -3,8 +3,11 @@ package moe.antimony.hoshi.epub
 import android.content.ContentResolver
 import android.net.Uri
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -99,14 +102,11 @@ class BookStorage(private val filesDir: File) {
     }
 
     fun loadMetadata(bookRoot: File): BookMetadata? {
-        val file = bookRoot.resolve(METADATA_FILE_NAME)
-        if (!file.isFile) return null
-        return runCatching { json.decodeFromString<BookMetadata>(file.readText()) }.getOrNull()
+        return loadJson(BookMetadata.serializer(), bookRoot.resolve(METADATA_FILE_NAME))
     }
 
     fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
-        bookRoot.mkdirs()
-        bookRoot.resolve(METADATA_FILE_NAME).writeText(json.encodeToString(metadata))
+        saveJson(bookRoot, METADATA_FILE_NAME, BookMetadata.serializer(), metadata)
     }
 
     fun coverFile(entry: BookEntry): File? {
@@ -129,25 +129,35 @@ class BookStorage(private val filesDir: File) {
     }
 
     fun loadBookmark(bookRoot: File): Bookmark? {
-        val file = bookRoot.resolve(BOOKMARK_FILE_NAME)
-        if (!file.isFile) return null
-        return runCatching { json.decodeFromString<Bookmark>(file.readText()) }.getOrNull()
+        return loadJson(Bookmark.serializer(), bookRoot.resolve(BOOKMARK_FILE_NAME))
     }
 
     fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
-        bookRoot.mkdirs()
-        bookRoot.resolve(BOOKMARK_FILE_NAME).writeText(json.encodeToString(bookmark))
+        saveJson(bookRoot, BOOKMARK_FILE_NAME, Bookmark.serializer(), bookmark)
     }
 
     fun loadBookInfo(bookRoot: File): BookInfo? {
-        val file = bookRoot.resolve(BOOKINFO_FILE_NAME)
-        if (!file.isFile) return null
-        return runCatching { json.decodeFromString<BookInfo>(file.readText()) }.getOrNull()
+        return loadJson(BookInfo.serializer(), bookRoot.resolve(BOOKINFO_FILE_NAME))
     }
 
     fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
-        bookRoot.mkdirs()
-        bookRoot.resolve(BOOKINFO_FILE_NAME).writeText(json.encodeToString(bookInfo))
+        saveJson(bookRoot, BOOKINFO_FILE_NAME, BookInfo.serializer(), bookInfo)
+    }
+
+    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? {
+        return loadJson(SasayakiMatchData.serializer(), bookRoot.resolve(SASAYAKI_MATCH_FILE_NAME))
+    }
+
+    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+        saveJson(bookRoot, SASAYAKI_MATCH_FILE_NAME, SasayakiMatchData.serializer(), match)
+    }
+
+    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? {
+        return loadJson(SasayakiPlaybackData.serializer(), bookRoot.resolve(SASAYAKI_PLAYBACK_FILE_NAME))
+    }
+
+    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+        saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
     fun loadReadingProgress(bookRoot: File): Double {
@@ -208,7 +218,19 @@ class BookStorage(private val filesDir: File) {
         const val METADATA_FILE_NAME = "metadata.json"
         const val BOOKMARK_FILE_NAME = "bookmark.json"
         const val BOOKINFO_FILE_NAME = "bookinfo.json"
+        const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"
+        const val SASAYAKI_PLAYBACK_FILE_NAME = "sasayaki_playback.json"
         const val APPLE_REFERENCE_EPOCH_SECONDS = 978_307_200.0
+    }
+
+    private fun <T> loadJson(serializer: KSerializer<T>, file: File): T? {
+        if (!file.isFile) return null
+        return runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
+    }
+
+    private fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) {
+        bookRoot.mkdirs()
+        bookRoot.resolve(fileName).writeText(json.encodeToString(serializer, value))
     }
 
     private fun File.fallbackMetadata(): BookMetadata =

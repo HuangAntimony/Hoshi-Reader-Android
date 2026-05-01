@@ -12,6 +12,15 @@ internal object ReaderPaginationScripts {
     fun progressInvocation(): String =
         "window.hoshiReader.calculateProgress()"
 
+    fun applySasayakiCuesInvocation(cuesJson: String): String =
+        "window.hoshiReader.applySasayakiCues($cuesJson)"
+
+    fun highlightSasayakiCueInvocation(cueId: String, reveal: Boolean): String =
+        "window.hoshiReader.highlightSasayakiCue(${cueId.javaScriptStringLiteral()}, $reveal)"
+
+    fun clearSasayakiCueInvocation(): String =
+        "window.hoshiReader.clearSasayakiCue()"
+
     fun didScroll(result: String?): Boolean =
         result?.trim()?.trim('"') == "scrolled"
 
@@ -21,11 +30,14 @@ internal object ReaderPaginationScripts {
     fun shellScript(
         initialProgress: Double = 0.0,
         settings: ReaderSettings = ReaderSettings(),
+        sasayakiCuesJson: String? = null,
     ): String = """
         <script>
         window.hoshiReader = {
           pageHeight: 0,
           pageWidth: 0,
+          cueWrappers: new Map(),
+          activeCueId: null,
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
           nodeStartOffsets: new WeakMap(),
@@ -71,6 +83,126 @@ internal object ReaderPaginationScripts {
             }
             this.nodeStartOffsets = offsets;
           },
+          collectSasayakiCueRanges: function(cues) {
+            var cueRanges = new Map();
+            if (!cues.length) return [];
+            var index = 0;
+            var current = cues[0];
+            var start = current.start;
+            var end = start + current.length;
+            var cursor = 0;
+            var segment = null;
+            var flushSegment = function(node) {
+              if (!segment) return;
+              var ranges = cueRanges.get(segment.id) || [];
+              ranges.push({ node: node, start: segment.start, end: segment.end });
+              cueRanges.set(segment.id, ranges);
+              segment = null;
+            };
+            var advanceCue = function() {
+              index += 1;
+              current = cues[index];
+              if (current) {
+                start = current.start;
+                end = start + current.length;
+              }
+            };
+            var walker = this.createWalker();
+            var node;
+            while (current && (node = walker.nextNode())) {
+              var text = node.textContent;
+              var i = 0;
+              while (i < text.length && current) {
+                var char = String.fromCodePoint(text.codePointAt(i));
+                var next = i + char.length;
+                if (this.isMatchableChar(char)) {
+                  if (cursor >= start && cursor < end) {
+                    if (!segment) {
+                      segment = { id: current.id, start: i, end: next };
+                    } else {
+                      segment.end = next;
+                    }
+                  } else {
+                    flushSegment(node);
+                  }
+                  cursor += 1;
+                  if (cursor === end) {
+                    flushSegment(node);
+                    advanceCue();
+                  }
+                } else if (segment) {
+                  segment.end = next;
+                }
+                i = next;
+              }
+              flushSegment(node);
+            }
+            return cues.map(function(cue) {
+              return { id: cue.id, ranges: cueRanges.get(cue.id) || [] };
+            });
+          },
+          applySasayakiCues: function(cues) {
+            this.resetSasayakiCues();
+            var cueRanges = this.collectSasayakiCueRanges(cues);
+            var range = document.createRange();
+            for (var i = cueRanges.length - 1; i >= 0; i--) {
+              var id = cueRanges[i].id;
+              var ranges = cueRanges[i].ranges;
+              if (!ranges.length) continue;
+              var wrappers = [];
+              for (var j = ranges.length - 1; j >= 0; j--) {
+                var segment = ranges[j];
+                range.setStart(segment.node, segment.start);
+                range.setEnd(segment.node, segment.end);
+                var wrapper = document.createElement('span');
+                wrapper.className = 'hoshi-sasayaki-cue';
+                wrapper.appendChild(range.extractContents());
+                range.insertNode(wrapper);
+                wrappers.push(wrapper);
+              }
+              wrappers.reverse();
+              this.cueWrappers.set(id, wrappers);
+            }
+            this.buildNodeOffsets();
+          },
+          highlightSasayakiCue: function(cueId, reveal) {
+            this.clearSasayakiCue();
+            var wrappers = this.cueWrappers.get(cueId);
+            if (!wrappers || !wrappers.length) return null;
+            this.activeCueId = cueId;
+            wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
+            if (reveal) {
+              var range = document.createRange();
+              range.selectNodeContents(wrappers[0]);
+              if (this.scrollToRange(range)) {
+                return this.calculateProgress();
+              }
+            }
+            return null;
+          },
+          clearSasayakiCue: function() {
+            if (!this.activeCueId) return;
+            var wrappers = this.cueWrappers.get(this.activeCueId) || [];
+            wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
+            this.activeCueId = null;
+          },
+          resetSasayakiCues: function() {
+            var self = this;
+            this.cueWrappers.forEach(function(wrappers) { self.unwrap(wrappers); });
+            this.cueWrappers.clear();
+            this.activeCueId = null;
+          },
+          unwrap: function(wrappers) {
+            wrappers.forEach(function(wrapper) {
+              var parent = wrapper.parentNode;
+              if (!parent) return;
+              while (wrapper.firstChild) {
+                parent.insertBefore(wrapper.firstChild, wrapper);
+              }
+              parent.removeChild(wrapper);
+              parent.normalize();
+            });
+          },
           getScrollContext: function() {
             var vertical = this.isVertical();
             var scrollEl = document.body;
@@ -101,6 +233,20 @@ internal object ReaderPaginationScripts {
               return nearestPage;
             }
             return this.alignToPage(context, safeOffset);
+          },
+          scrollToRange: function(range) {
+            var context = this.getScrollContext();
+            var rect = this.getRect(range);
+            var currentScroll = this.getPagePosition(context);
+            var anchor = (context.vertical ? rect.top : rect.left) + currentScroll;
+            var targetScroll = this.alignToPage(context, anchor);
+            if (targetScroll === currentScroll) return false;
+            this.setPagePosition(context, targetScroll);
+            var self = this;
+            requestAnimationFrame(function() {
+              self.setPagePosition(context, targetScroll);
+            });
+            return true;
           },
           contentLastPageScroll: function(context) {
             var currentScroll = this.getPagePosition(context);
@@ -313,6 +459,7 @@ internal object ReaderPaginationScripts {
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
+            ${sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" }.orEmpty()}
             window.hoshiReader.restoreProgress($initialProgress);
           });
         };
@@ -325,3 +472,19 @@ internal object ReaderPaginationScripts {
         </script>
     """.trimIndent()
 }
+
+private fun String.javaScriptStringLiteral(): String =
+    buildString(length + 2) {
+        append('"')
+        this@javaScriptStringLiteral.forEach { ch ->
+            when (ch) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(ch)
+            }
+        }
+        append('"')
+    }

@@ -116,6 +116,20 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun exposesSasayakiCueWrappingAndHighlightingLikeIos() {
+        val script = ReaderPaginationScripts.shellScript()
+
+        assertTrue(script.contains("cueWrappers: new Map()"))
+        assertTrue(script.contains("collectSasayakiCueRanges: function(cues)"))
+        assertTrue(script.contains("applySasayakiCues: function(cues)"))
+        assertTrue(script.contains("highlightSasayakiCue: function(cueId, reveal)"))
+        assertTrue(script.contains("clearSasayakiCue: function()"))
+        assertTrue(script.contains("resetSasayakiCues: function()"))
+        assertTrue(script.contains("className = 'hoshi-sasayaki-cue'"))
+        assertTrue(script.contains("hoshi-sasayaki-active"))
+    }
+
+    @Test
     fun pageBoundariesUseLastActualContentPageInsteadOfReportedScrollHeight() {
         val script = ReaderPaginationScripts.shellScript()
 

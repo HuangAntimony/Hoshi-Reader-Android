@@ -1,0 +1,200 @@
+package moe.antimony.hoshi.features.sasayaki
+
+import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.importing.FileImportContent
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SasayakiSheet(
+    player: SasayakiPlayer,
+    audioRepository: SasayakiAudioRepository,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isImporting by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
+        if (uri == null || isImporting) return@rememberLauncherForActivityResult
+        isImporting = true
+        importError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    audioRepository.importAudio(context.contentResolver, uri)
+                }
+            }.onSuccess { fileName ->
+                player.importAudio(fileName)
+            }.onFailure { error ->
+                importError = error.localizedMessage ?: "Unable to import audiobook."
+            }
+            isImporting = false
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 28.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Sasayaki",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Close")
+                }
+            }
+            if (player.hasAudio) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = player::previousCue) {
+                        Icon(Icons.Rounded.FastRewind, contentDescription = "Previous Cue")
+                    }
+                    IconButton(onClick = player::togglePlayback) {
+                        Icon(
+                            if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = if (player.isPlaying) "Pause" else "Play",
+                        )
+                    }
+                    IconButton(onClick = player::nextCue) {
+                        Icon(Icons.Rounded.FastForward, contentDescription = "Next Cue")
+                    }
+                }
+                Text(
+                    text = "${formatDuration(player.currentTime)} / ${formatDuration(player.duration)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text("Load Audio") },
+                supportingContent = {
+                    Text(if (player.hasAudio) "Audiobook loaded" else "Select an .mp3 or .m4b audiobook")
+                },
+                trailingContent = {
+                    Button(
+                        enabled = !isImporting,
+                        onClick = { importer.launch(arrayOf("audio/mpeg", "audio/mp4", "audio/*", "application/octet-stream")) },
+                    ) {
+                        Text(if (isImporting) "Importing" else "Open")
+                    }
+                },
+            )
+            importError?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
+            player.errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            SliderRow(
+                label = "Delay",
+                valueText = String.format(java.util.Locale.US, "%+.2fs", player.delay),
+                value = player.delay.toFloat(),
+                range = -2f..2f,
+                steps = 79,
+                onValueChange = { player.setDelay(it.toDouble()) },
+            )
+            SliderRow(
+                label = "Speed",
+                valueText = String.format(java.util.Locale.US, "%.2fx", player.rate),
+                value = player.rate,
+                range = 0.5f..1.5f,
+                steps = 19,
+                onValueChange = { player.setRate(it) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SliderRow(
+    label: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onValueChange: (Float) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, modifier = Modifier.weight(1f))
+            Text(valueText, fontWeight = FontWeight.SemiBold)
+        }
+        Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
+    }
+}
+
+private fun formatDuration(seconds: Double): String =
+    DateUtils.formatElapsedTime(seconds.toLong().coerceAtLeast(0L))
