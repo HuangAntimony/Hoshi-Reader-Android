@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.dictionary
 
 import android.content.Context
 import de.manhhao.hoshi.LookupResult
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -34,7 +33,6 @@ internal data class LookupPopupAssets(
 internal object LookupPopupHtml {
     fun render(
         results: List<LookupResult>,
-        assets: LookupPopupAssets,
         dictionaryStyles: Map<String, String> = emptyMap(),
         topSpacerPx: Int = 0,
         settings: DictionarySettings = DictionarySettings(),
@@ -43,7 +41,7 @@ internal object LookupPopupHtml {
         darkMode: Boolean = false,
         audioSettings: AudioSettings = AudioSettings(),
     ): String {
-        val entries = entriesJson(results)
+        val entryCount = results.size
         val styles = dictionaryStylesJson(dictionaryStyles)
         val normalizedSettings = settings.normalized()
         val effectiveSwipeThreshold = if (swipeToDismiss) swipeThreshold.coerceAtLeast(0) else 0
@@ -63,10 +61,10 @@ internal object LookupPopupHtml {
             <html data-hoshi-color-scheme="$colorScheme">
             <head>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <style>${assets.popupCss}</style>
+                <link rel="stylesheet" href="popup.css">
                 <style>$androidColorSchemeCss</style>
-                <script>${assets.selectionJs.escapeScriptEnd()}</script>
-                <script>${assets.popupJs.escapeScriptEnd()}</script>
+                <script src="selection.js"></script>
+                <script src="popup.js"></script>
             </head>
             <body>
                 <script>
@@ -91,9 +89,16 @@ internal object LookupPopupHtml {
                             tapOutside: { postMessage: function() { window.HoshiAndroidPopup.postMessage('tapOutside'); } },
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
+                            contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             mineEntry: { postMessage: async function() { return false; } },
                             duplicateCheck: { postMessage: async function() { return false; } },
-                            getEntry: { postMessage: async function(index) { return window.lookupEntries[index]; } }
+                            getEntry: { postMessage: async function(index) {
+                                if (window.HoshiPopup && window.HoshiPopup.getEntry) {
+                                    var entryJson = window.HoshiPopup.getEntry(index);
+                                    return entryJson ? JSON.parse(entryJson) : null;
+                                }
+                                return window.lookupEntries[index];
+                            } }
                         }
                     };
                     window.collapseDictionaries = ${normalizedSettings.collapseDictionaries};
@@ -113,8 +118,8 @@ internal object LookupPopupHtml {
                     window.customCSS = ${JsonPrimitive(normalizedSettings.customCSS)};
                     window.swipeThreshold = $effectiveSwipeThreshold;
                     window.dictionaryStyles = $styles;
-                    window.lookupEntries = $entries;
-                    window.entryCount = window.lookupEntries.length;
+                    window.lookupEntries = [];
+                    window.entryCount = $entryCount;
                 </script>
                 <script>
                     (function() {
@@ -145,18 +150,37 @@ internal object LookupPopupHtml {
                     <div class="overlay-close" onclick="closeOverlay()">x</div>
                     <div class="overlay-content"></div>
                 </div>
-                <script>window.renderPopup();</script>
+                <script>
+                    (function() {
+                        var container = document.getElementById('entries-container');
+                        var posted = false;
+                        function postReady() {
+                            if (posted) return;
+                            posted = true;
+                            requestAnimationFrame(function() {
+                                requestAnimationFrame(function() {
+                                    webkit.messageHandlers.contentReady.postMessage(null);
+                                });
+                            });
+                        }
+                        if (container) {
+                            var observer = new MutationObserver(function() {
+                                if (container.querySelector('.entry')) {
+                                    postReady();
+                                    observer.disconnect();
+                                }
+                            });
+                            observer.observe(container, { childList: true, subtree: true });
+                        }
+                        window.renderPopup();
+                    })();
+                </script>
             </body>
             </html>
         """.trimIndent()
     }
 
-    private fun entriesJson(results: List<LookupResult>): JsonArray =
-        buildJsonArray {
-            results.forEach { result ->
-                add(result.toEntryJson())
-            }
-        }
+    internal fun entryJsonString(result: LookupResult): String = result.toEntryJson().toString()
 
     private fun dictionaryStylesJson(styles: Map<String, String>): JsonObject =
         buildJsonObject {
@@ -233,9 +257,6 @@ internal object LookupPopupHtml {
                 .forEach { add(JsonPrimitive(it)) }
         }
     }
-
-    private fun String.escapeScriptEnd(): String =
-        replace("</script>", "<\\/script>")
 
     private const val androidColorSchemeCss = """
         html[data-hoshi-color-scheme="light"],

@@ -33,9 +33,10 @@ internal data class LookupPopupItem(
 internal fun createLookupPopupItem(
     selection: ReaderSelectionData,
     options: LookupPopupOptions,
-    dictionaryStyles: Map<String, String> = currentDictionaryStyles(),
+    dictionaryStyles: Map<String, String>? = null,
 ): Pair<LookupPopupItem, Int>? {
     val settings = options.dictionarySettings.normalized()
+    val styles = dictionaryStyles ?: currentDictionaryStyles()
     val results = runCatching {
         LookupEngine.lookup(selection.text, settings.maxResults, settings.scanLength)
     }.getOrDefault(emptyList())
@@ -44,7 +45,7 @@ internal fun createLookupPopupItem(
         state = LookupPopupState(
             selection = selection,
             results = results,
-            dictionaryStyles = dictionaryStyles,
+            dictionaryStyles = styles,
             dictionarySettings = settings,
             isVertical = options.isVertical,
             isFullWidth = options.isFullWidth,

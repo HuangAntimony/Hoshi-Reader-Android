@@ -66,6 +66,7 @@ private const val DictionaryPopupBottomInset = 150.0
 internal data class DictionarySearchRenderState(
     val lastQuery: String,
     val html: String,
+    val results: List<LookupResult>,
     val hasResults: Boolean,
     val dictionaryStyles: Map<String, String>,
 )
@@ -74,7 +75,6 @@ internal object DictionarySearchContent {
     fun runLookup(
         query: String,
         lookup: (String) -> List<LookupResult>,
-        assets: LookupPopupAssets,
         dictionaryStyles: Map<String, String> = emptyMap(),
         dictionarySettings: DictionarySettings = DictionarySettings(),
         darkMode: Boolean = false,
@@ -85,6 +85,7 @@ internal object DictionarySearchContent {
             return DictionarySearchRenderState(
                 lastQuery = "",
                 html = "",
+                results = emptyList(),
                 hasResults = false,
                 dictionaryStyles = emptyMap(),
             )
@@ -94,6 +95,7 @@ internal object DictionarySearchContent {
             return DictionarySearchRenderState(
                 lastQuery = trimmed,
                 html = "",
+                results = emptyList(),
                 hasResults = false,
                 dictionaryStyles = emptyMap(),
             )
@@ -102,13 +104,13 @@ internal object DictionarySearchContent {
             lastQuery = trimmed,
             html = LookupPopupHtml.render(
                 results = results,
-                assets = assets,
                 dictionaryStyles = dictionaryStyles,
                 topSpacerPx = DictionarySearchTopSpacerPx,
                 settings = dictionarySettings,
                 darkMode = darkMode,
                 audioSettings = audioSettings,
             ),
+            results = results,
             hasResults = true,
             dictionaryStyles = dictionaryStyles,
         )
@@ -147,6 +149,7 @@ fun DictionarySearchView(
     val audioSettingsStore = remember { AudioSettingsStore(context) }
     var query by remember { mutableStateOf("") }
     var html by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<LookupResult>>(emptyList()) }
     var hasSearched by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -183,7 +186,6 @@ fun DictionarySearchView(
                     DictionarySearchContent.runLookup(
                         query = query,
                         lookup = { LookupEngine.lookup(it, settings.maxResults, settings.scanLength) },
-                        assets = assets,
                         dictionaryStyles = styles,
                         dictionarySettings = settings,
                         darkMode = popupDarkMode,
@@ -192,6 +194,7 @@ fun DictionarySearchView(
                 }
             }.onSuccess { state ->
                 html = state.html
+                searchResults = state.results
                 dictionaryStyles = state.dictionaryStyles
                 dictionarySettings = dictionarySettingsStore.load()
                 audioSettings = audioSettingsStore.load()
@@ -200,6 +203,7 @@ fun DictionarySearchView(
                 hasSearched = true
             }.onFailure {
                 html = ""
+                searchResults = emptyList()
                 dictionaryStyles = emptyMap()
                 popups = emptyList()
                 resultClearSelectionSignal = 0
@@ -226,6 +230,8 @@ fun DictionarySearchView(
         when {
             html.isNotBlank() -> DictionaryResultWebView(
                 html = html,
+                results = searchResults,
+                assets = assets,
                 audioSettings = audioSettings,
                 clearSelectionSignal = resultClearSelectionSignal,
                 callbacks = PopupWebViewCallbacks(
@@ -372,6 +378,8 @@ private fun DictionarySearchMessage(text: String, modifier: Modifier = Modifier)
 @Composable
 private fun DictionaryResultWebView(
     html: String,
+    results: List<LookupResult>,
+    assets: LookupPopupAssets,
     audioSettings: AudioSettings,
     clearSelectionSignal: Int,
     callbacks: PopupWebViewCallbacks,
@@ -379,6 +387,8 @@ private fun DictionaryResultWebView(
 ) {
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
     callbackHolder.callbacks = callbacks
+    val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
+    lookupResultsHolder.results = results
     var loadedHtml by remember { mutableStateOf<String?>(null) }
     var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
     AndroidView(
@@ -395,8 +405,15 @@ private fun DictionaryResultWebView(
                 isVerticalScrollBarEnabled = false
                 disableNativeOverscrollStretch()
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                addJavascriptInterface(PopupWebViewBridge(this, callbackHolder), "HoshiPopup")
-                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler)
+                addJavascriptInterface(
+                    PopupWebViewBridge(
+                        webView = this,
+                        callbackHolder = callbackHolder,
+                        lookupResultsHolder = lookupResultsHolder,
+                    ),
+                    "HoshiPopup",
+                )
+                webViewClient = PopupMessageWebViewClient(callbackHolder, audioRequestHandler, assets)
             }
         },
         update = { webView ->
@@ -406,6 +423,7 @@ private fun DictionaryResultWebView(
                 AudioRequestHandler(
                     LocalAudioRepository.fromContext(webView.context),
                 ),
+                assets,
             )
             if (loadedHtml != html) {
                 loadedHtml = html

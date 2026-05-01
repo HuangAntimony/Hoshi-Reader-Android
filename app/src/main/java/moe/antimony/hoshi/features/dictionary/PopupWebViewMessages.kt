@@ -8,6 +8,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.io.ByteArrayInputStream
+import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.features.audio.AudioPlaybackMode
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
@@ -20,15 +22,21 @@ internal class PopupWebViewCallbacks(
     val onOpenLink: (String) -> Unit = {},
     val onTextSelected: (ReaderSelectionData) -> Int? = { null },
     val onPlayWordAudio: (String, AudioPlaybackMode) -> Unit = { _, _ -> },
+    val onContentReady: () -> Unit = {},
 )
 
 internal class PopupWebViewCallbackHolder(
     var callbacks: PopupWebViewCallbacks,
 )
 
+internal class PopupLookupResultsHolder(
+    var results: List<LookupResult>,
+)
+
 internal class PopupMessageWebViewClient(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val audioRequestHandler: AudioRequestHandler? = null,
+    private val assets: LookupPopupAssets? = null,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
         handlePopupUrl(request.url)
@@ -38,11 +46,31 @@ internal class PopupMessageWebViewClient(
         handlePopupUrl(Uri.parse(url))
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-        audioRequestHandler?.handleAudioRequest(request.url.toString())
+        handleAssetRequest(request.url) ?: audioRequestHandler?.handleAudioRequest(request.url.toString())
 
     @Suppress("OVERRIDE_DEPRECATION")
     override fun shouldInterceptRequest(view: WebView, url: String): WebResourceResponse? =
-        audioRequestHandler?.handleAudioRequest(url)
+        handleAssetRequest(Uri.parse(url)) ?: audioRequestHandler?.handleAudioRequest(url)
+
+    private fun handleAssetRequest(uri: Uri): WebResourceResponse? {
+        val assets = assets ?: return null
+        if (uri.host != "hoshi.local" || !uri.path.orEmpty().startsWith("/popup/")) return null
+        val content = when (uri.lastPathSegment) {
+            "popup.css" -> assets.popupCss
+            "selection.js" -> assets.selectionJs
+            "popup.js" -> assets.popupJs
+            else -> return null
+        }
+        val mimeType = when (uri.lastPathSegment) {
+            "popup.css" -> "text/css"
+            else -> "application/javascript"
+        }
+        return WebResourceResponse(
+            mimeType,
+            "UTF-8",
+            ByteArrayInputStream(content.toByteArray(Charsets.UTF_8)),
+        )
+    }
 
     private fun handlePopupUrl(uri: Uri): Boolean {
         if (uri.scheme != "hoshi-popup") return false
@@ -57,10 +85,15 @@ internal class PopupMessageWebViewClient(
 internal class PopupWebViewBridge(
     private val webView: WebView,
     private val callbackHolder: PopupWebViewCallbackHolder,
+    private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
     private val selectionOffsetX: Double = 0.0,
     private val selectionOffsetY: Double = 0.0,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun getEntry(index: Int): String? =
+        lookupResultsHolder.results.getOrNull(index)?.let { LookupPopupHtml.entryJsonString(it) }
 
     @JavascriptInterface
     fun postMessage(message: String) {
@@ -73,6 +106,7 @@ internal class PopupWebViewBridge(
                 webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
             }
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
+            "contentReady" -> mainHandler.post(callbacks.onContentReady)
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return
                 val mode = AudioPlaybackMode.fromRawValue(body.optString("mode"))
