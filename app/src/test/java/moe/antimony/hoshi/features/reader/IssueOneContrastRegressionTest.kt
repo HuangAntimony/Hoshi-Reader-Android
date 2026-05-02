@@ -19,34 +19,27 @@ class IssueOneContrastRegressionTest {
 
     @Test
     fun chapterSheetUsesOpaqueSurfaceSoReaderDoesNotShowThrough() {
-        val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderChapterSheet.kt").readText()
-        val sheet = source.substringAfter("ModalBottomSheet(")
-            .substringBefore(") {\n        LazyColumn")
+        val chromeSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderSheetChrome.kt").readText()
 
-        assertTrue(sheet.contains("containerColor = MaterialTheme.colorScheme.surface"))
-        assertTrue(sheet.contains("contentColor = MaterialTheme.colorScheme.onSurface"))
-        assertFalse(sheet.contains(".copy(alpha ="))
+        assertTrue(chromeSource.contains("val containerColor = if (eInkMode) MaterialTheme.colorScheme.surface else BottomSheetDefaults.ContainerColor"))
+        assertTrue(chromeSource.contains("contentColor = if (eInkMode) MaterialTheme.colorScheme.onSurface else contentColorFor(containerColor)"))
     }
 
     @Test
     fun readerHalfSheetsDoNotDimPureReaderBackgrounds() {
-        val chapterSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderChapterSheet.kt").readText()
-        val appearanceSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderAppearanceView.kt").readText()
+        val chromeSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderSheetChrome.kt").readText()
 
-        listOf(chapterSource, appearanceSource).forEach { source ->
-            val sheet = source.substringAfter("ModalBottomSheet(")
-                .substringBefore(") {")
-            assertTrue(sheet.contains("scrimColor = Color.Transparent"))
-        }
+        assertTrue(chromeSource.contains("scrimColor = if (eInkMode) Color.Transparent else BottomSheetDefaults.ScrimColor"))
     }
 
     @Test
     fun readerHalfSheetsDrawTopOutlineBoundary() {
-        val chapterSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderChapterSheet.kt").readText()
-        val appearanceSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderAppearanceView.kt").readText()
+        val chromeSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderSheetChrome.kt").readText()
 
-        assertTrue(chapterSource.contains("ReaderSheetTopOutline("))
-        assertTrue(appearanceSource.contains("ReaderSheetTopOutline("))
+        val eInkHandle = chromeSource.substringAfter("if (sheetStyle.eInkMode) {")
+            .substringBefore("} else {")
+        assertTrue(eInkHandle.contains("ReaderSheetTopOutline()"))
+        assertFalse(chromeSource.substringAfter("} else {").contains("ReaderSheetTopOutline()"))
     }
 
     @Test
@@ -67,5 +60,20 @@ class IssueOneContrastRegressionTest {
         assertFalse(segmentedRow.contains("icon = {}"))
         assertFalse(segmentedRow.contains("colors ="))
         assertFalse(source.contains("private fun segmentedButtonColors("))
+    }
+
+    @Test
+    fun readerSheetsUseModeAwareSharedChrome() {
+        val chapterSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderChapterSheet.kt").readText()
+        val appearanceSource = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderAppearanceView.kt").readText()
+        val sasayakiSource = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiSheet.kt").readText()
+
+        listOf(chapterSource, appearanceSource, sasayakiSource).forEach { source ->
+            assertTrue(source.contains("val sheetStyle = readerSheetStyle()"))
+            assertTrue(source.contains("containerColor = sheetStyle.containerColor"))
+            assertTrue(source.contains("contentColor = sheetStyle.contentColor"))
+            assertTrue(source.contains("scrimColor = sheetStyle.scrimColor"))
+            assertTrue(source.contains("dragHandle = { ReaderSheetDragHandle(sheetStyle) }"))
+        }
     }
 }

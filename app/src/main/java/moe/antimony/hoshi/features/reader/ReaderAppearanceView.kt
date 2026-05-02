@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
@@ -124,12 +123,13 @@ internal fun ReaderAppearanceSheet(
     onDismiss: () -> Unit,
 ) {
     val palette = appearancePalette()
+    val sheetStyle = readerSheetStyle()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = palette.background,
-        contentColor = palette.onBackground,
-        scrimColor = Color.Transparent,
-        dragHandle = { ReaderAppearanceSheetHandle(palette) },
+        containerColor = sheetStyle.containerColor,
+        contentColor = sheetStyle.contentColor,
+        scrimColor = sheetStyle.scrimColor,
+        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
     ) {
         ReaderAppearanceContent(
             settings = settings,
@@ -139,18 +139,6 @@ internal fun ReaderAppearanceSheet(
             showDone = true,
             onDone = onDismiss,
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReaderAppearanceSheetHandle(palette: AppearancePalette) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ReaderSheetTopOutline()
-        BottomSheetDefaults.DragHandle(color = palette.onMuted)
     }
 }
 

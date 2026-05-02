@@ -62,15 +62,16 @@ internal fun ReaderChapterSheet(
 ) {
     val rows = remember(book, currentPosition.index) { book.chapterRows(currentPosition.index) }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.US) }
-    val eInkMode = LocalHoshiEInkMode.current
+    val sheetStyle = readerSheetStyle()
+    val eInkMode = sheetStyle.eInkMode
     var showJumpDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        scrimColor = Color.Transparent,
-        dragHandle = { ReaderSheetTopOutline() },
+        containerColor = sheetStyle.containerColor,
+        contentColor = sheetStyle.contentColor,
+        scrimColor = sheetStyle.scrimColor,
+        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
@@ -80,26 +81,13 @@ internal fun ReaderChapterSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 20.dp),
+                        .padding(top = 6.dp, bottom = 20.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .size(width = 42.dp, height = 5.dp)
-                            .clip(RoundedCornerShape(100))
-                            .background(
-                                if (eInkMode) {
-                                    MaterialTheme.colorScheme.outline
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
-                                },
-                            ),
-                    )
                     Text(
                         text = "Chapters",
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(top = 26.dp),
+                            .padding(top = 10.dp),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )

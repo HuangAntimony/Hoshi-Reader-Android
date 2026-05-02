@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.features.reader.ReaderSheetDragHandle
+import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.FileImportContent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +56,7 @@ fun SasayakiSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val sheetStyle = readerSheetStyle()
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
@@ -77,6 +80,10 @@ fun SasayakiSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
+        containerColor = sheetStyle.containerColor,
+        contentColor = sheetStyle.contentColor,
+        scrimColor = sheetStyle.scrimColor,
+        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
     ) {
         Column(
             modifier = Modifier
