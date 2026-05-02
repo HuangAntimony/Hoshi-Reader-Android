@@ -106,6 +106,18 @@ class MainShellUiTest {
     }
 
     @Test
+    fun sasayakiMatchMenuOpensAdjustableMatchScreen() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+
+        assertTrue(source.contains("var sasayakiMatchEntry by remember { mutableStateOf<BookEntry?>(null) }"))
+        assertTrue(source.contains("SasayakiMatchView("))
+        assertTrue(source.contains("sasayakiMatchEntry = entry"))
+        assertFalse(source.contains("SasayakiMatcher.match("))
+        assertFalse(source.contains("searchWindow = 200"))
+        assertFalse(source.contains("sasayakiMatcher.launch"))
+    }
+
+    @Test
     fun coverDecodeSampleSizeKeepsCoversNearTargetSize() {
         assertEquals(1, coverDecodeSampleSize(width = 600, height = 800, maxDimensionPx = 900))
         assertEquals(2, coverDecodeSampleSize(width = 1200, height = 1800, maxDimensionPx = 900))
