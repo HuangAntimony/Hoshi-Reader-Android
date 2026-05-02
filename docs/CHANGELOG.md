@@ -22,6 +22,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep Sasayaki popup Play Forward anchored on the selected cue instead of briefly jumping to a stale or edge-aligned page with no highlight.
 - Keep reader progress and saved book position in sync when Sasayaki Auto-Scroll follows audiobook cues across pages.
 - Highlight the current Sasayaki cue immediately when audiobook playback starts, matching iOS read-along behavior.
+- Match Sasayaki SRT files with the same cue accounting and non-reader TOC filtering as iOS so identical search windows report matching rates consistently.
 
 ## [v0.1.6] - 2026-05-02
 

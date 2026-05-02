@@ -16,8 +16,15 @@ object SasayakiMatcher {
         val source = mutableListOf<Int>()
         val chapters = mutableListOf<ChapterRange>()
         book.chapters.forEachIndexed { index, chapter ->
+            if (!chapter.linear) return@forEachIndexed
+            if (chapter.properties.hasManifestProperty("nav")) return@forEachIndexed
+            if (chapter.isGuideToc) return@forEachIndexed
             val codePoints = chapter.html.filteredReaderText().codePointsList()
-            chapters += ChapterRange(chapterIndex = index, start = source.size, length = codePoints.size)
+            chapters += ChapterRange(
+                chapterIndex = index,
+                start = source.size,
+                length = codePoints.size,
+            )
             source += codePoints
         }
 
@@ -37,9 +44,6 @@ object SasayakiMatcher {
         var cursor = start
 
         for (cue in cues) {
-            if (cue.text.startsWith("＊")) {
-                continue
-            }
             val text = cue.text.filteredReaderText()
             if (text.isEmpty()) {
                 unmatched += 1
@@ -94,3 +98,9 @@ object SasayakiMatcher {
 
 internal fun String.codePointsList(): List<Int> =
     codePoints().toArray().toList()
+
+private fun String?.hasManifestProperty(property: String): Boolean =
+    this
+        ?.trim()
+        ?.splitToSequence(Regex("\\s+"))
+        ?.any { it == property } == true
