@@ -97,4 +97,18 @@ class SasayakiPlayerSourceTest {
         assertTrue(complete.contains("displayCue(cue, reveal = autoScroll && (hasPlayedOnce || seek.startPlayback))"))
         assertTrue(complete.indexOf("seek.displayCue?.let { cue ->") < complete.indexOf("if (seek.startPlayback) startPlayback()"))
     }
+
+    @Test
+    fun startPlaybackRedisplaysCurrentCueLikeIos() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val startPlayback = source.substringAfter("private fun startPlayback()")
+            .substringBefore("private fun seek(")
+        val updateCue = source.substringAfter("private fun updateCue(")
+            .substringBefore("private fun displayCue(")
+
+        assertTrue(startPlayback.contains("hasPlayedOnce = true"))
+        assertTrue(startPlayback.contains("updateCue(currentTime, forceDisplay = true)"))
+        assertTrue(updateCue.contains("forceDisplay: Boolean = false"))
+        assertTrue(updateCue.contains("if (!forceDisplay && cue.id == currentCue?.id) return"))
+    }
 }

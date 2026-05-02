@@ -144,6 +144,7 @@ class SasayakiPlayer(
         player.start()
         hasPlayedOnce = true
         isPlaying = true
+        updateCue(currentTime, forceDisplay = true)
         handler.removeCallbacks(tickRunnable)
         handler.post(tickRunnable)
     }
@@ -232,14 +233,14 @@ class SasayakiPlayer(
         updateCue(currentTime)
     }
 
-    private fun updateCue(time: Double) {
+    private fun updateCue(time: Double, forceDisplay: Boolean = false) {
         if (!hasAudio || !hasMatch) return
         val cue = timeline.cueAt(time - delay)
         if (cue == null) {
             clearCue()
             return
         }
-        if (cue.id == currentCue?.id) return
+        if (!forceDisplay && cue.id == currentCue?.id) return
         if (cue.chapterIndex == getCurrentChapterIndex()) {
             displayCue(cue, autoScroll && hasPlayedOnce)
         } else if (autoScroll && hasPlayedOnce) {
