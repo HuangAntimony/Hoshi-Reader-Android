@@ -52,9 +52,12 @@ internal object LookupPopupHtml {
         val normalizedSettings = settings.normalized()
         val effectiveSwipeThreshold = if (swipeToDismiss) swipeThreshold.coerceAtLeast(0) else 0
         val colorScheme = if (darkMode) "dark" else "light"
-        val popupCss = assets?.let { """<style>${it.popupCss}</style>""" } ?: """<link rel="stylesheet" href="popup.css">"""
-        val selectionJs = assets?.let { """<script>${it.selectionJs}</script>""" } ?: """<script src="selection.js"></script>"""
-        val popupJs = assets?.let { """<script>${it.popupJs}</script>""" } ?: """<script src="popup.js"></script>"""
+        val popupCss = assets?.let { """<style>${it.popupCss}</style>""" }
+            ?: """<link rel="stylesheet" href="$PopupAssetBaseUrl/popup.css">"""
+        val selectionJs = assets?.let { """<script>${it.selectionJs}</script>""" }
+            ?: """<script src="$PopupAssetBaseUrl/selection.js"></script>"""
+        val popupJs = assets?.let { """<script>${it.popupJs}</script>""" }
+            ?: """<script src="$PopupAssetBaseUrl/popup.js"></script>"""
         val topSpacer = if (topSpacerPx > 0) {
             """<div style="height: ${topSpacerPx}px;"></div>"""
         } else {
@@ -299,4 +302,6 @@ internal object LookupPopupHtml {
             color: var(--text-color) !important;
         }
     """
+
+    private const val PopupAssetBaseUrl = "https://hoshi.local/popup"
 }

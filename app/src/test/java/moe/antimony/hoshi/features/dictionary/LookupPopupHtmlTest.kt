@@ -42,6 +42,23 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun lazyPopupAssetsUseAbsoluteBridgeUrlsSoDictionarySearchCanRender() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "test", reading = "test", glossary = "definition")),
+            assets = null,
+        )
+
+        assertTrue(html.contains("""<link rel="stylesheet" href="https://hoshi.local/popup/popup.css">"""))
+        assertTrue(html.contains("""<script src="https://hoshi.local/popup/selection.js"></script>"""))
+        assertTrue(html.contains("""<script src="https://hoshi.local/popup/popup.js"></script>"""))
+        assertFalse(html.contains("""href="popup.css""""))
+        assertFalse(html.contains("""src="selection.js""""))
+        assertFalse(html.contains("""src="popup.js""""))
+        assertTrue(html.contains("window.lookupEntries = [];"))
+        assertTrue(html.contains("window.entryCount = 1;"))
+    }
+
+    @Test
     fun serializesLookupEntriesUsingIosPopupShape() {
         val html = LookupPopupHtml.render(
             listOf(
