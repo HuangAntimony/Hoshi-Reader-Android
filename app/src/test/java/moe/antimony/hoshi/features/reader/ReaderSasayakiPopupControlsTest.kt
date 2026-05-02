@@ -35,4 +35,16 @@ class ReaderSasayakiPopupControlsTest {
         assertTrue(popupSource.contains("Play From Sasayaki Cue"))
         assertTrue(popupSource.contains("WordAudioPlayer.get(context).stop()"))
     }
+
+    @Test
+    fun popupControlsStayCompactForNarrowLookupWindows() {
+        val popupSource = File("src/main/java/moe/antimony/hoshi/features/dictionary/LookupPopupView.kt").readText()
+
+        assertTrue(popupSource.contains("private const val SasayakiPopupControlsTotalHeightValue = 37.0"))
+        assertTrue(popupSource.contains("private val SasayakiPopupControlsHeight = 36.dp"))
+        assertTrue(popupSource.contains("private val SasayakiPopupControlSize = 32.dp"))
+        assertTrue(popupSource.contains("private val SasayakiPopupControlIconSize = 20.dp"))
+        assertTrue(popupSource.contains(".padding(horizontal = 8.dp)"))
+        assertTrue(popupSource.contains("Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)"))
+    }
 }

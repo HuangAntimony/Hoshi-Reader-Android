@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.webkit.WebView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,7 +25,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +48,11 @@ import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
+
+private const val SasayakiPopupControlsTotalHeightValue = 37.0
+private val SasayakiPopupControlsHeight = 36.dp
+private val SasayakiPopupControlSize = 32.dp
+private val SasayakiPopupControlIconSize = 20.dp
 
 data class LookupPopupState(
     val selection: ReaderSelectionData,
@@ -122,7 +129,7 @@ fun LookupPopupView(
         val frameX = frame.centerX - frame.width / 2
         val frameY = frame.centerY - frame.height / 2
         val hasSasayakiControls = sasayakiCue != null
-        val controlsHeight = if (hasSasayakiControls) 49.0 else 0.0
+        val controlsHeight = if (hasSasayakiControls) SasayakiPopupControlsTotalHeightValue else 0.0
         val popupBackground = if (state.darkMode) Color.Black else Color.White
         val popupBorder = when {
             state.eInkMode && state.darkMode -> Color.White
@@ -219,34 +226,52 @@ private fun SasayakiPopupControls(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+                .height(SasayakiPopupControlsHeight)
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onReplay) {
+            SasayakiPopupControlButton(onClick = onReplay) {
                 Icon(
                     imageVector = Icons.Rounded.Replay,
                     contentDescription = "Replay Sasayaki Cue",
                     tint = contentColor,
+                    modifier = Modifier.size(SasayakiPopupControlIconSize),
                 )
             }
-            IconButton(onClick = onTogglePlayback) {
+            SasayakiPopupControlButton(onClick = onTogglePlayback) {
                 Icon(
                     imageVector = if (isPlaying || wasPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (isPlaying || wasPaused) "Pause Sasayaki" else "Play Sasayaki",
                     tint = contentColor,
+                    modifier = Modifier.size(SasayakiPopupControlIconSize),
                 )
             }
-            IconButton(onClick = onPlayForward) {
+            SasayakiPopupControlButton(onClick = onPlayForward) {
                 Icon(
                     imageVector = Icons.Rounded.FastForward,
                     contentDescription = "Play From Sasayaki Cue",
                     tint = contentColor,
+                    modifier = Modifier.size(SasayakiPopupControlIconSize),
                 )
             }
         }
         HorizontalDivider(color = dividerColor)
+    }
+}
+
+@Composable
+private fun SasayakiPopupControlButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(SasayakiPopupControlSize)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
