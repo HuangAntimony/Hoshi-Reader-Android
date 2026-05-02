@@ -19,10 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -34,9 +33,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -233,7 +236,7 @@ private fun SasayakiPopupControls(
         ) {
             SasayakiPopupControlButton(onClick = onReplay) {
                 Icon(
-                    imageVector = Icons.Rounded.Replay,
+                    imageVector = Icons.Rounded.Refresh,
                     contentDescription = "Replay Sasayaki Cue",
                     tint = contentColor,
                     modifier = Modifier.size(SasayakiPopupControlIconSize),
@@ -248,10 +251,8 @@ private fun SasayakiPopupControls(
                 )
             }
             SasayakiPopupControlButton(onClick = onPlayForward) {
-                Icon(
-                    imageVector = Icons.Rounded.FastForward,
-                    contentDescription = "Play From Sasayaki Cue",
-                    tint = contentColor,
+                SasayakiForwardFrameIcon(
+                    contentColor = contentColor,
                     modifier = Modifier.size(SasayakiPopupControlIconSize),
                 )
             }
@@ -272,6 +273,55 @@ private fun SasayakiPopupControlButton(
         contentAlignment = Alignment.Center,
     ) {
         content()
+    }
+}
+
+@Composable
+private fun SasayakiForwardFrameIcon(
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.Canvas(
+        modifier = modifier.semantics {
+            contentDescription = "Play From Sasayaki Cue"
+        },
+    ) {
+        val strokeWidth = size.minDimension * 0.12f
+        val left = size.width * 0.18f
+        val top = size.height * 0.18f
+        val bottom = size.height * 0.82f
+        val triangleLeft = size.width * 0.42f
+        val triangleRight = size.width * 0.82f
+        val centerY = size.height * 0.5f
+
+        drawLine(
+            color = contentColor,
+            start = Offset(left, top),
+            end = Offset(left, bottom),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = contentColor,
+            start = Offset(triangleLeft, top),
+            end = Offset(triangleRight, centerY),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = contentColor,
+            start = Offset(triangleRight, centerY),
+            end = Offset(triangleLeft, bottom),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = contentColor,
+            start = Offset(triangleLeft, bottom),
+            end = Offset(triangleLeft, top),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
     }
 }
 

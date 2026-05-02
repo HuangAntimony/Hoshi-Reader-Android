@@ -37,6 +37,20 @@ class ReaderSasayakiPopupControlsTest {
     }
 
     @Test
+    fun popupControlIconsMatchIosSymbolSemantics() {
+        val popupSource = File("src/main/java/moe/antimony/hoshi/features/dictionary/LookupPopupView.kt").readText()
+
+        assertTrue(popupSource.contains("imageVector = Icons.Rounded.Refresh"))
+        assertTrue(popupSource.contains("imageVector = if (isPlaying || wasPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow"))
+        assertTrue(popupSource.contains("SasayakiForwardFrameIcon("))
+        assertTrue(popupSource.contains("contentDescription = \"Play From Sasayaki Cue\""))
+        assertTrue(!popupSource.contains("Icons.Rounded.FastForward"))
+        assertTrue(!popupSource.contains("import androidx.compose.material.icons.rounded.FastForward"))
+        assertTrue(!popupSource.contains("Icons.Rounded.Replay"))
+        assertTrue(!popupSource.contains("import androidx.compose.material.icons.rounded.Replay"))
+    }
+
+    @Test
     fun popupControlsStayCompactForNarrowLookupWindows() {
         val popupSource = File("src/main/java/moe/antimony/hoshi/features/dictionary/LookupPopupView.kt").readText()
 
