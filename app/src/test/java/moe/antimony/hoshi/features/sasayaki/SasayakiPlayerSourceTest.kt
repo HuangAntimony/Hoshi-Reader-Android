@@ -44,11 +44,57 @@ class SasayakiPlayerSourceTest {
         assertTrue(playCue.contains("stopPlaybackTime = if (stop) cue.endTime + delay else null"))
         assertTrue(playCue.contains("savePosition = !stop"))
         assertTrue(seek.contains("savePosition: Boolean = true"))
-        assertTrue(seek.contains("if (savePosition)"))
+        assertTrue(source.contains("if (seek.savePosition)"))
         assertTrue(tick.contains("stopPlaybackTime?.let"))
         assertTrue(tick.contains("pausePlayback()"))
         assertTrue(tick.substringBefore("stopPlaybackTime?.let").contains("if (temporaryPlaybackReturnPosition == null && second != lastSavedSecond)"))
         assertTrue(source.contains("private fun restoreTemporaryPlaybackPositionIfNeeded()"))
         assertTrue(source.contains("temporaryPlaybackReturnPosition = null"))
+    }
+
+    @Test
+    fun seekWaitsForMediaPlayerCompletionBeforeUpdatingCueLikeIos() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val seek = source.substringAfter("private fun seek(")
+            .substringBefore("private fun restoreAudio()")
+        val complete = source.substringAfter("private fun handleSeekComplete(")
+            .substringBefore("private fun restoreAudio()")
+        val restoreAudio = source.substringAfter("private fun restoreAudio()")
+            .substringBefore("private fun tick()")
+        val tick = source.substringAfter("private fun tick()")
+            .substringBefore("private fun updateCue(")
+
+        assertTrue(source.contains("private data class PendingSeek"))
+        assertTrue(source.contains("private var pendingSeek: PendingSeek? = null"))
+        assertTrue(restoreAudio.contains("setOnSeekCompleteListener { handleSeekComplete() }"))
+        assertTrue(seek.contains("pendingSeek = PendingSeek("))
+        assertTrue(seek.contains("handler.removeCallbacks(tickRunnable)"))
+        assertFalse(seek.substringBefore("private fun handleSeekComplete(").contains("if (updateCue) updateCue(seconds)"))
+        assertFalse(seek.substringBefore("private fun handleSeekComplete(").contains("if (startPlayback) startPlayback()"))
+        assertTrue(complete.contains("val seek = pendingSeek ?: return"))
+        assertTrue(complete.contains("pendingSeek = null"))
+        assertTrue(complete.contains("currentTime = seek.seconds"))
+        assertTrue(complete.contains("if (seek.updateCue) updateCue(seek.seconds)"))
+        assertTrue(complete.contains("if (seek.startPlayback) startPlayback()"))
+        assertTrue(tick.contains("if (pendingSeek != null) return"))
+    }
+
+    @Test
+    fun popupCuePlaybackDisplaysSelectedCueAfterSeekCompletes() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val playCue = source.substringAfter("fun playCue(cue: SasayakiMatch, stop: Boolean)")
+            .substringBefore("fun release()")
+        val seek = source.substringAfter("private fun seek(")
+            .substringBefore("private fun handleSeekComplete(")
+        val complete = source.substringAfter("private fun handleSeekComplete(")
+            .substringBefore("private fun restoreAudio()")
+
+        assertTrue(source.contains("val displayCue: SasayakiMatch? = null"))
+        assertTrue(playCue.contains("displayCue = cue"))
+        assertTrue(seek.contains("displayCue = displayCue"))
+        assertTrue(source.contains("private fun displayCue(cue: SasayakiMatch, reveal: Boolean)"))
+        assertTrue(complete.contains("seek.displayCue?.let { cue ->"))
+        assertTrue(complete.contains("displayCue(cue, reveal = autoScroll && (hasPlayedOnce || seek.startPlayback))"))
+        assertTrue(complete.indexOf("seek.displayCue?.let { cue ->") < complete.indexOf("if (seek.startPlayback) startPlayback()"))
     }
 }

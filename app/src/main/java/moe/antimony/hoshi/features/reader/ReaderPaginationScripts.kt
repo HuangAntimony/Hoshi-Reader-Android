@@ -236,9 +236,10 @@ internal object ReaderPaginationScripts {
           },
           scrollToRange: function(range) {
             var context = this.getScrollContext();
+            if (context.pageSize <= 0) return false;
             var rect = this.getRect(range);
             var currentScroll = this.getPagePosition(context);
-            var anchor = (context.vertical ? rect.top : rect.left) + currentScroll;
+            var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll;
             var targetScroll = this.alignToPage(context, anchor);
             if (targetScroll === currentScroll) return false;
             this.setPagePosition(context, targetScroll);

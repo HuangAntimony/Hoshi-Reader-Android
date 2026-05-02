@@ -22,6 +22,14 @@ class SasayakiPlayer(
     private val onClearCue: () -> Unit,
     private val onLoadChapter: (Int) -> Unit,
 ) {
+    private data class PendingSeek(
+        val seconds: Double,
+        val startPlayback: Boolean,
+        val updateCue: Boolean,
+        val savePosition: Boolean,
+        val displayCue: SasayakiMatch? = null,
+    )
+
     private val appContext = context.applicationContext
     private val audioRepository = SasayakiAudioRepository(bookRoot)
     private val handler = Handler(Looper.getMainLooper())
@@ -32,6 +40,7 @@ class SasayakiPlayer(
     private var hasPlayedOnce = false
     private var stopPlaybackTime: Double? = null
     private var temporaryPlaybackReturnPosition: Double? = null
+    private var pendingSeek: PendingSeek? = null
 
     var playback by mutableStateOf(bookStorage.loadSasayakiPlayback(bookRoot) ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
@@ -116,7 +125,13 @@ class SasayakiPlayer(
         if (isPlaying) pausePlayback(restoreTemporaryPosition = false)
         temporaryPlaybackReturnPosition = if (stop) playback.lastPosition else null
         stopPlaybackTime = if (stop) cue.endTime + delay else null
-        seek(cue.startTime + delay, startPlayback = true, updateCue = false, savePosition = !stop)
+        seek(
+            seconds = cue.startTime + delay,
+            startPlayback = true,
+            updateCue = false,
+            savePosition = !stop,
+            displayCue = cue,
+        )
     }
 
     fun release() {
@@ -138,16 +153,39 @@ class SasayakiPlayer(
         startPlayback: Boolean,
         updateCue: Boolean = true,
         savePosition: Boolean = true,
+        displayCue: SasayakiMatch? = null,
     ) {
         val player = mediaPlayer ?: return
+        pendingSeek = PendingSeek(
+            seconds = seconds,
+            startPlayback = startPlayback,
+            updateCue = updateCue,
+            savePosition = savePosition,
+            displayCue = displayCue,
+        )
+        handler.removeCallbacks(tickRunnable)
+        if (isPlaying) {
+            player.pause()
+            isPlaying = false
+        }
         player.seekTo((seconds * 1000.0).toInt().coerceAtLeast(0))
-        currentTime = seconds
-        if (savePosition) {
-            playback = playback.copy(lastPosition = seconds)
+    }
+
+    private fun handleSeekComplete() {
+        val seek = pendingSeek ?: return
+        pendingSeek = null
+        currentTime = seek.seconds
+        if (seek.savePosition) {
+            playback = playback.copy(lastPosition = seek.seconds)
             savePlayback()
         }
-        if (updateCue) updateCue(seconds)
-        if (startPlayback) startPlayback()
+        if (seek.updateCue) updateCue(seek.seconds)
+        seek.displayCue?.let { cue ->
+            if (cue.chapterIndex == getCurrentChapterIndex()) {
+                displayCue(cue, reveal = autoScroll && (hasPlayedOnce || seek.startPlayback))
+            }
+        }
+        if (seek.startPlayback) startPlayback()
     }
 
     private fun restoreAudio() {
@@ -159,6 +197,7 @@ class SasayakiPlayer(
                     this@SasayakiPlayer.isPlaying = false
                     handler.removeCallbacks(tickRunnable)
                 }
+                setOnSeekCompleteListener { handleSeekComplete() }
                 prepare()
                 seekTo((playback.lastPosition * 1000.0).toInt().coerceAtLeast(0))
             }
@@ -174,6 +213,7 @@ class SasayakiPlayer(
     }
 
     private fun tick() {
+        if (pendingSeek != null) return
         val player = mediaPlayer ?: return
         currentTime = player.currentPosition.toDouble() / 1000.0
         duration = player.duration.coerceAtLeast(0).toDouble() / 1000.0
@@ -201,8 +241,7 @@ class SasayakiPlayer(
         }
         if (cue.id == currentCue?.id) return
         if (cue.chapterIndex == getCurrentChapterIndex()) {
-            currentCue = cue
-            onCue(cue, autoScroll && hasPlayedOnce)
+            displayCue(cue, autoScroll && hasPlayedOnce)
         } else if (autoScroll && hasPlayedOnce) {
             currentCue = null
             onClearCue()
@@ -210,6 +249,11 @@ class SasayakiPlayer(
         } else {
             clearCue()
         }
+    }
+
+    private fun displayCue(cue: SasayakiMatch, reveal: Boolean) {
+        currentCue = cue
+        onCue(cue, reveal)
     }
 
     private fun clearCue() {

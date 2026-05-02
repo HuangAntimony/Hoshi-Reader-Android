@@ -19,6 +19,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep restored Sasayaki audiobooks paused until the user explicitly starts playback, and expose the iOS-aligned Auto-Scroll controls in the reader Sasayaki sheet.
 - Resume Sasayaki playback after closing a lookup popup when Auto-Pause on Lookup paused it.
 - Switch reader sheet styling by E-ink Mode: Sasayaki no longer dims e-ink pages, while normal mode uses the same Material sheet chrome for Chapters, Appearance, and Sasayaki.
+- Keep Sasayaki popup Play Forward anchored on the selected cue instead of briefly jumping to a stale or edge-aligned page with no highlight.
 
 ## [v0.1.6] - 2026-05-02
 

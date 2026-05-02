@@ -130,6 +130,17 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun sasayakiRevealScrollsToRangeCenterLikeIos() {
+        val script = ReaderPaginationScripts.shellScript()
+        val scrollToRange = script.substringAfter("scrollToRange: function(range)")
+            .substringBefore("calculateProgress: function()")
+
+        assertTrue(scrollToRange.contains("if (context.pageSize <= 0)"))
+        assertTrue(scrollToRange.contains("var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll"))
+        assertFalse(scrollToRange.contains("var anchor = (context.vertical ? rect.top : rect.left) + currentScroll"))
+    }
+
+    @Test
     fun pageBoundariesUseLastActualContentPageInsteadOfReportedScrollHeight() {
         val script = ReaderPaginationScripts.shellScript()
 
