@@ -254,8 +254,13 @@ fun ReaderWebView(
                 onCue = { cue, reveal ->
                     webView?.evaluateJavascript(
                         ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal),
-                        null,
-                    )
+                    ) { progressResult ->
+                        ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
+                            val updatedPosition = readerPosition.recordPageProgress(progress)
+                            readerPosition = updatedPosition
+                            onSaveBookmark(updatedPosition.displayedPosition.index, updatedPosition.displayedPosition.progress)
+                        }
+                    }
                 },
                 onClearCue = {
                     webView?.evaluateJavascript(ReaderPaginationScripts.clearSasayakiCueInvocation(), null)
