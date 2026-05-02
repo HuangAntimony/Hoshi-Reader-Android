@@ -24,6 +24,8 @@ class SasayakiSheetTest {
         assertTrue(source.contains("settings.copyAudiobookToPrivateStorage"))
         assertTrue(source.contains("player.importAudio("))
         assertTrue(source.contains("copyToPrivateStorage = settings.copyAudiobookToPrivateStorage"))
+        assertTrue(source.contains("Copy Audiobook to App Storage"))
+        assertTrue(source.contains("settings.copy(copyAudiobookToPrivateStorage = it)"))
     }
 
     @Test

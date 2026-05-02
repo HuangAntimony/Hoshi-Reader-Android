@@ -219,6 +219,11 @@ fun SasayakiSheet(
                 checked = settings.autoPause,
                 onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
             )
+            SasayakiSettingsSwitchRow(
+                label = "Copy Audiobook to App Storage",
+                checked = settings.copyAudiobookToPrivateStorage,
+                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
+            )
         }
     }
 }
