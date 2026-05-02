@@ -462,6 +462,7 @@ internal fun HoshiMainShell(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
+                contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
                 bottomBar = {
                     HoshiCompactBottomNavigation(
                         selectedTab = selectedTab,
@@ -980,6 +981,7 @@ internal fun SettingsTab(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             CenterAlignedTopAppBar(
                 title = {

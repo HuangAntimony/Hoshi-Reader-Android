@@ -84,7 +84,7 @@ fun AdvancedSettingsView(
         modifier = modifier.fillMaxSize(),
         containerColor = colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            CenterAlignedTopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = colorScheme.background,
                     scrolledContainerColor = colorScheme.background,

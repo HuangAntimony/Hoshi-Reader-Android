@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Reduce excess top spacing in Books, Settings, and the Advanced settings header so those screens use more visible space near the status bar. #36
 - Make Android system Back return from Settings -> Diagnostics to Settings instead of closing the app.
 - Fix Dictionary tab lookup results rendering blank after search in v0.1.5 by loading popup CSS and JavaScript from the shared WebView bridge regardless of the result page base URL. #33
 - Render SVG dictionary media in lookup popups, restoring icons embedded in structured dictionary definitions. #35

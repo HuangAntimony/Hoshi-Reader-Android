@@ -205,4 +205,23 @@ class MainShellUiTest {
         assertTrue(source.contains("Alignment.TopStart"))
         assertTrue(source.contains(".align(bookContentAlignment)"))
     }
+
+    @Test
+    fun mainShellDoesNotDoubleApplyTopSystemInsets() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val shell = source.substringAfter("internal fun HoshiMainShell(")
+            .substringBefore("internal const val CompactNavigationBarTag")
+
+        assertTrue(shell.contains("contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)"))
+    }
+
+    @Test
+    fun advancedSettingsUsesCompactHeader() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/audio/AudioView.kt").readText()
+        val advanced = source.substringAfter("fun AdvancedSettingsView(")
+            .substringBefore("@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nfun AudioSettingsView")
+
+        assertTrue(advanced.contains("CenterAlignedTopAppBar("))
+        assertFalse(advanced.contains("LargeTopAppBar("))
+    }
 }
