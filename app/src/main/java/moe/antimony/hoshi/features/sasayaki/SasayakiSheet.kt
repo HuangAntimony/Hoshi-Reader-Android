@@ -23,6 +23,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +47,8 @@ import moe.antimony.hoshi.importing.FileImportContent
 fun SasayakiSheet(
     player: SasayakiPlayer,
     audioRepository: SasayakiAudioRepository,
+    settings: SasayakiSettings,
+    onSettingsChange: (SasayakiSettings) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -170,6 +173,29 @@ fun SasayakiSheet(
                 steps = 19,
                 onValueChange = { player.setRate(it) },
             )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            Text(
+                text = "Settings",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
+            )
+            SasayakiSettingsSwitchRow(
+                label = "Show Sasayaki Toggle",
+                checked = settings.showReaderToggle,
+                onCheckedChange = { onSettingsChange(settings.copy(showReaderToggle = it)) },
+            )
+            SasayakiSettingsSwitchRow(
+                label = "Auto-Scroll",
+                checked = settings.autoScroll,
+                onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
+            )
+            SasayakiSettingsSwitchRow(
+                label = "Auto-Pause on Lookup",
+                checked = settings.autoPause,
+                onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
+            )
         }
     }
 }
@@ -194,6 +220,24 @@ private fun SliderRow(
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
     }
+}
+
+@Composable
+private fun SasayakiSettingsSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        headlineContent = { Text(label) },
+        trailingContent = {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+            )
+        },
+    )
 }
 
 private fun formatDuration(seconds: Double): String =

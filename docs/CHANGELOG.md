@@ -9,6 +9,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add Sasayaki audiobook read-along support with an adjustable SRT Match page from the bookshelf, reader cue highlighting, audiobook import/playback controls, delay and speed adjustment, and persistent per-book playback state.
 
+### Fixed
+
+- Keep restored Sasayaki audiobooks paused until the user explicitly starts playback, and expose the iOS-aligned Auto-Scroll controls in the reader Sasayaki sheet.
+
 ## [v0.1.6] - 2026-05-02
 
 ### Added

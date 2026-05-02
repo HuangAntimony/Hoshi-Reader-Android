@@ -81,6 +81,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
@@ -172,6 +173,11 @@ fun ReaderWebView(
     fun closeLookupPopupsAndSelection() {
         clearReaderSelection()
         lookupPopups = emptyList()
+    }
+    fun updateSasayakiSettings(settings: SasayakiSettings) {
+        sasayakiSettings = settings
+        sasayakiSettingsStore.save(settings)
+        sasayakiPlayer?.autoScroll = settings.autoScroll
     }
     val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
         if (sasayakiSettings.enabled && sasayakiSettings.autoPause) {
@@ -408,6 +414,8 @@ fun ReaderWebView(
         SasayakiSheet(
             player = requireNotNull(sasayakiPlayer),
             audioRepository = sasayakiAudioRepository,
+            settings = sasayakiSettings,
+            onSettingsChange = ::updateSasayakiSettings,
             onDismiss = { showSasayaki = false },
         )
     }

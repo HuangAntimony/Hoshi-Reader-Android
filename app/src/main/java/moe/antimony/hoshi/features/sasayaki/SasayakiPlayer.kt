@@ -68,7 +68,9 @@ class SasayakiPlayer(
 
     fun setRate(value: Float) {
         playback = playback.copy(rate = value)
-        mediaPlayer?.playbackParams = playbackParams(value)
+        if (isPlaying) {
+            mediaPlayer?.playbackParams = playbackParams(value)
+        }
         savePlayback()
     }
 
@@ -134,7 +136,6 @@ class SasayakiPlayer(
                 }
                 prepare()
                 seekTo((playback.lastPosition * 1000.0).toInt().coerceAtLeast(0))
-                playbackParams = playbackParams(rate)
             }
             mediaPlayer = player
             duration = player.duration.coerceAtLeast(0).toDouble() / 1000.0
