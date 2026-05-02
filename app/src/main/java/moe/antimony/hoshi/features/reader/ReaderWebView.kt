@@ -133,6 +133,7 @@ fun ReaderWebView(
     val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookStorage::loadSasayakiMatch) }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    var sasayakiWasPausedByLookup by remember { mutableStateOf(false) }
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
     fun lookupRootPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
@@ -170,24 +171,44 @@ fun ReaderWebView(
     fun clearReaderSelection() {
         webView?.evaluateJavascript(ReaderSelectionScripts.clearInvocation(), null)
     }
+    fun resumeSasayakiAfterLookupIfNeeded() {
+        val player = sasayakiPlayer
+        if (sasayakiWasPausedByLookup && player != null && !player.isPlaying) {
+            player.togglePlayback()
+        }
+        sasayakiWasPausedByLookup = false
+    }
+    fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
+        lookupPopups = nextPopups
+        if (nextPopups.isEmpty()) {
+            resumeSasayakiAfterLookupIfNeeded()
+        }
+    }
     fun closeLookupPopupsAndSelection() {
         clearReaderSelection()
-        lookupPopups = emptyList()
+        setLookupPopups(emptyList())
     }
     fun updateSasayakiSettings(settings: SasayakiSettings) {
         sasayakiSettings = settings
         sasayakiSettingsStore.save(settings)
         sasayakiPlayer?.autoScroll = settings.autoScroll
     }
-    val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
-        if (sasayakiSettings.enabled && sasayakiSettings.autoPause) {
-            sasayakiPlayer?.takeIf { it.isPlaying }?.pausePlayback()
+    fun pauseSasayakiForLookupIfNeeded() {
+        val player = sasayakiPlayer
+        if (sasayakiSettings.enabled && sasayakiSettings.autoPause && player?.isPlaying == true) {
+            player.pausePlayback()
+            sasayakiWasPausedByLookup = true
+        } else if (!sasayakiSettings.autoPause) {
+            sasayakiWasPausedByLookup = false
         }
-        lookupPopups = emptyList()
+    }
+    val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
+        setLookupPopups(emptyList())
         val lookup = lookupRootPopup(selection)
         if (lookup != null) {
             val (popup, highlightCount) = lookup
-            lookupPopups = listOf(popup)
+            pauseSasayakiForLookupIfNeeded()
+            setLookupPopups(listOf(popup))
             onTextSelected(selection) ?: highlightCount
         } else {
             onTextSelected(selection)
@@ -328,7 +349,7 @@ fun ReaderWebView(
             )
             LookupPopupStackView(
                 popups = lookupPopups,
-                onPopupsChange = { lookupPopups = it },
+                onPopupsChange = ::setLookupPopups,
                 lookupChildPopup = ::lookupChildPopup,
                 onRootPopupDismissed = ::clearReaderSelection,
                 modifier = Modifier.fillMaxSize(),
@@ -379,8 +400,16 @@ fun ReaderWebView(
             },
             onSasayakiToggle = sasayakiPlayer
                 ?.takeIf { sasayakiSettings.enabled && sasayakiSettings.showReaderToggle && it.hasAudio }
-                ?.let { player -> ({ player.togglePlayback() }) },
-            sasayakiPlaying = sasayakiPlayer?.isPlaying == true,
+                ?.let { player ->
+                    ({
+                        if (sasayakiWasPausedByLookup) {
+                            sasayakiWasPausedByLookup = false
+                        } else {
+                            player.togglePlayback()
+                        }
+                    })
+                },
+            sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         webView?.let { _ -> Unit }
