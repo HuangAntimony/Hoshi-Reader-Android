@@ -13,8 +13,8 @@ class SasayakiSheetTest {
         assertTrue(source.contains("takePersistableUriPermission"))
         assertTrue(source.contains("Intent.FLAG_GRANT_READ_URI_PERMISSION"))
         assertTrue(source.contains("copyToPrivateStorage = settings.copyAudiobookToPrivateStorage"))
-        assertTrue(source.contains("audio/mpeg"))
-        assertTrue(source.contains("audio/mp4"))
+        assertTrue(source.contains("validateImportFile(uri, ImportFileType.SasayakiAudiobook)"))
+        assertTrue(source.contains("importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes)"))
     }
 
     @Test

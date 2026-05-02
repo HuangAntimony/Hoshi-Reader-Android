@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
+import moe.antimony.hoshi.importing.ImportFileType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -344,7 +345,7 @@ fun AudioSettingsView(
                                 trailingContent = {
                                     Button(
                                         enabled = !isImporting,
-                                        onClick = { importer.launch(arrayOf("*/*")) },
+                                        onClick = { importer.launch(ImportFileType.LocalAudioDatabase.mimeTypes) },
                                     ) {
                                         Text(if (isImporting) "Importing" else "Import")
                                     }

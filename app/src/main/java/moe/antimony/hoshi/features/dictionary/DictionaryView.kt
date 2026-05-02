@@ -83,7 +83,9 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
+import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.MultipleFileImportContent
+import moe.antimony.hoshi.importing.validateImportFile
 
 private val DictionarySwitchColor = Color(0xFF34C759)
 
@@ -164,6 +166,14 @@ fun DictionaryView(
 
     val importer = rememberLauncherForActivityResult(MultipleFileImportContent()) { uris: List<Uri> ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        runCatching {
+            uris.forEach { uri ->
+                context.contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
+            }
+        }.onFailure { error ->
+            errorMessage = error.localizedMessage ?: "Select a .zip dictionary archive."
+            return@rememberLauncherForActivityResult
+        }
         uris.forEach { uri ->
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
@@ -316,7 +326,7 @@ fun DictionaryView(
                                     onClick = {
                                         importMenuExpanded = false
                                         importType = type
-                                        importer.launch(zipMimeTypes)
+                                        importer.launch(ImportFileType.DictionaryArchive.mimeTypes)
                                     },
                                 )
                             }
@@ -472,12 +482,6 @@ private enum class DictionaryDestination {
     Settings,
     CustomCss,
 }
-
-private val zipMimeTypes = arrayOf(
-    "application/zip",
-    "application/octet-stream",
-    "application/x-zip-compressed",
-)
 
 private val DictionaryType.displayName: String
     get() = when (this) {

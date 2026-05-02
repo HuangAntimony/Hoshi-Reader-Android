@@ -43,7 +43,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.features.reader.ReaderSheetDragHandle
 import moe.antimony.hoshi.features.reader.readerSheetStyle
+import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.OpenDocumentContent
+import moe.antimony.hoshi.importing.validateImportFile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +70,7 @@ fun SasayakiSheet(
             runCatching {
                 val copyToPrivateStorage = settings.copyAudiobookToPrivateStorage
                 withContext(Dispatchers.IO) {
+                    context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiAudiobook)
                     if (copyToPrivateStorage) {
                         audioRepository.importAudio(context.contentResolver, uri)
                     } else {
@@ -156,7 +159,7 @@ fun SasayakiSheet(
                 trailingContent = {
                     Button(
                         enabled = !isImporting,
-                        onClick = { importer.launch(arrayOf("audio/mpeg", "audio/mp4", "audio/*", "application/octet-stream")) },
+                        onClick = { importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes) },
                     ) {
                         Text(if (isImporting) "Importing" else "Open")
                     }

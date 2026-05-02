@@ -1,8 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
-import android.content.ContentResolver
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
@@ -50,6 +48,9 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.importing.FileImportContent
+import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.importDisplayName
+import moe.antimony.hoshi.importing.validateImportFile
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,8 +73,14 @@ fun SasayakiMatchView(
     }
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
+        }.onFailure { error ->
+            errorMessage = error.localizedMessage ?: "Select an .srt subtitle file."
+            return@rememberLauncherForActivityResult
+        }
         selectedSrtUri = uri
-        selectedSrtName = context.contentResolver.displayName(uri).ifBlank { "Selected SRT" }
+        selectedSrtName = context.contentResolver.importDisplayName(uri).ifBlank { "Selected SRT" }
         errorMessage = null
     }
 
@@ -149,14 +156,7 @@ fun SasayakiMatchView(
                             TextButton(
                                 enabled = !isMatching,
                                 onClick = {
-                                    importer.launch(
-                                        arrayOf(
-                                            "application/x-subrip",
-                                            "text/plain",
-                                            "application/octet-stream",
-                                            "*/*",
-                                        ),
-                                    )
+                                    importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes)
                                 },
                             ) {
                                 Text("Open")
@@ -286,12 +286,3 @@ private fun MatchCard(content: @Composable () -> Unit) {
         Column(content = { content() })
     }
 }
-
-private fun ContentResolver.displayName(uri: Uri): String =
-    query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            cursor.getString(0)
-        } else {
-            null
-        }
-    } ?: uri.lastPathSegment.orEmpty()

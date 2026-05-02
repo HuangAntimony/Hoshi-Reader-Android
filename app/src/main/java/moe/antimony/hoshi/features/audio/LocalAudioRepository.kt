@@ -6,6 +6,8 @@ import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -41,6 +43,7 @@ class LocalAudioRepository(private val filesDir: File) {
         } == true
 
     fun importDatabase(contentResolver: ContentResolver, uri: Uri, onProgress: (LocalAudioImportProgress) -> Unit = {}): Long {
+        contentResolver.validateImportFile(uri, ImportFileType.LocalAudioDatabase)
         val expectedSize = contentResolver.sizeBytes(uri)
         return contentResolver.openInputStream(uri)?.use { input ->
             replacePrivateDatabase(input, expectedSize, onProgress)

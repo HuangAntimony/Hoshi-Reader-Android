@@ -14,6 +14,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class FileImportContentContractTest {
@@ -21,7 +22,7 @@ class FileImportContentContractTest {
 
     @Test
     fun singleFileImportUsesGetContentSoOtherAppsCanProvideFiles() {
-        val mimeTypes = arrayOf("application/epub+zip", "application/octet-stream")
+        val mimeTypes = ImportFileType.Epub.mimeTypes
 
         val intent = FileImportContent().createIntent(context, mimeTypes)
 
@@ -35,11 +36,7 @@ class FileImportContentContractTest {
 
     @Test
     fun multipleFileImportKeepsGetContentAndEnablesMultipleSelection() {
-        val mimeTypes = arrayOf(
-            "application/zip",
-            "application/octet-stream",
-            "application/x-zip-compressed",
-        )
+        val mimeTypes = ImportFileType.DictionaryArchive.mimeTypes
 
         val intent = MultipleFileImportContent().createIntent(context, mimeTypes)
 
@@ -62,7 +59,7 @@ class FileImportContentContractTest {
 
     @Test
     fun openDocumentContentUsesPersistableDocumentAccess() {
-        val mimeTypes = arrayOf("audio/mpeg", "audio/mp4", "audio/*", "application/octet-stream")
+        val mimeTypes = ImportFileType.SasayakiAudiobook.mimeTypes
 
         val intent = OpenDocumentContent().createIntent(context, mimeTypes)
 
@@ -85,5 +82,26 @@ class FileImportContentContractTest {
         val uris = MultipleFileImportContent().parseResult(Activity.RESULT_OK, result)
 
         assertEquals(listOf(uri), uris)
+    }
+
+    @Test
+    fun validationRejectsWrongExtensionBeforeOpeningFile() {
+        val uri = Uri.fromFile(File(context.cacheDir, "not-a-subtitle.m4b"))
+
+        val result = runCatching {
+            context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
+        }
+
+        assertTrue(result.exceptionOrNull() is UnsupportedImportFileTypeException)
+        assertEquals("Select an .srt subtitle file.", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun validationAcceptsExpectedExtensionCaseInsensitively() {
+        val uri = Uri.fromFile(File(context.cacheDir, "MATCH.SRT"))
+
+        val displayName = context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
+
+        assertEquals("MATCH.SRT", displayName)
     }
 }

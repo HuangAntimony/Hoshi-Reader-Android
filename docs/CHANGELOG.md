@@ -25,6 +25,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Highlight the current Sasayaki cue immediately when audiobook playback starts, matching iOS read-along behavior.
 - Match Sasayaki SRT files with the same cue accounting and non-reader TOC filtering as iOS so identical search windows report matching rates consistently.
 - Keep Sasayaki audiobooks linked to the selected external media file instead of importing another private copy, matching iOS storage behavior.
+- Reject mismatched import files before reading them, so EPUB, Sasayaki SRT, Sasayaki audiobook, local audio database, dictionary, and reader font imports only accept their supported file extensions.
 
 ## [v0.1.6] - 2026-05-02
 

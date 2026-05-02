@@ -8,6 +8,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
+import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -173,6 +175,7 @@ class BookStorage(private val filesDir: File) {
     }
 
     fun importBook(contentResolver: ContentResolver, uri: Uri): File {
+        contentResolver.validateImportFile(uri, ImportFileType.Epub)
         val tempRoot = File(filesDir, "ImportTemp/${UUID.randomUUID()}").canonicalFile
         contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "Unable to open selected EPUB" }

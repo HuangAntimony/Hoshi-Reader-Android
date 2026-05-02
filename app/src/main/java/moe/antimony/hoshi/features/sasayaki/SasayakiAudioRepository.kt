@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.sasayaki
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
 
 class SasayakiAudioRepository(private val bookRoot: File) {
@@ -15,6 +17,7 @@ class SasayakiAudioRepository(private val bookRoot: File) {
     }
 
     fun importAudio(contentResolver: ContentResolver, uri: Uri): String {
+        contentResolver.validateImportFile(uri, ImportFileType.SasayakiAudiobook)
         val displayName = contentResolver.displayName(uri)
         val extension = displayName.substringAfterLast('.', missingDelimiterValue = "")
             .lowercase()

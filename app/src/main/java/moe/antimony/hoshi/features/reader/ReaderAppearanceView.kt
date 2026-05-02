@@ -63,6 +63,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.importing.FileImportContent
+import moe.antimony.hoshi.importing.ImportFileType
 import java.util.Locale
 import kotlin.math.round
 
@@ -248,7 +249,7 @@ private fun ReaderAppearanceContent(
                     label = "Import Font",
                     button = if (isImportingFont) "Importing..." else "Import",
                     enabled = !isImportingFont,
-                    onClick = { fontImporter.launch(fontMimeTypes) },
+                    onClick = { fontImporter.launch(ImportFileType.ReaderFont.mimeTypes) },
                 )
                 AppearanceDivider(palette)
                 StepperRow(
@@ -445,16 +446,6 @@ private fun ReaderAppearanceContent(
         )
     }
 }
-
-private val fontMimeTypes = arrayOf(
-    "font/ttf",
-    "font/otf",
-    "application/x-font-ttf",
-    "application/x-font-otf",
-    "application/vnd.ms-opentype",
-    "application/octet-stream",
-    "*/*",
-)
 
 @Composable
 private fun AppearanceSection(

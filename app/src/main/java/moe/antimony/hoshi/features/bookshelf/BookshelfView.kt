@@ -118,6 +118,7 @@ import moe.antimony.hoshi.features.reader.ReaderWebView
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import moe.antimony.hoshi.importing.FileImportContent
+import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.io.File
 import kotlin.math.max
@@ -258,7 +259,7 @@ fun BookshelfView(
     }
 
     fun launchBookImporter() {
-        importer.launch(arrayOf("application/epub+zip", "application/octet-stream"))
+        importer.launch(ImportFileType.Epub.mimeTypes)
     }
 
     fun updateReaderSettings(settings: ReaderSettings) {

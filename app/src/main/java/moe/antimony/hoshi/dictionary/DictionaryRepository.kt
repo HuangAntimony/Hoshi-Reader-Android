@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.net.Uri
 import de.manhhao.hoshi.HoshiDicts
 import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
 
 class DictionaryRepository(
@@ -29,6 +31,7 @@ class DictionaryRepository(
     }
 
     fun importDictionary(contentResolver: ContentResolver, uri: Uri, type: DictionaryType) {
+        contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
         val typeDirectory = typeDirectory(type).also { it.mkdirs() }
         val tempZip = File.createTempFile("hoshi-dictionary-", ".zip", cacheDir)
         try {
