@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-05-03
+
 ### Added
 
 - Add Sasayaki audiobook read-along support, including SRT matching, cue highlighting, audiobook playback controls, delay and speed adjustment, auto-scroll, and saved per-book playback state.
