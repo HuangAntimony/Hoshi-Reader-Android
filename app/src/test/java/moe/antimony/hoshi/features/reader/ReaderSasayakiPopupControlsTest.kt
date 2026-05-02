@@ -42,8 +42,11 @@ class ReaderSasayakiPopupControlsTest {
 
         assertTrue(popupSource.contains("imageVector = Icons.Rounded.Refresh"))
         assertTrue(popupSource.contains("imageVector = if (isPlaying || wasPaused) Icons.Rounded.Pause else Icons.Rounded.PlayArrow"))
-        assertTrue(popupSource.contains("SasayakiForwardFrameIcon("))
+        assertTrue(popupSource.contains("imageVector = Icons.Rounded.Start"))
         assertTrue(popupSource.contains("contentDescription = \"Play From Sasayaki Cue\""))
+        assertTrue(!popupSource.contains("SasayakiForwardFrameIcon"))
+        assertTrue(!popupSource.contains("Canvas("))
+        assertTrue(!popupSource.contains("drawLine("))
         assertTrue(!popupSource.contains("Icons.Rounded.FastForward"))
         assertTrue(!popupSource.contains("import androidx.compose.material.icons.rounded.FastForward"))
         assertTrue(!popupSource.contains("Icons.Rounded.Replay"))
