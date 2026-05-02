@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
@@ -106,22 +105,6 @@ fun SasayakiSheet(
                 .fillMaxWidth()
                 .padding(bottom = 28.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, end = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Sasayaki",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close")
-                }
-            }
             if (player.hasAudio) {
                 Row(
                     modifier = Modifier
@@ -154,16 +137,27 @@ fun SasayakiSheet(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Load Audio") },
                 supportingContent = {
-                    Text(if (player.hasAudio) "Audiobook loaded" else "Select an .mp3 or .m4b audiobook")
+                    Text(player.audioStorageSummary)
                 },
                 trailingContent = {
                     Button(
                         enabled = !isImporting,
-                        onClick = { importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes) },
+                        onClick = {
+                            if (player.hasAudio) {
+                                player.clearAudio()
+                            } else {
+                                importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes)
+                            }
+                        },
                     ) {
-                        Text(if (isImporting) "Importing" else "Open")
+                        Text(if (player.hasAudio) "Remove" else if (isImporting) "Importing" else "Open")
                     }
                 },
+            )
+            SasayakiSettingsSwitchRow(
+                label = "Copy Audiobook to App Storage",
+                checked = settings.copyAudiobookToPrivateStorage,
+                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
             )
             importError?.let { message ->
                 Text(
@@ -218,11 +212,6 @@ fun SasayakiSheet(
                 label = "Auto-Pause on Lookup",
                 checked = settings.autoPause,
                 onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
-            )
-            SasayakiSettingsSwitchRow(
-                label = "Copy Audiobook to App Storage",
-                checked = settings.copyAudiobookToPrivateStorage,
-                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
             )
         }
     }

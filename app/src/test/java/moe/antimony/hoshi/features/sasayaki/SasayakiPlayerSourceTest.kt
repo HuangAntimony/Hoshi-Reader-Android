@@ -25,6 +25,22 @@ class SasayakiPlayerSourceTest {
     }
 
     @Test
+    fun audioCanBeClearedAndDescribesStorageMode() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val clearAudio = source.substringAfter("fun clearAudio()")
+            .substringBefore("fun togglePlayback()")
+
+        assertTrue(source.contains("val audioStorageSummary: String"))
+        assertTrue(source.contains("playback.audioFileName != null"))
+        assertTrue(source.contains("playback.audioUri != null"))
+        assertTrue(clearAudio.contains("audioRepository.deleteAudio(playback)"))
+        assertTrue(clearAudio.contains("releasePersistableUriPermission"))
+        assertTrue(clearAudio.contains("audioUri = null"))
+        assertTrue(clearAudio.contains("audioFileName = null"))
+        assertTrue(clearAudio.contains("hasAudio = false"))
+    }
+
+    @Test
     fun restoredAudioStaysPausedUntilExplicitPlaybackLikeIos() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")

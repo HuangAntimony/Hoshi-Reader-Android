@@ -16,6 +16,9 @@ class SasayakiAudioRepository(private val bookRoot: File) {
         return file.takeIf { it.isFile }
     }
 
+    fun deleteAudio(playback: SasayakiPlaybackData): Boolean =
+        audioFile(playback)?.delete() == true
+
     fun importAudio(contentResolver: ContentResolver, uri: Uri): String {
         contentResolver.validateImportFile(uri, ImportFileType.SasayakiAudiobook)
         val displayName = contentResolver.displayName(uri)

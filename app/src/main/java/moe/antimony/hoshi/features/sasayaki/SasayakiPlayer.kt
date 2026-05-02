@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.PlaybackParams
@@ -61,6 +62,12 @@ class SasayakiPlayer(
 
     val delay: Double get() = playback.delay
     val rate: Float get() = playback.rate
+    val audioStorageSummary: String
+        get() = when {
+            playback.audioFileName != null -> "Copied to app storage. The original audiobook file can be deleted."
+            playback.audioUri != null -> "Linked to the external audiobook file. Keep the original file available."
+            else -> "Select an .mp3 or .m4b audiobook"
+        }
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -95,6 +102,30 @@ class SasayakiPlayer(
         )
         savePlayback()
         restoreAudio()
+    }
+
+    fun clearAudio() {
+        val previousAudioUri = playback.audioUri
+        audioRepository.deleteAudio(playback)
+        teardownPlayer(clearCue = true)
+        previousAudioUri?.let { uriString ->
+            runCatching {
+                appContext.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(uriString),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+        }
+        playback = playback.copy(
+            lastPosition = 0.0,
+            audioUri = null,
+            audioFileName = null,
+        )
+        currentTime = 0.0
+        duration = 0.0
+        hasAudio = false
+        errorMessage = null
+        savePlayback()
     }
 
     fun togglePlayback() {

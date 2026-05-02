@@ -20,12 +20,33 @@ class SasayakiSheetTest {
     @Test
     fun sheetUsesSettingsToggleToChooseExternalUriOrPrivateCopy() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiSheet.kt").readText()
+        val loadAudioIndex = source.indexOf("Load Audio")
+        val copyToggleIndex = source.indexOf("Copy Audiobook to App Storage")
+        val delayIndex = source.indexOf("Delay")
 
         assertTrue(source.contains("settings.copyAudiobookToPrivateStorage"))
         assertTrue(source.contains("player.importAudio("))
         assertTrue(source.contains("copyToPrivateStorage = settings.copyAudiobookToPrivateStorage"))
-        assertTrue(source.contains("Copy Audiobook to App Storage"))
+        assertTrue(copyToggleIndex > loadAudioIndex)
+        assertTrue(copyToggleIndex < delayIndex)
         assertTrue(source.contains("settings.copy(copyAudiobookToPrivateStorage = it)"))
+    }
+
+    @Test
+    fun sheetKeepsStorageControlsBesideLoadAudioAndRemovesWastedHeader() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiSheet.kt").readText()
+        val loadAudioIndex = source.indexOf("Load Audio")
+        val removeIndex = source.indexOf("Remove")
+        val storageSummaryIndex = source.indexOf("audioStorageSummary")
+
+        assertTrue(loadAudioIndex >= 0)
+        assertTrue(storageSummaryIndex > loadAudioIndex)
+        assertTrue(removeIndex > loadAudioIndex)
+        assertTrue(source.contains("player.clearAudio()"))
+        assertTrue(source.contains("Text(if (player.hasAudio) \"Remove\" else if (isImporting) \"Importing\" else \"Open\")"))
+        assertTrue(source.contains("if (player.hasAudio) {\n                                player.clearAudio()"))
+        assertTrue(!source.contains("Text(\n                    text = \"Sasayaki\""))
+        assertTrue(!source.contains("contentDescription = \"Close\""))
     }
 
     @Test
