@@ -42,7 +42,9 @@
    - `done` - Add Settings -> Diagnostics between Report an Issue and About, using Android process exit history on Android 11+ plus save-as-`.txt` and share actions so users can attach diagnostics to issue reports.
    - `done` - Fix Settings -> Diagnostics so Android system Back returns to the Settings list instead of closing the app.
    - `done` - Fix issue #36 so Books, Settings, and Advanced settings headers no longer double-apply top safe-area spacing.
+   - `done` - Unify Settings -> Dictionaries, Appearance, and Advanced behind one compact detail header so subpage content starts directly below a single top bar.
    - `todo` - Align multi-select, shelves, and batch actions with iOS.
+   - Verified Settings detail header layout with `SettingsDetailLayoutTest` on physical `SM-G9860` and `Pixel_10_Pro(AVD)`: Dictionaries uses a centered compact title instead of a large header, and Appearance no longer renders a second large in-content title before the Theme section.
    - Verified issue #36 on `emulator-5554` after uninstalling the stale `moe.antimony.hoshi` release package and installing the current `moe.antimony.hoshi.debug` build: Books and Settings headers each render in a single top app-bar safe-area band, and Settings -> Advanced uses a compact header with the title aligned beside the back button instead of a separated large-title row.
    - Verified on emulator with `testdata/test.epub`: cleared app data, imported the EPUB twice through DocumentsUI, confirmed two shelf rows and two independent `files/Books/<uuid>/metadata.json` files, then opened a listed book into the reader.
    - Verified cover thumbnails on emulator with `testdata/test.epub`: imported through DocumentsUI, confirmed `metadata.cover` is `item/image/cover.jpg`, and visually checked the real cover image renders in the shelf row.

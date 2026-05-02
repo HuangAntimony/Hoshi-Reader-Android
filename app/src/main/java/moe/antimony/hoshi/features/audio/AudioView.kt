@@ -32,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -61,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -87,21 +87,12 @@ fun AdvancedSettingsView(
         return
     }
 
-    BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
-    Scaffold(
+    SettingsDetailScaffold(
+        title = "Advanced",
+        onClose = onClose,
         modifier = modifier.fillMaxSize(),
         containerColor = colorScheme.background,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colorScheme.background,
-                    scrolledContainerColor = colorScheme.background,
-                ),
-                title = { Text("Advanced", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = { BackIconButton(onClose) },
-            )
-        },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier

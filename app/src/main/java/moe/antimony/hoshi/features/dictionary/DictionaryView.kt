@@ -33,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +82,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.MultipleFileImportContent
 import moe.antimony.hoshi.importing.validateImportFile
@@ -271,69 +271,51 @@ fun DictionaryView(
         null -> Unit
     }
 
-    BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
 
-    Scaffold(
+    SettingsDetailScaffold(
+        title = "Dictionaries",
+        onClose = onClose,
         modifier = modifier.fillMaxSize(),
         containerColor = colorScheme.background,
-        topBar = {
-            LargeTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colorScheme.background,
-                    scrolledContainerColor = colorScheme.background,
-                    titleContentColor = colorScheme.onBackground,
-                    navigationIconContentColor = colorScheme.onBackground,
-                    actionIconContentColor = colorScheme.onBackground,
-                ),
-                title = {
-                    Text(
-                        text = "Dictionaries",
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                navigationIcon = {
-                    HoshiIconBackButton(onClose)
-                },
-                actions = {
-                    IconButton(onClick = { destination = DictionaryDestination.CustomCss }) {
+        contentColor = colorScheme.onBackground,
+        actions = {
+            IconButton(onClick = { destination = DictionaryDestination.CustomCss }) {
+                Icon(
+                    imageVector = Icons.Rounded.DataObject,
+                    contentDescription = "Custom CSS",
+                )
+            }
+            Box {
+                IconButton(
+                    onClick = { importMenuExpanded = true },
+                    enabled = !isImporting,
+                ) {
+                    if (isImporting) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
                         Icon(
-                            imageVector = Icons.Rounded.DataObject,
-                            contentDescription = "Custom CSS",
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = "Import Dictionary",
                         )
                     }
-                    Box {
-                        IconButton(
-                            onClick = { importMenuExpanded = true },
-                            enabled = !isImporting,
-                        ) {
-                            if (isImporting) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = "Import Dictionary",
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = importMenuExpanded,
-                            onDismissRequest = { importMenuExpanded = false },
-                        ) {
-                            DictionaryType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type.displayName) },
-                                    onClick = {
-                                        importMenuExpanded = false
-                                        importType = type
-                                        importer.launch(ImportFileType.DictionaryArchive.mimeTypes)
-                                    },
-                                )
-                            }
-                        }
+                }
+                DropdownMenu(
+                    expanded = importMenuExpanded,
+                    onDismissRequest = { importMenuExpanded = false },
+                ) {
+                    DictionaryType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.displayName) },
+                            onClick = {
+                                importMenuExpanded = false
+                                importType = type
+                                importer.launch(ImportFileType.DictionaryArchive.mimeTypes)
+                            },
+                        )
                     }
-                },
-            )
+                }
+            }
         },
     ) { innerPadding ->
         Box(

@@ -47,8 +47,10 @@ class IssueOneContrastRegressionTest {
         val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderAppearanceView.kt").readText()
         val screen = source.substringAfter("internal fun ReaderAppearanceScreen(")
             .substringBefore("@OptIn(ExperimentalMaterial3Api::class)\n@Composable\ninternal fun ReaderAppearanceSheet(")
+        val scaffold = File("src/main/java/moe/antimony/hoshi/features/settings/SettingsDetailScaffold.kt").readText()
 
-        assertTrue(screen.contains("BackHandler(onBack = onClose)"))
+        assertTrue(screen.contains("SettingsDetailScaffold("))
+        assertTrue(scaffold.contains("BackHandler(onBack = onClose)"))
     }
 
     @Test

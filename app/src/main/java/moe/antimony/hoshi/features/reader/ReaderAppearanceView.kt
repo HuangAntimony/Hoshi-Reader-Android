@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.reader
 
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -20,12 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,7 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -44,7 +40,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -62,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import java.util.Locale
@@ -77,28 +73,12 @@ internal fun ReaderAppearanceScreen(
     modifier: Modifier = Modifier,
 ) {
     val palette = appearancePalette()
-    BackHandler(onBack = onClose)
-    Scaffold(
+    SettingsDetailScaffold(
+        title = "Appearance",
+        onClose = onClose,
         modifier = modifier.fillMaxSize(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Appearance", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = palette.background,
-                    titleContentColor = palette.onBackground,
-                    navigationIconContentColor = palette.onBackground,
-                ),
-            )
-        },
         containerColor = palette.background,
+        contentColor = palette.onBackground,
     ) { padding ->
         ReaderAppearanceContent(
             settings = settings,
@@ -107,9 +87,10 @@ internal fun ReaderAppearanceScreen(
             contentPadding = PaddingValues(
                 start = 24.dp,
                 end = 24.dp,
-                top = padding.calculateTopPadding() + 14.dp,
+                top = padding.calculateTopPadding() + 12.dp,
                 bottom = 128.dp,
             ),
+            showTitle = false,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -150,6 +131,7 @@ private fun ReaderAppearanceContent(
     fontManager: ReaderFontManager,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
     showDone: Boolean = false,
     onDone: () -> Unit = {},
 ) {
@@ -190,7 +172,7 @@ private fun ReaderAppearanceContent(
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item {
+            if (showTitle) item {
                 Text(
                     text = "Appearance",
                     style = MaterialTheme.typography.headlineLarge,

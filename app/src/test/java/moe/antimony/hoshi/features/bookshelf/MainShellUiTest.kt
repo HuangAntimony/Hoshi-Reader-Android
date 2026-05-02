@@ -233,7 +233,7 @@ class MainShellUiTest {
         val advanced = source.substringAfter("fun AdvancedSettingsView(")
             .substringBefore("@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nfun AudioSettingsView")
 
-        assertTrue(advanced.contains("CenterAlignedTopAppBar("))
+        assertTrue(advanced.contains("SettingsDetailScaffold("))
         assertFalse(advanced.contains("LargeTopAppBar("))
     }
 }

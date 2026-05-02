@@ -28,6 +28,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep Sasayaki audiobooks linked to the selected external media file instead of importing another private copy, matching iOS storage behavior.
 - Reject mismatched import files before reading them, so EPUB, Sasayaki SRT, Sasayaki audiobook, local audio database, dictionary, and reader font imports only accept their supported file extensions.
 - Simplify the reader Sasayaki sheet by removing the redundant header row, moving the audiobook storage toggle next to Load Audio, showing whether loaded audio is an external reference or app-private copy, and replacing Open with Remove while an audiobook is loaded.
+- Use the same compact Settings detail header for Dictionaries, Appearance, and Advanced so subpage content starts directly below a single top bar.
 
 ## [v0.1.6] - 2026-05-02
 
