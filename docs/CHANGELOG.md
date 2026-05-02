@@ -14,6 +14,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Align Sasayaki lookup popup control icons with the iOS symbols for replaying the cue, toggling playback, and playing forward from the cue.
 - Use only system icons for Sasayaki lookup popup controls, including the play-forward action.
+- Keep Sasayaki popup Replay as temporary cue playback so it does not overwrite the saved audiobook position.
 - Make the Sasayaki lookup popup controls more compact so the three buttons fit in narrow popup windows.
 - Keep restored Sasayaki audiobooks paused until the user explicitly starts playback, and expose the iOS-aligned Auto-Scroll controls in the reader Sasayaki sheet.
 - Resume Sasayaki playback after closing a lookup popup when Auto-Pause on Lookup paused it.

@@ -31,6 +31,7 @@ class SasayakiPlayer(
     private var currentCue: SasayakiMatch? = null
     private var hasPlayedOnce = false
     private var stopPlaybackTime: Double? = null
+    private var temporaryPlaybackReturnPosition: Double? = null
 
     var playback by mutableStateOf(bookStorage.loadSasayakiPlayback(bookRoot) ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
@@ -86,10 +87,13 @@ class SasayakiPlayer(
         if (isPlaying) pausePlayback() else startPlayback()
     }
 
-    fun pausePlayback() {
+    fun pausePlayback(restoreTemporaryPosition: Boolean = true) {
         mediaPlayer?.pause()
         isPlaying = false
         handler.removeCallbacks(tickRunnable)
+        if (restoreTemporaryPosition) {
+            restoreTemporaryPlaybackPositionIfNeeded()
+        }
     }
 
     fun nextCue() {
@@ -109,9 +113,10 @@ class SasayakiPlayer(
 
     fun playCue(cue: SasayakiMatch, stop: Boolean) {
         stopPlaybackTime = null
-        if (isPlaying) pausePlayback()
+        if (isPlaying) pausePlayback(restoreTemporaryPosition = false)
+        temporaryPlaybackReturnPosition = if (stop) playback.lastPosition else null
         stopPlaybackTime = if (stop) cue.endTime + delay else null
-        seek(cue.startTime + delay, startPlayback = true, updateCue = false)
+        seek(cue.startTime + delay, startPlayback = true, updateCue = false, savePosition = !stop)
     }
 
     fun release() {
@@ -128,12 +133,19 @@ class SasayakiPlayer(
         handler.post(tickRunnable)
     }
 
-    private fun seek(seconds: Double, startPlayback: Boolean, updateCue: Boolean = true) {
+    private fun seek(
+        seconds: Double,
+        startPlayback: Boolean,
+        updateCue: Boolean = true,
+        savePosition: Boolean = true,
+    ) {
         val player = mediaPlayer ?: return
         player.seekTo((seconds * 1000.0).toInt().coerceAtLeast(0))
         currentTime = seconds
-        playback = playback.copy(lastPosition = seconds)
-        savePlayback()
+        if (savePosition) {
+            playback = playback.copy(lastPosition = seconds)
+            savePlayback()
+        }
         if (updateCue) updateCue(seconds)
         if (startPlayback) startPlayback()
     }
@@ -166,7 +178,7 @@ class SasayakiPlayer(
         currentTime = player.currentPosition.toDouble() / 1000.0
         duration = player.duration.coerceAtLeast(0).toDouble() / 1000.0
         val second = currentTime.toInt()
-        if (second != lastSavedSecond) {
+        if (temporaryPlaybackReturnPosition == null && second != lastSavedSecond) {
             lastSavedSecond = second
             playback = playback.copy(lastPosition = currentTime)
             savePlayback()
@@ -208,6 +220,15 @@ class SasayakiPlayer(
 
     private fun savePlayback() {
         bookStorage.saveSasayakiPlayback(bookRoot, playback)
+    }
+
+    private fun restoreTemporaryPlaybackPositionIfNeeded() {
+        val returnPosition = temporaryPlaybackReturnPosition ?: return
+        temporaryPlaybackReturnPosition = null
+        mediaPlayer?.seekTo((returnPosition * 1000.0).toInt().coerceAtLeast(0))
+        currentTime = returnPosition
+        lastSavedSecond = returnPosition.toInt()
+        updateCue(returnPosition)
     }
 
     private fun teardownPlayer(clearCue: Boolean) {
