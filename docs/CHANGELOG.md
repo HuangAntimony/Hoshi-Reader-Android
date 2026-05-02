@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add Sasayaki audiobook read-along support with an adjustable SRT Match page from the bookshelf, reader cue highlighting, audiobook import/playback controls, delay and speed adjustment, and persistent per-book playback state.
 - Add iOS-aligned Sasayaki controls to lookup popups for replaying the selected cue, toggling the current playback pause state, or continuing playback from the selected cue.
+- Add a Sasayaki setting for choosing whether selected audiobooks stay linked as external files or are copied into app storage.
 
 ### Fixed
 
@@ -23,6 +24,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep reader progress and saved book position in sync when Sasayaki Auto-Scroll follows audiobook cues across pages.
 - Highlight the current Sasayaki cue immediately when audiobook playback starts, matching iOS read-along behavior.
 - Match Sasayaki SRT files with the same cue accounting and non-reader TOC filtering as iOS so identical search windows report matching rates consistently.
+- Keep Sasayaki audiobooks linked to the selected external media file instead of importing another private copy, matching iOS storage behavior.
 
 ## [v0.1.6] - 2026-05-02
 

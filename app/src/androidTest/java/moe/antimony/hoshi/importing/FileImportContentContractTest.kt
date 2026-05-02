@@ -61,6 +61,20 @@ class FileImportContentContractTest {
     }
 
     @Test
+    fun openDocumentContentUsesPersistableDocumentAccess() {
+        val mimeTypes = arrayOf("audio/mpeg", "audio/mp4", "audio/*", "application/octet-stream")
+
+        val intent = OpenDocumentContent().createIntent(context, mimeTypes)
+
+        assertEquals(Intent.ACTION_OPEN_DOCUMENT, intent.action)
+        assertEquals("*/*", intent.type)
+        assertTrue(intent.categories.orEmpty().contains(Intent.CATEGORY_OPENABLE))
+        assertArrayEquals(mimeTypes, intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES))
+        assertTrue(intent.flags.toInt() and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        assertTrue(intent.flags.toInt() and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0)
+    }
+
+    @Test
     fun multipleFileImportDeduplicatesDataAndClipDataUris() {
         val uri = Uri.parse("content://example/dictionary.zip")
         val result = Intent().apply {

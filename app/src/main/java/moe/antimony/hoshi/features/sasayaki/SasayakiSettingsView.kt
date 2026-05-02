@@ -104,6 +104,18 @@ fun SasayakiSettingsView(
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Copy Audiobook to App Storage") },
+                            supportingContent = { Text("Keep a private copy instead of linking to the selected external media file") },
+                            trailingContent = {
+                                Switch(
+                                    checked = settings.copyAudiobookToPrivateStorage,
+                                    onCheckedChange = { save(settings.copy(copyAudiobookToPrivateStorage = it)) },
+                                )
+                            },
+                        )
+                        SettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             headlineContent = { Text("Auto-Scroll") },
                             trailingContent = {
                                 Switch(

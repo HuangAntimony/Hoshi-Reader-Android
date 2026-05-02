@@ -1,8 +1,10 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.PlaybackParams
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
@@ -85,9 +87,12 @@ class SasayakiPlayer(
         savePlayback()
     }
 
-    fun importAudio(audioFileName: String) {
+    fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
         teardownPlayer(clearCue = false)
-        playback = playback.copy(audioFileName = audioFileName, audioUri = null)
+        playback = playback.copy(
+            audioUri = if (copiedAudioFileName == null) audioUri.toString() else null,
+            audioFileName = copiedAudioFileName,
+        )
         savePlayback()
         restoreAudio()
     }
@@ -190,10 +195,17 @@ class SasayakiPlayer(
     }
 
     private fun restoreAudio() {
-        val file = audioRepository.audioFile(playback) ?: return
+        val uri = playback.audioUri?.let { Uri.parse(it) }
+        val file = if (uri == null) audioRepository.audioFile(playback) else null
+        if (uri == null && file == null) return
         runCatching {
             val player = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
+                setAudioAttributes(audioAttributes())
+                if (uri != null) {
+                    setDataSource(appContext, uri)
+                } else {
+                    setDataSource(requireNotNull(file).absolutePath)
+                }
                 setOnCompletionListener {
                     this@SasayakiPlayer.isPlaying = false
                     handler.removeCallbacks(tickRunnable)
@@ -286,4 +298,10 @@ class SasayakiPlayer(
 
     private fun playbackParams(speed: Float): PlaybackParams =
         PlaybackParams().setSpeed(speed).setPitch(1f)
+
+    private fun audioAttributes(): AudioAttributes =
+        AudioAttributes.Builder()
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .build()
 }

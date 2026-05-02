@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.features.reader.ReaderSheetDragHandle
 import moe.antimony.hoshi.features.reader.readerSheetStyle
-import moe.antimony.hoshi.importing.FileImportContent
+import moe.antimony.hoshi.importing.OpenDocumentContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,17 +60,29 @@ fun SasayakiSheet(
     val sheetStyle = readerSheetStyle()
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
-    val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
+    val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
         if (uri == null || isImporting) return@rememberLauncherForActivityResult
         isImporting = true
         importError = null
         scope.launch {
             runCatching {
+                val copyToPrivateStorage = settings.copyAudiobookToPrivateStorage
                 withContext(Dispatchers.IO) {
-                    audioRepository.importAudio(context.contentResolver, uri)
+                    if (copyToPrivateStorage) {
+                        audioRepository.importAudio(context.contentResolver, uri)
+                    } else {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                        null
+                    }
                 }
-            }.onSuccess { fileName ->
-                player.importAudio(fileName)
+            }.onSuccess { copiedFileName ->
+                player.importAudio(
+                    audioUri = uri,
+                    copiedAudioFileName = copiedFileName,
+                )
             }.onFailure { error ->
                 importError = error.localizedMessage ?: "Unable to import audiobook."
             }

@@ -7,6 +7,24 @@ import java.io.File
 
 class SasayakiPlayerSourceTest {
     @Test
+    fun importedAudioUsesPersistedUriInsteadOfPrivateCopyLikeIos() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val importAudio = source.substringAfter("fun importAudio(")
+            .substringBefore("fun togglePlayback()")
+        val restoreAudio = source.substringAfter("private fun restoreAudio()")
+            .substringBefore("private fun tick()")
+
+        assertTrue(source.contains("import android.net.Uri"))
+        assertTrue(importAudio.contains("audioUri: Uri, copiedAudioFileName: String? = null"))
+        assertTrue(importAudio.contains("if (copiedAudioFileName == null)"))
+        assertTrue(importAudio.contains("audioUri.toString()"))
+        assertTrue(importAudio.contains("audioFileName = copiedAudioFileName"))
+        assertTrue(restoreAudio.contains("Uri.parse("))
+        assertTrue(restoreAudio.contains("setDataSource(appContext, uri)"))
+        assertTrue(restoreAudio.contains("setDataSource(requireNotNull(file).absolutePath)"))
+    }
+
+    @Test
     fun restoredAudioStaysPausedUntilExplicitPlaybackLikeIos() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")

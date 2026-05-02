@@ -17,6 +17,16 @@ class FileImportContent : ActivityResultContract<Array<String>, Uri?>() {
     }
 }
 
+class OpenDocumentContent : ActivityResultContract<Array<String>, Uri?>() {
+    override fun createIntent(context: Context, input: Array<String>): Intent =
+        createOpenDocumentIntent(input)
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? {
+        if (resultCode != Activity.RESULT_OK) return null
+        return intent?.data
+    }
+}
+
 class MultipleFileImportContent : ActivityResultContract<Array<String>, List<Uri>>() {
     override fun createIntent(context: Context, input: Array<String>): Intent =
         createImportIntent(input, allowMultiple = true)
@@ -35,6 +45,16 @@ private fun createImportIntent(mimeTypes: Array<String>, allowMultiple: Boolean)
         .putExtra(Intent.EXTRA_MIME_TYPES, requestedMimeTypes)
         .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+}
+
+private fun createOpenDocumentIntent(mimeTypes: Array<String>): Intent {
+    val requestedMimeTypes = mimeTypes.takeIf { it.isNotEmpty() } ?: arrayOf("*/*")
+    return Intent(Intent.ACTION_OPEN_DOCUMENT)
+        .addCategory(Intent.CATEGORY_OPENABLE)
+        .setType(if (requestedMimeTypes.size == 1) requestedMimeTypes.single() else "*/*")
+        .putExtra(Intent.EXTRA_MIME_TYPES, requestedMimeTypes)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        .addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
 }
 
 private fun ClipData?.toUris(): List<Uri> {
