@@ -30,6 +30,7 @@ class SasayakiPlayer(
     private var lastSavedSecond = -1
     private var currentCue: SasayakiMatch? = null
     private var hasPlayedOnce = false
+    private var stopPlaybackTime: Double? = null
 
     var playback by mutableStateOf(bookStorage.loadSasayakiPlayback(bookRoot) ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
@@ -93,12 +94,24 @@ class SasayakiPlayer(
 
     fun nextCue() {
         val next = timeline.nextCue(after = currentCue?.startTime ?: currentTime - delay) ?: return
+        stopPlaybackTime = null
         seek(next + delay, startPlayback = isPlaying)
     }
 
     fun previousCue() {
         val previous = timeline.previousCue(before = currentCue?.startTime ?: max(0.0, currentTime - delay)) ?: 0.0
+        stopPlaybackTime = null
         seek(previous + delay, startPlayback = isPlaying)
+    }
+
+    fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
+        timeline.findCue(chapterIndex = chapterIndex, offset = offset)
+
+    fun playCue(cue: SasayakiMatch, stop: Boolean) {
+        stopPlaybackTime = null
+        if (isPlaying) pausePlayback()
+        stopPlaybackTime = if (stop) cue.endTime + delay else null
+        seek(cue.startTime + delay, startPlayback = true, updateCue = false)
     }
 
     fun release() {
@@ -115,13 +128,13 @@ class SasayakiPlayer(
         handler.post(tickRunnable)
     }
 
-    private fun seek(seconds: Double, startPlayback: Boolean) {
+    private fun seek(seconds: Double, startPlayback: Boolean, updateCue: Boolean = true) {
         val player = mediaPlayer ?: return
         player.seekTo((seconds * 1000.0).toInt().coerceAtLeast(0))
         currentTime = seconds
         playback = playback.copy(lastPosition = seconds)
         savePlayback()
-        updateCue(seconds)
+        if (updateCue) updateCue(seconds)
         if (startPlayback) startPlayback()
     }
 
@@ -157,6 +170,12 @@ class SasayakiPlayer(
             lastSavedSecond = second
             playback = playback.copy(lastPosition = currentTime)
             savePlayback()
+        }
+        stopPlaybackTime?.let { stopTime ->
+            if (currentTime >= stopTime && isPlaying) {
+                stopPlaybackTime = null
+                pausePlayback()
+            }
         }
         updateCue(currentTime)
     }

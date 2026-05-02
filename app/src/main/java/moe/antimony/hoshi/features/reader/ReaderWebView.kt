@@ -136,6 +136,23 @@ fun ReaderWebView(
     var sasayakiWasPausedByLookup by remember { mutableStateOf(false) }
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
+    val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
+    var readerPosition by remember(book) {
+        mutableStateOf(
+            ReaderPositionState(
+                ReaderChapterPosition(
+                    index = clampedInitialIndex,
+                    progress = initialProgress.coerceIn(0.0, 1.0),
+                ),
+            ),
+        )
+    }
+    fun sasayakiCueForSelection(selection: ReaderSelectionData): SasayakiMatch? {
+        val player = sasayakiPlayer ?: return null
+        val offset = selection.normalizedOffset ?: return null
+        if (!sasayakiSettings.enabled || !player.hasAudio) return null
+        return player.findCue(chapterIndex = readerPosition.displayedPosition.index, offset = offset)
+    }
     fun lookupRootPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
         createLookupPopupItem(
             selection = selection,
@@ -151,7 +168,9 @@ fun ReaderWebView(
                 eInkMode = effectiveSettings.eInkMode,
                 audioSettings = audioSettingsStore.load(),
             ),
-        )
+        )?.let { (popup, highlightCount) ->
+            popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
+        }
     fun lookupChildPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
         createLookupPopupItem(
             selection = selection,
@@ -167,7 +186,9 @@ fun ReaderWebView(
                 eInkMode = effectiveSettings.eInkMode,
                 audioSettings = audioSettingsStore.load(),
             ),
-        )
+        )?.let { (popup, highlightCount) ->
+            popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
+        }
     fun clearReaderSelection() {
         webView?.evaluateJavascript(ReaderSelectionScripts.clearInvocation(), null)
     }
@@ -213,17 +234,6 @@ fun ReaderWebView(
         } else {
             onTextSelected(selection)
         }
-    }
-    val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
-    var readerPosition by remember(book) {
-        mutableStateOf(
-            ReaderPositionState(
-                ReaderChapterPosition(
-                    index = clampedInitialIndex,
-                    progress = initialProgress.coerceIn(0.0, 1.0),
-                ),
-            ),
-        )
     }
     val chromeState = remember(book, readerPosition.displayedPosition) {
         ReaderChromeState(
@@ -352,6 +362,15 @@ fun ReaderWebView(
                 onPopupsChange = ::setLookupPopups,
                 lookupChildPopup = ::lookupChildPopup,
                 onRootPopupDismissed = ::clearReaderSelection,
+                sasayakiWasPaused = sasayakiWasPausedByLookup,
+                sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
+                onSasayakiTogglePlayback = { sasayakiPlayer?.togglePlayback() },
+                onSasayakiPauseStateCleared = { sasayakiWasPausedByLookup = false },
+                onSasayakiPlayForward = { cue ->
+                    sasayakiPlayer?.playCue(cue, stop = false)
+                    setLookupPopups(emptyList())
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

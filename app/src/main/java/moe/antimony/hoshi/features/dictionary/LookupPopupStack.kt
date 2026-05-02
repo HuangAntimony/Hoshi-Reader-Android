@@ -8,6 +8,7 @@ import androidx.compose.ui.zIndex
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import java.util.UUID
 
 internal data class LookupPopupOptions(
@@ -29,6 +30,7 @@ internal data class LookupPopupItem(
     val id: String = UUID.randomUUID().toString(),
     val state: LookupPopupState,
     val clearSelectionSignal: Int = 0,
+    val sasayakiCue: SasayakiMatch? = null,
 )
 
 internal fun createLookupPopupItem(
@@ -96,11 +98,20 @@ internal fun LookupPopupStackView(
     lookupChildPopup: (ReaderSelectionData) -> Pair<LookupPopupItem, Int>?,
     modifier: Modifier = Modifier,
     onRootPopupDismissed: () -> Unit = {},
+    sasayakiWasPaused: Boolean = false,
+    sasayakiIsPlaying: Boolean = false,
+    onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
+    onSasayakiTogglePlayback: () -> Unit = {},
+    onSasayakiPauseStateCleared: () -> Unit = {},
+    onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
 ) {
     popups.forEachIndexed { index, popup ->
         key(popup.id) {
             LookupPopupView(
                 state = popup.state,
+                sasayakiCue = popup.sasayakiCue,
+                sasayakiWasPaused = sasayakiWasPaused,
+                sasayakiIsPlaying = sasayakiIsPlaying,
                 clearSelectionSignal = popup.clearSelectionSignal,
                 onTapOutside = {
                     onPopupsChange(closeChildPopups(popups, index))
@@ -116,6 +127,10 @@ internal fun LookupPopupStackView(
                         highlightCount
                     }
                 },
+                onSasayakiReplayCue = onSasayakiReplayCue,
+                onSasayakiTogglePlayback = onSasayakiTogglePlayback,
+                onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
+                onSasayakiPlayForward = onSasayakiPlayForward,
                 modifier = modifier
                     .fillMaxSize()
                     .zIndex(2f + index),
