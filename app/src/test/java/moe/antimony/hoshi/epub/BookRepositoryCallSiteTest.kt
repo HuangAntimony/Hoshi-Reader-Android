@@ -20,8 +20,12 @@ class BookRepositoryCallSiteTest {
         assertTrue(readerDestination.contains("stateHolder.load(bookId)"))
         assertTrue(readerDestination.contains("stateHolder.saveBookmark("))
         assertTrue(readerWebView.contains("val bookRepository = remember { BookRepository(context.filesDir) }"))
+        assertTrue(readerWebView.contains("BookSasayakiPlaybackRepository(bookRoot, bookRepository)"))
         assertTrue(sasayakiMatchView.contains("bookRepository: SasayakiSidecarRepository"))
-        assertTrue(sasayakiPlayer.contains("bookRepository: SasayakiSidecarRepository"))
+        assertTrue(sasayakiPlayer.contains("playbackRepository: SasayakiPlaybackRepository"))
+        assertTrue(sasayakiPlayer.contains("playbackRepository.load()"))
+        assertTrue(sasayakiPlayer.contains("playbackRepository.save(playback)"))
+        assertFalse(sasayakiPlayer.contains("bookRepository: SasayakiSidecarRepository"))
 
         val productionSources = listOf(bookshelfView, appShell, readerDestination, readerWebView, sasayakiMatchView, sasayakiPlayer)
             .joinToString("\n")

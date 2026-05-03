@@ -11,14 +11,13 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import java.io.File
 import kotlin.math.max
 
 class SasayakiPlayer(
     context: Context,
     private val bookRoot: File,
-    private val bookRepository: SasayakiSidecarRepository,
+    private val playbackRepository: SasayakiPlaybackRepository,
     private val bookTitle: String?,
     private val bookCoverFile: File?,
     matchData: SasayakiMatchData?,
@@ -48,7 +47,7 @@ class SasayakiPlayer(
     private var temporaryPlaybackReturnPosition: Double? = null
     private var pendingSeek: PendingSeek? = null
 
-    var playback by mutableStateOf(bookRepository.loadSasayakiPlayback(bookRoot) ?: SasayakiPlaybackData(lastPosition = 0.0))
+    var playback by mutableStateOf(playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
     var currentTime by mutableStateOf(playback.lastPosition)
         private set
@@ -332,7 +331,7 @@ class SasayakiPlayer(
     }
 
     private fun savePlayback() {
-        bookRepository.saveSasayakiPlayback(bookRoot, playback)
+        playbackRepository.save(playback)
     }
 
     private fun updateMediaSession() {

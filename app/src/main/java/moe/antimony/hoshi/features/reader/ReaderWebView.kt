@@ -82,6 +82,7 @@ import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
+import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
@@ -311,7 +312,7 @@ fun ReaderWebView(
             SasayakiPlayer(
                 context = context,
                 bookRoot = bookRoot,
-                bookRepository = bookRepository,
+                playbackRepository = BookSasayakiPlaybackRepository(bookRoot, bookRepository),
                 bookTitle = book.title,
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,
