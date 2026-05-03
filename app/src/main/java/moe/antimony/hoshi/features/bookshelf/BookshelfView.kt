@@ -104,7 +104,6 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.epub.BookStorage
-import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
@@ -113,14 +112,6 @@ import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.io.File
 import kotlin.math.max
-
-data class ReaderOpenRequest(
-    val bookId: String,
-    val bookRoot: File,
-    val book: EpubBook,
-    val bookmark: Bookmark?,
-    val onBookmarkChanged: (bookmark: Bookmark, readingProgress: Double) -> Unit,
-)
 
 data class SasayakiMatchRequest(
     val bookId: String,
@@ -132,9 +123,10 @@ data class SasayakiMatchRequest(
 fun BookshelfView(
     pendingImportUri: Uri? = null,
     onPendingImportConsumed: () -> Unit = {},
-    onOpenReader: (ReaderOpenRequest) -> Unit,
+    onOpenReader: (String) -> Unit,
     onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     sasayakiSettingsReloadKey: Int = 0,
+    refreshKey: Int = 0,
     layoutSpec: MainShellLayoutSpec,
     modifier: Modifier = Modifier,
 ) {
@@ -150,9 +142,6 @@ fun BookshelfView(
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
     var sasayakiEnabled by remember { mutableStateOf(sasayakiSettingsStore.load().enabled) }
     var bookProgressById by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
-    var selectedBookRoot by remember { mutableStateOf<File?>(null) }
-    var book by remember { mutableStateOf<EpubBook?>(null) }
-    var bookmark by remember { mutableStateOf<Bookmark?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -182,23 +171,10 @@ fun BookshelfView(
         bookStorage.saveBookInfo(root, parsedBook.bookInfo)
     }
 
-    fun readerOpenRequest(
-        root: File,
-        parsedBook: EpubBook,
-        currentBookmark: Bookmark?,
-    ): ReaderOpenRequest {
-        val bookId = bookEntries.firstOrNull { it.root == root }?.metadata?.id ?: root.name
-        return ReaderOpenRequest(
-            bookId = bookId,
-            bookRoot = root,
-            book = parsedBook,
-            bookmark = currentBookmark,
-            onBookmarkChanged = { savedBookmark, readingProgress ->
-                bookmark = savedBookmark
-                bookProgressById = bookProgressById + (bookId to readingProgress)
-            },
-        )
-    }
+    fun readerBookId(root: File): String =
+        bookStorage.loadMetadata(root)?.id
+            ?: bookEntries.firstOrNull { it.root == root }?.metadata?.id
+            ?: root.name
 
     fun parseBook(file: File, openReader: Boolean, refreshAccess: Boolean) {
         scope.launch {
@@ -214,13 +190,9 @@ fun BookshelfView(
                     parsedBook
                 }
             }.onSuccess { parsedBook ->
-                selectedBookRoot = file
-                book = parsedBook
-                val loadedBookmark = bookStorage.loadBookmark(file)
-                bookmark = loadedBookmark
                 reloadBookEntries()
                 if (openReader) {
-                    onOpenReader(readerOpenRequest(file, parsedBook, loadedBookmark))
+                    onOpenReader(readerBookId(file))
                 }
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to open EPUB."
@@ -242,13 +214,9 @@ fun BookshelfView(
                     root to parsedBook
                 }
             }.onSuccess { (root, parsedBook) ->
-                selectedBookRoot = root
-                book = parsedBook
-                val loadedBookmark = bookStorage.loadBookmark(root)
-                bookmark = loadedBookmark
                 reloadBookEntries()
                 isLoading = false
-                onOpenReader(readerOpenRequest(root, parsedBook, loadedBookmark))
+                onOpenReader(readerBookId(root))
             }.onFailure {
                 errorMessage = it.localizedMessage ?: "Failed to import EPUB."
                 isLoading = false
@@ -273,8 +241,11 @@ fun BookshelfView(
         importer.launch(ImportFileType.Epub.mimeTypes)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
         reloadBookEntries()
+    }
+
+    LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             runCatching { dictionaryRepository.rebuildLookupQuery() }
         }
@@ -327,11 +298,6 @@ fun BookshelfView(
                         scope.launch(Dispatchers.IO) {
                             bookStorage.deleteBook(candidate.root)
                             withContext(Dispatchers.Main) {
-                                if (selectedBookRoot == candidate.root) {
-                                    selectedBookRoot = null
-                                    book = null
-                                    bookmark = null
-                                }
                                 reloadBookEntries()
                                 deleteCandidate = null
                             }

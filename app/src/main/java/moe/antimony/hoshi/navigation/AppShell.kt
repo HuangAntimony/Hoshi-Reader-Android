@@ -3,7 +3,9 @@ package moe.antimony.hoshi.navigation
 import android.content.Intent
 import android.net.Uri
 import android.view.KeyEvent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +14,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.NavEntry
@@ -23,11 +27,12 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.features.audio.AdvancedSettingsView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
 import moe.antimony.hoshi.features.bookshelf.MainTab
-import moe.antimony.hoshi.features.bookshelf.ReaderOpenRequest
 import moe.antimony.hoshi.features.bookshelf.SasayakiMatchRequest
 import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
@@ -41,8 +46,11 @@ import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 private const val ReportIssueUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues"
 
@@ -64,12 +72,12 @@ fun AppShell(
         }
     }
     val backStack = rememberNavBackStack(initialRoute)
-    val scope = rememberCoroutineScope()
+    val appScope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
-    var readerSessions by remember { mutableStateOf<Map<String, ReaderOpenRequest>>(emptyMap()) }
     var sasayakiMatchRequests by remember { mutableStateOf<Map<String, SasayakiMatchRequest>>(emptyMap()) }
     var sasayakiSettingsReloadKey by remember { mutableIntStateOf(0) }
+    var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
 
     fun popRoute() {
         if (backStack.size > 1) {
@@ -89,10 +97,9 @@ fun AppShell(
         backStack.add(AppRoute.SettingsDetailRoute(section))
     }
 
-    fun openReader(request: ReaderOpenRequest) {
-        readerSessions = readerSessions + (request.bookId to request)
+    fun openReader(bookId: String) {
         selectTopLevelRoute(AppRoute.BooksRoute)
-        backStack.add(AppRoute.ReaderRoute(request.bookId))
+        backStack.add(AppRoute.ReaderRoute(bookId))
     }
 
     fun openSasayakiMatch(request: SasayakiMatchRequest) {
@@ -125,6 +132,7 @@ fun AppShell(
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
+                        bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
                     AppRoute.DictionaryRoute -> TopLevelRouteContent(
@@ -136,6 +144,7 @@ fun AppShell(
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
+                        bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
                     AppRoute.SettingsRoute -> TopLevelRouteContent(
@@ -147,6 +156,7 @@ fun AppShell(
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
+                        bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                         onSettingsDestination = { destination ->
                             when (destination) {
@@ -174,44 +184,17 @@ fun AppShell(
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
                     is AppRoute.ReaderRoute -> {
-                        val session = readerSessions[route.bookId]
-                        if (session != null) {
-                            ReaderWebView(
-                                book = session.book,
-                                bookRoot = session.bookRoot,
-                                initialChapterIndex = session.bookmark?.chapterIndex ?: 0,
-                                initialProgress = session.bookmark?.progress ?: 0.0,
-                                readerSettings = readerSettings,
-                                onReaderSettingsChange = onReaderSettingsChange,
-                                onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
-                                onSaveBookmark = { chapterIndex, progress ->
-                                    val savedBookmark = Bookmark(
-                                        chapterIndex = chapterIndex,
-                                        progress = progress,
-                                        characterCount = session.book.characterCountAt(chapterIndex, progress),
-                                        lastModified = bookStorage.currentAppleReferenceDateSeconds(),
-                                    )
-                                    val total = session.book.bookInfo.characterCount
-                                    val readingProgress = if (total > 0) {
-                                        savedBookmark.characterCount.toDouble()
-                                            .div(total.toDouble())
-                                            .coerceIn(0.0, 1.0)
-                                    } else {
-                                        0.0
-                                    }
-                                    session.onBookmarkChanged(savedBookmark, readingProgress)
-                                    scope.launch(Dispatchers.IO) {
-                                        bookStorage.saveBookmark(session.bookRoot, savedBookmark)
-                                    }
-                                },
-                                onClose = ::popRoute,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
-                            MissingRouteRedirect {
-                                selectTopLevelRoute(AppRoute.BooksRoute)
-                            }
-                        }
+                        ReaderRouteDestination(
+                            bookId = route.bookId,
+                            bookStorage = bookStorage,
+                            readerSettings = readerSettings,
+                            onReaderSettingsChange = onReaderSettingsChange,
+                            onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
+                            bookmarkScope = appScope,
+                            onBookmarkSaved = { bookshelfRefreshKey += 1 },
+                            onClose = ::popRoute,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                     is AppRoute.SasayakiMatchRoute -> {
                         val request = sasayakiMatchRequests[route.bookId]
@@ -237,6 +220,7 @@ fun AppShell(
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
+                        bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
                 }
@@ -259,9 +243,10 @@ private fun TopLevelRouteContent(
     onPendingImportConsumed: () -> Unit,
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
-    onOpenReader: (ReaderOpenRequest) -> Unit,
+    onOpenReader: (String) -> Unit,
     onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     sasayakiSettingsReloadKey: Int,
+    bookshelfRefreshKey: Int,
     onSelectedTabChange: (MainTab) -> Unit,
     onSettingsDestination: (SettingsDestination) -> Unit = {},
 ) {
@@ -276,6 +261,7 @@ private fun TopLevelRouteContent(
                 onOpenReader = onOpenReader,
                 onOpenSasayakiMatch = onOpenSasayakiMatch,
                 sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
+                refreshKey = bookshelfRefreshKey,
                 layoutSpec = layoutSpec,
                 modifier = contentModifier,
             )
@@ -290,6 +276,104 @@ private fun TopLevelRouteContent(
             )
         }
     }
+}
+
+@Composable
+private fun ReaderRouteDestination(
+    bookId: String,
+    bookStorage: BookStorage,
+    readerSettings: ReaderSettings,
+    onReaderSettingsChange: (ReaderSettings) -> Unit,
+    onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit,
+    bookmarkScope: CoroutineScope,
+    onBookmarkSaved: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val routeState by produceState<ReaderRouteLoadState>(
+        initialValue = ReaderRouteLoadState.Loading,
+        key1 = bookId,
+        key2 = bookStorage,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val entry = bookStorage.loadBookEntry(bookId)
+                    ?: error("Book not found.")
+                val parsedBook = EpubBookParser().parse(entry.root)
+                bookStorage.saveMetadata(
+                    entry.root,
+                    entry.metadata.copy(
+                        title = parsedBook.title,
+                        cover = parsedBook.coverHref,
+                        folder = entry.root.name,
+                        lastAccess = bookStorage.currentAppleReferenceDateSeconds(),
+                    ),
+                )
+                bookStorage.saveBookInfo(entry.root, parsedBook.bookInfo)
+                ReaderRouteLoadState.Ready(
+                    bookRoot = entry.root,
+                    book = parsedBook,
+                    bookmark = bookStorage.loadBookmark(entry.root),
+                )
+            }.getOrElse { error ->
+                ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
+            }
+        }
+    }
+
+    when (val state = routeState) {
+        ReaderRouteLoadState.Loading -> Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+        is ReaderRouteLoadState.Error -> Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(state.message)
+        }
+        is ReaderRouteLoadState.Ready -> ReaderWebView(
+            book = state.book,
+            bookRoot = state.bookRoot,
+            initialChapterIndex = state.bookmark?.chapterIndex ?: 0,
+            initialProgress = state.bookmark?.progress ?: 0.0,
+            readerSettings = readerSettings,
+            onReaderSettingsChange = onReaderSettingsChange,
+            onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
+            onSaveBookmark = { chapterIndex, progress ->
+                val savedBookmark = Bookmark(
+                    chapterIndex = chapterIndex,
+                    progress = progress,
+                    characterCount = state.book.characterCountAt(chapterIndex, progress),
+                    lastModified = bookStorage.currentAppleReferenceDateSeconds(),
+                )
+                bookmarkScope.launch(Dispatchers.IO) {
+                    bookStorage.saveBookmark(state.bookRoot, savedBookmark)
+                    withContext(Dispatchers.Main) {
+                        onBookmarkSaved()
+                    }
+                }
+            },
+            onClose = onClose,
+            modifier = modifier.fillMaxSize(),
+        )
+    }
+}
+
+private sealed interface ReaderRouteLoadState {
+    data object Loading : ReaderRouteLoadState
+
+    data class Ready(
+        val bookRoot: File,
+        val book: EpubBook,
+        val bookmark: Bookmark?,
+    ) : ReaderRouteLoadState
+
+    data class Error(
+        val message: String,
+    ) : ReaderRouteLoadState
 }
 
 @Composable
@@ -339,6 +423,7 @@ private fun SettingsDetailDestination(
                 onOpenReader = {},
                 onOpenSasayakiMatch = {},
                 sasayakiSettingsReloadKey = 0,
+                bookshelfRefreshKey = 0,
                 onSelectedTabChange = onSelectedTabChange,
             )
             AlertDialog(

@@ -37,12 +37,28 @@ class AppShellNavigationTest {
         val functionHeader = bookshelf.substringAfter("fun BookshelfView(")
             .substringBefore("modifier: Modifier")
 
-        assertTrue(functionHeader.contains("onOpenReader: (ReaderOpenRequest) -> Unit"))
+        assertTrue(functionHeader.contains("onOpenReader: (String) -> Unit"))
         assertTrue(functionHeader.contains("onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit"))
         assertFalse(bookshelf.contains("var selectedTab by remember"))
         assertFalse(bookshelf.contains("var settingsDestination by remember"))
         assertFalse(bookshelf.contains("var isReading by remember"))
         assertFalse(bookshelf.contains("ReaderWebView("))
         assertFalse(bookshelf.contains("SasayakiMatchView("))
+    }
+
+    @Test
+    fun readerRouteResolvesBookByStableIdInsteadOfSessionPayload() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+        val bookshelf = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val readerBranch = appShell.substringAfter("is AppRoute.ReaderRoute ->")
+            .substringBefore("is AppRoute.SasayakiMatchRoute")
+
+        assertFalse(appShell.contains("readerSessions"))
+        assertFalse(appShell.contains("ReaderOpenRequest"))
+        assertFalse(bookshelf.contains("data class ReaderOpenRequest"))
+        assertTrue(appShell.contains("ReaderRouteDestination("))
+        assertTrue(appShell.contains("bookStorage.loadBookEntry(bookId)"))
+        assertTrue(appShell.contains("EpubBookParser().parse(entry.root)"))
+        assertTrue(readerBranch.contains("bookId = route.bookId"))
     }
 }

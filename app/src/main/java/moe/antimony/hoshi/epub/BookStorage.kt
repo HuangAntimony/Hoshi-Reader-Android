@@ -86,6 +86,17 @@ class BookStorage(private val filesDir: File) {
         }
     }
 
+    fun loadBookEntry(bookId: String): BookEntry? =
+        loadAllBooks()
+            .asSequence()
+            .map { root ->
+                BookEntry(
+                    root = root,
+                    metadata = loadMetadata(root) ?: root.fallbackMetadata(),
+                )
+            }
+            .firstOrNull { it.metadata.id == bookId }
+
     fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File {
         booksDirectory.mkdirs()
         val root = booksDirectory.resolve(folder).canonicalFile

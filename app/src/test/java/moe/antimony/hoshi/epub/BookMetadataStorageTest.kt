@@ -75,6 +75,32 @@ class BookMetadataStorageTest {
     }
 
     @Test
+    fun loadBookEntryFindsBooksByStableMetadataId() {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-id").toFile())
+        val root = storage.createBookDirectory("folder-a")
+        storage.saveMetadata(
+            root,
+            BookMetadata(id = "stable-id", title = "Stable", cover = null, folder = "folder-a", lastAccess = 20.0),
+        )
+
+        val entry = storage.loadBookEntry("stable-id")
+
+        assertEquals(root.canonicalFile, entry?.root?.canonicalFile)
+        assertEquals("stable-id", entry?.metadata?.id)
+    }
+
+    @Test
+    fun loadBookEntryFallsBackToFolderIdWhenMetadataIsMissing() {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-fallback-id").toFile())
+        val root = storage.createBookDirectory("folder-only")
+
+        val entry = storage.loadBookEntry("folder-only")
+
+        assertEquals(root.canonicalFile, entry?.root?.canonicalFile)
+        assertEquals("folder-only", entry?.metadata?.id)
+    }
+
+    @Test
     fun deleteBookRemovesBookDirectory() {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-delete").toFile())
         val root = storage.createBookDirectory("delete-me")
