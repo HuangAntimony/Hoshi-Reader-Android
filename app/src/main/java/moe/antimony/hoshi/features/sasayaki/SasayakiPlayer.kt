@@ -44,6 +44,12 @@ class SasayakiPlayer(
         handler = handler,
         tickRunnable = tickRunnable,
     )
+    private val playbackCommands = SasayakiPlaybackCommandCoordinator(
+        playbackState = playbackState,
+        playbackLifecycle = playbackLifecycle,
+        cueNavigation = cueNavigation,
+        cueDisplay = cueDisplay,
+    )
     private val audioRestore = SasayakiAudioRestoreController(
         context = appContext,
         bookRoot = bookRoot,
@@ -102,11 +108,15 @@ class SasayakiPlayer(
     }
 
     fun togglePlayback() {
-        if (isPlaying) pausePlayback() else startPlayback()
+        playbackCommands.toggle(
+            isPlaying = isPlaying,
+            startPlayback = ::startPlayback,
+            pausePlayback = { pausePlayback() },
+        )
     }
 
     fun pausePlayback(restoreTemporaryPosition: Boolean = true) {
-        playbackLifecycle.pause(
+        playbackCommands.pause(
             restoreTemporaryPosition = restoreTemporaryPosition,
             updateMediaSession = ::updateMediaSession,
             restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
@@ -114,39 +124,32 @@ class SasayakiPlayer(
     }
 
     fun nextCue() {
-        val next = cueNavigation.nextCueSeekTime(
-            currentCueStartTime = cueDisplay.currentCueStartTime,
+        playbackCommands.nextCue(
             currentTime = currentTime,
             delay = delay,
-        ) ?: return
-        playbackState.clearStopPlaybackTime()
-        seek(next, startPlayback = isPlaying)
+            isPlaying = isPlaying,
+        )
     }
 
     fun previousCue() {
-        val previous = cueNavigation.previousCueSeekTime(
-            currentCueStartTime = cueDisplay.currentCueStartTime,
+        playbackCommands.previousCue(
             currentTime = currentTime,
             delay = delay,
+            isPlaying = isPlaying,
         )
-        playbackState.clearStopPlaybackTime()
-        seek(previous, startPlayback = isPlaying)
     }
 
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
         cueNavigation.findCue(chapterIndex = chapterIndex, offset = offset)
 
     fun playCue(cue: SasayakiMatch, stop: Boolean) {
-        playbackState.clearStopPlaybackTime()
-        if (isPlaying) pausePlayback(restoreTemporaryPosition = false)
-        playbackState.setTemporaryPlaybackReturnPosition(if (stop) playback.lastPosition else null)
-        playbackState.setStopPlaybackTime(if (stop) cue.endTime + delay else null)
-        seek(
-            seconds = cue.startTime + delay,
-            startPlayback = true,
-            updateCue = false,
-            savePosition = !stop,
-            displayCue = cue,
+        playbackCommands.playCue(
+            cue = cue,
+            stop = stop,
+            isPlaying = isPlaying,
+            lastPosition = playback.lastPosition,
+            delay = delay,
+            pauseWithoutRestore = { pausePlayback(restoreTemporaryPosition = false) },
         )
     }
 
@@ -155,7 +158,7 @@ class SasayakiPlayer(
     }
 
     private fun startPlayback() {
-        playbackLifecycle.start(
+        playbackCommands.start(
             rate = rate,
             markPlayedOnce = { hasPlayedOnce = true },
             afterMarkedPlaying = {
@@ -173,7 +176,7 @@ class SasayakiPlayer(
         savePosition: Boolean = true,
         displayCue: SasayakiMatch? = null,
     ) {
-        playbackLifecycle.beginSeek(
+        playbackCommands.seek(
             seconds = seconds,
             startPlayback = startPlayback,
             updateCue = updateCue,
@@ -216,8 +219,10 @@ class SasayakiPlayer(
                     onSkipToPrevious = ::previousCue,
                     onSkipToNext = ::nextCue,
                     onSeekTo = { positionMs ->
-                        playbackState.clearStopPlaybackTime()
-                        seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
+                        playbackCommands.mediaSessionSeek(
+                            positionMs = positionMs,
+                            isPlaying = isPlaying,
+                        )
                     },
                 ),
             )
