@@ -10,7 +10,7 @@ This file is the short operational handoff for future agents.
 - Record only current state, next actionable work, active blockers, and durable validation requirements.
 - Do not paste long emulator transcripts, adb details, screenshot observations, release notes, or per-commit history here.
 - Put user-visible shipped changes in `docs/CHANGELOG.md`.
-- Put architecture-refactor slice state in `docs/REFACTORING_TRACKER.md`.
+- Keep architecture-refactor slice state out of tracked docs; use the local `.codex/skills/hoshi-refactoring-workflow` skill when available.
 - Put detailed reproduction, verification logs, and investigation notes in the relevant issue, PR, commit message, or a focused doc.
 - When completing a task, update the smallest relevant line here in the same commit.
 
@@ -18,13 +18,12 @@ This file is the short operational handoff for future agents.
 
 ### Architecture Refactoring
 
-Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction, `docs/REFACTORING_TRACKER.md` for slice status.
+Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex/skills/hoshi-refactoring-workflow` for execution workflow when available.
 
 Status: `in_progress`
 
-- Complete `R-000 Characterize Navigation and Reader Entry Behavior` before starting the Navigation3 AppShell migration.
-- Do not start a later architecture slice until its dependencies are `done` in `docs/REFACTORING_TRACKER.md`.
-- Keep refactor commits slice-sized and update the tracker before committing.
+- Characterize navigation and reader entry behavior before starting the Navigation3 AppShell migration.
+- Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
 ### Bookshelf
 
@@ -107,11 +106,5 @@ Before claiming implementation complete, run:
 ```
 
 Also run `./gradlew lint` when changing resources, manifest, UI, packaging, or release-facing build behavior.
-
-For architecture refactoring slices, also run:
-
-```bash
-python3 tools/check_refactoring_tracker.py docs/REFACTORING_TRACKER.md
-```
 
 For reader/dictionary/audio user flows, perform targeted emulator or device validation using the test data listed in `AGENTS.md`.
