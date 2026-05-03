@@ -71,7 +71,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
-import moe.antimony.hoshi.epub.BookStorage
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsStore
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsStore
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
@@ -131,10 +131,10 @@ fun ReaderWebView(
     val fontManager = remember { ReaderFontManager(context.filesDir) }
     val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
     val audioSettingsStore = remember { AudioSettingsStore(context) }
-    val bookStorage = remember { BookStorage(context.filesDir) }
+    val bookRepository = remember { BookRepository(context.filesDir) }
     val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
     var sasayakiSettings by remember { mutableStateOf(sasayakiSettingsStore.load()) }
-    val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookStorage::loadSasayakiMatch) }
+    val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookRepository::loadSasayakiMatch) }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
     val sasayakiCoverFile = remember(bookRoot, book.coverHref) {
         resolveBookCoverFile(bookRoot, book.coverHref)
@@ -290,7 +290,7 @@ fun ReaderWebView(
             SasayakiPlayer(
                 context = context,
                 bookRoot = bookRoot,
-                bookStorage = bookStorage,
+                bookRepository = bookRepository,
                 bookTitle = book.title,
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,

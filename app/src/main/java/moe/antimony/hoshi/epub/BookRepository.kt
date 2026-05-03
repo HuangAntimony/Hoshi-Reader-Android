@@ -19,7 +19,7 @@ class BookRepository(
     private val fileDataSource: BookFileDataSource = BookFileDataSource(filesDir),
     private val sidecarDataSource: BookSidecarDataSource = BookSidecarDataSource(),
     private val clock: BookClock = SystemBookClock,
-) {
+) : ReaderRouteBookRepository, SasayakiSidecarRepository {
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource)
 
     val currentBookFile: File get() = fileDataSource.currentBookFile
@@ -40,7 +40,7 @@ class BookRepository(
         }
     }
 
-    fun loadBookEntry(bookId: String): BookEntry? =
+    override fun loadBookEntry(bookId: String): BookEntry? =
         loadAllBooks()
             .asSequence()
             .map { root ->
@@ -60,7 +60,7 @@ class BookRepository(
     fun loadMetadata(bookRoot: File): BookMetadata? =
         sidecarDataSource.loadMetadata(bookRoot)
 
-    fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    override fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
         sidecarDataSource.saveMetadata(bookRoot, metadata)
     }
 
@@ -70,31 +70,31 @@ class BookRepository(
         fileDataSource.deleteBook(bookRoot)
     }
 
-    fun loadBookmark(bookRoot: File): Bookmark? =
+    override fun loadBookmark(bookRoot: File): Bookmark? =
         sidecarDataSource.loadBookmark(bookRoot)
 
-    fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    override fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
     }
 
     fun loadBookInfo(bookRoot: File): BookInfo? =
         sidecarDataSource.loadBookInfo(bookRoot)
 
-    fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    override fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
         sidecarDataSource.saveBookInfo(bookRoot, bookInfo)
     }
 
-    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
+    override fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         sidecarDataSource.loadSasayakiMatch(bookRoot)
 
-    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    override fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
         sidecarDataSource.saveSasayakiMatch(bookRoot, match)
     }
 
-    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
+    override fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         sidecarDataSource.loadSasayakiPlayback(bookRoot)
 
-    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+    override fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
         sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
     }
 
@@ -105,7 +105,7 @@ class BookRepository(
         return current.toDouble().div(total.toDouble()).coerceIn(0.0, 1.0)
     }
 
-    fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()
+    override fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()
 
     fun importBook(contentResolver: ContentResolver, uri: Uri): File =
         importDataSource.importBook(contentResolver, uri)
@@ -118,6 +118,22 @@ class BookRepository(
             folder = name,
             lastAccess = (lastModified().toDouble() / 1000.0) - APPLE_REFERENCE_EPOCH_SECONDS,
         )
+}
+
+interface ReaderRouteBookRepository {
+    fun loadBookEntry(bookId: String): BookEntry?
+    fun saveMetadata(bookRoot: File, metadata: BookMetadata)
+    fun loadBookmark(bookRoot: File): Bookmark?
+    fun saveBookmark(bookRoot: File, bookmark: Bookmark)
+    fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
+    fun currentAppleReferenceDateSeconds(): Double
+}
+
+interface SasayakiSidecarRepository {
+    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData?
+    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData)
+    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData?
+    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData)
 }
 
 class BookFileDataSource(filesDir: File) {

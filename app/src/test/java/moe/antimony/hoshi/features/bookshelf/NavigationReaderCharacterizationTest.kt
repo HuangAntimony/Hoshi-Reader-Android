@@ -50,11 +50,11 @@ class NavigationReaderCharacterizationTest {
         assertTrue(appShell.contains("backStack.openReaderRoute(bookId)"))
         assertTrue(appShell.contains("ReaderWebView("))
         assertTrue(readerBranch.contains("bookId = route.bookId"))
-        assertTrue(appShell.contains("bookStorage.loadBookEntry(bookId)"))
+        assertTrue(appShell.contains("bookRepository.loadBookEntry(bookId)"))
         assertTrue(appShell.contains("initialChapterIndex = state.bookmark?.chapterIndex ?: 0"))
         assertTrue(appShell.contains("initialProgress = state.bookmark?.progress ?: 0.0"))
         assertTrue(appShell.contains("onSaveBookmark = { chapterIndex, progress ->"))
-        assertTrue(appShell.contains("bookStorage.saveBookmark(state.bookRoot, savedBookmark)"))
+        assertTrue(appShell.contains("bookRepository.saveBookmark(state.bookRoot, savedBookmark)"))
         assertTrue(appShell.contains("bookshelfRefreshKey += 1"))
         assertTrue(appShell.contains("onClose = onClose"))
     }

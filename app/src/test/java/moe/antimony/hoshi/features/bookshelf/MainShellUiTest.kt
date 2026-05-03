@@ -3,7 +3,7 @@ package moe.antimony.hoshi.features.bookshelf
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookInfo
-import moe.antimony.hoshi.epub.BookStorage
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -131,10 +131,10 @@ class MainShellUiTest {
     fun bookProgressIsLoadedOnceForShelfEntries() {
         val filesDir = Files.createTempDirectory("hoshi-bookshelf-progress").toFile()
         try {
-            val storage = BookStorage(filesDir)
+            val repository = BookRepository(filesDir)
             val root = File(filesDir, "Books/book-a").also { it.mkdirs() }
-            storage.saveBookInfo(root, BookInfo(characterCount = 200, chapterInfo = emptyMap()))
-            storage.saveBookmark(
+            repository.saveBookInfo(root, BookInfo(characterCount = 200, chapterInfo = emptyMap()))
+            repository.saveBookmark(
                 root,
                 Bookmark(
                     chapterIndex = 0,
@@ -153,7 +153,7 @@ class MainShellUiTest {
                 ),
             )
 
-            assertEquals(0.25, loadBookProgressById(listOf(entry), storage).getValue("a"), 0.0001)
+            assertEquals(0.25, loadBookProgressById(listOf(entry), repository).getValue("a"), 0.0001)
         } finally {
             filesDir.deleteRecursively()
         }

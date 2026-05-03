@@ -45,8 +45,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.BookEntry
-import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.importDisplayName
@@ -57,7 +57,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SasayakiMatchView(
     bookEntry: BookEntry,
-    bookStorage: BookStorage,
+    bookRepository: SasayakiSidecarRepository,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -69,7 +69,7 @@ fun SasayakiMatchView(
     var isMatching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var currentMatch by remember(bookEntry.root) {
-        mutableStateOf(bookStorage.loadSasayakiMatch(bookEntry.root))
+        mutableStateOf(bookRepository.loadSasayakiMatch(bookEntry.root))
     }
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -101,7 +101,7 @@ fun SasayakiMatchView(
                         cues = SasayakiParser.parseCues(srtBytes),
                         searchWindow = searchWindow.roundToInt(),
                     )
-                    bookStorage.saveSasayakiMatch(bookEntry.root, nextMatch)
+                    bookRepository.saveSasayakiMatch(bookEntry.root, nextMatch)
                     nextMatch
                 }
             }.onSuccess { nextMatch ->

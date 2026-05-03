@@ -33,10 +33,11 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
-import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import moe.antimony.hoshi.features.audio.AdvancedSettingsView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
@@ -90,7 +91,7 @@ fun AppShell(
     }
     val backStack = rememberNavBackStack(initialRoute)
     val appScope = rememberCoroutineScope()
-    val bookStorage = remember { BookStorage(context.filesDir) }
+    val bookRepository = remember { BookRepository(context.filesDir) }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
@@ -201,7 +202,7 @@ fun AppShell(
                     is AppRoute.ReaderRoute -> {
                         ReaderRouteDestination(
                             bookId = route.bookId,
-                            bookStorage = bookStorage,
+                            bookRepository = bookRepository,
                             readerSettings = currentReaderSettings,
                             onReaderSettingsChange = currentOnReaderSettingsChange,
                             onReaderKeyEventHandlerChange = currentOnReaderKeyEventHandlerChange,
@@ -216,7 +217,7 @@ fun AppShell(
                         if (request != null) {
                             SasayakiMatchView(
                                 bookEntry = request.bookEntry,
-                                bookStorage = bookStorage,
+                                bookRepository = bookRepository,
                                 onClose = ::popRoute,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -296,7 +297,7 @@ private fun TopLevelRouteContent(
 @Composable
 private fun ReaderRouteDestination(
     bookId: String,
-    bookStorage: BookStorage,
+    bookRepository: ReaderRouteBookRepository,
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit,
@@ -308,27 +309,27 @@ private fun ReaderRouteDestination(
     val routeState by produceState<ReaderRouteLoadState>(
         initialValue = ReaderRouteLoadState.Loading,
         key1 = bookId,
-        key2 = bookStorage,
+        key2 = bookRepository,
     ) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                val entry = bookStorage.loadBookEntry(bookId)
+                val entry = bookRepository.loadBookEntry(bookId)
                     ?: error("Book not found.")
                 val parsedBook = EpubBookParser().parse(entry.root)
-                bookStorage.saveMetadata(
+                bookRepository.saveMetadata(
                     entry.root,
                     entry.metadata.copy(
                         title = parsedBook.title,
                         cover = parsedBook.coverHref,
                         folder = entry.root.name,
-                        lastAccess = bookStorage.currentAppleReferenceDateSeconds(),
+                        lastAccess = bookRepository.currentAppleReferenceDateSeconds(),
                     ),
                 )
-                bookStorage.saveBookInfo(entry.root, parsedBook.bookInfo)
+                bookRepository.saveBookInfo(entry.root, parsedBook.bookInfo)
                 ReaderRouteLoadState.Ready(
                     bookRoot = entry.root,
                     book = parsedBook,
-                    bookmark = bookStorage.loadBookmark(entry.root),
+                    bookmark = bookRepository.loadBookmark(entry.root),
                 )
             }.getOrElse { error ->
                 ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
@@ -362,10 +363,10 @@ private fun ReaderRouteDestination(
                     chapterIndex = chapterIndex,
                     progress = progress,
                     characterCount = state.book.characterCountAt(chapterIndex, progress),
-                    lastModified = bookStorage.currentAppleReferenceDateSeconds(),
+                    lastModified = bookRepository.currentAppleReferenceDateSeconds(),
                 )
                 bookmarkScope.launch(Dispatchers.IO) {
-                    bookStorage.saveBookmark(state.bookRoot, savedBookmark)
+                    bookRepository.saveBookmark(state.bookRoot, savedBookmark)
                     withContext(Dispatchers.Main) {
                         onBookmarkSaved()
                     }

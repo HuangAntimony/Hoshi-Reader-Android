@@ -77,7 +77,7 @@ class AppShellNavigationTest {
         assertFalse(appShell.contains("ReaderOpenRequest"))
         assertFalse(bookshelf.contains("data class ReaderOpenRequest"))
         assertTrue(appShell.contains("ReaderRouteDestination("))
-        assertTrue(appShell.contains("bookStorage.loadBookEntry(bookId)"))
+        assertTrue(appShell.contains("bookRepository.loadBookEntry(bookId)"))
         assertTrue(appShell.contains("EpubBookParser().parse(entry.root)"))
         assertTrue(readerBranch.contains("bookId = route.bookId"))
     }

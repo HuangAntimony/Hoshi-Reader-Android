@@ -18,7 +18,7 @@ class SasayakiMatchViewTest {
         assertTrue(source.contains("valueRange = 50f..350f"))
         assertTrue(source.contains("steps = 11"))
         assertTrue(source.contains("searchWindow.roundToInt()"))
-        assertTrue(source.contains("bookStorage.loadSasayakiMatch(bookEntry.root)"))
-        assertTrue(source.contains("bookStorage.saveSasayakiMatch(bookEntry.root, nextMatch)"))
+        assertTrue(source.contains("bookRepository.loadSasayakiMatch(bookEntry.root)"))
+        assertTrue(source.contains("bookRepository.saveSasayakiMatch(bookEntry.root, nextMatch)"))
     }
 }

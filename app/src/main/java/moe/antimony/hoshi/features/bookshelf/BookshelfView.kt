@@ -105,7 +105,6 @@ import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
-import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -657,14 +656,6 @@ private fun BookGridCell(
         )
     }
 }
-
-internal fun loadBookProgressById(
-    entries: List<BookEntry>,
-    bookStorage: BookStorage,
-): Map<String, Double> =
-    entries.associate { entry ->
-        entry.metadata.id to bookStorage.loadReadingProgress(entry.root)
-    }
 
 internal fun loadBookProgressById(
     entries: List<BookEntry>,
