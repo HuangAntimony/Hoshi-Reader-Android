@@ -1,0 +1,106 @@
+package moe.antimony.hoshi.features.sasayaki
+
+class SasayakiPlaybackEventCoordinator(
+    private val playbackState: SasayakiPlaybackStateCoordinator,
+    private val playbackLifecycle: SasayakiPlaybackLifecycleController,
+    private val playbackPersistence: SasayakiPlaybackPersistenceState,
+    private val cueNavigation: SasayakiCueNavigationController,
+    private val cueDisplay: SasayakiCueDisplayCoordinator,
+) {
+    fun handleSeekComplete(
+        hasAudio: Boolean,
+        hasMatch: Boolean,
+        delay: Double,
+        currentChapterIndex: Int,
+        autoScroll: Boolean,
+        hasPlayedOnce: Boolean,
+        startPlayback: () -> Unit,
+        updateMediaSession: () -> Unit,
+        applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
+    ) {
+        val seek = playbackState.completeSeek() ?: return
+        if (seek.savePosition) {
+            playbackPersistence.savePosition(seek.seconds)
+        }
+        if (seek.updateCue) {
+            updateCue(
+                hasAudio = hasAudio,
+                hasMatch = hasMatch,
+                time = seek.seconds,
+                delay = delay,
+                currentChapterIndex = currentChapterIndex,
+                autoScroll = autoScroll,
+                hasPlayedOnce = hasPlayedOnce,
+                forceDisplay = false,
+                applyCueDisplayAction = applyCueDisplayAction,
+            )
+        }
+        seek.displayCue?.let { cue ->
+            applyCueDisplayAction(
+                cueDisplay.displaySelectedCue(
+                    cue = cue,
+                    currentChapterIndex = currentChapterIndex,
+                    reveal = autoScroll && (hasPlayedOnce || seek.startPlayback),
+                ),
+            )
+        }
+        if (seek.startPlayback) startPlayback()
+        updateMediaSession()
+    }
+
+    fun tick(
+        hasAudio: Boolean,
+        hasMatch: Boolean,
+        delay: Double,
+        currentChapterIndex: Int,
+        autoScroll: Boolean,
+        hasPlayedOnce: Boolean,
+        pausePlayback: () -> Unit,
+        updateMediaSession: () -> Unit,
+        applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
+    ) {
+        val tick = playbackLifecycle.updateTick() ?: return
+        if (tick.shouldSavePosition) {
+            playbackPersistence.savePosition(playbackState.currentTime)
+        }
+        if (tick.shouldStopPlayback) {
+            pausePlayback()
+        }
+        updateCue(
+            hasAudio = hasAudio,
+            hasMatch = hasMatch,
+            time = playbackState.currentTime,
+            delay = delay,
+            currentChapterIndex = currentChapterIndex,
+            autoScroll = autoScroll,
+            hasPlayedOnce = hasPlayedOnce,
+            forceDisplay = false,
+            applyCueDisplayAction = applyCueDisplayAction,
+        )
+        updateMediaSession()
+    }
+
+    fun updateCue(
+        hasAudio: Boolean,
+        hasMatch: Boolean,
+        time: Double,
+        delay: Double,
+        currentChapterIndex: Int,
+        autoScroll: Boolean,
+        hasPlayedOnce: Boolean,
+        forceDisplay: Boolean = false,
+        applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
+    ) {
+        if (!hasAudio || !hasMatch) return
+        val cue = cueNavigation.cueAtPlaybackTime(time = time, delay = delay)
+        applyCueDisplayAction(
+            cueDisplay.update(
+                cue = cue,
+                currentChapterIndex = currentChapterIndex,
+                autoScroll = autoScroll,
+                hasPlayedOnce = hasPlayedOnce,
+                forceDisplay = forceDisplay,
+            ),
+        )
+    }
+}

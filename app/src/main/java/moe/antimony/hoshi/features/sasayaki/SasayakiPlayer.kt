@@ -50,6 +50,13 @@ class SasayakiPlayer(
         cueNavigation = cueNavigation,
         cueDisplay = cueDisplay,
     )
+    private val playbackEvents = SasayakiPlaybackEventCoordinator(
+        playbackState = playbackState,
+        playbackLifecycle = playbackLifecycle,
+        playbackPersistence = playbackPersistence,
+        cueNavigation = cueNavigation,
+        cueDisplay = cueDisplay,
+    )
     private val audioRestore = SasayakiAudioRestoreController(
         context = appContext,
         bookRoot = bookRoot,
@@ -186,22 +193,17 @@ class SasayakiPlayer(
     }
 
     private fun handleSeekComplete() {
-        val seek = playbackState.completeSeek() ?: return
-        if (seek.savePosition) {
-            playbackPersistence.savePosition(seek.seconds)
-        }
-        if (seek.updateCue) updateCue(seek.seconds)
-        seek.displayCue?.let { cue ->
-            applyCueDisplayAction(
-                cueDisplay.displaySelectedCue(
-                    cue = cue,
-                    currentChapterIndex = getCurrentChapterIndex(),
-                    reveal = autoScroll && (hasPlayedOnce || seek.startPlayback),
-                ),
-            )
-        }
-        if (seek.startPlayback) startPlayback()
-        updateMediaSession()
+        playbackEvents.handleSeekComplete(
+            hasAudio = hasAudio,
+            hasMatch = hasMatch,
+            delay = delay,
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = autoScroll,
+            hasPlayedOnce = hasPlayedOnce,
+            startPlayback = ::startPlayback,
+            updateMediaSession = ::updateMediaSession,
+            applyCueDisplayAction = ::applyCueDisplayAction,
+        )
     }
 
     private fun restoreAudio() {
@@ -239,28 +241,30 @@ class SasayakiPlayer(
     }
 
     private fun tick() {
-        val tick = playbackLifecycle.updateTick() ?: return
-        if (tick.shouldSavePosition) {
-            playbackPersistence.savePosition(currentTime)
-        }
-        if (tick.shouldStopPlayback) {
-            pausePlayback()
-        }
-        updateCue(currentTime)
-        updateMediaSession()
+        playbackEvents.tick(
+            hasAudio = hasAudio,
+            hasMatch = hasMatch,
+            delay = delay,
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = autoScroll,
+            hasPlayedOnce = hasPlayedOnce,
+            pausePlayback = { pausePlayback() },
+            updateMediaSession = ::updateMediaSession,
+            applyCueDisplayAction = ::applyCueDisplayAction,
+        )
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
-        if (!hasAudio || !hasMatch) return
-        val cue = cueNavigation.cueAtPlaybackTime(time = time, delay = delay)
-        applyCueDisplayAction(
-            cueDisplay.update(
-                cue = cue,
-                currentChapterIndex = getCurrentChapterIndex(),
-                autoScroll = autoScroll,
-                hasPlayedOnce = hasPlayedOnce,
-                forceDisplay = forceDisplay,
-            ),
+        playbackEvents.updateCue(
+            hasAudio = hasAudio,
+            hasMatch = hasMatch,
+            time = time,
+            delay = delay,
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = autoScroll,
+            hasPlayedOnce = hasPlayedOnce,
+            forceDisplay = forceDisplay,
+            applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }
 
