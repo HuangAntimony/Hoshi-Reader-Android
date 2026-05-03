@@ -20,8 +20,8 @@ class SasayakiPlayerSourceTest {
         assertTrue(importAudio.contains("audioUri.toString()"))
         assertTrue(importAudio.contains("audioFileName = copiedAudioFileName"))
         assertTrue(restoreAudio.contains("Uri.parse("))
-        assertTrue(restoreAudio.contains("setDataSource(appContext, uri)"))
-        assertTrue(restoreAudio.contains("setDataSource(requireNotNull(file).absolutePath)"))
+        assertTrue(restoreAudio.contains("SasayakiPlaybackSource.ExternalUri(uri)"))
+        assertTrue(restoreAudio.contains("SasayakiPlaybackSource.PrivateFile(file)"))
     }
 
     @Test
@@ -50,11 +50,11 @@ class SasayakiPlayerSourceTest {
         val startPlayback = source.substringAfter("private fun startPlayback()")
             .substringBefore("private fun seek(")
 
-        assertFalse(restoreAudio.contains("playbackParams = playbackParams(rate)"))
+        assertFalse(restoreAudio.contains("engine.start(rate)"))
         assertTrue(setRate.contains("if (isPlaying)"))
-        assertTrue(setRate.contains("mediaPlayer?.playbackParams = playbackParams(value)"))
-        assertTrue(startPlayback.contains("player.playbackParams = playbackParams(rate)"))
-        assertTrue(startPlayback.contains("player.start()"))
+        assertTrue(setRate.contains("playbackEngine?.setRate(value)"))
+        assertTrue(startPlayback.contains("val engine = playbackEngine ?: return"))
+        assertTrue(startPlayback.contains("engine.start(rate)"))
         assertTrue(startPlayback.contains("hasPlayedOnce = true"))
     }
 
@@ -100,9 +100,10 @@ class SasayakiPlayerSourceTest {
 
         assertTrue(source.contains("private data class PendingSeek"))
         assertTrue(source.contains("private var pendingSeek: PendingSeek? = null"))
-        assertTrue(restoreAudio.contains("setOnSeekCompleteListener { handleSeekComplete() }"))
+        assertTrue(restoreAudio.contains("onSeekComplete = ::handleSeekComplete"))
         assertTrue(seek.contains("pendingSeek = PendingSeek("))
         assertTrue(seek.contains("handler.removeCallbacks(tickRunnable)"))
+        assertTrue(seek.contains("engine.seekTo((seconds * 1000.0).toInt())"))
         assertFalse(seek.substringBefore("private fun handleSeekComplete(").contains("if (updateCue) updateCue(seconds)"))
         assertFalse(seek.substringBefore("private fun handleSeekComplete(").contains("if (startPlayback) startPlayback()"))
         assertTrue(complete.contains("val seek = pendingSeek ?: return"))
@@ -183,5 +184,31 @@ class SasayakiPlayerSourceTest {
         assertTrue(tick.contains("temporaryPlaybackReturnPosition == null && second != lastSavedSecond"))
         assertTrue(tick.contains("playback = playback.copy(lastPosition = currentTime)"))
         assertTrue(tick.contains("savePlayback()"))
+    }
+
+    @Test
+    fun playerUsesPlaybackEngineBoundaryForMediaPlayerOperations() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val restoreAudio = source.substringAfter("private fun restoreAudio()")
+            .substringBefore("private fun tick()")
+        val tick = source.substringAfter("private fun tick()")
+            .substringBefore("private fun updateCue(")
+        val teardown = source.substringAfter("private fun teardownPlayer(clearCue: Boolean)")
+
+        assertFalse(source.contains("import android.media.MediaPlayer"))
+        assertFalse(source.contains("import android.media.AudioAttributes"))
+        assertFalse(source.contains("import android.media.PlaybackParams"))
+        assertFalse(source.contains("MediaPlayer()"))
+        assertTrue(source.contains("private var playbackEngine: SasayakiPlaybackEngine? = null"))
+        assertTrue(restoreAudio.contains("AndroidSasayakiPlaybackEngine.prepare("))
+        assertTrue(restoreAudio.contains("startPositionMs = (playback.lastPosition * 1000.0).toInt()"))
+        assertTrue(restoreAudio.contains("onCompletion = {"))
+        assertTrue(restoreAudio.contains("onSeekComplete = ::handleSeekComplete"))
+        assertTrue(restoreAudio.contains("playbackEngine = engine"))
+        assertTrue(tick.contains("val engine = playbackEngine ?: return"))
+        assertTrue(tick.contains("engine.currentPositionMs.toDouble() / 1000.0"))
+        assertTrue(tick.contains("engine.durationMs.coerceAtLeast(0).toDouble() / 1000.0"))
+        assertTrue(teardown.contains("playbackEngine?.release()"))
+        assertTrue(teardown.contains("playbackEngine = null"))
     }
 }

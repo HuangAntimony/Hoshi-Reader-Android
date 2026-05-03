@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: extract a narrow Sasayaki playback-engine boundary from `SasayakiPlayer` without changing `MediaPlayer` behavior.
+- Next architecture slice: extract the Sasayaki audio-source boundary from `SasayakiPlayer` without changing external URI or private-copy audio behavior.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

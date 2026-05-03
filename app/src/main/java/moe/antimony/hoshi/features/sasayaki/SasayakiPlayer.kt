@@ -2,9 +2,6 @@ package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.PlaybackParams
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -38,7 +35,7 @@ class SasayakiPlayer(
     private val audioRepository = SasayakiAudioRepository(bookRoot)
     private val handler = Handler(Looper.getMainLooper())
     private val timeline = CueTimeline(matchData)
-    private var mediaPlayer: MediaPlayer? = null
+    private var playbackEngine: SasayakiPlaybackEngine? = null
     private var mediaSession: SasayakiMediaSessionHandle? = null
     private var lastSavedSecond = -1
     private var currentCue: SasayakiMatch? = null
@@ -91,7 +88,7 @@ class SasayakiPlayer(
     fun setRate(value: Float) {
         playback = playback.copy(rate = value)
         if (isPlaying) {
-            mediaPlayer?.playbackParams = playbackParams(value)
+            playbackEngine?.setRate(value)
         }
         updateMediaSession()
         savePlayback()
@@ -136,7 +133,7 @@ class SasayakiPlayer(
     }
 
     fun pausePlayback(restoreTemporaryPosition: Boolean = true) {
-        mediaPlayer?.pause()
+        playbackEngine?.pause()
         isPlaying = false
         handler.removeCallbacks(tickRunnable)
         updateMediaSession()
@@ -179,9 +176,8 @@ class SasayakiPlayer(
     }
 
     private fun startPlayback() {
-        val player = mediaPlayer ?: return
-        player.playbackParams = playbackParams(rate)
-        player.start()
+        val engine = playbackEngine ?: return
+        engine.start(rate)
         hasPlayedOnce = true
         isPlaying = true
         updateMediaSession()
@@ -198,7 +194,7 @@ class SasayakiPlayer(
         savePosition: Boolean = true,
         displayCue: SasayakiMatch? = null,
     ) {
-        val player = mediaPlayer ?: return
+        val engine = playbackEngine ?: return
         pendingSeek = PendingSeek(
             seconds = seconds,
             startPlayback = startPlayback,
@@ -208,10 +204,10 @@ class SasayakiPlayer(
         )
         handler.removeCallbacks(tickRunnable)
         if (isPlaying) {
-            player.pause()
+            engine.pause()
             isPlaying = false
         }
-        player.seekTo((seconds * 1000.0).toInt().coerceAtLeast(0))
+        engine.seekTo((seconds * 1000.0).toInt())
     }
 
     private fun handleSeekComplete() {
@@ -235,25 +231,24 @@ class SasayakiPlayer(
     private fun restoreAudio() {
         val uri = playback.audioUri?.let { Uri.parse(it) }
         val file = if (uri == null) audioRepository.audioFile(playback) else null
-        if (uri == null && file == null) return
+        val source = when {
+            uri != null -> SasayakiPlaybackSource.ExternalUri(uri)
+            file != null -> SasayakiPlaybackSource.PrivateFile(file)
+            else -> return
+        }
         runCatching {
-            val player = MediaPlayer().apply {
-                setAudioAttributes(audioAttributes())
-                if (uri != null) {
-                    setDataSource(appContext, uri)
-                } else {
-                    setDataSource(requireNotNull(file).absolutePath)
-                }
-                setOnCompletionListener {
+            val engine = AndroidSasayakiPlaybackEngine.prepare(
+                context = appContext,
+                source = source,
+                startPositionMs = (playback.lastPosition * 1000.0).toInt(),
+                onCompletion = {
                     this@SasayakiPlayer.isPlaying = false
                     handler.removeCallbacks(tickRunnable)
                     updateMediaSession()
-                }
-                setOnSeekCompleteListener { handleSeekComplete() }
-                prepare()
-                seekTo((playback.lastPosition * 1000.0).toInt().coerceAtLeast(0))
-            }
-            mediaPlayer = player
+                },
+                onSeekComplete = ::handleSeekComplete,
+            )
+            playbackEngine = engine
             mediaSession?.release()
             mediaSession = AndroidSasayakiMediaSessionHandle(
                 context = appContext,
@@ -268,7 +263,7 @@ class SasayakiPlayer(
                     seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
                 },
             )
-            duration = player.duration.coerceAtLeast(0).toDouble() / 1000.0
+            duration = engine.durationMs.coerceAtLeast(0).toDouble() / 1000.0
             hasAudio = true
             errorMessage = null
             updateCue(currentTime)
@@ -281,9 +276,9 @@ class SasayakiPlayer(
 
     private fun tick() {
         if (pendingSeek != null) return
-        val player = mediaPlayer ?: return
-        currentTime = player.currentPosition.toDouble() / 1000.0
-        duration = player.duration.coerceAtLeast(0).toDouble() / 1000.0
+        val engine = playbackEngine ?: return
+        currentTime = engine.currentPositionMs.toDouble() / 1000.0
+        duration = engine.durationMs.coerceAtLeast(0).toDouble() / 1000.0
         val second = currentTime.toInt()
         if (temporaryPlaybackReturnPosition == null && second != lastSavedSecond) {
             lastSavedSecond = second
@@ -346,7 +341,7 @@ class SasayakiPlayer(
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
         val returnPosition = temporaryPlaybackReturnPosition ?: return
         temporaryPlaybackReturnPosition = null
-        mediaPlayer?.seekTo((returnPosition * 1000.0).toInt().coerceAtLeast(0))
+        playbackEngine?.seekTo((returnPosition * 1000.0).toInt())
         currentTime = returnPosition
         lastSavedSecond = returnPosition.toInt()
         updateCue(returnPosition)
@@ -355,20 +350,11 @@ class SasayakiPlayer(
 
     private fun teardownPlayer(clearCue: Boolean) {
         pausePlayback()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        playbackEngine?.release()
+        playbackEngine = null
         mediaSession?.release()
         mediaSession = null
         hasAudio = false
         if (clearCue) clearCue()
     }
-
-    private fun playbackParams(speed: Float): PlaybackParams =
-        PlaybackParams().setSpeed(speed).setPitch(1f)
-
-    private fun audioAttributes(): AudioAttributes =
-        AudioAttributes.Builder()
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .setUsage(AudioAttributes.USAGE_MEDIA)
-            .build()
 }
