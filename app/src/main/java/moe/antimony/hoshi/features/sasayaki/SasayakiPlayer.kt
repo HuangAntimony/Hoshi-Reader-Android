@@ -41,6 +41,14 @@ class SasayakiPlayer(
         handler = handler,
         tickRunnable = tickRunnable,
     )
+    private val audioRestore = SasayakiAudioRestoreController(
+        context = appContext,
+        bookRoot = bookRoot,
+        bookTitle = bookTitle,
+        bookCoverFile = bookCoverFile,
+        audioSourceRepository = audioSourceRepository,
+        playbackLifecycle = playbackLifecycle,
+    )
     private var mediaSession: SasayakiMediaSessionHandle? = null
     private var hasPlayedOnce = false
 
@@ -201,41 +209,35 @@ class SasayakiPlayer(
     }
 
     private fun restoreAudio() {
-        val source = audioSourceRepository.playbackSource(playback) ?: return
-        runCatching {
-            val engine = AndroidSasayakiPlaybackEngine.prepare(
-                context = appContext,
-                source = source,
-                startPositionMs = (playback.lastPosition * 1000.0).toInt(),
-                onCompletion = {
-                    playbackLifecycle.markCompleted(updateMediaSession = ::updateMediaSession)
-                },
-                onSeekComplete = ::handleSeekComplete,
+        val result = runCatching {
+            audioRestore.restore(
+                playback = playback,
+                releaseExistingMediaSession = { mediaSession?.release() },
+                callbacks = SasayakiAudioRestoreCallbacks(
+                    onCompletion = {
+                        playbackLifecycle.markCompleted(updateMediaSession = ::updateMediaSession)
+                    },
+                    onSeekComplete = ::handleSeekComplete,
+                    onPlay = ::startPlayback,
+                    onPause = { pausePlayback() },
+                    onSkipToPrevious = ::previousCue,
+                    onSkipToNext = ::nextCue,
+                    onSeekTo = { positionMs ->
+                        playbackState.clearStopPlaybackTime()
+                        seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
+                    },
+                ),
             )
-            playbackLifecycle.attachEngine(engine)
-            mediaSession?.release()
-            mediaSession = AndroidSasayakiMediaSessionHandle(
-                context = appContext,
-                title = bookTitle ?: bookRoot.name,
-                artworkFile = bookCoverFile,
-                onPlay = ::startPlayback,
-                onPause = { pausePlayback() },
-                onSkipToPrevious = ::previousCue,
-                onSkipToNext = ::nextCue,
-                onSeekTo = { positionMs ->
-                    playbackState.clearStopPlaybackTime()
-                    seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
-                },
-            )
-            playbackState.updateDuration(engine.durationMs)
-            hasAudio = true
-            errorMessage = null
-            updateCue(currentTime)
-            updateMediaSession()
         }.onFailure { error ->
             errorMessage = error.localizedMessage ?: "Unable to load audiobook."
             hasAudio = false
-        }
+        }.getOrNull() ?: return
+        mediaSession = result.mediaSession
+        playbackState.updateDuration(result.durationMs)
+        hasAudio = true
+        errorMessage = null
+        updateCue(currentTime)
+        updateMediaSession()
     }
 
     private fun tick() {

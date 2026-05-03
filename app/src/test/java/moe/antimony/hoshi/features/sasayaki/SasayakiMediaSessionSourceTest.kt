@@ -48,6 +48,7 @@ class SasayakiMediaSessionSourceTest {
     @Test
     fun sasayakiPlayerUsesMediaSessionHandleBoundary() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val restoreController = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRestoreController.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")
             .substringBefore("private fun tick()")
         val startPlayback = source.substringAfter("private fun startPlayback()")
@@ -60,9 +61,11 @@ class SasayakiMediaSessionSourceTest {
         assertTrue(source.contains("bookTitle: String?"))
         assertTrue(source.contains("bookCoverFile: File?"))
         assertTrue(source.contains("private var mediaSession: SasayakiMediaSessionHandle? = null"))
-        assertTrue(restoreAudio.contains("AndroidSasayakiMediaSessionHandle("))
-        assertTrue(restoreAudio.contains("title = bookTitle ?: bookRoot.name"))
-        assertTrue(restoreAudio.contains("artworkFile = bookCoverFile"))
+        assertTrue(source.contains("private val audioRestore = SasayakiAudioRestoreController("))
+        assertTrue(restoreAudio.contains("mediaSession = result.mediaSession"))
+        assertTrue(restoreController.contains("AndroidSasayakiMediaSessionHandle("))
+        assertTrue(restoreController.contains("title = bookTitle ?: bookRoot.name"))
+        assertTrue(restoreController.contains("artworkFile = bookCoverFile"))
         assertFalse(restoreAudio.contains("SasayakiMediaSession("))
         assertFalse(restoreAudio.contains("SasayakiMediaSession.loadCoverArt(bookCoverFile)"))
         assertTrue(startPlayback.contains("mediaSession?.activate()"))
