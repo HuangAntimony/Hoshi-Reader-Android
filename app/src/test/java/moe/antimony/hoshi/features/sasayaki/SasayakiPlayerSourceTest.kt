@@ -70,6 +70,7 @@ class SasayakiPlayerSourceTest {
         assertFalse(source.contains("private var stopPlaybackTime: Double? = null"))
         assertFalse(source.contains("private var temporaryPlaybackReturnPosition: Double? = null"))
         assertTrue(source.contains("fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch?"))
+        assertTrue(source.contains("private val cueNavigation = SasayakiCueNavigationController(matchData)"))
         assertTrue(playCue.contains("playbackState.clearStopPlaybackTime()"))
         assertTrue(playCue.contains("if (isPlaying) pausePlayback(restoreTemporaryPosition = false)"))
         assertTrue(playCue.contains("playbackState.setTemporaryPlaybackReturnPosition(if (stop) playback.lastPosition else null)"))
@@ -170,6 +171,38 @@ class SasayakiPlayerSourceTest {
         assertTrue(applyAction.contains("onClearCue()"))
         assertTrue(applyAction.contains("onLoadChapter(action.chapterIndex)"))
         assertTrue(applyAction.indexOf("onClearCue()") < applyAction.indexOf("onLoadChapter(action.chapterIndex)"))
+    }
+
+    @Test
+    fun playerUsesCueNavigationBoundaryForTimelineOperations() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val nextCue = source.substringAfter("fun nextCue()")
+            .substringBefore("fun previousCue()")
+        val previousCue = source.substringAfter("fun previousCue()")
+            .substringBefore("fun findCue(")
+        val findCue = source.substringAfter("fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch?")
+            .substringBefore("fun playCue(")
+        val updateCue = source.substringAfter("private fun updateCue(")
+            .substringBefore("private fun applyCueDisplayAction(")
+
+        assertTrue(source.contains("private val cueNavigation = SasayakiCueNavigationController(matchData)"))
+        assertFalse(source.contains("private val timeline = CueTimeline(matchData)"))
+        assertFalse(source.contains("import kotlin.math.max"))
+        assertTrue(nextCue.contains("cueNavigation.nextCueSeekTime("))
+        assertTrue(nextCue.contains("currentCueStartTime = cueDisplay.currentCueStartTime"))
+        assertTrue(nextCue.contains("currentTime = currentTime"))
+        assertTrue(nextCue.contains("delay = delay"))
+        assertTrue(nextCue.contains("seek(next, startPlayback = isPlaying)"))
+        assertFalse(nextCue.contains("timeline.nextCue("))
+        assertTrue(previousCue.contains("cueNavigation.previousCueSeekTime("))
+        assertTrue(previousCue.contains("currentCueStartTime = cueDisplay.currentCueStartTime"))
+        assertTrue(previousCue.contains("currentTime = currentTime"))
+        assertTrue(previousCue.contains("delay = delay"))
+        assertTrue(previousCue.contains("seek(previous, startPlayback = isPlaying)"))
+        assertFalse(previousCue.contains("timeline.previousCue("))
+        assertTrue(findCue.contains("cueNavigation.findCue(chapterIndex = chapterIndex, offset = offset)"))
+        assertTrue(updateCue.contains("cueNavigation.cueAtPlaybackTime(time = time, delay = delay)"))
+        assertFalse(updateCue.contains("timeline.cueAt("))
     }
 
     @Test

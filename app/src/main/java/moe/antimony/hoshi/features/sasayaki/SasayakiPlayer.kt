@@ -8,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.File
-import kotlin.math.max
 
 class SasayakiPlayer(
     context: Context,
@@ -26,7 +25,7 @@ class SasayakiPlayer(
     private val initialPlayback = playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0)
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
     private val handler = Handler(Looper.getMainLooper())
-    private val timeline = CueTimeline(matchData)
+    private val cueNavigation = SasayakiCueNavigationController(matchData)
     private val playbackState = SasayakiPlaybackStateCoordinator(
         initialPosition = initialPlayback.lastPosition,
     )
@@ -113,19 +112,27 @@ class SasayakiPlayer(
     }
 
     fun nextCue() {
-        val next = timeline.nextCue(after = cueDisplay.currentCueStartTime ?: currentTime - delay) ?: return
+        val next = cueNavigation.nextCueSeekTime(
+            currentCueStartTime = cueDisplay.currentCueStartTime,
+            currentTime = currentTime,
+            delay = delay,
+        ) ?: return
         playbackState.clearStopPlaybackTime()
-        seek(next + delay, startPlayback = isPlaying)
+        seek(next, startPlayback = isPlaying)
     }
 
     fun previousCue() {
-        val previous = timeline.previousCue(before = cueDisplay.currentCueStartTime ?: max(0.0, currentTime - delay)) ?: 0.0
+        val previous = cueNavigation.previousCueSeekTime(
+            currentCueStartTime = cueDisplay.currentCueStartTime,
+            currentTime = currentTime,
+            delay = delay,
+        )
         playbackState.clearStopPlaybackTime()
-        seek(previous + delay, startPlayback = isPlaying)
+        seek(previous, startPlayback = isPlaying)
     }
 
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
-        timeline.findCue(chapterIndex = chapterIndex, offset = offset)
+        cueNavigation.findCue(chapterIndex = chapterIndex, offset = offset)
 
     fun playCue(cue: SasayakiMatch, stop: Boolean) {
         playbackState.clearStopPlaybackTime()
@@ -246,7 +253,7 @@ class SasayakiPlayer(
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
         if (!hasAudio || !hasMatch) return
-        val cue = timeline.cueAt(time - delay)
+        val cue = cueNavigation.cueAtPlaybackTime(time = time, delay = delay)
         applyCueDisplayAction(
             cueDisplay.update(
                 cue = cue,
