@@ -22,8 +22,8 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: add Navigation3 dependencies and serializable route keys for main, settings detail, reader, and Sasayaki match routes.
-- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` during route migration.
+- Next architecture slice: extract an AppShell-level route owner and move app-level route decisions out of `BookshelfView`.
+- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while wiring Navigation3 display behavior.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
 ### Bookshelf
