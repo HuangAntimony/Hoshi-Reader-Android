@@ -3,6 +3,11 @@ package moe.antimony.hoshi.navigation
 import android.content.Intent
 import android.net.Uri
 import android.view.KeyEvent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,14 +21,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.Bookmark
@@ -54,6 +62,15 @@ import java.io.File
 
 private const val ReportIssueUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues"
 
+private val NoNavContentTransition: AnimatedContentTransitionScope<Scene<NavKey>>.() -> ContentTransform = {
+    EnterTransition.None togetherWith ExitTransition.None
+}
+
+private val NoPredictiveNavContentTransition:
+    AnimatedContentTransitionScope<Scene<NavKey>>.(Int) -> ContentTransform = { _ ->
+        EnterTransition.None togetherWith ExitTransition.None
+    }
+
 @Composable
 fun AppShell(
     pendingImportUri: Uri? = null,
@@ -75,6 +92,9 @@ fun AppShell(
     val appScope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
+    val currentReaderSettings by rememberUpdatedState(readerSettings)
+    val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
+    val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     var sasayakiMatchRequests by remember { mutableStateOf<Map<String, SasayakiMatchRequest>>(emptyMap()) }
     var sasayakiSettingsReloadKey by remember { mutableIntStateOf(0) }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
@@ -111,6 +131,9 @@ fun AppShell(
         modifier = modifier,
         onBack = ::popRoute,
         entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+        transitionSpec = NoNavContentTransition,
+        popTransitionSpec = NoNavContentTransition,
+        predictivePopTransitionSpec = NoPredictiveNavContentTransition,
         entryProvider = { key ->
             val route = key as AppRoute
             NavEntry(route) {
@@ -119,8 +142,8 @@ fun AppShell(
                         selectedTab = MainTab.Books,
                         pendingImportUri = pendingImportUri,
                         onPendingImportConsumed = onPendingImportConsumed,
-                        readerSettings = readerSettings,
-                        onReaderSettingsChange = onReaderSettingsChange,
+                        readerSettings = currentReaderSettings,
+                        onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
@@ -131,8 +154,8 @@ fun AppShell(
                         selectedTab = MainTab.Dictionary,
                         pendingImportUri = pendingImportUri,
                         onPendingImportConsumed = onPendingImportConsumed,
-                        readerSettings = readerSettings,
-                        onReaderSettingsChange = onReaderSettingsChange,
+                        readerSettings = currentReaderSettings,
+                        onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
@@ -143,8 +166,8 @@ fun AppShell(
                         selectedTab = MainTab.Settings,
                         pendingImportUri = pendingImportUri,
                         onPendingImportConsumed = onPendingImportConsumed,
-                        readerSettings = readerSettings,
-                        onReaderSettingsChange = onReaderSettingsChange,
+                        readerSettings = currentReaderSettings,
+                        onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
@@ -164,8 +187,8 @@ fun AppShell(
                     )
                     is AppRoute.SettingsDetailRoute -> SettingsDetailDestination(
                         route = route,
-                        readerSettings = readerSettings,
-                        onReaderSettingsChange = onReaderSettingsChange,
+                        readerSettings = currentReaderSettings,
+                        onReaderSettingsChange = currentOnReaderSettingsChange,
                         readerFontManager = readerFontManager,
                         onClose = {
                             if (route.section == SettingsDetailSection.Advanced) {
@@ -179,9 +202,9 @@ fun AppShell(
                         ReaderRouteDestination(
                             bookId = route.bookId,
                             bookStorage = bookStorage,
-                            readerSettings = readerSettings,
-                            onReaderSettingsChange = onReaderSettingsChange,
-                            onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
+                            readerSettings = currentReaderSettings,
+                            onReaderSettingsChange = currentOnReaderSettingsChange,
+                            onReaderKeyEventHandlerChange = currentOnReaderKeyEventHandlerChange,
                             bookmarkScope = appScope,
                             onBookmarkSaved = { bookshelfRefreshKey += 1 },
                             onClose = ::popRoute,
@@ -207,8 +230,8 @@ fun AppShell(
                         selectedTab = MainTab.Books,
                         pendingImportUri = pendingImportUri,
                         onPendingImportConsumed = onPendingImportConsumed,
-                        readerSettings = readerSettings,
-                        onReaderSettingsChange = onReaderSettingsChange,
+                        readerSettings = currentReaderSettings,
+                        onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
                         sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,

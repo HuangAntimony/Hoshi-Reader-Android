@@ -108,4 +108,6 @@ Before claiming implementation complete, run:
 
 Also run `./gradlew lint` when changing resources, manifest, UI, packaging, or release-facing build behavior.
 
+For settings/navigation changes, verify settings controls update immediately and route changes avoid fade transitions on e-ink displays.
+
 For reader/dictionary/audio user flows, perform targeted emulator or device validation using the test data listed in `AGENTS.md`.

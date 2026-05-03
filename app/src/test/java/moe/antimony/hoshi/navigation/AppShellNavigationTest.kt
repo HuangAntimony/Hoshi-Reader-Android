@@ -32,6 +32,26 @@ class AppShellNavigationTest {
     }
 
     @Test
+    fun appShellReadsLatestSettingsInsideSavedNavEntries() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+
+        assertTrue(appShell.contains("rememberUpdatedState(readerSettings)"))
+        assertTrue(appShell.contains("readerSettings = currentReaderSettings"))
+        assertTrue(appShell.contains("onReaderSettingsChange = currentOnReaderSettingsChange"))
+    }
+
+    @Test
+    fun appShellDisablesNavigationContentTransitions() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+
+        assertTrue(appShell.contains("transitionSpec = NoNavContentTransition"))
+        assertTrue(appShell.contains("popTransitionSpec = NoNavContentTransition"))
+        assertTrue(appShell.contains("predictivePopTransitionSpec = NoPredictiveNavContentTransition"))
+        assertFalse(appShell.contains("defaultTransitionSpec"))
+        assertFalse(appShell.contains("defaultPopTransitionSpec"))
+    }
+
+    @Test
     fun bookshelfViewEmitsAppRouteEventsInsteadOfOwningDisplayRoutes() {
         val bookshelf = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
         val functionHeader = bookshelf.substringAfter("fun BookshelfView(")
