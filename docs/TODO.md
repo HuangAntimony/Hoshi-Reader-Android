@@ -1,292 +1,117 @@
-# Hoshi Android Roadmap
+# Hoshi Android Agent TODO
 
-> Status values: `todo`, `in_progress`, `blocked`, `done`.
-> After every implemented feature, update this file before committing so development can resume from the current state.
+Last updated: 2026-05-04
 
-## Execution Rules
+This file is the short operational handoff for future agents.
 
-- iOS is the only source of truth for user-visible UI and interaction behavior.
-- If Android behavior differs from iOS, inspect the iOS implementation first and remove the difference instead of adding isolated compatibility patches.
-- Use `testdata/test.epub` and `testdata/test2.epub` for EPUB reader validation and `testdata/JMdict_english.zip` for Yomitan dictionary validation.
-- Use `testdata/freq.zip` and `testdata/pitch.zip` when validating frequency and pitch dictionary support.
-- Use `testdata/KleeOne-SemiBold.ttf` when validating reader font import and WebView font rendering.
-- Each implemented feature must be verified in an Android emulator before commit.
-- Each implemented feature commit must include the matching status update in this file.
-- If a feature is blocked, mark it as `blocked`, record the blocker, and continue with the next feasible item.
+## Maintenance Rules
 
-## Roadmap
+- Keep this file under 150 lines.
+- Record only current state, next actionable work, active blockers, and durable validation requirements.
+- Do not paste long emulator transcripts, adb details, screenshot observations, release notes, or per-commit history here.
+- Put user-visible shipped changes in `docs/CHANGELOG.md`.
+- Put architecture-refactor slice state in `docs/REFACTORING_TRACKER.md`.
+- Put detailed reproduction, verification logs, and investigation notes in the relevant issue, PR, commit message, or a focused doc.
+- When completing a task, update the smallest relevant line here in the same commit.
 
-1. `done` - Stabilize EPUB reading main flow
-   - Save and restore reader position using the iOS `bookmark.json` shape.
-   - Preserve iOS WebView paging semantics: page scroll first, chapter transition only at boundaries.
-   - Keep reverse chapter transitions landing at the previous chapter end.
-   - Verified on emulator with `testdata/test.epub`: saved `chapterIndex=9`, `progress=0.2734952481520591`, relaunched app, reopened reader, restored to `item/xhtml/p-003.xhtml` with `scrollTop=1668` and matching progress.
+## Active Work
 
-2. `in_progress` - Bookshelf and book metadata
-   - `done` - Move from a single `current.epub` directory to multi-book storage.
-   - `done` - Persist title, cover path, folder, and last access in iOS-shaped `metadata.json`.
-   - `done` - Open imported/listed books from their independent storage directories.
-   - `done` - Render cover thumbnails in the bookshelf.
-   - `done` - Align basic bookshelf sorting with iOS `Recent` / `Title`.
-   - `done` - Align single-book delete flow with iOS long-press context action plus confirmation.
-   - `done` - Align the main Books/Dictionary/Settings shell with iOS: floating Books chrome, cover-grid bookshelf, grouped Settings list, and bottom capsule tab bar.
-   - `done` - Point Settings -> Report an Issue at the Android GitHub issue tracker instead of the iOS upstream tracker.
-   - `done` - Align EPUB import deduplication with iOS title-based `Books/<safeTitle>` storage and calculate bookshelf progress from `bookmark.characterCount / bookinfo.characterCount`.
-   - `done` - Use transient content import intents for EPUB imports so Android's picker can show providers under "Browse files in other apps" on affected devices.
-   - `done` - Replace the fixed iOS-style main shell with Material 3 adaptive navigation, responsive Books grid sizing, and constrained Settings lists for phones, tall screens, and tablet-width windows.
-   - `done` - Tighten the Books main screen after adaptive shell feedback: reduce bookshelf title weight, compact the `Unshelved` shelf header and book row spacing, match compact-phone bottom navigation to the page background with a divider, disable bookshelf overscroll stretch, cache scaled cover thumbnails, and load reading progress outside each grid item for smoother scrolling.
-   - `done` - Remove nonessential shadows, elevation, translucent search chrome, and reader fade animation from the main reader/dictionary/bookshelf surfaces so low-power e-ink devices spend less work on decorative effects, while retaining low-cost outline borders for visible control boundaries.
-   - `done` - Replace iOS-style inset Settings row separators with full-width Material-style dividers.
-   - `done` - Remove the duplicate manual inset beside Material 3 navigation rail so large-screen layouts rely on `NavigationSuiteScaffold` spacing instead of adding extra blank space.
-   - `done` - Align Books shelf content to the start side of the large-screen content area while keeping the grid width capped.
-   - `done` - Add Settings -> Diagnostics between Report an Issue and About, using Android process exit history on Android 11+ plus save-as-`.txt` and share actions so users can attach diagnostics to issue reports.
-   - `done` - Fix Settings -> Diagnostics so Android system Back returns to the Settings list instead of closing the app.
-   - `done` - Fix issue #36 so Books, Settings, and Advanced settings headers no longer double-apply top safe-area spacing.
-   - `done` - Unify Settings -> Dictionaries, Appearance, and Advanced behind one compact detail header so subpage content starts directly below a single top bar.
-   - `todo` - Align multi-select, shelves, and batch actions with iOS.
-   - Verified Settings detail header layout with `SettingsDetailLayoutTest` on physical `SM-G9860` and `Pixel_10_Pro(AVD)`: Dictionaries uses a centered compact title instead of a large header, and Appearance no longer renders a second large in-content title before the Theme section.
-   - Verified issue #36 on `emulator-5554` after uninstalling the stale `moe.antimony.hoshi` release package and installing the current `moe.antimony.hoshi.debug` build: Books and Settings headers each render in a single top app-bar safe-area band, and Settings -> Advanced uses a compact header with the title aligned beside the back button instead of a separated large-title row.
-   - Verified on emulator with `testdata/test.epub`: cleared app data, imported the EPUB twice through DocumentsUI, confirmed two shelf rows and two independent `files/Books/<uuid>/metadata.json` files, then opened a listed book into the reader.
-   - Verified cover thumbnails on emulator with `testdata/test.epub`: imported through DocumentsUI, confirmed `metadata.cover` is `item/image/cover.jpg`, and visually checked the real cover image renders in the shelf row.
-   - Verified sorting/deletion on emulator: opened sort menu, switched from `Recent` to `Title`, long-pressed a book row, used `Delete`, confirmed the dialog, and checked `files/Books` metadata count decreased.
-   - Verified main shell UI on emulator with `testdata/test.epub`: imported through Android DocumentsUI from `testdata`, opened the reader, returned to Books, confirmed the `Unshelved` cover grid with two imported books, checked the Settings tab renders iOS-ordered grouped cards above the bottom capsule tab bar, confirmed the Books page no longer renders an artificial fixed blurred cover strip at the top, and confirmed custom toolbar/tab icons no longer carry fixed pink/blue/ripple color artifacts.
-   - Verified import deduplication and full-book progress on emulator with `testdata/test.epub`: cleared app data, imported the same EPUB twice through Android DocumentsUI, confirmed `files/Books` contains only `屍人荘の殺人`, swiped to正文, confirmed `bookmark.json` saved `characterCount=90`, reader chrome showed `90 / 169326 0.05%`, and the bookshelf showed `0.1%`.
-   - Verified bookshelf card layout on emulator with `testdata/test.epub`: imported through Android DocumentsUI, confirmed the progress bar and percentage render below the cover image instead of overlaying it, and confirmed the Books shell toolbar/tab icons are scaled down closer to the iOS proportions.
-   - Verified Books toolbar scaling on emulator without clearing app data: installed the resize build on `emulator-5554`, opened Books, confirmed the sort/check/folder/add toolbar controls render smaller while preserving the existing Books interactions, and moved the shelf content upward so the books sit closer to the resized toolbar.
-   - Verified import picker intent fix on `emulator-5554`: installed debug build without clearing app data, tapped Books -> Import EPUB, confirmed DocumentsUI opened with root navigation, selected `test.epub`, and confirmed the reader opened. `FileImportContentContractTest` also passed on `SM-G9860` and `Pixel_10_Pro(AVD)`, covering `ACTION_GET_CONTENT`, MIME filters, multi-select, and URI deduplication for shared import contracts.
-   - Verified adaptive main shell on `emulator-5554`: installed debug build, confirmed the default/tall phone Books empty state uses a standard app bar and bottom navigation without oversized controls, temporarily simulated a 3200x2000/320dpi tablet window and confirmed Books and Settings switch to a left navigation rail with constrained content width, then restored the emulator display size and density.
-   - Verified Books chrome and scroll performance on physical SM-G9860 without clearing app data: installed debug build, confirmed the content/bottom-navigation divider aligns with the bottom bar boundary and selected tab highlight no longer protrudes above it, confirmed bookshelf scrolling no longer uses Compose overscroll stretch, and compared `gfxinfo` before/after scrolling data; warm Books scrolling improved from earlier 99th percentile tails around 53-125ms to 32ms with no slow bitmap uploads after cover/progress caching.
-   - Verified low-motion/e-ink chrome by source scan and unit test: Books cover cards, Dictionary search/popup surfaces, Reader menu/buttons, and Reader WebView restore no longer use decorative `.shadow(...)`, nonzero 8dp popup elevation, or `webView.animate()` fade-in; follow-up restored low-cost 1dp outline borders through Surface border APIs instead of outer shadow effects.
+### Architecture Refactoring
 
-3. `in_progress` - Reader settings
-   - `done` - Implement iOS-aligned reader Appearance sheet entry from the reader.
-   - `done` - Apply theme, text orientation, font size, horizontal padding, vertical padding, and line height through WebView CSS without changing reader page-turn logic.
-   - `done` - Persist reader Appearance settings across app restart.
-   - `done` - Align reader chrome with iOS `ReaderView`: remove solid top/bottom bars, render title/progress as an overlay, use theme-aware floating circular controls, reserve transparent WebView space behind chrome, and set Android system bar icon contrast from the reader theme.
-   - `done` - Align reader restore display timing with iOS: keep the WebView transparent while saved progress is restored, then fade it in after JS reports restore completion.
-   - `done` - Align font family selection/import/delete with iOS `FontManager`: store imported fonts under `Fonts/`, use file basenames as font names, persist `selectedFont`, and inject selected imported fonts into the reader WebView through `@font-face`.
-   - `done` - Use transient content import intents for reader font imports so Android's picker can show providers under "Browse files in other apps" on affected devices.
-   - `done` - Add the iOS-aligned Chapters sheet from the reader menu, flatten EPUB TOC entries, show current full-book progress, and jump selected chapters to their matching spine item.
-   - `done` - Reuse one iOS-aligned Appearance settings implementation from both Settings -> Appearance and the reader menu, backed by the same `ReaderSettingsStore`; add implemented iOS reader toggles for furigana, layout advanced options, display progress/title controls, and popup sizing/swipe controls.
-   - `done` - Fix Appearance theme controls and dark-mode readability: match iOS native segmented picker behavior by giving multi-option pickers their own full-width row, and apply reader-theme-aware content colors to the shared Appearance page/sheet.
-   - `done` - Fix GitHub issue #1 dark-mode contrast regression: app background and Chapters sheet containers provide readable Material content colors for default text, and System reader theme now follows system dark mode for WebView content and reader chrome.
-   - `done` - Align Appearance theme semantics with iOS at the app root: Dark applies the Android Material color scheme app-wide, while Sepia keeps the app UI light and only changes reader rendering colors.
-   - `done` - Replace hand-drawn Compose icon glyphs in Books, Settings, Dictionary, and search chrome with Material Icons.
-   - `done` - Align popup sizing, swipe dismissal, and dark rendering with iOS `PopupView` / `PopupWebView`: root reader popups honor Full-width, Swipe to Dismiss injects a zero threshold when disabled, popup touch handling stays inside the popup WebView, and Android WebView receives explicit iOS-equivalent light/dark popup color variables.
-   - `done` - Disable Android native WebView overscroll stretch in reader and popup surfaces so dragging does not zoom or rubber-band the WebView.
-   - `done` - Fix issue #4 by normalizing Calibre cover SVG wrappers that set `preserveAspectRatio="none"`, preserving the embedded cover image ratio in the reader.
-   - `done` - Fix issue #21 so Android system Back from Settings -> Appearance returns to Settings, matching the toolbar back button and other settings subpages.
-   - `done` - Fix issue #24 by loading reader chapters as XHTML URLs before injecting reader CSS/JS, matching iOS `loadFileURL` plus post-load `evaluateJavaScript` behavior and preserving EPUB-authored XHTML script syntax.
-   - `done` - Align issue #24 image chapter pagination with iOS by keeping block image width/height `auto` and deriving reader page boundaries from actual text/image rects instead of Android WebView's reported trailing scroll range.
-   - `done` - Fix issue #26 by replacing the iOS-only Hiragino reader font presets with Android Japanese Noto Serif CJK JP and Noto Sans CJK JP presets, while mapping saved legacy Hiragino selections to the matching Android preset.
-   - `done` - Fix issue #27 so device orientation changes reflow the open reader in place instead of dismissing back to the bookshelf.
-   - `done` - Fix issue #31 by matching iOS `WebViewState` size identity: WebView viewport changes reload the current chapter at the displayed reading progress so pages are repaginated for the new screen ratio.
-   - `done` - Fix issue #34 so `また、同じ夢を見ていた.epub` opens in the reader without Android WebView renderer crash by normalizing EPUB-private CSS declarations before serving chapter styles to WebView.
-   - `done` - Fix issue #39 by intercepting EPUB internal reader links like iOS, loading the target spine item through reader state, restoring target fragments with reader JS, and syncing the resulting progress back into reader chrome/bookmark state.
-   - `done` - Add an Appearance theme switch for e-ink mode, backed by reader settings, that disables dynamic Material colors and maps app surfaces, selected controls, progress indicators, reader pages, and reader chrome to pure black/white high-contrast colors.
-   - `done` - Apply e-ink mode to lookup popup rendering by injecting a Hoshi-specific high-contrast black/white popup CSS layer for dictionary tags, frequency/pitch labels, audio/mining buttons, and popup borders while leaving normal light/dark popup styling unchanged.
-   - `done` - Fix e-ink dark lookup popup readability by making the injected e-ink popup CSS follow the active popup color scheme instead of forcing black text and black controls over the dark popup background.
-   - `done` - Make the reader Chapters sheet use an opaque surface instead of a translucent one, and remove the outline border from the reader bottom Back/Menu floating buttons in light and dark themes.
-   - `done` - Remove the dimming scrim from the reader Chapters and Appearance half sheets and add a top outline boundary so e-ink black/white reader backgrounds stay pure behind open sheets.
-   - `done` - Unify reader Chapters, Appearance, and Sasayaki sheet chrome behind E-ink Mode: e-ink sheets use transparent scrims, opaque surfaces, and a top boundary, while normal sheets use the same Material scrim and drag handle styling.
-   - `done` - Restore Material default selected indicators and high-contrast selected text colors for Appearance segmented controls, matching the working Advanced Audio segmented controls.
-   - `done` - Remove the full-page dimming scrim shown during dictionary import so the Dictionaries page keeps pure e-ink black/white surfaces while a compact import spinner is shown in the import action.
-   - `done` - Sync iOS upstream reader appearance changes after `6f1e48c`: Sepia can invert in system dark mode, reader chrome follows the inverted Sepia dark interface, and reader WebView CSS now disables WebKit text auto-sizing, ruby selection, and line-box clipping differences.
-   - `done` - Add Android reader hardware-key paging: Page Down/Page Up always turn next/previous pages, and Settings -> Behavior can enable Volume Down/Volume Up paging with optional direction reversal.
-   - `done` - Fix issue #43 by adding the iOS snap scroll handler to Android's paged reader script and locking the root viewport at zero, so WebView-native text selection scrolling cannot leave the document between page offsets or shift the visible page by one character.
-   - Verified issue #43 on physical `SM-G9860` without clearing app data: reproduced the remaining one-character upward shift as `documentElement.scrollTop/window.scrollY=21.69` while `body.scrollTop` was still on the correct page; installed the root-lock build, reopened the same saved page, forced root viewport scroll to 22px and body scroll to a half page through CDP, and confirmed both returned to `docTop=0`, `winY=0`, `bodyRectTop=0`, and `lastPageScroll=116706` with no crash log output.
-   - Verified issue #43 on `emulator-5554` without clearing app data: installed debug build, opened existing `testdata/test.epub` import, confirmed the reader WebView registers `window.snapScrollRegistered=true`, forced `document.body.scrollTop` to a half-page offset through CDP, and confirmed it snapped back to the last full-page offset with no crash log output.
-   - Verified Android hardware-key paging on `emulator-5554` without clearing app data: installed the debug build, opened Settings -> Behavior, confirmed both switches render and persist to `reader-settings.xml`, opened an existing `testdata/test.epub` import, confirmed Page Up moved progress from `29105 / 169326 17.19%` to `29030 / 169326 17.14%`, Page Down restored `29105 / 169326 17.19%`, reversed Volume Down moved backward to `29030 / 169326 17.14%`, reversed Volume Up moved forward to `29105 / 169326 17.19%`, then disabled Volume Keys Turn Pages and confirmed Volume Down left progress unchanged.
-   - Verified upstream Sepia settings on `emulator-5554` without clearing app data: installed the debug build, opened Settings -> Appearance, selected Sepia, and confirmed `Invert in System Dark Theme` appears under the Theme section.
-   - Verified reader sheet chrome on connected `SM-G9860` without clearing app data: with `E-ink Mode` enabled, opened `屍人荘の殺人` -> Reader Menu -> Sasayaki and confirmed the sheet uses a pure white surface, black top boundary, and transparent scrim over the reader; with `E-ink Mode` disabled, opened Appearance, Chapters, and Sasayaki and confirmed all three use the same Material scrim/drag-handle styling before restoring `E-ink Mode` to its original enabled state.
-   - Verified Appearance segmented controls on physical e-ink device `B651CNB2FKPB006000178`: Dark/e-ink selected controls render white background, black text, and check indicator; Light/e-ink selected controls render black background, white text, and check indicator.
-   - Verified on emulator with `testdata/test2.epub`: imported through DocumentsUI, opened `かがみの孤城`, and confirmed the Calibre SVG cover keeps the embedded 507x751 image ratio instead of stretching to the WebView page box.
-   - Verified on emulator with `testdata/test.epub` and `testdata/test2.epub`: checked cover and frontispiece/image pages for both books; `test2.epub` cover keeps the correct aspect ratio and `text/part0005.html` stays vertically centered in the reader.
-   - Verified on emulator with `testdata/test.epub`: opened reader, opened Appearance from the reader, changed font size from 22 to 23 and theme to Dark, confirmed WebView computed CSS changed to `fontSize=23px`, black background, white text, and confirmed those settings persisted after force-stopping and reopening the app.
-   - Verified on emulator with `testdata/test.epub`: opened an imported book, confirmed the WebView bounds are inset below the top overlay and above the bottom controls, confirmed no solid title bar or white bottom bar is present, confirmed status/navigation icons switch to light on dark reader theme, and confirmed the Appearance menu is anchored to the right floating control.
-   - Verified on emulator with `testdata/test.epub`: force-stopped the app from a saved reader position, opened the book from the shelf, captured 16 rapid screenshots during launch, and confirmed the sequence goes from shelf to a blank reader background/chrome to the saved page without ever showing the chapter beginning.
-   - Verified on emulator with `testdata/test.epub` and `testdata/KleeOne-SemiBold.ttf`: imported the font through Android DocumentsUI from the reader Appearance sheet, confirmed `files/Fonts/KleeOne-SemiBold.ttf` exists, selected `KleeOne-SemiBold`, confirmed `reader-settings.xml` stores `selectedFont`, and used WebView DevTools to confirm `font-family: KleeOne-SemiBold, serif`, `@font-face`, `https://hoshi.local/fonts/KleeOne-SemiBold.ttf`, and `document.fonts` loaded status.
-   - Verified on emulator without clearing app data: opened an existing EPUB, confirmed the reader bottom controls use Material icons inside theme-aware floating circular buttons, confirmed the reader menu renders as an iOS-style rounded floating card, opened Appearance, and confirmed it uses scrollable Material 3 grouped sections, segmented controls, and icon steppers.
-   - Verified on emulator without clearing app data: opened existing `testdata/test2.epub`, opened Reader Menu -> Chapters, confirmed the iOS-style TOC sheet renders cover/header/full-book progress and TOC rows, tapped `六月` and confirmed chrome `24932 / 248250 10.04%` with `bookmark.json` `chapterIndex=11`, then reinstalled the refactor build and tapped `contents`, confirming chrome `591 / 248250 0.24%` with `bookmark.json` `chapterIndex=5`.
-   - Verified on emulator without clearing app data: opened Settings -> Appearance and confirmed the full Material 3 page replaces the placeholder; toggled `Hide Furigana` and confirmed `shared_prefs/reader-settings.xml` wrote `readerHideFurigana=true`; opened the same Appearance implementation from the reader menu and confirmed the same toggle is checked; changed `Progress Position` to Bottom and confirmed reader chrome moved progress from the top overlay to the bottom overlay while the same `readerShowProgressTop=false` preference was saved.
-   - Verified on emulator without clearing app data: opened Settings -> Appearance and Reader Menu -> Appearance, selected Dark, confirmed the Theme segmented control no longer overlaps or wraps `System`, and confirmed all Appearance labels, section titles, segmented controls, steppers, and sheet text remain readable in dark mode.
-   - Verified on emulator without clearing app data: with Sepia selected, confirmed the Books UI remains light while the reader uses the sepia page color; then selected Dark in Settings -> Appearance and confirmed Books, Settings, Dictionary tab, and Dictionaries management all switch to readable dark Material colors with Material icon rendering.
-   - Verified on emulator after clearing app data for first-run coverage: enabled system dark mode with default System reader theme, confirmed the empty Books page renders `No Books` and the import guidance as readable light text, imported `testdata/test.epub` through Android DocumentsUI, opened the reader and confirmed System theme uses dark reader content/chrome instead of Light, opened Reader Menu -> Chapters, and confirmed `Chapters`, the book title, progress, TOC rows, and close affordance remain readable in the dark sheet.
-   - Verified on emulator without clearing app data: opened Settings -> Appearance in Dark mode, confirmed `Progress Position` shows the full `Bottom` label, confirmed `Full-width` is enabled and `Swipe to Dismiss` is disabled, opened an existing EPUB, selected vertical text to show a full-width bottom popup, confirmed popup dictionary text is readable in dark mode, then performed a horizontal swipe over the popup and confirmed it stayed open without changing reader page.
-   - Verified on emulator without clearing app data after the popup focus regression: opened an existing EPUB, selected text to show a full-width bottom popup, confirmed popup content still scrolls, confirmed horizontal swipe over the popup does not close it or page the reader when `Swipe to Dismiss` is disabled, and confirmed the reader menu button remains tappable while the popup is visible.
-   - Verified on emulator without clearing app data after redoing the Appearance progress fix: with `layoutVerticalPadding=33` and `layoutHorizontalPadding=24`, opened an existing EPUB, confirmed the reader shows the expected large vertical and horizontal page padding, performed three page swipes without the WebView reloading or stalling, changed the reader theme from Dark to Light and back to Dark, and confirmed the chrome stayed at `1027 / 248250 0.41%` instead of jumping to the chapter start.
-   - Verified reader bottom control scaling on emulator without clearing app data: opened an existing EPUB, confirmed the bottom Back/Menu floating controls render smaller with reduced bottom safe-area spacing, and tapped the resized Menu control to open the existing Chapters/Appearance reader menu using the user-requested `58.dp` menu bottom offset.
-   - Verified popup background stabilization on emulator without clearing app data: opened Dictionary and searched `たべる`, confirmed the popup/result WebView uses a pure white light background after fixing HTML body, WebView, and Compose popup `Surface` backgrounds to explicit white/black instead of transparent/dynamic Material colors. Dark-mode real-device verification remains user-side because the mismatch only reproduced on physical hardware.
-   - Verified WebView overscroll on emulator without clearing app data: opened an imported EPUB reader, dragged at the WebView edge, and confirmed Android stretch/zoom overscroll no longer appears; also ran an instrumentation check that the shared reader/popup WebView helper sets `View.OVER_SCROLL_NEVER`.
-   - Verified issue #21 on emulator without clearing app data: opened Settings -> Appearance, pressed Android system Back, confirmed the app returned to the Settings list instead of closing, and confirmed the app process stayed alive with an empty crash buffer.
-   - Verified issue #24 on emulator without clearing app data: pushed `testdata/test3.epub` to Downloads, imported it through Android DocumentsUI, confirmed the Re:Zero volume 13 cover renders instead of a blank reader, swiped into `p-001.xhtml`, confirmed vertical Japanese text is visible, then performed an additional in-chapter page swipe and confirmed progress advanced from `482 / 143553 0.34%` to `629 / 143553 0.44%` instead of jumping directly to the next chapter.
-   - Verified issue #24 regression on emulator without clearing app data using existing `testdata/test2.epub`: opened `かがみの孤城`, confirmed `text/part0005.html` image-only chapter restores to the visible illustration instead of the leading blank page, swiped forward to the following title page without a trailing blank page, swiped back from the title page to the image page, swiped back again to the previous contents page, and continued reverse swiping through preceding contents/text pages without hitting a blank page.
-   - Verified issue #24 regression on physical SM-G9860 without clearing app data: reproduced `text/part0005.html` image-only chapter at `scrollTop=685.8666` where the image absolute top measured `685.9999`; confirmed the rounded content-start page boundary reports `686`, then swiped backward from the image page and landed directly on the previous contents page without the intermediate blank page.
-   - Verified issue #26 on `emulator-5554` Pixel_10_Pro Android 16: confirmed `/system/fonts` contains `NotoSansCJK-Regular.ttc` and `NotoSerifCJK-Regular.ttc`, confirmed `/system/etc/fonts.xml` maps Japanese fallback to those files, and ran an instrumented WebView canvas test proving the Noto Serif CJK JP and Noto Sans CJK JP preset fallback chains render different Japanese glyph pixels.
-   - Verified issue #27 on `emulator-5554` without clearing app data: opened an existing EPUB from Books, rotated the device to landscape and back to portrait, and confirmed the reader WebView plus title/progress/Back/Menu chrome stayed in front instead of returning to the bookshelf; crash buffer stayed empty.
-   - Reproduced issue #34 on physical `R5CR692DYXM` without clearing app data: imported `testdata/test4.epub` through DocumentsUI, confirmed `また、同じ夢を見ていた` opened into the reader and then WebView renderer crashed with `Renderer process crash detected (code 5)` followed by `Render process crash wasn't handled by all associated webviews, triggering application crash`; after the fix, installed debug build, opened the same imported book, confirmed the reader remained open with a live `moe.antimony.hoshi.debug` process and no repeated renderer fatal entries in logcat.
-   - Verified issue #31 on `emulator-5554` after importing `testdata/test.epub` through DocumentsUI: opened a vertical text reader page, confirmed DevTools reported portrait `pageWidth=426` / `pageHeight=798`, rotated to landscape and confirmed the reader stayed open with `pageWidth=952` / `pageHeight=298`, then rotated back to portrait and confirmed the page variables returned to `426` / `798`; crash buffer stayed empty.
-   - Verified e-ink mode on physical `B651CNB2FKPB006000178` HiBreak without clearing app data: installed debug build, opened Settings -> Appearance, enabled `E-ink Mode`, confirmed `reader-settings.xml` stores `eInkMode=true`, captured Appearance/Settings/Books screenshots, and sampled screenshot pixels showing page/card/bottom backgrounds at `#FFFFFF`, selected controls at `#000000`, and selected tab icons/text remaining visible on the black indicator.
-   - Verified reader bottom controls and Chapters sheet on physical `B651CNB2FKPB006000178` HiBreak: installed debug build, opened an imported `testdata/test.epub`, captured Light and Dark reader screenshots showing the bottom Back/Menu controls without outline strokes, opened Chapters in both themes, and sampled sheet surface pixels as stable opaque colors (`#DCD6FF` light dynamic surface, `#0D0E12` dark surface) instead of showing reader content through the sheet.
-   - Verified e-ink lookup popup styling on `emulator-5554` without clearing app data: installed debug build, enabled Settings -> Appearance -> `E-ink Mode`, opened an existing vertical reader page with an imported term dictionary, tapped `調査`, and confirmed the lookup popup renders as a square white surface with black border, black/white frequency label, black text controls, and no crash buffer entries.
-   - Verified e-ink dark lookup popup styling on `emulator-5554` without clearing app data: installed debug build with `theme=Dark` and `eInkMode=true`, opened an existing vertical reader page, tapped `後`, and confirmed the popup renders white text, white controls, and white tag borders on a black surface with an empty crash buffer.
+Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction, `docs/REFACTORING_TRACKER.md` for slice status.
 
-4. `done` - WebView selection bridge
-   - `done` - Implement JS-side text selection, selected text extraction, range data, and popup anchor rectangles.
-   - `done` - Keep native Android as the receiver of JS results instead of reimplementing DOM logic.
-   - Verified on emulator with `testdata/test.epub`: imported through DocumentsUI, opened a vertical text chapter in WebView, confirmed `window.hoshiSelection` and `HoshiTextSelection` are injected, performed a real tap on正文 text, and observed JS selection data returning selected text `見です` with sentence `「そこまでは俺も同意見です。`.
+Status: `in_progress`
 
-5. `in_progress` - Dictionary lookup popup
-   - `done` - Connect lookup to `third_party/hoshidicts-kotlin-bridge`.
-   - `done` - Trigger lookup from WebView selection results.
-   - `done` - Add iOS-aligned Dictionary tab lookup: submit a search query, use `LookupEngine`, and render results through the existing popup WebView HTML/JS/CSS pipeline.
-   - `done` - Align Dictionary tab search chrome with iOS: floating glass-style search capsule, search icon, compact circular clear button, and WebView result spacer so entries do not render under the search field.
-   - `done` - Align Dictionary tab popup interaction with iOS `PopupWebView`: intercept internal `hoshi-popup://` messages, inject iOS `selection.js`, and support nested lookup popups from selected definition text.
-   - `done` - Share the iOS-style lookup popup stack between Dictionary and Reader, including child popup dismissal and popup-local selection coordinate conversion.
-   - `done` - Align Reader popup coordinate space with iOS by rendering popup stack in the same padded content layer as the chapter WebView, so first lookup popups stay below the system status area.
-   - `done` - Align Reader lookup selection highlighting with iOS by adding the same `::highlight(hoshi-selection)` style used by popup WebViews.
-   - `done` - Align iOS dictionary popup settings plumbing: `maxResults`, `scanLength`, dictionary collapse, compact glossaries, expression tags, harmonic frequency, pitch deduplication, and custom CSS now feed the shared WebView popup renderer.
-   - `done` - Add first-pass popup positioning using iOS `PopupLayout` geometry.
-   - `done` - Close lookup popup from the same Reader-level tap-outside and page-turn paths as iOS, and add popup-level horizontal swipe dismissal for gestures that start on the popup itself.
-   - `done` - Make popup-level swipe dismissal default on with a 20-60 threshold range and horizontal-intent detection instead of a fixed 20px vertical tolerance, so natural diagonal horizontal swipes still close the popup while vertical scrolls keep scrolling definitions; Reader popup lookup now also uses the latest Appearance settings immediately after in-reader changes.
-   - `done` - Clear the reader WebView and popup-local selection highlights whenever lookup popups are dismissed from tap-outside, same-word tap, page swipe, popup swipe dismissal, or chapter jump paths, so the same word can be tapped again for a fresh lookup and parent popup definition highlights clear when child popups close. #25
-   - `done` - Keep lookup popup surfaces hidden until the popup WebView reports that its first entry has rendered, serve shared popup CSS/JS as local WebView assets, and align Android result entry loading with iOS by fetching entries lazily through the native WebView bridge instead of embedding all entry JSON in the initial HTML.
-   - `done` - Fix issue #33 so Dictionary tab result pages load popup CSS/JS from the shared WebView bridge even though their page base URL is `/dictionary/`, restoring definition rendering after search.
-   - `done` - Replace raw Compose glossary text with a popup WebView renderer that expands Yomitan structured-content JSON into HTML without adding search or other extra capabilities.
-   - `done` - Copy iOS `popup.js` and `popup.css` into Android assets and render lookup entries through the same `entries-container` / `renderPopup()` pipeline and `lookupEntries` data shape as iOS.
-   - `done` - Fix issue #35 by serving dictionary media requests from the popup WebView bridge with iOS-aligned MIME types, including `image/svg+xml` for SVG structured-content images, and adapting Android WebView image sizing when `100vh` resolves to zero.
-   - `done` - Sync iOS upstream popup changes after `6f1e48c`: internal structured-content links redirect in-place with back/forward history, optional popup action bar controls history and close actions, link taps no longer trigger lookup selection, compact pitch accents are configurable, and compact glossary/custom CSS injection is deduplicated.
-   - `done` - Fix issue #40 so Dictionary tab lookup results observe horizontal redirect-history swipes without consuming vertical WebView scrolling.
-   - `done` - Fix issue #41 so Dictionary tab cross-reference redirects keep their native result holder across history-count recompositions and restore prior top-of-page results without blocking the first visible repaint.
-   - Verified upstream popup settings on `emulator-5554` without clearing app data: installed the debug build, opened Settings -> Appearance and confirmed the new `Show Action Bar` popup option, then opened Settings -> Dictionaries -> Settings and confirmed `Compact Pitch Accents` is visible and enabled by default. Full popup redirect history remains covered by unit/source tests in this pass because the emulator state had no imported dictionaries/books.
-   - `todo` - Wire remaining iOS `PopupWebView` Anki mining behavior.
-   - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: opened a vertical text chapter, tapped `お冷や`, and confirmed a popup appears over the reader with `お冷や`, reading `おひや`, and JMdict glossary content.
-   - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, confirmed the popup reading `ひや` appears, then confirmed popup-level horizontal swipe, tap outside the popup, and Reader page swipe each dismiss the popup without leaving the reading node visible.
-   - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: tapped `お冷や`, inspected the popup WebView through Chrome DevTools Protocol, and confirmed it renders `冷や`, `ひや`, `cold water`, and `JMdict [2026-04-27]` as HTML while no longer showing raw `structured-content` JSON; also rechecked popup WebView horizontal swipe dismissal.
-   - Verified on emulator with `testdata/test.epub` and imported `testdata/JMdict_english.zip`: inspected the popup WebView DOM and confirmed iOS-generated structure is present (`.entry-header`, `.expression ruby`, `details.glossary-group`, `.dict-label .dict-name`, `.glossary-content`, `.mine-button`) and raw `structured-content` JSON is absent; rechecked popup horizontal swipe dismissal after switching to the iOS JS/CSS pipeline.
-   - Verified on emulator with `testdata/MK3.zip`: cleared app data, imported MK3 through Android DocumentsUI, opened Dictionary tab, searched `test`, and confirmed the result WebView renders `テスト [test]` with `明鏡国語辞典 第三版` glossary content.
-   - Verified on emulator with imported `testdata/MK3.zip`: searched `test` again after the search chrome change and confirmed the first result starts below the search capsule while the clear affordance renders as a compact circular x.
-   - Reproduced issue #33 on physical `R5CR692DYXM` without clearing app data: installed v0.1.5 debug build, opened Dictionary, searched `test`, confirmed a blank result WebView with no definitions, and captured logcat `Uncaught TypeError: window.renderPopup is not a function` from `https://hoshi.local/dictionary/`, showing popup JS was not loaded.
-   - Verified issue #33 on physical `R5CR692DYXM` without clearing app data: installed the fixed debug build, opened Dictionary, searched `test`, confirmed the result WebView renders `test`, `テスト [test]`, and `明鏡国語辞典 第三版` glossary content, and confirmed logcat no longer reports `window.renderPopup is not a function`.
-   - Verified on emulator with imported `testdata/MK3.zip`: searched `test`, tapped definition text to open a nested `試験` popup, tapped inside that popup to open a second nested popup, and confirmed tap-outside no longer navigates to `hoshi-popup://tapOutside` or shows `Webpage not available`.
-   - Verified on emulator with imported `testdata/MK3.zip` and `testdata/test.epub`: opened the reader, tapped vertical正文 `える` to create the root popup, tapped popup definition text `簡にして要を得る` to create a second popup, then tapped `要点` in that popup to create a third popup without the stack closing unexpectedly.
-   - Verified on emulator with imported `testdata/MK3.zip` and `testdata/test.epub`: opened the reader, tapped vertical正文 `える`, confirmed the first popup WebView bounds are `[18,390][817,1140]` while the chapter WebView bounds are `[0,372][1280,2496]`, and confirmed a nested popup still opens from `簡にして要を得る`.
-   - Verified on emulator with imported `testdata/MK3.zip` and `testdata/test.epub`: opened the reader, tapped vertical正文 `える`, confirmed the reader text behind the popup shows the same gray `hoshi-selection` highlight as iOS and popup nested lookups.
-   - Verified on emulator without clearing app data: in Dark reader theme, selected vertical正文 `て`, confirmed the popup renders JMdict glossary body text in readable light color while Jiten/Meikyo-style dictionary content remains readable.
-   - Verified on emulator without clearing app data after the popup WebView touch fix: searched `たべる` in Dictionary, confirmed the result WebView scrolls through a long JMdict/Jiten result list with repeated long vertical swipes and crash log remains empty; the popup-specific fix removes Android native touch interception so popup vertical scrolling is handled by WebView like iOS `WKWebView`, while swipe dismissal remains in the shared iOS-style popup JavaScript.
-   - Verified on emulator without clearing app data after aligning Dictionary WebView reload behavior with iOS: searched `たべる`, scrolled the expanded Japanese dictionary result, triggered nested lookup for `田`, and confirmed the underlying result WebView kept its scroll position and JS marker, the child popup stayed open, and no original-entry audio playback was posted.
-   - Verified on emulator without clearing app data after aligning Dictionary popup settings with iOS `UserConfig`: with Appearance `Swipe to Dismiss` enabled and threshold `35`, searched `たべる`, opened a nested `田` popup from the Dictionary tab, confirmed the popup WebView had `window.swipeThreshold=35`, and confirmed a horizontal swipe inside that Dictionary popup dismissed it.
-   - Verified on emulator without clearing app data after the reader highlight dismissal fix: opened an existing EPUB reader, tapped vertical正文 text to show a lookup popup, swiped horizontally inside the popup and confirmed the reader highlight cleared with the popup, tapped the same coordinate again and confirmed a new lookup popup opened, then tapped the highlighted word while the popup was open and confirmed both popup and highlight cleared.
-   - Verified on emulator without clearing app data after aligning nested popup dismissal with iOS: opened a reader lookup popup, selected text inside the parent popup definition to open a child popup, swiped horizontally inside the child popup, and confirmed the child popup closed, the parent popup stayed open, and the parent popup's definition selection highlight cleared.
-   - Verified issue #35 on `emulator-5554` without clearing app data: opened Dictionary, searched `はんたい`, confirmed the blue `賛成` cross-reference renders with the black double-arrow SVG before it, and confirmed DevTools reports `gaiji/対義語.svg` complete with `image/svg+xml` media dimensions and nonzero WebView layout height.
-   - `blocked` - Re-run hands-on diagonal popup swipe validation when adb can reliably trigger a Reader or nested Dictionary popup; current emulator session imported `testdata/MK3.zip` and `testdata/test.epub`, enabled Appearance `Swipe to Dismiss`, and verified Dictionary lookup content, but did not reach a popup state suitable for gesture verification.
+- Complete `R-000 Characterize Navigation and Reader Entry Behavior` before starting the Navigation3 AppShell migration.
+- Do not start a later architecture slice until its dependencies are `done` in `docs/REFACTORING_TRACKER.md`.
+- Keep refactor commits slice-sized and update the tracker before committing.
 
-6. `in_progress` - Dictionary import and management
-   - `done` - Build Android native `hoshidicts_jni` from `third_party/hoshidicts-kotlin-bridge` while linking to the bridge-owned GPL `hoshidicts` submodule.
-   - `done` - Import `testdata/JMdict_english.zip` through the GPLv3 `hoshidicts` bridge.
-   - `done` - Persist iOS-shaped `Dictionaries/config.json` and list imported term dictionaries.
-   - `done` - Align term dictionary enable/disable and swipe-to-delete with iOS `DictionaryView` list behavior.
-   - `done` - Add iOS-aligned Term/Frequency/Pitch type picker and import-type menu, and route import/list/toggle/delete through the selected dictionary type.
-   - `done` - Align iOS dictionary settings: default Dictionary tab, Lookup steppers, Behaviour toggles, custom CSS editor entry, and shared persistence matching `UserConfig` defaults.
-   - `done` - Persist dictionary display order in `Dictionaries/config.json` and use Android long-press drag reordering to match iOS `.onMove`, so lookup order and management order stay aligned.
-   - `done` - Use transient content import intents for dictionary ZIP imports so Android's picker can show providers under "Browse files in other apps" on affected devices.
-   - `todo` - Align download recommended dictionaries and update dictionaries state with iOS `DictionaryView`.
-   - Do not reimplement Yomitan import or dictionary media handling outside the bridge.
-   - Verified on emulator with `testdata/JMdict_english.zip`: imported through DocumentsUI, confirmed dictionary list shows `JMdict [2026-04-27]`, confirmed private files `Dictionaries/Term/JMdict [2026-04-27]/index.json`, `blobs.bin`, `hash.table`, and `Dictionaries/config.json`, and temporarily verified native lookup query returned `猫` for lookup text `猫` before removing the debug UI.
-   - Verified on emulator with `testdata/JMdict_english.zip`: toggled `JMdict [2026-04-27]` off and confirmed `Dictionaries/config.json` wrote `"isEnabled": false`, swiped the row from right to left and confirmed `Dictionaries/Term` was empty with an empty config, then reimported the zip through DocumentsUI and confirmed the row and enabled config were restored.
-   - Verified on emulator with `testdata/MK3.zip`: imported through DocumentsUI, confirmed dictionary list shows `明鏡国語辞典 第三版`, and confirmed private files plus `Dictionaries/config.json` are written under app storage.
-   - Verified on emulator with existing `testdata/MK3.zip`, imported `testdata/freq.zip` as Frequency and `testdata/pitch.zip` as Pitch through the iOS-style import menu, confirmed the type picker lists `Jiten` under Frequency and `アクセント辞典` under Pitch, then ran an app-process instrumentation lookup for `食べる` and confirmed native results include both frequency and pitch metadata.
-   - Verified on emulator without clearing app data: opened Settings -> Dictionaries, confirmed Default to Dictionary Tab, Settings, Term/Frequency/Pitch, custom CSS entry, and two Term dictionaries render; opened dictionary Settings and confirmed iOS Lookup/Behaviour defaults, changed `maxResults` and `collapseDictionaries`, confirmed `shared_prefs/dictionary-settings.xml`, then reset them.
-   - Verified dictionary ordering on emulator with existing `明鏡国語辞典 第三版` and `JMdict [2026-04-27]`: long-pressed and dragged the first Term dictionary down with `adb input draganddrop`, confirmed `Dictionaries/config.json` rewrote the order, then dragged it back and confirmed the original order was restored.
-   - Verified dictionary lookup on emulator with existing Term/Frequency/Pitch dictionaries and query `test`: Dictionary tab rendered the MK3 result through the WebView popup renderer while the app process stayed alive and crash log remained empty. During this verification, stale dictionary mmap offsets exposed a native crash path; fixed `hoshidicts` query rebuilding/lifetime and added mmap/hash bounds validation so invalid imported dictionaries are skipped instead of crashing lookup.
-   - Verified dictionary management UI on emulator without clearing app data: opened Settings -> Dictionaries and dictionary Settings, confirmed the pages now use Material 3 app bars, native icon buttons, grouped list cards, neutral segmented controls, green switches, swipe-delete rows, and compact icon steppers while preserving the iOS page structure.
-   - Verified dictionary row affordance on emulator without clearing app data: removed the misleading always-visible reorder handle, kept whole-row long-press drag ordering, and confirmed `Dictionaries/config.json` order still changes and can be restored.
+### Bookshelf
 
-7. `todo` - Highlights and notes foundation
-   - Store highlight anchors based on WebView range data.
-   - Restore highlights after chapter load through JS.
-   - Align highlight tap, delete, and color behavior with iOS.
+Status: `in_progress`
 
-8. `todo` - Anki integration
-   - Investigate AnkiDroid APIs before implementation.
-   - Build the smallest card creation flow from dictionary lookup results.
-   - Do not copy iOS AnkiMobile x-callback behavior directly.
+- Align multi-select, shelves, and batch actions with iOS.
+- Keep EPUB import through Android SAF.
+- Preserve iOS-shaped `Books/<safeTitle>` storage and sidecar JSON compatibility.
 
-9. `in_progress` - Audio and pronunciation
-   - `done` - Align iOS `AudioView` under Settings -> Advanced with source ordering/toggles, custom source add/delete, auto-play, background audio mode, and Local Audio import/delete controls.
-   - `done` - Inject iOS popup audio variables into the shared popup WebView renderer and route audio button taps through the same native playback bridge used by iOS `PopupWebView`.
-   - `done` - Support iOS-compatible local `Audio/android.db` lookup semantics for `http://localhost:8765/localaudio/get/?term={term}&reading={reading}` and play returned local audio blobs.
-   - `done` - Fix issue #28 by moving large `android.db` picker imports off the UI thread; Hoshi copies the selected database in the background, reports progress, writes to `Audio/android.db.tmp`, only exposes the import action when no private `Audio/android.db` exists, and explains that users need free space for one extra copy before deleting the original external file after import.
-   - `done` - Verified the attempted SAF file-descriptor shortcut on a real SM-G9860 device with `testdata/android.db`: `SQLiteDatabase.openDatabase("/proc/self/fd/<fd>")` failed with `SQLITE_CANTOPEN_EACCES` because MediaProvider resolved the descriptor back to `/storage/emulated/0/Download/testdata/android.db`, so Android cannot reliably avoid the copy for this database.
-   - `done` - Support configurable remote Yomitan audio source URLs, verified with `https://audiov2.animecards.site/audio/list?term={term}&reading={reading}&apiKey=04887404-aba9-43b8-abb8-0e3847038a76`.
-   - `done` - Fix issue #3 by making the Background Audio segmented picker use one unified equal-size pill even when option labels wrap.
-   - `todo` - Read dictionary media through the existing dictionary bridge.
-   - `done` - Align Sasayaki/audiobook playback with iOS: Settings -> Advanced -> Sasayaki enables the feature and reader options, the bookshelf context menu opens an iOS-aligned Match page for selecting `.srt` files, adjusting Search Window, and writing iOS-compatible `sasayaki_match.json`, the reader injects cue ranges into the WebView and highlights active lines during playback, and the Sasayaki sheet loads `.mp3`/`.m4b` audio with play/pause, previous/next cue, delay, speed, and `sasayaki_playback.json` persistence.
-   - `done` - Align Sasayaki audiobook file access with iOS by defaulting to a long-lived external media URI instead of copying selected `.mp3`/`.m4b` files into app-private book storage, add a Sasayaki settings toggle for users who prefer private copies, and keep old copied sidecars readable as a migration compatibility path.
-   - `done` - Keep the reader Sasayaki sheet audiobook private-copy toggle directly under Load Audio so the storage-mode choice is adjacent to selecting an audiobook; remove the redundant reader-sheet header/close row, describe whether loaded audio is an external reference or app-private copy, and replace Open with Remove while audio is loaded so users delete the loaded file or reference before importing another.
-   - `done` - Restrict user file imports by purpose: EPUB books require `.epub`, Sasayaki subtitles require `.srt`, Sasayaki audiobooks require `.mp3`/`.m4b`, local audio databases require `.db`, dictionaries require `.zip`, and reader fonts require supported font extensions; use Android picker MIME filters where possible and validate the selected display-name extension before reading the file.
-   - `done` - Keep restored Sasayaki audiobooks paused until explicit playback, align the reader Sasayaki sheet Settings section with iOS by exposing Show Sasayaki Toggle, Auto-Scroll, and Auto-Pause on Lookup, and only apply playback rate changes immediately while audio is already playing.
-   - `done` - Fix issue #42 by keeping reader Appearance and Sasayaki sheets fixed at half height like iOS, disabling outer sheet drag gestures while their internal settings content remains scrollable, preserving drag-handle-row swipe-down dismissal, and matching the Appearance handle row background to the internal settings page.
-   - `done` - Align iOS Auto-Pause on Lookup resume behavior: when lookup creation pauses Sasayaki, closing the root popup resumes playback and clears the paused marker; if the user cancels the paused marker from the quick Sasayaki button, popup close does not restart audio.
-   - `done` - Add the iOS-aligned Sasayaki lookup popup controls: selecting text with a matched cue shows Replay, pause/play-state, and Play Forward buttons above the popup, stops dictionary word audio before controlling the audiobook, and supports iOS-style cue-limited playback.
-   - `done` - Compact the Sasayaki lookup popup controls so the top control strip is shorter and all three progress buttons fit inside narrow popup windows.
-   - `done` - Align Sasayaki lookup popup control icons with iOS `arrow.clockwise`, `play.fill`/`pause.fill`, and `forward.frame` semantics instead of using Android fast-forward-style symbols.
-   - `done` - Replace the hand-drawn Sasayaki lookup popup play-forward icon with the system Material `Start` icon while keeping the iOS `forward.frame` action semantics.
-   - `done` - Align the Sasayaki lookup popup Replay button with iOS temporary playback semantics: replaying the selected cue stops at that cue, does not save the cue position to `sasayaki_playback.json`, and returns the player to the previous saved audiobook position.
-   - `done` - Align Sasayaki popup Play Forward seek/reveal behavior with iOS: wait for Android `MediaPlayer` seek completion before ticking or starting playback, display the selected cue after seek completion, and reveal cue ranges from their midpoint so short cues at page edges do not jump to a blank or stale page.
-   - `done` - Keep Sasayaki Auto-Scroll cue reveals on the same progress path as manual page turns so followed cues update the reader chrome character count and persist the book bookmark.
-   - `done` - Redisplay the current Sasayaki cue when audiobook playback starts so restored in-cue positions highlight immediately instead of waiting for the next cue transition.
-   - `done` - Align iOS Sasayaki screen-awake behavior by keeping the Android display awake only while audiobook playback is active and Auto-Scroll is enabled, then clearing the keep-awake flag when playback pauses, Auto-Scroll is disabled, or the reader leaves composition.
-   - `done` - Align iOS Sasayaki system media control behavior by publishing an Android media session and media-style notification with the current book cover during audiobook playback, allowing system media controls to play/pause, jump to previous/next cue, and seek within the audiobook.
-   - `done` - Keep Android system media control taps in the existing reader task during Sasayaki playback, preventing a new bookshelf entry from overlapping audiobook playback.
-   - `done` - Align Sasayaki matching with iOS for `＊`-prefixed cues and non-reader TOC spine filtering so the same SRT search window reports the same match rate.
-   - `done` - Align Android Sasayaki reader-text filtering with the iOS/WebView `Unified_Ideograph` character set so compatibility ideographs such as `猪` do not make all following cue highlights drift by one character after matching.
-   - Verified import extension validation on `emulator-5554`: DocumentsUI MIME filters are applied through shared import contracts, selecting a visible non-EPUB file (`hoshi_media.bin`) from the EPUB import flow returns `Select an .epub EPUB book file.` without importing or crashing, and the instrumentation validation test rejects `not-a-subtitle.m4b` for the Sasayaki SRT path before opening the file. Crash log remained empty.
-   - `done` - Added regression coverage for iOS-compatible SRT parsing, filtered EPUB matching, cue timeline navigation, sidecar JSON names, reader JavaScript cue wrapping/highlighting, Sasayaki Auto-Scroll progress persistence, playback-start current-cue highlighting, the iOS-aligned adjustable Match page, restored-audio paused startup, reader-sheet Sasayaki settings, lookup auto-pause resume, `＊`-prefixed cue cursor advancement, and iOS-style exclusion of guide TOC, nav, and non-linear spine items from Sasayaki matching.
-   - Verified the adjustable Sasayaki Match page on `emulator-5554` without clearing app data: enabled Settings -> Advanced -> Sasayaki, long-pressed `屍人荘の殺人`, opened Match Sasayaki, confirmed the Match page showed File/Open, Search Window `200`, disabled Match, and Done, dragged Search Window to `225`, selected `testdata/test.srt` through DocumentsUI, tapped Match, confirmed Current Match showed `10955/10966 (99.9%)`, verified `files/Books/屍人荘の殺人/sasayaki_match.json` was rewritten, and confirmed the Android crash buffer stayed empty.
-   - Verified restored Sasayaki playback on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, confirmed the reader stayed paused after creating MediaPlayer `piid:3151` with no `state:started`, opened the reader Sasayaki sheet, confirmed the button showed `Play` and the Settings section exposed Show Sasayaki Toggle, Auto-Scroll, and Auto-Pause on Lookup, tapped Play, confirmed `piid:3151 state:started`, the button changed to `Pause`, playback time advanced, and the reader followed the Sasayaki position.
-   - Verified issue #42 on connected `SM-G9860` without clearing app data: installed the debug build over the existing Sasayaki audiobook import, opened `屍人荘の殺人` -> Reader Menu -> Appearance and Sasayaki, confirmed both sheets stayed at the same half-height handle position (`y=1323-1334`) during repeated upward swipes, confirmed Appearance scrolled internally from Theme to Popup settings, confirmed Appearance handle-row and content-background screenshot samples both read `(246, 250, 255)`, confirmed Sasayaki scrolled internally from Load Audio/Delay to Speed/Settings/Auto-Pause, and confirmed downward swipes starting from the handle row dismissed both sheets without producing app exceptions.
-   - Verified Auto-Pause on Lookup resume on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, started Sasayaki from the reader quick button, tapped正文 to create a lookup popup and confirmed Sasayaki MediaPlayer `piid:3207` changed from `state:started` to `state:paused`, then tapped a blank reader area to close the popup and confirmed the same `piid:3207` returned to `state:started`.
-   - Verified Sasayaki lookup popup controls on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, tapped `ラス` to open a lookup popup, confirmed the top Replay, Play/Pause, and Play Forward controls render above the dictionary popup, tapped Replay and confirmed the audiobook seeked to the selected cue, tapped the middle button to pause/resume with matching popup and reader-toggle icons, tapped Play Forward and confirmed the popup closed while playback continued from the selected cue, then stopped playback and confirmed the Android crash buffer was empty.
-   - Verified Sasayaki lookup popup icon semantics on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, tapped `ラス` to open a lookup popup, confirmed the compact top controls now render as clockwise replay, play, and iOS-style forward-frame icons instead of the previous Android replay/fast-forward symbols, then cleared and re-read the Android crash buffer with no new crash entries.
-   - Verified Sasayaki lookup popup Replay temporary playback on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, tapped `す` to open the lookup popup, tapped the left Replay control, waited for the cue-limited playback to stop, and confirmed `sasayaki_playback.json` kept `lastPosition` at `490.026` before and after Replay with an empty Android crash buffer.
-   - Verified Sasayaki popup Play Forward on connected `SM-G9860` without clearing app data: installed the debug build over the existing `test.srt`/`test.m4b` import, opened `屍人荘の殺人`, tapped `だが` to open the lookup popup, tapped the right Play Forward control, confirmed the popup closed while the page stayed anchored on the selected `だが` cue with visible Sasayaki highlighting, then confirmed playback advanced to the following cue without jumping back to the stale page and the Android crash buffer stayed empty.
-   - Verified the Sasayaki lookup popup play-forward icon on `emulator-5554` without clearing app data: installed the debug build, opened `屍人荘の殺人`, tapped `あり` to open the lookup popup, confirmed the top controls render with system Material icons including the `Start` play-forward icon, and confirmed the Android crash buffer stayed empty.
-   - Verified Sasayaki screen-awake behavior on `emulator-5554` without clearing app data: installed debug build, temporarily added a minimal Sasayaki match plus short local MP3 sidecar for the existing `屍人荘の殺人` import, confirmed reader playback with Auto-Scroll enabled sets `mHoldScreenWindow` to the Hoshi activity and adds `KEEP_SCREEN_ON`, confirmed pausing clears both, confirmed playback with Auto-Scroll disabled keeps `mHoldScreenWindow=null` with no `KEEP_SCREEN_ON` flag, then removed the temporary sidecars and restored the original bookmark.
-   - Verified Sasayaki system media return on `emulator-5554` without clearing app data: installed debug build, temporarily added a minimal Sasayaki match plus short local MP3 sidecar for the existing `屍人荘の殺人` import, started playback from the reader quick toggle, confirmed `dumpsys media_session` exposed one `Hoshi Sasayaki` session with a launch intent, sent the app home, relaunched through the same `SINGLE_TOP | REORDER_TO_FRONT` activity flags used by the media pending intent, and confirmed the existing Reader task came back instead of Books; temporary sidecars were removed afterward.
-   - Verified on emulator without clearing app data: enabled Settings -> Advanced -> Sasayaki and Show Sasayaki Toggle, long-pressed `屍人荘の殺人`, selected `testdata/test.srt` through DocumentsUI, confirmed the match dialog showed `10955/10966 (99.9%)`, opened the reader, loaded `testdata/test.m4b` through DocumentsUI, confirmed playback advanced past 00:28, the reader auto-scrolled to the active cue area, the quick reader pause button appeared, `sasayaki_match.json`, `Sasayaki/sasayaki_audio.m4b`, and `sasayaki_playback.json` were written under the book folder, and the app process stayed alive with no Hoshi crash log entries.
-   - Verified Sasayaki Auto-Scroll progress persistence on `emulator-5554` without clearing app data: installed the debug build, opened existing `屍人荘の殺人`, started Sasayaki playback from the reader sheet, waited for playback to reach matched cues, and confirmed reader chrome showed `890 / 169326 0.53%` while `bookmark.json` saved `chapterIndex=9`, `progress=0.0791974656810982`, and `characterCount=890`; Android crash buffer stayed empty.
-   - Verified Sasayaki playback-start highlighting on `emulator-5554` without clearing app data: set existing `屍人荘の殺人` playback to `lastPosition=89.5`, opened the reader at the matching page, started playback from the Sasayaki sheet, and confirmed the current cue was highlighted immediately before the next cue transition while `sasayaki_playback.json` advanced to `lastPosition=91.017`; Android crash buffer stayed empty.
-   - Verified Sasayaki test2 matching on `emulator-5554` without clearing app data: imported `testdata/test2.epub` through DocumentsUI, long-pressed `かがみの孤城`, selected `testdata/test2.srt` through DocumentsUI, ran Match with Search Window `200`, and confirmed Current Match showed `21450/21659 (99.0%)` with an empty Android crash buffer.
-   - Verified Sasayaki audiobook storage modes on `emulator-5554`: imported `test.epub` through DocumentsUI, enabled Settings -> Advanced -> Sasayaki, matched `test.srt` through DocumentsUI, confirmed the new `Copy Audiobook to App Storage` switch is off by default, selected a generated MP3 through DocumentsUI, and confirmed `sasayaki_playback.json` stored a persisted `content://` `audioUri` with no `Sasayaki/sasayaki_audio.*` file; then enabled the copy switch, selected the same MP3 again, and confirmed `sasayaki_playback.json` stored `audioFileName=sasayaki_audio.mp3`, `audioUri=null`, and `Sasayaki/sasayaki_audio.mp3` existed. Android crash buffer stayed empty.
-   - Verified the reader Sasayaki sheet private-copy toggle on `emulator-5554`: imported `test.epub` through DocumentsUI, enabled Sasayaki for the imported book, opened Reader Menu -> Sasayaki, scrolled the sheet Settings section, confirmed `Copy Audiobook to App Storage` appears below Auto-Pause on Lookup, toggled it on, and confirmed `sasayaki-settings.xml` wrote `sasayakiCopyAudiobookToPrivateStorage=true`. Android crash buffer stayed empty.
-   - Verified on emulator without clearing app data: opened Settings -> Advanced -> Audio and confirmed Local, AnimeCards, and Default audio sources render with iOS-aligned controls; because the full `testdata/android.db` is 5.8GB and emulator `/data` had only 3.3GB free, extracted a schema-preserving `食べる/たべる` subset from the real `testdata/android.db` into app-private `files/Audio/android.db`, searched `たべる` in Dictionary, tapped the popup audio button, and confirmed `MediaPlayer` decoded local `audio/mpeg` without app crash.
-   - Verified remote audio on emulator without clearing app data: temporarily disabled Local Audio, kept the AnimeCards source enabled, searched `たべる`, tapped the popup audio button, and confirmed Android `MediaHTTPService` fetched the remote audio URL and `MediaPlayer` decoded `audio/mpeg` without app crash; restored Local + AnimeCards audio settings afterward.
-   - Verified popup audio button polish on emulator without clearing app data: searched `たべる` in Dictionary, confirmed the audio and Anki buttons share the same header-row alignment, then held the audio button and confirmed the iOS-style circular filled pressed state is visible before playback.
-   - Verified issue #3 on emulator without clearing app data: opened Settings -> Advanced -> Audio and confirmed the Background Audio segmented picker renders as one equal-size pill for Interrupt, Lower Volume, and Keep Volume.
+### Reader And Lookup
 
-10. `todo` - Sync
-    - Investigate Android Google Drive/OAuth integration.
-    - When Google Drive sync is implemented, match iOS upstream behavior by creating the root `ttu-reader-data` folder under Drive root if it does not exist instead of treating first sync as a missing-folder failure.
-    - Sync sidecar JSON, progress, settings, and dictionary configuration.
-    - Do not reuse iOS token or keychain assumptions.
+Status: `in_progress`
 
-11. `todo` - Regression coverage and release hardening
-    - `done` - Add GitHub Actions signed APK release workflow for `v*` tags and manual dispatch, using repository signing secrets and uploading the APK plus GPLv3 `LICENSE` to the GitHub Release.
-    - `done` - Add structured `docs/CHANGELOG.md` maintenance to the agent workflow, a private release skill with Gradle version sync, and release CI changelog extraction for GitHub Release notes.
-    - `done` - Give debug builds a distinct application id so debug and release installs can coexist on physical devices.
-    - `done` - Enable R8 code/resource optimization for release APKs and make release CI initialize the recursive dictionary bridge submodules used by native builds.
-    - `done` - Fix optimized release JNA/UniFFI startup so EPUB import/open does not fail after R8 obfuscates JNA internals.
-    - `done` - Limit release APK native ABIs to `arm64-v8a` while keeping debug builds compatible with `arm64-v8a` and `x86_64` emulator/device validation.
-    - Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
-    - Expand WebView pagination regression checks.
-    - Keep Gradle `test`, `assembleDebug`, and `lint` passing before release-facing changes.
-    - Verified Gradle manifest processing: `:app:processDebugMainManifest` writes package `moe.antimony.hoshi.debug` for debug builds, while `:app:processReleaseMainManifest` keeps release at `moe.antimony.hoshi`.
-    - Verified release optimization with `:app:assembleRelease`: Gradle ran `minifyReleaseWithR8`, `convertShrunkResourcesToBinaryRelease`, and `optimizeReleaseResources` successfully.
-    - Verified optimized release JNA fix on `emulator-5554`: installed `app-release.apk`, imported `testdata/test.epub` through DocumentsUI, returned to Books, tapped `屍人荘の殺人`, and confirmed the reader opened without `Can't obtain peer field ID for class com.sun.jna.Pointer`, `com.sun.jna.Native`, or crash-buffer entries.
+- Wire remaining iOS `PopupWebView` Anki mining behavior.
+- Re-run diagonal popup swipe validation when a reliable Reader or nested Dictionary popup state is available.
+- Reader fixes must start from `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift` plus the matching JS/CSS.
+- Keep WebView-based reading and lookup. Do not replace it with native text rendering.
+- Manual reader validation must cover cover image pages, multi-image illustration pages, long text paging, forward/backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 
-12. `in_progress` - Architecture refactoring execution
-    - `done` - Add `docs/ARCHITECTURE_REFACTORING.md` with the phased Android architecture refactoring direction.
-    - `done` - Add `docs/REFACTORING_TRACKER.md` as the single execution-state document for resumable refactoring slices, with initial Phase 0-3 work items.
-    - `done` - Add `tools/check_refactoring_tracker.py` and standard-library tests so agents can validate slice status, dependencies, required fields, and verification evidence before handoff.
-    - `todo` - Complete `R-000` characterization baseline before starting the Navigation3 AppShell migration.
+### Dictionary
+
+Status: `in_progress`
+
+- Align recommended dictionary download/update state with iOS `DictionaryView`.
+- Do not reimplement Yomitan import, lookup, media, or style extraction outside `third_party/hoshidicts-kotlin-bridge` unless the bridge gap is documented first.
+- Frequency and pitch dictionaries must stay type-specific; do not treat metadata dictionaries as term fallback dictionaries.
+
+### Highlights And Notes
+
+Status: `todo`
+
+- Store highlight anchors from WebView range data.
+- Restore highlights after chapter load through JS.
+- Align highlight tap, delete, and color behavior with iOS.
+
+### Anki
+
+Status: `todo`
+
+- Investigate AnkiDroid APIs, intents, and any Android-appropriate AnkiConnect path.
+- Build the smallest card creation flow from dictionary lookup results.
+- Do not copy iOS AnkiMobile x-callback behavior directly.
+
+### Audio And Sasayaki
+
+Status: `in_progress`
+
+- Read dictionary media through the existing dictionary bridge.
+- Keep Sasayaki sidecars iOS-compatible.
+- Treat a future Media3/ExoPlayer migration as a separate behavior-protected slice, not a cleanup mixed into UI changes.
+
+### Sync
+
+Status: `todo`
+
+- Investigate Android Google Sign-In/OAuth/Drive API integration.
+- Match iOS upstream behavior by creating the root `ttu-reader-data` Drive folder when needed.
+- Sync sidecar JSON, progress, settings, and dictionary configuration.
+- Do not reuse iOS token/keychain assumptions.
+
+### Regression Coverage And Release Hardening
+
+Status: `todo`
+
+- Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
+- Expand WebView pagination regression checks.
+- Keep release/debug native build behavior stable while architecture refactoring proceeds.
+
+## Persistent Blockers
+
+- Diagonal popup swipe validation is blocked until adb or manual setup can reliably reach a Reader or nested Dictionary popup state suitable for gesture verification.
+
+## Required Validation
+
+Before claiming implementation complete, run:
+
+```bash
+./gradlew test
+./gradlew assembleDebug
+```
+
+Also run `./gradlew lint` when changing resources, manifest, UI, packaging, or release-facing build behavior.
+
+For architecture refactoring slices, also run:
+
+```bash
+python3 tools/check_refactoring_tracker.py docs/REFACTORING_TRACKER.md
+```
+
+For reader/dictionary/audio user flows, perform targeted emulator or device validation using the test data listed in `AGENTS.md`.

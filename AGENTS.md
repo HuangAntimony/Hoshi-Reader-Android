@@ -12,6 +12,8 @@
 - 推进顺序：model/storage -> bookshelf import -> reader -> dictionary popup -> Anki -> sync -> settings。
 - 主路径：bookshelf -> import EPUB -> open reader -> select text -> lookup。
 - 完成需求时先更新 `docs/TODO.md`，再把代码和 TODO 放进同一个 commit；用户明确要求不 commit 时不要提交。
+- `docs/TODO.md` 只记录当前状态、下一步、阻塞项和长期有效的验证入口；不要把它当流水账。不要粘贴长 emulator/adb 验证记录、截图观察、发布历史或每次提交的详细复现过程。
+- 用户可见变更写入 `docs/CHANGELOG.md`；架构重构切片状态写入 `docs/REFACTORING_TRACKER.md`；详细调查和验证证据优先放在 issue、PR、commit message 或专门文档中。
 - 完成新功能或修复问题时，同步更新 `docs/CHANGELOG.md` 的 `[Unreleased]` section；CHANGELOG 面向普通用户，只记录用户可感知的 App 功能、体验和问题修复，不记录 CI、agent workflow、私有 skill、构建脚本、依赖管理或仅开发者可见的内部改动。
 - 如果 commit 修复或实现了某个 GitHub Issue，`docs/CHANGELOG.md` 对应用户可见条目末尾加上 `#123` 形式的 issue 引用，便于 GitHub Release 页面自动生成可跳转链接。
 - 修复问题时，如果用户要求建立 GitHub Issue，先调查问题现象和复现方式，再创建关联 issue；之后再进行实际修复，并在修复完成后的 commit message 中使用 closing keyword（如 `Closes #123`）关联该 issue，便于后续追踪 bug 记录。
