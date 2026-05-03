@@ -243,8 +243,9 @@ class SettingsStoreSourceTest {
     @Test
     fun currentSynchronousSettingsStoreCallSitesAreCharacterizedForRepositoryMigration() {
         source("MainActivity.kt").mustContainAll(
-            "ReaderSettingsStore(this)",
-            "mutableStateOf(readerSettingsStore.load())",
+            "readerSettingsRepository()",
+            "readerSettingsRepository.settings.collect",
+            "readerSettingsRepository.update { settings }",
         )
         source("navigation/AppShell.kt").mustContainAll(
             "DictionarySettingsStore(context).load().dictionaryTabDefault",

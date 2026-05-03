@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: introduce a DataStore-backed `ReaderSettingsRepository` while preserving existing keys/defaults and providing a transition path for current synchronous UI call sites.
+- Next architecture slice: introduce a DataStore-backed `DictionarySettingsRepository` and route dictionary settings UI/search call sites through observable state.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
