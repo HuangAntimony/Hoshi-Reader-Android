@@ -245,13 +245,15 @@ class ReaderSettingsTest {
     @Test
     fun chapterWebViewReloadsForViewportSizeLikeIosWebViewStateIdentity() {
         val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val stateHolder = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebViewStateHolder.kt").readText()
         val readerView = source.substringAfter("fun ReaderWebView(")
             .substringBefore("private fun ReaderTopInfo(")
         val chapterWebView = source.substringAfter("private fun ChapterWebView(")
             .substringBefore("private class EpubWebViewClient")
 
-        assertTrue(readerView.contains("prepareReloadAtDisplayedPosition()"))
-        assertTrue(readerView.contains("onReaderViewportSizeChanged"))
+        assertTrue(stateHolder.contains("prepareReloadAtDisplayedPosition()"))
+        assertTrue(stateHolder.contains("fun updateViewportSize(size: IntSize)"))
+        assertTrue(readerView.contains("onReaderViewportSizeChanged = stateHolder::updateViewportSize"))
         assertTrue(chapterWebView.contains("onSizeChanged"))
         assertTrue(chapterWebView.contains("webViewViewportSize"))
         assertTrue(chapterWebView.contains("baseUrl#${'$'}{readerSetupScript.hashCode()}#${'$'}webViewViewportSize"))

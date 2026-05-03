@@ -13,9 +13,8 @@ class ReaderSasayakiAutoScrollProgressTest {
 
         assertTrue(onCue.contains("ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal)"))
         assertTrue(onCue.contains("ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->"))
-        assertTrue(onCue.contains("val updatedPosition = readerPosition.recordPageProgress(progress)"))
-        assertTrue(onCue.contains("readerPosition = updatedPosition"))
-        assertTrue(onCue.contains("onSaveBookmark(updatedPosition.displayedPosition.index, updatedPosition.displayedPosition.progress)"))
+        assertTrue(onCue.contains("val savedPosition = stateHolder.recordDisplayedProgress(progress)"))
+        assertTrue(onCue.contains("onSaveBookmark(savedPosition.index, savedPosition.progress)"))
     }
 
     @Test
