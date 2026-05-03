@@ -16,6 +16,7 @@
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
+            android:documentLaunchMode="never"
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"

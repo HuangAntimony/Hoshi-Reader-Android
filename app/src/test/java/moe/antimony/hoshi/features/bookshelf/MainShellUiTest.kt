@@ -112,7 +112,7 @@ class MainShellUiTest {
 
         assertTrue(source.contains("onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))"))
         assertTrue(appShell.contains("sasayakiMatchRequests = sasayakiMatchRequests + (request.bookId to request)"))
-        assertTrue(appShell.contains("backStack.add(AppRoute.SasayakiMatchRoute(request.bookId))"))
+        assertTrue(appShell.contains("backStack.openSasayakiMatchRoute(request.bookId)"))
         assertTrue(appShell.contains("SasayakiMatchView("))
         assertFalse(source.contains("SasayakiMatcher.match("))
         assertFalse(source.contains("searchWindow = 200"))

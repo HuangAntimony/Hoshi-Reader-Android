@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        pendingImportUri = intent.importUri()
+        intent.importUri()?.let { pendingImportUri = it }
     }
 
     private fun Intent?.importUri(): Uri? =

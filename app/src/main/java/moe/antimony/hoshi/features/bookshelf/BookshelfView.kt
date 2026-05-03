@@ -135,6 +135,7 @@ fun BookshelfView(
     val bookStorage = remember { BookStorage(context.filesDir) }
     val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
     val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
+    val importGate = remember { PendingImportGate<Uri>() }
     var bookEntries by remember { mutableStateOf<List<BookEntry>>(emptyList()) }
     var sortOption by remember { mutableStateOf(BookSortOption.Recent) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -202,24 +203,31 @@ fun BookshelfView(
     }
 
     fun importBook(uri: Uri) {
+        if (!importGate.tryStart(uri)) {
+            return
+        }
         scope.launch {
-            isLoading = true
-            errorMessage = null
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val root = bookStorage.importBook(context.contentResolver, uri)
-                    val parsedBook = EpubBookParser().parse(root)
-                    saveMetadata(root, parsedBook, bookStorage.loadMetadata(root))
-                    saveBookInfo(root, parsedBook)
-                    root to parsedBook
+            try {
+                isLoading = true
+                errorMessage = null
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val root = bookStorage.importBook(context.contentResolver, uri)
+                        val parsedBook = EpubBookParser().parse(root)
+                        saveMetadata(root, parsedBook, bookStorage.loadMetadata(root))
+                        saveBookInfo(root, parsedBook)
+                        root to parsedBook
+                    }
+                }.onSuccess { (root, parsedBook) ->
+                    reloadBookEntries()
+                    isLoading = false
+                    onOpenReader(readerBookId(root))
+                }.onFailure {
+                    errorMessage = it.localizedMessage ?: "Failed to import EPUB."
+                    isLoading = false
                 }
-            }.onSuccess { (root, parsedBook) ->
-                reloadBookEntries()
-                isLoading = false
-                onOpenReader(readerBookId(root))
-            }.onFailure {
-                errorMessage = it.localizedMessage ?: "Failed to import EPUB."
-                isLoading = false
+            } finally {
+                importGate.finish(uri)
             }
         }
     }

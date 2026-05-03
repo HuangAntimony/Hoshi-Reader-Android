@@ -20,6 +20,20 @@ class MainActivityConfigurationTest {
         assertTrue("MainActivity must also handle the screen size change emitted with rotation.", "screenSize" in configChanges)
     }
 
+    @Test
+    fun mainActivityKeepsExternalOpensAndMediaReturnsInTheExistingTask() {
+        val activity = mainActivityManifestElement()
+
+        assertTrue(
+            "MainActivity must receive new EPUB ACTION_VIEW intents in the existing task.",
+            activity.getAttribute("android:launchMode") == "singleTop",
+        )
+        assertTrue(
+            "External EPUB senders must not be able to split Hoshi into document tasks.",
+            activity.getAttribute("android:documentLaunchMode") == "never",
+        )
+    }
+
     private fun mainActivityManifestElement(): Element {
         val document = DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()

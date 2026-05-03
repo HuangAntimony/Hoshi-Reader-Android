@@ -80,17 +80,11 @@ fun AppShell(
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
 
     fun popRoute() {
-        if (backStack.size > 1) {
-            backStack.removeAt(backStack.lastIndex)
-        }
+        backStack.popAppRoute()
     }
 
     fun selectTopLevelRoute(route: AppRoute) {
-        if (backStack.size == 1 && backStack.lastOrNull() == route) {
-            return
-        }
-        backStack.clear()
-        backStack.add(route)
+        backStack.selectTopLevelRoute(route)
     }
 
     fun openSettingsDetail(section: SettingsDetailSection) {
@@ -98,19 +92,17 @@ fun AppShell(
     }
 
     fun openReader(bookId: String) {
-        selectTopLevelRoute(AppRoute.BooksRoute)
-        backStack.add(AppRoute.ReaderRoute(bookId))
+        backStack.openReaderRoute(bookId)
     }
 
     fun openSasayakiMatch(request: SasayakiMatchRequest) {
         sasayakiMatchRequests = sasayakiMatchRequests + (request.bookId to request)
-        selectTopLevelRoute(AppRoute.BooksRoute)
-        backStack.add(AppRoute.SasayakiMatchRoute(request.bookId))
+        backStack.openSasayakiMatchRoute(request.bookId)
     }
 
     LaunchedEffect(pendingImportUri) {
         if (pendingImportUri != null) {
-            selectTopLevelRoute(AppRoute.BooksRoute)
+            backStack.routeExternalBookImport()
         }
     }
 

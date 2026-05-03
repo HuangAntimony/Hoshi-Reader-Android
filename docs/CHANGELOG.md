@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep external EPUB opens and Sasayaki media-control returns in the existing Hoshi task, and ignore duplicate EPUB import requests while an import is already running.
+
 ## [v0.2.1] - 2026-05-03
 
 ### Added
