@@ -8,9 +8,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +17,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation3.runtime.NavEntry
@@ -33,11 +28,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
-import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.BookRepository
-import moe.antimony.hoshi.epub.EpubBook
-import moe.antimony.hoshi.epub.EpubBookParser
-import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import moe.antimony.hoshi.features.audio.AdvancedSettingsView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
@@ -53,13 +44,7 @@ import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
-import moe.antimony.hoshi.features.reader.ReaderWebView
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 
 private const val ReportIssueUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues"
 
@@ -90,8 +75,8 @@ fun AppShell(
         }
     }
     val backStack = rememberNavBackStack(initialRoute)
-    val appScope = rememberCoroutineScope()
     val bookRepository = remember { BookRepository(context.filesDir) }
+    val readerRouteStateHolder = remember(bookRepository) { ReaderRouteStateHolder(bookRepository) }
     val readerFontManager = remember { ReaderFontManager(context.filesDir) }
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
@@ -202,11 +187,10 @@ fun AppShell(
                     is AppRoute.ReaderRoute -> {
                         ReaderRouteDestination(
                             bookId = route.bookId,
-                            bookRepository = bookRepository,
+                            stateHolder = readerRouteStateHolder,
                             readerSettings = currentReaderSettings,
                             onReaderSettingsChange = currentOnReaderSettingsChange,
                             onReaderKeyEventHandlerChange = currentOnReaderKeyEventHandlerChange,
-                            bookmarkScope = appScope,
                             onBookmarkSaved = { bookshelfRefreshKey += 1 },
                             onClose = ::popRoute,
                             modifier = Modifier.fillMaxSize(),
@@ -292,104 +276,6 @@ private fun TopLevelRouteContent(
             )
         }
     }
-}
-
-@Composable
-private fun ReaderRouteDestination(
-    bookId: String,
-    bookRepository: ReaderRouteBookRepository,
-    readerSettings: ReaderSettings,
-    onReaderSettingsChange: (ReaderSettings) -> Unit,
-    onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit,
-    bookmarkScope: CoroutineScope,
-    onBookmarkSaved: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val routeState by produceState<ReaderRouteLoadState>(
-        initialValue = ReaderRouteLoadState.Loading,
-        key1 = bookId,
-        key2 = bookRepository,
-    ) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val entry = bookRepository.loadBookEntry(bookId)
-                    ?: error("Book not found.")
-                val parsedBook = EpubBookParser().parse(entry.root)
-                bookRepository.saveMetadata(
-                    entry.root,
-                    entry.metadata.copy(
-                        title = parsedBook.title,
-                        cover = parsedBook.coverHref,
-                        folder = entry.root.name,
-                        lastAccess = bookRepository.currentAppleReferenceDateSeconds(),
-                    ),
-                )
-                bookRepository.saveBookInfo(entry.root, parsedBook.bookInfo)
-                ReaderRouteLoadState.Ready(
-                    bookRoot = entry.root,
-                    book = parsedBook,
-                    bookmark = bookRepository.loadBookmark(entry.root),
-                )
-            }.getOrElse { error ->
-                ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
-            }
-        }
-    }
-
-    when (val state = routeState) {
-        ReaderRouteLoadState.Loading -> Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator()
-        }
-        is ReaderRouteLoadState.Error -> Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(state.message)
-        }
-        is ReaderRouteLoadState.Ready -> ReaderWebView(
-            book = state.book,
-            bookRoot = state.bookRoot,
-            initialChapterIndex = state.bookmark?.chapterIndex ?: 0,
-            initialProgress = state.bookmark?.progress ?: 0.0,
-            readerSettings = readerSettings,
-            onReaderSettingsChange = onReaderSettingsChange,
-            onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
-            onSaveBookmark = { chapterIndex, progress ->
-                val savedBookmark = Bookmark(
-                    chapterIndex = chapterIndex,
-                    progress = progress,
-                    characterCount = state.book.characterCountAt(chapterIndex, progress),
-                    lastModified = bookRepository.currentAppleReferenceDateSeconds(),
-                )
-                bookmarkScope.launch(Dispatchers.IO) {
-                    bookRepository.saveBookmark(state.bookRoot, savedBookmark)
-                    withContext(Dispatchers.Main) {
-                        onBookmarkSaved()
-                    }
-                }
-            },
-            onClose = onClose,
-            modifier = modifier.fillMaxSize(),
-        )
-    }
-}
-
-private sealed interface ReaderRouteLoadState {
-    data object Loading : ReaderRouteLoadState
-
-    data class Ready(
-        val bookRoot: File,
-        val book: EpubBook,
-        val bookmark: Bookmark?,
-    ) : ReaderRouteLoadState
-
-    data class Error(
-        val message: String,
-    ) : ReaderRouteLoadState
 }
 
 @Composable

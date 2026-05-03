@@ -38,6 +38,7 @@ class NavigationReaderCharacterizationTest {
         val bookshelfViewModel = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfViewModel.kt").readText()
         val bookshelfRepository = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfRepository.kt").readText()
         val appShell = appShellSource()
+        val readerDestination = File("src/main/java/moe/antimony/hoshi/navigation/ReaderRouteDestination.kt").readText()
         val readerBranch = appShell.substringAfter("is AppRoute.ReaderRoute ->")
             .substringBefore("is AppRoute.SasayakiMatchRoute")
 
@@ -48,15 +49,15 @@ class NavigationReaderCharacterizationTest {
         assertTrue(bookshelfRepository.contains("override suspend fun importBook(uri: Uri): String"))
         assertTrue(appShell.contains("fun openReader(bookId: String)"))
         assertTrue(appShell.contains("backStack.openReaderRoute(bookId)"))
-        assertTrue(appShell.contains("ReaderWebView("))
+        assertTrue(readerDestination.contains("ReaderWebView("))
         assertTrue(readerBranch.contains("bookId = route.bookId"))
-        assertTrue(appShell.contains("bookRepository.loadBookEntry(bookId)"))
-        assertTrue(appShell.contains("initialChapterIndex = state.bookmark?.chapterIndex ?: 0"))
-        assertTrue(appShell.contains("initialProgress = state.bookmark?.progress ?: 0.0"))
-        assertTrue(appShell.contains("onSaveBookmark = { chapterIndex, progress ->"))
-        assertTrue(appShell.contains("bookRepository.saveBookmark(state.bookRoot, savedBookmark)"))
+        assertTrue(readerDestination.contains("stateHolder.load(bookId)"))
+        assertTrue(readerDestination.contains("initialChapterIndex = state.bookmark?.chapterIndex ?: 0"))
+        assertTrue(readerDestination.contains("initialProgress = state.bookmark?.progress ?: 0.0"))
+        assertTrue(readerDestination.contains("onSaveBookmark = { chapterIndex, progress ->"))
+        assertTrue(readerDestination.contains("stateHolder.saveBookmark("))
         assertTrue(appShell.contains("bookshelfRefreshKey += 1"))
-        assertTrue(appShell.contains("onClose = onClose"))
+        assertTrue(readerDestination.contains("onClose = onClose"))
     }
 
     @Test
