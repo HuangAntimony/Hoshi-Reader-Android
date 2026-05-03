@@ -19,11 +19,11 @@ class BookshelfViewModelTest {
         val repository = FakeBookshelfRepository(
             entries = listOf(entry),
             progressById = mapOf("book-a" to 0.25),
-            sasayakiEnabled = true,
         )
         val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
 
         viewModel.reloadBookEntries()
+        viewModel.setSasayakiEnabled(true)
 
         assertEquals(listOf(entry), viewModel.uiState.value.bookEntries)
         assertEquals(mapOf("book-a" to 0.25), viewModel.uiState.value.bookProgressById)
@@ -106,6 +106,15 @@ class BookshelfViewModelTest {
         assertEquals(emptyList<BookEntry>(), viewModel.uiState.value.bookEntries)
     }
 
+    @Test
+    fun sasayakiEnabledCanBeDrivenByObservedSettingsState() {
+        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope(), Dispatchers.Unconfined)
+
+        viewModel.setSasayakiEnabled(true)
+
+        assertTrue(viewModel.uiState.value.sasayakiEnabled)
+    }
+
     private fun testScope(): CoroutineScope = CoroutineScope(Dispatchers.Unconfined)
 
     private fun bookEntry(id: String): BookEntry =
@@ -123,7 +132,6 @@ class BookshelfViewModelTest {
     private class FakeBookshelfRepository(
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
-        var sasayakiEnabled: Boolean = false,
         var openBookId: String = "book-a",
         var importBookId: String = "imported-book",
     ) : BookshelfRepository {
@@ -144,7 +152,5 @@ class BookshelfViewModelTest {
         }
 
         override suspend fun rebuildLookupQuery() = Unit
-
-        override fun isSasayakiEnabled(): Boolean = sasayakiEnabled
     }
 }

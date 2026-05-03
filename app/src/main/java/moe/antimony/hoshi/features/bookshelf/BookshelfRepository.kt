@@ -9,7 +9,6 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import java.io.File
 
 internal interface BookshelfRepository {
@@ -18,14 +17,12 @@ internal interface BookshelfRepository {
     suspend fun importBook(uri: Uri): String
     suspend fun deleteBook(entry: BookEntry)
     suspend fun rebuildLookupQuery()
-    fun isSasayakiEnabled(): Boolean
 }
 
 internal class AndroidBookshelfRepository(
     private val contentResolver: ContentResolver,
     private val bookRepository: BookRepository,
     private val dictionaryRepository: DictionaryRepository,
-    private val sasayakiSettingsStore: SasayakiSettingsStore,
     private val bookParser: EpubBookParser = EpubBookParser(),
 ) : BookshelfRepository {
     override suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult {
@@ -58,9 +55,6 @@ internal class AndroidBookshelfRepository(
     override suspend fun rebuildLookupQuery() {
         dictionaryRepository.rebuildLookupQuery()
     }
-
-    override fun isSasayakiEnabled(): Boolean =
-        sasayakiSettingsStore.load().enabled
 
     private fun saveMetadata(root: File, parsedBook: EpubBook, previous: BookMetadata? = null) {
         val metadata = BookMetadata(

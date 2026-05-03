@@ -81,7 +81,6 @@ fun AppShell(
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     var sasayakiMatchRequests by remember { mutableStateOf<Map<String, SasayakiMatchRequest>>(emptyMap()) }
-    var sasayakiSettingsReloadKey by remember { mutableIntStateOf(0) }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(dictionarySettingsRepository) {
@@ -154,7 +153,6 @@ fun AppShell(
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
-                        sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
                         bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
@@ -166,7 +164,6 @@ fun AppShell(
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
-                        sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
                         bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
@@ -178,7 +175,6 @@ fun AppShell(
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
-                        sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
                         bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                         onSettingsDestination = { destination ->
@@ -198,12 +194,7 @@ fun AppShell(
                         readerSettings = currentReaderSettings,
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         readerFontManager = readerFontManager,
-                        onClose = {
-                            if (route.section == SettingsDetailSection.Advanced) {
-                                sasayakiSettingsReloadKey += 1
-                            }
-                            popRoute()
-                        },
+                        onClose = ::popRoute,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
                     is AppRoute.ReaderRoute -> {
@@ -241,7 +232,6 @@ fun AppShell(
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         onOpenReader = ::openReader,
                         onOpenSasayakiMatch = ::openSasayakiMatch,
-                        sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
                         bookshelfRefreshKey = bookshelfRefreshKey,
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                     )
@@ -267,7 +257,6 @@ private fun TopLevelRouteContent(
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onOpenReader: (String) -> Unit,
     onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
-    sasayakiSettingsReloadKey: Int,
     bookshelfRefreshKey: Int,
     onSelectedTabChange: (MainTab) -> Unit,
     onSettingsDestination: (SettingsDestination) -> Unit = {},
@@ -282,7 +271,6 @@ private fun TopLevelRouteContent(
                 onPendingImportConsumed = onPendingImportConsumed,
                 onOpenReader = onOpenReader,
                 onOpenSasayakiMatch = onOpenSasayakiMatch,
-                sasayakiSettingsReloadKey = sasayakiSettingsReloadKey,
                 refreshKey = bookshelfRefreshKey,
                 layoutSpec = layoutSpec,
                 modifier = contentModifier,
@@ -346,7 +334,6 @@ private fun SettingsDetailDestination(
                 onReaderSettingsChange = onReaderSettingsChange,
                 onOpenReader = {},
                 onOpenSasayakiMatch = {},
-                sasayakiSettingsReloadKey = 0,
                 bookshelfRefreshKey = 0,
                 onSelectedTabChange = onSelectedTabChange,
             )

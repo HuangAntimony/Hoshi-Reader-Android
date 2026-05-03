@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +71,7 @@ import androidx.core.view.WindowCompat
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.launch
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettings
@@ -87,8 +89,8 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiScreenAwake
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
+import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
 import java.io.File
 
@@ -123,12 +125,13 @@ fun ReaderWebView(
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val fontManager = remember { ReaderFontManager(context.filesDir) }
     val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
     val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
+    val sasayakiSettingsRepository = remember { context.applicationContext.sasayakiSettingsRepository() }
     val bookRepository = remember { BookRepository(context.filesDir) }
-    val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
-    var sasayakiSettings by remember { mutableStateOf(sasayakiSettingsStore.load()) }
+    var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
     val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookRepository::loadSasayakiMatch) }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
     val sasayakiCoverFile = remember(bookRoot, book.coverHref) {
@@ -160,6 +163,11 @@ fun ReaderWebView(
     LaunchedEffect(audioSettingsRepository) {
         audioSettingsRepository.settings.collect { settings ->
             audioSettings = settings
+        }
+    }
+    LaunchedEffect(sasayakiSettingsRepository) {
+        sasayakiSettingsRepository.settings.collect { settings ->
+            sasayakiSettings = settings
         }
     }
     val effectiveSettings = stateHolder.effectiveSettings
@@ -232,7 +240,9 @@ fun ReaderWebView(
     }
     fun updateSasayakiSettings(settings: SasayakiSettings) {
         sasayakiSettings = settings
-        sasayakiSettingsStore.save(settings)
+        scope.launch {
+            sasayakiSettingsRepository.update { settings }
+        }
         sasayakiPlayer?.autoScroll = settings.autoScroll
     }
     fun goToNextChapter(): Boolean {
@@ -331,9 +341,6 @@ fun ReaderWebView(
     }
     DisposableEffect(Unit) {
         onDispose { sasayakiPlayer?.release() }
-    }
-    LaunchedEffect(showReaderMenu, showSasayaki) {
-        sasayakiSettings = sasayakiSettingsStore.load()
     }
     sasayakiPlayer?.autoScroll = sasayakiSettings.autoScroll
     val currentReaderKeyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { event ->

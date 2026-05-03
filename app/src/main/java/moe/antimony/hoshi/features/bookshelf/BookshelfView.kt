@@ -105,7 +105,7 @@ import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
+import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
@@ -124,13 +124,13 @@ fun BookshelfView(
     onPendingImportConsumed: () -> Unit = {},
     onOpenReader: (String) -> Unit,
     onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
-    sasayakiSettingsReloadKey: Int = 0,
     refreshKey: Int = 0,
     layoutSpec: MainShellLayoutSpec,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val bookRepository = remember { BookRepository(context.filesDir) }
+    val sasayakiSettingsRepository = remember { context.applicationContext.sasayakiSettingsRepository() }
     val booksViewModel: BookshelfViewModel = viewModel(
         factory = remember(context, bookRepository) {
             object : ViewModelProvider.Factory {
@@ -141,7 +141,6 @@ fun BookshelfView(
                             contentResolver = context.contentResolver,
                             bookRepository = bookRepository,
                             dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
-                            sasayakiSettingsStore = SasayakiSettingsStore(context),
                         ),
                     ) as T
             }
@@ -175,8 +174,10 @@ fun BookshelfView(
         booksViewModel.rebuildLookupQuery()
     }
 
-    LaunchedEffect(sasayakiSettingsReloadKey) {
-        booksViewModel.reloadSasayakiSettings()
+    LaunchedEffect(sasayakiSettingsRepository) {
+        sasayakiSettingsRepository.settings.collect { settings ->
+            booksViewModel.setSasayakiEnabled(settings.enabled)
+        }
     }
 
     LaunchedEffect(pendingImportUri) {

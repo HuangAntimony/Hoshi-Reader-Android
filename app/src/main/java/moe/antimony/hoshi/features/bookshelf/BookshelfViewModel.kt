@@ -87,8 +87,8 @@ internal class BookshelfViewModel(
         }
     }
 
-    fun reloadSasayakiSettings() {
-        _uiState.update { it.copy(sasayakiEnabled = repository.isSasayakiEnabled()) }
+    fun setSasayakiEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(sasayakiEnabled = enabled) }
     }
 
     fun rebuildLookupQuery() {
@@ -111,7 +111,6 @@ internal class BookshelfViewModel(
                     bookEntries = result.entries,
                     bookProgressById = result.progressById,
                     errorMessage = null,
-                    sasayakiEnabled = repository.isSasayakiEnabled(),
                 )
             }
         }
@@ -123,7 +122,6 @@ internal class BookshelfViewModel(
             it.copy(
                 bookEntries = result.entries,
                 bookProgressById = result.progressById,
-                sasayakiEnabled = repository.isSasayakiEnabled(),
             )
         }
     }

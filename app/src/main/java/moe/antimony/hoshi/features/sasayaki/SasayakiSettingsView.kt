@@ -25,15 +25,18 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,11 +45,21 @@ fun SasayakiSettingsView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val store = remember { SasayakiSettingsStore(context) }
-    var settings by remember { mutableStateOf(store.load()) }
+    val scope = rememberCoroutineScope()
+    val repository = remember { context.applicationContext.sasayakiSettingsRepository() }
+    var settings by remember { mutableStateOf(SasayakiSettings()) }
+
+    LaunchedEffect(repository) {
+        repository.settings.collect { latest ->
+            settings = latest
+        }
+    }
+
     fun save(next: SasayakiSettings) {
         settings = next
-        store.save(next)
+        scope.launch {
+            repository.update { next }
+        }
     }
 
     BackHandler(onBack = onClose)
