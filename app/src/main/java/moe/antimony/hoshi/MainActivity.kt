@@ -14,9 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.reader.ReaderSettingsStore
 import moe.antimony.hoshi.features.reader.usesDarkInterface
+import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = readerSettings.usesDarkInterface(systemDark),
                 eInkMode = readerSettings.eInkMode,
             ) {
-                BookshelfView(
+                AppShell(
                     pendingImportUri = pendingImportUri,
                     onPendingImportConsumed = { pendingImportUri = null },
                     readerSettings = readerSettings,

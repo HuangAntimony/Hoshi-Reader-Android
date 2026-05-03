@@ -108,10 +108,12 @@ class MainShellUiTest {
     @Test
     fun sasayakiMatchMenuOpensAdjustableMatchScreen() {
         val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
 
-        assertTrue(source.contains("var sasayakiMatchEntry by remember { mutableStateOf<BookEntry?>(null) }"))
-        assertTrue(source.contains("SasayakiMatchView("))
-        assertTrue(source.contains("sasayakiMatchEntry = entry"))
+        assertTrue(source.contains("onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))"))
+        assertTrue(appShell.contains("sasayakiMatchRequests = sasayakiMatchRequests + (request.bookId to request)"))
+        assertTrue(appShell.contains("backStack.add(AppRoute.SasayakiMatchRoute(request.bookId))"))
+        assertTrue(appShell.contains("SasayakiMatchView("))
         assertFalse(source.contains("SasayakiMatcher.match("))
         assertFalse(source.contains("searchWindow = 200"))
         assertFalse(source.contains("sasayakiMatcher.launch"))

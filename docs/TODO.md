@@ -22,8 +22,8 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: extract an AppShell-level route owner and move app-level route decisions out of `BookshelfView`.
-- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while wiring Navigation3 display behavior.
+- Next architecture slice: stabilize `ReaderRoute(bookId)` lookup through repository/storage and verify back behavior after the AppShell migration.
+- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
 ### Bookshelf
