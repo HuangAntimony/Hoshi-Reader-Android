@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: introduce a DataStore-backed `AudioSettingsRepository` and route audio/search/reader audio settings call sites through observable state.
+- Next architecture slice: introduce a DataStore-backed `SasayakiSettingsRepository` and route Sasayaki settings/reader/bookshelf call sites through observable state.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

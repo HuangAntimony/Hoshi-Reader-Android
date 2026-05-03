@@ -72,7 +72,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.BookRepository
-import moe.antimony.hoshi.features.audio.AudioSettingsStore
+import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.audio.audioSettingsRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
@@ -124,7 +125,7 @@ fun ReaderWebView(
     val context = LocalContext.current
     val fontManager = remember { ReaderFontManager(context.filesDir) }
     val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
-    val audioSettingsStore = remember { AudioSettingsStore(context) }
+    val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
     val bookRepository = remember { BookRepository(context.filesDir) }
     val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
     var sasayakiSettings by remember { mutableStateOf(sasayakiSettingsStore.load()) }
@@ -150,9 +151,15 @@ fun ReaderWebView(
         stateHolder.syncSettings(readerSettings)
     }
     var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
+    var audioSettings by remember { mutableStateOf(AudioSettings()) }
     LaunchedEffect(dictionarySettingsRepository) {
         dictionarySettingsRepository.settings.collect { settings ->
             dictionarySettings = settings
+        }
+    }
+    LaunchedEffect(audioSettingsRepository) {
+        audioSettingsRepository.settings.collect { settings ->
+            audioSettings = settings
         }
     }
     val effectiveSettings = stateHolder.effectiveSettings
@@ -183,7 +190,7 @@ fun ReaderWebView(
                 dictionarySettings = dictionarySettings,
                 darkMode = effectiveSettings.usesDarkInterface(systemDarkTheme),
                 eInkMode = effectiveSettings.eInkMode,
-                audioSettings = audioSettingsStore.load(),
+                audioSettings = audioSettings,
             ),
         )?.let { (popup, highlightCount) ->
             popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
@@ -202,7 +209,7 @@ fun ReaderWebView(
                 dictionarySettings = dictionarySettings,
                 darkMode = effectiveSettings.usesDarkInterface(systemDarkTheme),
                 eInkMode = effectiveSettings.eInkMode,
-                audioSettings = audioSettingsStore.load(),
+                audioSettings = audioSettings,
             ),
         )?.let { (popup, highlightCount) ->
             popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount

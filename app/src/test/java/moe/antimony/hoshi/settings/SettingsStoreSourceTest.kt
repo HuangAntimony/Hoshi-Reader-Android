@@ -253,8 +253,9 @@ class SettingsStoreSourceTest {
             "dictionarySettingsLoaded",
         )
         source("features/audio/AudioView.kt").mustContainAll(
-            "AudioSettingsStore(context)",
-            "mutableStateOf(store.load())",
+            "audioSettingsRepository()",
+            "audioSettingsRepository.settings.collect",
+            "audioSettingsRepository.update { next }",
         )
         source("features/sasayaki/SasayakiSettingsView.kt").mustContainAll(
             "SasayakiSettingsStore(context)",
@@ -263,16 +264,16 @@ class SettingsStoreSourceTest {
         source("features/dictionary/DictionarySearchView.kt").mustContainAll(
             "dictionarySettingsRepository()",
             "dictionarySettingsRepository.settings.collect",
-            "AudioSettingsStore(context)",
-            "mutableStateOf(audioSettingsStore.load())",
+            "audioSettingsRepository()",
+            "audioSettingsRepository.settings.collect",
         )
         source("features/reader/ReaderWebView.kt").mustContainAll(
             "dictionarySettingsRepository()",
             "dictionarySettingsRepository.settings.collect",
-            "AudioSettingsStore(context)",
+            "audioSettingsRepository()",
+            "audioSettingsRepository.settings.collect",
             "SasayakiSettingsStore(context)",
             "mutableStateOf(sasayakiSettingsStore.load())",
-            "audioSettingsStore.load()",
         )
         source("features/bookshelf/BookshelfRepository.kt").mustContainAll(
             "SasayakiSettingsStore",

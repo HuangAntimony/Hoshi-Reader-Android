@@ -46,6 +46,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,8 +132,8 @@ fun AudioSettingsView(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val store = remember { AudioSettingsStore(context) }
-    var settings by remember { mutableStateOf(store.load()) }
+    val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
+    var settings by remember { mutableStateOf(AudioSettings()) }
     val repository = remember { LocalAudioRepository.fromContext(context) }
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
@@ -142,9 +143,17 @@ fun AudioSettingsView(
     var isImporting by remember { mutableStateOf(false) }
     val hasImportedDatabase = importedSize != null
 
+    LaunchedEffect(audioSettingsRepository) {
+        audioSettingsRepository.settings.collect { latest ->
+            settings = latest
+        }
+    }
+
     fun save(next: AudioSettings) {
         settings = next
-        store.save(next)
+        scope.launch {
+            audioSettingsRepository.update { next }
+        }
     }
 
     fun moveSource(from: Int, to: Int) {

@@ -57,9 +57,9 @@ import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
-import moe.antimony.hoshi.features.audio.AudioSettingsStore
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.audio.audioSettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
 import kotlin.math.abs
@@ -157,7 +157,7 @@ fun DictionarySearchView(
     val assets = remember(context) { LookupPopupAssets.load(context) }
     val repository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
     val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
-    val audioSettingsStore = remember { AudioSettingsStore(context) }
+    val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
     var query by remember { mutableStateOf("") }
     var html by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<LookupResult>>(emptyList()) }
@@ -166,7 +166,7 @@ fun DictionarySearchView(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var dictionaryStyles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
-    var audioSettings by remember { mutableStateOf(audioSettingsStore.load()) }
+    var audioSettings by remember { mutableStateOf(AudioSettings()) }
     var popups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     var resultClearSelectionSignal by remember { mutableStateOf(0) }
     var backCount by remember(html) { mutableStateOf(0) }
@@ -193,11 +193,11 @@ fun DictionarySearchView(
             isSearching = true
             errorMessage = null
             val settings = dictionarySettings
+            val currentAudioSettings = audioSettings
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.rebuildLookupQuery()
                     val styles = currentDictionaryStyles()
-                    val loadedAudioSettings = audioSettingsStore.load()
                     DictionarySearchContent.runLookup(
                         query = query,
                         lookup = { LookupEngine.lookup(it, settings.maxResults, settings.scanLength) },
@@ -205,14 +205,13 @@ fun DictionarySearchView(
                         dictionarySettings = settings,
                         darkMode = popupDarkMode,
                         eInkMode = readerSettings.eInkMode,
-                        audioSettings = loadedAudioSettings,
+                        audioSettings = currentAudioSettings,
                     )
                 }
             }.onSuccess { state ->
                 html = state.html
                 searchResults = state.results
                 dictionaryStyles = state.dictionaryStyles
-                audioSettings = audioSettingsStore.load()
                 popups = emptyList()
                 resultClearSelectionSignal = 0
                 backCount = 0
@@ -234,7 +233,6 @@ fun DictionarySearchView(
     }
 
     LaunchedEffect(Unit) {
-        audioSettings = audioSettingsStore.load()
         withContext(Dispatchers.IO) {
             runCatching { repository.rebuildLookupQuery() }
         }
@@ -242,6 +240,11 @@ fun DictionarySearchView(
     LaunchedEffect(dictionarySettingsRepository) {
         dictionarySettingsRepository.settings.collect { settings ->
             dictionarySettings = settings
+        }
+    }
+    LaunchedEffect(audioSettingsRepository) {
+        audioSettingsRepository.settings.collect { settings ->
+            audioSettings = settings
         }
     }
 
