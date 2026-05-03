@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -45,7 +46,7 @@ class SasayakiMediaSessionSourceTest {
     }
 
     @Test
-    fun sasayakiPlayerOwnsUpdatesAndReleasesMediaSession() {
+    fun sasayakiPlayerUsesMediaSessionHandleBoundary() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")
             .substringBefore("private fun tick()")
@@ -58,16 +59,37 @@ class SasayakiMediaSessionSourceTest {
 
         assertTrue(source.contains("bookTitle: String?"))
         assertTrue(source.contains("bookCoverFile: File?"))
-        assertTrue(source.contains("private var mediaSession: SasayakiMediaSession? = null"))
-        assertTrue(restoreAudio.contains("SasayakiMediaSession("))
+        assertTrue(source.contains("private var mediaSession: SasayakiMediaSessionHandle? = null"))
+        assertTrue(restoreAudio.contains("AndroidSasayakiMediaSessionHandle("))
         assertTrue(restoreAudio.contains("title = bookTitle ?: bookRoot.name"))
-        assertTrue(restoreAudio.contains("artwork = SasayakiMediaSession.loadCoverArt(bookCoverFile)"))
+        assertTrue(restoreAudio.contains("artworkFile = bookCoverFile"))
+        assertFalse(restoreAudio.contains("SasayakiMediaSession("))
+        assertFalse(restoreAudio.contains("SasayakiMediaSession.loadCoverArt(bookCoverFile)"))
         assertTrue(startPlayback.contains("mediaSession?.activate()"))
         assertTrue(startPlayback.contains("updateMediaSession()"))
         assertTrue(pausePlayback.contains("updateMediaSession()"))
         assertTrue(source.contains("private fun updateMediaSession()"))
         assertTrue(teardown.contains("mediaSession?.release()"))
         assertTrue(teardown.contains("mediaSession = null"))
+    }
+
+    @Test
+    fun mediaSessionHandleWrapsAndroidMediaSessionImplementation() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiMediaSessionController.kt").readText()
+        val handle = source.substringAfter("class AndroidSasayakiMediaSessionHandle(")
+
+        assertTrue(source.contains("interface SasayakiMediaSessionHandle"))
+        assertTrue(source.contains("fun activate()"))
+        assertTrue(source.contains("fun update("))
+        assertTrue(source.contains("fun release()"))
+        assertTrue(handle.contains("private val session = SasayakiMediaSession("))
+        assertTrue(handle.contains("artwork = SasayakiMediaSession.loadCoverArt(artworkFile)"))
+        assertTrue(handle.contains("override fun activate()"))
+        assertTrue(handle.contains("session.activate()"))
+        assertTrue(handle.contains("override fun update("))
+        assertTrue(handle.contains("session.update("))
+        assertTrue(handle.contains("override fun release()"))
+        assertTrue(handle.contains("session.release()"))
     }
 
     @Test

@@ -39,7 +39,7 @@ class SasayakiPlayer(
     private val handler = Handler(Looper.getMainLooper())
     private val timeline = CueTimeline(matchData)
     private var mediaPlayer: MediaPlayer? = null
-    private var mediaSession: SasayakiMediaSession? = null
+    private var mediaSession: SasayakiMediaSessionHandle? = null
     private var lastSavedSecond = -1
     private var currentCue: SasayakiMatch? = null
     private var hasPlayedOnce = false
@@ -255,10 +255,10 @@ class SasayakiPlayer(
             }
             mediaPlayer = player
             mediaSession?.release()
-            mediaSession = SasayakiMediaSession(
+            mediaSession = AndroidSasayakiMediaSessionHandle(
                 context = appContext,
                 title = bookTitle ?: bookRoot.name,
-                artwork = SasayakiMediaSession.loadCoverArt(bookCoverFile),
+                artworkFile = bookCoverFile,
                 onPlay = ::startPlayback,
                 onPause = { pausePlayback() },
                 onSkipToPrevious = ::previousCue,
