@@ -219,14 +219,60 @@ internal object ReaderPaginationScripts {
           getPagePosition: function(context) {
             return context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
           },
+          lockRootViewport: function() {
+            var root = document.documentElement;
+            var didScroll = false;
+            if (root.scrollTop !== 0) {
+              root.scrollTop = 0;
+              didScroll = true;
+            }
+            if (root.scrollLeft !== 0) {
+              root.scrollLeft = 0;
+              didScroll = true;
+            }
+            if (window.scrollX !== 0 || window.scrollY !== 0) {
+              window.scrollTo(0, 0);
+              didScroll = true;
+            }
+            return didScroll;
+          },
+          assignPagePosition: function(context, position) {
+            if (context.vertical) {
+              context.scrollEl.scrollTop = position;
+            } else {
+              context.scrollEl.scrollLeft = position;
+            }
+            this.lockRootViewport();
+          },
           setPagePosition: function(context, position) {
             var clamped = Math.min(Math.max(0, position), context.maxScroll);
-            if (context.vertical) {
-              context.scrollEl.scrollTop = clamped;
-            } else {
-              context.scrollEl.scrollLeft = clamped;
-            }
+            window.lastPageScroll = clamped;
+            this.assignPagePosition(context, clamped);
             return clamped;
+          },
+          registerSnapScroll: function(initialScroll) {
+            if (window.snapScrollRegistered) return;
+            window.snapScrollRegistered = true;
+            window.lastPageScroll = initialScroll;
+            this.lockRootViewport();
+            window.addEventListener('scroll', () => {
+              if (this.lockRootViewport()) {
+                requestAnimationFrame(() => this.lockRootViewport());
+              }
+            }, { passive: true });
+            document.body.addEventListener('scroll', () => {
+              this.lockRootViewport();
+              var context = this.getScrollContext();
+              if (context.pageSize <= 0) return;
+              var currentScroll = this.getPagePosition(context);
+              var snappedScroll = Math.round(currentScroll / context.pageSize) * context.pageSize;
+              snappedScroll = Math.min(Math.max(0, snappedScroll), context.maxScroll);
+              if (Math.abs(currentScroll - snappedScroll) > 1) {
+                this.assignPagePosition(context, window.lastPageScroll || 0);
+              } else {
+                window.lastPageScroll = snappedScroll;
+              }
+            }, { passive: true });
           },
           alignToPage: function(context, offset) {
             return Math.floor(Math.max(0, offset) / context.pageSize) * context.pageSize;
@@ -342,6 +388,7 @@ internal object ReaderPaginationScripts {
             if (context.pageSize <= 0 || progress <= 0) {
               var firstPage = this.contentFirstPageScroll(context);
               this.setPagePosition(context, firstPage);
+              this.registerSnapScroll(firstPage);
               this.notifyRestoreComplete();
               return;
             }
@@ -351,6 +398,7 @@ internal object ReaderPaginationScripts {
               this.setPagePosition(context, lastPage);
               requestAnimationFrame(() => {
                 this.setPagePosition(context, lastPage);
+                this.registerSnapScroll(lastPage);
                 requestAnimationFrame(() => this.notifyRestoreComplete());
               });
               return;
@@ -383,10 +431,12 @@ internal object ReaderPaginationScripts {
               this.setPagePosition(context, targetScroll);
               requestAnimationFrame(() => {
                 this.setPagePosition(context, targetScroll);
+                this.registerSnapScroll(targetScroll);
               });
             } else {
               var firstPage = this.contentFirstPageScroll(context);
               this.setPagePosition(context, firstPage);
+              this.registerSnapScroll(firstPage);
             }
             requestAnimationFrame(() => {
               requestAnimationFrame(() => this.notifyRestoreComplete());
@@ -398,6 +448,7 @@ internal object ReaderPaginationScripts {
             var rawFragment = (fragment || '').trim();
             var target = rawFragment && (document.getElementById(rawFragment) || document.getElementsByName(rawFragment)[0]);
             if (context.pageSize <= 0 || !target) {
+              this.registerSnapScroll(this.getPagePosition(context));
               this.notifyRestoreComplete();
               return false;
             }
@@ -408,6 +459,7 @@ internal object ReaderPaginationScripts {
             this.setPagePosition(context, targetScroll);
             requestAnimationFrame(() => {
               this.setPagePosition(context, targetScroll);
+              this.registerSnapScroll(targetScroll);
               requestAnimationFrame(() => this.notifyRestoreComplete());
             });
             return true;

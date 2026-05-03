@@ -157,6 +157,42 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun registersSnapScrollHandlerLikeIosToRejectNativeHalfPageScrolls() {
+        val script = ReaderPaginationScripts.shellScript()
+
+        assertTrue(script.contains("registerSnapScroll: function(initialScroll)"))
+        assertTrue(script.contains("window.snapScrollRegistered = true"))
+        assertTrue(script.contains("window.lastPageScroll = initialScroll"))
+        assertTrue(script.contains("document.body.addEventListener('scroll'"))
+        assertTrue(script.contains("var snappedScroll = Math.round(currentScroll / context.pageSize) * context.pageSize"))
+        assertTrue(script.contains("this.assignPagePosition(context, window.lastPageScroll || 0)"))
+    }
+
+    @Test
+    fun programmaticReaderScrollsRefreshLastSnapPosition() {
+        val script = ReaderPaginationScripts.shellScript()
+
+        assertTrue(script.contains("setPagePosition: function(context, position)"))
+        assertTrue(script.contains("window.lastPageScroll = clamped"))
+        assertTrue(script.contains("this.registerSnapScroll(firstPage)"))
+        assertTrue(script.contains("this.registerSnapScroll(lastPage)"))
+        assertTrue(script.contains("this.registerSnapScroll(targetScroll)"))
+    }
+
+    @Test
+    fun snapScrollLocksRootViewportLikeIosWebViewScrollDisabled() {
+        val script = ReaderPaginationScripts.shellScript()
+
+        assertTrue(script.contains("lockRootViewport: function()"))
+        assertTrue(script.contains("var root = document.documentElement"))
+        assertTrue(script.contains("root.scrollTop = 0"))
+        assertTrue(script.contains("root.scrollLeft = 0"))
+        assertTrue(script.contains("window.scrollTo(0, 0)"))
+        assertTrue(script.contains("window.addEventListener('scroll'"))
+        assertTrue(script.contains("this.lockRootViewport()"))
+    }
+
+    @Test
     fun appendsTrailingSpacerUsingIosDefaultVerticalLayout() {
         val script = ReaderPaginationScripts.shellScript()
 

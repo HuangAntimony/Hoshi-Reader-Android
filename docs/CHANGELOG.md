@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Keep the paged reader snapped to full pages while selecting text, so Android WebView selection handles no longer leave vertical text split between page offsets. #43
 - Keep Sasayaki cue highlighting aligned after compatibility ideographs such as `猪`, so subsequent audiobook cues no longer drift by one character.
 - Keep the reader open when returning from Android system media controls during Sasayaki audiobook playback, preventing overlapping audio from a second app entry.
 - Keep the screen awake during Sasayaki audiobook playback only when Auto-Scroll is enabled, matching iOS and restoring normal sleep behavior when playback pauses or Auto-Scroll is off.
