@@ -59,13 +59,13 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,12 +73,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
@@ -95,74 +96,26 @@ fun DictionaryView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    val repository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
-    val settingsStore = remember { DictionarySettingsStore(context) }
-    var selectedType by remember { mutableStateOf(DictionaryType.Term) }
+    val context = LocalContext.current
+    val dictionaryViewModel: DictionaryViewModel = viewModel(
+        factory = remember(context) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    DictionaryViewModel(
+                        AndroidDictionaryViewModelRepository(
+                            contentResolver = context.contentResolver,
+                            dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
+                            settingsStore = DictionarySettingsStore(context),
+                        ),
+                    ) as T
+            }
+        },
+    )
+    val uiState by dictionaryViewModel.uiState.collectAsState()
     var importType by remember { mutableStateOf(DictionaryType.Term) }
     var importMenuExpanded by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf<DictionaryDestination?>(null) }
-    var dictionaries by remember { mutableStateOf<Map<DictionaryType, List<DictionaryInfo>>>(emptyMap()) }
-    var dictionarySettings by remember { mutableStateOf(settingsStore.load()) }
-    var isImporting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    fun reload() {
-        dictionaries = DictionaryType.entries.associateWith { repository.loadDictionaries(it) }
-        runCatching { repository.rebuildLookupQuery() }
-    }
-
-    fun importDictionaries(uris: List<Uri>, type: DictionaryType) {
-        scope.launch {
-            isImporting = true
-            errorMessage = null
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    uris.forEach { uri ->
-                        repository.importDictionary(context.contentResolver, uri, type)
-                    }
-                }
-            }.onSuccess {
-                reload()
-            }.onFailure {
-                errorMessage = it.localizedMessage ?: "Failed to import dictionary."
-            }
-            isImporting = false
-        }
-    }
-
-    fun setDictionaryEnabled(dictionary: DictionaryInfo, enabled: Boolean) {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                repository.setDictionaryEnabled(selectedType, dictionary.path.name, enabled)
-            }
-            reload()
-        }
-    }
-
-    fun deleteDictionary(dictionary: DictionaryInfo) {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                repository.deleteDictionary(selectedType, dictionary.path.name)
-            }
-            reload()
-        }
-    }
-
-    fun moveDictionary(fromIndex: Int, toIndex: Int) {
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                repository.moveDictionary(selectedType, fromIndex, toIndex)
-            }
-            reload()
-        }
-    }
-
-    fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
-        dictionarySettings = transform(dictionarySettings).normalized()
-        settingsStore.save(dictionarySettings)
-    }
 
     val importer = rememberLauncherForActivityResult(MultipleFileImportContent()) { uris: List<Uri> ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
@@ -171,7 +124,7 @@ fun DictionaryView(
                 context.contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
             }
         }.onFailure { error ->
-            errorMessage = error.localizedMessage ?: "Select a .zip dictionary archive."
+            dictionaryViewModel.showError(error.localizedMessage ?: "Select a .zip dictionary archive.")
             return@rememberLauncherForActivityResult
         }
         uris.forEach { uri ->
@@ -182,17 +135,18 @@ fun DictionaryView(
                 )
             }
         }
-        importDictionaries(uris, importType)
+        dictionaryViewModel.importDictionaries(uris, importType)
     }
 
-    val currentDictionaries = dictionaries[selectedType].orEmpty()
+    val selectedType = uiState.selectedType
+    val currentDictionaries = uiState.currentDictionaries
     val listState = rememberLazyListState()
     var draggedFileName by remember { mutableStateOf<String?>(null) }
     var dragStartIndex by remember { mutableIntStateOf(-1) }
     var dragStartTop by remember { mutableFloatStateOf(0f) }
     var dragStartHeight by remember { mutableFloatStateOf(0f) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    val dictionaryStartGlobalIndex = 1 + if (errorMessage != null) 1 else 0
+    val dictionaryStartGlobalIndex = 1 + if (uiState.errorMessage != null) 1 else 0
     val dragTargetIndex by remember(
         listState,
         currentDictionaries,
@@ -246,14 +200,14 @@ fun DictionaryView(
     }
 
     LaunchedEffect(Unit) {
-        reload()
+        dictionaryViewModel.reload()
     }
 
     when (destination) {
         DictionaryDestination.Settings -> {
             DictionarySettingsView(
-                settings = dictionarySettings,
-                onSettingsChange = ::updateSettings,
+                settings = uiState.settings,
+                onSettingsChange = dictionaryViewModel::updateSettings,
                 onClose = { destination = null },
                 modifier = modifier,
             )
@@ -261,8 +215,8 @@ fun DictionaryView(
         }
         DictionaryDestination.CustomCss -> {
             DictionaryCustomCssView(
-                settings = dictionarySettings,
-                onSettingsChange = ::updateSettings,
+                settings = uiState.settings,
+                onSettingsChange = dictionaryViewModel::updateSettings,
                 onClose = { destination = null },
                 modifier = modifier,
             )
@@ -289,9 +243,9 @@ fun DictionaryView(
             Box {
                 IconButton(
                     onClick = { importMenuExpanded = true },
-                    enabled = !isImporting,
+                    enabled = !uiState.isImporting,
                 ) {
-                    if (isImporting) {
+                    if (uiState.isImporting) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     } else {
                         Icon(
@@ -346,9 +300,9 @@ fun DictionaryView(
                                     headlineContent = { Text("Default to Dictionary Tab") },
                                     trailingContent = {
                                         Switch(
-                                            checked = dictionarySettings.dictionaryTabDefault,
+                                            checked = uiState.settings.dictionaryTabDefault,
                                             onCheckedChange = { checked ->
-                                                updateSettings { it.copy(dictionaryTabDefault = checked) }
+                                                dictionaryViewModel.updateSettings { it.copy(dictionaryTabDefault = checked) }
                                             },
                                             colors = hoshiSwitchColors(),
                                         )
@@ -386,7 +340,7 @@ fun DictionaryView(
                             DictionaryType.entries.forEachIndexed { index, type ->
                                 SegmentedButton(
                                     selected = selectedType == type,
-                                    onClick = { selectedType = type },
+                                    onClick = { dictionaryViewModel.selectType(type) },
                                     shape = SegmentedButtonDefaults.itemShape(
                                         index = index,
                                         count = DictionaryType.entries.size,
@@ -412,7 +366,7 @@ fun DictionaryView(
                         )
                     }
                 }
-                errorMessage?.let { item { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) } }
+                uiState.errorMessage?.let { item { Text(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) } }
                 if (currentDictionaries.isEmpty()) {
                     item {
                         Box(
@@ -432,8 +386,8 @@ fun DictionaryView(
                         val isDragging = draggedFileName == dictionary.path.name
                         DictionaryRow(
                             dictionary = dictionary,
-                            onEnabledChange = { setDictionaryEnabled(dictionary, it) },
-                            onDelete = { deleteDictionary(dictionary) },
+                            onEnabledChange = { dictionaryViewModel.setDictionaryEnabled(dictionary, it) },
+                            onDelete = { dictionaryViewModel.deleteDictionary(dictionary) },
                             modifier = Modifier
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .graphicsLayer {
@@ -448,7 +402,7 @@ fun DictionaryView(
                                     dragTargetIndex in currentDictionaries.indices &&
                                     dragTargetIndex != dragStartIndex
                                 ) {
-                                    moveDictionary(dragStartIndex, dragTargetIndex)
+                                    dictionaryViewModel.moveDictionary(dragStartIndex, dragTargetIndex)
                                 }
                                 resetDrag()
                             },

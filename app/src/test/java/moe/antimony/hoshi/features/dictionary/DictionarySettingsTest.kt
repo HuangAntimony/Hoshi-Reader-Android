@@ -34,11 +34,12 @@ class DictionarySettingsTest {
     @Test
     fun dictionaryImportProgressDoesNotDimEInkSurfaces() {
         val source = File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionaryView.kt").readText()
-        val importingBlock = source.substringAfter("if (isImporting) {")
+        val importingBlock = source.substringAfter("if (uiState.isImporting) {")
             .substringBefore("private enum class DictionaryDestination")
 
         assertFalse(source.contains("colorScheme.scrim"))
         assertFalse(source.contains(".background(colorScheme.scrim"))
+        assertTrue(source.contains("enabled = !uiState.isImporting"))
         assertTrue(importingBlock.contains("CircularProgressIndicator"))
     }
 
