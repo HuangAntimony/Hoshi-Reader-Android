@@ -106,7 +106,7 @@ fun DictionaryView(
                         AndroidDictionaryViewModelRepository(
                             contentResolver = context.contentResolver,
                             dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
-                            settingsStore = DictionarySettingsStore(context),
+                            settingsRepository = context.applicationContext.dictionarySettingsRepository(),
                         ),
                     ) as T
             }

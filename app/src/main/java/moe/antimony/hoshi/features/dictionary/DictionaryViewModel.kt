@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,15 +26,17 @@ internal interface DictionaryViewModelRepository {
     suspend fun deleteDictionary(type: DictionaryType, fileName: String)
     suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int)
     suspend fun rebuildLookupQuery()
-    fun loadSettings(): DictionarySettings
-    fun saveSettings(settings: DictionarySettings)
+    val settings: Flow<DictionarySettings>
+    suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings)
 }
 
 internal class AndroidDictionaryViewModelRepository(
     private val contentResolver: ContentResolver,
     private val dictionaryRepository: DictionaryRepository,
-    private val settingsStore: DictionarySettingsStore,
+    private val settingsRepository: DictionarySettingsRepository,
 ) : DictionaryViewModelRepository {
+    override val settings: Flow<DictionarySettings> = settingsRepository.settings
+
     override suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>> =
         DictionaryType.entries.associateWith { type ->
             dictionaryRepository.loadDictionaries(type)
@@ -61,10 +64,8 @@ internal class AndroidDictionaryViewModelRepository(
         dictionaryRepository.rebuildLookupQuery()
     }
 
-    override fun loadSettings(): DictionarySettings = settingsStore.load()
-
-    override fun saveSettings(settings: DictionarySettings) {
-        settingsStore.save(settings)
+    override suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
+        settingsRepository.update(transform)
     }
 }
 
@@ -79,11 +80,17 @@ internal class DictionaryViewModel(
         null
     }
     private val scope = coroutineScope ?: ownedScope!!
-    private val _uiState = MutableStateFlow(
-        DictionaryUiState(settings = repository.loadSettings()),
-    )
+    private val _uiState = MutableStateFlow(DictionaryUiState())
 
     val uiState: StateFlow<DictionaryUiState> = _uiState.asStateFlow()
+
+    init {
+        scope.launch {
+            repository.settings.collect { settings ->
+                _uiState.update { it.copy(settings = settings) }
+            }
+        }
+    }
 
     fun reload() {
         scope.launch {
@@ -162,8 +169,10 @@ internal class DictionaryViewModel(
 
     fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
         val next = transform(_uiState.value.settings).normalized()
-        repository.saveSettings(next)
         _uiState.update { it.copy(settings = next) }
+        scope.launch {
+            repository.updateSettings { next }
+        }
     }
 
     fun showError(message: String) {

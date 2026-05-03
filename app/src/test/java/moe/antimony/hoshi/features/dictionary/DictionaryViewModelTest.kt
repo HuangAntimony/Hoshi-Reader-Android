@@ -2,6 +2,8 @@ package moe.antimony.hoshi.features.dictionary
 
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import moe.antimony.hoshi.dictionary.DictionaryIndex
 import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryType
@@ -152,8 +154,10 @@ class DictionaryViewModelTest {
 
 private class FakeDictionaryRepository(
     var dictionaries: Map<DictionaryType, List<DictionaryInfo>> = emptyMap(),
-    private var settings: DictionarySettings = DictionarySettings(),
+    settings: DictionarySettings = DictionarySettings(),
 ) : DictionaryViewModelRepository {
+    private val settingsFlow = MutableStateFlow(settings)
+    override val settings: StateFlow<DictionarySettings> = settingsFlow
     var rebuildCount = 0
     var loadDictionariesCount = 0
     var onImport: (() -> Unit)? = null
@@ -185,10 +189,9 @@ private class FakeDictionaryRepository(
         rebuildCount += 1
     }
 
-    override fun loadSettings(): DictionarySettings = settings
-
-    override fun saveSettings(settings: DictionarySettings) {
-        this.settings = settings
-        savedSettings = settings
+    override suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
+        val next = transform(settingsFlow.value).normalized()
+        settingsFlow.value = next
+        savedSettings = next
     }
 }

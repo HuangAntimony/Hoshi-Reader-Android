@@ -248,7 +248,9 @@ class SettingsStoreSourceTest {
             "readerSettingsRepository.update { settings }",
         )
         source("navigation/AppShell.kt").mustContainAll(
-            "DictionarySettingsStore(context).load().dictionaryTabDefault",
+            "dictionarySettingsRepository()",
+            "dictionarySettingsRepository.settings.collect",
+            "dictionarySettingsLoaded",
         )
         source("features/audio/AudioView.kt").mustContainAll(
             "AudioSettingsStore(context)",
@@ -259,17 +261,17 @@ class SettingsStoreSourceTest {
             "mutableStateOf(store.load())",
         )
         source("features/dictionary/DictionarySearchView.kt").mustContainAll(
-            "DictionarySettingsStore(context)",
+            "dictionarySettingsRepository()",
+            "dictionarySettingsRepository.settings.collect",
             "AudioSettingsStore(context)",
-            "mutableStateOf(dictionarySettingsStore.load())",
             "mutableStateOf(audioSettingsStore.load())",
         )
         source("features/reader/ReaderWebView.kt").mustContainAll(
-            "DictionarySettingsStore(context)",
+            "dictionarySettingsRepository()",
+            "dictionarySettingsRepository.settings.collect",
             "AudioSettingsStore(context)",
             "SasayakiSettingsStore(context)",
             "mutableStateOf(sasayakiSettingsStore.load())",
-            "dictionarySettingsStore.load()",
             "audioSettingsStore.load()",
         )
         source("features/bookshelf/BookshelfRepository.kt").mustContainAll(
@@ -277,8 +279,8 @@ class SettingsStoreSourceTest {
             "sasayakiSettingsStore.load().enabled",
         )
         source("features/dictionary/DictionaryViewModel.kt").mustContainAll(
-            "DictionarySettingsStore",
-            "override fun loadSettings(): DictionarySettings = settingsStore.load()",
+            "repository.settings.collect",
+            "repository.updateSettings",
         )
     }
 

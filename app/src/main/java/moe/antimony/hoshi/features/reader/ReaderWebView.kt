@@ -73,11 +73,12 @@ import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsStore
-import moe.antimony.hoshi.features.dictionary.DictionarySettingsStore
+import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
+import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
@@ -122,7 +123,7 @@ fun ReaderWebView(
     var webView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
     val fontManager = remember { ReaderFontManager(context.filesDir) }
-    val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
+    val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
     val audioSettingsStore = remember { AudioSettingsStore(context) }
     val bookRepository = remember { BookRepository(context.filesDir) }
     val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
@@ -147,6 +148,12 @@ fun ReaderWebView(
     }
     LaunchedEffect(readerSettings) {
         stateHolder.syncSettings(readerSettings)
+    }
+    var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
+    LaunchedEffect(dictionarySettingsRepository) {
+        dictionarySettingsRepository.settings.collect { settings ->
+            dictionarySettings = settings
+        }
     }
     val effectiveSettings = stateHolder.effectiveSettings
     val readerPosition = stateHolder.readerPosition
@@ -173,7 +180,7 @@ fun ReaderWebView(
                 swipeToDismiss = effectiveSettings.popupSwipeToDismiss,
                 swipeThreshold = effectiveSettings.popupSwipeThreshold,
                 popupActionBar = effectiveSettings.popupActionBar,
-                dictionarySettings = dictionarySettingsStore.load(),
+                dictionarySettings = dictionarySettings,
                 darkMode = effectiveSettings.usesDarkInterface(systemDarkTheme),
                 eInkMode = effectiveSettings.eInkMode,
                 audioSettings = audioSettingsStore.load(),
@@ -192,7 +199,7 @@ fun ReaderWebView(
                 swipeToDismiss = effectiveSettings.popupSwipeToDismiss,
                 swipeThreshold = effectiveSettings.popupSwipeThreshold,
                 popupActionBar = effectiveSettings.popupActionBar,
-                dictionarySettings = dictionarySettingsStore.load(),
+                dictionarySettings = dictionarySettings,
                 darkMode = effectiveSettings.usesDarkInterface(systemDarkTheme),
                 eInkMode = effectiveSettings.eInkMode,
                 audioSettings = audioSettingsStore.load(),

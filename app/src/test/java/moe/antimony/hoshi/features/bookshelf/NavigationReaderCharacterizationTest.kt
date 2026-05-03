@@ -71,7 +71,8 @@ class NavigationReaderCharacterizationTest {
         val settingsRoute = appShell.substringAfter("AppRoute.SettingsRoute ->")
             .substringBefore("is AppRoute.SettingsDetailRoute")
 
-        assertTrue(appShell.contains("DictionarySettingsStore(context).load().dictionaryTabDefault"))
+        assertTrue(appShell.contains("dictionarySettingsRepository.settings.collect"))
+        assertTrue(appShell.contains("dictionarySettings.dictionaryTabDefault"))
         assertTrue(appShell.contains("rememberNavBackStack(initialRoute)"))
         assertTrue(settingsRoute.contains("openSettingsDetail(destination.toSection())"))
         assertTrue(routeBranch.contains("SettingsDetailDestination("))

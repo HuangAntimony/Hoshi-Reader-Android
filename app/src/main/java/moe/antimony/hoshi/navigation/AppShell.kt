@@ -38,8 +38,9 @@ import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
-import moe.antimony.hoshi.features.dictionary.DictionarySettingsStore
+import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.DictionaryView
+import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
@@ -67,13 +68,11 @@ fun AppShell(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val initialRoute = remember {
-        if (DictionarySettingsStore(context).load().dictionaryTabDefault) {
-            AppRoute.DictionaryRoute
-        } else {
-            AppRoute.BooksRoute
-        }
-    }
+    val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
+    var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
+    var dictionarySettingsLoaded by remember { mutableStateOf(false) }
+    var dictionaryDefaultRouteApplied by remember { mutableStateOf(false) }
+    val initialRoute = AppRoute.BooksRoute
     val backStack = rememberNavBackStack(initialRoute)
     val bookRepository = remember { BookRepository(context.filesDir) }
     val readerRouteStateHolder = remember(bookRepository) { ReaderRouteStateHolder(bookRepository) }
@@ -84,6 +83,13 @@ fun AppShell(
     var sasayakiMatchRequests by remember { mutableStateOf<Map<String, SasayakiMatchRequest>>(emptyMap()) }
     var sasayakiSettingsReloadKey by remember { mutableIntStateOf(0) }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(dictionarySettingsRepository) {
+        dictionarySettingsRepository.settings.collect { settings ->
+            dictionarySettings = settings
+            dictionarySettingsLoaded = true
+        }
+    }
 
     fun popRoute() {
         backStack.popAppRoute()
@@ -109,6 +115,22 @@ fun AppShell(
     LaunchedEffect(pendingImportUri) {
         if (pendingImportUri != null) {
             backStack.routeExternalBookImport()
+        }
+    }
+
+    LaunchedEffect(dictionarySettingsLoaded, dictionarySettings.dictionaryTabDefault, pendingImportUri) {
+        if (
+            dictionarySettingsLoaded &&
+            !dictionaryDefaultRouteApplied &&
+            dictionarySettings.dictionaryTabDefault &&
+            pendingImportUri == null &&
+            backStack.size == 1 &&
+            backStack.lastOrNull() == AppRoute.BooksRoute
+        ) {
+            backStack.selectTopLevelRoute(AppRoute.DictionaryRoute)
+        }
+        if (dictionarySettingsLoaded) {
+            dictionaryDefaultRouteApplied = true
         }
     }
 

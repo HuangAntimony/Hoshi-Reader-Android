@@ -1,6 +1,17 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 data class DictionarySettings(
     val dictionaryTabDefault: Boolean = false,
@@ -27,10 +38,14 @@ data class DictionarySettings(
     }
 }
 
-class DictionarySettingsStore(context: Context) {
+interface DictionarySettingsLegacySource {
+    fun load(): DictionarySettings
+}
+
+class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource {
     private val preferences = context.getSharedPreferences("dictionary-settings", Context.MODE_PRIVATE)
 
-    fun load(): DictionarySettings = DictionarySettings(
+    override fun load(): DictionarySettings = DictionarySettings(
         dictionaryTabDefault = preferences.getBoolean(KEY_DICTIONARY_TAB_DEFAULT, false),
         maxResults = preferences.getInt(KEY_MAX_RESULTS, 16),
         scanLength = preferences.getInt(KEY_SCAN_LENGTH, 16),
@@ -70,5 +85,84 @@ class DictionarySettingsStore(context: Context) {
         const val KEY_DEDUPLICATE_PITCH_ACCENTS = "deduplicatePitchAccents"
         const val KEY_COMPACT_PITCH_ACCENTS = "compactPitchAccents"
         const val KEY_CUSTOM_CSS = "customCSS"
+    }
+}
+
+private val Context.dictionarySettingsDataStore by preferencesDataStore(name = DictionarySettingsRepository.DataStoreName)
+
+fun Context.dictionarySettingsRepository(): DictionarySettingsRepository =
+    DictionarySettingsRepository(
+        dataStore = dictionarySettingsDataStore,
+        legacySource = DictionarySettingsStore(this),
+    )
+
+class DictionarySettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+    private val legacySource: DictionarySettingsLegacySource? = null,
+) {
+    val settings: Flow<DictionarySettings> = dataStore.data
+        .onStart { migrateLegacySettingsIfNeeded() }
+        .map { preferences -> preferences.toDictionarySettings() }
+
+    suspend fun update(transform: (DictionarySettings) -> DictionarySettings) {
+        migrateLegacySettingsIfNeeded()
+        dataStore.edit { preferences ->
+            val current = preferences.toDictionarySettings()
+            preferences.writeDictionarySettings(transform(current).normalized())
+            preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
+        }
+    }
+
+    private suspend fun migrateLegacySettingsIfNeeded() {
+        dataStore.edit { preferences ->
+            if (preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] == true) return@edit
+            preferences.writeDictionarySettings(legacySource?.load()?.normalized() ?: DictionarySettings())
+            preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
+        }
+    }
+
+    private fun Preferences.toDictionarySettings(): DictionarySettings =
+        DictionarySettings(
+            dictionaryTabDefault = this[KEY_DICTIONARY_TAB_DEFAULT] ?: false,
+            maxResults = this[KEY_MAX_RESULTS] ?: 16,
+            scanLength = this[KEY_SCAN_LENGTH] ?: 16,
+            collapseDictionaries = this[KEY_COLLAPSE_DICTIONARIES] ?: false,
+            compactGlossaries = this[KEY_COMPACT_GLOSSARIES] ?: true,
+            showExpressionTags = this[KEY_SHOW_EXPRESSION_TAGS] ?: false,
+            harmonicFrequency = this[KEY_HARMONIC_FREQUENCY] ?: false,
+            deduplicatePitchAccents = this[KEY_DEDUPLICATE_PITCH_ACCENTS] ?: false,
+            compactPitchAccents = this[KEY_COMPACT_PITCH_ACCENTS] ?: true,
+            customCSS = this[KEY_CUSTOM_CSS].orEmpty(),
+        ).normalized()
+
+    private fun MutablePreferences.writeDictionarySettings(settings: DictionarySettings) {
+        val normalized = settings.normalized()
+        this[KEY_DICTIONARY_TAB_DEFAULT] = normalized.dictionaryTabDefault
+        this[KEY_MAX_RESULTS] = normalized.maxResults
+        this[KEY_SCAN_LENGTH] = normalized.scanLength
+        this[KEY_COLLAPSE_DICTIONARIES] = normalized.collapseDictionaries
+        this[KEY_COMPACT_GLOSSARIES] = normalized.compactGlossaries
+        this[KEY_SHOW_EXPRESSION_TAGS] = normalized.showExpressionTags
+        this[KEY_HARMONIC_FREQUENCY] = normalized.harmonicFrequency
+        this[KEY_DEDUPLICATE_PITCH_ACCENTS] = normalized.deduplicatePitchAccents
+        this[KEY_COMPACT_PITCH_ACCENTS] = normalized.compactPitchAccents
+        this[KEY_CUSTOM_CSS] = normalized.customCSS
+    }
+
+    companion object {
+        const val DataStoreName = "dictionary-settings"
+
+        private val KEY_MIGRATED_FROM_SHARED_PREFERENCES =
+            booleanPreferencesKey("dictionarySettingsMigratedFromSharedPreferences")
+        private val KEY_DICTIONARY_TAB_DEFAULT = booleanPreferencesKey("dictionaryTabDefault")
+        private val KEY_MAX_RESULTS = intPreferencesKey("maxResults")
+        private val KEY_SCAN_LENGTH = intPreferencesKey("scanLength")
+        private val KEY_COLLAPSE_DICTIONARIES = booleanPreferencesKey("collapseDictionaries")
+        private val KEY_COMPACT_GLOSSARIES = booleanPreferencesKey("compactGlossaries")
+        private val KEY_SHOW_EXPRESSION_TAGS = booleanPreferencesKey("showExpressionTags")
+        private val KEY_HARMONIC_FREQUENCY = booleanPreferencesKey("harmonicFrequency")
+        private val KEY_DEDUPLICATE_PITCH_ACCENTS = booleanPreferencesKey("deduplicatePitchAccents")
+        private val KEY_COMPACT_PITCH_ACCENTS = booleanPreferencesKey("compactPitchAccents")
+        private val KEY_CUSTOM_CSS = stringPreferencesKey("customCSS")
     }
 }

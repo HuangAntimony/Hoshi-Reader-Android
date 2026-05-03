@@ -156,7 +156,7 @@ fun DictionarySearchView(
     val scope = rememberCoroutineScope()
     val assets = remember(context) { LookupPopupAssets.load(context) }
     val repository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
-    val dictionarySettingsStore = remember { DictionarySettingsStore(context) }
+    val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
     val audioSettingsStore = remember { AudioSettingsStore(context) }
     var query by remember { mutableStateOf("") }
     var html by remember { mutableStateOf("") }
@@ -165,7 +165,7 @@ fun DictionarySearchView(
     var isSearching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var dictionaryStyles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var dictionarySettings by remember { mutableStateOf(dictionarySettingsStore.load()) }
+    var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
     var audioSettings by remember { mutableStateOf(audioSettingsStore.load()) }
     var popups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     var resultClearSelectionSignal by remember { mutableStateOf(0) }
@@ -192,11 +192,11 @@ fun DictionarySearchView(
         scope.launch {
             isSearching = true
             errorMessage = null
+            val settings = dictionarySettings
             runCatching {
                 withContext(Dispatchers.IO) {
                     repository.rebuildLookupQuery()
                     val styles = currentDictionaryStyles()
-                    val settings = dictionarySettingsStore.load()
                     val loadedAudioSettings = audioSettingsStore.load()
                     DictionarySearchContent.runLookup(
                         query = query,
@@ -212,7 +212,6 @@ fun DictionarySearchView(
                 html = state.html
                 searchResults = state.results
                 dictionaryStyles = state.dictionaryStyles
-                dictionarySettings = dictionarySettingsStore.load()
                 audioSettings = audioSettingsStore.load()
                 popups = emptyList()
                 resultClearSelectionSignal = 0
@@ -235,10 +234,14 @@ fun DictionarySearchView(
     }
 
     LaunchedEffect(Unit) {
-        dictionarySettings = dictionarySettingsStore.load()
         audioSettings = audioSettingsStore.load()
         withContext(Dispatchers.IO) {
             runCatching { repository.rebuildLookupQuery() }
+        }
+    }
+    LaunchedEffect(dictionarySettingsRepository) {
+        dictionarySettingsRepository.settings.collect { settings ->
+            dictionarySettings = settings
         }
     }
 
