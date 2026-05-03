@@ -61,6 +61,8 @@ Candidate first slice:
 2. Move book list reload, import result handling, selected book/open reader state, bookmark save, and error/loading state into `BookshelfViewModel`.
 3. Leave file picker launchers and `ActivityResultContract` in Compose, but pass selected URIs to the ViewModel.
 
+Future batch EPUB import support should be modeled separately from the current single-book import-and-open path. When multiple EPUBs are imported in one operation, completion should refresh the bookshelf and report aggregate success/failure state, but it should not automatically open a reader. At that point there is no unambiguous user intent for which imported book should become the active reader route; opening one arbitrarily would make the navigation result dependent on import ordering rather than user choice.
+
 Expected benefits:
 
 - Less recomposition-time I/O orchestration.
