@@ -35,12 +35,17 @@ class NavigationReaderCharacterizationTest {
     @Test
     fun readerEntryRestoresBookmarkAndClosesBackToBookshelfState() {
         val bookshelf = bookshelfSource()
+        val bookshelfViewModel = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfViewModel.kt").readText()
+        val bookshelfRepository = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfRepository.kt").readText()
         val appShell = appShellSource()
         val readerBranch = appShell.substringAfter("is AppRoute.ReaderRoute ->")
             .substringBefore("is AppRoute.SasayakiMatchRoute")
 
-        assertTrue(bookshelf.contains("onOpenReader(readerBookId(file))"))
-        assertTrue(bookshelf.contains("onOpenReader(readerBookId(root))"))
+        assertTrue(bookshelf.contains("onOpenBook = booksViewModel::openBook"))
+        assertTrue(bookshelf.contains("onOpenReader(bookId)"))
+        assertTrue(bookshelfViewModel.contains("openReaderBookId = bookId"))
+        assertTrue(bookshelfRepository.contains("override suspend fun openBook(entry: BookEntry): String"))
+        assertTrue(bookshelfRepository.contains("override suspend fun importBook(uri: Uri): String"))
         assertTrue(appShell.contains("fun openReader(bookId: String)"))
         assertTrue(appShell.contains("backStack.openReaderRoute(bookId)"))
         assertTrue(appShell.contains("ReaderWebView("))

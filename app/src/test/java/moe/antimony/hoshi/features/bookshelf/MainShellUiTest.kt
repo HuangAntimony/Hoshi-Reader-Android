@@ -97,12 +97,13 @@ class MainShellUiTest {
     @Test
     fun bookshelfGridDisablesOverscrollAndKeepsDividerOnContentBoundary() {
         val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val repository = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfRepository.kt").readText()
 
         assertTrue(source.contains("CompositionLocalProvider(LocalOverscrollFactory provides null)"))
         assertTrue(source.contains(".padding(bottom = innerPadding.calculateBottomPadding())"))
         assertTrue(source.contains("contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)"))
         assertTrue(source.contains("BookCoverBitmapCache.load(coverFile)"))
-        assertTrue(source.contains("loadBookProgressById(entries, bookStorage)"))
+        assertTrue(repository.contains("loadBookProgressById(entries, bookStorage)"))
     }
 
     @Test

@@ -78,11 +78,11 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,16 +96,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookEntry
-import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.epub.BookStorage
-import moe.antimony.hoshi.epub.EpubBook
-import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -131,118 +130,37 @@ fun BookshelfView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val bookStorage = remember { BookStorage(context.filesDir) }
-    val dictionaryRepository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
-    val sasayakiSettingsStore = remember { SasayakiSettingsStore(context) }
-    val importGate = remember { PendingImportGate<Uri>() }
-    var bookEntries by remember { mutableStateOf<List<BookEntry>>(emptyList()) }
-    var sortOption by remember { mutableStateOf(BookSortOption.Recent) }
+    val booksViewModel: BookshelfViewModel = viewModel(
+        factory = remember(context, bookStorage) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    BookshelfViewModel(
+                        AndroidBookshelfRepository(
+                            contentResolver = context.contentResolver,
+                            bookStorage = bookStorage,
+                            dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
+                            sasayakiSettingsStore = SasayakiSettingsStore(context),
+                        ),
+                    ) as T
+            }
+        },
+    )
+    val uiState by booksViewModel.uiState.collectAsState()
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var contextMenuEntry by remember { mutableStateOf<BookEntry?>(null) }
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
-    var sasayakiEnabled by remember { mutableStateOf(sasayakiSettingsStore.load().enabled) }
-    var bookProgressById by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    fun reloadBookEntries(option: BookSortOption = sortOption) {
-        scope.launch {
-            val (entries, progressById) = withContext(Dispatchers.IO) {
-                val entries = bookStorage.loadBookEntries(option)
-                entries to loadBookProgressById(entries, bookStorage)
-            }
-            bookEntries = entries
-            bookProgressById = progressById
-        }
-    }
-
-    fun saveMetadata(root: File, parsedBook: EpubBook, previous: BookMetadata? = null) {
-        val metadata = BookMetadata(
-            id = previous?.id ?: root.name,
-            title = parsedBook.title,
-            cover = parsedBook.coverHref,
-            folder = root.name,
-            lastAccess = bookStorage.currentAppleReferenceDateSeconds(),
-        )
-        bookStorage.saveMetadata(root, metadata)
-    }
-
-    fun saveBookInfo(root: File, parsedBook: EpubBook) {
-        bookStorage.saveBookInfo(root, parsedBook.bookInfo)
-    }
-
-    fun readerBookId(root: File): String =
-        bookStorage.loadMetadata(root)?.id
-            ?: bookEntries.firstOrNull { it.root == root }?.metadata?.id
-            ?: root.name
-
-    fun parseBook(file: File, openReader: Boolean, refreshAccess: Boolean) {
-        scope.launch {
-            isLoading = true
-            errorMessage = null
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val parsedBook = EpubBookParser().parse(file)
-                    if (refreshAccess) {
-                        saveMetadata(file, parsedBook, bookStorage.loadMetadata(file))
-                    }
-                    saveBookInfo(file, parsedBook)
-                    parsedBook
-                }
-            }.onSuccess { parsedBook ->
-                reloadBookEntries()
-                if (openReader) {
-                    onOpenReader(readerBookId(file))
-                }
-            }.onFailure {
-                errorMessage = it.localizedMessage ?: "Failed to open EPUB."
-            }
-            isLoading = false
-        }
-    }
-
-    fun importBook(uri: Uri) {
-        if (!importGate.tryStart(uri)) {
-            return
-        }
-        scope.launch {
-            try {
-                isLoading = true
-                errorMessage = null
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        val root = bookStorage.importBook(context.contentResolver, uri)
-                        val parsedBook = EpubBookParser().parse(root)
-                        saveMetadata(root, parsedBook, bookStorage.loadMetadata(root))
-                        saveBookInfo(root, parsedBook)
-                        root to parsedBook
-                    }
-                }.onSuccess { (root, parsedBook) ->
-                    reloadBookEntries()
-                    isLoading = false
-                    onOpenReader(readerBookId(root))
-                }.onFailure {
-                    errorMessage = it.localizedMessage ?: "Failed to import EPUB."
-                    isLoading = false
-                }
-            } finally {
-                importGate.finish(uri)
-            }
-        }
-    }
 
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            importBook(uri)
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
         }
+        booksViewModel.importBook(uri)
     }
 
     fun launchBookImporter() {
@@ -250,47 +168,50 @@ fun BookshelfView(
     }
 
     LaunchedEffect(refreshKey) {
-        reloadBookEntries()
+        booksViewModel.reloadBookEntries()
     }
 
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            runCatching { dictionaryRepository.rebuildLookupQuery() }
-        }
+        booksViewModel.rebuildLookupQuery()
     }
 
     LaunchedEffect(sasayakiSettingsReloadKey) {
-        sasayakiEnabled = sasayakiSettingsStore.load().enabled
+        booksViewModel.reloadSasayakiSettings()
     }
 
     LaunchedEffect(pendingImportUri) {
         val uri = pendingImportUri ?: return@LaunchedEffect
         onPendingImportConsumed()
-        importBook(uri)
+        booksViewModel.importBook(uri)
+    }
+
+    LaunchedEffect(uiState.openReaderBookId) {
+        val bookId = uiState.openReaderBookId ?: return@LaunchedEffect
+        onOpenReader(bookId)
+        booksViewModel.consumeOpenReaderEvent()
     }
 
     BooksTab(
         modifier = modifier,
         layoutSpec = layoutSpec,
-        bookEntries = bookEntries,
-        bookProgressById = bookProgressById,
+        bookEntries = uiState.bookEntries,
+        bookProgressById = uiState.bookProgressById,
         bookStorage = bookStorage,
-        isLoading = isLoading,
-        errorMessage = errorMessage,
-        sortOption = sortOption,
+        isLoading = uiState.isLoading,
+        errorMessage = uiState.errorMessage,
+        sortOption = uiState.sortOption,
         sortMenuExpanded = sortMenuExpanded,
         onSortMenuExpandedChange = { sortMenuExpanded = it },
         onSortChange = {
-            sortOption = it
             sortMenuExpanded = false
-            reloadBookEntries(it)
+            booksViewModel.changeSort(it)
         },
         onImport = ::launchBookImporter,
-        onOpenBook = { parseBook(it.root, openReader = true, refreshAccess = true) },
+        onOpenBook = booksViewModel::openBook,
         contextMenuEntry = contextMenuEntry,
         onContextMenuEntryChange = { contextMenuEntry = it },
         onDeleteCandidate = { deleteCandidate = it },
-        sasayakiEnabled = sasayakiEnabled,
+        sasayakiEnabled = uiState.sasayakiEnabled,
         onMatchSasayaki = { entry ->
             onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))
         },
@@ -303,13 +224,8 @@ fun BookshelfView(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            bookStorage.deleteBook(candidate.root)
-                            withContext(Dispatchers.Main) {
-                                reloadBookEntries()
-                                deleteCandidate = null
-                            }
-                        }
+                        booksViewModel.deleteBook(candidate)
+                        deleteCandidate = null
                     },
                 ) {
                     Text("Delete")
