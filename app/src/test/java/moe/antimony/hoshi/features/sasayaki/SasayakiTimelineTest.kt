@@ -25,11 +25,25 @@ class SasayakiTimelineTest {
     }
 
     @Test
+    fun cueAtUsesIosStartToleranceAndInclusiveEndBoundary() {
+        val timeline = CueTimeline(match)
+
+        assertEquals("b", timeline.cueAt(14.995)?.id)
+        assertNull(timeline.cueAt(14.98))
+        assertEquals("b", timeline.cueAt(18.0)?.id)
+        assertNull(timeline.cueAt(18.001))
+    }
+
+    @Test
     fun nextAndPreviousCueUseCueStartsLikeIos() {
         val timeline = CueTimeline(match)
 
         assertEquals(15.0, timeline.nextCue(after = 10.0) ?: -1.0, 0.0)
+        assertEquals(15.0, timeline.nextCue(after = 10.5) ?: -1.0, 0.0)
+        assertEquals(22.0, timeline.nextCue(after = 15.0) ?: -1.0, 0.0)
+        assertNull(timeline.nextCue(after = 22.0))
         assertEquals(10.0, timeline.previousCue(before = 15.0) ?: -1.0, 0.0)
+        assertEquals(15.0, timeline.previousCue(before = 17.0) ?: -1.0, 0.0)
         assertNull(timeline.previousCue(before = 10.0))
     }
 
@@ -37,8 +51,10 @@ class SasayakiTimelineTest {
     fun findsCueContainingReaderOffset() {
         val timeline = CueTimeline(match)
 
+        assertEquals("a", timeline.findCue(chapterIndex = 0, offset = 0)?.id)
+        assertNull(timeline.findCue(chapterIndex = 0, offset = 5))
         assertEquals("b", timeline.findCue(chapterIndex = 0, offset = 8)?.id)
-        assertNull(timeline.findCue(chapterIndex = 0, offset = 12))
+        assertNull(timeline.findCue(chapterIndex = 0, offset = 11))
         assertEquals("c", timeline.findCue(chapterIndex = 1, offset = 1)?.id)
     }
 }

@@ -138,6 +138,12 @@ class BookMetadataStorageTest {
             rate = 1.1f,
             audioUri = "content://audio/test.m4b",
         )
+        val copiedPlayback = SasayakiPlaybackData(
+            lastPosition = 42.0,
+            delay = 0.2,
+            rate = 0.95f,
+            audioFileName = "sasayaki_audio.m4b",
+        )
 
         storage.saveSasayakiMatch(root, match)
         storage.saveSasayakiPlayback(root, playback)
@@ -146,5 +152,9 @@ class BookMetadataStorageTest {
         assertEquals(playback, storage.loadSasayakiPlayback(root))
         assertEquals(true, root.resolve("sasayaki_match.json").isFile)
         assertEquals(true, root.resolve("sasayaki_playback.json").isFile)
+
+        storage.saveSasayakiPlayback(root, copiedPlayback)
+
+        assertEquals(copiedPlayback, storage.loadSasayakiPlayback(root))
     }
 }

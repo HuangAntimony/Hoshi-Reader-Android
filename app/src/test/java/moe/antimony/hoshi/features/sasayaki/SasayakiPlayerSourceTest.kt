@@ -145,4 +145,43 @@ class SasayakiPlayerSourceTest {
         assertTrue(updateCue.contains("forceDisplay: Boolean = false"))
         assertTrue(updateCue.contains("if (!forceDisplay && cue.id == currentCue?.id) return"))
     }
+
+    @Test
+    fun autoScrollCrossChapterCueClearsDisplayedCueBeforeLoadingChapter() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val updateCue = source.substringAfter("private fun updateCue(")
+            .substringBefore("private fun displayCue(")
+
+        assertTrue(updateCue.contains("if (cue.chapterIndex == getCurrentChapterIndex())"))
+        assertTrue(updateCue.contains("displayCue(cue, autoScroll && hasPlayedOnce)"))
+        assertTrue(updateCue.contains("} else if (autoScroll && hasPlayedOnce) {"))
+        assertTrue(updateCue.contains("currentCue = null"))
+        assertTrue(updateCue.contains("onClearCue()"))
+        assertTrue(updateCue.contains("onLoadChapter(cue.chapterIndex)"))
+        assertTrue(updateCue.indexOf("onClearCue()") < updateCue.indexOf("onLoadChapter(cue.chapterIndex)"))
+    }
+
+    @Test
+    fun playbackPositionPersistsOnDelayRateSeekAndWholeSecondTicks() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val setDelay = source.substringAfter("fun setDelay(value: Double)")
+            .substringBefore("fun setRate(value: Float)")
+        val setRate = source.substringAfter("fun setRate(value: Float)")
+            .substringBefore("fun importAudio(")
+        val complete = source.substringAfter("private fun handleSeekComplete(")
+            .substringBefore("private fun restoreAudio()")
+        val tick = source.substringAfter("private fun tick()")
+            .substringBefore("private fun updateCue(")
+
+        assertTrue(setDelay.contains("playback = playback.copy(delay = value)"))
+        assertTrue(setDelay.contains("savePlayback()"))
+        assertTrue(setRate.contains("playback = playback.copy(rate = value)"))
+        assertTrue(setRate.contains("savePlayback()"))
+        assertTrue(complete.contains("playback = playback.copy(lastPosition = seek.seconds)"))
+        assertTrue(complete.contains("savePlayback()"))
+        assertTrue(tick.contains("val second = currentTime.toInt()"))
+        assertTrue(tick.contains("temporaryPlaybackReturnPosition == null && second != lastSavedSecond"))
+        assertTrue(tick.contains("playback = playback.copy(lastPosition = currentTime)"))
+        assertTrue(tick.contains("savePlayback()"))
+    }
 }
