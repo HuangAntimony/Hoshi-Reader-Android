@@ -22,7 +22,8 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Characterize navigation and reader entry behavior before starting the Navigation3 AppShell migration.
+- Next architecture slice: add Navigation3 dependencies and serializable route keys for main, settings detail, reader, and Sasayaki match routes.
+- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` during route migration.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
 ### Bookshelf
