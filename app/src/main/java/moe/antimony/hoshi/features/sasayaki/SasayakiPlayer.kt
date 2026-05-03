@@ -22,35 +22,24 @@ class SasayakiPlayer(
     private val onClearCue: () -> Unit,
     private val onLoadChapter: (Int) -> Unit,
 ) {
-    private data class PendingSeek(
-        val seconds: Double,
-        val startPlayback: Boolean,
-        val updateCue: Boolean,
-        val savePosition: Boolean,
-        val displayCue: SasayakiMatch? = null,
-    )
-
     private val appContext = context.applicationContext
+    private val initialPlayback = playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0)
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
     private val handler = Handler(Looper.getMainLooper())
     private val timeline = CueTimeline(matchData)
+    private val playbackState = SasayakiPlaybackStateCoordinator(
+        initialPosition = initialPlayback.lastPosition,
+    )
     private var playbackEngine: SasayakiPlaybackEngine? = null
     private var mediaSession: SasayakiMediaSessionHandle? = null
-    private var lastSavedSecond = -1
     private var currentCue: SasayakiMatch? = null
     private var hasPlayedOnce = false
-    private var stopPlaybackTime: Double? = null
-    private var temporaryPlaybackReturnPosition: Double? = null
-    private var pendingSeek: PendingSeek? = null
 
-    var playback by mutableStateOf(playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0))
+    var playback by mutableStateOf(initialPlayback)
         private set
-    var currentTime by mutableStateOf(playback.lastPosition)
-        private set
-    var duration by mutableStateOf(0.0)
-        private set
-    var isPlaying by mutableStateOf(false)
-        private set
+    val currentTime: Double get() = playbackState.currentTime
+    val duration: Double get() = playbackState.duration
+    val isPlaying: Boolean get() = playbackState.isPlaying
     var errorMessage by mutableStateOf<String?>(null)
     var autoScroll by mutableStateOf(true)
     var hasAudio by mutableStateOf(false)
@@ -104,8 +93,7 @@ class SasayakiPlayer(
             audioUri = null,
             audioFileName = null,
         )
-        currentTime = 0.0
-        duration = 0.0
+        playbackState.clearAudioState()
         hasAudio = false
         errorMessage = null
         savePlayback()
@@ -117,7 +105,7 @@ class SasayakiPlayer(
 
     fun pausePlayback(restoreTemporaryPosition: Boolean = true) {
         playbackEngine?.pause()
-        isPlaying = false
+        playbackState.markPaused()
         handler.removeCallbacks(tickRunnable)
         updateMediaSession()
         if (restoreTemporaryPosition) {
@@ -127,13 +115,13 @@ class SasayakiPlayer(
 
     fun nextCue() {
         val next = timeline.nextCue(after = currentCue?.startTime ?: currentTime - delay) ?: return
-        stopPlaybackTime = null
+        playbackState.clearStopPlaybackTime()
         seek(next + delay, startPlayback = isPlaying)
     }
 
     fun previousCue() {
         val previous = timeline.previousCue(before = currentCue?.startTime ?: max(0.0, currentTime - delay)) ?: 0.0
-        stopPlaybackTime = null
+        playbackState.clearStopPlaybackTime()
         seek(previous + delay, startPlayback = isPlaying)
     }
 
@@ -141,10 +129,10 @@ class SasayakiPlayer(
         timeline.findCue(chapterIndex = chapterIndex, offset = offset)
 
     fun playCue(cue: SasayakiMatch, stop: Boolean) {
-        stopPlaybackTime = null
+        playbackState.clearStopPlaybackTime()
         if (isPlaying) pausePlayback(restoreTemporaryPosition = false)
-        temporaryPlaybackReturnPosition = if (stop) playback.lastPosition else null
-        stopPlaybackTime = if (stop) cue.endTime + delay else null
+        playbackState.setTemporaryPlaybackReturnPosition(if (stop) playback.lastPosition else null)
+        playbackState.setStopPlaybackTime(if (stop) cue.endTime + delay else null)
         seek(
             seconds = cue.startTime + delay,
             startPlayback = true,
@@ -162,7 +150,7 @@ class SasayakiPlayer(
         val engine = playbackEngine ?: return
         engine.start(rate)
         hasPlayedOnce = true
-        isPlaying = true
+        playbackState.markPlaying()
         updateMediaSession()
         mediaSession?.activate()
         updateCue(currentTime, forceDisplay = true)
@@ -178,7 +166,7 @@ class SasayakiPlayer(
         displayCue: SasayakiMatch? = null,
     ) {
         val engine = playbackEngine ?: return
-        pendingSeek = PendingSeek(
+        playbackState.beginSeek(
             seconds = seconds,
             startPlayback = startPlayback,
             updateCue = updateCue,
@@ -188,15 +176,13 @@ class SasayakiPlayer(
         handler.removeCallbacks(tickRunnable)
         if (isPlaying) {
             engine.pause()
-            isPlaying = false
+            playbackState.markPaused()
         }
         engine.seekTo((seconds * 1000.0).toInt())
     }
 
     private fun handleSeekComplete() {
-        val seek = pendingSeek ?: return
-        pendingSeek = null
-        currentTime = seek.seconds
+        val seek = playbackState.completeSeek() ?: return
         if (seek.savePosition) {
             playback = playback.copy(lastPosition = seek.seconds)
             savePlayback()
@@ -219,7 +205,7 @@ class SasayakiPlayer(
                 source = source,
                 startPositionMs = (playback.lastPosition * 1000.0).toInt(),
                 onCompletion = {
-                    this@SasayakiPlayer.isPlaying = false
+                    playbackState.markCompleted()
                     handler.removeCallbacks(tickRunnable)
                     updateMediaSession()
                 },
@@ -236,11 +222,11 @@ class SasayakiPlayer(
                 onSkipToPrevious = ::previousCue,
                 onSkipToNext = ::nextCue,
                 onSeekTo = { positionMs ->
-                    stopPlaybackTime = null
+                    playbackState.clearStopPlaybackTime()
                     seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
                 },
             )
-            duration = engine.durationMs.coerceAtLeast(0).toDouble() / 1000.0
+            playbackState.updateDuration(engine.durationMs)
             hasAudio = true
             errorMessage = null
             updateCue(currentTime)
@@ -252,21 +238,18 @@ class SasayakiPlayer(
     }
 
     private fun tick() {
-        if (pendingSeek != null) return
+        if (playbackState.hasPendingSeek) return
         val engine = playbackEngine ?: return
-        currentTime = engine.currentPositionMs.toDouble() / 1000.0
-        duration = engine.durationMs.coerceAtLeast(0).toDouble() / 1000.0
-        val second = currentTime.toInt()
-        if (temporaryPlaybackReturnPosition == null && second != lastSavedSecond) {
-            lastSavedSecond = second
+        val tick = playbackState.updateTick(
+            currentPositionMs = engine.currentPositionMs,
+            durationMs = engine.durationMs,
+        )
+        if (tick.shouldSavePosition) {
             playback = playback.copy(lastPosition = currentTime)
             savePlayback()
         }
-        stopPlaybackTime?.let { stopTime ->
-            if (currentTime >= stopTime && isPlaying) {
-                stopPlaybackTime = null
-                pausePlayback()
-            }
+        if (tick.shouldStopPlayback) {
+            pausePlayback()
         }
         updateCue(currentTime)
         updateMediaSession()
@@ -316,11 +299,8 @@ class SasayakiPlayer(
     }
 
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
-        val returnPosition = temporaryPlaybackReturnPosition ?: return
-        temporaryPlaybackReturnPosition = null
+        val returnPosition = playbackState.restoreTemporaryPlaybackPositionIfNeeded() ?: return
         playbackEngine?.seekTo((returnPosition * 1000.0).toInt())
-        currentTime = returnPosition
-        lastSavedSecond = returnPosition.toInt()
         updateCue(returnPosition)
         updateMediaSession()
     }
