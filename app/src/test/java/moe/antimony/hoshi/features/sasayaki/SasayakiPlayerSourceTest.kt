@@ -124,9 +124,11 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("displayCue: SasayakiMatch? = null"))
         assertTrue(playCue.contains("displayCue = cue"))
         assertTrue(seek.contains("displayCue = displayCue"))
-        assertTrue(source.contains("private fun displayCue(cue: SasayakiMatch, reveal: Boolean)"))
+        assertFalse(source.contains("private fun displayCue(cue: SasayakiMatch, reveal: Boolean)"))
         assertTrue(complete.contains("seek.displayCue?.let { cue ->"))
-        assertTrue(complete.contains("displayCue(cue, reveal = autoScroll && (hasPlayedOnce || seek.startPlayback))"))
+        assertTrue(complete.contains("cueDisplay.displaySelectedCue("))
+        assertTrue(complete.contains("reveal = autoScroll && (hasPlayedOnce || seek.startPlayback)"))
+        assertTrue(complete.contains("applyCueDisplayAction("))
         assertTrue(complete.indexOf("seek.displayCue?.let { cue ->") < complete.indexOf("if (seek.startPlayback) startPlayback()"))
     }
 
@@ -136,27 +138,35 @@ class SasayakiPlayerSourceTest {
         val startPlayback = source.substringAfter("private fun startPlayback()")
             .substringBefore("private fun seek(")
         val updateCue = source.substringAfter("private fun updateCue(")
-            .substringBefore("private fun displayCue(")
+            .substringBefore("private fun applyCueDisplayAction(")
 
         assertTrue(startPlayback.contains("hasPlayedOnce = true"))
         assertTrue(startPlayback.contains("updateCue(currentTime, forceDisplay = true)"))
         assertTrue(updateCue.contains("forceDisplay: Boolean = false"))
-        assertTrue(updateCue.contains("if (!forceDisplay && cue.id == currentCue?.id) return"))
+        assertTrue(updateCue.contains("cueDisplay.update("))
+        assertTrue(updateCue.contains("forceDisplay = forceDisplay"))
     }
 
     @Test
     fun autoScrollCrossChapterCueClearsDisplayedCueBeforeLoadingChapter() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
         val updateCue = source.substringAfter("private fun updateCue(")
-            .substringBefore("private fun displayCue(")
+            .substringBefore("private fun applyCueDisplayAction(")
+        val applyAction = source.substringAfter("private fun applyCueDisplayAction(")
+            .substringBefore("private fun savePlayback(")
 
-        assertTrue(updateCue.contains("if (cue.chapterIndex == getCurrentChapterIndex())"))
-        assertTrue(updateCue.contains("displayCue(cue, autoScroll && hasPlayedOnce)"))
-        assertTrue(updateCue.contains("} else if (autoScroll && hasPlayedOnce) {"))
-        assertTrue(updateCue.contains("currentCue = null"))
-        assertTrue(updateCue.contains("onClearCue()"))
-        assertTrue(updateCue.contains("onLoadChapter(cue.chapterIndex)"))
-        assertTrue(updateCue.indexOf("onClearCue()") < updateCue.indexOf("onLoadChapter(cue.chapterIndex)"))
+        assertTrue(source.contains("private val cueDisplay = SasayakiCueDisplayCoordinator()"))
+        assertFalse(source.contains("private var currentCue: SasayakiMatch? = null"))
+        assertTrue(updateCue.contains("cueDisplay.update("))
+        assertTrue(updateCue.contains("currentChapterIndex = getCurrentChapterIndex()"))
+        assertTrue(updateCue.contains("autoScroll = autoScroll"))
+        assertTrue(updateCue.contains("hasPlayedOnce = hasPlayedOnce"))
+        assertTrue(applyAction.contains("SasayakiCueDisplayAction.Clear -> onClearCue()"))
+        assertTrue(applyAction.contains("is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)"))
+        assertTrue(applyAction.contains("is SasayakiCueDisplayAction.ClearAndLoadChapter -> {"))
+        assertTrue(applyAction.contains("onClearCue()"))
+        assertTrue(applyAction.contains("onLoadChapter(action.chapterIndex)"))
+        assertTrue(applyAction.indexOf("onClearCue()") < applyAction.indexOf("onLoadChapter(action.chapterIndex)"))
     }
 
     @Test

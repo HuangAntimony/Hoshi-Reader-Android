@@ -30,9 +30,9 @@ class SasayakiPlayer(
     private val playbackState = SasayakiPlaybackStateCoordinator(
         initialPosition = initialPlayback.lastPosition,
     )
+    private val cueDisplay = SasayakiCueDisplayCoordinator()
     private var playbackEngine: SasayakiPlaybackEngine? = null
     private var mediaSession: SasayakiMediaSessionHandle? = null
-    private var currentCue: SasayakiMatch? = null
     private var hasPlayedOnce = false
 
     var playback by mutableStateOf(initialPlayback)
@@ -114,13 +114,13 @@ class SasayakiPlayer(
     }
 
     fun nextCue() {
-        val next = timeline.nextCue(after = currentCue?.startTime ?: currentTime - delay) ?: return
+        val next = timeline.nextCue(after = cueDisplay.currentCueStartTime ?: currentTime - delay) ?: return
         playbackState.clearStopPlaybackTime()
         seek(next + delay, startPlayback = isPlaying)
     }
 
     fun previousCue() {
-        val previous = timeline.previousCue(before = currentCue?.startTime ?: max(0.0, currentTime - delay)) ?: 0.0
+        val previous = timeline.previousCue(before = cueDisplay.currentCueStartTime ?: max(0.0, currentTime - delay)) ?: 0.0
         playbackState.clearStopPlaybackTime()
         seek(previous + delay, startPlayback = isPlaying)
     }
@@ -189,9 +189,13 @@ class SasayakiPlayer(
         }
         if (seek.updateCue) updateCue(seek.seconds)
         seek.displayCue?.let { cue ->
-            if (cue.chapterIndex == getCurrentChapterIndex()) {
-                displayCue(cue, reveal = autoScroll && (hasPlayedOnce || seek.startPlayback))
-            }
+            applyCueDisplayAction(
+                cueDisplay.displaySelectedCue(
+                    cue = cue,
+                    currentChapterIndex = getCurrentChapterIndex(),
+                    reveal = autoScroll && (hasPlayedOnce || seek.startPlayback),
+                ),
+            )
         }
         if (seek.startPlayback) startPlayback()
         updateMediaSession()
@@ -258,31 +262,27 @@ class SasayakiPlayer(
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
         if (!hasAudio || !hasMatch) return
         val cue = timeline.cueAt(time - delay)
-        if (cue == null) {
-            clearCue()
-            return
-        }
-        if (!forceDisplay && cue.id == currentCue?.id) return
-        if (cue.chapterIndex == getCurrentChapterIndex()) {
-            displayCue(cue, autoScroll && hasPlayedOnce)
-        } else if (autoScroll && hasPlayedOnce) {
-            currentCue = null
-            onClearCue()
-            onLoadChapter(cue.chapterIndex)
-        } else {
-            clearCue()
-        }
+        applyCueDisplayAction(
+            cueDisplay.update(
+                cue = cue,
+                currentChapterIndex = getCurrentChapterIndex(),
+                autoScroll = autoScroll,
+                hasPlayedOnce = hasPlayedOnce,
+                forceDisplay = forceDisplay,
+            ),
+        )
     }
 
-    private fun displayCue(cue: SasayakiMatch, reveal: Boolean) {
-        currentCue = cue
-        onCue(cue, reveal)
-    }
-
-    private fun clearCue() {
-        if (currentCue == null) return
-        currentCue = null
-        onClearCue()
+    private fun applyCueDisplayAction(action: SasayakiCueDisplayAction) {
+        when (action) {
+            SasayakiCueDisplayAction.None -> Unit
+            SasayakiCueDisplayAction.Clear -> onClearCue()
+            is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)
+            is SasayakiCueDisplayAction.ClearAndLoadChapter -> {
+                onClearCue()
+                onLoadChapter(action.chapterIndex)
+            }
+        }
     }
 
     private fun savePlayback() {
@@ -312,6 +312,6 @@ class SasayakiPlayer(
         mediaSession?.release()
         mediaSession = null
         hasAudio = false
-        if (clearCue) clearCue()
+        if (clearCue) applyCueDisplayAction(cueDisplay.clear())
     }
 }
