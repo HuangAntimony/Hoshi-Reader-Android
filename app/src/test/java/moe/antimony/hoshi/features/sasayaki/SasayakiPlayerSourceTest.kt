@@ -20,10 +20,14 @@ class SasayakiPlayerSourceTest {
         assertFalse(importAudio.contains("audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)"))
         assertTrue(source.contains("private val audioRestore = SasayakiAudioRestoreController("))
         assertTrue(restoreAudio.contains("audioRestore.restore("))
+        assertTrue(restoreAudio.contains("onFailure(audioAvailability::markRestoreFailed)"))
+        assertTrue(restoreAudio.contains("audioAvailability.markRestoreSucceeded()"))
         assertFalse(restoreAudio.contains("audioSourceRepository.playbackSource(playback) ?: return"))
         assertFalse(restoreAudio.contains("Uri.parse("))
         assertFalse(restoreAudio.contains("SasayakiPlaybackSource.ExternalUri"))
         assertFalse(restoreAudio.contains("SasayakiPlaybackSource.PrivateFile"))
+        assertFalse(restoreAudio.contains("hasAudio = true"))
+        assertFalse(restoreAudio.contains("errorMessage = null"))
     }
 
     @Test
@@ -32,6 +36,9 @@ class SasayakiPlayerSourceTest {
         val clearAudio = source.substringAfter("fun clearAudio()")
             .substringBefore("fun togglePlayback()")
 
+        assertTrue(source.contains("private val audioAvailability = SasayakiAudioAvailabilityState()"))
+        assertTrue(source.contains("val errorMessage: String? get() = audioAvailability.errorMessage"))
+        assertTrue(source.contains("val hasAudio: Boolean get() = audioAvailability.hasAudio"))
         assertTrue(source.contains("val audioStorageSummary: String"))
         assertTrue(source.contains("get() = playbackPersistence.audioStorageSummary"))
         assertTrue(clearAudio.contains("audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)"))
@@ -39,7 +46,9 @@ class SasayakiPlayerSourceTest {
         assertTrue(clearAudio.contains("playbackPersistence.clearAudioMetadata()"))
         assertFalse(clearAudio.contains("audioUri = null"))
         assertFalse(clearAudio.contains("audioFileName = null"))
-        assertTrue(clearAudio.contains("hasAudio = false"))
+        assertTrue(clearAudio.contains("audioAvailability.markAudioCleared()"))
+        assertFalse(clearAudio.contains("hasAudio = false"))
+        assertFalse(clearAudio.contains("errorMessage = null"))
     }
 
     @Test
@@ -289,6 +298,7 @@ class SasayakiPlayerSourceTest {
         assertFalse(tick.contains("currentPositionMs = engine.currentPositionMs"))
         assertFalse(tick.contains("durationMs = engine.durationMs"))
         assertTrue(teardown.contains("playbackLifecycle.releaseEngine()"))
+        assertTrue(teardown.contains("audioAvailability.markAudioUnavailable()"))
         assertFalse(teardown.contains("playbackEngine?.release()"))
         assertFalse(teardown.contains("playbackEngine = null"))
     }

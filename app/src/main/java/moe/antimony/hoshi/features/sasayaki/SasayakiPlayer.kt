@@ -65,6 +65,7 @@ class SasayakiPlayer(
         audioSourceRepository = audioSourceRepository,
         playbackLifecycle = playbackLifecycle,
     )
+    private val audioAvailability = SasayakiAudioAvailabilityState()
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
     private var hasPlayedOnce = false
 
@@ -72,10 +73,9 @@ class SasayakiPlayer(
     val currentTime: Double get() = playbackState.currentTime
     val duration: Double get() = playbackState.duration
     val isPlaying: Boolean get() = playbackState.isPlaying
-    var errorMessage by mutableStateOf<String?>(null)
+    val errorMessage: String? get() = audioAvailability.errorMessage
     var autoScroll by mutableStateOf(true)
-    var hasAudio by mutableStateOf(false)
-        private set
+    val hasAudio: Boolean get() = audioAvailability.hasAudio
 
     val hasMatch: Boolean = matchData != null
 
@@ -110,8 +110,7 @@ class SasayakiPlayer(
         teardownPlayer(clearCue = true)
         playbackPersistence.clearAudioMetadata()
         playbackState.clearAudioState()
-        hasAudio = false
-        errorMessage = null
+        audioAvailability.markAudioCleared()
     }
 
     fun togglePlayback() {
@@ -228,14 +227,10 @@ class SasayakiPlayer(
                     },
                 ),
             )
-        }.onFailure { error ->
-            errorMessage = error.localizedMessage ?: "Unable to load audiobook."
-            hasAudio = false
-        }.getOrNull() ?: return
+        }.onFailure(audioAvailability::markRestoreFailed).getOrNull() ?: return
         mediaSessionHandle.replace(result.mediaSession)
         playbackState.updateDuration(result.durationMs)
-        hasAudio = true
-        errorMessage = null
+        audioAvailability.markRestoreSucceeded()
         updateCue(currentTime)
         updateMediaSession()
     }
@@ -300,7 +295,7 @@ class SasayakiPlayer(
         pausePlayback()
         playbackLifecycle.releaseEngine()
         mediaSessionHandle.releaseAndClear()
-        hasAudio = false
+        audioAvailability.markAudioUnavailable()
         if (clearCue) applyCueDisplayAction(cueDisplay.clear())
     }
 }
