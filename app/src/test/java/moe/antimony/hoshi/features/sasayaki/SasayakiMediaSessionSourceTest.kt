@@ -67,7 +67,7 @@ class SasayakiMediaSessionSourceTest {
         assertFalse(restoreAudio.contains("SasayakiMediaSession.loadCoverArt(bookCoverFile)"))
         assertTrue(startPlayback.contains("mediaSession?.activate()"))
         assertTrue(startPlayback.contains("updateMediaSession()"))
-        assertTrue(pausePlayback.contains("updateMediaSession()"))
+        assertTrue(pausePlayback.contains("updateMediaSession = ::updateMediaSession"))
         assertTrue(source.contains("private fun updateMediaSession()"))
         assertTrue(teardown.contains("mediaSession?.release()"))
         assertTrue(teardown.contains("mediaSession = null"))
