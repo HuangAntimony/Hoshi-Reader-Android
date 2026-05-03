@@ -65,7 +65,7 @@ class SasayakiPlayer(
         audioSourceRepository = audioSourceRepository,
         playbackLifecycle = playbackLifecycle,
     )
-    private var mediaSession: SasayakiMediaSessionHandle? = null
+    private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
     private var hasPlayedOnce = false
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
@@ -170,7 +170,7 @@ class SasayakiPlayer(
             markPlayedOnce = { hasPlayedOnce = true },
             afterMarkedPlaying = {
                 updateMediaSession()
-                mediaSession?.activate()
+                mediaSessionHandle.activate()
                 updateCue(currentTime, forceDisplay = true)
             },
         )
@@ -210,7 +210,7 @@ class SasayakiPlayer(
         val result = runCatching {
             audioRestore.restore(
                 playback = playback,
-                releaseExistingMediaSession = { mediaSession?.release() },
+                releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
                 callbacks = SasayakiAudioRestoreCallbacks(
                     onCompletion = {
                         playbackLifecycle.markCompleted(updateMediaSession = ::updateMediaSession)
@@ -232,7 +232,7 @@ class SasayakiPlayer(
             errorMessage = error.localizedMessage ?: "Unable to load audiobook."
             hasAudio = false
         }.getOrNull() ?: return
-        mediaSession = result.mediaSession
+        mediaSessionHandle.replace(result.mediaSession)
         playbackState.updateDuration(result.durationMs)
         hasAudio = true
         errorMessage = null
@@ -281,7 +281,7 @@ class SasayakiPlayer(
     }
 
     private fun updateMediaSession() {
-        mediaSession?.update(
+        mediaSessionHandle.update(
             isPlaying = isPlaying,
             currentTimeMs = (currentTime * 1000.0).toLong(),
             durationMs = (duration * 1000.0).toLong(),
@@ -299,8 +299,7 @@ class SasayakiPlayer(
     private fun teardownPlayer(clearCue: Boolean) {
         pausePlayback()
         playbackLifecycle.releaseEngine()
-        mediaSession?.release()
-        mediaSession = null
+        mediaSessionHandle.releaseAndClear()
         hasAudio = false
         if (clearCue) applyCueDisplayAction(cueDisplay.clear())
     }

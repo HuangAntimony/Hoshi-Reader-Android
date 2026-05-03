@@ -282,7 +282,7 @@ class SasayakiPlayerSourceTest {
         assertTrue(restoreAudio.contains("onCompletion = {"))
         assertTrue(restoreAudio.contains("onSeekComplete = ::handleSeekComplete"))
         assertFalse(restoreAudio.contains("playbackLifecycle.attachEngine(engine)"))
-        assertTrue(restoreAudio.contains("mediaSession = result.mediaSession"))
+        assertTrue(restoreAudio.contains("mediaSessionHandle.replace(result.mediaSession)"))
         assertTrue(restoreAudio.contains("playbackState.updateDuration(result.durationMs)"))
         assertTrue(tick.contains("playbackEvents.tick("))
         assertFalse(tick.contains("val engine = playbackEngine ?: return"))

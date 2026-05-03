@@ -49,6 +49,7 @@ class SasayakiMediaSessionSourceTest {
     fun sasayakiPlayerUsesMediaSessionHandleBoundary() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
         val restoreController = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRestoreController.kt").readText()
+        val handleCoordinator = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiMediaSessionHandleCoordinator.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")
             .substringBefore("private fun tick()")
         val startPlayback = source.substringAfter("private fun startPlayback()")
@@ -60,20 +61,23 @@ class SasayakiMediaSessionSourceTest {
 
         assertTrue(source.contains("bookTitle: String?"))
         assertTrue(source.contains("bookCoverFile: File?"))
-        assertTrue(source.contains("private var mediaSession: SasayakiMediaSessionHandle? = null"))
+        assertTrue(source.contains("private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()"))
+        assertFalse(source.contains("private var mediaSession: SasayakiMediaSessionHandle? = null"))
+        assertTrue(handleCoordinator.contains("private var mediaSession: SasayakiMediaSessionHandle? = null"))
         assertTrue(source.contains("private val audioRestore = SasayakiAudioRestoreController("))
-        assertTrue(restoreAudio.contains("mediaSession = result.mediaSession"))
+        assertTrue(restoreAudio.contains("releaseExistingMediaSession = mediaSessionHandle::releaseExisting"))
+        assertTrue(restoreAudio.contains("mediaSessionHandle.replace(result.mediaSession)"))
         assertTrue(restoreController.contains("AndroidSasayakiMediaSessionHandle("))
         assertTrue(restoreController.contains("title = bookTitle ?: bookRoot.name"))
         assertTrue(restoreController.contains("artworkFile = bookCoverFile"))
         assertFalse(restoreAudio.contains("SasayakiMediaSession("))
         assertFalse(restoreAudio.contains("SasayakiMediaSession.loadCoverArt(bookCoverFile)"))
-        assertTrue(startPlayback.contains("mediaSession?.activate()"))
+        assertTrue(startPlayback.contains("mediaSessionHandle.activate()"))
         assertTrue(startPlayback.contains("updateMediaSession()"))
         assertTrue(pausePlayback.contains("updateMediaSession = ::updateMediaSession"))
         assertTrue(source.contains("private fun updateMediaSession()"))
-        assertTrue(teardown.contains("mediaSession?.release()"))
-        assertTrue(teardown.contains("mediaSession = null"))
+        assertTrue(source.contains("mediaSessionHandle.update("))
+        assertTrue(teardown.contains("mediaSessionHandle.releaseAndClear()"))
     }
 
     @Test
