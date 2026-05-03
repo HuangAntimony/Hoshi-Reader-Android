@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.2.1] - 2026-05-03
+
 ### Added
 
 - Add Android system media controls for Sasayaki audiobook playback, including the current book cover, so play/pause, previous/next cue, and seeking can be controlled from the media controls area while reading.
