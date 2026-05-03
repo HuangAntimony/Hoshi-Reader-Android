@@ -16,12 +16,11 @@ class SasayakiPlayerSourceTest {
 
         assertTrue(source.contains("import android.net.Uri"))
         assertTrue(importAudio.contains("audioUri: Uri, copiedAudioFileName: String? = null"))
-        assertTrue(importAudio.contains("if (copiedAudioFileName == null)"))
-        assertTrue(importAudio.contains("audioUri.toString()"))
-        assertTrue(importAudio.contains("audioFileName = copiedAudioFileName"))
-        assertTrue(restoreAudio.contains("Uri.parse("))
-        assertTrue(restoreAudio.contains("SasayakiPlaybackSource.ExternalUri(uri)"))
-        assertTrue(restoreAudio.contains("SasayakiPlaybackSource.PrivateFile(file)"))
+        assertTrue(importAudio.contains("audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)"))
+        assertTrue(restoreAudio.contains("audioSourceRepository.playbackSource(playback) ?: return"))
+        assertFalse(restoreAudio.contains("Uri.parse("))
+        assertFalse(restoreAudio.contains("SasayakiPlaybackSource.ExternalUri"))
+        assertFalse(restoreAudio.contains("SasayakiPlaybackSource.PrivateFile"))
     }
 
     @Test
@@ -31,10 +30,9 @@ class SasayakiPlayerSourceTest {
             .substringBefore("fun togglePlayback()")
 
         assertTrue(source.contains("val audioStorageSummary: String"))
-        assertTrue(source.contains("playback.audioFileName != null"))
-        assertTrue(source.contains("playback.audioUri != null"))
-        assertTrue(clearAudio.contains("audioRepository.deleteAudio(playback)"))
-        assertTrue(clearAudio.contains("releasePersistableUriPermission"))
+        assertTrue(source.contains("get() = audioSourceRepository.storageSummary(playback)"))
+        assertTrue(clearAudio.contains("audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)"))
+        assertFalse(clearAudio.contains("releasePersistableUriPermission"))
         assertTrue(clearAudio.contains("audioUri = null"))
         assertTrue(clearAudio.contains("audioFileName = null"))
         assertTrue(clearAudio.contains("hasAudio = false"))
@@ -199,6 +197,7 @@ class SasayakiPlayerSourceTest {
         assertFalse(source.contains("import android.media.AudioAttributes"))
         assertFalse(source.contains("import android.media.PlaybackParams"))
         assertFalse(source.contains("MediaPlayer()"))
+        assertTrue(source.contains("private val audioSourceRepository = SasayakiAudioRepository(bookRoot)"))
         assertTrue(source.contains("private var playbackEngine: SasayakiPlaybackEngine? = null"))
         assertTrue(restoreAudio.contains("AndroidSasayakiPlaybackEngine.prepare("))
         assertTrue(restoreAudio.contains("startPositionMs = (playback.lastPosition * 1000.0).toInt()"))

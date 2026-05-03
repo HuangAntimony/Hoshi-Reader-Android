@@ -1,7 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -32,7 +31,7 @@ class SasayakiPlayer(
     )
 
     private val appContext = context.applicationContext
-    private val audioRepository = SasayakiAudioRepository(bookRoot)
+    private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
     private val handler = Handler(Looper.getMainLooper())
     private val timeline = CueTimeline(matchData)
     private var playbackEngine: SasayakiPlaybackEngine? = null
@@ -62,11 +61,7 @@ class SasayakiPlayer(
     val delay: Double get() = playback.delay
     val rate: Float get() = playback.rate
     val audioStorageSummary: String
-        get() = when {
-            playback.audioFileName != null -> "Copied to app storage. The original audiobook file can be deleted."
-            playback.audioUri != null -> "Linked to the external audiobook file. Keep the original file available."
-            else -> "Select an .mp3 or .m4b audiobook"
-        }
+        get() = audioSourceRepository.storageSummary(playback)
 
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -96,26 +91,14 @@ class SasayakiPlayer(
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
         teardownPlayer(clearCue = false)
-        playback = playback.copy(
-            audioUri = if (copiedAudioFileName == null) audioUri.toString() else null,
-            audioFileName = copiedAudioFileName,
-        )
+        playback = audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)
         savePlayback()
         restoreAudio()
     }
 
     fun clearAudio() {
-        val previousAudioUri = playback.audioUri
-        audioRepository.deleteAudio(playback)
+        audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)
         teardownPlayer(clearCue = true)
-        previousAudioUri?.let { uriString ->
-            runCatching {
-                appContext.contentResolver.releasePersistableUriPermission(
-                    Uri.parse(uriString),
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-        }
         playback = playback.copy(
             lastPosition = 0.0,
             audioUri = null,
@@ -229,13 +212,7 @@ class SasayakiPlayer(
     }
 
     private fun restoreAudio() {
-        val uri = playback.audioUri?.let { Uri.parse(it) }
-        val file = if (uri == null) audioRepository.audioFile(playback) else null
-        val source = when {
-            uri != null -> SasayakiPlaybackSource.ExternalUri(uri)
-            file != null -> SasayakiPlaybackSource.PrivateFile(file)
-            else -> return
-        }
+        val source = audioSourceRepository.playbackSource(playback) ?: return
         runCatching {
             val engine = AndroidSasayakiPlaybackEngine.prepare(
                 context = appContext,
