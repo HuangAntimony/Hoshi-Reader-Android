@@ -22,12 +22,15 @@ class SasayakiPlayer(
     private val onLoadChapter: (Int) -> Unit,
 ) {
     private val appContext = context.applicationContext
-    private val initialPlayback = playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0)
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
+    private val playbackPersistence = SasayakiPlaybackPersistenceState(
+        playbackRepository = playbackRepository,
+        audioSourceRepository = audioSourceRepository,
+    )
     private val handler = Handler(Looper.getMainLooper())
     private val cueNavigation = SasayakiCueNavigationController(matchData)
     private val playbackState = SasayakiPlaybackStateCoordinator(
-        initialPosition = initialPlayback.lastPosition,
+        initialPosition = playback.lastPosition,
     )
     private val cueDisplay = SasayakiCueDisplayCoordinator()
     private val tickRunnable = object : Runnable {
@@ -52,8 +55,7 @@ class SasayakiPlayer(
     private var mediaSession: SasayakiMediaSessionHandle? = null
     private var hasPlayedOnce = false
 
-    var playback by mutableStateOf(initialPlayback)
-        private set
+    val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
     val duration: Double get() = playbackState.duration
     val isPlaying: Boolean get() = playbackState.isPlaying
@@ -67,44 +69,36 @@ class SasayakiPlayer(
     val delay: Double get() = playback.delay
     val rate: Float get() = playback.rate
     val audioStorageSummary: String
-        get() = audioSourceRepository.storageSummary(playback)
+        get() = playbackPersistence.audioStorageSummary
 
     init {
         restoreAudio()
     }
 
     fun setDelay(value: Double) {
-        playback = playback.copy(delay = value)
-        savePlayback()
+        playbackPersistence.setDelay(value)
         updateCue(currentTime)
     }
 
     fun setRate(value: Float) {
-        playback = playback.copy(rate = value)
+        playbackPersistence.setRate(value)
         playbackLifecycle.setRateIfPlaying(value)
         updateMediaSession()
-        savePlayback()
     }
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
         teardownPlayer(clearCue = false)
-        playback = audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)
-        savePlayback()
+        playbackPersistence.importAudio(audioUri, copiedAudioFileName)
         restoreAudio()
     }
 
     fun clearAudio() {
         audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)
         teardownPlayer(clearCue = true)
-        playback = playback.copy(
-            lastPosition = 0.0,
-            audioUri = null,
-            audioFileName = null,
-        )
+        playbackPersistence.clearAudioMetadata()
         playbackState.clearAudioState()
         hasAudio = false
         errorMessage = null
-        savePlayback()
     }
 
     fun togglePlayback() {
@@ -191,8 +185,7 @@ class SasayakiPlayer(
     private fun handleSeekComplete() {
         val seek = playbackState.completeSeek() ?: return
         if (seek.savePosition) {
-            playback = playback.copy(lastPosition = seek.seconds)
-            savePlayback()
+            playbackPersistence.savePosition(seek.seconds)
         }
         if (seek.updateCue) updateCue(seek.seconds)
         seek.displayCue?.let { cue ->
@@ -243,8 +236,7 @@ class SasayakiPlayer(
     private fun tick() {
         val tick = playbackLifecycle.updateTick() ?: return
         if (tick.shouldSavePosition) {
-            playback = playback.copy(lastPosition = currentTime)
-            savePlayback()
+            playbackPersistence.savePosition(currentTime)
         }
         if (tick.shouldStopPlayback) {
             pausePlayback()
@@ -277,10 +269,6 @@ class SasayakiPlayer(
                 onLoadChapter(action.chapterIndex)
             }
         }
-    }
-
-    private fun savePlayback() {
-        playbackRepository.save(playback)
     }
 
     private fun updateMediaSession() {

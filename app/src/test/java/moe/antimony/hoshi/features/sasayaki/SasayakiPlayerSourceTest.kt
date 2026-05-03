@@ -16,7 +16,8 @@ class SasayakiPlayerSourceTest {
 
         assertTrue(source.contains("import android.net.Uri"))
         assertTrue(importAudio.contains("audioUri: Uri, copiedAudioFileName: String? = null"))
-        assertTrue(importAudio.contains("audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)"))
+        assertTrue(importAudio.contains("playbackPersistence.importAudio(audioUri, copiedAudioFileName)"))
+        assertFalse(importAudio.contains("audioSourceRepository.importedPlayback(playback, audioUri, copiedAudioFileName)"))
         assertTrue(source.contains("private val audioRestore = SasayakiAudioRestoreController("))
         assertTrue(restoreAudio.contains("audioRestore.restore("))
         assertFalse(restoreAudio.contains("audioSourceRepository.playbackSource(playback) ?: return"))
@@ -32,11 +33,12 @@ class SasayakiPlayerSourceTest {
             .substringBefore("fun togglePlayback()")
 
         assertTrue(source.contains("val audioStorageSummary: String"))
-        assertTrue(source.contains("get() = audioSourceRepository.storageSummary(playback)"))
+        assertTrue(source.contains("get() = playbackPersistence.audioStorageSummary"))
         assertTrue(clearAudio.contains("audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)"))
         assertFalse(clearAudio.contains("releasePersistableUriPermission"))
-        assertTrue(clearAudio.contains("audioUri = null"))
-        assertTrue(clearAudio.contains("audioFileName = null"))
+        assertTrue(clearAudio.contains("playbackPersistence.clearAudioMetadata()"))
+        assertFalse(clearAudio.contains("audioUri = null"))
+        assertFalse(clearAudio.contains("audioFileName = null"))
         assertTrue(clearAudio.contains("hasAudio = false"))
     }
 
@@ -160,7 +162,7 @@ class SasayakiPlayerSourceTest {
         val updateCue = source.substringAfter("private fun updateCue(")
             .substringBefore("private fun applyCueDisplayAction(")
         val applyAction = source.substringAfter("private fun applyCueDisplayAction(")
-            .substringBefore("private fun savePlayback(")
+            .substringBefore("private fun updateMediaSession(")
 
         assertTrue(source.contains("private val cueDisplay = SasayakiCueDisplayCoordinator()"))
         assertFalse(source.contains("private var currentCue: SasayakiMatch? = null"))
@@ -220,16 +222,22 @@ class SasayakiPlayerSourceTest {
         val tick = source.substringAfter("private fun tick()")
             .substringBefore("private fun updateCue(")
 
-        assertTrue(setDelay.contains("playback = playback.copy(delay = value)"))
-        assertTrue(setDelay.contains("savePlayback()"))
-        assertTrue(setRate.contains("playback = playback.copy(rate = value)"))
-        assertTrue(setRate.contains("savePlayback()"))
-        assertTrue(complete.contains("playback = playback.copy(lastPosition = seek.seconds)"))
-        assertTrue(complete.contains("savePlayback()"))
+        assertTrue(source.contains("private val playbackPersistence = SasayakiPlaybackPersistenceState("))
+        assertTrue(source.contains("val playback: SasayakiPlaybackData get() = playbackPersistence.playback"))
+        assertTrue(setDelay.contains("playbackPersistence.setDelay(value)"))
+        assertFalse(setDelay.contains("playback = playback.copy(delay = value)"))
+        assertFalse(setDelay.contains("savePlayback()"))
+        assertTrue(setRate.contains("playbackPersistence.setRate(value)"))
+        assertFalse(setRate.contains("playback = playback.copy(rate = value)"))
+        assertFalse(setRate.contains("savePlayback()"))
+        assertTrue(complete.contains("playbackPersistence.savePosition(seek.seconds)"))
+        assertFalse(complete.contains("playback = playback.copy(lastPosition = seek.seconds)"))
+        assertFalse(complete.contains("savePlayback()"))
         assertTrue(tick.contains("val tick = playbackLifecycle.updateTick() ?: return"))
         assertTrue(tick.contains("if (tick.shouldSavePosition)"))
-        assertTrue(tick.contains("playback = playback.copy(lastPosition = currentTime)"))
-        assertTrue(tick.contains("savePlayback()"))
+        assertTrue(tick.contains("playbackPersistence.savePosition(currentTime)"))
+        assertFalse(tick.contains("playback = playback.copy(lastPosition = currentTime)"))
+        assertFalse(tick.contains("savePlayback()"))
     }
 
     @Test
