@@ -284,3 +284,9 @@
     - Verified Gradle manifest processing: `:app:processDebugMainManifest` writes package `moe.antimony.hoshi.debug` for debug builds, while `:app:processReleaseMainManifest` keeps release at `moe.antimony.hoshi`.
     - Verified release optimization with `:app:assembleRelease`: Gradle ran `minifyReleaseWithR8`, `convertShrunkResourcesToBinaryRelease`, and `optimizeReleaseResources` successfully.
     - Verified optimized release JNA fix on `emulator-5554`: installed `app-release.apk`, imported `testdata/test.epub` through DocumentsUI, returned to Books, tapped `屍人荘の殺人`, and confirmed the reader opened without `Can't obtain peer field ID for class com.sun.jna.Pointer`, `com.sun.jna.Native`, or crash-buffer entries.
+
+12. `in_progress` - Architecture refactoring execution
+    - `done` - Add `docs/ARCHITECTURE_REFACTORING.md` with the phased Android architecture refactoring direction.
+    - `done` - Add `docs/REFACTORING_TRACKER.md` as the single execution-state document for resumable refactoring slices, with initial Phase 0-3 work items.
+    - `done` - Add `tools/check_refactoring_tracker.py` and standard-library tests so agents can validate slice status, dependencies, required fields, and verification evidence before handoff.
+    - `todo` - Complete `R-000` characterization baseline before starting the Navigation3 AppShell migration.
