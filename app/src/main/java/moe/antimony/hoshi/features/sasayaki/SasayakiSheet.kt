@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.sasayaki
 import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +43,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import moe.antimony.hoshi.features.reader.ReaderSheetDragHandle
+import moe.antimony.hoshi.features.reader.ReaderSheetDismissDragHandle
+import moe.antimony.hoshi.features.reader.readerMediumSheetContentHeight
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.OpenDocumentContent
@@ -59,6 +63,7 @@ fun SasayakiSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetStyle = readerSheetStyle()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
@@ -95,14 +100,18 @@ fun SasayakiSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
         containerColor = sheetStyle.containerColor,
         contentColor = sheetStyle.contentColor,
         scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
+        dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .readerMediumSheetContentHeight()
+                .verticalScroll(rememberScrollState())
                 .padding(bottom = 28.dp),
         ) {
             if (player.hasAudio) {

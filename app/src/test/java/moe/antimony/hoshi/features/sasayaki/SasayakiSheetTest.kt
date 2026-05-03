@@ -63,4 +63,16 @@ class SasayakiSheetTest {
         assertTrue(source.contains("Auto-Pause on Lookup"))
         assertTrue(source.contains("settings.copy(autoPause = it)"))
     }
+
+    @Test
+    fun sheetStaysPartiallyExpandedAndConsumesInternalScroll() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiSheet.kt").readText()
+
+        assertTrue(source.contains("rememberModalBottomSheetState(skipPartiallyExpanded = false)"))
+        assertTrue(source.contains("sheetState = sheetState"))
+        assertTrue(source.contains("sheetGesturesEnabled = false"))
+        assertTrue(!source.contains("SasayakiSheetHeightFraction"))
+        assertTrue(source.contains(".readerMediumSheetContentHeight()"))
+        assertTrue(source.contains(".verticalScroll(rememberScrollState())"))
+    }
 }

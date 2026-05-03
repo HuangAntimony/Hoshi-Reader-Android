@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -105,13 +106,19 @@ internal fun ReaderAppearanceSheet(
     onDismiss: () -> Unit,
 ) {
     val palette = appearancePalette()
-    val sheetStyle = readerSheetStyle()
+    val sheetStyle = readerSheetStyle().copy(
+        containerColor = palette.background,
+        contentColor = palette.onBackground,
+    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
         containerColor = sheetStyle.containerColor,
         contentColor = sheetStyle.contentColor,
         scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
+        dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) },
     ) {
         ReaderAppearanceContent(
             settings = settings,
@@ -120,6 +127,7 @@ internal fun ReaderAppearanceSheet(
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
             showDone = true,
             onDone = onDismiss,
+            modifier = Modifier.readerMediumSheetContentHeight(),
         )
     }
 }
