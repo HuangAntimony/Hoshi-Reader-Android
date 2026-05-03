@@ -5,8 +5,8 @@ import android.net.Uri
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
-import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
@@ -23,36 +23,36 @@ internal interface BookshelfRepository {
 
 internal class AndroidBookshelfRepository(
     private val contentResolver: ContentResolver,
-    private val bookStorage: BookStorage,
+    private val bookRepository: BookRepository,
     private val dictionaryRepository: DictionaryRepository,
     private val sasayakiSettingsStore: SasayakiSettingsStore,
     private val bookParser: EpubBookParser = EpubBookParser(),
 ) : BookshelfRepository {
     override suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult {
-        val entries = bookStorage.loadBookEntries(sortOption)
+        val entries = bookRepository.loadBookEntries(sortOption)
         return BookshelfLoadResult(
             entries = entries,
-            progressById = loadBookProgressById(entries, bookStorage),
+            progressById = loadBookProgressById(entries, bookRepository),
         )
     }
 
     override suspend fun openBook(entry: BookEntry): String {
         val parsedBook = bookParser.parse(entry.root)
-        saveMetadata(entry.root, parsedBook, bookStorage.loadMetadata(entry.root))
+        saveMetadata(entry.root, parsedBook, bookRepository.loadMetadata(entry.root))
         saveBookInfo(entry.root, parsedBook)
         return readerBookId(entry.root)
     }
 
     override suspend fun importBook(uri: Uri): String {
-        val root = bookStorage.importBook(contentResolver, uri)
+        val root = bookRepository.importBook(contentResolver, uri)
         val parsedBook = bookParser.parse(root)
-        saveMetadata(root, parsedBook, bookStorage.loadMetadata(root))
+        saveMetadata(root, parsedBook, bookRepository.loadMetadata(root))
         saveBookInfo(root, parsedBook)
         return readerBookId(root)
     }
 
     override suspend fun deleteBook(entry: BookEntry) {
-        bookStorage.deleteBook(entry.root)
+        bookRepository.deleteBook(entry.root)
     }
 
     override suspend fun rebuildLookupQuery() {
@@ -68,15 +68,15 @@ internal class AndroidBookshelfRepository(
             title = parsedBook.title,
             cover = parsedBook.coverHref,
             folder = root.name,
-            lastAccess = bookStorage.currentAppleReferenceDateSeconds(),
+            lastAccess = bookRepository.currentAppleReferenceDateSeconds(),
         )
-        bookStorage.saveMetadata(root, metadata)
+        bookRepository.saveMetadata(root, metadata)
     }
 
     private fun saveBookInfo(root: File, parsedBook: EpubBook) {
-        bookStorage.saveBookInfo(root, parsedBook.bookInfo)
+        bookRepository.saveBookInfo(root, parsedBook.bookInfo)
     }
 
     private fun readerBookId(root: File): String =
-        bookStorage.loadMetadata(root)?.id ?: root.name
+        bookRepository.loadMetadata(root)?.id ?: root.name
 }

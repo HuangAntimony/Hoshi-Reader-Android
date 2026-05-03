@@ -103,7 +103,7 @@ class MainShellUiTest {
         assertTrue(source.contains(".padding(bottom = innerPadding.calculateBottomPadding())"))
         assertTrue(source.contains("contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)"))
         assertTrue(source.contains("BookCoverBitmapCache.load(coverFile)"))
-        assertTrue(repository.contains("loadBookProgressById(entries, bookStorage)"))
+        assertTrue(repository.contains("loadBookProgressById(entries, bookRepository)"))
     }
 
     @Test

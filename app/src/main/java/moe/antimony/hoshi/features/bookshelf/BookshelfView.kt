@@ -103,6 +103,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookEntry
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.epub.BookStorage
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsStore
@@ -130,16 +131,16 @@ fun BookshelfView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val bookStorage = remember { BookStorage(context.filesDir) }
+    val bookRepository = remember { BookRepository(context.filesDir) }
     val booksViewModel: BookshelfViewModel = viewModel(
-        factory = remember(context, bookStorage) {
+        factory = remember(context, bookRepository) {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
                     BookshelfViewModel(
                         AndroidBookshelfRepository(
                             contentResolver = context.contentResolver,
-                            bookStorage = bookStorage,
+                            bookRepository = bookRepository,
                             dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
                             sasayakiSettingsStore = SasayakiSettingsStore(context),
                         ),
@@ -196,7 +197,7 @@ fun BookshelfView(
         layoutSpec = layoutSpec,
         bookEntries = uiState.bookEntries,
         bookProgressById = uiState.bookProgressById,
-        bookStorage = bookStorage,
+        bookRepository = bookRepository,
         isLoading = uiState.isLoading,
         errorMessage = uiState.errorMessage,
         sortOption = uiState.sortOption,
@@ -381,7 +382,7 @@ private fun BooksTab(
     layoutSpec: MainShellLayoutSpec,
     bookEntries: List<BookEntry>,
     bookProgressById: Map<String, Double>,
-    bookStorage: BookStorage,
+    bookRepository: BookRepository,
     isLoading: Boolean,
     errorMessage: String?,
     sortOption: BookSortOption,
@@ -473,7 +474,7 @@ private fun BooksTab(
                                     BookGridCell(
                                         entry = entry,
                                         progress = bookProgressById[entry.metadata.id] ?: 0.0,
-                                        bookStorage = bookStorage,
+                                        bookRepository = bookRepository,
                                         layoutSpec = layoutSpec,
                                         onOpen = { onOpenBook(entry) },
                                         onLongPress = { onContextMenuEntryChange(entry) },
@@ -629,7 +630,7 @@ private fun BookshelfSectionHeader(
 private fun BookGridCell(
     entry: BookEntry,
     progress: Double,
-    bookStorage: BookStorage,
+    bookRepository: BookRepository,
     layoutSpec: MainShellLayoutSpec,
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
@@ -640,7 +641,7 @@ private fun BookGridCell(
             onLongClick = onLongPress,
         ),
     ) {
-        BookCoverCard(entry = entry, bookStorage = bookStorage)
+        BookCoverCard(entry = entry, bookRepository = bookRepository)
         Spacer(Modifier.height(6.dp))
         ReadingProgressPill(
             progress = progress,
@@ -665,9 +666,17 @@ internal fun loadBookProgressById(
         entry.metadata.id to bookStorage.loadReadingProgress(entry.root)
     }
 
+internal fun loadBookProgressById(
+    entries: List<BookEntry>,
+    bookRepository: BookRepository,
+): Map<String, Double> =
+    entries.associate { entry ->
+        entry.metadata.id to bookRepository.loadReadingProgress(entry.root)
+    }
+
 @Composable
-private fun BookCoverCard(entry: BookEntry, bookStorage: BookStorage) {
-    val coverFile = remember(entry) { bookStorage.coverFile(entry) }
+private fun BookCoverCard(entry: BookEntry, bookRepository: BookRepository) {
+    val coverFile = remember(entry) { bookRepository.coverFile(entry) }
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = coverFile) {
         value = BookCoverBitmapCache.load(coverFile)
     }
