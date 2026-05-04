@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import android.annotation.SuppressLint
 import android.webkit.WebView
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -51,7 +53,6 @@ import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 private const val SasayakiPopupControlsTotalHeightValue = 37.0

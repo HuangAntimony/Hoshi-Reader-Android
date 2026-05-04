@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatchData
+
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult

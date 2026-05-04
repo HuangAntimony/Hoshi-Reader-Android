@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue

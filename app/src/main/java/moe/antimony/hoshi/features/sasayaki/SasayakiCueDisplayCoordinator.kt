@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 sealed interface SasayakiCueDisplayAction {
     data object None : SasayakiCueDisplayAction
     data object Clear : SasayakiCueDisplayAction

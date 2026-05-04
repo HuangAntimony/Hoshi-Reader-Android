@@ -1,13 +1,11 @@
 package moe.antimony.hoshi.epub
 
+
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
-import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -157,5 +155,53 @@ class BookMetadataStorageTest {
         storage.saveSasayakiPlayback(root, copiedPlayback)
 
         assertEquals(copiedPlayback, storage.loadSasayakiPlayback(root))
+    }
+
+    @Test
+    fun loadsExistingIosSasayakiSidecarJsonWithoutMigration() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-ios-sasayaki-sidecars").toFile())
+        val root = storage.createBookDirectory("book")
+        root.resolve("sasayaki_match.json").writeText(
+            """
+            {
+                "matches": [
+                    {
+                        "id": "0",
+                        "startTime": 1.0,
+                        "endTime": 2.0,
+                        "text": "本文",
+                        "chapterIndex": 3,
+                        "start": 10,
+                        "length": 2
+                    }
+                ],
+                "unmatched": 4
+            }
+            """.trimIndent(),
+        )
+        root.resolve("sasayaki_playback.json").writeText(
+            """
+            {
+                "lastPosition": 12.5,
+                "audioBookmark": "AAEC"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            SasayakiMatchData(
+                matches = listOf(SasayakiMatch("0", 1.0, 2.0, "本文", chapterIndex = 3, start = 10, length = 2)),
+                unmatched = 4,
+            ),
+            storage.loadSasayakiMatch(root),
+        )
+        assertEquals(
+            SasayakiPlaybackData(
+                lastPosition = 12.5,
+                delay = 0.0,
+                rate = 1f,
+            ),
+            storage.loadSasayakiPlayback(root),
+        )
     }
 }

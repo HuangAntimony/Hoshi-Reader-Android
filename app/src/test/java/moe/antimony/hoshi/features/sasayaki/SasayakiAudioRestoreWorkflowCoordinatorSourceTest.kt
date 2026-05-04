@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

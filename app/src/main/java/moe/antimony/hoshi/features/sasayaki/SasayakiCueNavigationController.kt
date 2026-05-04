@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import kotlin.math.max
 
 class SasayakiCueNavigationController(matchData: SasayakiMatchData?) {

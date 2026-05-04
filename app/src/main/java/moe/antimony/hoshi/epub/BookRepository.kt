@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.epub
 
+
 import android.content.ContentResolver
 import android.net.Uri
 import kotlinx.coroutines.CoroutineDispatcher
@@ -8,8 +9,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
-import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
@@ -253,6 +252,7 @@ class BookSidecarDataSource(
         prettyPrint = true
         prettyPrintIndent = "    "
         encodeDefaults = true
+        ignoreUnknownKeys = true
     }
 
     suspend fun loadMetadata(bookRoot: File): BookMetadata? =

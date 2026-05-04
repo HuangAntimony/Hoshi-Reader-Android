@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.CoroutineScope

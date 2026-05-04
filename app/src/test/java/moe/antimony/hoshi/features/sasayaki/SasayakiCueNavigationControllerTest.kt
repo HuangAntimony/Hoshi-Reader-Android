@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

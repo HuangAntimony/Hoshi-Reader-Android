@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri

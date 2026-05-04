@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.SasayakiMatchData
+
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import org.junit.Assert.assertEquals

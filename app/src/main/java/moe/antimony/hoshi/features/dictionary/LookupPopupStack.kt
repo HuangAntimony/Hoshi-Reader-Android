@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
@@ -8,7 +10,6 @@ import androidx.compose.ui.zIndex
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import java.util.UUID
 
 internal data class LookupPopupOptions(

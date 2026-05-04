@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import android.os.Handler
 
 interface SasayakiTickScheduler {

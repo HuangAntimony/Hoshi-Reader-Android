@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -84,9 +88,6 @@ import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
-import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiScreenAwake
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings

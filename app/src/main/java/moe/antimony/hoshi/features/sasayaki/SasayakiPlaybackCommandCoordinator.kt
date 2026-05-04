@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 class SasayakiPlaybackCommandCoordinator(
     private val playbackState: SasayakiPlaybackStateCoordinator,
     private val playbackLifecycle: SasayakiPlaybackLifecycleController,

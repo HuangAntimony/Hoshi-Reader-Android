@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 class SasayakiCueDisplayActionDispatcher(
     private val onCue: (SasayakiMatch, Boolean) -> Unit,
     private val onClearCue: () -> Unit,

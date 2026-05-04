@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatch
+
 class CueTimeline(match: SasayakiMatchData? = null) {
     private val cues = match?.matches.orEmpty()
 

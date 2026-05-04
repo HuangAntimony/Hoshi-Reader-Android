@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+
 class SasayakiAudioRestoreWorkflowCoordinator(
     private val audioRestore: SasayakiAudioRestoreController,
     private val audioRestoreCallbacks: SasayakiAudioRestoreCallbacksCoordinator,

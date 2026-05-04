@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+
 import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import java.io.File
 
