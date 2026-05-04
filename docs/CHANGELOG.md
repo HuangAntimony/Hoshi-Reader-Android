@@ -23,6 +23,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep MK3 SVG gaiji inline with surrounding text in AnkiDroid Lapis glossary fields.
 - Bold only the selected sentence occurrence in AnkiDroid `{sentence}` fields when the mined word appears multiple times.
 - Make the Anki field mapping settings list responsive by using lightweight rows and editing mappings in a focused dialog.
+- Make Anki tags use the same focused settings editor as field mappings, without showing handlebar choices.
 - Show imported term dictionaries as `{single-glossary-...}` handlebar choices in AnkiDroid field mappings, matching iOS dictionary-specific glossary mappings.
 - Keep dictionary-specific AnkiDroid glossary handlebars from falling back to the first glossary when imported dictionary titles include a version suffix.
 - Expand Sasayaki audiobook exports for AnkiDroid `{sasayaki-audio}` to adjacent cues from the selected sentence, matching the iOS sentence-audio behavior.

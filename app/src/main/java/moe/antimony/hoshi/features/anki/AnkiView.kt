@@ -166,15 +166,11 @@ fun AnkiView(
                     )
                 }
                 item {
-                    OutlinedTextField(
+                    AnkiTextValueRow(
+                        label = "Tags",
                         value = uiState.settings.tags,
                         onValueChange = viewModel::updateTags,
-                        label = { Text("Tags") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
+                        dialogLabel = "Tags",
                     )
                 }
             }
@@ -266,6 +262,38 @@ private fun AnkiFieldMappingRow(
     onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    AnkiTextValueRow(
+        label = field,
+        value = value,
+        onValueChange = onValueChange,
+        dialogLabel = "Handlebar",
+        trailingContent = {
+            Column {
+                TextButton(onClick = { expanded = true }) { Text("{}") }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    handlebarOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                expanded = false
+                                onValueChange(if (option == "-") "" else option)
+                            },
+                        )
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun AnkiTextValueRow(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    dialogLabel: String,
+    trailingContent: (@Composable () -> Unit)? = null,
+) {
     var editing by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -277,7 +305,7 @@ private fun AnkiFieldMappingRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = field,
+                text = label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -291,25 +319,13 @@ private fun AnkiFieldMappingRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Column {
-            TextButton(onClick = { expanded = true }) { Text("{}") }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                handlebarOptions.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            expanded = false
-                            onValueChange(if (option == "-") "" else option)
-                        },
-                    )
-                }
-            }
-        }
+        trailingContent?.invoke()
     }
     AnkiDivider()
     if (editing) {
-        AnkiFieldMappingDialog(
-            field = field,
+        AnkiTextValueDialog(
+            title = label,
+            textFieldLabel = dialogLabel,
             value = value,
             onDismiss = { editing = false },
             onSave = { newValue ->
@@ -321,21 +337,22 @@ private fun AnkiFieldMappingRow(
 }
 
 @Composable
-private fun AnkiFieldMappingDialog(
-    field: String,
+private fun AnkiTextValueDialog(
+    title: String,
+    textFieldLabel: String,
     value: String,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var draft by remember(field, value) { mutableStateOf(value) }
+    var draft by remember(title, value) { mutableStateOf(value) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(field) },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = draft,
                 onValueChange = { draft = it },
-                label = { Text("Handlebar") },
+                label = { Text(textFieldLabel) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onSave(draft) }),
