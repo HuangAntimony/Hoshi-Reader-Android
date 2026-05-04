@@ -10,8 +10,11 @@ class SasayakiSourceTestPolicyTest {
         val sasayakiTests = File("src/test/java/moe/antimony/hoshi/features/sasayaki")
 
         listOf(
+            "SasayakiAudioRestoreResultCoordinatorSourceTest.kt",
+            "SasayakiMediaSessionHandleCoordinatorSourceTest.kt",
             "SasayakiPlaybackLifecycleControllerSourceTest.kt",
             "SasayakiPlaybackPersistenceStateSourceTest.kt",
+            "SasayakiTemporaryPlaybackRestoreCoordinatorSourceTest.kt",
         ).forEach { fileName ->
             assertFalse("$fileName should be covered by behavior tests.", File(sasayakiTests, fileName).exists())
         }

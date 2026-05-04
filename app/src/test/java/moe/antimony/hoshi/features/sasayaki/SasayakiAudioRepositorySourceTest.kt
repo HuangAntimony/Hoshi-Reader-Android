@@ -6,7 +6,10 @@ import java.io.File
 
 class SasayakiAudioRepositorySourceTest {
     @Test
-    fun repositoryBuildsPlaybackStateForExternalUriOrPrivateCopyImport() {
+    fun sourceShapeGuardRepositoryBuildsPlaybackStateForExternalUriOrPrivateCopyImport() {
+        // Android Uri behavior is not executable in this JVM test suite, so this
+        // source-shape guard only protects the framework branch that behavior tests
+        // cannot cover without instrumentation.
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRepository.kt").readText()
         val importedPlayback = source.substringAfter("fun importedPlayback(")
             .substringBefore("fun playbackSource(")
@@ -18,7 +21,9 @@ class SasayakiAudioRepositorySourceTest {
     }
 
     @Test
-    fun repositoryResolvesExternalUriBeforePrivateCopiedAudioFile() {
+    fun sourceShapeGuardRepositoryResolvesExternalUriBeforePrivateCopiedAudioFile() {
+        // `Uri.parse` is an Android framework seam in local JVM tests. Private
+        // copied-file resolution is covered by SasayakiAudioRepositoryTest.
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRepository.kt").readText()
         val playbackSource = source.substringAfter("fun playbackSource(")
             .substringBefore("fun clearAudioSource(")
@@ -32,7 +37,9 @@ class SasayakiAudioRepositorySourceTest {
     }
 
     @Test
-    fun repositoryClearsPrivateAudioAndReleasesPersistedUriPermission() {
+    fun sourceShapeGuardRepositoryReleasesPersistedUriPermissionWhenClearingExternalAudio() {
+        // Persisted Uri permission release depends on Android ContentResolver and
+        // is intentionally left as a narrow source-shape guard.
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRepository.kt").readText()
         val clearSource = source.substringAfter("fun clearAudioSource(")
             .substringBefore("fun storageSummary(")
@@ -45,16 +52,4 @@ class SasayakiAudioRepositorySourceTest {
         assertTrue(clearSource.contains("Intent.FLAG_GRANT_READ_URI_PERMISSION"))
     }
 
-    @Test
-    fun repositoryOwnsAudioStorageSummaryText() {
-        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRepository.kt").readText()
-        val summary = source.substringAfter("fun storageSummary(")
-            .substringBefore("fun audioFile(")
-
-        assertTrue(summary.contains("playback.audioFileName != null"))
-        assertTrue(summary.contains("Copied to app storage. The original audiobook file can be deleted."))
-        assertTrue(summary.contains("playback.audioUri != null"))
-        assertTrue(summary.contains("Linked to the external audiobook file. Keep the original file available."))
-        assertTrue(summary.contains("Select an .mp3 or .m4b audiobook"))
-    }
 }

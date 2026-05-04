@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Reader WebView resource loading and shared secure WebView defaults now have named boundaries; next architecture slice: reduce remaining source-string test debt.
+- Source-string test debt has been reduced around dictionary and Sasayaki behavior seams; next architecture slice: reassess modularization and build cleanup before any module extraction.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
