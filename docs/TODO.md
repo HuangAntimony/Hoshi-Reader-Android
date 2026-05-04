@@ -66,7 +66,7 @@ Status: `todo`
 Status: `in_progress`
 
 - Android now targets AnkiDroid's native API instead of AnkiMobile callbacks.
-- Current emulator validation covers Lapis field mapping restore, field mapping list scrolling, MK3 SVG dictionary media/inline gaiji styling, selected sentence occurrence bolding, and Sasayaki sentence-expanded cue audio mining.
+- Current emulator validation covers Lapis field mapping restore, field mapping list scrolling, dictionary-specific Anki handlebars, MK3 SVG dictionary media/inline gaiji styling, selected sentence occurrence bolding, and Sasayaki sentence-expanded cue audio mining.
 - Next: expand duplicate and future AnkiConnect backend coverage.
 - Keep AnkiConnect behind the Anki backend boundary; do not add it by coupling popup mining directly to HTTP calls.
 

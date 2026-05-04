@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -47,6 +48,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import moe.antimony.hoshi.LocalHoshiAppContainer
+import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 
 @Composable
@@ -66,6 +68,16 @@ fun AnkiView(
         },
     )
     val uiState by viewModel.uiState.collectAsState()
+    val handlebarOptions by produceState(
+        initialValue = AnkiHandlebarOptions.forTermDictionaries(emptyList()),
+        key1 = appContainer.dictionaryRepository,
+    ) {
+        value = AnkiHandlebarOptions.forTermDictionaries(
+            appContainer.dictionaryRepository
+                .loadDictionaries(DictionaryType.Term)
+                .map { it.index.title },
+        )
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -149,6 +161,7 @@ fun AnkiView(
                     AnkiFieldMappingRow(
                         field = field,
                         value = uiState.settings.fieldMappings[field].orEmpty(),
+                        handlebarOptions = handlebarOptions,
                         onValueChange = { viewModel.updateFieldMapping(field, it) },
                     )
                 }
@@ -249,6 +262,7 @@ private fun AnkiSwitchRow(
 private fun AnkiFieldMappingRow(
     field: String,
     value: String,
+    handlebarOptions: List<String>,
     onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -280,7 +294,7 @@ private fun AnkiFieldMappingRow(
         Column {
             TextButton(onClick = { expanded = true }) { Text("{}") }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                AnkiHandlebarOptions.forEach { option ->
+                handlebarOptions.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option) },
                         onClick = {
@@ -364,24 +378,31 @@ private fun AnkiDivider() {
     )
 }
 
-private val AnkiHandlebarOptions = listOf(
-    "-",
-    "{expression}",
-    "{reading}",
-    "{furigana-plain}",
-    "{audio}",
-    "{glossary}",
-    "{glossary-first}",
-    "{selected-glossary}",
-    "{popup-selection-text}",
-    "{sentence}",
-    "{frequencies}",
-    "{frequency-harmonic-rank}",
-    "{pitch-accent-positions}",
-    "{pitch-accent-categories}",
-    "{document-title}",
-    "{book-cover}",
-    "{sasayaki-audio}",
-)
+internal object AnkiHandlebarOptions {
+    private val CoreOptions = listOf(
+        "-",
+        "{expression}",
+        "{reading}",
+        "{furigana-plain}",
+        "{audio}",
+        "{glossary}",
+        "{glossary-first}",
+        "{selected-glossary}",
+        "{popup-selection-text}",
+        "{sentence}",
+        "{frequencies}",
+        "{frequency-harmonic-rank}",
+        "{pitch-accent-positions}",
+        "{pitch-accent-categories}",
+        "{document-title}",
+        "{book-cover}",
+        "{sasayaki-audio}",
+    )
+
+    fun forTermDictionaries(dictionaryNames: List<String>): List<String> =
+        CoreOptions + dictionaryNames
+            .distinct()
+            .map { dictionaryName -> "{single-glossary-$dictionaryName}" }
+}
 
 private const val AnkiDroidReadWritePermission = "com.ichi2.anki.permission.READ_WRITE_DATABASE"
