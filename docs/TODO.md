@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Source-string test debt has been reduced around dictionary and Sasayaki behavior seams; next architecture slice: reassess modularization and build cleanup before any module extraction.
+- Modularization is deferred until sidecar/model and native build boundaries are characterized; next architecture slice: characterize Rust/UniFFI Gradle task behavior before build-logic extraction.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

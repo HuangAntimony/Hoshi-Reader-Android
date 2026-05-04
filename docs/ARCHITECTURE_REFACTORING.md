@@ -206,6 +206,14 @@ Later modules:
 
 Native/Rust build logic should stay in `:app` until the Kotlin boundaries are stable, or move into a dedicated native module only after the build behavior is understood.
 
+Current reassessment as of 2026-05-04:
+
+- Do not extract `:core:model` yet. EPUB storage still imports Sasayaki sidecar models, so a model module would either pull feature concepts into core or require a separate sidecar-model slice first.
+- Do not extract `:core:epub` yet. `BookRepository` and `BookStorage` still combine Android SAF import, sidecar JSON, route-facing repository APIs, and Rust parser handoff.
+- Do not extract `:core:dictionary-api` yet. Dictionary storage/query APIs are cleaner, but import still combines Android `ContentResolver`, temporary ZIP handling, native bridge dispatch, and config rebuild flow.
+- Do not extract `:core:settings` yet. Reader, dictionary, audio, and Sasayaki settings have DataStore repositories, but they still live in feature packages with legacy SharedPreferences migration adapters and UI call sites.
+- Prefer one more boundary-stabilizing slice before module extraction: separate shared sidecar/model contracts from feature implementations or characterize native build behavior before moving Gradle logic.
+
 Expected benefits:
 
 - Better encapsulation and ownership.
@@ -477,6 +485,11 @@ Scope:
 - Extract modules only after APIs have stabilized: start with pure Kotlin or low-Android-dependency boundaries such as `:core:model`, `:core:storage`, `:core:epub`, `:core:dictionary-api`, and `:core:settings`.
 - Extract Rust/UniFFI Gradle task registration only after the current build behavior is well characterized.
 - Add Macrobenchmark/Baseline Profile coverage for startup, EPUB import/open reader, reader page turn, dictionary search, and lookup popup open.
+
+Current build checkpoint as of 2026-05-04:
+
+- `app/build.gradle.kts` still owns release signing validation, CMake/JNI dictionary bridge wiring, Rust host build, UniFFI Kotlin generation, `cargo-ndk` Android library builds, generated source registration, generated JNI libs, and JNA test runtime wiring.
+- Build-logic extraction should start with characterization of task dependencies and expected outputs for `buildRustHost`, `generateUniffiKotlin`, `buildRustAndroidDebug`, and `buildRustAndroidRelease`; do not move this logic to another module or script until those behaviors are verified.
 
 Why last:
 
