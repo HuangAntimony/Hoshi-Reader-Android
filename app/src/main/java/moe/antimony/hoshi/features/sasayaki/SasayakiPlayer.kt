@@ -108,6 +108,11 @@ class SasayakiPlayer(
         cuePresentation = cuePresentation,
         mediaSessionPublishing = mediaSessionPublishing,
     )
+    private val playbackTick = SasayakiPlaybackTickCoordinator(
+        playbackEvents = playbackEvents,
+        cuePresentation = cuePresentation,
+        getCurrentChapterIndex = getCurrentChapterIndex,
+    )
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
@@ -277,13 +282,10 @@ class SasayakiPlayer(
     }
 
     private fun tick() {
-        playbackEvents.tick(
+        playbackTick.tick(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
             delay = delay,
-            currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = cuePresentation.autoScroll,
-            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             pausePlayback = { pausePlayback() },
             updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
