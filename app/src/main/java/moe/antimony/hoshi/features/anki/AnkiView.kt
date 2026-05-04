@@ -4,15 +4,21 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -31,7 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -133,14 +141,16 @@ fun AnkiView(
                         modifier = Modifier.padding(top = 18.dp, bottom = 8.dp),
                     )
                 }
-                selectedNoteType.fields.forEach { field ->
-                    item {
-                        AnkiFieldMappingRow(
-                            field = field,
-                            value = uiState.settings.fieldMappings[field].orEmpty(),
-                            onValueChange = { viewModel.updateFieldMapping(field, it) },
-                        )
-                    }
+                items(
+                    items = selectedNoteType.fields,
+                    key = { field -> field },
+                    contentType = { "anki-field-mapping" },
+                ) { field ->
+                    AnkiFieldMappingRow(
+                        field = field,
+                        value = uiState.settings.fieldMappings[field].orEmpty(),
+                        onValueChange = { viewModel.updateFieldMapping(field, it) },
+                    )
                 }
                 item {
                     OutlinedTextField(
@@ -242,12 +252,32 @@ private fun AnkiFieldMappingRow(
     onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(field) },
-        singleLine = true,
-        trailingIcon = {
+    var editing by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { editing = true }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = field,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value.ifBlank { "None" },
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Column {
             TextButton(onClick = { expanded = true }) { Text("{}") }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 AnkiHandlebarOptions.forEach { option ->
@@ -260,12 +290,54 @@ private fun AnkiFieldMappingRow(
                     )
                 }
             }
+        }
+    }
+    AnkiDivider()
+    if (editing) {
+        AnkiFieldMappingDialog(
+            field = field,
+            value = value,
+            onDismiss = { editing = false },
+            onSave = { newValue ->
+                editing = false
+                onValueChange(newValue)
+            },
+        )
+    }
+}
+
+@Composable
+private fun AnkiFieldMappingDialog(
+    field: String,
+    value: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var draft by remember(field, value) { mutableStateOf(value) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(field) },
+        text = {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                label = { Text("Handlebar") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onSave(draft) }),
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = {}),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        confirmButton = {
+            Button(onClick = { onSave(draft) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
     )
 }
 
