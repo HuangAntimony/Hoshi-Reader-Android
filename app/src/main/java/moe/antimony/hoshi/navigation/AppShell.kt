@@ -72,6 +72,7 @@ fun AppShell(
     var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
     var dictionarySettingsLoaded by remember { mutableStateOf(false) }
     var dictionaryDefaultRouteApplied by remember { mutableStateOf(false) }
+    var showAnkiPlaceholder by remember { mutableStateOf(false) }
     val initialRoute = AppRoute.BooksRoute
     val backStack = rememberNavBackStack(initialRoute)
     val bookRepository = remember { BookRepository(context.filesDir) }
@@ -179,6 +180,7 @@ fun AppShell(
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                         onSettingsDestination = { destination ->
                             when (destination) {
+                                SettingsDestination.Anki -> showAnkiPlaceholder = true
                                 SettingsDestination.ReportIssue -> context.startActivity(
                                     Intent(
                                         Intent.ACTION_VIEW,
@@ -239,6 +241,19 @@ fun AppShell(
             }
         },
     )
+
+    if (showAnkiPlaceholder) {
+        AlertDialog(
+            onDismissRequest = { showAnkiPlaceholder = false },
+            title = { Text("Anki") },
+            text = { Text("This settings page is not implemented yet.") },
+            confirmButton = {
+                TextButton(onClick = { showAnkiPlaceholder = false }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -323,7 +338,6 @@ private fun SettingsDetailDestination(
             onClose = onClose,
             modifier = Modifier.fillMaxSize(),
         )
-        SettingsDetailSection.Anki,
         SettingsDetailSection.About,
         -> {
             TopLevelRouteContent(
@@ -359,7 +373,7 @@ private fun MainTab.toRoute(): AppRoute = when (this) {
 
 private fun SettingsDestination.toSection(): SettingsDetailSection = when (this) {
     SettingsDestination.Dictionaries -> SettingsDetailSection.Dictionaries
-    SettingsDestination.Anki -> SettingsDetailSection.Anki
+    SettingsDestination.Anki -> error("Anki placeholder is handled outside Navigation3.")
     SettingsDestination.Appearance -> SettingsDetailSection.Appearance
     SettingsDestination.Behavior -> SettingsDetailSection.Behavior
     SettingsDestination.Advanced -> SettingsDetailSection.Advanced
@@ -369,7 +383,6 @@ private fun SettingsDestination.toSection(): SettingsDetailSection = when (this)
 }
 
 private fun SettingsDetailSection.placeholderTitle(): String = when (this) {
-    SettingsDetailSection.Anki -> "Anki"
     SettingsDetailSection.About -> "About"
     SettingsDetailSection.Appearance -> "Appearance"
     SettingsDetailSection.Behavior -> "Behavior"

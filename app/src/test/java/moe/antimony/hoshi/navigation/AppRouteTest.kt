@@ -57,7 +57,6 @@ class AppRouteTest {
         assertEquals(
             listOf(
                 "Dictionaries",
-                "Anki",
                 "Appearance",
                 "Behavior",
                 "Advanced",

@@ -32,6 +32,24 @@ class AppShellNavigationTest {
     }
 
     @Test
+    fun ankiSettingsPlaceholderStaysOutsideNavigation3DetailRoutes() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+        val appRoute = File("src/main/java/moe/antimony/hoshi/navigation/AppRoute.kt").readText()
+        val settingsRoute = appShell.substringAfter("AppRoute.SettingsRoute ->")
+            .substringBefore("is AppRoute.SettingsDetailRoute")
+        val sectionMapping = appShell.substringAfter("private fun SettingsDestination.toSection()")
+            .substringBefore("private fun SettingsDetailSection.placeholderTitle()")
+
+        assertFalse(appRoute.contains("Anki,"))
+        assertTrue(settingsRoute.contains("SettingsDestination.Anki -> showAnkiPlaceholder = true"))
+        assertTrue(
+            sectionMapping.contains(
+                "SettingsDestination.Anki -> error(\"Anki placeholder is handled outside Navigation3.\")",
+            ),
+        )
+    }
+
+    @Test
     fun appShellReadsLatestSettingsInsideSavedNavEntries() {
         val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
 

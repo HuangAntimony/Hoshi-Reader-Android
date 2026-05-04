@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Sasayaki playback production split is complete for the current architecture queue; next architecture slice: start the Reader/WebView typed bridge work without changing pagination, lookup popup, bookmark restore, or Sasayaki integration behavior.
+- Navigation3 settings route scope is reconciled with the Anki non-goal; next architecture slice: extract a small app dependency container before slimming `AppShell`.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
