@@ -47,6 +47,10 @@ class SasayakiPlayer(
         cueNavigation = cueNavigation,
         cueDisplay = cueDisplay,
     )
+    private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator(
+        playbackLifecycle = playbackLifecycle,
+        playbackCommands = playbackCommands,
+    )
     private val playbackSettings = SasayakiPlaybackSettingsCoordinator(
         playbackPersistence = playbackPersistence,
         playbackLifecycle = playbackLifecycle,
@@ -239,21 +243,14 @@ class SasayakiPlayer(
             audioRestore.restore(
                 playback = playback,
                 releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
-                callbacks = SasayakiAudioRestoreCallbacks(
-                    onCompletion = {
-                        playbackLifecycle.markCompleted(updateMediaSession = ::updateMediaSession)
-                    },
-                    onSeekComplete = ::handleSeekComplete,
-                    onPlay = ::startPlayback,
-                    onPause = { pausePlayback() },
-                    onSkipToPrevious = ::previousCue,
-                    onSkipToNext = ::nextCue,
-                    onSeekTo = { positionMs ->
-                        playbackCommands.mediaSessionSeek(
-                            positionMs = positionMs,
-                            isPlaying = isPlaying,
-                        )
-                    },
+                callbacks = audioRestoreCallbacks.build(
+                    updateMediaSession = ::updateMediaSession,
+                    handleSeekComplete = ::handleSeekComplete,
+                    startPlayback = ::startPlayback,
+                    pausePlayback = { pausePlayback() },
+                    previousCue = ::previousCue,
+                    nextCue = ::nextCue,
+                    isPlaying = { isPlaying },
                 ),
             )
         }.onFailure(audioRestoreResult::handleFailure).getOrNull() ?: return

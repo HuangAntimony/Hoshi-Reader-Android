@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: extract a small Sasayaki audio restore callbacks coordinator from `SasayakiPlayer` without changing completion, seek, play/pause, skip, or media-session seek behavior.
+- Next architecture slice: extract a small Sasayaki media-session publishing coordinator from `SasayakiPlayer` without changing current time, duration, rate, active state, or transport metadata behavior.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
