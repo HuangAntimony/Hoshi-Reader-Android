@@ -1,8 +1,10 @@
 package moe.antimony.hoshi.navigation
 
 import android.view.KeyEvent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -11,6 +13,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
 import kotlinx.coroutines.launch
@@ -27,6 +30,10 @@ internal fun ReaderRouteDestination(
     modifier: Modifier = Modifier,
 ) {
     val bookmarkScope = rememberCoroutineScope()
+    val systemDarkTheme = isSystemInDarkTheme()
+    val readerLoadingBackground = Modifier.background(
+        Color(readerSettings.backgroundColor(systemDarkTheme)),
+    )
     val routeState by produceState<ReaderRouteLoadState>(
         initialValue = ReaderRouteLoadState.Loading,
         key1 = bookId,
@@ -37,13 +44,17 @@ internal fun ReaderRouteDestination(
 
     when (val state = routeState) {
         ReaderRouteLoadState.Loading -> Box(
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier
+                .fillMaxSize()
+                .then(readerLoadingBackground),
             contentAlignment = Alignment.Center,
         ) {
             CircularProgressIndicator()
         }
         is ReaderRouteLoadState.Error -> Box(
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier
+                .fillMaxSize()
+                .then(readerLoadingBackground),
             contentAlignment = Alignment.Center,
         ) {
             Text(state.message)

@@ -7,6 +7,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Match the reader loading screen to the active reader background, preventing a white flash when opening books in dark mode.
 - Keep the bookshelf visible while opening an existing book, preventing a brief loading-spinner flash before the reader appears.
 - Refresh Settings detail controls immediately after toggles or option changes, and remove Navigation3 fade transitions so page switches are e-ink friendly.
 - Keep external EPUB opens and Sasayaki media-control returns in the existing Hoshi task, and ignore duplicate EPUB import requests while an import is already running.
