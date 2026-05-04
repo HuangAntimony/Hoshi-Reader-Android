@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Dictionary search now has a state holder behind the Compose-facing view; next architecture slice: start Reader typed JavaScript command/result boundaries.
+- Reader selection now has typed JavaScript command/result boundaries; next architecture slice: extract Reader WebView resource bridge and security defaults.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

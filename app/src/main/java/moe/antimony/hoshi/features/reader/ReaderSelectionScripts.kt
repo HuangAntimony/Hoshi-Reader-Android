@@ -2,18 +2,16 @@ package moe.antimony.hoshi.features.reader
 
 internal object ReaderSelectionScripts {
     fun selectInvocation(x: Float, y: Float, maxLength: Int): String =
-        "window.hoshiSelection.selectText($x, $y, $maxLength)"
+        ReaderSelectionCommand.SelectText(x, y, maxLength).source
 
     fun highlightInvocation(count: Int): String =
-        "window.hoshiSelection.highlightSelection($count)"
+        ReaderSelectionCommand.HighlightSelection(count).source
 
     fun clearInvocation(): String =
-        "window.hoshiSelection.clearSelection()"
+        ReaderSelectionCommand.ClearSelection.source
 
     fun didSelectNothing(result: String?): Boolean =
-        result?.trim()
-            ?.let { it == "null" || it == "undefined" }
-            ?: true
+        ReaderSelectionResult.fromWebViewResult(result).selectedNothing
 
     fun script(): String = """
         <script>

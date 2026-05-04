@@ -221,8 +221,9 @@ fun ReaderWebView(
         )?.let { (popup, highlightCount) ->
             popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
         }
+
     fun clearReaderSelection() {
-        webView?.evaluateJavascript(ReaderSelectionScripts.clearInvocation(), null)
+        webView?.evaluateJavascript(ReaderSelectionCommand.ClearSelection.source, null)
     }
     fun resumeSasayakiAfterLookupIfNeeded() {
         val player = sasayakiPlayer
@@ -872,13 +873,13 @@ private fun ChapterWebView(
                     override fun onTap(x: Float, y: Float) {
                         val density = resources.displayMetrics.density
                         evaluateJavascript(
-                            ReaderSelectionScripts.selectInvocation(
+                            ReaderSelectionCommand.SelectText(
                                 x = androidPixelsToCssPixels(x, density),
                                 y = androidPixelsToCssPixels(y, density),
                                 maxLength = MAX_SELECTION_LENGTH,
-                            ),
+                            ).source,
                         ) { result ->
-                            if (ReaderSelectionScripts.didSelectNothing(result)) {
+                            if (ReaderSelectionResult.fromWebViewResult(result).selectedNothing) {
                                 onClearLookupPopup()
                             }
                         }
@@ -1051,7 +1052,7 @@ private class ReaderSelectionBridge(
         )
         webView.post {
             val highlightCount = onTextSelected(data) ?: return@post
-            webView.evaluateJavascript(ReaderSelectionScripts.highlightInvocation(highlightCount), null)
+            webView.evaluateJavascript(ReaderSelectionCommand.HighlightSelection(highlightCount).source, null)
         }
     }
 }
