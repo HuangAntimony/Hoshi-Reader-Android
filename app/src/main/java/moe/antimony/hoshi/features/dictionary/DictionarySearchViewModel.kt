@@ -18,6 +18,7 @@ import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
+import moe.antimony.hoshi.features.anki.AnkiPopupSettings
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 
 internal interface DictionarySearchRepository {
@@ -88,6 +89,7 @@ internal class DictionarySearchViewModel(
         assets: LookupPopupAssets? = null,
         darkMode: Boolean = false,
         eInkMode: Boolean = false,
+        ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
     ) {
         val query = _uiState.value.query
         val dictionarySettings = _uiState.value.dictionarySettings.normalized()
@@ -106,6 +108,7 @@ internal class DictionarySearchViewModel(
                             darkMode = darkMode,
                             eInkMode = eInkMode,
                             audioSettings = audioSettings,
+                            ankiSettings = ankiSettings,
                         )
                     } else {
                         repository.rebuildLookupQuery()
@@ -119,6 +122,7 @@ internal class DictionarySearchViewModel(
                             darkMode = darkMode,
                             eInkMode = eInkMode,
                             audioSettings = audioSettings,
+                            ankiSettings = ankiSettings,
                         )
                     }
                 }

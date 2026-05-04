@@ -63,11 +63,11 @@ Status: `todo`
 
 ### Anki
 
-Status: `todo`
+Status: `in_progress`
 
-- Investigate AnkiDroid APIs, intents, and any Android-appropriate AnkiConnect path.
-- Build the smallest card creation flow from dictionary lookup results.
-- Do not copy iOS AnkiMobile x-callback behavior directly.
+- Android now targets AnkiDroid's native API instead of AnkiMobile callbacks.
+- Next: expand manual emulator coverage for Lapis mining, media fields, duplicates, and future AnkiConnect backend support.
+- Keep AnkiConnect behind the Anki backend boundary; do not add it by coupling popup mining directly to HTTP calls.
 
 ### Audio And Sasayaki
 

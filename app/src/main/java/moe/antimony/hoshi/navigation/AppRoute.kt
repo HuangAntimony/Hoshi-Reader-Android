@@ -36,6 +36,7 @@ sealed interface AppRoute : NavKey {
 @Serializable
 enum class SettingsDetailSection {
     Dictionaries,
+    Anki,
     Appearance,
     Behavior,
     Advanced,

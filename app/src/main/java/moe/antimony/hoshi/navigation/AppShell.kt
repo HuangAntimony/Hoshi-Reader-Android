@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -30,6 +29,7 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.audio.AdvancedSettingsView
+import moe.antimony.hoshi.features.anki.AnkiView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
 import moe.antimony.hoshi.features.bookshelf.MainTab
@@ -71,7 +71,6 @@ fun AppShell(
     val launchRouteStateHolder = remember { AppLaunchRouteStateHolder() }
     val pendingImportRouteCoordinator = remember { PendingImportRouteCoordinator() }
     val sasayakiMatchRequestStore = remember { SasayakiMatchRequestStore() }
-    var showAnkiPlaceholder by remember { mutableStateOf(false) }
     val initialRoute = AppRoute.BooksRoute
     val backStack = rememberNavBackStack(initialRoute)
     val bookRepository = appContainer.bookRepository
@@ -167,7 +166,7 @@ fun AppShell(
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
                         onSettingsDestination = { destination ->
                             when (destination) {
-                                SettingsDestination.Anki -> showAnkiPlaceholder = true
+                                SettingsDestination.Anki -> openSettingsDetail(destination.toSection())
                                 SettingsDestination.ReportIssue -> context.startActivity(
                                     Intent(
                                         Intent.ACTION_VIEW,
@@ -228,19 +227,6 @@ fun AppShell(
             }
         },
     )
-
-    if (showAnkiPlaceholder) {
-        AlertDialog(
-            onDismissRequest = { showAnkiPlaceholder = false },
-            title = { Text("Anki") },
-            text = { Text("This settings page is not implemented yet.") },
-            confirmButton = {
-                TextButton(onClick = { showAnkiPlaceholder = false }) {
-                    Text("OK")
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -304,6 +290,10 @@ private fun SettingsDetailDestination(
             onClose = onClose,
             modifier = Modifier.fillMaxSize(),
         )
+        SettingsDetailSection.Anki -> AnkiView(
+            onClose = onClose,
+            modifier = Modifier.fillMaxSize(),
+        )
         SettingsDetailSection.Appearance -> ReaderAppearanceScreen(
             settings = readerSettings,
             onSettingsChange = onReaderSettingsChange,
@@ -360,7 +350,7 @@ private fun MainTab.toRoute(): AppRoute = when (this) {
 
 private fun SettingsDestination.toSection(): SettingsDetailSection = when (this) {
     SettingsDestination.Dictionaries -> SettingsDetailSection.Dictionaries
-    SettingsDestination.Anki -> error("Anki placeholder is handled outside Navigation3.")
+    SettingsDestination.Anki -> SettingsDetailSection.Anki
     SettingsDestination.Appearance -> SettingsDetailSection.Appearance
     SettingsDestination.Behavior -> SettingsDetailSection.Behavior
     SettingsDestination.Advanced -> SettingsDetailSection.Advanced
@@ -376,4 +366,5 @@ private fun SettingsDetailSection.placeholderTitle(): String = when (this) {
     SettingsDetailSection.Advanced -> "Advanced"
     SettingsDetailSection.Diagnostics -> "Diagnostics"
     SettingsDetailSection.Dictionaries -> "Dictionaries"
+    SettingsDetailSection.Anki -> "Anki"
 }

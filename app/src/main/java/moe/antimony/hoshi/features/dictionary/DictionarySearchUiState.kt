@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.dictionary
 
 import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.anki.AnkiPopupSettings
 
 internal data class DictionarySearchUiState(
     val query: String = "",
@@ -42,6 +43,7 @@ internal object DictionarySearchContent {
         darkMode: Boolean = false,
         eInkMode: Boolean = false,
         audioSettings: AudioSettings = AudioSettings(),
+        ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
     ): DictionarySearchRenderState {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
@@ -74,6 +76,7 @@ internal object DictionarySearchContent {
                 darkMode = darkMode,
                 eInkMode = eInkMode,
                 audioSettings = audioSettings,
+                ankiSettings = ankiSettings,
             ),
             results = results,
             hasResults = true,

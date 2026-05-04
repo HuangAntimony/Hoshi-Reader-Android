@@ -13,6 +13,7 @@ datastore = "1.2.1"
 jna = "5.18.1"
 kotlinxSerializationJson = "1.9.0"
 navigation3 = "1.1.1"
+ankidroidApi = "api-v1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,6 +37,7 @@ androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compo
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
+ankidroid-api = { group = "com.github.ankidroid", name = "Anki-Android", version.ref = "ankidroidApi" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }

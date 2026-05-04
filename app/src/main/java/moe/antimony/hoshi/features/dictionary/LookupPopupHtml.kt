@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.anki.AnkiPopupSettings
 
 internal data class LookupPopupAssets(
     val popupJs: String,
@@ -42,6 +43,7 @@ internal object LookupPopupHtml {
         darkMode: Boolean = false,
         eInkMode: Boolean = false,
         audioSettings: AudioSettings = AudioSettings(),
+        ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
     ): String {
         val entryCount = results.size
         val entries = if (assets == null) {
@@ -105,8 +107,8 @@ internal object LookupPopupHtml {
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
-                            mineEntry: { postMessage: async function() { return false; } },
-                            duplicateCheck: { postMessage: async function() { return false; } },
+                            mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
+                            duplicateCheck: { postMessage: async function(expression) { return window.HoshiPopup.duplicateCheck(expression); } },
                             getEntry: { postMessage: async function(index) {
                                 if (window.HoshiPopup && window.HoshiPopup.getEntry) {
                                     var entryJson = window.HoshiPopup.getEntry(index);
@@ -134,11 +136,11 @@ internal object LookupPopupHtml {
                     window.disablePopupImageViewportMaxHeight = true;
                     window.audioEnableAutoplay = ${audioSettings.enableAutoplay};
                     window.audioPlaybackMode = "${audioSettings.playbackMode.rawValue}";
-                    window.needsAudio = false;
-                    window.allowDupes = false;
+                    window.needsAudio = ${ankiSettings.needsAudio};
+                    window.allowDupes = ${ankiSettings.allowDupes};
                     window.useAnkiConnect = false;
-                    window.embedMedia = false;
-                    window.compactGlossariesAnki = false;
+                    window.embedMedia = ${ankiSettings.embedMedia};
+                    window.compactGlossariesAnki = ${ankiSettings.compactGlossaries};
                     window.customCSS = ${JsonPrimitive(normalizedSettings.customCSS)};
                     window.swipeThreshold = $effectiveSwipeThreshold;
                     window.dictionaryStyles = $styles;

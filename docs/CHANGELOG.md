@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add AnkiDroid mining from dictionary lookup results, including Lapis field defaults, iOS-compatible handlebars, duplicate checks, tags, and media export support.
+
 ### Fixed
 
 - Match the reader loading screen to the active reader background, preventing a white flash when opening books in dark mode.

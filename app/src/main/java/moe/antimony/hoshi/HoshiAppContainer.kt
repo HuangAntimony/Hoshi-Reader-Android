@@ -8,6 +8,11 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.audioSettingsRepository
+import moe.antimony.hoshi.features.anki.AndroidAnkiContentApi
+import moe.antimony.hoshi.features.anki.AnkiDroidBackendAdapter
+import moe.antimony.hoshi.features.anki.AnkiRepository
+import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
+import moe.antimony.hoshi.features.anki.ankiSettingsRepository
 import moe.antimony.hoshi.features.bookshelf.AndroidBookshelfRepository
 import moe.antimony.hoshi.features.bookshelf.BookshelfRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionaryViewModelRepository
@@ -31,9 +36,15 @@ internal class HoshiAppContainer(context: Context) {
     val readerSettingsRepository: ReaderSettingsRepository = appContext.readerSettingsRepository()
     val dictionarySettingsRepository: DictionarySettingsRepository = appContext.dictionarySettingsRepository()
     val audioSettingsRepository: AudioSettingsRepository = appContext.audioSettingsRepository()
+    val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()
     val readerFontManager: ReaderFontManager = ReaderFontManager(appContext.filesDir)
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
+    val ankiRepository: AnkiRepository = AnkiRepository(
+        context = appContext,
+        backend = AnkiDroidBackendAdapter(AndroidAnkiContentApi(appContext)),
+        settingsRepository = ankiSettingsRepository,
+    )
 
     fun readerRouteStateHolder(): ReaderRouteStateHolder =
         ReaderRouteStateHolder(bookRepository)

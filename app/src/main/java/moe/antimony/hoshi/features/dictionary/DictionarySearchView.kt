@@ -57,6 +57,8 @@ import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.anki.AnkiMiningContext
+import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import kotlin.math.abs
@@ -102,7 +104,17 @@ fun DictionarySearchView(
             }
         },
     )
+    val ankiViewModel: AnkiViewModel = viewModel(
+        factory = remember(appContainer) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    AnkiViewModel(appContainer.ankiRepository) as T
+            }
+        },
+    )
     val uiState by searchViewModel.uiState.collectAsState()
+    val ankiUiState by ankiViewModel.uiState.collectAsState()
     val localAudioRepository = appContainer.localAudioRepository
     val popupDarkMode = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val popupOptions = dictionarySearchPopupOptions(
@@ -116,6 +128,7 @@ fun DictionarySearchView(
             assets = assets,
             darkMode = popupDarkMode,
             eInkMode = readerSettings.eInkMode,
+            ankiSettings = ankiUiState.popupSettings,
         )
     }
     val lookupPopup = { selection: moe.antimony.hoshi.features.reader.ReaderSelectionData ->
@@ -151,6 +164,16 @@ fun DictionarySearchView(
                     onPlayWordAudio = { url, mode ->
                         WordAudioPlayer.get(context).play(url, mode)
                     },
+                    onMineEntry = { payload ->
+                        ankiViewModel.mineEntry(
+                            payload,
+                            AnkiMiningContext(
+                                sentence = uiState.lastQuery.ifBlank { uiState.query },
+                                popupSelectionText = "",
+                            ),
+                        )
+                    },
+                    onDuplicateCheck = ankiViewModel::duplicateCheck,
                 ),
                 modifier = Modifier
                     .fillMaxSize()

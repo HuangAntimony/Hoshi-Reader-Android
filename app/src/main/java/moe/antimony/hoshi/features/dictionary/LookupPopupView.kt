@@ -33,10 +33,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,10 +52,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.dictionary.LookupEngine
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.anki.AnkiMiningContext
+import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
@@ -79,6 +86,7 @@ data class LookupPopupState(
     val eInkMode: Boolean = false,
     val audioSettings: AudioSettings = AudioSettings(),
     val popupActionBar: Boolean = false,
+    val ankiContext: AnkiMiningContext = AnkiMiningContext(sentence = selection.sentence),
 )
 
 @Composable
@@ -99,6 +107,17 @@ fun LookupPopupView(
 ) {
     if (state.results.isEmpty()) return
     val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
+    val ankiViewModel: AnkiViewModel = viewModel(
+        factory = remember(appContainer) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    AnkiViewModel(appContainer.ankiRepository) as T
+            }
+        },
+    )
+    val ankiUiState by ankiViewModel.uiState.collectAsState()
     val assets = remember(context) { LookupPopupAssets.load(context) }
     val html = remember(
         state.results,
@@ -109,6 +128,7 @@ fun LookupPopupView(
         state.darkMode,
         state.eInkMode,
         state.audioSettings,
+        ankiUiState.popupSettings,
     ) {
         LookupPopupHtml.render(
             results = state.results,
@@ -119,6 +139,7 @@ fun LookupPopupView(
             darkMode = state.darkMode,
             eInkMode = state.eInkMode,
             audioSettings = state.audioSettings,
+            ankiSettings = ankiUiState.popupSettings,
         )
     }
     var contentReady by remember(html) { mutableStateOf(false) }
@@ -254,6 +275,12 @@ fun LookupPopupView(
                         },
                         onPlayWordAudio = { url, mode ->
                             WordAudioPlayer.get(context).play(url, mode)
+                        },
+                        onMineEntry = { payload ->
+                            ankiViewModel.mineEntry(payload, state.ankiContext)
+                        },
+                        onDuplicateCheck = { expression ->
+                            ankiViewModel.duplicateCheck(expression)
                         },
                         onContentReady = {
                             contentReady = true

@@ -107,6 +107,9 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        disable += "DirectSystemCurrentTimeMillisUsage"
+    }
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -134,6 +137,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.ankidroid.api)
     implementation(libs.kotlinx.serialization.json)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     testImplementation(libs.junit)

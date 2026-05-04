@@ -9,6 +9,7 @@ import de.manhhao.hoshi.TermResult
 import moe.antimony.hoshi.features.audio.AudioPlaybackMode
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSource
+import moe.antimony.hoshi.features.anki.AnkiPopupSettings
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -174,6 +175,28 @@ class LookupPopupHtmlTest {
         )
 
         assertTrue(html.contains("window.swipeThreshold = 55;"))
+    }
+
+    @Test
+    fun injectsAnkiMiningSettingsIntoPopupWebView() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "eat")),
+            assets = LookupPopupAssets(popupJs = "", popupCss = ""),
+            ankiSettings = AnkiPopupSettings(
+                isConfigured = true,
+                needsAudio = true,
+                allowDupes = true,
+                compactGlossaries = true,
+            ),
+        )
+
+        assertTrue(html.contains("window.needsAudio = true;"))
+        assertTrue(html.contains("window.allowDupes = true;"))
+        assertTrue(html.contains("window.useAnkiConnect = false;"))
+        assertTrue(html.contains("window.embedMedia = true;"))
+        assertTrue(html.contains("window.compactGlossariesAnki = true;"))
+        assertTrue(html.contains("mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } }"))
+        assertTrue(html.contains("duplicateCheck: { postMessage: async function(expression) { return window.HoshiPopup.duplicateCheck(expression); } }"))
     }
 
     @Test
