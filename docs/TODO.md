@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- `AppShell` non-navigation coordination is split into focused helpers; next architecture slice: replace high-value Sasayaki source-shape tests with behavior tests before further playback cleanup.
+- High-value Sasayaki lifecycle/persistence source-shape tests are replaced with behavior tests; next architecture slice: introduce a Sasayaki playback controller facade.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

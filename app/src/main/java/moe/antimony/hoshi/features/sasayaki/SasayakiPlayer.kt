@@ -43,8 +43,10 @@ class SasayakiPlayer(
     }
     private val playbackLifecycle = SasayakiPlaybackLifecycleController(
         playbackState = playbackState,
-        handler = handler,
-        tickRunnable = tickRunnable,
+        tickScheduler = HandlerSasayakiTickScheduler(
+            handler = handler,
+            tickRunnable = tickRunnable,
+        ),
     )
     private val temporaryPlaybackRestore = SasayakiTemporaryPlaybackRestoreCoordinator(
         playbackState = playbackState,

@@ -2,10 +2,28 @@ package moe.antimony.hoshi.features.sasayaki
 
 import android.os.Handler
 
-class SasayakiPlaybackLifecycleController(
-    private val playbackState: SasayakiPlaybackStateCoordinator,
+interface SasayakiTickScheduler {
+    fun postTick()
+    fun stopTicking()
+}
+
+class HandlerSasayakiTickScheduler(
     private val handler: Handler,
     private val tickRunnable: Runnable,
+) : SasayakiTickScheduler {
+    override fun postTick() {
+        handler.removeCallbacks(tickRunnable)
+        handler.post(tickRunnable)
+    }
+
+    override fun stopTicking() {
+        handler.removeCallbacks(tickRunnable)
+    }
+}
+
+class SasayakiPlaybackLifecycleController(
+    private val playbackState: SasayakiPlaybackStateCoordinator,
+    private val tickScheduler: SasayakiTickScheduler,
 ) {
     private var engine: SasayakiPlaybackEngine? = null
 
@@ -97,11 +115,10 @@ class SasayakiPlaybackLifecycleController(
     }
 
     private fun restartTicking() {
-        handler.removeCallbacks(tickRunnable)
-        handler.post(tickRunnable)
+        tickScheduler.postTick()
     }
 
     private fun stopTicking() {
-        handler.removeCallbacks(tickRunnable)
+        tickScheduler.stopTicking()
     }
 }

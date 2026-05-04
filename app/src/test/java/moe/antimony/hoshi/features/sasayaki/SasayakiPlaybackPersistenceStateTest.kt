@@ -1,8 +1,10 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 
 class SasayakiPlaybackPersistenceStateTest {
     @Test
@@ -38,6 +40,11 @@ class SasayakiPlaybackPersistenceStateTest {
 
     @Test
     fun clearsAudioMetadataAndPreservesStorageSummaryBehavior() {
+        val bookRoot = Files.createTempDirectory("hoshi-sasayaki-persistence").toFile()
+        val copiedAudio = File(bookRoot, "Audio/sasayaki_audio.mp3").also { file ->
+            file.parentFile?.mkdirs()
+            file.writeText("audio")
+        }
         val repository = FakePlaybackRepository(
             SasayakiPlaybackData(
                 lastPosition = 42.0,
@@ -48,7 +55,7 @@ class SasayakiPlaybackPersistenceStateTest {
         )
         val state = SasayakiPlaybackPersistenceState(
             playbackRepository = repository,
-            audioSourceRepository = SasayakiAudioRepository(File("book-root")),
+            audioSourceRepository = SasayakiAudioRepository(bookRoot),
         )
 
         assertEquals("Copied to app storage. The original audiobook file can be deleted.", state.audioStorageSummary)
@@ -62,6 +69,7 @@ class SasayakiPlaybackPersistenceStateTest {
         assertEquals(null, state.playback.audioFileName)
         assertEquals("Select an .mp3 or .m4b audiobook", state.audioStorageSummary)
         assertEquals(state.playback, repository.saved.last())
+        assertTrue(copiedAudio.exists())
     }
 
     private class FakePlaybackRepository(
