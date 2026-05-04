@@ -15,6 +15,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep MK3 SVG gaiji inline with surrounding text in AnkiDroid Lapis glossary fields.
 - Bold only the selected sentence occurrence in AnkiDroid `{sentence}` fields when the mined word appears multiple times.
 - Make the Anki field mapping settings list responsive by using lightweight rows and editing mappings in a focused dialog.
+- Expand Sasayaki audiobook exports for AnkiDroid `{sasayaki-audio}` to adjacent cues from the selected sentence, matching the iOS sentence-audio behavior.
 - Fill the Lapis `SentenceAudio` field from Sasayaki reader lookups by exporting the matched cue audio before adding the AnkiDroid note.
 - Keep Anki field-to-handlebar mappings editable after closing and reopening the app process without requiring another Fetch.
 - Match the reader loading screen to the active reader background, preventing a white flash when opening books in dark mode.

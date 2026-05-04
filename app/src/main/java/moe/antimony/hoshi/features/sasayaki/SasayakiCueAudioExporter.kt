@@ -16,6 +16,7 @@ internal object SasayakiCueAudioExporter {
         context: Context,
         source: SasayakiPlaybackSource,
         cue: SasayakiMatch,
+        range: SasayakiCueAudioRange,
         outputDir: File,
     ): File? = runCatching {
         outputDir.mkdirs()
@@ -32,8 +33,8 @@ internal object SasayakiCueAudioExporter {
             } ?: return@runCatching null
             extractor.selectTrack(trackIndex)
             val format = extractor.getTrackFormat(trackIndex)
-            val startUs = (cue.startTime * 1_000_000).toLong().coerceAtLeast(0L)
-            val endUs = (cue.endTime * 1_000_000).toLong().coerceAtLeast(startUs + 1L)
+            val startUs = (range.startTime * 1_000_000).toLong().coerceAtLeast(0L)
+            val endUs = (range.endTime * 1_000_000).toLong().coerceAtLeast(startUs + 1L)
             extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).use { muxer ->
                 val muxerTrack = muxer.addTrack(format)
