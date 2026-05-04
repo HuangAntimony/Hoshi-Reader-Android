@@ -22,8 +22,9 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Modularization is deferred until sidecar/model and native build boundaries are characterized; next architecture slice: characterize Rust/UniFFI Gradle task behavior before build-logic extraction.
-- Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
+- Next architecture slice: make book repository/data-source APIs main-safe while preserving EPUB import, metadata, bookmark, progress, and Sasayaki sidecar compatibility.
+- Follow-up architecture slice: split book sidecar/model contracts so `epub` storage no longer imports feature playback/UI packages.
+- Defer modularization until sidecar/model, Reader bridge/state, and native build boundaries are stable.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
 ### Bookshelf
@@ -91,6 +92,7 @@ Status: `todo`
 
 - Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
 - Expand WebView pagination regression checks.
+- Replace brittle source-string tests with behavior tests in areas being refactored; keep source guards only for security, SAF/native/build wiring, or framework constraints that cannot be tested behaviorally.
 - Keep release/debug native build behavior stable while architecture refactoring proceeds.
 
 ## Persistent Blockers
