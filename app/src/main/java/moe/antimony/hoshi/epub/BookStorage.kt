@@ -53,61 +53,61 @@ class BookStorage(filesDir: File) {
 
     val currentBookFile: File get() = repository.currentBookFile
 
-    fun loadAllBooks(): List<File> = repository.loadAllBooks()
+    suspend fun loadAllBooks(): List<File> = repository.loadAllBooks()
 
-    fun loadBookEntries(sortOption: BookSortOption = BookSortOption.Recent): List<BookEntry> =
+    suspend fun loadBookEntries(sortOption: BookSortOption = BookSortOption.Recent): List<BookEntry> =
         repository.loadBookEntries(sortOption)
 
-    fun loadBookEntry(bookId: String): BookEntry? = repository.loadBookEntry(bookId)
+    suspend fun loadBookEntry(bookId: String): BookEntry? = repository.loadBookEntry(bookId)
 
-    fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File =
+    suspend fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File =
         repository.createBookDirectory(folder)
 
-    fun createBookDirectoryForImportedTitle(title: String): File =
+    suspend fun createBookDirectoryForImportedTitle(title: String): File =
         repository.createBookDirectoryForImportedTitle(title)
 
-    fun loadMetadata(bookRoot: File): BookMetadata? = repository.loadMetadata(bookRoot)
+    suspend fun loadMetadata(bookRoot: File): BookMetadata? = repository.loadMetadata(bookRoot)
 
-    fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
         repository.saveMetadata(bookRoot, metadata)
     }
 
-    fun coverFile(entry: BookEntry): File? = repository.coverFile(entry)
+    suspend fun coverFile(entry: BookEntry): File? = repository.coverFile(entry)
 
-    fun deleteBook(bookRoot: File) {
+    suspend fun deleteBook(bookRoot: File) {
         repository.deleteBook(bookRoot)
     }
 
-    fun loadBookmark(bookRoot: File): Bookmark? = repository.loadBookmark(bookRoot)
+    suspend fun loadBookmark(bookRoot: File): Bookmark? = repository.loadBookmark(bookRoot)
 
-    fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
         repository.saveBookmark(bookRoot, bookmark)
     }
 
-    fun loadBookInfo(bookRoot: File): BookInfo? = repository.loadBookInfo(bookRoot)
+    suspend fun loadBookInfo(bookRoot: File): BookInfo? = repository.loadBookInfo(bookRoot)
 
-    fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
         repository.saveBookInfo(bookRoot, bookInfo)
     }
 
-    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
+    suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         repository.loadSasayakiMatch(bookRoot)
 
-    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
         repository.saveSasayakiMatch(bookRoot, match)
     }
 
-    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
+    suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         repository.loadSasayakiPlayback(bookRoot)
 
-    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+    suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
         repository.saveSasayakiPlayback(bookRoot, playback)
     }
 
-    fun loadReadingProgress(bookRoot: File): Double = repository.loadReadingProgress(bookRoot)
+    suspend fun loadReadingProgress(bookRoot: File): Double = repository.loadReadingProgress(bookRoot)
 
     fun currentAppleReferenceDateSeconds(): Double = repository.currentAppleReferenceDateSeconds()
 
-    fun importBook(contentResolver: ContentResolver, uri: Uri): File =
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File =
         repository.importBook(contentResolver, uri)
 }

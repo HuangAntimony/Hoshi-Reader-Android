@@ -2,6 +2,9 @@ package moe.antimony.hoshi.epub
 
 import android.content.ContentResolver
 import android.net.Uri
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -16,17 +19,18 @@ import java.util.zip.ZipInputStream
 
 class BookRepository(
     filesDir: File,
-    private val fileDataSource: BookFileDataSource = BookFileDataSource(filesDir),
-    private val sidecarDataSource: BookSidecarDataSource = BookSidecarDataSource(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val fileDataSource: BookFileDataSource = BookFileDataSource(filesDir, ioDispatcher),
+    private val sidecarDataSource: BookSidecarDataSource = BookSidecarDataSource(ioDispatcher),
     private val clock: BookClock = SystemBookClock,
 ) : ReaderRouteBookRepository, SasayakiSidecarRepository {
-    private val importDataSource = BookImportDataSource(filesDir, fileDataSource)
+    private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
 
     val currentBookFile: File get() = fileDataSource.currentBookFile
 
-    fun loadAllBooks(): List<File> = fileDataSource.loadAllBooks()
+    suspend fun loadAllBooks(): List<File> = fileDataSource.loadAllBooks()
 
-    fun loadBookEntries(sortOption: BookSortOption = BookSortOption.Recent): List<BookEntry> {
+    suspend fun loadBookEntries(sortOption: BookSortOption = BookSortOption.Recent): List<BookEntry> {
         val entries = loadAllBooks()
             .map { root ->
                 BookEntry(
@@ -40,65 +44,65 @@ class BookRepository(
         }
     }
 
-    override fun loadBookEntry(bookId: String): BookEntry? =
-        loadAllBooks()
-            .asSequence()
-            .map { root ->
-                BookEntry(
-                    root = root,
-                    metadata = loadMetadata(root) ?: root.fallbackMetadata(),
-                )
-            }
-            .firstOrNull { it.metadata.id == bookId }
+    override suspend fun loadBookEntry(bookId: String): BookEntry? {
+        for (root in loadAllBooks()) {
+            val entry = BookEntry(
+                root = root,
+                metadata = loadMetadata(root) ?: root.fallbackMetadata(),
+            )
+            if (entry.metadata.id == bookId) return entry
+        }
+        return null
+    }
 
-    fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File =
+    suspend fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File =
         fileDataSource.createBookDirectory(folder)
 
-    fun createBookDirectoryForImportedTitle(title: String): File =
+    suspend fun createBookDirectoryForImportedTitle(title: String): File =
         fileDataSource.createBookDirectoryForImportedTitle(title)
 
-    fun loadMetadata(bookRoot: File): BookMetadata? =
+    suspend fun loadMetadata(bookRoot: File): BookMetadata? =
         sidecarDataSource.loadMetadata(bookRoot)
 
-    override fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
         sidecarDataSource.saveMetadata(bookRoot, metadata)
     }
 
-    fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
+    suspend fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
 
-    fun deleteBook(bookRoot: File) {
+    suspend fun deleteBook(bookRoot: File) {
         fileDataSource.deleteBook(bookRoot)
     }
 
-    override fun loadBookmark(bookRoot: File): Bookmark? =
+    override suspend fun loadBookmark(bookRoot: File): Bookmark? =
         sidecarDataSource.loadBookmark(bookRoot)
 
-    override fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
     }
 
-    fun loadBookInfo(bookRoot: File): BookInfo? =
+    suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         sidecarDataSource.loadBookInfo(bookRoot)
 
-    override fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
         sidecarDataSource.saveBookInfo(bookRoot, bookInfo)
     }
 
-    override fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
+    override suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         sidecarDataSource.loadSasayakiMatch(bookRoot)
 
-    override fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
         sidecarDataSource.saveSasayakiMatch(bookRoot, match)
     }
 
-    override fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
+    override suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         sidecarDataSource.loadSasayakiPlayback(bookRoot)
 
-    override fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+    override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
         sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
     }
 
-    fun loadReadingProgress(bookRoot: File): Double {
+    suspend fun loadReadingProgress(bookRoot: File): Double {
         val total = loadBookInfo(bookRoot)?.characterCount ?: return 0.0
         if (total <= 0) return 0.0
         val current = loadBookmark(bookRoot)?.characterCount ?: return 0.0
@@ -107,10 +111,10 @@ class BookRepository(
 
     override fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()
 
-    fun importBook(contentResolver: ContentResolver, uri: Uri): File =
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File =
         importDataSource.importBook(contentResolver, uri)
 
-    private fun File.fallbackMetadata(): BookMetadata =
+    private suspend fun File.fallbackMetadata(): BookMetadata = withContext(ioDispatcher) {
         BookMetadata(
             id = name,
             title = null,
@@ -118,37 +122,42 @@ class BookRepository(
             folder = name,
             lastAccess = (lastModified().toDouble() / 1000.0) - APPLE_REFERENCE_EPOCH_SECONDS,
         )
+    }
 }
 
 interface ReaderRouteBookRepository {
-    fun loadBookEntry(bookId: String): BookEntry?
-    fun saveMetadata(bookRoot: File, metadata: BookMetadata)
-    fun loadBookmark(bookRoot: File): Bookmark?
-    fun saveBookmark(bookRoot: File, bookmark: Bookmark)
-    fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
+    suspend fun loadBookEntry(bookId: String): BookEntry?
+    suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
+    suspend fun loadBookmark(bookRoot: File): Bookmark?
+    suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
+    suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
     fun currentAppleReferenceDateSeconds(): Double
 }
 
 interface SasayakiSidecarRepository {
-    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData?
-    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData)
-    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData?
-    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData)
+    suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData?
+    suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData)
+    suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData?
+    suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData)
 }
 
-class BookFileDataSource(filesDir: File) {
+class BookFileDataSource(
+    filesDir: File,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
     private val booksDirectory = File(filesDir, "Books")
 
     val currentBookFile: File = File(booksDirectory, "current.epub")
 
-    fun loadAllBooks(): List<File> =
+    suspend fun loadAllBooks(): List<File> = withContext(ioDispatcher) {
         booksDirectory
             .listFiles()
             ?.filter { it.isDirectory && !it.name.startsWith(".") }
             ?.sortedByDescending { it.lastModified() }
             .orEmpty()
+    }
 
-    fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File {
+    suspend fun createBookDirectory(folder: String = UUID.randomUUID().toString()): File = withContext(ioDispatcher) {
         booksDirectory.mkdirs()
         val root = booksDirectory.resolve(folder).canonicalFile
         val booksRoot = booksDirectory.canonicalFile
@@ -156,24 +165,24 @@ class BookFileDataSource(filesDir: File) {
             "Unsafe book folder: $folder"
         }
         root.mkdirs()
-        return root
+        root
     }
 
-    fun createBookDirectoryForImportedTitle(title: String): File {
+    suspend fun createBookDirectoryForImportedTitle(title: String): File {
         val safeTitle = title.sanitizeImportedBookTitle()
         require(safeTitle.isNotBlank()) { "EPUB title is empty" }
         return createBookDirectory(safeTitle)
     }
 
-    fun coverFile(entry: BookEntry): File? {
-        val cover = entry.metadata.cover?.takeIf { it.isNotBlank() } ?: return null
+    suspend fun coverFile(entry: BookEntry): File? = withContext(ioDispatcher) {
+        val cover = entry.metadata.cover?.takeIf { it.isNotBlank() } ?: return@withContext null
         val root = entry.root.canonicalFile
         val file = root.resolve(cover).canonicalFile
-        if (file.path != root.path && !file.path.startsWith(root.path + File.separator)) return null
-        return file.takeIf { it.isFile }
+        if (file.path != root.path && !file.path.startsWith(root.path + File.separator)) return@withContext null
+        file.takeIf { it.isFile }
     }
 
-    fun deleteBook(bookRoot: File) {
+    suspend fun deleteBook(bookRoot: File) = withContext(ioDispatcher) {
         val root = bookRoot.canonicalFile
         val booksRoot = booksDirectory.canonicalFile
         require(root.path != booksRoot.path && root.path.startsWith(booksRoot.path + File.separator)) {
@@ -189,8 +198,9 @@ class BookImportDataSource(
     private val filesDir: File,
     private val fileDataSource: BookFileDataSource,
     private val parser: EpubBookParser = EpubBookParser(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    fun importBook(contentResolver: ContentResolver, uri: Uri): File {
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File = withContext(ioDispatcher) {
         contentResolver.validateImportFile(uri, ImportFileType.Epub)
         val tempRoot = File(filesDir, "ImportTemp/${UUID.randomUUID()}").canonicalFile
         contentResolver.openInputStream(uri).use { input ->
@@ -226,15 +236,18 @@ class BookImportDataSource(
         val targetRoot = fileDataSource.createBookDirectoryForImportedTitle(parsedBook.title)
         if (targetRoot.listFiles()?.isNotEmpty() == true) {
             tempRoot.deleteRecursively()
-            return targetRoot
+            targetRoot
+        } else {
+            targetRoot.deleteRecursively()
+            check(tempRoot.renameTo(targetRoot)) { "Unable to move imported EPUB into Books/${targetRoot.name}" }
+            targetRoot
         }
-        targetRoot.deleteRecursively()
-        check(tempRoot.renameTo(targetRoot)) { "Unable to move imported EPUB into Books/${targetRoot.name}" }
-        return targetRoot
     }
 }
 
-class BookSidecarDataSource {
+class BookSidecarDataSource(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
         prettyPrint = true
@@ -242,47 +255,47 @@ class BookSidecarDataSource {
         encodeDefaults = true
     }
 
-    fun loadMetadata(bookRoot: File): BookMetadata? =
+    suspend fun loadMetadata(bookRoot: File): BookMetadata? =
         loadJson(BookMetadata.serializer(), bookRoot.resolve(METADATA_FILE_NAME))
 
-    fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
         saveJson(bookRoot, METADATA_FILE_NAME, BookMetadata.serializer(), metadata)
     }
 
-    fun loadBookmark(bookRoot: File): Bookmark? =
+    suspend fun loadBookmark(bookRoot: File): Bookmark? =
         loadJson(Bookmark.serializer(), bookRoot.resolve(BOOKMARK_FILE_NAME))
 
-    fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
         saveJson(bookRoot, BOOKMARK_FILE_NAME, Bookmark.serializer(), bookmark)
     }
 
-    fun loadBookInfo(bookRoot: File): BookInfo? =
+    suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         loadJson(BookInfo.serializer(), bookRoot.resolve(BOOKINFO_FILE_NAME))
 
-    fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
         saveJson(bookRoot, BOOKINFO_FILE_NAME, BookInfo.serializer(), bookInfo)
     }
 
-    fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
+    suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         loadJson(SasayakiMatchData.serializer(), bookRoot.resolve(SASAYAKI_MATCH_FILE_NAME))
 
-    fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
         saveJson(bookRoot, SASAYAKI_MATCH_FILE_NAME, SasayakiMatchData.serializer(), match)
     }
 
-    fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
+    suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         loadJson(SasayakiPlaybackData.serializer(), bookRoot.resolve(SASAYAKI_PLAYBACK_FILE_NAME))
 
-    fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+    suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
-    private fun <T> loadJson(serializer: KSerializer<T>, file: File): T? {
-        if (!file.isFile) return null
-        return runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
+    private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = withContext(ioDispatcher) {
+        if (!file.isFile) return@withContext null
+        runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
     }
 
-    private fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) {
+    private suspend fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) = withContext(ioDispatcher) {
         bookRoot.mkdirs()
         bookRoot.resolve(fileName).writeText(json.encodeToString(serializer, value))
     }

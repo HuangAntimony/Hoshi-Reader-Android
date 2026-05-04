@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
 import java.io.File
 
 internal interface SasayakiPlaybackControllerContract {
@@ -39,6 +40,8 @@ internal class SasayakiPlaybackController(
     bookTitle: String?,
     bookCoverFile: File?,
     matchData: SasayakiMatchData?,
+    initialPlayback: SasayakiPlaybackData?,
+    persistenceScope: CoroutineScope,
     private val getCurrentChapterIndex: () -> Int,
     onCue: (SasayakiMatch, Boolean) -> Unit,
     onClearCue: () -> Unit,
@@ -49,6 +52,8 @@ internal class SasayakiPlaybackController(
     private val playbackPersistence = SasayakiPlaybackPersistenceState(
         playbackRepository = playbackRepository,
         audioSourceRepository = audioSourceRepository,
+        initialPlayback = initialPlayback,
+        persistenceScope = persistenceScope,
     )
     private val handler = Handler(Looper.getMainLooper())
     private val cueNavigation = SasayakiCueNavigationController(matchData)

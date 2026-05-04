@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,8 +69,9 @@ fun SasayakiMatchView(
     var searchWindow by remember { mutableFloatStateOf(200f) }
     var isMatching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var currentMatch by remember(bookEntry.root) {
-        mutableStateOf(bookRepository.loadSasayakiMatch(bookEntry.root))
+    var currentMatch by remember(bookEntry.root) { mutableStateOf<SasayakiMatchData?>(null) }
+    LaunchedEffect(bookEntry.root, bookRepository) {
+        currentMatch = bookRepository.loadSasayakiMatch(bookEntry.root)
     }
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult

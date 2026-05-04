@@ -1,27 +1,27 @@
 package moe.antimony.hoshi.epub
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 
 class BookRepositoryDataSourceTest {
     @Test
-    fun fileDataSourceRejectsPathTraversalBookFolders() {
+    fun fileDataSourceRejectsPathTraversalBookFolders() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-book-files").toFile()
         val dataSource = BookFileDataSource(filesDir)
 
-        assertThrows(IllegalArgumentException::class.java) {
-            dataSource.createBookDirectory("../escaped")
-        }
+        val result = runCatching { dataSource.createBookDirectory("../escaped") }
+
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
 
         assertFalse(filesDir.parentFile!!.resolve("escaped").exists())
     }
 
     @Test
-    fun repositoryPreservesSidecarNamesAndProgressCalculation() {
+    fun repositoryPreservesSidecarNamesAndProgressCalculation() = runBlocking {
         val repository = BookRepository(Files.createTempDirectory("hoshi-book-repository").toFile())
         val bookRoot = repository.createBookDirectory("book-a")
         val metadata = BookMetadata(
@@ -52,7 +52,7 @@ class BookRepositoryDataSourceTest {
     }
 
     @Test
-    fun fileDataSourceHidesDotPrefixedBookFolders() {
+    fun fileDataSourceHidesDotPrefixedBookFolders() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-book-hidden").toFile()
         val dataSource = BookFileDataSource(filesDir)
         val visible = dataSource.createBookDirectory("visible")

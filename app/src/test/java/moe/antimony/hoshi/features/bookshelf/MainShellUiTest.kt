@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.bookshelf
 
+import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookInfo
@@ -128,7 +129,7 @@ class MainShellUiTest {
     }
 
     @Test
-    fun bookProgressIsLoadedOnceForShelfEntries() {
+    fun bookProgressIsLoadedOnceForShelfEntries() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-bookshelf-progress").toFile()
         try {
             val repository = BookRepository(filesDir)

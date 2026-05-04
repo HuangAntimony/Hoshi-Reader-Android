@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.navigation
 
+import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookMetadata
@@ -14,7 +15,7 @@ import java.io.File
 
 class ReaderRouteStateHolderTest {
     @Test
-    fun loadReadyParsesBookUpdatesSidecarsAndRestoresBookmark() {
+    fun loadReadyParsesBookUpdatesSidecarsAndRestoresBookmark() = runBlocking {
         val root = File("book-a")
         val parsedBook = readerBook(title = "Parsed Title", coverHref = "cover.jpg")
         val bookmark = Bookmark(chapterIndex = 0, progress = 0.5, characterCount = 4, lastModified = 10.0)
@@ -55,7 +56,7 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
-    fun loadErrorReportsMissingBook() {
+    fun loadErrorReportsMissingBook() = runBlocking {
         val stateHolder = ReaderRouteStateHolder(
             repository = FakeReaderRouteBookRepository(entry = null),
             parser = FakeReaderRouteEpubParser(readerBook()),
@@ -67,7 +68,7 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
-    fun saveBookmarkCalculatesCharacterCountAndNotifiesRefresh() {
+    fun saveBookmarkCalculatesCharacterCountAndNotifiesRefresh() = runBlocking {
         val root = File("book-a")
         val book = readerBook(html = "1234567890")
         val repository = FakeReaderRouteBookRepository(entry = null, now = 99.0)
@@ -109,19 +110,19 @@ class ReaderRouteStateHolderTest {
         var savedBookmark: Bookmark? = null
             private set
 
-        override fun loadBookEntry(bookId: String): BookEntry? = entry
+        override suspend fun loadBookEntry(bookId: String): BookEntry? = entry
 
-        override fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+        override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
             savedMetadata = metadata
         }
 
-        override fun loadBookmark(bookRoot: File): Bookmark? = bookmark
+        override suspend fun loadBookmark(bookRoot: File): Bookmark? = bookmark
 
-        override fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+        override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
             savedBookmark = bookmark
         }
 
-        override fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+        override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
             savedBookInfo = bookInfo
         }
 

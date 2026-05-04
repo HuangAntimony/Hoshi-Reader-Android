@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.epub
 
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -14,7 +15,7 @@ import java.nio.file.Files
 
 class BookMetadataStorageTest {
     @Test
-    fun saveMetadataWritesIosCompatibleMetadataJson() {
+    fun saveMetadataWritesIosCompatibleMetadataJson() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata").toFile())
         val bookRoot = storage.createBookDirectory("book-a")
         val metadata = BookMetadata(
@@ -36,7 +37,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun loadBookEntriesReturnsMetadataBackedBooksSortedByLastAccessDescending() {
+    fun loadBookEntriesReturnsMetadataBackedBooksSortedByLastAccessDescending() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-list").toFile())
         val olderRoot = storage.createBookDirectory("older")
         val newerRoot = storage.createBookDirectory("newer")
@@ -56,7 +57,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun loadBookEntriesCanSortByTitleLikeIos() {
+    fun loadBookEntriesCanSortByTitleLikeIos() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-title").toFile())
         val zRoot = storage.createBookDirectory("z")
         val aRoot = storage.createBookDirectory("a")
@@ -75,7 +76,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun loadBookEntryFindsBooksByStableMetadataId() {
+    fun loadBookEntryFindsBooksByStableMetadataId() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-id").toFile())
         val root = storage.createBookDirectory("folder-a")
         storage.saveMetadata(
@@ -90,7 +91,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun loadBookEntryFallsBackToFolderIdWhenMetadataIsMissing() {
+    fun loadBookEntryFallsBackToFolderIdWhenMetadataIsMissing() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-fallback-id").toFile())
         val root = storage.createBookDirectory("folder-only")
 
@@ -101,7 +102,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun deleteBookRemovesBookDirectory() {
+    fun deleteBookRemovesBookDirectory() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-delete").toFile())
         val root = storage.createBookDirectory("delete-me")
         root.resolve("metadata.json").writeText("{}")
@@ -113,7 +114,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun importedBookDirectoryNameMatchesIosSanitizedTitleAndDeduplicates() {
+    fun importedBookDirectoryNameMatchesIosSanitizedTitleAndDeduplicates() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-dedupe").toFile())
 
         val first = storage.createBookDirectoryForImportedTitle("屍人荘/の:殺人")
@@ -125,7 +126,7 @@ class BookMetadataStorageTest {
     }
 
     @Test
-    fun savesAndLoadsIosCompatibleSasayakiSidecars() {
+    fun savesAndLoadsIosCompatibleSasayakiSidecars() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-sasayaki-sidecars").toFile())
         val root = storage.createBookDirectory("book")
         val match = SasayakiMatchData(

@@ -654,7 +654,7 @@ private fun BookGridCell(
     }
 }
 
-internal fun loadBookProgressById(
+internal suspend fun loadBookProgressById(
     entries: List<BookEntry>,
     bookRepository: BookRepository,
 ): Map<String, Double> =
@@ -664,7 +664,9 @@ internal fun loadBookProgressById(
 
 @Composable
 private fun BookCoverCard(entry: BookEntry, bookRepository: BookRepository) {
-    val coverFile = remember(entry) { bookRepository.coverFile(entry) }
+    val coverFile by produceState<File?>(initialValue = null, key1 = entry, key2 = bookRepository) {
+        value = bookRepository.coverFile(entry)
+    }
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = coverFile) {
         value = BookCoverBitmapCache.load(coverFile)
     }

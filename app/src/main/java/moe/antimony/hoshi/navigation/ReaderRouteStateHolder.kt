@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.navigation
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
@@ -9,8 +12,9 @@ import java.io.File
 internal class ReaderRouteStateHolder(
     private val repository: ReaderRouteBookRepository,
     private val parser: ReaderRouteEpubParser = DefaultReaderRouteEpubParser,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    fun load(bookId: String): ReaderRouteLoadState =
+    suspend fun load(bookId: String): ReaderRouteLoadState = withContext(ioDispatcher) {
         runCatching {
             val entry = repository.loadBookEntry(bookId)
                 ?: error("Book not found.")
@@ -33,20 +37,23 @@ internal class ReaderRouteStateHolder(
         }.getOrElse { error ->
             ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
         }
+    }
 
-    fun saveBookmark(
+    suspend fun saveBookmark(
         state: ReaderRouteLoadState.Ready,
         chapterIndex: Int,
         progress: Double,
         onBookmarkSaved: () -> Unit,
     ) {
-        val bookmark = Bookmark(
-            chapterIndex = chapterIndex,
-            progress = progress,
-            characterCount = state.book.characterCountAt(chapterIndex, progress),
-            lastModified = repository.currentAppleReferenceDateSeconds(),
-        )
-        repository.saveBookmark(state.bookRoot, bookmark)
+        withContext(ioDispatcher) {
+            val bookmark = Bookmark(
+                chapterIndex = chapterIndex,
+                progress = progress,
+                characterCount = state.book.characterCountAt(chapterIndex, progress),
+                lastModified = repository.currentAppleReferenceDateSeconds(),
+            )
+            repository.saveBookmark(state.bookRoot, bookmark)
+        }
         onBookmarkSaved()
     }
 }

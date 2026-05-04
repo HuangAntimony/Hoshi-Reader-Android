@@ -4,12 +4,19 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SasayakiPlaybackPersistenceState(
     private val playbackRepository: SasayakiPlaybackRepository,
     private val audioSourceRepository: SasayakiAudioRepository,
+    initialPlayback: SasayakiPlaybackData?,
+    private val persistenceScope: CoroutineScope,
 ) {
-    var playback by mutableStateOf(playbackRepository.load() ?: SasayakiPlaybackData(lastPosition = 0.0))
+    var playback by mutableStateOf(initialPlayback ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
 
     val delay: Double get() = playback.delay
@@ -47,6 +54,11 @@ class SasayakiPlaybackPersistenceState(
     }
 
     private fun save() {
-        playbackRepository.save(playback)
+        val snapshot = playback
+        persistenceScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                playbackRepository.save(snapshot)
+            }
+        }
     }
 }

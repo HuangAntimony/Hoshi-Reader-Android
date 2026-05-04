@@ -22,8 +22,8 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: make book repository/data-source APIs main-safe while preserving EPUB import, metadata, bookmark, progress, and Sasayaki sidecar compatibility.
-- Follow-up architecture slice: split book sidecar/model contracts so `epub` storage no longer imports feature playback/UI packages.
+- Completed architecture slice: book repository/data-source APIs are main-safe for EPUB import, metadata, bookmark, progress, Reader route loading, and Sasayaki sidecar access.
+- Next architecture slice: split book sidecar/model contracts so `epub` storage no longer imports feature playback/UI packages.
 - Defer modularization until sidecar/model, Reader bridge/state, and native build boundaries are stable.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

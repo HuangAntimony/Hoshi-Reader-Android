@@ -13,9 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ReaderRouteDestination(
@@ -34,9 +32,7 @@ internal fun ReaderRouteDestination(
         key1 = bookId,
         key2 = stateHolder,
     ) {
-        value = withContext(Dispatchers.IO) {
-            stateHolder.load(bookId)
-        }
+        value = stateHolder.load(bookId)
     }
 
     when (val state = routeState) {
@@ -61,16 +57,12 @@ internal fun ReaderRouteDestination(
             onReaderSettingsChange = onReaderSettingsChange,
             onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
             onSaveBookmark = { chapterIndex, progress ->
-                bookmarkScope.launch(Dispatchers.IO) {
+                bookmarkScope.launch {
                     stateHolder.saveBookmark(
                         state = state,
                         chapterIndex = chapterIndex,
                         progress = progress,
-                        onBookmarkSaved = {
-                            bookmarkScope.launch(Dispatchers.Main) {
-                                onBookmarkSaved()
-                            }
-                        },
+                        onBookmarkSaved = onBookmarkSaved,
                     )
                 }
             },

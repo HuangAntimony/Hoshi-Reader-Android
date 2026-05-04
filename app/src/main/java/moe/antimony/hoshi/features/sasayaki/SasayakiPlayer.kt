@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
 import android.net.Uri
+import kotlinx.coroutines.CoroutineScope
 import java.io.File
 
 class SasayakiPlayer internal constructor(
@@ -14,6 +15,8 @@ class SasayakiPlayer internal constructor(
         bookTitle: String?,
         bookCoverFile: File?,
         matchData: SasayakiMatchData?,
+        initialPlayback: SasayakiPlaybackData?,
+        persistenceScope: CoroutineScope,
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
@@ -26,6 +29,8 @@ class SasayakiPlayer internal constructor(
             bookTitle = bookTitle,
             bookCoverFile = bookCoverFile,
             matchData = matchData,
+            initialPlayback = initialPlayback,
+            persistenceScope = persistenceScope,
             getCurrentChapterIndex = getCurrentChapterIndex,
             onCue = onCue,
             onClearCue = onClearCue,

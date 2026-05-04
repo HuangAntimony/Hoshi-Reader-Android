@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.epub
 
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -12,7 +13,7 @@ import java.nio.file.Files
 
 class BookBookmarkStorageTest {
     @Test
-    fun saveBookmarkWritesIosCompatibleBookmarkJson() {
+    fun saveBookmarkWritesIosCompatibleBookmarkJson() = runBlocking {
         val root = Files.createTempDirectory("hoshi-bookmark").toFile()
         val storage = BookStorage(root)
         val bookRoot = storage.currentBookFile.apply { mkdirs() }
@@ -34,7 +35,7 @@ class BookBookmarkStorageTest {
     }
 
     @Test
-    fun loadBookmarkReturnsNullWhenBookmarkJsonIsMissing() {
+    fun loadBookmarkReturnsNullWhenBookmarkJsonIsMissing() = runBlocking {
         val root = Files.createTempDirectory("hoshi-bookmark-missing").toFile()
         val storage = BookStorage(root)
         val bookRoot = storage.currentBookFile.apply { mkdirs() }
@@ -43,7 +44,7 @@ class BookBookmarkStorageTest {
     }
 
     @Test
-    fun loadBookmarkReadsSavedBookmark() {
+    fun loadBookmarkReadsSavedBookmark() = runBlocking {
         val root = Files.createTempDirectory("hoshi-bookmark-load").toFile()
         val storage = BookStorage(root)
         val bookRoot = storage.currentBookFile.apply { mkdirs() }
@@ -70,7 +71,7 @@ class BookBookmarkStorageTest {
     }
 
     @Test
-    fun bookProgressUsesBookmarkCharacterCountOverBookInfoCharacterCount() {
+    fun bookProgressUsesBookmarkCharacterCountOverBookInfoCharacterCount() = runBlocking {
         val root = Files.createTempDirectory("hoshi-book-progress").toFile()
         val storage = BookStorage(root)
         val bookRoot = storage.currentBookFile.apply { mkdirs() }

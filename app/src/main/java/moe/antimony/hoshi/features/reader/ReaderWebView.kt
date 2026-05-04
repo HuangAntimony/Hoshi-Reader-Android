@@ -54,6 +54,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -85,6 +86,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchData
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackData
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiScreenAwake
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
@@ -131,7 +133,16 @@ fun ReaderWebView(
     val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
     val bookRepository = appContainer.bookRepository
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
-    val sasayakiMatchData = remember(bookRoot) { bookRoot?.let(bookRepository::loadSasayakiMatch) }
+    val sasayakiMatchData by produceState<SasayakiMatchData?>(initialValue = null, key1 = bookRoot, key2 = bookRepository) {
+        value = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
+    }
+    var sasayakiPlaybackData by remember(bookRoot) { mutableStateOf<SasayakiPlaybackData?>(null) }
+    var isSasayakiPlaybackLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
+    LaunchedEffect(bookRoot, bookRepository) {
+        isSasayakiPlaybackLoaded = bookRoot == null
+        sasayakiPlaybackData = bookRoot?.let { bookRepository.loadSasayakiPlayback(it) }
+        isSasayakiPlaybackLoaded = true
+    }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
     val sasayakiCoverFile = remember(bookRoot, book.coverHref) {
         resolveBookCoverFile(bookRoot, book.coverHref)
@@ -305,9 +316,9 @@ fun ReaderWebView(
             totalCharacters = book.bookInfo.characterCount,
         )
     }
-    LaunchedEffect(bookRoot, sasayakiMatchData) {
+    LaunchedEffect(bookRoot, sasayakiMatchData, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         sasayakiPlayer?.release()
-        sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null) {
+        sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
                 context = context,
                 bookRoot = bookRoot,
@@ -315,6 +326,8 @@ fun ReaderWebView(
                 bookTitle = book.title,
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,
+                initialPlayback = sasayakiPlaybackData,
+                persistenceScope = scope,
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
                     webView?.evaluateJavascript(

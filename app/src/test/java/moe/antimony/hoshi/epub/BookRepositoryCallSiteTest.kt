@@ -31,8 +31,8 @@ class BookRepositoryCallSiteTest {
         assertTrue(sasayakiPlayer.contains("playbackRepository: SasayakiPlaybackRepository"))
         assertTrue(sasayakiPlaybackController.contains("playbackRepository: SasayakiPlaybackRepository"))
         assertTrue(sasayakiPlaybackController.contains("SasayakiPlaybackPersistenceState("))
-        assertTrue(sasayakiPlaybackPersistence.contains("playbackRepository.load()"))
-        assertTrue(sasayakiPlaybackPersistence.contains("playbackRepository.save(playback)"))
+        assertTrue(sasayakiPlaybackPersistence.contains("initialPlayback ?: SasayakiPlaybackData(lastPosition = 0.0)"))
+        assertTrue(sasayakiPlaybackPersistence.contains("playbackRepository.save(snapshot)"))
         assertFalse(sasayakiPlayer.contains("bookRepository: SasayakiSidecarRepository"))
         assertFalse(sasayakiPlaybackController.contains("bookRepository: SasayakiSidecarRepository"))
 

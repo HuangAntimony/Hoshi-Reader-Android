@@ -6,19 +6,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookSortOption
 
 internal class BookshelfViewModel(
     private val repository: BookshelfRepository,
     coroutineScope: CoroutineScope? = null,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val importGate: PendingImportGate<String> = PendingImportGate(),
 ) : ViewModel() {
     private val ownedScope = if (coroutineScope == null) {
@@ -73,16 +70,13 @@ internal class BookshelfViewModel(
 
     fun deleteBook(entry: BookEntry) {
         workScope.launch {
-            withContext(ioDispatcher) {
-                repository.deleteBook(entry)
-                loadBookEntries(_uiState.value.sortOption)
-            }.also { result ->
-                _uiState.update {
-                    it.copy(
-                        bookEntries = result.entries,
-                        bookProgressById = result.progressById,
-                    )
-                }
+            repository.deleteBook(entry)
+            val result = loadBookEntries(_uiState.value.sortOption)
+            _uiState.update {
+                it.copy(
+                    bookEntries = result.entries,
+                    bookProgressById = result.progressById,
+                )
             }
         }
     }
@@ -92,7 +86,7 @@ internal class BookshelfViewModel(
     }
 
     fun rebuildLookupQuery() {
-        workScope.launch(ioDispatcher) {
+        workScope.launch {
             runCatching { repository.rebuildLookupQuery() }
         }
     }
@@ -103,9 +97,7 @@ internal class BookshelfViewModel(
 
     private fun reloadBookEntries(sortOption: BookSortOption) {
         workScope.launch {
-            val result = withContext(ioDispatcher) {
-                loadBookEntries(sortOption)
-            }
+            val result = loadBookEntries(sortOption)
             _uiState.update {
                 it.copy(
                     bookEntries = result.entries,
@@ -137,9 +129,7 @@ internal class BookshelfViewModel(
         workScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                withContext(ioDispatcher) {
-                    block()
-                }
+                block()
             } catch (error: Throwable) {
                 _uiState.update {
                     it.copy(

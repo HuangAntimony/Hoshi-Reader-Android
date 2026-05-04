@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.epub
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -7,7 +8,7 @@ import java.nio.file.Files
 
 class BookCoverStorageTest {
     @Test
-    fun coverFileResolvesMetadataCoverInsideBookRoot() {
+    fun coverFileResolvesMetadataCoverInsideBookRoot() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-cover").toFile())
         val root = storage.createBookDirectory("book")
         root.resolve("OPS/images").mkdirs()
@@ -27,7 +28,7 @@ class BookCoverStorageTest {
     }
 
     @Test
-    fun coverFileRejectsPathsOutsideBookRoot() {
+    fun coverFileRejectsPathsOutsideBookRoot() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-cover-unsafe").toFile())
         val root = storage.createBookDirectory("book")
         val entry = BookEntry(

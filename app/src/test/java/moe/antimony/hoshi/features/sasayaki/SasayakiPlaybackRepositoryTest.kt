@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -8,7 +9,7 @@ import java.io.File
 
 class SasayakiPlaybackRepositoryTest {
     @Test
-    fun bookPlaybackRepositoryDelegatesLoadAndSaveToBookSidecar() {
+    fun bookPlaybackRepositoryDelegatesLoadAndSaveToBookSidecar() = runBlocking {
         val root = File("book-root")
         val saved = SasayakiPlaybackData(
             lastPosition = 24.5,
@@ -43,16 +44,16 @@ class SasayakiPlaybackRepositoryTest {
         var savedPlayback: SasayakiPlaybackData? = null
             private set
 
-        override fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? = null
+        override suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? = null
 
-        override fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = Unit
+        override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = Unit
 
-        override fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? {
+        override suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? {
             loadedRoot = bookRoot
             return playback
         }
 
-        override fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+        override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
             savedRoot = bookRoot
             savedPlayback = playback
         }

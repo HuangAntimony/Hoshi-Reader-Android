@@ -20,7 +20,7 @@ class BookshelfViewModelTest {
             entries = listOf(entry),
             progressById = mapOf("book-a" to 0.25),
         )
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.reloadBookEntries()
         viewModel.setSasayakiEnabled(true)
@@ -35,7 +35,7 @@ class BookshelfViewModelTest {
     @Test
     fun changingSortOptionReloadsBooksWithThatOption() {
         val repository = FakeBookshelfRepository()
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.changeSort(BookSortOption.Title)
 
@@ -47,7 +47,7 @@ class BookshelfViewModelTest {
     fun openingBookRefreshesShelfAndEmitsOpenReaderEvent() {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(entries = listOf(entry), openBookId = "book-a")
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.openBook(entry)
 
@@ -63,7 +63,7 @@ class BookshelfViewModelTest {
     @Test
     fun importingBookPublishesOpenReaderEventOnSuccess() {
         val repository = FakeBookshelfRepository(importBookId = "imported-book")
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.importBook("content://books/import.epub") {
             repository.importBookId
@@ -77,7 +77,7 @@ class BookshelfViewModelTest {
     @Test
     fun importingBookReportsErrorAndAllowsRetryOnFailure() {
         val repository = FakeBookshelfRepository()
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.importBook("content://books/import.epub") {
             error("bad epub")
@@ -98,7 +98,7 @@ class BookshelfViewModelTest {
     fun deleteBookReloadsBooksAfterRepositoryDeletion() {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(entries = emptyList())
-        val viewModel = BookshelfViewModel(repository, testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.deleteBook(entry)
 
@@ -108,7 +108,7 @@ class BookshelfViewModelTest {
 
     @Test
     fun sasayakiEnabledCanBeDrivenByObservedSettingsState() {
-        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope(), Dispatchers.Unconfined)
+        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
 
         viewModel.setSasayakiEnabled(true)
 

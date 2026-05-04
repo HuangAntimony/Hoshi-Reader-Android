@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +21,8 @@ class SasayakiPlaybackPersistenceStateTest {
         val state = SasayakiPlaybackPersistenceState(
             playbackRepository = repository,
             audioSourceRepository = SasayakiAudioRepository(File("book-root")),
+            initialPlayback = initial,
+            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
         assertEquals(initial, state.playback)
@@ -56,6 +60,8 @@ class SasayakiPlaybackPersistenceStateTest {
         val state = SasayakiPlaybackPersistenceState(
             playbackRepository = repository,
             audioSourceRepository = SasayakiAudioRepository(bookRoot),
+            initialPlayback = repository.initial,
+            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
         assertEquals("Copied to app storage. The original audiobook file can be deleted.", state.audioStorageSummary)
@@ -73,13 +79,13 @@ class SasayakiPlaybackPersistenceStateTest {
     }
 
     private class FakePlaybackRepository(
-        private val initial: SasayakiPlaybackData?,
+        val initial: SasayakiPlaybackData?,
     ) : SasayakiPlaybackRepository {
         val saved = mutableListOf<SasayakiPlaybackData>()
 
-        override fun load(): SasayakiPlaybackData? = initial
+        override suspend fun load(): SasayakiPlaybackData? = initial
 
-        override fun save(playback: SasayakiPlaybackData) {
+        override suspend fun save(playback: SasayakiPlaybackData) {
             saved += playback
         }
     }
