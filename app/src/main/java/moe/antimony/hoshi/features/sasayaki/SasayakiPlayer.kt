@@ -96,6 +96,11 @@ class SasayakiPlayer(
         playbackState = playbackState,
         audioAvailability = audioAvailability,
     )
+    private val audioRestoreWorkflow = SasayakiAudioRestoreWorkflowCoordinator(
+        audioRestore = audioRestore,
+        audioRestoreCallbacks = audioRestoreCallbacks,
+        audioRestoreResult = audioRestoreResult,
+    )
     private val playbackTeardown = SasayakiPlaybackTeardownCoordinator(
         playbackLifecycle = playbackLifecycle,
         mediaSessionHandle = mediaSessionHandle,
@@ -265,26 +270,18 @@ class SasayakiPlayer(
     }
 
     private fun restoreAudio() {
-        val result = runCatching {
-            audioRestore.restore(
-                playback = playback,
-                releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
-                callbacks = audioRestoreCallbacks.build(
-                    updateMediaSession = ::updateMediaSession,
-                    handleSeekComplete = ::handleSeekComplete,
-                    startPlayback = ::startPlayback,
-                    pausePlayback = { pausePlayback() },
-                    previousCue = ::previousCue,
-                    nextCue = ::nextCue,
-                    isPlaying = { isPlaying },
-                ),
-            )
-        }.onFailure(audioRestoreResult::handleFailure).getOrNull() ?: return
-        audioRestoreResult.handleSuccess(
-            result = result,
+        audioRestoreWorkflow.restore(
+            playback = playback,
             currentTime = currentTime,
-            updateCue = ::updateCue,
+            releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
             updateMediaSession = ::updateMediaSession,
+            handleSeekComplete = ::handleSeekComplete,
+            startPlayback = ::startPlayback,
+            pausePlayback = { pausePlayback() },
+            previousCue = ::previousCue,
+            nextCue = ::nextCue,
+            isPlaying = { isPlaying },
+            updateCue = ::updateCue,
         )
     }
 
