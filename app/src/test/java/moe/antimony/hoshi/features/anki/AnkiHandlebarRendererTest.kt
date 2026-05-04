@@ -72,6 +72,31 @@ class AnkiHandlebarRendererTest {
     }
 
     @Test
+    fun sentenceBoldUsesSelectedOccurrenceOnly() {
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{sentence}",
+            payload = AnkiMiningPayload(expression = "僕", matched = "僕"),
+            context = AnkiMiningContext(
+                sentence = "僕は僕の本を読んだ。",
+                sentenceOffset = 2,
+            ),
+        )
+
+        assertEquals("僕は<b>僕</b>の本を読んだ。", rendered)
+    }
+
+    @Test
+    fun sentenceBoldFallsBackToFirstOccurrenceOnlyWithoutSelectionOffset() {
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{sentence}",
+            payload = AnkiMiningPayload(expression = "僕", matched = "僕"),
+            context = AnkiMiningContext(sentence = "僕は僕の本を読んだ。"),
+        )
+
+        assertEquals("<b>僕</b>は僕の本を読んだ。", rendered)
+    }
+
+    @Test
     fun selectedGlossaryFallsBackToFirstGlossaryWhenNoDictionaryIsSelected() {
         val rendered = AnkiHandlebarRenderer.render(
             template = "{selected-glossary}",

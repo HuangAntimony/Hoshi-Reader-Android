@@ -72,6 +72,7 @@ internal fun createLookupPopupItem(
                 sentence = selection.sentence,
                 documentTitle = options.documentTitle,
                 coverPath = options.coverPath,
+                sentenceOffset = selection.sentenceOffset,
             ),
         ),
     ) to first.matched.codePointCount(0, first.matched.length)

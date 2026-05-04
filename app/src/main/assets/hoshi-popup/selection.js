@@ -126,7 +126,7 @@ window.hoshiSelection = {
         return null;
     },
     
-    getSentence(startNode, startOffset) {
+    getSentenceContext(startNode, startOffset) {
         const container = this.findParagraph(startNode) || document.body;
         const walker = this.createWalker(container);
         
@@ -188,7 +188,11 @@ window.hoshiSelection = {
             start = 0;
         }
         
-        let sentence = (partsBefore.reverse().join('') + partsAfter.join('')).trim();
+        const beforeText = partsBefore.reverse().join('');
+        const rawSentence = beforeText + partsAfter.join('');
+        const leadingTrim = rawSentence.length - rawSentence.trimStart().length;
+        let selectedOffset = Math.max(0, beforeText.length - leadingTrim);
+        let sentence = rawSentence.trim();
 
         const closeBrackets = new Set(Object.values(this.brackets));
         const openBrackets = new Set(Object.keys(this.brackets));
@@ -227,7 +231,17 @@ window.hoshiSelection = {
             } else if (!this.sentenceDelimiters.includes(sentence[endIdx])) break;
             endIdx--;
         }
-        return sentence.slice(startSlice, endSlice + 1).trim();
+        const sliced = sentence.slice(startSlice, endSlice + 1);
+        const slicedLeadingTrim = sliced.length - sliced.trimStart().length;
+        selectedOffset = Math.max(0, selectedOffset - startSlice - slicedLeadingTrim);
+        return {
+            sentence: sliced.trim(),
+            sentenceOffset: selectedOffset,
+        };
+    },
+
+    getSentence(startNode, startOffset) {
+        return this.getSentenceContext(startNode, startOffset).sentence;
     },
     
     selectText(x, y, maxLength) {
@@ -295,13 +309,14 @@ window.hoshiSelection = {
             text
         };
         
-        const sentence = this.getSentence(hit.node, hit.offset);
+        const sentenceContext = this.getSentenceContext(hit.node, hit.offset);
         const normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
         webkit.messageHandlers.textSelected.postMessage({
             text,
-            sentence,
+            sentence: sentenceContext.sentence,
             rect: this.getSelectionRect(x, y),
-            normalizedOffset
+            normalizedOffset,
+            sentenceOffset: sentenceContext.sentenceOffset
         });
         
         return text;

@@ -103,7 +103,7 @@ internal object ReaderSelectionScripts {
             }
             return null;
           },
-          getSentence: function(startNode, startOffset) {
+          getSentenceContext: function(startNode, startOffset) {
             var container = this.findParagraph(startNode) || document.body;
             var walker = this.createWalker(container);
             walker.currentNode = startNode;
@@ -146,7 +146,16 @@ internal object ReaderSelectionScripts {
               node = walker.nextNode();
               start = 0;
             }
-            return (partsBefore.reverse().join('') + partsAfter.join('')).trim();
+            var beforeText = partsBefore.reverse().join('');
+            var rawSentence = beforeText + partsAfter.join('');
+            var leadingTrim = rawSentence.length - rawSentence.trimStart().length;
+            return {
+              sentence: rawSentence.trim(),
+              sentenceOffset: Math.max(0, beforeText.length - leadingTrim)
+            };
+          },
+          getSentence: function(startNode, startOffset) {
+            return this.getSentenceContext(startNode, startOffset).sentence;
           },
           selectText: function(x, y, maxLength) {
             if (document.elementFromPoint(x, y)?.closest('a')) {
@@ -185,13 +194,14 @@ internal object ReaderSelectionScripts {
             }
             if (!text) return null;
             this.selection = { startNode: hit.node, startOffset: hit.offset, ranges: ranges, text: text };
-            var sentence = this.getSentence(hit.node, hit.offset);
+            var sentenceContext = this.getSentenceContext(hit.node, hit.offset);
             var normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
             HoshiTextSelection.postMessage(JSON.stringify({
               text: text,
-              sentence: sentence,
+              sentence: sentenceContext.sentence,
               rect: this.getSelectionRect(x, y),
-              normalizedOffset: normalizedOffset
+              normalizedOffset: normalizedOffset,
+              sentenceOffset: sentenceContext.sentenceOffset
             }));
             return text;
           },

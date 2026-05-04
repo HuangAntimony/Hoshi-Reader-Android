@@ -206,5 +206,6 @@ private fun JSONObject.toSelectionData(
             height = rect.optDouble("height"),
         ),
         normalizedOffset = opt("normalizedOffset")?.let { if (it == JSONObject.NULL) null else (it as? Number)?.toInt() },
+        sentenceOffset = opt("sentenceOffset")?.let { if (it == JSONObject.NULL) null else (it as? Number)?.toInt() },
     )
 }

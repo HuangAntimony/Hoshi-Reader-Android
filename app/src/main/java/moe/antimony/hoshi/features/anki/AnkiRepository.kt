@@ -77,6 +77,7 @@ class AnkiRepository(
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.let { addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it)) },
             sasayakiAudioPath = context.sasayakiAudioPath?.let { addMediaFile(it, File(it).name, "audio/mp4") },
+            sentenceOffset = context.sentenceOffset,
         )
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { it.isNotBlank() }?.let(::addRemoteAudio).orEmpty(),
@@ -89,6 +90,7 @@ class AnkiRepository(
             dictionaryMediaTags.entries.fold(
                 AnkiHandlebarRenderer.render(template, mediaPayload, mediaContext),
             ) { value, (filename, tag) -> value.replace(filename, tag) }
+                .let(::normalizeAnkiDictionaryHtml)
         }.filterValues { it.isNotBlank() }
 
         val added = backend.addNote(
@@ -187,3 +189,11 @@ internal fun ankiInlineMediaReference(addMediaResult: String): String {
         ?.getOrNull(1)
     return soundFile ?: addMediaResult
 }
+
+internal fun normalizeAnkiDictionaryHtml(value: String): String {
+    if (!value.contains("data-sc-img") || !value.contains("gloss-image")) return value
+    return value + AnkiGaijiImageStyle
+}
+
+private const val AnkiGaijiImageStyle =
+    """<style>.yomitan-glossary [data-sc-img][data-sc-class="gaiji"]{display:inline!important;white-space:nowrap!important;vertical-align:baseline!important}.yomitan-glossary [data-sc-img][data-sc-class="gaiji"] .gloss-image-link{display:inline-block!important;vertical-align:text-bottom!important;max-width:1.2em!important}.yomitan-glossary [data-sc-img][data-sc-class="gaiji"] .gloss-image-container{display:inline-block!important;width:1em!important;height:1em!important;max-width:1em!important;max-height:1em!important;vertical-align:text-bottom!important;font-size:1em!important}.yomitan-glossary [data-sc-img][data-sc-class="gaiji"] .gloss-image-sizer{display:none!important}.yomitan-glossary [data-sc-img][data-sc-class="gaiji"] .gloss-image{position:static!important;width:1em!important;height:1em!important;vertical-align:text-bottom!important}</style>"""

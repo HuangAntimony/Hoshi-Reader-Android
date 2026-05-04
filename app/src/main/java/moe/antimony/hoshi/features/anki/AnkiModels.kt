@@ -113,6 +113,7 @@ data class AnkiMiningContext(
     val coverPath: String? = null,
     val sasayakiAudioPath: String? = null,
     val popupSelectionText: String? = null,
+    val sentenceOffset: Int? = null,
 )
 
 object AnkiHandlebarRenderer {
@@ -160,6 +161,15 @@ object AnkiHandlebarRenderer {
 
     private fun sentenceValue(payload: AnkiMiningPayload, context: AnkiMiningContext): String {
         val matched = payload.matched.takeIf { it.isNotBlank() } ?: return context.sentence
-        return context.sentence.replace(matched, "<b>$matched</b>")
+        val offset = context.sentenceOffset
+        if (
+            offset != null &&
+            offset >= 0 &&
+            offset + matched.length <= context.sentence.length &&
+            context.sentence.regionMatches(offset, matched, 0, matched.length)
+        ) {
+            return context.sentence.replaceRange(offset, offset + matched.length, "<b>$matched</b>")
+        }
+        return context.sentence.replaceFirst(matched, "<b>$matched</b>")
     }
 }
