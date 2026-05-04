@@ -118,6 +118,11 @@ class SasayakiPlayer(
         cuePresentation = cuePresentation,
         getCurrentChapterIndex = getCurrentChapterIndex,
     )
+    private val seekComplete = SasayakiSeekCompleteCoordinator(
+        playbackEvents = playbackEvents,
+        cuePresentation = cuePresentation,
+        getCurrentChapterIndex = getCurrentChapterIndex,
+    )
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
@@ -249,13 +254,10 @@ class SasayakiPlayer(
     }
 
     private fun handleSeekComplete() {
-        playbackEvents.handleSeekComplete(
+        seekComplete.handle(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
             delay = delay,
-            currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = cuePresentation.autoScroll,
-            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             startPlayback = ::startPlayback,
             updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
