@@ -109,6 +109,8 @@ class SasayakiPlayerSourceTest {
             .substringBefore("private fun updateCue(")
         val seek = source.substringAfter("private fun seek(")
             .substringBefore("private fun restoreAudio()")
+        val restoreTemporary = source.substringAfter("private fun restoreTemporaryPlaybackPositionIfNeeded()")
+            .substringBefore("private fun teardownPlayer(")
 
         assertTrue(source.contains("private val playbackState = SasayakiPlaybackStateCoordinator("))
         assertFalse(source.contains("private var stopPlaybackTime: Double? = null"))
@@ -129,8 +131,13 @@ class SasayakiPlayerSourceTest {
         assertTrue(eventSource.contains("tick.shouldStopPlayback"))
         assertTrue(eventSource.contains("pausePlayback()"))
         assertTrue(eventSource.indexOf("tick.shouldSavePosition") < eventSource.indexOf("tick.shouldStopPlayback"))
+        assertTrue(source.contains("private val temporaryPlaybackRestore = SasayakiTemporaryPlaybackRestoreCoordinator("))
         assertTrue(source.contains("private fun restoreTemporaryPlaybackPositionIfNeeded()"))
-        assertTrue(source.contains("playbackState.restoreTemporaryPlaybackPositionIfNeeded() ?: return"))
+        assertTrue(restoreTemporary.contains("temporaryPlaybackRestore.restoreIfNeeded("))
+        assertTrue(restoreTemporary.contains("updateCue = ::updateCue"))
+        assertTrue(restoreTemporary.contains("updateMediaSession = ::updateMediaSession"))
+        assertFalse(restoreTemporary.contains("playbackState.restoreTemporaryPlaybackPositionIfNeeded() ?: return"))
+        assertFalse(restoreTemporary.contains("playbackLifecycle.seekTo((returnPosition * 1000.0).toInt())"))
     }
 
     @Test
@@ -322,6 +329,7 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("private val audioRestore = SasayakiAudioRestoreController("))
         assertTrue(source.contains("private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator("))
         assertTrue(source.contains("private val playbackLifecycle = SasayakiPlaybackLifecycleController("))
+        assertTrue(source.contains("private val temporaryPlaybackRestore = SasayakiTemporaryPlaybackRestoreCoordinator("))
         assertTrue(source.contains("private val playbackTeardown = SasayakiPlaybackTeardownCoordinator("))
         assertTrue(source.contains("private val mediaSessionPublishing = SasayakiMediaSessionPublishingCoordinator("))
         assertFalse(source.contains("private var playbackEngine: SasayakiPlaybackEngine? = null"))

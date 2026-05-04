@@ -46,6 +46,10 @@ class SasayakiPlayer(
         handler = handler,
         tickRunnable = tickRunnable,
     )
+    private val temporaryPlaybackRestore = SasayakiTemporaryPlaybackRestoreCoordinator(
+        playbackState = playbackState,
+        playbackLifecycle = playbackLifecycle,
+    )
     private val playbackCommands = SasayakiPlaybackCommandCoordinator(
         playbackState = playbackState,
         playbackLifecycle = playbackLifecycle,
@@ -312,10 +316,10 @@ class SasayakiPlayer(
     }
 
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
-        val returnPosition = playbackState.restoreTemporaryPlaybackPositionIfNeeded() ?: return
-        playbackLifecycle.seekTo((returnPosition * 1000.0).toInt())
-        updateCue(returnPosition)
-        updateMediaSession()
+        temporaryPlaybackRestore.restoreIfNeeded(
+            updateCue = ::updateCue,
+            updateMediaSession = ::updateMediaSession,
+        )
     }
 
     private fun teardownPlayer(clearCue: Boolean) {
