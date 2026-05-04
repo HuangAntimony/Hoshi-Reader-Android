@@ -11,7 +11,9 @@ import moe.antimony.hoshi.features.audio.audioSettingsRepository
 import moe.antimony.hoshi.features.bookshelf.AndroidBookshelfRepository
 import moe.antimony.hoshi.features.bookshelf.BookshelfRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionaryViewModelRepository
+import moe.antimony.hoshi.features.dictionary.AndroidDictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsRepository
+import moe.antimony.hoshi.features.dictionary.DictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.DictionaryViewModelRepository
 import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderFontManager
@@ -48,6 +50,13 @@ internal class HoshiAppContainer(context: Context) {
             contentResolver = contentResolver,
             dictionaryRepository = dictionaryRepository,
             settingsRepository = dictionarySettingsRepository,
+        )
+
+    fun dictionarySearchRepository(): DictionarySearchRepository =
+        AndroidDictionarySearchRepository(
+            dictionaryRepository = dictionaryRepository,
+            dictionarySettingsRepository = dictionarySettingsRepository,
+            audioSettingsRepository = audioSettingsRepository,
         )
 }
 

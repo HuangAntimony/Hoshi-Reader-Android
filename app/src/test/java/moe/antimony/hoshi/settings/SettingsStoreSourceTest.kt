@@ -269,10 +269,12 @@ class SettingsStoreSourceTest {
             "repository.update { next }",
         )
         source("features/dictionary/DictionarySearchView.kt").mustContainAll(
-            "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",
-            "dictionarySettingsRepository.settings.collect",
-            "val audioSettingsRepository = appContainer.audioSettingsRepository",
-            "audioSettingsRepository.settings.collect",
+            "appContainer.dictionarySearchRepository()",
+            "searchViewModel.uiState.collectAsState()",
+        )
+        source("features/dictionary/DictionarySearchViewModel.kt").mustContainAll(
+            "repository.dictionarySettings.collect",
+            "repository.audioSettings.collect",
         )
         source("features/reader/ReaderWebView.kt").mustContainAll(
             "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",

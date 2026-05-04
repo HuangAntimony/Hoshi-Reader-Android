@@ -91,6 +91,8 @@ class AudioSettingsRepositoryTest {
     fun audioCallSitesUseRepositoryFlowTransitionPath() {
         val audioView = java.io.File("src/main/java/moe/antimony/hoshi/features/audio/AudioView.kt").readText()
         val dictionarySearch = java.io.File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionarySearchView.kt").readText()
+        val dictionarySearchViewModel =
+            java.io.File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionarySearchViewModel.kt").readText()
         val readerWebView = java.io.File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
         val container = java.io.File("src/main/java/moe/antimony/hoshi/HoshiAppContainer.kt").readText()
 
@@ -98,8 +100,10 @@ class AudioSettingsRepositoryTest {
         assertTrue(audioView.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
         assertTrue(audioView.contains("audioSettingsRepository.settings.collect"))
         assertTrue(audioView.contains("audioSettingsRepository.update { next }"))
-        assertTrue(dictionarySearch.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
-        assertTrue(dictionarySearch.contains("audioSettingsRepository.settings.collect"))
+        assertTrue(dictionarySearch.contains("appContainer.dictionarySearchRepository()"))
+        assertTrue(dictionarySearchViewModel.contains("override val audioSettings: Flow<AudioSettings>"))
+        assertTrue(dictionarySearchViewModel.contains("audioSettingsRepository.settings"))
+        assertTrue(dictionarySearchViewModel.contains("repository.audioSettings.collect"))
         assertTrue(readerWebView.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
         assertTrue(readerWebView.contains("audioSettingsRepository.settings.collect"))
     }

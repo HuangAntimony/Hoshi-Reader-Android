@@ -29,11 +29,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,12 +48,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import de.manhhao.hoshi.LookupResult
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiAppContainer
-import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
@@ -63,67 +61,8 @@ import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
 import kotlin.math.abs
 
-private const val DictionarySearchTopSpacerPx = 118
 private const val DictionaryPopupTopInset = 118.0
 private const val DictionaryPopupBottomInset = 150.0
-
-internal data class DictionarySearchRenderState(
-    val lastQuery: String,
-    val html: String,
-    val results: List<LookupResult>,
-    val hasResults: Boolean,
-    val dictionaryStyles: Map<String, String>,
-)
-
-internal object DictionarySearchContent {
-    fun runLookup(
-        query: String,
-        lookup: (String) -> List<LookupResult>,
-        assets: LookupPopupAssets? = null,
-        dictionaryStyles: Map<String, String> = emptyMap(),
-        dictionarySettings: DictionarySettings = DictionarySettings(),
-        darkMode: Boolean = false,
-        eInkMode: Boolean = false,
-        audioSettings: AudioSettings = AudioSettings(),
-    ): DictionarySearchRenderState {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) {
-            return DictionarySearchRenderState(
-                lastQuery = "",
-                html = "",
-                results = emptyList(),
-                hasResults = false,
-                dictionaryStyles = emptyMap(),
-            )
-        }
-        val results = lookup(trimmed)
-        if (results.isEmpty()) {
-            return DictionarySearchRenderState(
-                lastQuery = trimmed,
-                html = "",
-                results = emptyList(),
-                hasResults = false,
-                dictionaryStyles = emptyMap(),
-            )
-        }
-        return DictionarySearchRenderState(
-            lastQuery = trimmed,
-            html = LookupPopupHtml.render(
-                results = results,
-                assets = assets,
-                dictionaryStyles = dictionaryStyles,
-                topSpacerPx = DictionarySearchTopSpacerPx,
-                settings = dictionarySettings,
-                darkMode = darkMode,
-                eInkMode = eInkMode,
-                audioSettings = audioSettings,
-            ),
-            results = results,
-            hasResults = true,
-            dictionaryStyles = dictionaryStyles,
-        )
-    }
-}
 
 internal fun dictionarySearchPopupOptions(
     readerSettings: ReaderSettings,
@@ -153,100 +92,37 @@ fun DictionarySearchView(
 ) {
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
-    val scope = rememberCoroutineScope()
     val assets = remember(context) { LookupPopupAssets.load(context) }
-    val repository = appContainer.dictionaryRepository
-    val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
-    val audioSettingsRepository = appContainer.audioSettingsRepository
+    val searchViewModel: DictionarySearchViewModel = viewModel(
+        factory = remember(appContainer) {
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    DictionarySearchViewModel(appContainer.dictionarySearchRepository()) as T
+            }
+        },
+    )
+    val uiState by searchViewModel.uiState.collectAsState()
     val localAudioRepository = appContainer.localAudioRepository
-    var query by remember { mutableStateOf("") }
-    var html by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<LookupResult>>(emptyList()) }
-    var hasSearched by remember { mutableStateOf(false) }
-    var isSearching by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var dictionaryStyles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
-    var audioSettings by remember { mutableStateOf(AudioSettings()) }
-    var popups by remember { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
-    var resultClearSelectionSignal by remember { mutableStateOf(0) }
-    var backCount by remember(html) { mutableStateOf(0) }
-    var forwardCount by remember(html) { mutableStateOf(0) }
-    var backSignal by remember(html) { mutableStateOf(0) }
-    var forwardSignal by remember(html) { mutableStateOf(0) }
     val popupDarkMode = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val popupOptions = dictionarySearchPopupOptions(
         readerSettings = readerSettings,
-        dictionarySettings = dictionarySettings,
+        dictionarySettings = uiState.dictionarySettings,
         darkMode = popupDarkMode,
-        audioSettings = audioSettings,
+        audioSettings = uiState.audioSettings,
     )
-    val lookupPopup = { selection: moe.antimony.hoshi.features.reader.ReaderSelectionData ->
-        createLookupPopupItem(
-            selection = selection,
-            options = popupOptions,
-            dictionaryStyles = dictionaryStyles,
+    val runLookup = {
+        searchViewModel.runLookup(
+            assets = assets,
+            darkMode = popupDarkMode,
+            eInkMode = readerSettings.eInkMode,
         )
     }
-
-    fun runLookup() {
-        scope.launch {
-            isSearching = true
-            errorMessage = null
-            val settings = dictionarySettings
-            val currentAudioSettings = audioSettings
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    repository.rebuildLookupQuery()
-                    val styles = currentDictionaryStyles()
-                    DictionarySearchContent.runLookup(
-                        query = query,
-                        lookup = { LookupEngine.lookup(it, settings.maxResults, settings.scanLength) },
-                        dictionaryStyles = styles,
-                        dictionarySettings = settings,
-                        darkMode = popupDarkMode,
-                        eInkMode = readerSettings.eInkMode,
-                        audioSettings = currentAudioSettings,
-                    )
-                }
-            }.onSuccess { state ->
-                html = state.html
-                searchResults = state.results
-                dictionaryStyles = state.dictionaryStyles
-                popups = emptyList()
-                resultClearSelectionSignal = 0
-                backCount = 0
-                forwardCount = 0
-                hasSearched = true
-            }.onFailure {
-                html = ""
-                searchResults = emptyList()
-                dictionaryStyles = emptyMap()
-                popups = emptyList()
-                resultClearSelectionSignal = 0
-                backCount = 0
-                forwardCount = 0
-                hasSearched = true
-                errorMessage = it.localizedMessage ?: "Lookup failed."
-            }
-            isSearching = false
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            runCatching { repository.rebuildLookupQuery() }
-        }
-    }
-    LaunchedEffect(dictionarySettingsRepository) {
-        dictionarySettingsRepository.settings.collect { settings ->
-            dictionarySettings = settings
-        }
-    }
-    LaunchedEffect(audioSettingsRepository) {
-        audioSettingsRepository.settings.collect { settings ->
-            audioSettings = settings
-        }
+    val lookupPopup = { selection: moe.antimony.hoshi.features.reader.ReaderSelectionData ->
+        searchViewModel.createPopup(
+            selection = selection,
+            options = popupOptions,
+        )
     }
 
     Box(
@@ -255,38 +131,23 @@ fun DictionarySearchView(
             .background(MaterialTheme.colorScheme.background),
     ) {
         when {
-            html.isNotBlank() -> DictionaryResultWebView(
-                html = html,
-                results = searchResults,
+            uiState.html.isNotBlank() -> DictionaryResultWebView(
+                html = uiState.html,
+                results = uiState.results,
                 assets = assets,
-                audioSettings = audioSettings,
+                audioSettings = uiState.audioSettings,
                 localAudioRepository = localAudioRepository,
-                clearSelectionSignal = resultClearSelectionSignal,
-                backSignal = backSignal,
-                forwardSignal = forwardSignal,
+                clearSelectionSignal = uiState.resultClearSelectionSignal,
+                backSignal = uiState.backSignal,
+                forwardSignal = uiState.forwardSignal,
                 callbacks = PopupWebViewCallbacks(
-                    onTapOutside = { popups = emptyList() },
-                    onSwipeDismiss = { popups = emptyList() },
+                    onTapOutside = searchViewModel::closePopups,
+                    onSwipeDismiss = searchViewModel::closePopups,
                     onTextSelected = { selection ->
-                        popups = emptyList()
-                        lookupPopup(selection)?.let { (popup, highlightCount) ->
-                            popups = listOf(popup)
-                            highlightCount
-                        }
+                        searchViewModel.openRootPopup(selection, popupOptions)
                     },
-                    onLookupRedirect = { redirectQuery ->
-                        LookupEngine.lookup(
-                            redirectQuery,
-                            dictionarySettings.maxResults,
-                            dictionarySettings.scanLength,
-                        )
-                    },
-                    onLookupRedirected = { count ->
-                        if (count > 0) {
-                            backCount += 1
-                            forwardCount = 0
-                        }
-                    },
+                    onLookupRedirect = searchViewModel::lookupRedirect,
+                    onLookupRedirected = searchViewModel::recordLookupRedirected,
                     onPlayWordAudio = { url, mode ->
                         WordAudioPlayer.get(context).play(url, mode)
                     },
@@ -294,44 +155,36 @@ fun DictionarySearchView(
                 modifier = Modifier
                     .fillMaxSize()
                     .observeDictionaryHistorySwipe(
-                        backCount = backCount,
-                        forwardCount = forwardCount,
-                        onBack = {
-                            backSignal += 1
-                            backCount -= 1
-                            forwardCount += 1
-                        },
-                        onForward = {
-                            forwardSignal += 1
-                            forwardCount -= 1
-                            backCount += 1
-                        },
+                        backCount = uiState.backCount,
+                        forwardCount = uiState.forwardCount,
+                        onBack = searchViewModel::navigateBack,
+                        onForward = searchViewModel::navigateForward,
                     ),
             )
-            errorMessage != null -> DictionarySearchMessage(
-                text = requireNotNull(errorMessage),
+            uiState.errorMessage != null -> DictionarySearchMessage(
+                text = requireNotNull(uiState.errorMessage),
                 modifier = Modifier.fillMaxSize(),
             )
-            hasSearched && !isSearching -> DictionarySearchMessage(
+            uiState.hasSearched && !uiState.isSearching -> DictionarySearchMessage(
                 text = "",
                 modifier = Modifier.fillMaxSize(),
             )
         }
         DictionarySearchBar(
-            query = query,
-            isSearching = isSearching,
-            onQueryChange = { query = it },
-            onSubmit = ::runLookup,
+            query = uiState.query,
+            isSearching = uiState.isSearching,
+            onQueryChange = searchViewModel::updateQuery,
+            onSubmit = runLookup,
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp),
         )
         LookupPopupStackView(
-            popups = popups,
-            onPopupsChange = { popups = it },
+            popups = uiState.popups,
+            onPopupsChange = searchViewModel::setPopups,
             lookupChildPopup = lookupPopup,
-            onRootPopupDismissed = { resultClearSelectionSignal += 1 },
+            onRootPopupDismissed = searchViewModel::dismissRootPopup,
             modifier = Modifier.fillMaxSize(),
         )
     }
