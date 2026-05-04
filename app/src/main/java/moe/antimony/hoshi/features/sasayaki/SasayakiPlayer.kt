@@ -79,6 +79,9 @@ class SasayakiPlayer(
         contentResolver = appContext.contentResolver,
     )
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
+    private val mediaSessionPublishing = SasayakiMediaSessionPublishingCoordinator(
+        mediaSessionHandle = mediaSessionHandle,
+    )
     private val audioRestoreResult = SasayakiAudioRestoreResultCoordinator(
         mediaSessionHandle = mediaSessionHandle,
         playbackState = playbackState,
@@ -202,7 +205,7 @@ class SasayakiPlayer(
             markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
                 updateMediaSession()
-                mediaSessionHandle.activate()
+                mediaSessionPublishing.activate()
                 updateCue(currentTime, forceDisplay = true)
             },
         )
@@ -303,10 +306,10 @@ class SasayakiPlayer(
     }
 
     private fun updateMediaSession() {
-        mediaSessionHandle.update(
+        mediaSessionPublishing.update(
             isPlaying = isPlaying,
-            currentTimeMs = (currentTime * 1000.0).toLong(),
-            durationMs = (duration * 1000.0).toLong(),
+            currentTime = currentTime,
+            duration = duration,
             rate = rate,
         )
     }

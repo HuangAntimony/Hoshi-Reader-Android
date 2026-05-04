@@ -96,6 +96,7 @@ class SasayakiPlayerSourceTest {
         assertTrue(startPlayback.contains("playbackCommands.start("))
         assertTrue(startPlayback.contains("rate = rate"))
         assertTrue(startPlayback.contains("markPlayedOnce = cuePresentation::markPlayedOnce"))
+        assertTrue(startPlayback.contains("mediaSessionPublishing.activate()"))
     }
 
     @Test
@@ -323,6 +324,7 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator("))
         assertTrue(source.contains("private val playbackLifecycle = SasayakiPlaybackLifecycleController("))
         assertTrue(source.contains("private val playbackTeardown = SasayakiPlaybackTeardownCoordinator("))
+        assertTrue(source.contains("private val mediaSessionPublishing = SasayakiMediaSessionPublishingCoordinator("))
         assertFalse(source.contains("private var playbackEngine: SasayakiPlaybackEngine? = null"))
         assertFalse(restoreAudio.contains("AndroidSasayakiPlaybackEngine.prepare("))
         assertFalse(restoreAudio.contains("startPositionMs = (playback.lastPosition * 1000.0).toInt()"))
@@ -347,5 +349,27 @@ class SasayakiPlayerSourceTest {
         assertFalse(teardown.contains("audioAvailability.markAudioUnavailable()"))
         assertFalse(teardown.contains("playbackEngine?.release()"))
         assertFalse(teardown.contains("playbackEngine = null"))
+    }
+
+    @Test
+    fun playerUsesMediaSessionPublishingBoundaryForStateUpdates() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val startPlayback = source.substringAfter("private fun startPlayback()")
+            .substringBefore("private fun seek(")
+        val updateMediaSession = source.substringAfter("private fun updateMediaSession()")
+            .substringBefore("private fun restoreTemporaryPlaybackPositionIfNeeded()")
+
+        assertTrue(source.contains("private val mediaSessionPublishing = SasayakiMediaSessionPublishingCoordinator("))
+        assertTrue(startPlayback.contains("updateMediaSession()"))
+        assertTrue(startPlayback.contains("mediaSessionPublishing.activate()"))
+        assertFalse(startPlayback.contains("mediaSessionHandle.activate()"))
+        assertTrue(updateMediaSession.contains("mediaSessionPublishing.update("))
+        assertTrue(updateMediaSession.contains("isPlaying = isPlaying"))
+        assertTrue(updateMediaSession.contains("currentTime = currentTime"))
+        assertTrue(updateMediaSession.contains("duration = duration"))
+        assertTrue(updateMediaSession.contains("rate = rate"))
+        assertFalse(updateMediaSession.contains("mediaSessionHandle.update("))
+        assertFalse(updateMediaSession.contains("currentTimeMs = (currentTime * 1000.0).toLong()"))
+        assertFalse(updateMediaSession.contains("durationMs = (duration * 1000.0).toLong()"))
     }
 }
