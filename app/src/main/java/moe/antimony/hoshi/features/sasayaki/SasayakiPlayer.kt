@@ -75,6 +75,11 @@ class SasayakiPlayer(
         contentResolver = appContext.contentResolver,
     )
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
+    private val audioRestoreResult = SasayakiAudioRestoreResultCoordinator(
+        mediaSessionHandle = mediaSessionHandle,
+        playbackState = playbackState,
+        audioAvailability = audioAvailability,
+    )
     private val playbackTeardown = SasayakiPlaybackTeardownCoordinator(
         playbackLifecycle = playbackLifecycle,
         mediaSessionHandle = mediaSessionHandle,
@@ -251,12 +256,13 @@ class SasayakiPlayer(
                     },
                 ),
             )
-        }.onFailure(audioAvailability::markRestoreFailed).getOrNull() ?: return
-        mediaSessionHandle.replace(result.mediaSession)
-        playbackState.updateDuration(result.durationMs)
-        audioAvailability.markRestoreSucceeded()
-        updateCue(currentTime)
-        updateMediaSession()
+        }.onFailure(audioRestoreResult::handleFailure).getOrNull() ?: return
+        audioRestoreResult.handleSuccess(
+            result = result,
+            currentTime = currentTime,
+            updateCue = ::updateCue,
+            updateMediaSession = ::updateMediaSession,
+        )
     }
 
     private fun tick() {
