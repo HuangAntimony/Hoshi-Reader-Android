@@ -73,9 +73,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.EpubBook
@@ -94,20 +94,6 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import java.io.File
-
-data class ReaderSelectionData(
-    val text: String,
-    val sentence: String,
-    val rect: ReaderSelectionRect,
-    val normalizedOffset: Int?,
-)
-
-data class ReaderSelectionRect(
-    val x: Double,
-    val y: Double,
-    val width: Double,
-    val height: Double,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1032,33 +1018,6 @@ private fun WebView.navigatePage(
     }
 }
 
-private class ReaderSelectionBridge(
-    private val webView: WebView,
-    private val onTextSelected: (ReaderSelectionData) -> Int?,
-) {
-    private val json = Json { ignoreUnknownKeys = true }
-
-    @JavascriptInterface
-    fun postMessage(message: String) {
-        val payload = runCatching { json.decodeFromString<ReaderSelectionPayload>(message) }.getOrNull() ?: return
-        val data = ReaderSelectionData(
-            text = payload.text,
-            sentence = payload.sentence,
-            rect = ReaderSelectionRect(
-                x = payload.rect.x,
-                y = payload.rect.y,
-                width = payload.rect.width,
-                height = payload.rect.height,
-            ),
-            normalizedOffset = payload.normalizedOffset,
-        )
-        webView.post {
-            val highlightCount = onTextSelected(data) ?: return@post
-            webView.evaluateJavascript(ReaderSelectionCommand.HighlightSelection(highlightCount).source, null)
-        }
-    }
-}
-
 private class ReaderRestoreBridge(
     private val webView: WebView,
     private val onRestoreCompleted: (WebView) -> Unit,
@@ -1071,22 +1030,6 @@ private class ReaderRestoreBridge(
         }
     }
 }
-
-@Serializable
-private data class ReaderSelectionPayload(
-    val text: String,
-    val sentence: String,
-    val rect: ReaderSelectionPayloadRect,
-    val normalizedOffset: Int? = null,
-)
-
-@Serializable
-private data class ReaderSelectionPayloadRect(
-    val x: Double,
-    val y: Double,
-    val width: Double,
-    val height: Double,
-)
 
 private const val MAX_SELECTION_LENGTH = 16
 private val ReaderWebViewTopPadding = 44.dp

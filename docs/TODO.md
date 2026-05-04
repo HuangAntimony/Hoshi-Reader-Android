@@ -22,8 +22,8 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Completed architecture slices: book repository/data-source APIs are main-safe, and Sasayaki sidecar DTOs now live outside feature playback/UI packages.
-- Next architecture slice: extract Reader selection Web bridge command dispatch and payload parsing behind behavior tests.
+- Completed architecture slices: book repository/data-source APIs are main-safe, Sasayaki sidecar DTOs live outside feature playback/UI packages, and Reader selection bridge payload handling is extracted behind behavior tests.
+- Next architecture slice: make Compose screen Flow collection lifecycle-aware with `collectAsStateWithLifecycle()`.
 - Defer modularization until sidecar/model, Reader bridge/state, and native build boundaries are stable.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
