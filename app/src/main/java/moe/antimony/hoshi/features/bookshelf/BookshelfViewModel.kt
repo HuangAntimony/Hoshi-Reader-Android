@@ -26,6 +26,7 @@ internal class BookshelfViewModel(
     private val workScope = coroutineScope ?: ownedScope!!
     private val _uiState = MutableStateFlow(BookshelfUiState())
     val uiState: StateFlow<BookshelfUiState> = _uiState
+    private var openBookInFlight = false
 
     fun reloadBookEntries() {
         reloadBookEntries(_uiState.value.sortOption)
@@ -37,14 +38,25 @@ internal class BookshelfViewModel(
     }
 
     fun openBook(entry: BookEntry) {
-        runLoading(
-            errorPrefix = "Failed to open EPUB.",
-            block = {
+        if (openBookInFlight) {
+            return
+        }
+        openBookInFlight = true
+        workScope.launch {
+            _uiState.update { it.copy(errorMessage = null) }
+            try {
                 val bookId = repository.openBook(entry)
-                reloadBookEntriesSync()
                 _uiState.update { it.copy(openReaderBookId = bookId) }
-            },
-        )
+            } catch (error: Throwable) {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = error.localizedMessage ?: "Failed to open EPUB.",
+                    )
+                }
+            } finally {
+                openBookInFlight = false
+            }
+        }
     }
 
     fun importBook(uri: Uri) {

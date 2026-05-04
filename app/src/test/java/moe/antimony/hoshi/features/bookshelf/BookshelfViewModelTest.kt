@@ -44,7 +44,7 @@ class BookshelfViewModelTest {
     }
 
     @Test
-    fun openingBookRefreshesShelfAndEmitsOpenReaderEvent() {
+    fun openingBookEmitsOpenReaderEventWithoutRefreshingShelf() {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(entries = listOf(entry), openBookId = "book-a")
         val viewModel = BookshelfViewModel(repository, testScope())
@@ -52,7 +52,8 @@ class BookshelfViewModelTest {
         viewModel.openBook(entry)
 
         assertEquals("book-a", viewModel.uiState.value.openReaderBookId)
-        assertEquals(listOf(entry), viewModel.uiState.value.bookEntries)
+        assertEquals(emptyList<BookEntry>(), viewModel.uiState.value.bookEntries)
+        assertEquals(emptyList<BookSortOption>(), repository.loadRequests)
         assertFalse(viewModel.uiState.value.isLoading)
 
         viewModel.consumeOpenReaderEvent()

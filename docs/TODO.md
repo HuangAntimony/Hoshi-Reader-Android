@@ -112,4 +112,6 @@ Also run `./gradlew lint` when changing resources, manifest, UI, packaging, or r
 
 For settings/navigation changes, verify settings controls update immediately and route changes avoid fade transitions on e-ink displays.
 
+For bookshelf-to-reader regressions, use real-device continuous screenshots or screen recording to confirm no Bookshelf loading spinner appears between tapping a book and showing the Reader.
+
 For reader/dictionary/audio user flows, perform targeted emulator or device validation using the test data listed in `AGENTS.md`.
