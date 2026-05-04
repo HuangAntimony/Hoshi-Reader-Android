@@ -13,6 +13,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Match the bookshelf cover loading placeholder to the shelf background, preventing white cover flashes when returning to Books from the bottom tab bar in dark mode.
 - Wait for saved reader appearance settings and the first bookshelf load before drawing the app shell, avoiding light-theme empty-library flashes during dark-theme cold starts.
+- Let the Android launch screen follow the system light or dark mode before the app UI is ready.
 - Preserve selected popup text when mining AnkiDroid cards, restoring the Lapis `{popup-selection-text}` field.
 - Add dictionary SVG media to AnkiDroid notes as real media files instead of nested image HTML, restoring MK3 gaiji icons in mined Lapis cards.
 - Keep MK3 SVG gaiji inline with surrounding text in AnkiDroid Lapis glossary fields.

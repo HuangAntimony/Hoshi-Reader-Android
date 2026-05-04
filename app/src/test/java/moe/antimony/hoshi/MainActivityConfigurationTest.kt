@@ -34,6 +34,15 @@ class MainActivityConfigurationTest {
         )
     }
 
+    @Test
+    fun launchThemeHasNightResourceVariant() {
+        val lightTheme = themeElement(File("src/main/res/values/themes.xml"))
+        val nightTheme = themeElement(File("src/main/res/values-night/themes.xml"))
+
+        assertTrue(lightTheme.getAttribute("parent") == "android:Theme.Material.Light.NoActionBar")
+        assertTrue(nightTheme.getAttribute("parent") == "android:Theme.Material.NoActionBar")
+    }
+
     private fun mainActivityManifestElement(): Element {
         val document = DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()
@@ -46,5 +55,19 @@ class MainActivityConfigurationTest {
             }
         }
         error("MainActivity not found in AndroidManifest.xml")
+    }
+
+    private fun themeElement(file: File): Element {
+        val document = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(file)
+        val styles = document.getElementsByTagName("style")
+        for (index in 0 until styles.length) {
+            val element = styles.item(index) as Element
+            if (element.getAttribute("name") == "Theme.HoshiReader") {
+                return element
+            }
+        }
+        error("Theme.HoshiReader not found in ${file.path}")
     }
 }
