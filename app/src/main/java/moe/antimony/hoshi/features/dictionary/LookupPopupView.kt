@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.dictionary
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.webkit.WebView
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
@@ -104,6 +105,7 @@ fun LookupPopupView(
     onSasayakiTogglePlayback: () -> Unit = {},
     onSasayakiPauseStateCleared: () -> Unit = {},
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
+    onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
 ) {
     if (state.results.isEmpty()) return
     val context = LocalContext.current
@@ -277,7 +279,15 @@ fun LookupPopupView(
                             WordAudioPlayer.get(context).play(url, mode)
                         },
                         onMineEntry = { payload ->
-                            ankiViewModel.mineEntry(payload, state.ankiContext)
+                            runCatching {
+                                val ankiContext = sasayakiCue?.let { cue ->
+                                    state.ankiContext.copy(
+                                        sasayakiAudioPath = onPrepareSasayakiAudio(cue, state.selection.sentence),
+                                    )
+                                } ?: state.ankiContext
+                                ankiViewModel.mineEntry(payload, ankiContext)
+                            }.onFailure { Log.w("LookupPopupView", "Failed to mine popup entry", it) }
+                                .getOrDefault(false)
                         },
                         onDuplicateCheck = { expression ->
                             ankiViewModel.duplicateCheck(expression)

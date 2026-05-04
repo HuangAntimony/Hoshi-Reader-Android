@@ -116,6 +116,7 @@ internal fun LookupPopupStackView(
     onSasayakiTogglePlayback: () -> Unit = {},
     onSasayakiPauseStateCleared: () -> Unit = {},
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
+    onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
 ) {
     popups.forEachIndexed { index, popup ->
         key(popup.id) {
@@ -143,6 +144,7 @@ internal fun LookupPopupStackView(
                 onSasayakiTogglePlayback = onSasayakiTogglePlayback,
                 onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = onSasayakiPlayForward,
+                onPrepareSasayakiAudio = onPrepareSasayakiAudio,
                 modifier = modifier
                     .fillMaxSize()
                     .zIndex(2f + index),

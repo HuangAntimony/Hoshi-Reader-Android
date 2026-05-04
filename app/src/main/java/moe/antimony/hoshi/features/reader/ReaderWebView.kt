@@ -452,6 +452,9 @@ fun ReaderWebView(
                     sasayakiPlayer?.playCue(cue, stop = false)
                     setLookupPopups(emptyList())
                 },
+                onPrepareSasayakiAudio = { cue, sentence ->
+                    sasayakiPlayer?.exportCueAudio(cue, sentence)?.absolutePath
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

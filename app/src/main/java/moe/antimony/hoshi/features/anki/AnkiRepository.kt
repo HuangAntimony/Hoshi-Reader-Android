@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.FileProvider
 import de.manhhao.hoshi.HoshiDicts
 import java.io.File
@@ -42,6 +43,8 @@ class AnkiRepository(
                 selectedDeckName = selectedDeck.name,
                 selectedNoteTypeId = selectedNoteType.id,
                 selectedNoteTypeName = selectedNoteType.name,
+                availableDecks = decks,
+                availableNoteTypes = noteTypes,
                 fieldMappings = LapisPreset.applyDefaults(selectedNoteType, current.fieldMappings),
             )
         }
@@ -73,7 +76,7 @@ class AnkiRepository(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.let { addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it)) },
-            sasayakiAudioPath = context.sasayakiAudioPath?.let { addMediaFile(it, "hoshi_sasayaki_${File(it).name}", "audio/mp4") },
+            sasayakiAudioPath = context.sasayakiAudioPath?.let { addMediaFile(it, File(it).name, "audio/mp4") },
         )
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { it.isNotBlank() }?.let(::addRemoteAudio).orEmpty(),
@@ -124,14 +127,19 @@ class AnkiRepository(
                 ?: return null
             val file = mediaCacheFile("hoshi_dict_${data.contentHashCode()}.${media.path.substringAfterLast('.', "bin")}")
             file.writeBytes(data)
-            addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path))
-        }.getOrNull()
+            addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path))?.let(::ankiInlineMediaReference)
+        }.onFailure { Log.w(TAG, "Failed to add dictionary media ${media.path}", it) }
+            .getOrNull()
 
     private fun addMediaFile(path: String, preferredName: String, mimeType: String): String? {
         val file = File(path).takeIf { it.isFile } ?: return null
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        context.grantUriPermission("com.ichi2.anki", uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        return backend.addMediaFromUri(uri.toString(), preferredName, mimeType)
+        return runCatching {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            context.grantUriPermission("com.ichi2.anki", uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            backend.addMediaFromUri(uri.toString(), preferredName, mimeType)
+        }
+            .onFailure { Log.w(TAG, "Failed to add Anki media $preferredName", it) }
+            .getOrNull()
     }
 
     private fun mediaCacheFile(name: String): File {
@@ -139,6 +147,8 @@ class AnkiRepository(
         return File(dir, name)
     }
 }
+
+private const val TAG = "AnkiRepository"
 
 sealed interface AnkiFetchResult {
     data class Success(
@@ -164,3 +174,16 @@ fun mimeTypeForPath(path: String): String =
         "svg" -> "image/svg+xml"
         else -> "application/octet-stream"
     }
+
+internal fun ankiInlineMediaReference(addMediaResult: String): String {
+    val imageSrc = Regex("""<img\s+[^>]*src=["']([^"']+)["'][^>]*>""")
+        .find(addMediaResult)
+        ?.groupValues
+        ?.getOrNull(1)
+    if (!imageSrc.isNullOrBlank()) return imageSrc
+    val soundFile = Regex("""\[sound:([^\]]+)]""")
+        .find(addMediaResult)
+        ?.groupValues
+        ?.getOrNull(1)
+    return soundFile ?: addMediaResult
+}

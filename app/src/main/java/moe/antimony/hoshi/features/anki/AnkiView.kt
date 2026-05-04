@@ -167,8 +167,8 @@ private fun AnkiDeckRow(
     AnkiDropdownRow(
         label = "Deck",
         value = uiState.settings.selectedDeckName ?: "None",
-        enabled = uiState.decks.isNotEmpty(),
-        items = uiState.decks,
+        enabled = uiState.availableDecks.isNotEmpty(),
+        items = uiState.availableDecks,
         itemLabel = { it.name },
         onSelect = onSelect,
     )
@@ -182,8 +182,8 @@ private fun AnkiNoteTypeRow(
     AnkiDropdownRow(
         label = "Model",
         value = uiState.settings.selectedNoteTypeName ?: "None",
-        enabled = uiState.noteTypes.isNotEmpty(),
-        items = uiState.noteTypes,
+        enabled = uiState.availableNoteTypes.isNotEmpty(),
+        items = uiState.availableNoteTypes,
         itemLabel = { it.name },
         onSelect = onSelect,
     )

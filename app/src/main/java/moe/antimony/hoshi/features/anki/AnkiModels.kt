@@ -7,6 +7,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+@Serializable
 data class AnkiDeck(
     val id: Long,
     val name: String,
@@ -25,6 +26,8 @@ data class AnkiSettings(
     val selectedDeckName: String? = null,
     val selectedNoteTypeId: Long? = null,
     val selectedNoteTypeName: String? = null,
+    val availableDecks: List<AnkiDeck> = emptyList(),
+    val availableNoteTypes: List<AnkiNoteType> = emptyList(),
     val fieldMappings: Map<String, String> = emptyMap(),
     val tags: String = "",
     val allowDupes: Boolean = false,

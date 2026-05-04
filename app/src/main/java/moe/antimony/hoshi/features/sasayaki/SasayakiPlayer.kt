@@ -97,6 +97,9 @@ class SasayakiPlayer internal constructor(
         controller.playCue(cue = cue, stop = stop)
     }
 
+    fun exportCueAudio(cue: SasayakiMatch, sentence: String): File? =
+        controller.exportCueAudio(cue = cue, sentence = sentence)
+
     fun release() {
         controller.release()
     }

@@ -8,6 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class SasayakiPlayerFacadeTest {
     private val cue = SasayakiMatch("cue", 1.0, 2.0, "text", 0, 3, 4)
@@ -49,6 +50,7 @@ class SasayakiPlayerFacadeTest {
         player.previousCue()
         assertSame(cue, player.findCue(chapterIndex = 2, offset = 10))
         player.playCue(cue, stop = true)
+        assertEquals(File("cue.m4a"), player.exportCueAudio(cue, "sentence"))
         player.release()
 
         assertEquals(
@@ -63,6 +65,7 @@ class SasayakiPlayerFacadeTest {
                 "previousCue",
                 "findCue:2:10",
                 "playCue:cue:true",
+                "exportCueAudio:cue:sentence",
                 "release",
             ),
             controller.commands,
@@ -121,6 +124,11 @@ class SasayakiPlayerFacadeTest {
 
         override fun playCue(cue: SasayakiMatch, stop: Boolean) {
             commands += "playCue:${cue.id}:$stop"
+        }
+
+        override fun exportCueAudio(cue: SasayakiMatch, sentence: String): File? {
+            commands += "exportCueAudio:${cue.id}:$sentence"
+            return File("cue.m4a")
         }
 
         override fun release() {

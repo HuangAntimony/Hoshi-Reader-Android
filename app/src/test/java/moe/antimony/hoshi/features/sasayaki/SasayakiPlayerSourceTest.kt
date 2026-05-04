@@ -25,6 +25,7 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("controller.pausePlayback(restoreTemporaryPosition = restoreTemporaryPosition)"))
         assertTrue(source.contains("controller.findCue(chapterIndex = chapterIndex, offset = offset)"))
         assertTrue(source.contains("controller.playCue(cue = cue, stop = stop)"))
+        assertTrue(source.contains("controller.exportCueAudio(cue = cue, sentence = sentence)"))
 
         assertFalse(source.contains("SasayakiAudioCommandCoordinator("))
         assertFalse(source.contains("SasayakiPlaybackCommandCoordinator("))
@@ -60,6 +61,8 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("get() = playbackPersistence.playback"))
         assertTrue(source.contains("val audioStorageSummary: String"))
         assertTrue(source.contains("get() = playbackPersistence.audioStorageSummary"))
+        assertTrue(source.contains("override fun exportCueAudio(cue: SasayakiMatch, sentence: String): File?"))
+        assertTrue(source.contains("File(appContext.cacheDir, \"anki-media/sasayaki\")"))
 
         assertTrue(restoreAudio.contains("audioRestoreWorkflow.restore("))
         assertTrue(restoreAudio.contains("releaseExistingMediaSession = mediaSessionHandle::releaseExisting"))
@@ -139,6 +142,19 @@ class SasayakiPlayerSourceTest {
         assertFalse(setDelay.contains("playbackPersistence.setDelay(value)"))
         assertFalse(setRate.contains("playbackPersistence.setRate(value)"))
         assertFalse(updateMediaSession.contains("mediaSessionHandle.update("))
+    }
+
+    @Test
+    fun cueAudioExporterUsesLocalExtractorInputAndStopsStalledReads() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiCueAudioExporter.kt").readText()
+
+        assertTrue(source.contains("localExtractorFile(context = context, outputDir = outputDir)"))
+        assertTrue(source.contains("extractor.setDataSource(localSource.absolutePath)"))
+        assertTrue(source.contains("context.contentResolver.openInputStream(uri)"))
+        assertTrue(source.contains("input.copyTo(output)"))
+        assertTrue(source.contains("if (!extractor.advance() || extractor.sampleTime == previousSampleTime) break"))
+        assertTrue(source.contains("if (!wroteSample)"))
+        assertFalse(source.contains("extractor.setDataSource(context, source.uri, null)"))
     }
 
     private fun playerSource(): String =

@@ -11,6 +11,9 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Add dictionary SVG media to AnkiDroid notes as real media files instead of nested image HTML, restoring MK3 gaiji icons in mined Lapis cards.
+- Fill the Lapis `SentenceAudio` field from Sasayaki reader lookups by exporting the matched cue audio before adding the AnkiDroid note.
+- Keep Anki field-to-handlebar mappings editable after closing and reopening the app process without requiring another Fetch.
 - Match the reader loading screen to the active reader background, preventing a white flash when opening books in dark mode.
 - Keep the bookshelf visible while opening an existing book, preventing a brief loading-spinner flash before the reader appears.
 - Refresh Settings detail controls immediately after toggles or option changes, and remove Navigation3 fade transitions so page switches are e-ink friendly.

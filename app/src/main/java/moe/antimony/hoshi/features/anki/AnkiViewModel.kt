@@ -16,9 +16,15 @@ data class AnkiUiState(
     val isFetching: Boolean = false,
     val errorMessage: String? = null,
 ) {
+    val availableDecks: List<AnkiDeck>
+        get() = decks.ifEmpty { settings.availableDecks }
+
+    val availableNoteTypes: List<AnkiNoteType>
+        get() = noteTypes.ifEmpty { settings.availableNoteTypes }
+
     val selectedNoteType: AnkiNoteType?
-        get() = noteTypes.firstOrNull { it.id == settings.selectedNoteTypeId }
-            ?: settings.selectedNoteTypeName?.let { name -> noteTypes.firstOrNull { it.name == name } }
+        get() = availableNoteTypes.firstOrNull { it.id == settings.selectedNoteTypeId }
+            ?: settings.selectedNoteTypeName?.let { name -> availableNoteTypes.firstOrNull { it.name == name } }
 
     val isConfigured: Boolean
         get() = settings.selectedDeckId != null && settings.selectedNoteTypeId != null
@@ -37,11 +43,21 @@ class AnkiViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AnkiUiState())
     val uiState: StateFlow<AnkiUiState> = _uiState.asStateFlow()
+    private var attemptedRestoreFetch = false
 
     init {
         viewModelScope.launch {
             repository.settings.collectLatest { settings ->
                 _uiState.value = _uiState.value.copy(settings = settings)
+                if (
+                    !attemptedRestoreFetch &&
+                    settings.selectedDeckId != null &&
+                    settings.selectedNoteTypeId != null &&
+                    (settings.availableDecks.isEmpty() || settings.availableNoteTypes.isEmpty())
+                ) {
+                    attemptedRestoreFetch = true
+                    fetchConfiguration()
+                }
             }
         }
     }
@@ -66,7 +82,11 @@ class AnkiViewModel(
     fun selectDeck(deck: AnkiDeck) {
         viewModelScope.launch {
             repository.updateSettings {
-                it.copy(selectedDeckId = deck.id, selectedDeckName = deck.name)
+                it.copy(
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    availableDecks = (it.availableDecks + deck).distinctBy(AnkiDeck::id),
+                )
             }
         }
     }
@@ -77,6 +97,7 @@ class AnkiViewModel(
                 it.copy(
                     selectedNoteTypeId = noteType.id,
                     selectedNoteTypeName = noteType.name,
+                    availableNoteTypes = (it.availableNoteTypes + noteType).distinctBy(AnkiNoteType::id),
                     fieldMappings = LapisPreset.applyDefaults(noteType, emptyMap()),
                 )
             }
