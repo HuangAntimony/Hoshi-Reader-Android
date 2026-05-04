@@ -89,7 +89,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiScreenAwake
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
-import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
+import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import java.io.File
 
 data class ReaderSelectionData(
@@ -845,13 +845,9 @@ private fun ChapterWebView(
             .background(Color(readerSettings.backgroundColor(systemDark))),
         factory = { context ->
             WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
+                applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
-                disableNativeOverscrollStretch()
                 alpha = 0f
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
@@ -918,6 +914,8 @@ private class EpubWebViewClient(
     private val onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     private val onReaderPageFinished: (WebView) -> Unit,
 ) : WebViewClient() {
+    private val resourceBridge = ReaderWebResourceBridge(book, fontManager)
+
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val target = book.resolveInternalReaderLink(request.url?.toString().orEmpty()) ?: return false
         onInternalLink(target)
@@ -932,18 +930,8 @@ private class EpubWebViewClient(
     }
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-        val uri = request.url ?: return null
-        if (uri.host != "hoshi.local") return null
-        if (uri.path.orEmpty().startsWith("/fonts/")) {
-            val fileName = Uri.decode(uri.path.orEmpty().removePrefix("/fonts/"))
-            val fontFile = fontManager.fontFileForRequest(fileName) ?: return null
-            return WebResourceResponse(fontFile.mediaType(), null, fontFile.inputStream())
-        }
-        val path = uri.path.orEmpty().removePrefix("/epub/")
-        val mediaType = book.mediaType(path)
-        val data = book.readResource(path)?.let { sanitizeReaderResource(mediaType, it) } ?: return null
-        val encoding = if (mediaType.substringBefore(';').trim().equals("text/css", ignoreCase = true)) "UTF-8" else null
-        return WebResourceResponse(mediaType, encoding, data.inputStream())
+        val url = request.url?.toString() ?: return null
+        return resourceBridge.resourceForUrl(url)?.toWebResourceResponse()
     }
 
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
@@ -1006,7 +994,7 @@ private fun String.javaScriptStringLiteral(): String =
         append('"')
     }
 
-private fun File.mediaType(): String = when (extension.lowercase()) {
+internal fun File.mediaType(): String = when (extension.lowercase()) {
     "ttf" -> "font/ttf"
     "otf" -> "font/otf"
     "woff" -> "font/woff"

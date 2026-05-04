@@ -52,7 +52,7 @@ import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatch
-import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
+import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 private const val SasayakiPopupControlsTotalHeightValue = 37.0
 private const val LookupPopupActionBarTotalHeightValue = 37.0
@@ -420,13 +420,9 @@ private fun LookupPopupWebView(
                 LocalAudioRepository.fromContext(context),
             )
             WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
+                applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
-                disableNativeOverscrollStretch()
                 setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
                 addJavascriptInterface(
                     PopupWebViewBridge(
