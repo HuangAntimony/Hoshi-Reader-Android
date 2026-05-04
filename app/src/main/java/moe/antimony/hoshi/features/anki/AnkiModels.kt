@@ -135,7 +135,7 @@ object AnkiHandlebarRenderer {
     ): String {
         if (handlebar.startsWith(SingleGlossaryPrefix)) {
             val dictionary = handlebar.removePrefix(SingleGlossaryPrefix).removeSuffix("}")
-            return payload.singleGlossaries[dictionary].orEmpty()
+            return payload.singleGlossaryForDictionary(dictionary)
         }
         return when (handlebar) {
             "{expression}" -> payload.expression
@@ -144,8 +144,7 @@ object AnkiHandlebarRenderer {
             "{audio}" -> payload.audio
             "{glossary}" -> payload.glossary
             "{glossary-first}" -> payload.glossaryFirst
-            "{selected-glossary}" -> payload.singleGlossaries[payload.selectedDictionary]
-                ?: payload.glossaryFirst
+            "{selected-glossary}" -> payload.singleGlossaryForDictionary(payload.selectedDictionary)
             "{popup-selection-text}" -> payload.popupSelectionText
             "{sentence}" -> sentenceValue(payload, context)
             "{frequencies}" -> payload.frequenciesHtml
@@ -158,6 +157,18 @@ object AnkiHandlebarRenderer {
             else -> ""
         }
     }
+
+    private fun AnkiMiningPayload.singleGlossaryForDictionary(dictionary: String): String {
+        if (dictionary.isBlank()) return ""
+        singleGlossaries[dictionary]?.let { return it }
+        val normalizedDictionary = dictionary.normalizedDictionaryName()
+        return singleGlossaries.entries.firstOrNull { (name, _) ->
+            name.normalizedDictionaryName() == normalizedDictionary
+        }?.value.orEmpty()
+    }
+
+    private fun String.normalizedDictionaryName(): String =
+        trim().replace(Regex("""\s*\[[^]]+]\s*$"""), "")
 
     private fun sentenceValue(payload: AnkiMiningPayload, context: AnkiMiningContext): String {
         val matched = payload.matched.takeIf { it.isNotBlank() } ?: return context.sentence

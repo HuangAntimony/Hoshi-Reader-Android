@@ -61,6 +61,21 @@ class AnkiHandlebarRendererTest {
     }
 
     @Test
+    fun singleGlossaryHandlebarMatchesImportedDictionaryTitleWhenPayloadUsesBaseDictionaryName() {
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{single-glossary-JMdict [2026-04-27]}",
+            payload = AnkiMiningPayload(
+                expression = "読む",
+                glossaryFirst = "first glossary",
+                singleGlossaries = mapOf("JMdict" to "jmdict glossary"),
+            ),
+            context = AnkiMiningContext(sentence = "本を読む。"),
+        )
+
+        assertEquals("jmdict glossary", rendered)
+    }
+
+    @Test
     fun sentenceFallsBackToRawContextWhenMatchedPayloadIsBlank() {
         val rendered = AnkiHandlebarRenderer.render(
             template = "{sentence}",
@@ -97,7 +112,7 @@ class AnkiHandlebarRendererTest {
     }
 
     @Test
-    fun selectedGlossaryFallsBackToFirstGlossaryWhenNoDictionaryIsSelected() {
+    fun selectedGlossaryReturnsEmptyWhenNoDictionaryIsSelected() {
         val rendered = AnkiHandlebarRenderer.render(
             template = "{selected-glossary}",
             payload = AnkiMiningPayload(
@@ -109,6 +124,6 @@ class AnkiHandlebarRendererTest {
             context = AnkiMiningContext(sentence = "本を読む。"),
         )
 
-        assertEquals("read", rendered)
+        assertEquals("", rendered)
     }
 }
