@@ -30,6 +30,11 @@ class SasayakiPlayer(
         initialPosition = playback.lastPosition,
     )
     private val cueDisplay = SasayakiCueDisplayCoordinator()
+    private val cueDisplayActionDispatcher = SasayakiCueDisplayActionDispatcher(
+        onCue = onCue,
+        onClearCue = onClearCue,
+        onLoadChapter = onLoadChapter,
+    )
     private val tickRunnable = object : Runnable {
         override fun run() {
             tick()
@@ -294,15 +299,7 @@ class SasayakiPlayer(
     }
 
     private fun applyCueDisplayAction(action: SasayakiCueDisplayAction) {
-        when (action) {
-            SasayakiCueDisplayAction.None -> Unit
-            SasayakiCueDisplayAction.Clear -> onClearCue()
-            is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)
-            is SasayakiCueDisplayAction.ClearAndLoadChapter -> {
-                onClearCue()
-                onLoadChapter(action.chapterIndex)
-            }
-        }
+        cueDisplayActionDispatcher.apply(action)
     }
 
     private fun updateMediaSession() {

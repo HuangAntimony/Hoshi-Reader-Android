@@ -220,18 +220,17 @@ class SasayakiPlayerSourceTest {
             .substringBefore("private fun updateMediaSession(")
 
         assertTrue(source.contains("private val cueDisplay = SasayakiCueDisplayCoordinator()"))
+        assertTrue(source.contains("private val cueDisplayActionDispatcher = SasayakiCueDisplayActionDispatcher("))
         assertFalse(source.contains("private var currentCue: SasayakiMatch? = null"))
         assertTrue(updateCue.contains("playbackEvents.updateCue("))
         assertTrue(updateCue.contains("currentChapterIndex = getCurrentChapterIndex()"))
         assertTrue(updateCue.contains("autoScroll = cuePresentation.autoScroll"))
         assertTrue(updateCue.contains("hasPlayedOnce = cuePresentation.hasPlayedOnce"))
         assertTrue(eventSource.contains("cueDisplay.update("))
-        assertTrue(applyAction.contains("SasayakiCueDisplayAction.Clear -> onClearCue()"))
-        assertTrue(applyAction.contains("is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)"))
-        assertTrue(applyAction.contains("is SasayakiCueDisplayAction.ClearAndLoadChapter -> {"))
-        assertTrue(applyAction.contains("onClearCue()"))
-        assertTrue(applyAction.contains("onLoadChapter(action.chapterIndex)"))
-        assertTrue(applyAction.indexOf("onClearCue()") < applyAction.indexOf("onLoadChapter(action.chapterIndex)"))
+        assertTrue(applyAction.contains("cueDisplayActionDispatcher.apply(action)"))
+        assertFalse(applyAction.contains("SasayakiCueDisplayAction.Clear -> onClearCue()"))
+        assertFalse(applyAction.contains("is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)"))
+        assertFalse(applyAction.contains("is SasayakiCueDisplayAction.ClearAndLoadChapter -> {"))
     }
 
     @Test
