@@ -103,6 +103,11 @@ class SasayakiPlayer(
         cueDisplay = cueDisplay,
     )
     private val cuePresentation = SasayakiCuePresentationState()
+    private val playbackStart = SasayakiPlaybackStartCoordinator(
+        playbackCommands = playbackCommands,
+        cuePresentation = cuePresentation,
+        mediaSessionPublishing = mediaSessionPublishing,
+    )
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
@@ -209,14 +214,11 @@ class SasayakiPlayer(
     }
 
     private fun startPlayback() {
-        playbackCommands.start(
+        playbackStart.start(
             rate = rate,
-            markPlayedOnce = cuePresentation::markPlayedOnce,
-            afterMarkedPlaying = {
-                updateMediaSession()
-                mediaSessionPublishing.activate()
-                updateCue(currentTime, forceDisplay = true)
-            },
+            currentTime = { currentTime },
+            updateMediaSession = ::updateMediaSession,
+            redisplayCue = { time -> updateCue(time, forceDisplay = true) },
         )
     }
 
