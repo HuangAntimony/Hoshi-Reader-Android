@@ -242,42 +242,48 @@ class SettingsStoreSourceTest {
 
     @Test
     fun currentSynchronousSettingsStoreCallSitesAreCharacterizedForRepositoryMigration() {
-        source("MainActivity.kt").mustContainAll(
+        source("HoshiAppContainer.kt").mustContainAll(
             "readerSettingsRepository()",
+            "dictionarySettingsRepository()",
+            "audioSettingsRepository()",
+            "sasayakiSettingsRepository()",
+        )
+        source("MainActivity.kt").mustContainAll(
+            "val readerSettingsRepository = appContainer.readerSettingsRepository",
             "readerSettingsRepository.settings.collect",
             "readerSettingsRepository.update { settings }",
         )
         source("navigation/AppShell.kt").mustContainAll(
-            "dictionarySettingsRepository()",
+            "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",
             "dictionarySettingsRepository.settings.collect",
             "dictionarySettingsLoaded",
         )
         source("features/audio/AudioView.kt").mustContainAll(
-            "audioSettingsRepository()",
+            "val audioSettingsRepository = appContainer.audioSettingsRepository",
             "audioSettingsRepository.settings.collect",
             "audioSettingsRepository.update { next }",
         )
         source("features/sasayaki/SasayakiSettingsView.kt").mustContainAll(
-            "sasayakiSettingsRepository()",
+            "val repository = appContainer.sasayakiSettingsRepository",
             "repository.settings.collect",
             "repository.update { next }",
         )
         source("features/dictionary/DictionarySearchView.kt").mustContainAll(
-            "dictionarySettingsRepository()",
+            "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",
             "dictionarySettingsRepository.settings.collect",
-            "audioSettingsRepository()",
+            "val audioSettingsRepository = appContainer.audioSettingsRepository",
             "audioSettingsRepository.settings.collect",
         )
         source("features/reader/ReaderWebView.kt").mustContainAll(
-            "dictionarySettingsRepository()",
+            "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",
             "dictionarySettingsRepository.settings.collect",
-            "audioSettingsRepository()",
+            "val audioSettingsRepository = appContainer.audioSettingsRepository",
             "audioSettingsRepository.settings.collect",
-            "sasayakiSettingsRepository()",
+            "val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository",
             "sasayakiSettingsRepository.settings.collect",
         )
         source("features/bookshelf/BookshelfView.kt").mustContainAll(
-            "sasayakiSettingsRepository()",
+            "val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository",
             "sasayakiSettingsRepository.settings.collect",
             "booksViewModel.setSasayakiEnabled(settings.enabled)",
         )

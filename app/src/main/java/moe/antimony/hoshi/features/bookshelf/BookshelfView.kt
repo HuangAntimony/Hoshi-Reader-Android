@@ -101,11 +101,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookSortOption
-import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
@@ -129,19 +128,16 @@ fun BookshelfView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val bookRepository = remember { BookRepository(context.filesDir) }
-    val sasayakiSettingsRepository = remember { context.applicationContext.sasayakiSettingsRepository() }
+    val appContainer = LocalHoshiAppContainer.current
+    val bookRepository = appContainer.bookRepository
+    val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
     val booksViewModel: BookshelfViewModel = viewModel(
-        factory = remember(context, bookRepository) {
+        factory = remember(context, appContainer) {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
                     BookshelfViewModel(
-                        AndroidBookshelfRepository(
-                            contentResolver = context.contentResolver,
-                            bookRepository = bookRepository,
-                            dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
-                        ),
+                        appContainer.bookshelfRepository(context.contentResolver),
                     ) as T
             }
         },

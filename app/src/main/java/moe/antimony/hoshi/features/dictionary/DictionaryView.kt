@@ -80,8 +80,8 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.dictionary.DictionaryInfo
-import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.ImportFileType
@@ -97,17 +97,14 @@ fun DictionaryView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
     val dictionaryViewModel: DictionaryViewModel = viewModel(
-        factory = remember(context) {
+        factory = remember(context, appContainer) {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
                     DictionaryViewModel(
-                        AndroidDictionaryViewModelRepository(
-                            contentResolver = context.contentResolver,
-                            dictionaryRepository = DictionaryRepository(context.filesDir, context.cacheDir),
-                            settingsRepository = context.applicationContext.dictionarySettingsRepository(),
-                        ),
+                        appContainer.dictionaryViewModelRepository(context.contentResolver),
                     ) as T
             }
         },

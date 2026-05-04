@@ -92,13 +92,15 @@ class AudioSettingsRepositoryTest {
         val audioView = java.io.File("src/main/java/moe/antimony/hoshi/features/audio/AudioView.kt").readText()
         val dictionarySearch = java.io.File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionarySearchView.kt").readText()
         val readerWebView = java.io.File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val container = java.io.File("src/main/java/moe/antimony/hoshi/HoshiAppContainer.kt").readText()
 
-        assertTrue(audioView.contains("audioSettingsRepository()"))
+        assertTrue(container.contains("audioSettingsRepository()"))
+        assertTrue(audioView.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
         assertTrue(audioView.contains("audioSettingsRepository.settings.collect"))
         assertTrue(audioView.contains("audioSettingsRepository.update { next }"))
-        assertTrue(dictionarySearch.contains("audioSettingsRepository()"))
+        assertTrue(dictionarySearch.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
         assertTrue(dictionarySearch.contains("audioSettingsRepository.settings.collect"))
-        assertTrue(readerWebView.contains("audioSettingsRepository()"))
+        assertTrue(readerWebView.contains("val audioSettingsRepository = appContainer.audioSettingsRepository"))
         assertTrue(readerWebView.contains("audioSettingsRepository.settings.collect"))
     }
 

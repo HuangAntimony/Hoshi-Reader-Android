@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Navigation3 settings route scope is reconciled with the Anki non-goal; next architecture slice: extract a small app dependency container before slimming `AppShell`.
+- App dependency construction is centralized in a small container; next architecture slice: slim `AppShell` back toward navigation ownership.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

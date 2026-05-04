@@ -150,8 +150,10 @@ class ReaderSettingsRepositoryTest {
     @Test
     fun mainActivityUsesRepositoryFlowAndImmediateLocalStateAsTransitionAdapter() {
         val source = java.io.File("src/main/java/moe/antimony/hoshi/MainActivity.kt").readText()
+        val container = java.io.File("src/main/java/moe/antimony/hoshi/HoshiAppContainer.kt").readText()
 
-        assertTrue(source.contains("readerSettingsRepository()"))
+        assertTrue(container.contains("readerSettingsRepository()"))
+        assertTrue(source.contains("val readerSettingsRepository = appContainer.readerSettingsRepository"))
         assertTrue(source.contains("LaunchedEffect(readerSettingsRepository)"))
         assertTrue(source.contains("readerSettingsRepository.settings.collect"))
         assertTrue(source.contains("readerSettings = settings"))

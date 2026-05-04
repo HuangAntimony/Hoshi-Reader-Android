@@ -53,13 +53,12 @@ import de.manhhao.hoshi.LookupResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
-import moe.antimony.hoshi.features.audio.audioSettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.webview.disableNativeOverscrollStretch
 import kotlin.math.abs
@@ -153,11 +152,13 @@ fun DictionarySearchView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
     val assets = remember(context) { LookupPopupAssets.load(context) }
-    val repository = remember { DictionaryRepository(context.filesDir, context.cacheDir) }
-    val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
-    val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
+    val repository = appContainer.dictionaryRepository
+    val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
+    val audioSettingsRepository = appContainer.audioSettingsRepository
+    val localAudioRepository = appContainer.localAudioRepository
     var query by remember { mutableStateOf("") }
     var html by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<LookupResult>>(emptyList()) }
@@ -259,6 +260,7 @@ fun DictionarySearchView(
                 results = searchResults,
                 assets = assets,
                 audioSettings = audioSettings,
+                localAudioRepository = localAudioRepository,
                 clearSelectionSignal = resultClearSelectionSignal,
                 backSignal = backSignal,
                 forwardSignal = forwardSignal,
@@ -470,6 +472,7 @@ private fun DictionaryResultWebView(
     results: List<LookupResult>,
     assets: LookupPopupAssets,
     audioSettings: AudioSettings,
+    localAudioRepository: LocalAudioRepository,
     clearSelectionSignal: Int,
     backSignal: Int,
     forwardSignal: Int,
@@ -487,7 +490,7 @@ private fun DictionaryResultWebView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
             val audioRequestHandler = AudioRequestHandler(
-                LocalAudioRepository.fromContext(context),
+                localAudioRepository,
             )
             WebView(context).apply {
                 settings.javaScriptEnabled = true
@@ -513,7 +516,7 @@ private fun DictionaryResultWebView(
             webView.webViewClient = PopupMessageWebViewClient(
                 callbackHolder,
                 AudioRequestHandler(
-                    LocalAudioRepository.fromContext(webView.context),
+                    localAudioRepository,
                 ),
                 assets,
             )

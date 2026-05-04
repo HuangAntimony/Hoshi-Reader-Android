@@ -18,11 +18,11 @@ class BookRepositoryCallSiteTest {
             "src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlaybackPersistenceState.kt",
         ).readText()
 
-        assertTrue(appShell.contains("val bookRepository = remember { BookRepository(context.filesDir) }"))
-        assertTrue(appShell.contains("val readerRouteStateHolder = remember(bookRepository) { ReaderRouteStateHolder(bookRepository) }"))
+        assertTrue(appShell.contains("val bookRepository = appContainer.bookRepository"))
+        assertTrue(appShell.contains("val readerRouteStateHolder = remember(appContainer) { appContainer.readerRouteStateHolder() }"))
         assertTrue(readerDestination.contains("stateHolder.load(bookId)"))
         assertTrue(readerDestination.contains("stateHolder.saveBookmark("))
-        assertTrue(readerWebView.contains("val bookRepository = remember { BookRepository(context.filesDir) }"))
+        assertTrue(readerWebView.contains("val bookRepository = appContainer.bookRepository"))
         assertTrue(readerWebView.contains("BookSasayakiPlaybackRepository(bookRoot, bookRepository)"))
         assertTrue(sasayakiMatchView.contains("bookRepository: SasayakiSidecarRepository"))
         assertTrue(sasayakiPlayer.contains("playbackRepository: SasayakiPlaybackRepository"))

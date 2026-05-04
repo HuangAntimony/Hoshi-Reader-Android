@@ -28,7 +28,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
-import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.audio.AdvancedSettingsView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
@@ -40,7 +40,6 @@ import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.DictionaryView
-import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
@@ -68,16 +67,17 @@ fun AppShell(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val dictionarySettingsRepository = remember { context.applicationContext.dictionarySettingsRepository() }
+    val appContainer = LocalHoshiAppContainer.current
+    val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
     var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
     var dictionarySettingsLoaded by remember { mutableStateOf(false) }
     var dictionaryDefaultRouteApplied by remember { mutableStateOf(false) }
     var showAnkiPlaceholder by remember { mutableStateOf(false) }
     val initialRoute = AppRoute.BooksRoute
     val backStack = rememberNavBackStack(initialRoute)
-    val bookRepository = remember { BookRepository(context.filesDir) }
-    val readerRouteStateHolder = remember(bookRepository) { ReaderRouteStateHolder(bookRepository) }
-    val readerFontManager = remember { ReaderFontManager(context.filesDir) }
+    val bookRepository = appContainer.bookRepository
+    val readerRouteStateHolder = remember(appContainer) { appContainer.readerRouteStateHolder() }
+    val readerFontManager = appContainer.readerFontManager
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)

@@ -81,13 +81,15 @@ class SasayakiSettingsRepositoryTest {
         val bookshelfView = java.io.File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
         val bookshelfRepository =
             java.io.File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfRepository.kt").readText()
+        val container = java.io.File("src/main/java/moe/antimony/hoshi/HoshiAppContainer.kt").readText()
 
-        assertTrue(settingsView.contains("sasayakiSettingsRepository()"))
+        assertTrue(container.contains("sasayakiSettingsRepository()"))
+        assertTrue(settingsView.contains("val repository = appContainer.sasayakiSettingsRepository"))
         assertTrue(settingsView.contains("repository.settings.collect"))
         assertTrue(settingsView.contains("repository.update { next }"))
-        assertTrue(readerWebView.contains("sasayakiSettingsRepository()"))
+        assertTrue(readerWebView.contains("val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository"))
         assertTrue(readerWebView.contains("sasayakiSettingsRepository.settings.collect"))
-        assertTrue(bookshelfView.contains("sasayakiSettingsRepository()"))
+        assertTrue(bookshelfView.contains("val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository"))
         assertTrue(bookshelfView.contains("sasayakiSettingsRepository.settings.collect"))
         assertTrue(bookshelfView.contains("booksViewModel.setSasayakiEnabled(settings.enabled)"))
         assertFalse(bookshelfRepository.contains("SasayakiSettingsStore"))

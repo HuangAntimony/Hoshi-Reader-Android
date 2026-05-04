@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +19,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.reader.ReaderSettings
-import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
@@ -35,7 +35,8 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         setContent {
-            val readerSettingsRepository = remember { applicationContext.readerSettingsRepository() }
+            val appContainer = remember { HoshiAppContainer(applicationContext) }
+            val readerSettingsRepository = appContainer.readerSettingsRepository
             val scope = rememberCoroutineScope()
             var readerSettings by remember { mutableStateOf(ReaderSettings()) }
             LaunchedEffect(readerSettingsRepository) {
@@ -44,24 +45,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val systemDark = isSystemInDarkTheme()
-            HoshiReaderTheme(
-                darkTheme = readerSettings.usesDarkInterface(systemDark),
-                eInkMode = readerSettings.eInkMode,
-            ) {
-                AppShell(
-                    pendingImportUri = pendingImportUri,
-                    onPendingImportConsumed = { pendingImportUri = null },
-                    readerSettings = readerSettings,
-                    onReaderSettingsChange = { settings ->
-                        readerSettings = settings
-                        scope.launch {
-                            readerSettingsRepository.update { settings }
+            CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
+                HoshiReaderTheme(
+                    darkTheme = readerSettings.usesDarkInterface(systemDark),
+                    eInkMode = readerSettings.eInkMode,
+                ) {
+                    AppShell(
+                        pendingImportUri = pendingImportUri,
+                        onPendingImportConsumed = { pendingImportUri = null },
+                        readerSettings = readerSettings,
+                        onReaderSettingsChange = { settings ->
+                            readerSettings = settings
+                            scope.launch {
+                                readerSettingsRepository.update { settings }
+                            }
+                        },
+                        onReaderKeyEventHandlerChange = { handler ->
+                            readerKeyEventHandler = handler
                         }
-                    },
-                    onReaderKeyEventHandlerChange = { handler ->
-                        readerKeyEventHandler = handler
-                    },
-                )
+                    )
+                }
             }
         }
     }

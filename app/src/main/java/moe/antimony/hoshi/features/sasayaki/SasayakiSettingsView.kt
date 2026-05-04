@@ -33,10 +33,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import moe.antimony.hoshi.LocalHoshiAppContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,9 +44,9 @@ fun SasayakiSettingsView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
-    val repository = remember { context.applicationContext.sasayakiSettingsRepository() }
+    val repository = appContainer.sasayakiSettingsRepository
     var settings by remember { mutableStateOf(SasayakiSettings()) }
 
     LaunchedEffect(repository) {

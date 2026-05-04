@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
@@ -131,10 +132,11 @@ fun AudioSettingsView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
-    val audioSettingsRepository = remember { context.applicationContext.audioSettingsRepository() }
+    val audioSettingsRepository = appContainer.audioSettingsRepository
     var settings by remember { mutableStateOf(AudioSettings()) }
-    val repository = remember { LocalAudioRepository.fromContext(context) }
+    val repository = appContainer.localAudioRepository
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
     var importedSize by remember { mutableStateOf(repository.databaseSizeBytes()) }
