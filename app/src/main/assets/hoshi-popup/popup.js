@@ -1354,9 +1354,8 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     dictWrapper.appendChild(el('style', {
         textContent: `
             [data-dictionary="${dictName}"] {
-                @media (prefers-color-scheme: light) { color: #000; }
-                @media (prefers-color-scheme: dark) { color: #fff; }
                 ${dictStyle}
+                color: var(--text-color) !important;
             }
         `.trim()
     }));

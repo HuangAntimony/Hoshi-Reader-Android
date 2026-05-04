@@ -12,6 +12,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Keep dictionary popup entries readable when Android is in system night mode but Hoshi is using the light app theme.
 - Make dictionary management reordering use an explicit drag handle and require tapping the revealed trash button after a left swipe, reducing accidental dictionary deletion.
 - Keep repeated dictionary reordering aligned with the row being dragged when several dictionaries are installed, and prevent the release animation from snapping back before settling.
 - Keep continuous scroll chapter transitions landing at the next chapter start instead of inheriting the previous chapter's WebView scroll offset.

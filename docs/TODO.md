@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 
 This file is the short operational handoff for future agents.
 
@@ -51,6 +51,7 @@ Status: `in_progress`
 Status: `in_progress`
 
 - Dictionary management now uses explicit drag handles and two-step swipe-to-delete to reduce accidental deletes.
+- Dictionary popup entry colors now follow Hoshi's active app theme instead of Android's system night mode.
 - Align recommended dictionary download/update state with iOS `DictionaryView`.
 - Do not reimplement Yomitan import, lookup, media, or style extraction outside `third_party/hoshidicts-kotlin-bridge` unless the bridge gap is documented first.
 - Frequency and pitch dictionaries must stay type-specific; do not treat metadata dictionaries as term fallback dictionaries.

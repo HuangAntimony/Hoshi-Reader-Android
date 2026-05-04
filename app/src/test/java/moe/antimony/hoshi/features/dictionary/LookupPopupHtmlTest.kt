@@ -366,6 +366,17 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun popupDictionaryWrappersFollowHoshiThemeInsteadOfSystemTheme() {
+        val source = java.io.File("src/main/assets/hoshi-popup/popup.js").readText()
+        val dictWrapperStyle = source.substringAfter("dictWrapper.appendChild(el('style', {")
+            .substringBefore("}));")
+
+        assertTrue(dictWrapperStyle.contains("color: var(--text-color) !important;"))
+        assertFalse(dictWrapperStyle.contains("prefers-color-scheme"))
+        assertFalse(dictWrapperStyle.contains("color: #fff"))
+    }
+
+    @Test
     fun popupJavascriptDefersOffscreenHistoryRestoreNodesAtTop() {
         val source = java.io.File("src/main/assets/hoshi-popup/popup.js").readText()
         val redirectBody = source.substringAfter("function redirect(count) {")
