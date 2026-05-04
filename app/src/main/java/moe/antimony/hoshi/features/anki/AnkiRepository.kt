@@ -81,7 +81,6 @@ class AnkiRepository(
         )
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { it.isNotBlank() }?.let(::addRemoteAudio).orEmpty(),
-            popupSelectionText = context.popupSelectionText ?: payload.popupSelectionText,
         )
         val dictionaryMediaTags = payload.dictionaryMedia.associate { media ->
             media.filename to addDictionaryMedia(media).orEmpty()

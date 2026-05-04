@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Preserve selected popup text when mining AnkiDroid cards, restoring the Lapis `{popup-selection-text}` field.
 - Add dictionary SVG media to AnkiDroid notes as real media files instead of nested image HTML, restoring MK3 gaiji icons in mined Lapis cards.
 - Keep MK3 SVG gaiji inline with surrounding text in AnkiDroid Lapis glossary fields.
 - Bold only the selected sentence occurrence in AnkiDroid `{sentence}` fields when the mined word appears multiple times.

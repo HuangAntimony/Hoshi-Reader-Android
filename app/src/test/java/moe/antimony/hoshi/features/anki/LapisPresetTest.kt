@@ -74,7 +74,7 @@ class LapisPresetTest {
     }
 
     @Test
-    fun migratesLegacySelectedGlossaryLapisDefaultToFirstGlossary() {
+    fun preservesLegacySelectedGlossaryMappingWithoutMigration() {
         val noteType = AnkiNoteType(
             id = 10L,
             name = "Lapis",
@@ -86,11 +86,11 @@ class LapisPresetTest {
             currentMappings = mapOf("MainDefinition" to "{selected-glossary}"),
         )
 
-        assertEquals("{glossary-first}", merged.getValue("MainDefinition"))
+        assertEquals("{selected-glossary}", merged.getValue("MainDefinition"))
     }
 
     @Test
-    fun migratesLegacyCoverDefaultToLapisPictureField() {
+    fun preservesLegacyDefinitionPictureMappingWithoutMigration() {
         val noteType = AnkiNoteType(
             id = 10L,
             name = "Lapis",
@@ -102,7 +102,7 @@ class LapisPresetTest {
             currentMappings = mapOf("DefinitionPicture" to "{book-cover}"),
         )
 
-        assertFalse(merged.containsKey("DefinitionPicture"))
+        assertEquals("{book-cover}", merged.getValue("DefinitionPicture"))
         assertEquals("{book-cover}", merged.getValue("Picture"))
     }
 

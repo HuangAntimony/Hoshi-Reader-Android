@@ -36,20 +36,6 @@ object LapisPreset {
         currentMappings: Map<String, String>,
     ): Map<String, String> {
         if (!matches(noteType)) return currentMappings
-        val migratedMappings = currentMappings.mapValues { (field, value) ->
-            when {
-                field == "MainDefinition" && value == "{selected-glossary}" -> "{glossary-first}"
-                else -> value
-            }
-        }.toMutableMap()
-        if (
-            "Picture" in noteType.fields &&
-            migratedMappings["DefinitionPicture"] == "{book-cover}" &&
-            migratedMappings["Picture"].isNullOrBlank()
-        ) {
-            migratedMappings.remove("DefinitionPicture")
-            migratedMappings["Picture"] = "{book-cover}"
-        }
-        return defaultMappings(noteType) + migratedMappings
+        return defaultMappings(noteType) + currentMappings
     }
 }

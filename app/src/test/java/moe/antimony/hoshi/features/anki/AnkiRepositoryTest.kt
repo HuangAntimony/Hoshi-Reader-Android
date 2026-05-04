@@ -31,4 +31,11 @@ class AnkiRepositoryTest {
         assertTrue(html.contains("width:1em!important"))
         assertTrue(html.contains("position:static!important"))
     }
+
+    @Test
+    fun miningPayloadSelectionTextIsNotOverriddenByMiningContext() {
+        val source = java.io.File("src/main/java/moe/antimony/hoshi/features/anki/AnkiRepository.kt").readText()
+
+        assertTrue(!source.contains("popupSelectionText = context.popupSelectionText ?: payload.popupSelectionText"))
+    }
 }

@@ -112,7 +112,6 @@ data class AnkiMiningContext(
     val documentTitle: String? = null,
     val coverPath: String? = null,
     val sasayakiAudioPath: String? = null,
-    val popupSelectionText: String? = null,
     val sentenceOffset: Int? = null,
 )
 

@@ -64,4 +64,13 @@ class PopupWebViewMessagesTest {
         assertTrue(source.contains(".closest('a')"))
         assertTrue(source.contains("return null;"))
     }
+
+    @Test
+    fun popupMiningUsesStoredHoshiSelectionTextBeforeWebViewClearsNativeSelection() {
+        val source = File("src/main/assets/hoshi-popup/popup.js").readText()
+
+        assertTrue(source.contains("function getPopupSelectionText()"))
+        assertTrue(source.contains("window.hoshiSelection?.selection?.text"))
+        assertTrue(source.contains("lastSelection = getPopupSelectionText();"))
+    }
 }

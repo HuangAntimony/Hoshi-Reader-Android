@@ -39,7 +39,7 @@ Status: `in_progress`
 
 Status: `in_progress`
 
-- Wire remaining iOS `PopupWebView` Anki mining behavior.
+- Wire remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
 - Re-run diagonal popup swipe validation when a reliable Reader or nested Dictionary popup state is available.
 - Reader fixes must start from `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift` plus the matching JS/CSS.
 - Keep WebView-based reading and lookup. Do not replace it with native text rendering.

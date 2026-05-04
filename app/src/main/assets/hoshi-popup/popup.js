@@ -22,6 +22,10 @@ let lastSelection = '';
 let currentDictionaryMedia = null;
 let selectedDictionaries = {};
 
+function getPopupSelectionText() {
+    return window.hoshiSelection?.selection?.text || window.getSelection()?.toString() || '';
+}
+
 function el(tag, props = {}, children = []) {
     const element = document.createElement(tag);
     for (const [key, value] of Object.entries(props)) {
@@ -1278,7 +1282,7 @@ function createEntryHeader(entry, idx) {
         textContent: '+',
         disabled: true,
         ontouchstart: () => {
-            lastSelection = window.getSelection()?.toString() || '';
+            lastSelection = getPopupSelectionText();
         },
         onclick: async () => {
             mineButton.disabled = true;

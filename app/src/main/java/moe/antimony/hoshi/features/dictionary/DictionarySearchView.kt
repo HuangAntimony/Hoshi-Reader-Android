@@ -169,7 +169,6 @@ fun DictionarySearchView(
                             payload,
                             AnkiMiningContext(
                                 sentence = uiState.lastQuery.ifBlank { uiState.query },
-                                popupSelectionText = "",
                             ),
                         )
                     },
