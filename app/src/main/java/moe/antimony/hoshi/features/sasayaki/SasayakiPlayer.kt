@@ -47,6 +47,10 @@ class SasayakiPlayer(
         cueNavigation = cueNavigation,
         cueDisplay = cueDisplay,
     )
+    private val playbackSettings = SasayakiPlaybackSettingsCoordinator(
+        playbackPersistence = playbackPersistence,
+        playbackLifecycle = playbackLifecycle,
+    )
     private val playbackEvents = SasayakiPlaybackEventCoordinator(
         playbackState = playbackState,
         playbackLifecycle = playbackLifecycle,
@@ -90,14 +94,18 @@ class SasayakiPlayer(
     }
 
     fun setDelay(value: Double) {
-        playbackPersistence.setDelay(value)
-        updateCue(currentTime)
+        playbackSettings.setDelay(
+            value = value,
+            currentTime = currentTime,
+            updateCue = ::updateCue,
+        )
     }
 
     fun setRate(value: Float) {
-        playbackPersistence.setRate(value)
-        playbackLifecycle.setRateIfPlaying(value)
-        updateMediaSession()
+        playbackSettings.setRate(
+            value = value,
+            updateMediaSession = ::updateMediaSession,
+        )
     }
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
