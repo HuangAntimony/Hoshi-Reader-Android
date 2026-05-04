@@ -113,6 +113,11 @@ class SasayakiPlayer(
         cuePresentation = cuePresentation,
         getCurrentChapterIndex = getCurrentChapterIndex,
     )
+    private val cueUpdate = SasayakiCueUpdateCoordinator(
+        playbackEvents = playbackEvents,
+        cuePresentation = cuePresentation,
+        getCurrentChapterIndex = getCurrentChapterIndex,
+    )
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
@@ -293,14 +298,11 @@ class SasayakiPlayer(
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
-        playbackEvents.updateCue(
+        cueUpdate.update(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
             time = time,
             delay = delay,
-            currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = cuePresentation.autoScroll,
-            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             forceDisplay = forceDisplay,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )

@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: extract a small Sasayaki cue update coordinator from `SasayakiPlayer` without changing cue lookup timing, current-chapter handling, auto-scroll, played-once reveal behavior, or forced redisplay behavior.
+- Next architecture slice: extract a small Sasayaki seek-complete coordinator from `SasayakiPlayer` without changing pending seek completion, selected cue display ordering, start-after-seek behavior, or media-session refresh timing.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 
