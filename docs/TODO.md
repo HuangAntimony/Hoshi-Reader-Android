@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- High-value Sasayaki lifecycle/persistence source-shape tests are replaced with behavior tests; next architecture slice: introduce a Sasayaki playback controller facade.
+- Sasayaki playback now has a controller facade behind the Compose-facing player; next architecture slice: extract the dictionary search state holder.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

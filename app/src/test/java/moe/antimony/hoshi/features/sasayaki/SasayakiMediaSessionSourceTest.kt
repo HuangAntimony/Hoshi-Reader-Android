@@ -47,17 +47,16 @@ class SasayakiMediaSessionSourceTest {
 
     @Test
     fun sasayakiPlayerUsesMediaSessionHandleBoundary() {
-        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlayer.kt").readText()
+        val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiPlaybackController.kt").readText()
         val restoreController = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiAudioRestoreController.kt").readText()
         val handleCoordinator = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiMediaSessionHandleCoordinator.kt").readText()
         val restoreAudio = source.substringAfter("private fun restoreAudio()")
             .substringBefore("private fun tick()")
         val startPlayback = source.substringAfter("private fun startPlayback()")
             .substringBefore("private fun seek(")
-        val pausePlayback = source.substringAfter("fun pausePlayback(")
+        val pausePlayback = source.substringAfter("override fun pausePlayback(")
             .substringBefore("fun nextCue()")
         val teardown = source.substringAfter("private fun teardownPlayer(clearCue: Boolean)")
-            .substringBefore("private fun playbackParams(")
 
         assertTrue(source.contains("bookTitle: String?"))
         assertTrue(source.contains("bookCoverFile: File?"))
