@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- Next architecture slice: convert the highest-value Sasayaki playback coordinator source-string coverage toward behavior tests without reducing protection for popup playback, seek completion, tick persistence, or media-session behavior.
+- Sasayaki playback production split is complete for the current architecture queue; next architecture slice: start the Reader/WebView typed bridge work without changing pagination, lookup popup, bookmark restore, or Sasayaki integration behavior.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

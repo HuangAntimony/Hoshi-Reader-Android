@@ -35,8 +35,8 @@ class SasayakiCueDisplayActionDispatcherTest {
 
     @Test
     fun clearAndLoadChapterClearsCueBeforeLoadingChapter() {
-        dispatcher.apply(SasayakiCueDisplayAction.ClearAndLoadChapter(chapterIndex = 3))
+        dispatcher.apply(SasayakiCueDisplayAction.ClearAndLoadChapter(chapterIndex = 7))
 
-        assertEquals(listOf("clear", "load:3"), events)
+        assertEquals(listOf("clear", "load:7"), events)
     }
 }
