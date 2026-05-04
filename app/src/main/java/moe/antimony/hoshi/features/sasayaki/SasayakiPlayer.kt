@@ -4,9 +4,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import java.io.File
 
 class SasayakiPlayer(
@@ -67,14 +64,18 @@ class SasayakiPlayer(
     )
     private val audioAvailability = SasayakiAudioAvailabilityState()
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
-    private var hasPlayedOnce = false
+    private val cuePresentation = SasayakiCuePresentationState()
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     val currentTime: Double get() = playbackState.currentTime
     val duration: Double get() = playbackState.duration
     val isPlaying: Boolean get() = playbackState.isPlaying
     val errorMessage: String? get() = audioAvailability.errorMessage
-    var autoScroll by mutableStateOf(true)
+    var autoScroll: Boolean
+        get() = cuePresentation.autoScroll
+        set(value) {
+            cuePresentation.autoScroll = value
+        }
     val hasAudio: Boolean get() = audioAvailability.hasAudio
 
     val hasMatch: Boolean = matchData != null
@@ -166,7 +167,7 @@ class SasayakiPlayer(
     private fun startPlayback() {
         playbackCommands.start(
             rate = rate,
-            markPlayedOnce = { hasPlayedOnce = true },
+            markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
                 updateMediaSession()
                 mediaSessionHandle.activate()
@@ -197,8 +198,8 @@ class SasayakiPlayer(
             hasMatch = hasMatch,
             delay = delay,
             currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = autoScroll,
-            hasPlayedOnce = hasPlayedOnce,
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             startPlayback = ::startPlayback,
             updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
@@ -241,8 +242,8 @@ class SasayakiPlayer(
             hasMatch = hasMatch,
             delay = delay,
             currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = autoScroll,
-            hasPlayedOnce = hasPlayedOnce,
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             pausePlayback = { pausePlayback() },
             updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
@@ -256,8 +257,8 @@ class SasayakiPlayer(
             time = time,
             delay = delay,
             currentChapterIndex = getCurrentChapterIndex(),
-            autoScroll = autoScroll,
-            hasPlayedOnce = hasPlayedOnce,
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             forceDisplay = forceDisplay,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )

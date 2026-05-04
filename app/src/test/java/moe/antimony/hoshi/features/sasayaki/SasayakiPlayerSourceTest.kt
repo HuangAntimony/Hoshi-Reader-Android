@@ -67,7 +67,7 @@ class SasayakiPlayerSourceTest {
         assertFalse(setRate.contains("playbackEngine?.setRate(value)"))
         assertTrue(startPlayback.contains("playbackCommands.start("))
         assertTrue(startPlayback.contains("rate = rate"))
-        assertTrue(startPlayback.contains("hasPlayedOnce = true"))
+        assertTrue(startPlayback.contains("markPlayedOnce = cuePresentation::markPlayedOnce"))
     }
 
     @Test
@@ -169,7 +169,12 @@ class SasayakiPlayerSourceTest {
         val updateCue = source.substringAfter("private fun updateCue(")
             .substringBefore("private fun applyCueDisplayAction(")
 
-        assertTrue(startPlayback.contains("hasPlayedOnce = true"))
+        assertTrue(source.contains("private val cuePresentation = SasayakiCuePresentationState()"))
+        assertTrue(source.contains("var autoScroll: Boolean"))
+        assertTrue(source.contains("get() = cuePresentation.autoScroll"))
+        assertTrue(source.contains("cuePresentation.autoScroll = value"))
+        assertFalse(source.contains("private var hasPlayedOnce = false"))
+        assertTrue(startPlayback.contains("markPlayedOnce = cuePresentation::markPlayedOnce"))
         assertTrue(startPlayback.contains("updateCue(currentTime, forceDisplay = true)"))
         assertTrue(updateCue.contains("forceDisplay: Boolean = false"))
         assertTrue(updateCue.contains("playbackEvents.updateCue("))
@@ -189,8 +194,8 @@ class SasayakiPlayerSourceTest {
         assertFalse(source.contains("private var currentCue: SasayakiMatch? = null"))
         assertTrue(updateCue.contains("playbackEvents.updateCue("))
         assertTrue(updateCue.contains("currentChapterIndex = getCurrentChapterIndex()"))
-        assertTrue(updateCue.contains("autoScroll = autoScroll"))
-        assertTrue(updateCue.contains("hasPlayedOnce = hasPlayedOnce"))
+        assertTrue(updateCue.contains("autoScroll = cuePresentation.autoScroll"))
+        assertTrue(updateCue.contains("hasPlayedOnce = cuePresentation.hasPlayedOnce"))
         assertTrue(eventSource.contains("cueDisplay.update("))
         assertTrue(applyAction.contains("SasayakiCueDisplayAction.Clear -> onClearCue()"))
         assertTrue(applyAction.contains("is SasayakiCueDisplayAction.Display -> onCue(action.cue, action.reveal)"))
