@@ -75,6 +75,12 @@ class SasayakiPlayer(
         contentResolver = appContext.contentResolver,
     )
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
+    private val playbackTeardown = SasayakiPlaybackTeardownCoordinator(
+        playbackLifecycle = playbackLifecycle,
+        mediaSessionHandle = mediaSessionHandle,
+        audioAvailability = audioAvailability,
+        cueDisplay = cueDisplay,
+    )
     private val cuePresentation = SasayakiCuePresentationState()
 
     val playback: SasayakiPlaybackData get() = playbackPersistence.playback
@@ -310,10 +316,10 @@ class SasayakiPlayer(
     }
 
     private fun teardownPlayer(clearCue: Boolean) {
-        pausePlayback()
-        playbackLifecycle.releaseEngine()
-        mediaSessionHandle.releaseAndClear()
-        audioAvailability.markAudioUnavailable()
-        if (clearCue) applyCueDisplayAction(cueDisplay.clear())
+        playbackTeardown.teardown(
+            clearCue = clearCue,
+            pausePlayback = { pausePlayback() },
+            applyCueDisplayAction = ::applyCueDisplayAction,
+        )
     }
 }

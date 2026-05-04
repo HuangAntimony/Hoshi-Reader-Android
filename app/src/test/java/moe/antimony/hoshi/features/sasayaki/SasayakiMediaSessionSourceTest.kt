@@ -77,7 +77,9 @@ class SasayakiMediaSessionSourceTest {
         assertTrue(pausePlayback.contains("updateMediaSession = ::updateMediaSession"))
         assertTrue(source.contains("private fun updateMediaSession()"))
         assertTrue(source.contains("mediaSessionHandle.update("))
-        assertTrue(teardown.contains("mediaSessionHandle.releaseAndClear()"))
+        assertTrue(source.contains("private val playbackTeardown = SasayakiPlaybackTeardownCoordinator("))
+        assertTrue(teardown.contains("playbackTeardown.teardown("))
+        assertFalse(teardown.contains("mediaSessionHandle.releaseAndClear()"))
     }
 
     @Test
