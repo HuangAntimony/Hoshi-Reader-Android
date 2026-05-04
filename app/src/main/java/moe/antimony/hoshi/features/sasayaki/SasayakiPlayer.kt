@@ -67,6 +67,13 @@ class SasayakiPlayer(
         playbackLifecycle = playbackLifecycle,
     )
     private val audioAvailability = SasayakiAudioAvailabilityState()
+    private val audioCommands = SasayakiAudioCommandCoordinator(
+        audioSourceRepository = audioSourceRepository,
+        playbackPersistence = playbackPersistence,
+        playbackState = playbackState,
+        audioAvailability = audioAvailability,
+        contentResolver = appContext.contentResolver,
+    )
     private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
     private val cuePresentation = SasayakiCuePresentationState()
 
@@ -109,17 +116,19 @@ class SasayakiPlayer(
     }
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
-        teardownPlayer(clearCue = false)
-        playbackPersistence.importAudio(audioUri, copiedAudioFileName)
-        restoreAudio()
+        audioCommands.importAudio(
+            audioUri = audioUri,
+            copiedAudioFileName = copiedAudioFileName,
+            teardownPlayer = ::teardownPlayer,
+            restoreAudio = ::restoreAudio,
+        )
     }
 
     fun clearAudio() {
-        audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)
-        teardownPlayer(clearCue = true)
-        playbackPersistence.clearAudioMetadata()
-        playbackState.clearAudioState()
-        audioAvailability.markAudioCleared()
+        audioCommands.clearAudio(
+            playback = playback,
+            teardownPlayer = ::teardownPlayer,
+        )
     }
 
     fun togglePlayback() {
