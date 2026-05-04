@@ -100,4 +100,17 @@ class AppShellNavigationTest {
         assertTrue(readerDestination.contains("stateHolder.load(bookId)"))
         assertTrue(readerBranch.contains("bookId = route.bookId"))
     }
+
+    @Test
+    fun appShellDelegatesNonNavigationStateToFocusedHelpers() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+
+        assertTrue(appShell.contains("AppLaunchRouteStateHolder"))
+        assertTrue(appShell.contains("PendingImportRouteCoordinator"))
+        assertTrue(appShell.contains("SasayakiMatchRequestStore"))
+        assertFalse(appShell.contains("var dictionarySettings by remember"))
+        assertFalse(appShell.contains("var dictionarySettingsLoaded by remember"))
+        assertFalse(appShell.contains("var dictionaryDefaultRouteApplied by remember"))
+        assertFalse(appShell.contains("var sasayakiMatchRequests by remember"))
+    }
 }

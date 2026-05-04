@@ -22,7 +22,7 @@ Source of truth: `docs/ARCHITECTURE_REFACTORING.md` for direction; local `.codex
 
 Status: `in_progress`
 
-- App dependency construction is centralized in a small container; next architecture slice: slim `AppShell` back toward navigation ownership.
+- `AppShell` non-navigation coordination is split into focused helpers; next architecture slice: replace high-value Sasayaki source-shape tests with behavior tests before further playback cleanup.
 - Preserve the R-000 baseline in `docs/navigation-reader-entry-characterization.md` while continuing Navigation3 route wiring.
 - Keep refactor commits slice-sized and follow the local refactoring workflow skill if present.
 

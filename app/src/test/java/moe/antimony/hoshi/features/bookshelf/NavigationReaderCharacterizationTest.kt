@@ -64,6 +64,8 @@ class NavigationReaderCharacterizationTest {
     fun settingsDetailScreensAreExclusiveEarlyReturnDestinations() {
         val bookshelf = bookshelfSource()
         val appShell = appShellSource()
+        val launchRouteStateHolder = File("src/main/java/moe/antimony/hoshi/navigation/AppLaunchRouteStateHolder.kt")
+            .readText()
         val settingsScaffold = File("src/main/java/moe/antimony/hoshi/features/settings/SettingsDetailScaffold.kt")
             .readText()
         val routeBranch = appShell.substringAfter("is AppRoute.SettingsDetailRoute ->")
@@ -72,7 +74,7 @@ class NavigationReaderCharacterizationTest {
             .substringBefore("is AppRoute.SettingsDetailRoute")
 
         assertTrue(appShell.contains("dictionarySettingsRepository.settings.collect"))
-        assertTrue(appShell.contains("dictionarySettings.dictionaryTabDefault"))
+        assertTrue(launchRouteStateHolder.contains("settings.dictionaryTabDefault"))
         assertTrue(appShell.contains("rememberNavBackStack(initialRoute)"))
         assertTrue(settingsRoute.contains("openSettingsDetail(destination.toSection())"))
         assertTrue(routeBranch.contains("SettingsDetailDestination("))

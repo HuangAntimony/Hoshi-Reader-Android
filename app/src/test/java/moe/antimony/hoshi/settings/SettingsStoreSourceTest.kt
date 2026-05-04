@@ -256,7 +256,7 @@ class SettingsStoreSourceTest {
         source("navigation/AppShell.kt").mustContainAll(
             "val dictionarySettingsRepository = appContainer.dictionarySettingsRepository",
             "dictionarySettingsRepository.settings.collect",
-            "dictionarySettingsLoaded",
+            "launchRouteStateHolder.defaultRouteAfterSettingsLoad(",
         )
         source("features/audio/AudioView.kt").mustContainAll(
             "val audioSettingsRepository = appContainer.audioSettingsRepository",

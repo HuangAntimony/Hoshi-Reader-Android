@@ -112,7 +112,7 @@ class MainShellUiTest {
         val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
 
         assertTrue(source.contains("onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))"))
-        assertTrue(appShell.contains("sasayakiMatchRequests = sasayakiMatchRequests + (request.bookId to request)"))
+        assertTrue(appShell.contains("sasayakiMatchRequestStore.put(request)"))
         assertTrue(appShell.contains("backStack.openSasayakiMatchRoute(request.bookId)"))
         assertTrue(appShell.contains("SasayakiMatchView("))
         assertFalse(source.contains("SasayakiMatcher.match("))

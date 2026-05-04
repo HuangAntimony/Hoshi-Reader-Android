@@ -104,12 +104,14 @@ class DictionarySettingsRepositoryTest {
         val readerWebView = java.io.File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
         val viewModel = java.io.File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionaryViewModel.kt").readText()
         val container = java.io.File("src/main/java/moe/antimony/hoshi/HoshiAppContainer.kt").readText()
+        val launchRouteStateHolder =
+            java.io.File("src/main/java/moe/antimony/hoshi/navigation/AppLaunchRouteStateHolder.kt").readText()
 
         assertTrue(container.contains("dictionarySettingsRepository()"))
         assertTrue(appShell.contains("val dictionarySettingsRepository = appContainer.dictionarySettingsRepository"))
         assertTrue(appShell.contains("dictionarySettingsRepository.settings.collect"))
-        assertTrue(appShell.contains("dictionarySettingsLoaded"))
-        assertTrue(appShell.contains("dictionaryDefaultRouteApplied"))
+        assertTrue(appShell.contains("launchRouteStateHolder.defaultRouteAfterSettingsLoad("))
+        assertTrue(launchRouteStateHolder.contains("settings.dictionaryTabDefault"))
         assertTrue(dictionaryView.contains("appContainer.dictionaryViewModelRepository(context.contentResolver)"))
         assertTrue(dictionarySearch.contains("val dictionarySettingsRepository = appContainer.dictionarySettingsRepository"))
         assertTrue(dictionarySearch.contains("dictionarySettingsRepository.settings.collect"))

@@ -38,7 +38,6 @@ import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
-import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.DictionaryView
 import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
@@ -69,9 +68,9 @@ fun AppShell(
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
     val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
-    var dictionarySettings by remember { mutableStateOf(DictionarySettings()) }
-    var dictionarySettingsLoaded by remember { mutableStateOf(false) }
-    var dictionaryDefaultRouteApplied by remember { mutableStateOf(false) }
+    val launchRouteStateHolder = remember { AppLaunchRouteStateHolder() }
+    val pendingImportRouteCoordinator = remember { PendingImportRouteCoordinator() }
+    val sasayakiMatchRequestStore = remember { SasayakiMatchRequestStore() }
     var showAnkiPlaceholder by remember { mutableStateOf(false) }
     val initialRoute = AppRoute.BooksRoute
     val backStack = rememberNavBackStack(initialRoute)
@@ -81,13 +80,16 @@ fun AppShell(
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
-    var sasayakiMatchRequests by remember { mutableStateOf<Map<String, SasayakiMatchRequest>>(emptyMap()) }
+    val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(dictionarySettingsRepository) {
         dictionarySettingsRepository.settings.collect { settings ->
-            dictionarySettings = settings
-            dictionarySettingsLoaded = true
+            launchRouteStateHolder.defaultRouteAfterSettingsLoad(
+                settings = settings,
+                hasPendingImport = currentPendingImportUri != null,
+                backStack = backStack,
+            )?.let(backStack::selectTopLevelRoute)
         }
     }
 
@@ -108,30 +110,15 @@ fun AppShell(
     }
 
     fun openSasayakiMatch(request: SasayakiMatchRequest) {
-        sasayakiMatchRequests = sasayakiMatchRequests + (request.bookId to request)
+        sasayakiMatchRequestStore.put(request)
         backStack.openSasayakiMatchRoute(request.bookId)
     }
 
     LaunchedEffect(pendingImportUri) {
-        if (pendingImportUri != null) {
-            backStack.routeExternalBookImport()
-        }
-    }
-
-    LaunchedEffect(dictionarySettingsLoaded, dictionarySettings.dictionaryTabDefault, pendingImportUri) {
-        if (
-            dictionarySettingsLoaded &&
-            !dictionaryDefaultRouteApplied &&
-            dictionarySettings.dictionaryTabDefault &&
-            pendingImportUri == null &&
-            backStack.size == 1 &&
-            backStack.lastOrNull() == AppRoute.BooksRoute
-        ) {
-            backStack.selectTopLevelRoute(AppRoute.DictionaryRoute)
-        }
-        if (dictionarySettingsLoaded) {
-            dictionaryDefaultRouteApplied = true
-        }
+        pendingImportRouteCoordinator.routePendingImport(
+            hasPendingImport = pendingImportUri != null,
+            backStack = backStack,
+        )
     }
 
     NavDisplay(
@@ -212,7 +199,7 @@ fun AppShell(
                         )
                     }
                     is AppRoute.SasayakiMatchRoute -> {
-                        val request = sasayakiMatchRequests[route.bookId]
+                        val request = sasayakiMatchRequestStore.get(route.bookId)
                         if (request != null) {
                             SasayakiMatchView(
                                 bookEntry = request.bookEntry,
