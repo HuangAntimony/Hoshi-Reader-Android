@@ -9,6 +9,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Move Sasayaki audiobook playback and dictionary word audio onto Media3 ExoPlayer for more consistent playback, seeking, speed control, and system media integration.
 
+### Fixed
+
+- Keep Sasayaki previous/next cue controls available from Android system media controls, and make paused cue seeks reveal the correct text without flickering back to the old highlight.
+
 ## [v0.3.0] - 2026-05-05
 
 ### Added

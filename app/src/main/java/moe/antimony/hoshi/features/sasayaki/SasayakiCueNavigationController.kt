@@ -9,20 +9,22 @@ class SasayakiCueNavigationController(matchData: SasayakiMatchData?) {
     private val timeline = CueTimeline(matchData)
 
     fun nextCueSeekTime(
-        currentCueStartTime: Double?,
         currentTime: Double,
         delay: Double,
     ): Double? {
-        val next = timeline.nextCue(after = currentCueStartTime ?: currentTime - delay) ?: return null
+        val playbackTime = currentTime - delay
+        val anchor = timeline.cueAt(playbackTime)?.startTime ?: playbackTime
+        val next = timeline.nextCue(after = anchor) ?: return null
         return next + delay
     }
 
     fun previousCueSeekTime(
-        currentCueStartTime: Double?,
         currentTime: Double,
         delay: Double,
     ): Double {
-        val previous = timeline.previousCue(before = currentCueStartTime ?: max(0.0, currentTime - delay)) ?: 0.0
+        val playbackTime = max(0.0, currentTime - delay)
+        val anchor = timeline.cueAt(playbackTime)?.startTime ?: playbackTime
+        val previous = timeline.previousCue(before = anchor) ?: 0.0
         return previous + delay
     }
 

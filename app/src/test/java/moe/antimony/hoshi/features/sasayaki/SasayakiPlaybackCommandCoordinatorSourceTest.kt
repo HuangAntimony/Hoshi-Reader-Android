@@ -34,6 +34,7 @@ class SasayakiPlaybackCommandCoordinatorSourceTest {
         assertTrue(seek.contains("updateCue = updateCue"))
         assertTrue(seek.contains("savePosition = savePosition"))
         assertTrue(seek.contains("displayCue = displayCue"))
+        assertTrue(seek.contains("revealCue = revealCue"))
     }
 
     @Test
@@ -49,15 +50,15 @@ class SasayakiPlaybackCommandCoordinatorSourceTest {
             .substringBefore("fun seek(")
 
         assertTrue(source.contains("private val cueNavigation: SasayakiCueNavigationController"))
-        assertTrue(source.contains("private val cueDisplay: SasayakiCueDisplayCoordinator"))
+        assertFalse(source.contains("private val cueDisplay: SasayakiCueDisplayCoordinator"))
         assertTrue(nextCue.contains("cueNavigation.nextCueSeekTime("))
-        assertTrue(nextCue.contains("currentCueStartTime = cueDisplay.currentCueStartTime"))
+        assertTrue(nextCue.contains("currentTime = currentTime"))
         assertTrue(nextCue.contains("playbackState.clearStopPlaybackTime()"))
-        assertTrue(nextCue.contains("seek(next, startPlayback = isPlaying)"))
+        assertTrue(nextCue.contains("seek(next, startPlayback = isPlaying, revealCue = true)"))
         assertTrue(previousCue.contains("cueNavigation.previousCueSeekTime("))
-        assertTrue(previousCue.contains("currentCueStartTime = cueDisplay.currentCueStartTime"))
+        assertTrue(previousCue.contains("currentTime = currentTime"))
         assertTrue(previousCue.contains("playbackState.clearStopPlaybackTime()"))
-        assertTrue(previousCue.contains("seek(previous, startPlayback = isPlaying)"))
+        assertTrue(previousCue.contains("seek(previous, startPlayback = isPlaying, revealCue = true)"))
         assertTrue(playCue.contains("playbackState.clearStopPlaybackTime()"))
         assertTrue(playCue.contains("if (isPlaying) pauseWithoutRestore()"))
         assertTrue(playCue.contains("playbackState.setTemporaryPlaybackReturnPosition(if (stop) lastPosition else null)"))

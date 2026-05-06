@@ -23,6 +23,7 @@ class SasayakiPlaybackEventCoordinator(
             playbackPersistence.savePosition(seek.seconds)
         }
         if (seek.updateCue) {
+            val shouldRevealCue = hasPlayedOnce || seek.revealCue
             updateCue(
                 hasAudio = hasAudio,
                 hasMatch = hasMatch,
@@ -30,7 +31,7 @@ class SasayakiPlaybackEventCoordinator(
                 delay = delay,
                 currentChapterIndex = currentChapterIndex,
                 autoScroll = autoScroll,
-                hasPlayedOnce = hasPlayedOnce,
+                hasPlayedOnce = shouldRevealCue,
                 forceDisplay = false,
                 applyCueDisplayAction = applyCueDisplayAction,
             )
@@ -40,7 +41,7 @@ class SasayakiPlaybackEventCoordinator(
                 cueDisplay.displaySelectedCue(
                     cue = cue,
                     currentChapterIndex = currentChapterIndex,
-                    reveal = autoScroll && (hasPlayedOnce || seek.startPlayback),
+                    reveal = autoScroll && (hasPlayedOnce || seek.startPlayback || seek.revealCue),
                 ),
             )
         }

@@ -92,7 +92,6 @@ internal class SasayakiPlaybackController(
         playbackState = playbackState,
         playbackLifecycle = playbackLifecycle,
         cueNavigation = cueNavigation,
-        cueDisplay = cueDisplay,
     )
     private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator(
         playbackLifecycle = playbackLifecycle,
@@ -310,7 +309,7 @@ internal class SasayakiPlaybackController(
     private fun restoreAudio() {
         audioRestoreWorkflow.restore(
             playback = playback,
-            currentTime = currentTime,
+            currentTime = { currentTime },
             releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
             updateMediaSession = ::updateMediaSession,
             handleSeekComplete = ::handleSeekComplete,

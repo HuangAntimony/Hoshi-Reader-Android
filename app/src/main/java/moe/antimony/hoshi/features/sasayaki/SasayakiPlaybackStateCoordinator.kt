@@ -12,6 +12,7 @@ data class SasayakiPendingSeek(
     val updateCue: Boolean,
     val savePosition: Boolean,
     val displayCue: SasayakiMatch? = null,
+    val revealCue: Boolean = false,
 )
 
 data class SasayakiPlaybackTickUpdate(
@@ -65,6 +66,7 @@ class SasayakiPlaybackStateCoordinator(initialPosition: Double) {
         updateCue: Boolean,
         savePosition: Boolean,
         displayCue: SasayakiMatch?,
+        revealCue: Boolean = false,
     ) {
         pendingSeek = SasayakiPendingSeek(
             seconds = seconds,
@@ -72,6 +74,7 @@ class SasayakiPlaybackStateCoordinator(initialPosition: Double) {
             updateCue = updateCue,
             savePosition = savePosition,
             displayCue = displayCue,
+            revealCue = revealCue,
         )
     }
 

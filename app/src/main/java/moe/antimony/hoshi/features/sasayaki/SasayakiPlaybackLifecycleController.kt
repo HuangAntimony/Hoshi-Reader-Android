@@ -73,6 +73,7 @@ class SasayakiPlaybackLifecycleController(
         updateCue: Boolean,
         savePosition: Boolean,
         displayCue: SasayakiMatch?,
+        revealCue: Boolean = false,
     ): Boolean {
         val engine = engine ?: return false
         playbackState.beginSeek(
@@ -81,6 +82,7 @@ class SasayakiPlaybackLifecycleController(
             updateCue = updateCue,
             savePosition = savePosition,
             displayCue = displayCue,
+            revealCue = revealCue,
         )
         stopTicking()
         if (playbackState.isPlaying) {

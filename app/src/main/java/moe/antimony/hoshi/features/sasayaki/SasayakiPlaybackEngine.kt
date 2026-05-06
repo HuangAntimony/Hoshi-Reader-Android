@@ -2,6 +2,8 @@ package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -29,7 +31,12 @@ interface SasayakiPlaybackEngine {
 
 class Media3SasayakiPlaybackEngine private constructor(
     private val player: ExoPlayer,
+    private val onSeekComplete: () -> Unit,
 ) : SasayakiPlaybackEngine {
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingSeekToken = 0
+    private var completedSeekToken = 0
+
     val media3Player: Player
         get() = player
 
@@ -53,14 +60,32 @@ class Media3SasayakiPlaybackEngine private constructor(
     }
 
     override fun seekTo(positionMs: Int) {
-        player.seekTo(positionMs.coerceAtLeast(0).toLong())
+        val targetMs = positionMs.coerceAtLeast(0).toLong()
+        val wasAlreadyAtTarget = kotlin.math.abs(player.currentPosition - targetMs) <= NoOpSeekToleranceMs
+        val token = ++pendingSeekToken
+        player.seekTo(targetMs)
+        if (wasAlreadyAtTarget) {
+            mainHandler.post { completePendingSeek(token) }
+        }
     }
 
     override fun release() {
         player.release()
     }
 
+    private fun completePendingSeekFromPlayer() {
+        completePendingSeek(pendingSeekToken)
+    }
+
+    private fun completePendingSeek(token: Int) {
+        if (token != pendingSeekToken || token <= completedSeekToken) return
+        completedSeekToken = token
+        onSeekComplete()
+    }
+
     companion object {
+        private const val NoOpSeekToleranceMs = 1L
+
         fun prepare(
             context: Context,
             source: SasayakiPlaybackSource,
@@ -71,6 +96,7 @@ class Media3SasayakiPlaybackEngine private constructor(
             onError: (PlaybackException) -> Unit,
         ): Media3SasayakiPlaybackEngine {
             val player = ExoPlayer.Builder(context.applicationContext).build()
+            val engine = Media3SasayakiPlaybackEngine(player, onSeekComplete)
             player.apply {
                 setAudioAttributes(audioAttributes(), true)
                 setMediaItem(mediaItem(source))
@@ -88,8 +114,11 @@ class Media3SasayakiPlaybackEngine private constructor(
                             newPosition: Player.PositionInfo,
                             reason: Int,
                         ) {
-                            if (reason == Player.DISCONTINUITY_REASON_SEEK) {
-                                onSeekComplete()
+                            if (
+                                reason == Player.DISCONTINUITY_REASON_SEEK ||
+                                reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
+                            ) {
+                                engine.completePendingSeekFromPlayer()
                             }
                         }
 
@@ -101,7 +130,7 @@ class Media3SasayakiPlaybackEngine private constructor(
                 prepare()
                 seekTo(startPositionMs.coerceAtLeast(0).toLong())
             }
-            return Media3SasayakiPlaybackEngine(player)
+            return engine
         }
 
         private fun playbackParameters(speed: Float): PlaybackParameters =

@@ -6,7 +6,6 @@ class SasayakiPlaybackCommandCoordinator(
     private val playbackState: SasayakiPlaybackStateCoordinator,
     private val playbackLifecycle: SasayakiPlaybackLifecycleController,
     private val cueNavigation: SasayakiCueNavigationController,
-    private val cueDisplay: SasayakiCueDisplayCoordinator,
 ) {
     fun toggle(
         isPlaying: Boolean,
@@ -46,12 +45,11 @@ class SasayakiPlaybackCommandCoordinator(
         isPlaying: Boolean,
     ) {
         val next = cueNavigation.nextCueSeekTime(
-            currentCueStartTime = cueDisplay.currentCueStartTime,
             currentTime = currentTime,
             delay = delay,
         ) ?: return
         playbackState.clearStopPlaybackTime()
-        seek(next, startPlayback = isPlaying)
+        seek(next, startPlayback = isPlaying, revealCue = true)
     }
 
     fun previousCue(
@@ -60,12 +58,11 @@ class SasayakiPlaybackCommandCoordinator(
         isPlaying: Boolean,
     ) {
         val previous = cueNavigation.previousCueSeekTime(
-            currentCueStartTime = cueDisplay.currentCueStartTime,
             currentTime = currentTime,
             delay = delay,
         )
         playbackState.clearStopPlaybackTime()
-        seek(previous, startPlayback = isPlaying)
+        seek(previous, startPlayback = isPlaying, revealCue = true)
     }
 
     fun playCue(
@@ -103,6 +100,7 @@ class SasayakiPlaybackCommandCoordinator(
         updateCue: Boolean = true,
         savePosition: Boolean = true,
         displayCue: SasayakiMatch? = null,
+        revealCue: Boolean = false,
     ) {
         playbackLifecycle.beginSeek(
             seconds = seconds,
@@ -110,6 +108,7 @@ class SasayakiPlaybackCommandCoordinator(
             updateCue = updateCue,
             savePosition = savePosition,
             displayCue = displayCue,
+            revealCue = revealCue,
         )
     }
 }

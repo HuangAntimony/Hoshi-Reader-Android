@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.ForwardingSimpleBasePlayer
@@ -20,9 +19,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
-import androidx.media3.session.SessionCommand
-import androidx.media3.session.SessionCommands
-import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import moe.antimony.hoshi.R
@@ -51,19 +47,19 @@ class SasayakiMediaSession(
         player = player,
         onPlay = onPlay,
         onPause = onPause,
+        onSkipToPrevious = onSkipToPrevious,
+        onSkipToNext = onSkipToNext,
         onSeekTo = onSeekTo,
     )
-    private val previousCueCommand = SessionCommand(ActionPreviousCue, Bundle.EMPTY)
-    private val nextCueCommand = SessionCommand(ActionNextCue, Bundle.EMPTY)
     private val mediaButtons = listOf(
         CommandButton.Builder(CommandButton.ICON_PREVIOUS)
             .setDisplayName("Previous Cue")
-            .setSessionCommand(previousCueCommand)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
             .setSlots(CommandButton.SLOT_BACK)
             .build(),
         CommandButton.Builder(CommandButton.ICON_NEXT)
             .setDisplayName("Next Cue")
-            .setSessionCommand(nextCueCommand)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
             .setSlots(CommandButton.SLOT_FORWARD)
             .build(),
     )
@@ -184,34 +180,19 @@ class SasayakiMediaSession(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): MediaSession.ConnectionResult {
-            val sessionCommands: SessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
-                .buildUpon()
-                .add(previousCueCommand)
-                .add(nextCueCommand)
-                .build()
             val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
                 .buildUpon()
                 .add(Player.COMMAND_PLAY_PAUSE)
                 .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_NEXT)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-                .setAvailableSessionCommands(sessionCommands)
                 .setAvailablePlayerCommands(playerCommands)
                 .setMediaButtonPreferences(mediaButtons)
                 .build()
-        }
-
-        override fun onCustomCommand(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo,
-            customCommand: SessionCommand,
-            args: Bundle,
-        ): ListenableFuture<SessionResult> {
-            when (customCommand.customAction) {
-                ActionPreviousCue -> onSkipToPrevious()
-                ActionNextCue -> onSkipToNext()
-            }
-            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
     }
 
@@ -219,6 +200,8 @@ class SasayakiMediaSession(
         player: Player,
         private val onPlay: () -> Unit,
         private val onPause: () -> Unit,
+        private val onSkipToPrevious: () -> Unit,
+        private val onSkipToNext: () -> Unit,
         private val onSeekTo: (Long) -> Unit,
     ) : ForwardingSimpleBasePlayer(player) {
         override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
@@ -235,7 +218,17 @@ class SasayakiMediaSession(
             positionMs: Long,
             seekCommand: Int,
         ): ListenableFuture<*> {
-            onSeekTo(positionMs)
+            when (seekCommand) {
+                Player.COMMAND_SEEK_TO_PREVIOUS,
+                Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                -> onSkipToPrevious()
+
+                Player.COMMAND_SEEK_TO_NEXT,
+                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                -> onSkipToNext()
+
+                else -> onSeekTo(positionMs)
+            }
             return Futures.immediateFuture(null)
         }
     }
@@ -244,8 +237,6 @@ class SasayakiMediaSession(
         private const val ChannelId = "sasayaki_playback"
         private const val NotificationId = 2407
         private const val MaxArtworkDimensionPx = 900
-        private const val ActionPreviousCue = "moe.antimony.hoshi.sasayaki.PREVIOUS_CUE"
-        private const val ActionNextCue = "moe.antimony.hoshi.sasayaki.NEXT_CUE"
 
         fun loadCoverArt(file: File?): Bitmap? {
             file?.takeIf { it.isFile } ?: return null

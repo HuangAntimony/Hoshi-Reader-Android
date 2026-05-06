@@ -18,14 +18,13 @@ class SasayakiCueNavigationControllerTest {
     )
 
     @Test
-    fun nextCueUsesDisplayedCueWhenAvailableAndAddsDelay() {
+    fun nextCueUsesActivePlaybackCueWhenAvailableAndAddsDelay() {
         val navigation = SasayakiCueNavigationController(match)
 
         assertEquals(
             15.5,
             navigation.nextCueSeekTime(
-                currentCueStartTime = 10.0,
-                currentTime = 17.0,
+                currentTime = 10.5,
                 delay = 0.5,
             ) ?: -1.0,
             0.0,
@@ -39,7 +38,6 @@ class SasayakiCueNavigationControllerTest {
         assertEquals(
             22.25,
             navigation.nextCueSeekTime(
-                currentCueStartTime = null,
                 currentTime = 16.75,
                 delay = 0.25,
             ) ?: -1.0,
@@ -47,7 +45,6 @@ class SasayakiCueNavigationControllerTest {
         )
         assertNull(
             navigation.nextCueSeekTime(
-                currentCueStartTime = 22.0,
                 currentTime = 22.25,
                 delay = 0.25,
             ),
@@ -61,8 +58,7 @@ class SasayakiCueNavigationControllerTest {
         assertEquals(
             10.25,
             navigation.previousCueSeekTime(
-                currentCueStartTime = 15.0,
-                currentTime = 17.0,
+                currentTime = 15.25,
                 delay = 0.25,
             ),
             0.0,
@@ -70,10 +66,41 @@ class SasayakiCueNavigationControllerTest {
         assertEquals(
             0.5,
             navigation.previousCueSeekTime(
-                currentCueStartTime = null,
                 currentTime = 0.25,
                 delay = 0.5,
             ),
+            0.0,
+        )
+    }
+
+    @Test
+    fun cueNavigationUsesPlaybackTimeInsteadOfStaleDisplayedCue() {
+        val navigation = SasayakiCueNavigationController(
+            SasayakiMatchData(
+                matches = listOf(
+                    SasayakiMatch("2019", 7967.135, 7971.115, "old", 12, 0, 3),
+                    SasayakiMatch("2020", 7971.759, 7975.799, "previous", 12, 3, 8),
+                    SasayakiMatch("2021", 7976.847, 7979.335, "current", 12, 11, 7),
+                    SasayakiMatch("2022", 7980.655, 7983.475, "next", 12, 18, 4),
+                ),
+                unmatched = 0,
+            ),
+        )
+
+        assertEquals(
+            7971.759,
+            navigation.previousCueSeekTime(
+                currentTime = 7976.847,
+                delay = 0.0,
+            ),
+            0.0,
+        )
+        assertEquals(
+            7980.655,
+            navigation.nextCueSeekTime(
+                currentTime = 7976.847,
+                delay = 0.0,
+            ) ?: -1.0,
             0.0,
         )
     }

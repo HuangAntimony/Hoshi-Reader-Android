@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 This file is the short operational handoff for future agents.
 
@@ -80,7 +80,7 @@ Status: `in_progress`
 
 - Read dictionary media through the existing dictionary bridge.
 - Keep Sasayaki sidecars iOS-compatible.
-- Sasayaki audiobook playback and dictionary word audio now use Media3 ExoPlayer; keep future audio work behavior-protected and verify Sasayaki controls, lookup audio, and Anki cue export together.
+- Sasayaki audiobook playback and dictionary word audio now use Media3 ExoPlayer; keep standard Android media previous/next controls, paused Sasayaki cue reveal, lookup audio, and Anki cue export behavior-protected.
 
 ### Sync
 
