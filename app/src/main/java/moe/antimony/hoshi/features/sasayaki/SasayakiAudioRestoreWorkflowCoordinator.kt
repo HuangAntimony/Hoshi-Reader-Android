@@ -26,7 +26,16 @@ class SasayakiAudioRestoreWorkflowCoordinator(
                 releaseExistingMediaSession = releaseExistingMediaSession,
                 callbacks = audioRestoreCallbacks.build(
                     updateMediaSession = updateMediaSession,
+                    handlePrepared = { durationMs ->
+                        audioRestoreResult.handlePrepared(
+                            durationMs = durationMs,
+                            currentTime = currentTime,
+                            updateCue = updateCue,
+                            updateMediaSession = updateMediaSession,
+                        )
+                    },
                     handleSeekComplete = handleSeekComplete,
+                    handleError = audioRestoreResult::handleFailure,
                     startPlayback = startPlayback,
                     pausePlayback = pausePlayback,
                     previousCue = previousCue,

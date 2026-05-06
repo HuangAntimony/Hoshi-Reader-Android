@@ -96,7 +96,7 @@ class NavigationReaderCharacterizationTest {
             .substringBefore("companion object")
 
         assertTrue(reader.contains("BackHandler(onBack = onClose)"))
-        assertTrue(mediaSession.contains("session.setSessionActivity(contentIntent())"))
+        assertTrue(mediaSession.contains("contentIntent()?.let { setSessionActivity(it) }"))
         assertTrue(contentIntent.contains("getLaunchIntentForPackage(appContext.packageName)"))
         assertTrue(contentIntent.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT"))
         assertTrue(contentIntent.contains("PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE"))

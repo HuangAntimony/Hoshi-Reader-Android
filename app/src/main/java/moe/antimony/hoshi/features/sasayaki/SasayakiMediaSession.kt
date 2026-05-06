@@ -9,17 +9,31 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.media.MediaMetadata
-import android.media.session.MediaSession
-import android.media.session.PlaybackState
-import android.os.Handler
-import android.os.Looper
+import android.os.Bundle
+import androidx.annotation.OptIn
+import androidx.core.app.NotificationCompat
+import androidx.media3.common.ForwardingSimpleBasePlayer
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.CommandButton
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaStyleNotificationHelper
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import moe.antimony.hoshi.R
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
 
+@OptIn(UnstableApi::class)
 class SasayakiMediaSession(
     context: Context,
+    private val player: Player,
     private val title: String,
     private val artwork: Bitmap?,
     private val onPlay: () -> Unit,
@@ -29,43 +43,45 @@ class SasayakiMediaSession(
     private val onSeekTo: (Long) -> Unit,
 ) {
     private val appContext = context.applicationContext
-    private val session = MediaSession(context.applicationContext, "Hoshi Sasayaki")
     private val notificationManager = appContext.getSystemService(NotificationManager::class.java)
     private var isPlaying = false
     private var notificationPlaying: Boolean? = null
     private var hasPublishedNotification = false
+    private val sessionPlayer = SasayakiSessionPlayer(
+        player = player,
+        onPlay = onPlay,
+        onPause = onPause,
+        onSeekTo = onSeekTo,
+    )
+    private val previousCueCommand = SessionCommand(ActionPreviousCue, Bundle.EMPTY)
+    private val nextCueCommand = SessionCommand(ActionNextCue, Bundle.EMPTY)
+    private val mediaButtons = listOf(
+        CommandButton.Builder(CommandButton.ICON_PREVIOUS)
+            .setDisplayName("Previous Cue")
+            .setSessionCommand(previousCueCommand)
+            .setSlots(CommandButton.SLOT_BACK)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_NEXT)
+            .setDisplayName("Next Cue")
+            .setSessionCommand(nextCueCommand)
+            .setSlots(CommandButton.SLOT_FORWARD)
+            .build(),
+    )
+    private val session = MediaSession.Builder(appContext, sessionPlayer)
+        .setId("hoshi-sasayaki-${System.identityHashCode(this)}")
+        .setMediaButtonPreferences(mediaButtons)
+        .setCallback(SasayakiSessionCallback())
+        .apply {
+            contentIntent()?.let { setSessionActivity(it) }
+        }
+        .build()
 
     init {
         ensureNotificationChannel()
-        session.setSessionActivity(contentIntent())
-        session.setCallback(
-            object : MediaSession.Callback() {
-                override fun onPlay() {
-                    onPlay.invoke()
-                }
-
-                override fun onPause() {
-                    onPause.invoke()
-                }
-
-                override fun onSkipToPrevious() {
-                    onSkipToPrevious.invoke()
-                }
-
-                override fun onSkipToNext() {
-                    onSkipToNext.invoke()
-                }
-
-                override fun onSeekTo(pos: Long) {
-                    onSeekTo.invoke(pos)
-                }
-            },
-            Handler(Looper.getMainLooper()),
-        )
+        publishMetadata()
     }
 
     fun activate() {
-        session.isActive = true
         publishNotification()
     }
 
@@ -76,33 +92,34 @@ class SasayakiMediaSession(
         rate: Float,
     ) {
         this.isPlaying = isPlaying
-        val metadata = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-            .putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs.coerceAtLeast(0L))
-        artwork?.let {
-            metadata.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork)
-            metadata.putBitmap(MediaMetadata.METADATA_KEY_ART, artwork)
-        }
-        session.setMetadata(metadata.build())
-        session.setPlaybackState(
-            PlaybackState.Builder()
-                .setActions(PlaybackActions)
-                .setState(
-                    if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
-                    currentTimeMs.coerceAtLeast(0L),
-                    if (isPlaying) rate else 0f,
-                )
-                .build(),
-        )
-        if ((session.isActive || hasPublishedNotification) && notificationPlaying != isPlaying) {
+        if ((session.connectedControllers.isNotEmpty() || hasPublishedNotification) && notificationPlaying != isPlaying) {
             publishNotification()
         }
     }
 
     fun release() {
-        session.isActive = false
         notificationManager.cancel(NotificationId)
         session.release()
+    }
+
+    private fun publishMetadata() {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .apply {
+                artworkBytes()?.let { bytes ->
+                    setArtworkData(bytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                }
+            }
+            .build()
+        val current = player.currentMediaItem ?: MediaItem.Builder().build()
+        val mediaItem = current.buildUpon()
+            .setMediaMetadata(metadata)
+            .build()
+        if (player.mediaItemCount == 0) {
+            player.addMediaItem(mediaItem)
+        } else {
+            player.replaceMediaItem(player.currentMediaItemIndex.coerceAtLeast(0), mediaItem)
+        }
     }
 
     private fun ensureNotificationChannel() {
@@ -120,17 +137,19 @@ class SasayakiMediaSession(
 
     @SuppressLint("NotificationPermission")
     private fun publishNotification() {
-        val style = Notification.MediaStyle().setMediaSession(session.sessionToken)
-        val builder = Notification.Builder(appContext, ChannelId)
+        val builder = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_stat_hoshi)
             .setContentTitle(title)
             .setContentText("Sasayaki")
             .setContentIntent(contentIntent())
             .setCategory(Notification.CATEGORY_TRANSPORT)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
             .setOnlyAlertOnce(true)
-            .setStyle(style)
+            .setStyle(
+                MediaStyleNotificationHelper.MediaStyle(session)
+                    .setShowActionsInCompactView(0, 1),
+            )
         artwork?.let { builder.setLargeIcon(artwork) }
         val notification = builder.build()
         notificationManager.notify(NotificationId, notification)
@@ -152,17 +171,81 @@ class SasayakiMediaSession(
                 )
             }
 
+    private fun artworkBytes(): ByteArray? {
+        val image = artwork ?: return null
+        return ByteArrayOutputStream().use { output ->
+            image.compress(Bitmap.CompressFormat.PNG, 100, output)
+            output.toByteArray()
+        }
+    }
+
+    private inner class SasayakiSessionCallback : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult {
+            val sessionCommands: SessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
+                .buildUpon()
+                .add(previousCueCommand)
+                .add(nextCueCommand)
+                .build()
+            val playerCommands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+                .buildUpon()
+                .add(Player.COMMAND_PLAY_PAUSE)
+                .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommands)
+                .setAvailablePlayerCommands(playerCommands)
+                .setMediaButtonPreferences(mediaButtons)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            when (customCommand.customAction) {
+                ActionPreviousCue -> onSkipToPrevious()
+                ActionNextCue -> onSkipToNext()
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+    }
+
+    private class SasayakiSessionPlayer(
+        player: Player,
+        private val onPlay: () -> Unit,
+        private val onPause: () -> Unit,
+        private val onSeekTo: (Long) -> Unit,
+    ) : ForwardingSimpleBasePlayer(player) {
+        override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+            if (playWhenReady) {
+                onPlay()
+            } else {
+                onPause()
+            }
+            return Futures.immediateFuture(null)
+        }
+
+        override fun handleSeek(
+            mediaItemIndex: Int,
+            positionMs: Long,
+            seekCommand: Int,
+        ): ListenableFuture<*> {
+            onSeekTo(positionMs)
+            return Futures.immediateFuture(null)
+        }
+    }
+
     companion object {
         private const val ChannelId = "sasayaki_playback"
         private const val NotificationId = 2407
         private const val MaxArtworkDimensionPx = 900
-        private const val PlaybackActions =
-            PlaybackState.ACTION_PLAY or
-                PlaybackState.ACTION_PAUSE or
-                PlaybackState.ACTION_PLAY_PAUSE or
-                PlaybackState.ACTION_SKIP_TO_PREVIOUS or
-                PlaybackState.ACTION_SKIP_TO_NEXT or
-                PlaybackState.ACTION_SEEK_TO
+        private const val ActionPreviousCue = "moe.antimony.hoshi.sasayaki.PREVIOUS_CUE"
+        private const val ActionNextCue = "moe.antimony.hoshi.sasayaki.NEXT_CUE"
 
         fun loadCoverArt(file: File?): Bitmap? {
             file?.takeIf { it.isFile } ?: return null

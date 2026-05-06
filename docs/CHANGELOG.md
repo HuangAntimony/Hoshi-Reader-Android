@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Changed
+
+- Move Sasayaki audiobook playback and dictionary word audio onto Media3 ExoPlayer for more consistent playback, seeking, speed control, and system media integration.
+
 ## [v0.3.0] - 2026-05-05
 
 ### Added

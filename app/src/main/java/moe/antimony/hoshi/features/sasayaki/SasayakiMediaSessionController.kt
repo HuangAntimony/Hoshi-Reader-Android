@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
+import androidx.media3.common.Player
 import java.io.File
 
 interface SasayakiMediaSessionHandle {
@@ -18,6 +19,7 @@ interface SasayakiMediaSessionHandle {
 
 class AndroidSasayakiMediaSessionHandle(
     context: Context,
+    player: Player,
     title: String,
     artworkFile: File?,
     onPlay: () -> Unit,
@@ -28,6 +30,7 @@ class AndroidSasayakiMediaSessionHandle(
 ) : SasayakiMediaSessionHandle {
     private val session = SasayakiMediaSession(
         context = context,
+        player = player,
         title = title,
         artwork = SasayakiMediaSession.loadCoverArt(artworkFile),
         onPlay = onPlay,

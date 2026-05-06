@@ -6,8 +6,10 @@ import android.content.Context
 import java.io.File
 
 data class SasayakiAudioRestoreCallbacks(
+    val onPrepared: (Int) -> Unit,
     val onCompletion: () -> Unit,
     val onSeekComplete: () -> Unit,
+    val onError: (Throwable) -> Unit,
     val onPlay: () -> Unit,
     val onPause: () -> Unit,
     val onSkipToPrevious: () -> Unit,
@@ -36,18 +38,21 @@ class SasayakiAudioRestoreController(
         callbacks: SasayakiAudioRestoreCallbacks,
     ): SasayakiAudioRestoreResult? {
         val source = audioSourceRepository.playbackSource(playback) ?: return null
-        val engine = AndroidSasayakiPlaybackEngine.prepare(
+        val engine = Media3SasayakiPlaybackEngine.prepare(
             context = appContext,
             source = source,
             startPositionMs = (playback.lastPosition * 1000.0).toInt(),
+            onPrepared = callbacks.onPrepared,
             onCompletion = callbacks.onCompletion,
             onSeekComplete = callbacks.onSeekComplete,
+            onError = callbacks.onError,
         )
         playbackLifecycle.attachEngine(engine)
         releaseExistingMediaSession()
         return SasayakiAudioRestoreResult(
             mediaSession = AndroidSasayakiMediaSessionHandle(
                 context = appContext,
+                player = engine.media3Player,
                 title = bookTitle ?: bookRoot.name,
                 artworkFile = bookCoverFile,
                 onPlay = callbacks.onPlay,

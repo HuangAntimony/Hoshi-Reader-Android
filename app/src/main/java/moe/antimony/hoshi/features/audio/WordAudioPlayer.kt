@@ -1,59 +1,70 @@
 package moe.antimony.hoshi.features.audio
 
 import android.content.Context
-import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.MediaDataSource
-import android.media.MediaPlayer
 import android.os.Build
+import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.ByteArrayDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
+@OptIn(UnstableApi::class)
 class WordAudioPlayer private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var mediaPlayer: MediaPlayer? = null
+    private var player: ExoPlayer? = null
     private var focusRequest: AudioFocusRequest? = null
 
     fun play(url: String, mode: AudioPlaybackMode) {
         stop()
         if (!requestFocus(mode)) return
-        val player = MediaPlayer().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build(),
+        val nextPlayer = ExoPlayer.Builder(appContext).build().apply {
+            setAudioAttributes(audioAttributes(), true)
+            addListener(
+                object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_ENDED) {
+                            stop()
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        stop()
+                    }
+                },
             )
-            setOnCompletionListener { stop() }
-            setOnErrorListener { _, _, _ ->
-                stop()
-                true
-            }
         }
         runCatching {
             val localFile = LocalAudioResolver.parseAudioUrl(url)
             if (localFile != null) {
                 val data = LocalAudioRepository.fromContext(appContext).loadAudio(localFile)
                     ?: error("Local audio not found.")
-                player.setDataSource(ByteArrayAudioDataSource(data))
+                val mediaSource = ProgressiveMediaSource.Factory {
+                    ByteArrayDataSource(data)
+                }.createMediaSource(MediaItem.fromUri("memory://hoshi-local-audio"))
+                nextPlayer.setMediaSource(mediaSource)
             } else {
-                player.setDataSource(url)
+                nextPlayer.setMediaItem(MediaItem.fromUri(url))
             }
-            player.prepareAsync()
-            player.setOnPreparedListener { it.start() }
-            mediaPlayer = player
+            nextPlayer.prepare()
+            nextPlayer.playWhenReady = true
+            player = nextPlayer
         }.onFailure {
-            player.release()
+            nextPlayer.release()
             abandonFocus()
         }
     }
 
     fun stop() {
-        mediaPlayer?.runCatching {
-            if (isPlaying) stop()
-        }
-        mediaPlayer?.release()
-        mediaPlayer = null
+        player?.release()
+        player = null
         abandonFocus()
     }
 
@@ -66,12 +77,7 @@ class WordAudioPlayer private constructor(context: Context) {
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val request = AudioFocusRequest.Builder(gain)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build(),
-                )
+                .setAudioAttributes(platformAudioAttributes())
                 .build()
             focusRequest = request
             audioManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -92,18 +98,17 @@ class WordAudioPlayer private constructor(context: Context) {
         }
     }
 
-    private class ByteArrayAudioDataSource(private val bytes: ByteArray) : MediaDataSource() {
-        override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
-            if (position >= bytes.size) return -1
-            val length = minOf(size, bytes.size - position.toInt())
-            bytes.copyInto(buffer, destinationOffset = offset, startIndex = position.toInt(), endIndex = position.toInt() + length)
-            return length
-        }
+    private fun audioAttributes(): AudioAttributes =
+        AudioAttributes.Builder()
+            .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+            .setUsage(C.USAGE_MEDIA)
+            .build()
 
-        override fun getSize(): Long = bytes.size.toLong()
-
-        override fun close() = Unit
-    }
+    private fun platformAudioAttributes(): android.media.AudioAttributes =
+        android.media.AudioAttributes.Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
 
     companion object {
         @Volatile

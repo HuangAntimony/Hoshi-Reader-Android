@@ -6,7 +6,9 @@ class SasayakiAudioRestoreCallbacksCoordinator(
 ) {
     fun build(
         updateMediaSession: () -> Unit,
+        handlePrepared: (Int) -> Unit,
         handleSeekComplete: () -> Unit,
+        handleError: (Throwable) -> Unit,
         startPlayback: () -> Unit,
         pausePlayback: () -> Unit,
         previousCue: () -> Unit,
@@ -14,10 +16,12 @@ class SasayakiAudioRestoreCallbacksCoordinator(
         isPlaying: () -> Boolean,
     ): SasayakiAudioRestoreCallbacks =
         SasayakiAudioRestoreCallbacks(
+            onPrepared = handlePrepared,
             onCompletion = {
                 playbackLifecycle.markCompleted(updateMediaSession = updateMediaSession)
             },
             onSeekComplete = handleSeekComplete,
+            onError = handleError,
             onPlay = startPlayback,
             onPause = pausePlayback,
             onSkipToPrevious = previousCue,

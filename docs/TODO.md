@@ -80,7 +80,7 @@ Status: `in_progress`
 
 - Read dictionary media through the existing dictionary bridge.
 - Keep Sasayaki sidecars iOS-compatible.
-- Treat a future Media3/ExoPlayer migration as a separate behavior-protected slice, not a cleanup mixed into UI changes.
+- Sasayaki audiobook playback and dictionary word audio now use Media3 ExoPlayer; keep future audio work behavior-protected and verify Sasayaki controls, lookup audio, and Anki cue export together.
 
 ### Sync
 
