@@ -6,7 +6,8 @@ plugins {
 
 val rustProjectDir = file("src/main/rust/hoshiepub")
 val uniffiOutDir = layout.buildDirectory.dir("generated/source/uniffi/main/kotlin").get().asFile
-val rustJniLibsDir = layout.buildDirectory.dir("jniLibs").get().asFile
+val rustDebugJniLibsDir = layout.buildDirectory.dir("jniLibs/debug").get().asFile
+val rustReleaseJniLibsDir = layout.buildDirectory.dir("jniLibs/release").get().asFile
 val cargo = System.getenv("HOME") + "/.cargo/bin/cargo"
 val androidNdkHome = System.getenv("ANDROID_NDK_HOME") ?: "/opt/homebrew/share/android-ndk"
 val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
@@ -117,7 +118,8 @@ android {
         }
     }
     sourceSets["main"].java.directories.add(uniffiOutDir.absolutePath)
-    sourceSets["main"].jniLibs.directories.add(rustJniLibsDir.absolutePath)
+    sourceSets["debug"].jniLibs.directories.add(rustDebugJniLibsDir.absolutePath)
+    sourceSets["release"].jniLibs.directories.add(rustReleaseJniLibsDir.absolutePath)
 }
 
 dependencies {
@@ -155,7 +157,15 @@ dependencies {
 
 val buildRustHost by tasks.registering(Exec::class) {
     workingDir = rustProjectDir
-    commandLine(cargo, "build")
+    inputs.files(
+        rustProjectDir.resolve("Cargo.toml"),
+        rustProjectDir.resolve("Cargo.lock"),
+        rustProjectDir.resolve("uniffi.toml"),
+    )
+    inputs.dir(rustProjectDir.resolve("src"))
+    outputs.file(rustProjectDir.resolve("target/debug/libhoshiepub.$hostLibExtension"))
+
+    commandLine(cargo, "build", "--lib")
 }
 
 val generateUniffiKotlin by tasks.registering(Exec::class) {
@@ -164,15 +174,25 @@ val generateUniffiKotlin by tasks.registering(Exec::class) {
 
     val hostLibPath = rustProjectDir.resolve("target/debug/libhoshiepub.$hostLibExtension")
 
+    inputs.file(hostLibPath)
+    inputs.file(rustProjectDir.resolve("uniffi.toml"))
+    inputs.file(rustProjectDir.resolve("Cargo.toml"))
+    inputs.file(rustProjectDir.resolve("Cargo.lock"))
+    outputs.dir(uniffiOutDir)
+
     commandLine(
         cargo,
         "run",
+        "--features",
+        "bindgen",
         "--bin",
         "uniffi-bindgen",
         "--",
         "generate",
         "--library",
         hostLibPath.absolutePath,
+        "--config",
+        rustProjectDir.resolve("uniffi.toml").absolutePath,
         "--language",
         "kotlin",
         "--out-dir",
@@ -184,6 +204,18 @@ val generateUniffiKotlin by tasks.registering(Exec::class) {
 val buildRustAndroidDebug by tasks.registering(Exec::class) {
     workingDir = rustProjectDir
     environment("ANDROID_NDK_HOME", androidNdkHome)
+    inputs.files(
+        rustProjectDir.resolve("Cargo.toml"),
+        rustProjectDir.resolve("Cargo.lock"),
+        rustProjectDir.resolve("uniffi.toml"),
+    )
+    inputs.dir(rustProjectDir.resolve("src"))
+    inputs.property("androidNdkHome", androidNdkHome)
+    outputs.files(
+        rustDebugJniLibsDir.resolve("arm64-v8a/libhoshiepub.so"),
+        rustDebugJniLibsDir.resolve("x86_64/libhoshiepub.so"),
+    )
+
     commandLine(
         cargo,
         "ndk",
@@ -192,7 +224,7 @@ val buildRustAndroidDebug by tasks.registering(Exec::class) {
         "-t",
         "x86_64",
         "-o",
-        rustJniLibsDir.absolutePath,
+        rustDebugJniLibsDir.absolutePath,
         "build",
         "--lib",
     )
@@ -201,13 +233,22 @@ val buildRustAndroidDebug by tasks.registering(Exec::class) {
 val buildRustAndroidRelease by tasks.registering(Exec::class) {
     workingDir = rustProjectDir
     environment("ANDROID_NDK_HOME", androidNdkHome)
+    inputs.files(
+        rustProjectDir.resolve("Cargo.toml"),
+        rustProjectDir.resolve("Cargo.lock"),
+        rustProjectDir.resolve("uniffi.toml"),
+    )
+    inputs.dir(rustProjectDir.resolve("src"))
+    inputs.property("androidNdkHome", androidNdkHome)
+    outputs.file(rustReleaseJniLibsDir.resolve("arm64-v8a/libhoshiepub.so"))
+
     commandLine(
         cargo,
         "ndk",
         "-t",
         "arm64-v8a",
         "-o",
-        rustJniLibsDir.absolutePath,
+        rustReleaseJniLibsDir.absolutePath,
         "build",
         "--lib",
         "--release",

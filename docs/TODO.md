@@ -94,11 +94,12 @@ Status: `todo`
 
 ### Regression Coverage And Release Hardening
 
-Status: `todo`
+Status: `in_progress`
 
 - Add EPUB fixtures for cover, images, vertical text, horizontal text, complex spine, and broken resources.
 - Expand WebView pagination regression checks.
 - Replace brittle source-string tests with behavior tests in areas being refactored; keep source guards only for security, SAF/native/build wiring, or framework constraints that cannot be tested behaviorally.
+- Release build speed is being hardened through cached Gradle/Rust native tasks, a slim release APK workflow, and a separate full test/lint CI gate.
 - Keep release/debug native build behavior stable while architecture refactoring proceeds.
 
 ## Persistent Blockers

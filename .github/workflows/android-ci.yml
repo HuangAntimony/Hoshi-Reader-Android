@@ -1,0 +1,81 @@
+---
+name: Android CI
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-lint:
+    name: Test and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      CMAKE_VERSION: "3.22.1"
+      NDK_VERSION: "27.2.12479018"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Initialize required submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive third_party/hoshidicts-kotlin-bridge
+          git submodule status --recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager \
+            "platforms;android-36.1" \
+            "build-tools;36.0.0" \
+            "cmake;${CMAKE_VERSION}" \
+            "ndk;${NDK_VERSION}"
+          ndk_home="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ndk_home}" >> "${GITHUB_ENV}"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Restore Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src/main/rust/hoshiepub
+
+      - name: Install cargo-ndk
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+
+      - name: Restore Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test, lint, and assemble debug APK
+        shell: bash
+        run: ./gradlew --no-daemon test lint assembleDebug
