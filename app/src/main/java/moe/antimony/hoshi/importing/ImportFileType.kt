@@ -43,7 +43,7 @@ data class ImportFileType(
         val LocalAudioDatabase = ImportFileType(
             description = "audio database",
             extensions = listOf("db"),
-            mimeTypes = arrayOf("application/vnd.sqlite3", "application/x-sqlite3", "application/octet-stream"),
+            mimeTypes = arrayOf("*/*"),
         )
 
         val DictionaryArchive = ImportFileType(

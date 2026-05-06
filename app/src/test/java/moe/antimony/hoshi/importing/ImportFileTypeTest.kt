@@ -7,7 +7,7 @@ import org.junit.Test
 
 class ImportFileTypeTest {
     @Test
-    fun fileTypesExposePickerMimeTypesWithoutAcceptingEverything() {
+    fun regularFileTypesExposePickerMimeTypesWithoutAcceptingEverything() {
         assertEquals(listOf("epub"), ImportFileType.Epub.extensions)
         assertEquals(listOf("srt"), ImportFileType.SasayakiSubtitle.extensions)
         assertEquals(listOf("mp3", "m4b"), ImportFileType.SasayakiAudiobook.extensions)
@@ -19,12 +19,18 @@ class ImportFileTypeTest {
             ImportFileType.Epub,
             ImportFileType.SasayakiSubtitle,
             ImportFileType.SasayakiAudiobook,
-            ImportFileType.LocalAudioDatabase,
             ImportFileType.DictionaryArchive,
             ImportFileType.ReaderFont,
         ).flatMap { it.mimeTypes.toList() }
         assertFalse(allPickerTypes.contains("*/*"))
         assertFalse(ImportFileType.SasayakiAudiobook.mimeTypes.contains("audio/*"))
+    }
+
+    @Test
+    fun localAudioDatabasePickerAllowsVendorFileManagersToShowDbFiles() {
+        assertEquals(arrayOf("*/*").toList(), ImportFileType.LocalAudioDatabase.mimeTypes.toList())
+        assertTrue(ImportFileType.LocalAudioDatabase.matchesDisplayName("android.db"))
+        assertFalse(ImportFileType.LocalAudioDatabase.matchesDisplayName("dictionary.zip"))
     }
 
     @Test
