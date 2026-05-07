@@ -1,16 +1,19 @@
 package moe.antimony.hoshi.features.reader
 
-import android.content.Context
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
 
-abstract class SwipePageTouchListener(context: Context) : View.OnTouchListener {
-    private val detector = GestureDetector(context, GestureListener())
+abstract class SwipePageTouchListener : View.OnTouchListener {
+    private val tracker = ReaderSwipeGestureTracker(minDistance = MIN_DISTANCE)
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
-        detector.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> tracker.onDown(event.x, event.y, event.eventTime)
+            MotionEvent.ACTION_MOVE -> dispatch(tracker.onMove(event.x, event.y, event.eventTime))
+            MotionEvent.ACTION_UP -> dispatch(tracker.onUp(event.x, event.y))
+            MotionEvent.ACTION_CANCEL -> tracker.onCancel()
+        }
         return false
     }
 
@@ -18,31 +21,83 @@ abstract class SwipePageTouchListener(context: Context) : View.OnTouchListener {
     open fun onRightSwipe() = Unit
     open fun onTap(x: Float, y: Float) = Unit
 
-    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(event: MotionEvent): Boolean = true
-
-        override fun onSingleTapUp(event: MotionEvent): Boolean {
-            onTap(event.x, event.y)
-            return true
-        }
-
-        override fun onFling(
-            downEvent: MotionEvent?,
-            moveEvent: MotionEvent,
-            velocityX: Float,
-            velocityY: Float,
-        ): Boolean {
-            val start = downEvent ?: return false
-            val dx = moveEvent.x - start.x
-            if (abs(dx) < MIN_DISTANCE || abs(dx) < abs(moveEvent.y - start.y)) {
-                return false
-            }
-            if (dx < 0) onLeftSwipe() else onRightSwipe()
-            return true
+    private fun dispatch(result: ReaderSwipeGestureTracker.Result) {
+        when (result) {
+            ReaderSwipeGestureTracker.Result.LeftSwipe -> onLeftSwipe()
+            ReaderSwipeGestureTracker.Result.RightSwipe -> onRightSwipe()
+            is ReaderSwipeGestureTracker.Result.Tap -> onTap(result.x, result.y)
+            ReaderSwipeGestureTracker.Result.None -> Unit
         }
     }
 
     private companion object {
         const val MIN_DISTANCE = 72f
+    }
+}
+
+internal class ReaderSwipeGestureTracker(
+    private val minDistance: Float,
+) {
+    private var downX = 0f
+    private var downY = 0f
+    private var downTime = 0L
+    private var hasDown = false
+    private var swipeDispatched = false
+
+    fun onDown(x: Float, y: Float, eventTime: Long) {
+        downX = x
+        downY = y
+        downTime = eventTime
+        hasDown = true
+        swipeDispatched = false
+    }
+
+    fun onMove(x: Float, y: Float, eventTime: Long): Result {
+        if (!hasDown || swipeDispatched) return Result.None
+        val dx = x - downX
+        val dy = y - downY
+        val elapsedMs = (eventTime - downTime).coerceAtLeast(1L)
+        val velocityX = abs(dx) * 1_000f / elapsedMs
+        if (
+            abs(dx) < minDistance ||
+            abs(dx) < abs(dy) * HORIZONTAL_DOMINANCE ||
+            elapsedMs > MAX_EARLY_SWIPE_DURATION_MS ||
+            velocityX < MIN_EARLY_SWIPE_VELOCITY_PX_PER_SECOND
+        ) {
+            return Result.None
+        }
+        swipeDispatched = true
+        return if (dx < 0f) Result.LeftSwipe else Result.RightSwipe
+    }
+
+    fun onUp(x: Float, y: Float): Result {
+        if (!hasDown) return Result.None
+        val dx = x - downX
+        val dy = y - downY
+        val wasSwipeDispatched = swipeDispatched
+        onCancel()
+        return if (!wasSwipeDispatched && abs(dx) < minDistance && abs(dy) < minDistance) {
+            Result.Tap(x, y)
+        } else {
+            Result.None
+        }
+    }
+
+    fun onCancel() {
+        hasDown = false
+        swipeDispatched = false
+    }
+
+    sealed class Result {
+        data object None : Result()
+        data object LeftSwipe : Result()
+        data object RightSwipe : Result()
+        data class Tap(val x: Float, val y: Float) : Result()
+    }
+
+    private companion object {
+        const val HORIZONTAL_DOMINANCE = 1.75f
+        const val MAX_EARLY_SWIPE_DURATION_MS = 300L
+        const val MIN_EARLY_SWIPE_VELOCITY_PX_PER_SECOND = 360f
     }
 }

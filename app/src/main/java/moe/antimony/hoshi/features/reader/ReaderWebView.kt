@@ -968,7 +968,7 @@ private fun ChapterWebView(
                 }
             } else {
                 webView.setOnScrollChangeListener(null)
-                webView.setOnTouchListener(object : SwipePageTouchListener(webView.context) {
+                webView.setOnTouchListener(object : SwipePageTouchListener() {
                     override fun onTap(x: Float, y: Float) {
                         selectAt(x, y)
                     }

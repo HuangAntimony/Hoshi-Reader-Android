@@ -7,7 +7,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
-- Speed up paginated reader page turns by caching chapter page bounds after layout, updating visible progress from memory immediately, debouncing bookmark saves until page turning is idle, skipping no-op selection bridge calls, and avoiding bookshelf refresh invalidations while the reader is open.
+- Speed up paginated reader page turns by caching chapter page bounds after layout, triggering swipe page turns as soon as the gesture crosses the paging threshold, updating visible progress from memory immediately, debouncing bookmark saves until page turning is idle, skipping no-op selection bridge calls, and avoiding bookshelf refresh invalidations while the reader is open.
 
 ## [v0.3.1] - 2026-05-06
 
