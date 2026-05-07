@@ -42,6 +42,23 @@ class ReaderWebViewSourceTest {
     }
 
     @Test
+    fun pagedNavigationUpdatesDisplayedProgressBeforeDebouncedBookmarkSave() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val navigatePage = source.substringAfter("private fun WebView.navigatePage(")
+            .substringBefore("private fun WebView.navigatePageForDirection(")
+        val readerNavigation = source.substringAfter("fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean")
+            .substringBefore("fun pauseSasayakiForLookupIfNeeded()")
+
+        assertTrue(source.contains("fun displayPagedTurnProgress(progress: Double)"))
+        assertTrue(navigatePage.contains("onDisplayedProgress: (progress: Double) -> Unit"))
+        assertTrue(navigatePage.contains("onSaveProgress: (progress: Double) -> Unit"))
+        assertTrue(navigatePage.indexOf("onDisplayedProgress(progress)") < navigatePage.indexOf("postDelayed"))
+        assertTrue(navigatePage.contains("onSaveProgress(progress)"))
+        assertTrue(readerNavigation.contains("::displayPagedTurnProgress"))
+        assertTrue(readerNavigation.contains("::saveDisplayedProgress"))
+    }
+
+    @Test
     fun pageTurnsDoNotClearSelectionBridgeWhenNoLookupPopupIsOpen() {
         val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
         val closeLookup = source.substringAfter("fun closeLookupPopupsAndSelection()")
