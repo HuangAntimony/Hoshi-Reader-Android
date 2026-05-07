@@ -58,9 +58,11 @@ internal class ReaderSwipeGestureTracker(
         val dy = y - downY
         val elapsedMs = (eventTime - downTime).coerceAtLeast(1L)
         val velocityX = abs(dx) * 1_000f / elapsedMs
+        val hasPageDistance = abs(dx) >= minDistance
+        val hasFastFlickDistance = abs(dx) >= MIN_FAST_FLICK_DISTANCE &&
+            velocityX >= MIN_FAST_FLICK_VELOCITY_PX_PER_SECOND
         if (
-            abs(dx) < minDistance ||
-            abs(dx) < abs(dy) * HORIZONTAL_DOMINANCE ||
+            !hasPageDistance && !hasFastFlickDistance ||
             elapsedMs > MAX_EARLY_SWIPE_DURATION_MS ||
             velocityX < MIN_EARLY_SWIPE_VELOCITY_PX_PER_SECOND
         ) {
@@ -96,7 +98,8 @@ internal class ReaderSwipeGestureTracker(
     }
 
     private companion object {
-        const val HORIZONTAL_DOMINANCE = 1.75f
+        const val MIN_FAST_FLICK_DISTANCE = 36f
+        const val MIN_FAST_FLICK_VELOCITY_PX_PER_SECOND = 900f
         const val MAX_EARLY_SWIPE_DURATION_MS = 300L
         const val MIN_EARLY_SWIPE_VELOCITY_PX_PER_SECOND = 360f
     }

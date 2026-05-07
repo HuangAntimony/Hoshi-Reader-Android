@@ -17,6 +17,28 @@ class ReaderSwipeGestureTrackerTest {
     }
 
     @Test
+    fun shortFastHorizontalMoveTriggersBeforePointerUp() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+
+        val result = tracker.onMove(196f, 104f, eventTime = 1_030L)
+
+        assertTrue(result == ReaderSwipeGestureTracker.Result.LeftSwipe)
+    }
+
+    @Test
+    fun tinyFastHorizontalMoveDoesNotTriggerPageSwipe() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+
+        val result = tracker.onMove(220f, 104f, eventTime = 1_010L)
+
+        assertTrue(result == ReaderSwipeGestureTracker.Result.None)
+    }
+
+    @Test
     fun completedSwipeDoesNotTriggerAgainOnLaterMoveOrUp() {
         val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
 
@@ -50,14 +72,14 @@ class ReaderSwipeGestureTrackerTest {
     }
 
     @Test
-    fun diagonalHorizontalDragDoesNotTriggerPageSwipe() {
+    fun horizontalDragPastThresholdCanPageEvenWhenDiagonal() {
         val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
 
         tracker.onDown(240f, 100f, eventTime = 1_000L)
 
         val result = tracker.onMove(150f, 152f, eventTime = 1_120L)
 
-        assertTrue(result == ReaderSwipeGestureTracker.Result.None)
+        assertTrue(result == ReaderSwipeGestureTracker.Result.LeftSwipe)
     }
 
     @Test
