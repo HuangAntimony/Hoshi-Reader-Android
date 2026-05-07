@@ -242,7 +242,9 @@ fun ReaderWebView(
         stateHolder.setLookupPopups(nextPopups, ::resumeSasayakiAfterLookupIfNeeded)
     }
     fun closeLookupPopupsAndSelection() {
-        clearReaderSelection()
+        if (lookupPopups.isNotEmpty()) {
+            clearReaderSelection()
+        }
         setLookupPopups(emptyList())
     }
     fun updateSasayakiSettings(settings: SasayakiSettings) {
@@ -1232,7 +1234,7 @@ private val readerRestoreGenerations = WeakHashMap<WebView, Long>()
 private val readerPageTurnProgressCallbacks = WeakHashMap<WebView, Runnable>()
 private const val MAX_SELECTION_LENGTH = 16
 private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 250L
-private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 120L
+private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 1_000L
 private val ReaderWebViewTopPadding = 44.dp
 private val ReaderWebViewBottomPadding = 56.dp
 

@@ -35,8 +35,20 @@ class ReaderWebViewSourceTest {
             .substringBefore("private fun WebView.navigatePageForDirection(")
 
         assertTrue(source.contains("PAGE_TURN_PROGRESS_SAVE_DELAY_MS"))
+        assertTrue(source.contains("PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 1_000L"))
         assertTrue(navigatePage.contains("postDelayed(progressCallback, PAGE_TURN_PROGRESS_SAVE_DELAY_MS)"))
         assertTrue(navigatePage.contains("ReaderPaginationScripts.progressInvocation()"))
         assertTrue(navigatePage.contains("PAGE_TURN_PROGRESS_SAVE_DELAY_MS"))
+    }
+
+    @Test
+    fun pageTurnsDoNotClearSelectionBridgeWhenNoLookupPopupIsOpen() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val closeLookup = source.substringAfter("fun closeLookupPopupsAndSelection()")
+            .substringBefore("fun updateSasayakiSettings")
+
+        assertTrue(closeLookup.contains("if (lookupPopups.isNotEmpty())"))
+        assertTrue(closeLookup.contains("clearReaderSelection()"))
+        assertTrue(closeLookup.contains("setLookupPopups(emptyList())"))
     }
 }

@@ -7,7 +7,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
-- Speed up paginated reader page turns by caching chapter page bounds after layout, deferring progress saves until after WebView paint, and avoiding bookshelf refresh invalidations while the reader is open.
+- Speed up paginated reader page turns by caching chapter page bounds after layout, debouncing progress saves until page turning is idle, skipping no-op selection bridge calls, and avoiding bookshelf refresh invalidations while the reader is open.
 
 ## [v0.3.1] - 2026-05-06
 
