@@ -97,9 +97,9 @@ class ReaderPaginationScriptsTest {
         val script = ReaderPaginationScripts.shellScript()
 
         assertTrue(script.contains("calculateProgress: function()"))
-        assertTrue(script.contains("var exploredChars = 0"))
-        assertTrue(script.contains("range.selectNodeContents(node)"))
-        assertTrue(script.contains("return totalChars > 0 ? exploredChars / totalChars : 0"))
+        assertTrue(script.contains("totalChars: totalChars"))
+        assertTrue(script.contains("progressStops: progressStops"))
+        assertTrue(script.contains("return exploredChars / metrics.totalChars"))
     }
 
     @Test
@@ -163,14 +163,41 @@ class ReaderPaginationScriptsTest {
 
         assertTrue(script.contains("contentLastPageScroll: function(context)"))
         assertTrue(script.contains("contentFirstPageScroll: function(context)"))
+        assertTrue(script.contains("buildPaginationMetrics: function()"))
         assertTrue(script.contains("alignContentStartToPage: function(context, offset)"))
         assertTrue(script.contains("Math.abs(safeOffset - nearestPage) < 1"))
-        assertTrue(script.contains("var edge = (context.vertical ? rect.bottom : rect.right) + currentScroll"))
-        assertTrue(script.contains("var edge = (context.vertical ? rect.top : rect.left) + currentScroll"))
-        assertTrue(script.contains("var mediaEdge = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll"))
-        assertTrue(script.contains("var mediaEdge = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll"))
-        assertTrue(script.contains("var minAlignedScroll = this.contentFirstPageScroll(context)"))
-        assertTrue(script.contains("var maxAlignedScroll = this.contentLastPageScroll(context)"))
+        assertTrue(script.contains("var startEdge = (context.vertical ? rect.top : rect.left) + currentScroll"))
+        assertTrue(script.contains("var endEdge = (context.vertical ? rect.bottom : rect.right) + currentScroll"))
+        assertTrue(script.contains("var mediaStart = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll"))
+        assertTrue(script.contains("var mediaEnd = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll"))
+        assertTrue(script.contains("var minScroll = firstContentEdge === null ? 0"))
+        assertTrue(script.contains("var maxScroll = Math.min(maxAlignedScroll, lastContentScroll)"))
+    }
+
+    @Test
+    fun pagedNavigationUsesCachedContentBoundsInsteadOfScanningDomEveryTurn() {
+        val script = ReaderPaginationScripts.shellScript()
+        val paginate = script.substringAfter("paginate: function(direction)")
+            .substringBefore("window.hoshiReader.initialize")
+
+        assertTrue(script.contains("buildPaginationMetrics: function()"))
+        assertTrue(script.contains("paginationMetrics: null"))
+        assertTrue(paginate.contains("var metrics = this.paginationMetrics || this.buildPaginationMetrics()"))
+        assertFalse(paginate.contains("this.contentFirstPageScroll(context)"))
+        assertFalse(paginate.contains("this.contentLastPageScroll(context)"))
+    }
+
+    @Test
+    fun pagedProgressUsesCachedTextOffsetsInsteadOfScanningDomEveryTurn() {
+        val script = ReaderPaginationScripts.shellScript()
+        val calculateProgress = script.substringAfter("calculateProgress: function()")
+            .substringBefore("restoreProgress: async function(progress)")
+
+        assertTrue(script.contains("progressStops"))
+        assertTrue(calculateProgress.contains("var metrics = this.paginationMetrics || this.buildPaginationMetrics()"))
+        assertTrue(calculateProgress.contains("metrics.progressStops"))
+        assertFalse(calculateProgress.contains("this.createWalker()"))
+        assertFalse(calculateProgress.contains("range.selectNodeContents(node)"))
     }
 
     @Test

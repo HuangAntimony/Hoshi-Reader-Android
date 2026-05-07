@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Speed up paginated reader page turns by caching chapter page bounds and progress offsets after layout instead of recalculating them across the full chapter on every swipe.
+
 ## [v0.3.1] - 2026-05-06
 
 ### Changed

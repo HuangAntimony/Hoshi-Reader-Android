@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-06
+Last updated: 2026-05-07
 
 This file is the short operational handoff for future agents.
 
@@ -41,6 +41,7 @@ Status: `in_progress`
 
 - Paginated swipe direction now follows iOS per text orientation: horizontal left-swipe advances, vertical right-swipe advances.
 - Reader Appearance now allows font size increases up to 60.
+- Paginated reader page turns now cache chapter page bounds and progress offsets after layout instead of scanning the full WebView DOM on every page turn.
 - Continuous scroll mode is implemented behind Appearance -> Layout -> Mode; keep paginated and continuous reader validation in scope for future reader changes, including forward chapter-boundary landings at the chapter start, Android visual-state-gated chapter jumps, and stable progress counters during rapid boundary flips.
 - Wire remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
 - Re-run diagonal popup swipe validation when a reliable Reader or nested Dictionary popup state is available.

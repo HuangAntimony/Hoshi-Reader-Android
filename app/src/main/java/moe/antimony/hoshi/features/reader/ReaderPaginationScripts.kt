@@ -54,6 +54,7 @@ internal object ReaderPaginationScripts {
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
           nodeStartOffsets: new WeakMap(),
+          paginationMetrics: null,
           isVertical: function() {
             return window.getComputedStyle(document.body).writingMode === "vertical-rl";
           },
@@ -95,6 +96,7 @@ internal object ReaderPaginationScripts {
               count += this.countChars(node.textContent);
             }
             this.nodeStartOffsets = offsets;
+            this.paginationMetrics = null;
           },
           collectSasayakiCueRanges: function(cues) {
             var cueRanges = new Map();
@@ -309,86 +311,96 @@ internal object ReaderPaginationScripts {
             return true;
           },
           contentLastPageScroll: function(context) {
-            var currentScroll = this.getPagePosition(context);
-            var lastContentEdge = 0;
-            var walker = this.createWalker();
-            var node;
-            while (node = walker.nextNode()) {
-              if (this.countChars(node.textContent) <= 0) continue;
-              var range = document.createRange();
-              range.selectNodeContents(node);
-              var rects = range.getClientRects();
-              for (var i = 0; i < rects.length; i++) {
-                var rect = rects[i];
-                if (rect.width <= 0 || rect.height <= 0) continue;
-                var edge = (context.vertical ? rect.bottom : rect.right) + currentScroll;
-                lastContentEdge = Math.max(lastContentEdge, edge);
-              }
-            }
-
-            var media = document.querySelectorAll('img, svg, image, video, canvas');
-            for (var j = 0; j < media.length; j++) {
-              var mediaRect = media[j].getBoundingClientRect();
-              if (mediaRect.width <= 0 || mediaRect.height <= 0) continue;
-              var mediaEdge = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll;
-              lastContentEdge = Math.max(lastContentEdge, mediaEdge);
-            }
-
-            if (lastContentEdge <= 0) return 0;
-            var lastContentScroll = Math.floor(Math.max(0, lastContentEdge - 1) / context.pageSize) * context.pageSize;
-            var maxAlignedScroll = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
-            return Math.min(maxAlignedScroll, lastContentScroll);
+            var metrics = this.paginationMetrics || this.buildPaginationMetrics();
+            return metrics.maxScroll;
           },
           contentFirstPageScroll: function(context) {
-            var currentScroll = this.getPagePosition(context);
-            var firstContentEdge = null;
-            var walker = this.createWalker();
-            var node;
-            while (node = walker.nextNode()) {
-              if (this.countChars(node.textContent) <= 0) continue;
-              var range = document.createRange();
-              range.selectNodeContents(node);
-              var rects = range.getClientRects();
-              for (var i = 0; i < rects.length; i++) {
-                var rect = rects[i];
-                if (rect.width <= 0 || rect.height <= 0) continue;
-                var edge = (context.vertical ? rect.top : rect.left) + currentScroll;
-                firstContentEdge = firstContentEdge === null ? edge : Math.min(firstContentEdge, edge);
-              }
-            }
-
-            var media = document.querySelectorAll('img, svg, image, video, canvas');
-            for (var j = 0; j < media.length; j++) {
-              var mediaRect = media[j].getBoundingClientRect();
-              if (mediaRect.width <= 0 || mediaRect.height <= 0) continue;
-              var mediaEdge = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll;
-              firstContentEdge = firstContentEdge === null ? mediaEdge : Math.min(firstContentEdge, mediaEdge);
-            }
-
-            if (firstContentEdge === null) return 0;
-            var maxAlignedScroll = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
-            var firstContentScroll = this.alignContentStartToPage(context, firstContentEdge);
-            return Math.min(maxAlignedScroll, firstContentScroll);
+            var metrics = this.paginationMetrics || this.buildPaginationMetrics();
+            return metrics.minScroll;
           },
-          calculateProgress: function() {
-            var vertical = this.isVertical();
-            var walker = this.createWalker();
-            var totalChars = 0;
+          buildPaginationMetrics: function() {
+            var context = this.getScrollContext();
+            var currentScroll = this.getPagePosition(context);
+            var maxAlignedScroll = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
+            if (context.pageSize <= 0) {
+              var emptyMetrics = { minScroll: 0, maxScroll: 0, totalChars: 0, progressStops: [] };
+              this.paginationMetrics = emptyMetrics;
+              return emptyMetrics;
+            }
+            var lastContentEdge = 0;
+            var firstContentEdge = null;
+            var progressStops = [];
             var exploredChars = 0;
+            var totalChars = 0;
+            var walker = this.createWalker();
             var node;
             while (node = walker.nextNode()) {
               var nodeLen = this.countChars(node.textContent);
               totalChars += nodeLen;
-              if (nodeLen > 0) {
-                var range = document.createRange();
-                range.selectNodeContents(node);
-                var rect = this.getRect(range);
-                if ((vertical ? rect.top : rect.left) < 0) {
-                  exploredChars += nodeLen;
-                }
+              if (nodeLen <= 0) continue;
+              var range = document.createRange();
+              range.selectNodeContents(node);
+              var rects = range.getClientRects();
+              var progressRect = this.getRect(range);
+              var nodeStartEdge = progressRect && progressRect.width > 0 && progressRect.height > 0
+                ? (context.vertical ? progressRect.top : progressRect.left) + currentScroll
+                : null;
+              for (var i = 0; i < rects.length; i++) {
+                var rect = rects[i];
+                if (rect.width <= 0 || rect.height <= 0) continue;
+                var startEdge = (context.vertical ? rect.top : rect.left) + currentScroll;
+                var endEdge = (context.vertical ? rect.bottom : rect.right) + currentScroll;
+                firstContentEdge = firstContentEdge === null ? startEdge : Math.min(firstContentEdge, startEdge);
+                lastContentEdge = Math.max(lastContentEdge, endEdge);
+              }
+              if (nodeStartEdge !== null) {
+                progressStops.push({ scroll: nodeStartEdge, exploredChars: exploredChars + nodeLen });
+              }
+              exploredChars += nodeLen;
+            }
+
+            var media = document.querySelectorAll('img, svg, image, video, canvas');
+            for (var j = 0; j < media.length; j++) {
+              var mediaRect = media[j].getBoundingClientRect();
+              if (mediaRect.width <= 0 || mediaRect.height <= 0) continue;
+              var mediaStart = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll;
+              var mediaEnd = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll;
+              firstContentEdge = firstContentEdge === null ? mediaStart : Math.min(firstContentEdge, mediaStart);
+              lastContentEdge = Math.max(lastContentEdge, mediaEnd);
+            }
+
+            var minScroll = firstContentEdge === null ? 0 : Math.min(maxAlignedScroll, this.alignContentStartToPage(context, firstContentEdge));
+            var lastContentScroll = lastContentEdge <= 0 ? 0 : Math.floor(Math.max(0, lastContentEdge - 1) / context.pageSize) * context.pageSize;
+            var maxScroll = Math.min(maxAlignedScroll, lastContentScroll);
+            progressStops.sort(function(a, b) { return a.scroll - b.scroll; });
+            var metrics = {
+              minScroll: minScroll,
+              maxScroll: maxScroll,
+              totalChars: totalChars,
+              progressStops: progressStops
+            };
+            this.paginationMetrics = metrics;
+            return metrics;
+          },
+          calculateProgress: function() {
+            var metrics = this.paginationMetrics || this.buildPaginationMetrics();
+            if (metrics.totalChars <= 0) return 0;
+            var context = this.getScrollContext();
+            var currentScroll = this.getPagePosition(context);
+            var stops = metrics.progressStops;
+            var low = 0;
+            var high = stops.length - 1;
+            var exploredChars = 0;
+            while (low <= high) {
+              var mid = Math.floor((low + high) / 2);
+              if (stops[mid].scroll < currentScroll) {
+                exploredChars = stops[mid].exploredChars;
+                low = mid + 1;
+              } else {
+                high = mid - 1;
               }
             }
-            return totalChars > 0 ? exploredChars / totalChars : 0;
+            return exploredChars / metrics.totalChars;
           },
           restoreProgress: async function(progress) {
             await document.fonts.ready;
@@ -476,8 +488,9 @@ internal object ReaderPaginationScripts {
             var context = this.getScrollContext();
             if (context.pageSize <= 0) return "limit";
             var currentScroll = this.getPagePosition(context);
-            var minAlignedScroll = this.contentFirstPageScroll(context);
-            var maxAlignedScroll = this.contentLastPageScroll(context);
+            var metrics = this.paginationMetrics || this.buildPaginationMetrics();
+            var minAlignedScroll = metrics.minScroll;
+            var maxAlignedScroll = metrics.maxScroll;
             if (direction === "forward") {
               if ((currentScroll + context.pageSize) <= (maxAlignedScroll + 1)) {
                 var targetForward = Math.round((currentScroll + context.pageSize) / context.pageSize) * context.pageSize;
