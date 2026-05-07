@@ -52,11 +52,16 @@ function toKebabCase(str) {
 }
 
 // https://github.com/yomidevs/yomitan/blob/c0abb9e98a15aeb6b6f8f6e2d91fe5e54240b54a/ext/js/language/ja/japanese.js#L332
-function isStringPartiallyJapanese(text) {
-    if (!text) {
+function isStringPartiallyJapanese(str) {
+    if (!str) {
         return false;
     }
-    return KANA_PATTERN.test(text) || KANJI_PATTERN.test(text);
+    for (const c of str) {
+        if (window.hoshiSelection?.isCodePointJapanese(c.codePointAt(0))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // https://github.com/yomidevs/yomitan/blob/c0abb9e98a15aeb6b6f8f6e2d91fe5e54240b54a/ext/js/language/zh/chinese.js#L54
@@ -674,6 +679,14 @@ function createDefinitionImage(data, dictionary, exporting = false) {
                     const imageWidth = Math.min(img.naturalWidth, window.innerWidth - 20);
                     imageContainer.style.width = `${imageWidth}px`;
                     aspectRatioSizer.style.paddingTop = `${(img.naturalHeight / img.naturalWidth) * 100}%`;
+                    applyDictionaryImageContainerFixes(imageContainer);
+                }, {once: true});
+            } else if (!hasPreferredWidth && !hasPreferredHeight && sizeUnits === 'em') {
+                img.addEventListener('load', () => {
+                    const aspectRatio = img.naturalHeight / img.naturalWidth;
+                    const widthEm = typeof data.width === 'number' ? data.width : data.height / aspectRatio;
+                    imageContainer.style.width = `${widthEm}em`;
+                    aspectRatioSizer.style.paddingTop = `${aspectRatio * 100}%`;
                     applyDictionaryImageContainerFixes(imageContainer);
                 }, {once: true});
             }
@@ -1319,9 +1332,9 @@ function createEntryHeader(entry, idx) {
 
 function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     const details = el('details', { className: 'glossary-group' });
-    if (!window.collapseDictionaries || isFirst) {
-        details.open = true;
-    }
+    const collapsed = window.collapseMode === 'Collapse All'
+        || (window.collapseMode === 'Custom' && window.collapsedDictionaries.includes(dictName));
+    details.open = !collapsed || (window.expandFirstDictionary && isFirst);
 
     const summary = el('summary', { className: 'dict-label' });
     summary.appendChild(el('span', { className: 'dict-name', textContent: dictName }));
@@ -1451,6 +1464,9 @@ function redirect(count) {
     window.renderPopup();
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = 0;
+        requestAnimationFrame(() => {
+            document.scrollingElement.scrollTop = 0;
+        });
     });
 }
 
@@ -1505,11 +1521,18 @@ window.renderPopup = function() {
 
     (async () => {
         for (let idx = 0; idx < window.entryCount; idx++) {
-            const entry = window.lookupEntries?.[idx] ?? await webkit.messageHandlers.getEntry.postMessage(idx);
-            if (!entry) continue;
-
             window.lookupEntries ??= [];
-            window.lookupEntries[idx] = entry;
+            if (!window.lookupEntries[idx]) {
+                const entries = await webkit.messageHandlers.getEntries.postMessage({
+                    start: idx,
+                    count: Math.min(4, window.entryCount - idx)
+                });
+                entries.forEach((entry, offset) => {
+                    window.lookupEntries[idx + offset] = entry;
+                });
+            }
+            const entry = window.lookupEntries[idx];
+            if (!entry) continue;
 
             if (idx > 0) {
                 container.appendChild(document.createElement('hr'));
@@ -1533,7 +1556,6 @@ window.renderPopup = function() {
             }
 
             container.appendChild(entryDiv);
-            await new Promise(r => requestAnimationFrame(r));
 
             const grouped = {};
             entry.glossaries.forEach(g => {
@@ -1547,6 +1569,9 @@ window.renderPopup = function() {
             const dictNames = Object.keys(grouped);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
                 entryDiv.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
+            }
+
+            if (idx === 0 || (idx + 1) % 4 === 0) {
                 await new Promise(r => requestAnimationFrame(r));
             }
         }
@@ -1613,6 +1638,9 @@ window.renderPopup = function() {
     container.clickAttached = true;
     container.addEventListener('click', (e) => {
         const target = e.target?.nodeType === Node.TEXT_NODE ? e.target.parentElement : e.target;
+        if (target?.closest('summary')) {
+            return;
+        }
         if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
             webkit.messageHandlers.tapOutside.postMessage(null);
             return;

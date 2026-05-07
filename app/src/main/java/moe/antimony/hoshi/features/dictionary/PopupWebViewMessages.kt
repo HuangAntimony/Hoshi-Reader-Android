@@ -143,8 +143,15 @@ internal class PopupWebViewBridge(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     @JavascriptInterface
-    fun getEntry(index: Int): String? =
-        lookupResultsHolder.results.getOrNull(index)?.let { LookupPopupHtml.entryJsonString(it) }
+    fun getEntries(start: Int, count: Int): String {
+        val safeStart = start.coerceAtLeast(0)
+        val safeCount = count.coerceAtLeast(0)
+        return lookupResultsHolder.results
+            .asSequence()
+            .drop(safeStart)
+            .take(safeCount)
+            .joinToString(prefix = "[", postfix = "]") { LookupPopupHtml.entryJsonString(it) }
+    }
 
     @JavascriptInterface
     fun lookupRedirect(query: String): Int {

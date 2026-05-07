@@ -31,9 +31,12 @@ class DictionarySettingsRepositoryTest {
         val legacy = FakeLegacyDictionarySettingsSource(
             DictionarySettings(
                 dictionaryTabDefault = true,
+                scanNonJapaneseText = false,
                 maxResults = 100,
                 scanLength = 0,
-                collapseDictionaries = true,
+                collapseMode = DictionaryCollapseMode.CollapseAll,
+                expandFirstDictionary = true,
+                collapsedDictionaries = setOf("JMdict"),
                 compactGlossaries = false,
                 showExpressionTags = true,
                 harmonicFrequency = true,
@@ -47,9 +50,12 @@ class DictionarySettingsRepositoryTest {
             val migrated = repository.settings.first()
 
             assertTrue(migrated.dictionaryTabDefault)
+            assertFalse(migrated.scanNonJapaneseText)
             assertEquals(50, migrated.maxResults)
             assertEquals(1, migrated.scanLength)
-            assertTrue(migrated.collapseDictionaries)
+            assertEquals(DictionaryCollapseMode.CollapseAll, migrated.collapseMode)
+            assertTrue(migrated.expandFirstDictionary)
+            assertEquals(setOf("JMdict"), migrated.collapsedDictionaries)
             assertFalse(migrated.compactGlossaries)
             assertTrue(migrated.showExpressionTags)
             assertTrue(migrated.harmonicFrequency)
@@ -69,9 +75,12 @@ class DictionarySettingsRepositoryTest {
             repository.update {
                 it.copy(
                     dictionaryTabDefault = true,
+                    scanNonJapaneseText = false,
                     maxResults = 0,
                     scanLength = 100,
-                    collapseDictionaries = true,
+                    collapseMode = DictionaryCollapseMode.Custom,
+                    expandFirstDictionary = true,
+                    collapsedDictionaries = setOf("JMdict"),
                     compactGlossaries = false,
                     showExpressionTags = true,
                     harmonicFrequency = true,
@@ -84,9 +93,12 @@ class DictionarySettingsRepositoryTest {
             val saved = repository.settings.first()
 
             assertTrue(saved.dictionaryTabDefault)
+            assertFalse(saved.scanNonJapaneseText)
             assertEquals(1, saved.maxResults)
             assertEquals(64, saved.scanLength)
-            assertTrue(saved.collapseDictionaries)
+            assertEquals(DictionaryCollapseMode.Custom, saved.collapseMode)
+            assertTrue(saved.expandFirstDictionary)
+            assertEquals(setOf("JMdict"), saved.collapsedDictionaries)
             assertFalse(saved.compactGlossaries)
             assertTrue(saved.showExpressionTags)
             assertTrue(saved.harmonicFrequency)

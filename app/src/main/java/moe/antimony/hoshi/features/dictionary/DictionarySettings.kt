@@ -8,16 +8,32 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
+enum class DictionaryCollapseMode(val rawValue: String) {
+    ExpandAll("Expand All"),
+    CollapseAll("Collapse All"),
+    Custom("Custom"),
+    ;
+
+    companion object {
+        fun fromRawValue(value: String?): DictionaryCollapseMode? =
+            entries.firstOrNull { it.rawValue == value }
+    }
+}
+
 data class DictionarySettings(
     val dictionaryTabDefault: Boolean = false,
+    val scanNonJapaneseText: Boolean = true,
     val maxResults: Int = 16,
     val scanLength: Int = 16,
-    val collapseDictionaries: Boolean = false,
+    val collapseMode: DictionaryCollapseMode = DictionaryCollapseMode.ExpandAll,
+    val expandFirstDictionary: Boolean = false,
+    val collapsedDictionaries: Set<String> = emptySet(),
     val compactGlossaries: Boolean = true,
     val showExpressionTags: Boolean = false,
     val harmonicFrequency: Boolean = false,
@@ -47,9 +63,21 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
 
     override fun load(): DictionarySettings = DictionarySettings(
         dictionaryTabDefault = preferences.getBoolean(KEY_DICTIONARY_TAB_DEFAULT, false),
+        scanNonJapaneseText = preferences.getBoolean(KEY_SCAN_NON_JAPANESE_TEXT, true),
         maxResults = preferences.getInt(KEY_MAX_RESULTS, 16),
         scanLength = preferences.getInt(KEY_SCAN_LENGTH, 16),
-        collapseDictionaries = preferences.getBoolean(KEY_COLLAPSE_DICTIONARIES, false),
+        collapseMode = DictionaryCollapseMode.fromRawValue(preferences.getString(KEY_COLLAPSE_MODE, null))
+            ?: if (preferences.getBoolean(KEY_COLLAPSE_DICTIONARIES, false)) {
+                DictionaryCollapseMode.CollapseAll
+            } else {
+                DictionaryCollapseMode.ExpandAll
+            },
+        expandFirstDictionary = if (preferences.contains(KEY_EXPAND_FIRST_DICTIONARY)) {
+            preferences.getBoolean(KEY_EXPAND_FIRST_DICTIONARY, false)
+        } else {
+            preferences.getBoolean(KEY_COLLAPSE_DICTIONARIES, false)
+        },
+        collapsedDictionaries = preferences.getStringSet(KEY_COLLAPSED_DICTIONARIES, emptySet()).orEmpty(),
         compactGlossaries = preferences.getBoolean(KEY_COMPACT_GLOSSARIES, true),
         showExpressionTags = preferences.getBoolean(KEY_SHOW_EXPRESSION_TAGS, false),
         harmonicFrequency = preferences.getBoolean(KEY_HARMONIC_FREQUENCY, false),
@@ -62,9 +90,12 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
         val normalized = settings.normalized()
         preferences.edit()
             .putBoolean(KEY_DICTIONARY_TAB_DEFAULT, normalized.dictionaryTabDefault)
+            .putBoolean(KEY_SCAN_NON_JAPANESE_TEXT, normalized.scanNonJapaneseText)
             .putInt(KEY_MAX_RESULTS, normalized.maxResults)
             .putInt(KEY_SCAN_LENGTH, normalized.scanLength)
-            .putBoolean(KEY_COLLAPSE_DICTIONARIES, normalized.collapseDictionaries)
+            .putString(KEY_COLLAPSE_MODE, normalized.collapseMode.rawValue)
+            .putBoolean(KEY_EXPAND_FIRST_DICTIONARY, normalized.expandFirstDictionary)
+            .putStringSet(KEY_COLLAPSED_DICTIONARIES, normalized.collapsedDictionaries)
             .putBoolean(KEY_COMPACT_GLOSSARIES, normalized.compactGlossaries)
             .putBoolean(KEY_SHOW_EXPRESSION_TAGS, normalized.showExpressionTags)
             .putBoolean(KEY_HARMONIC_FREQUENCY, normalized.harmonicFrequency)
@@ -76,9 +107,13 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
 
     private companion object {
         const val KEY_DICTIONARY_TAB_DEFAULT = "dictionaryTabDefault"
+        const val KEY_SCAN_NON_JAPANESE_TEXT = "scanNonJapaneseText"
         const val KEY_MAX_RESULTS = "maxResults"
         const val KEY_SCAN_LENGTH = "scanLength"
         const val KEY_COLLAPSE_DICTIONARIES = "collapseDictionaries"
+        const val KEY_COLLAPSE_MODE = "collapseMode"
+        const val KEY_EXPAND_FIRST_DICTIONARY = "expandFirstDictionary"
+        const val KEY_COLLAPSED_DICTIONARIES = "collapsedDictionaries"
         const val KEY_COMPACT_GLOSSARIES = "compactGlossaries"
         const val KEY_SHOW_EXPRESSION_TAGS = "showExpressionTags"
         const val KEY_HARMONIC_FREQUENCY = "harmonicFrequency"
@@ -121,12 +156,21 @@ class DictionarySettingsRepository(
         }
     }
 
-    private fun Preferences.toDictionarySettings(): DictionarySettings =
-        DictionarySettings(
+    private fun Preferences.toDictionarySettings(): DictionarySettings {
+        val legacyCollapseDictionaries = this[KEY_COLLAPSE_DICTIONARIES]
+        return DictionarySettings(
             dictionaryTabDefault = this[KEY_DICTIONARY_TAB_DEFAULT] ?: false,
+            scanNonJapaneseText = this[KEY_SCAN_NON_JAPANESE_TEXT] ?: true,
             maxResults = this[KEY_MAX_RESULTS] ?: 16,
             scanLength = this[KEY_SCAN_LENGTH] ?: 16,
-            collapseDictionaries = this[KEY_COLLAPSE_DICTIONARIES] ?: false,
+            collapseMode = DictionaryCollapseMode.fromRawValue(this[KEY_COLLAPSE_MODE])
+                ?: if (legacyCollapseDictionaries == true) {
+                    DictionaryCollapseMode.CollapseAll
+                } else {
+                    DictionaryCollapseMode.ExpandAll
+                },
+            expandFirstDictionary = this[KEY_EXPAND_FIRST_DICTIONARY] ?: (legacyCollapseDictionaries == true),
+            collapsedDictionaries = this[KEY_COLLAPSED_DICTIONARIES].orEmpty(),
             compactGlossaries = this[KEY_COMPACT_GLOSSARIES] ?: true,
             showExpressionTags = this[KEY_SHOW_EXPRESSION_TAGS] ?: false,
             harmonicFrequency = this[KEY_HARMONIC_FREQUENCY] ?: false,
@@ -134,13 +178,17 @@ class DictionarySettingsRepository(
             compactPitchAccents = this[KEY_COMPACT_PITCH_ACCENTS] ?: true,
             customCSS = this[KEY_CUSTOM_CSS].orEmpty(),
         ).normalized()
+    }
 
     private fun MutablePreferences.writeDictionarySettings(settings: DictionarySettings) {
         val normalized = settings.normalized()
         this[KEY_DICTIONARY_TAB_DEFAULT] = normalized.dictionaryTabDefault
+        this[KEY_SCAN_NON_JAPANESE_TEXT] = normalized.scanNonJapaneseText
         this[KEY_MAX_RESULTS] = normalized.maxResults
         this[KEY_SCAN_LENGTH] = normalized.scanLength
-        this[KEY_COLLAPSE_DICTIONARIES] = normalized.collapseDictionaries
+        this[KEY_COLLAPSE_MODE] = normalized.collapseMode.rawValue
+        this[KEY_EXPAND_FIRST_DICTIONARY] = normalized.expandFirstDictionary
+        this[KEY_COLLAPSED_DICTIONARIES] = normalized.collapsedDictionaries
         this[KEY_COMPACT_GLOSSARIES] = normalized.compactGlossaries
         this[KEY_SHOW_EXPRESSION_TAGS] = normalized.showExpressionTags
         this[KEY_HARMONIC_FREQUENCY] = normalized.harmonicFrequency
@@ -155,9 +203,13 @@ class DictionarySettingsRepository(
         private val KEY_MIGRATED_FROM_SHARED_PREFERENCES =
             booleanPreferencesKey("dictionarySettingsMigratedFromSharedPreferences")
         private val KEY_DICTIONARY_TAB_DEFAULT = booleanPreferencesKey("dictionaryTabDefault")
+        private val KEY_SCAN_NON_JAPANESE_TEXT = booleanPreferencesKey("scanNonJapaneseText")
         private val KEY_MAX_RESULTS = intPreferencesKey("maxResults")
         private val KEY_SCAN_LENGTH = intPreferencesKey("scanLength")
         private val KEY_COLLAPSE_DICTIONARIES = booleanPreferencesKey("collapseDictionaries")
+        private val KEY_COLLAPSE_MODE = stringPreferencesKey("collapseMode")
+        private val KEY_EXPAND_FIRST_DICTIONARY = booleanPreferencesKey("expandFirstDictionary")
+        private val KEY_COLLAPSED_DICTIONARIES = stringSetPreferencesKey("collapsedDictionaries")
         private val KEY_COMPACT_GLOSSARIES = booleanPreferencesKey("compactGlossaries")
         private val KEY_SHOW_EXPRESSION_TAGS = booleanPreferencesKey("showExpressionTags")
         private val KEY_HARMONIC_FREQUENCY = booleanPreferencesKey("harmonicFrequency")

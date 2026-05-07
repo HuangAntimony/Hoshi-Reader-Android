@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
@@ -298,6 +299,7 @@ fun DictionaryView(
         DictionaryDestination.Settings -> {
             DictionarySettingsView(
                 settings = uiState.settings,
+                termDictionaries = uiState.dictionaries[DictionaryType.Term].orEmpty(),
                 onSettingsChange = dictionaryViewModel::updateSettings,
                 onClose = { destination = null },
                 modifier = modifier,
@@ -766,10 +768,30 @@ private fun GroupDivider() {
 @Composable
 private fun DictionarySettingsView(
     settings: DictionarySettings,
+    termDictionaries: List<DictionaryInfo>,
     onSettingsChange: ((DictionarySettings) -> DictionarySettings) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showCollapsedDictionaries by remember { mutableStateOf(false) }
+    if (showCollapsedDictionaries) {
+        CollapsedDictionariesView(
+            dictionaries = termDictionaries,
+            collapsedDictionaries = settings.collapsedDictionaries,
+            onToggleDictionary = { title ->
+                onSettingsChange { current ->
+                    val collapsed = current.collapsedDictionaries.toMutableSet()
+                    if (!collapsed.add(title)) {
+                        collapsed.remove(title)
+                    }
+                    current.copy(collapsedDictionaries = collapsed)
+                }
+            },
+            onClose = { showCollapsedDictionaries = false },
+            modifier = modifier,
+        )
+        return
+    }
     BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
     Scaffold(
@@ -798,6 +820,10 @@ private fun DictionarySettingsView(
             item {
                 SectionLabel("Lookup")
                 SettingsGroup {
+                    ToggleRow("Scan Non-Japanese Text", settings.scanNonJapaneseText) {
+                        onSettingsChange { current -> current.copy(scanNonJapaneseText = it) }
+                    }
+                    GroupDivider()
                     StepperRow(
                         title = "Max Results",
                         value = settings.maxResults,
@@ -824,12 +850,51 @@ private fun DictionarySettingsView(
                         canIncrease = settings.scanLength < DictionarySettings.MAX_SCAN_LENGTH,
                     )
                 }
+                SectionLabel("Collapse Dictionaries")
+                SettingsGroup {
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text("Mode") },
+                        supportingContent = {
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                DictionaryCollapseMode.entries.forEachIndexed { index, mode ->
+                                    SegmentedButton(
+                                        selected = settings.collapseMode == mode,
+                                        onClick = { onSettingsChange { current -> current.copy(collapseMode = mode) } },
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = index,
+                                            count = DictionaryCollapseMode.entries.size,
+                                        ),
+                                    ) {
+                                        Text(mode.rawValue)
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    if (settings.collapseMode != DictionaryCollapseMode.ExpandAll) {
+                        GroupDivider()
+                        ToggleRow("Expand First Dictionary", settings.expandFirstDictionary) {
+                            onSettingsChange { current -> current.copy(expandFirstDictionary = it) }
+                        }
+                    }
+                    if (settings.collapseMode == DictionaryCollapseMode.Custom) {
+                        GroupDivider()
+                        ListItem(
+                            modifier = Modifier.clickable { showCollapsedDictionaries = true },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Configure") },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                    }
+                }
                 SectionLabel("Behaviour")
                 SettingsGroup {
-                    ToggleRow("Auto-collapse Dictionaries", settings.collapseDictionaries) {
-                        onSettingsChange { current -> current.copy(collapseDictionaries = it) }
-                    }
-                    GroupDivider()
                     ToggleRow("Compact Glossaries", settings.compactGlossaries) {
                         onSettingsChange { current -> current.copy(compactGlossaries = it) }
                     }
@@ -849,6 +914,67 @@ private fun DictionarySettingsView(
                     ToggleRow("Compact Pitch Accents", settings.compactPitchAccents) {
                         onSettingsChange { current -> current.copy(compactPitchAccents = it) }
                     }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollapsedDictionariesView(
+    dictionaries: List<DictionaryInfo>,
+    collapsedDictionaries: Set<String>,
+    onToggleDictionary: (String) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClose)
+    val colorScheme = MaterialTheme.colorScheme
+    SettingsDetailScaffold(
+        title = "Collapse Dictionaries",
+        onClose = onClose,
+        modifier = modifier.fillMaxSize(),
+        containerColor = colorScheme.background,
+        contentColor = colorScheme.onBackground,
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp),
+        ) {
+            if (dictionaries.isEmpty()) {
+                item {
+                    Text(
+                        text = "No term dictionaries",
+                        color = colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            } else {
+                items(dictionaries, key = { it.path.name }) { dictionary ->
+                    val title = dictionary.index.title
+                    ListItem(
+                        modifier = Modifier.clickable { onToggleDictionary(title) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = {
+                            Text(
+                                text = title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        trailingContent = {
+                            Text(
+                                text = if (collapsedDictionaries.contains(title)) "Collapsed" else "Expanded",
+                                color = colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                    )
+                    GroupDivider()
                 }
             }
         }

@@ -473,6 +473,7 @@ fun ReaderWebView(
                     val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
                     onSaveBookmark(savedPosition.index, savedPosition.progress)
                 },
+                scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
                 readerSettings = effectiveSettings,
                 sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
                 sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
@@ -851,6 +852,7 @@ private fun ChapterWebView(
     onDisplayProgress: (progress: Double) -> Unit,
     onContinuousScrollProgress: (progress: Double, restoreEpoch: Int) -> Unit,
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
+    scanNonJapaneseText: Boolean,
     readerSettings: ReaderSettings,
     sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
@@ -895,6 +897,7 @@ private fun ChapterWebView(
         readerSettings,
         fontFaceUrl,
         systemDark,
+        scanNonJapaneseText,
         sasayakiCuesJson,
         sasayakiTextColor,
         sasayakiBackgroundColor,
@@ -905,6 +908,7 @@ private fun ChapterWebView(
             settings = readerSettings,
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
+            scanNonJapaneseText = scanNonJapaneseText,
             sasayakiCuesJson = sasayakiCuesJson,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
@@ -1077,6 +1081,7 @@ private fun readerSetupScript(
     settings: ReaderSettings,
     fontFaceUrl: String?,
     systemDark: Boolean,
+    scanNonJapaneseText: Boolean,
     sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
@@ -1100,6 +1105,7 @@ private fun readerSetupScript(
           var style = document.createElement('style');
           style.textContent = $css;
           document.head.appendChild(style);
+          window.scanNonJapaneseText = $scanNonJapaneseText;
           $selectionScript
           $paginationScript
         })();

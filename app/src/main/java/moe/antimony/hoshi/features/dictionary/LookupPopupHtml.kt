@@ -53,6 +53,7 @@ internal object LookupPopupHtml {
         }
         val styles = dictionaryStylesJson(dictionaryStyles)
         val normalizedSettings = settings.normalized()
+        val collapsedDictionaries = dictionaryNamesJson(normalizedSettings.collapsedDictionaries)
         val effectiveSwipeThreshold = if (swipeToDismiss) swipeThreshold.coerceAtLeast(0) else 0
         val colorScheme = if (darkMode) "dark" else "light"
         val popupCss = assets?.let { """<style>${it.popupCss}</style>""" }
@@ -109,12 +110,14 @@ internal object LookupPopupHtml {
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
                             duplicateCheck: { postMessage: async function(expression) { return window.HoshiPopup.duplicateCheck(expression); } },
-                            getEntry: { postMessage: async function(index) {
-                                if (window.HoshiPopup && window.HoshiPopup.getEntry) {
-                                    var entryJson = window.HoshiPopup.getEntry(index);
-                                    return entryJson ? JSON.parse(entryJson) : null;
+                            getEntries: { postMessage: async function(request) {
+                                var start = request && typeof request.start === 'number' ? request.start : 0;
+                                var count = request && typeof request.count === 'number' ? request.count : 0;
+                                if (window.HoshiPopup && window.HoshiPopup.getEntries) {
+                                    var entriesJson = window.HoshiPopup.getEntries(start, count);
+                                    return entriesJson ? JSON.parse(entriesJson) : [];
                                 }
-                                return window.lookupEntries[index];
+                                return (window.lookupEntries || []).slice(start, start + count);
                             } },
                             lookupRedirect: { postMessage: async function(query) {
                                 if (window.HoshiPopup && window.HoshiPopup.lookupRedirect) {
@@ -124,7 +127,10 @@ internal object LookupPopupHtml {
                             } }
                         }
                     };
-                    window.collapseDictionaries = ${normalizedSettings.collapseDictionaries};
+                    window.scanNonJapaneseText = ${normalizedSettings.scanNonJapaneseText};
+                    window.collapseMode = "${normalizedSettings.collapseMode.rawValue}";
+                    window.expandFirstDictionary = ${normalizedSettings.expandFirstDictionary};
+                    window.collapsedDictionaries = $collapsedDictionaries;
                     window.compactGlossaries = ${normalizedSettings.compactGlossaries};
                     window.showExpressionTags = ${normalizedSettings.showExpressionTags};
                     window.harmonicFrequency = ${normalizedSettings.harmonicFrequency};
@@ -214,6 +220,11 @@ internal object LookupPopupHtml {
                 put(dictionary, css)
             }
         }
+
+    private fun dictionaryNamesJson(names: Set<String>): String =
+        buildJsonArray {
+            names.sorted().forEach { add(JsonPrimitive(it)) }
+        }.toString()
 
     private fun audioSourcesJson(settings: AudioSettings): String =
         buildJsonArray {

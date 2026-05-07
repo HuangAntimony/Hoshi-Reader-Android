@@ -133,7 +133,9 @@ class LookupPopupHtmlTest {
             listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "eat")),
             assets = LookupPopupAssets(popupJs = "", popupCss = ""),
             settings = DictionarySettings(
-                collapseDictionaries = true,
+                collapseMode = DictionaryCollapseMode.CollapseAll,
+                expandFirstDictionary = true,
+                collapsedDictionaries = setOf("JMdict"),
                 compactGlossaries = false,
                 showExpressionTags = true,
                 harmonicFrequency = true,
@@ -143,13 +145,29 @@ class LookupPopupHtmlTest {
             ),
         )
 
-        assertTrue(html.contains("window.collapseDictionaries = true;"))
+        assertTrue(html.contains("""window.collapseMode = "Collapse All";"""))
+        assertTrue(html.contains("window.expandFirstDictionary = true;"))
+        assertTrue(html.contains("""window.collapsedDictionaries = ["JMdict"];"""))
+        assertTrue(html.contains("window.scanNonJapaneseText = true;"))
         assertTrue(html.contains("window.compactGlossaries = false;"))
         assertTrue(html.contains("window.showExpressionTags = true;"))
         assertTrue(html.contains("window.harmonicFrequency = true;"))
         assertTrue(html.contains("window.deduplicatePitchAccents = true;"))
         assertTrue(html.contains("window.compactPitchAccents = false;"))
         assertTrue(html.contains("""window.customCSS = ".entry-header { color: red; }";"""))
+    }
+
+    @Test
+    fun injectsIosDictionaryCollapseModeIntoPopupWebView() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "eat")),
+            assets = LookupPopupAssets(popupJs = "", popupCss = ""),
+        )
+
+        assertTrue(html.contains("""window.collapseMode = "Expand All";"""))
+        assertTrue(html.contains("window.expandFirstDictionary = false;"))
+        assertTrue(html.contains("window.collapsedDictionaries = [];"))
+        assertFalse(html.contains("window.collapseDictionaries"))
     }
 
     @Test

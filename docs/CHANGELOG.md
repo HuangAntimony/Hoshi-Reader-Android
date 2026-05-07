@@ -5,9 +5,22 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add a Dictionary setting to stop lookup scanning at non-Japanese text, matching the latest iOS selection behavior.
+
+### Changed
+
+- Replace the old auto-collapse dictionary toggle with iOS-style Expand All, Collapse All, and Custom dictionary collapse modes.
+- Match iOS Sasayaki subtitle matching by considering cue length in the search window and allowing a wider configurable matching window.
+
 ### Fixed
 
 - Speed up paginated reader page turns by caching chapter page bounds after layout, triggering swipe page turns during quick drags or short fast flicks, updating visible progress from memory immediately, debouncing bookmark saves until page turning is idle, flushing pending page-turn saves before closing or backgrounding the reader, skipping no-op selection bridge calls, and avoiding bookshelf refresh invalidations while the reader is open.
+- Speed up lookup popup rendering by fetching dictionary entries in small batches instead of one at a time.
+- Keep lookup popups scrolled to the top after cross-reference redirects finish rendering.
+- Let dictionary section headers expand and collapse without triggering a lookup or dismissing the popup.
+- Preserve `em` sizing for structured glossary images after their natural dimensions load.
 
 ## [v0.3.1] - 2026-05-06
 

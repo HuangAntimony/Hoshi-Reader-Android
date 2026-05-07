@@ -196,8 +196,8 @@ fun SasayakiMatchView(
                         Slider(
                             value = searchWindow,
                             onValueChange = { searchWindow = it },
-                            valueRange = 50f..350f,
-                            steps = 11,
+                            valueRange = 50f..1000f,
+                            steps = 18,
                             enabled = !isMatching,
                         )
                     }

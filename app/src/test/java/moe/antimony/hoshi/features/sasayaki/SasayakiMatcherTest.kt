@@ -56,6 +56,32 @@ class SasayakiMatcherTest {
     }
 
     @Test
+    fun searchWindowIncludesCueLengthLikeIos() {
+        val book = EpubBook(
+            title = "Book",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>これは検索窓より長い本文です。</body></html>",
+                ),
+            ),
+        )
+        val cue = SasayakiCue(
+            id = "0",
+            startTime = 0.0,
+            endTime = 1.0,
+            text = "これは検索窓より長い本文です。",
+        )
+
+        val match = SasayakiMatcher.match(book = book, cues = listOf(cue), searchWindow = 3)
+
+        assertEquals(listOf("0"), match.matches.map { it.id })
+        assertEquals(0, match.unmatched)
+    }
+
+    @Test
     fun doesNotMatchAcrossChapterBoundariesLikeIos() {
         val book = EpubBook(
             title = "Book",
