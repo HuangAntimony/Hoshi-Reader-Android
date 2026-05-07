@@ -76,6 +76,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.util.WeakHashMap
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
@@ -229,6 +232,10 @@ fun ReaderWebView(
             popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
         }
 
+    fun closeReader() {
+        webView?.flushPendingPageTurnProgress()
+        onClose()
+    }
     fun clearReaderSelection() {
         webView?.evaluateJavascript(ReaderSelectionCommand.ClearSelection.source, null)
     }
@@ -390,7 +397,21 @@ fun ReaderWebView(
         }
     }
 
-    BackHandler(onBack = onClose)
+    DisposableEffect(view) {
+        val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                webView?.flushPendingPageTurnProgress()
+            }
+        }
+        lifecycle?.addObserver(observer)
+        onDispose {
+            webView?.flushPendingPageTurnProgress()
+            lifecycle?.removeObserver(observer)
+        }
+    }
+
+    BackHandler(onBack = ::closeReader)
     val useLightSystemBars = when (effectiveSettings.theme) {
         ReaderTheme.Dark -> false
         ReaderTheme.System -> !systemDarkTheme
@@ -505,7 +526,7 @@ fun ReaderWebView(
         ReaderBottomChrome(
             settings = effectiveSettings,
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
-            onClose = onClose,
+            onClose = ::closeReader,
             onMenu = stateHolder::showReaderMenu,
             menuExpanded = showReaderMenu,
             onDismissMenu = stateHolder::dismissReaderMenu,
@@ -1165,6 +1186,12 @@ private fun WebView.navigatePageForDirection(
         ReaderNavigationDirection.Backward -> onPreviousChapter
     }
     navigatePage(direction, onLimit, onDisplayedProgress, onSaveProgress)
+}
+
+private fun WebView.flushPendingPageTurnProgress() {
+    val progressCallback = readerPageTurnProgressCallbacks.remove(this) ?: return
+    removeCallbacks(progressCallback)
+    progressCallback.run()
 }
 
 private class ContinuousScrollTouchListener(

@@ -96,7 +96,8 @@ class NavigationReaderCharacterizationTest {
         val contentIntent = mediaSession.substringAfter("private fun contentIntent()")
             .substringBefore("companion object")
 
-        assertTrue(reader.contains("BackHandler(onBack = onClose)"))
+        assertTrue(reader.contains("fun closeReader()"))
+        assertTrue(reader.contains("BackHandler(onBack = ::closeReader)"))
         assertTrue(mediaSession.contains("contentIntent()?.let { setSessionActivity(it) }"))
         assertTrue(contentIntent.contains("getLaunchIntentForPackage(appContext.packageName)"))
         assertTrue(contentIntent.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT"))

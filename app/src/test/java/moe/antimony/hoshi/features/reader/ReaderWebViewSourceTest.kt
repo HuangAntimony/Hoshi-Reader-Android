@@ -59,6 +59,24 @@ class ReaderWebViewSourceTest {
     }
 
     @Test
+    fun pendingPagedTurnProgressIsFlushedBeforeReaderCloseOrStop() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val closeReader = source.substringAfter("fun closeReader()")
+            .substringBefore("fun clearReaderSelection()")
+        val lifecycleEffect = source.substringAfter("DisposableEffect(view)")
+            .substringBefore("BackHandler")
+
+        assertTrue(source.contains("private fun WebView.flushPendingPageTurnProgress()"))
+        assertTrue(closeReader.contains("webView?.flushPendingPageTurnProgress()"))
+        assertTrue(closeReader.contains("onClose()"))
+        assertTrue(source.contains("BackHandler(onBack = ::closeReader)"))
+        assertTrue(source.contains("onClose = ::closeReader"))
+        assertTrue(lifecycleEffect.contains("Lifecycle.Event.ON_STOP"))
+        assertTrue(lifecycleEffect.contains("webView?.flushPendingPageTurnProgress()"))
+        assertTrue(lifecycleEffect.contains("onDispose"))
+    }
+
+    @Test
     fun pageTurnsDoNotClearSelectionBridgeWhenNoLookupPopupIsOpen() {
         val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
         val closeLookup = source.substringAfter("fun closeLookupPopupsAndSelection()")
