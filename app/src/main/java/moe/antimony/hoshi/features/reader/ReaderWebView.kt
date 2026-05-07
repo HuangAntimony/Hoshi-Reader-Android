@@ -1107,10 +1107,21 @@ private fun WebView.navigatePage(
 ) {
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
         if (ReaderPaginationScripts.didScroll(result)) {
-            evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                ReaderPaginationScripts.doubleResult(progressResult)?.let(onScrolled)
+            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
+            val webView = this
+            lateinit var progressCallback: Runnable
+            progressCallback = Runnable {
+                if (readerPageTurnProgressCallbacks[webView] == progressCallback) {
+                    readerPageTurnProgressCallbacks.remove(webView)
+                }
+                webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                    ReaderPaginationScripts.doubleResult(progressResult)?.let(onScrolled)
+                }
             }
+            readerPageTurnProgressCallbacks[webView] = progressCallback
+            postDelayed(progressCallback, PAGE_TURN_PROGRESS_SAVE_DELAY_MS)
         } else {
+            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
             onLimit()
         }
     }
@@ -1218,8 +1229,10 @@ private fun WebView.showAfterReaderRestore() {
 }
 
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()
+private val readerPageTurnProgressCallbacks = WeakHashMap<WebView, Runnable>()
 private const val MAX_SELECTION_LENGTH = 16
 private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 250L
+private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 120L
 private val ReaderWebViewTopPadding = 44.dp
 private val ReaderWebViewBottomPadding = 56.dp
 

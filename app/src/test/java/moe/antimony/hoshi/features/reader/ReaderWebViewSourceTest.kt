@@ -27,4 +27,16 @@ class ReaderWebViewSourceTest {
         assertFalse(playerSection.contains("currentSasayakiPlayer"))
         assertTrue(playerSection.contains("onDispose { sasayakiPlayer?.release() }"))
     }
+
+    @Test
+    fun pagedNavigationDefersProgressSaveUntilAfterWebViewScrollPaint() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/reader/ReaderWebView.kt").readText()
+        val navigatePage = source.substringAfter("private fun WebView.navigatePage(")
+            .substringBefore("private fun WebView.navigatePageForDirection(")
+
+        assertTrue(source.contains("PAGE_TURN_PROGRESS_SAVE_DELAY_MS"))
+        assertTrue(navigatePage.contains("postDelayed(progressCallback, PAGE_TURN_PROGRESS_SAVE_DELAY_MS)"))
+        assertTrue(navigatePage.contains("ReaderPaginationScripts.progressInvocation()"))
+        assertTrue(navigatePage.contains("PAGE_TURN_PROGRESS_SAVE_DELAY_MS"))
+    }
 }

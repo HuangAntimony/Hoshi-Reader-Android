@@ -56,7 +56,8 @@ class NavigationReaderCharacterizationTest {
         assertTrue(readerDestination.contains("initialProgress = state.bookmark?.progress ?: 0.0"))
         assertTrue(readerDestination.contains("onSaveBookmark = { chapterIndex, progress ->"))
         assertTrue(readerDestination.contains("stateHolder.saveBookmark("))
-        assertTrue(appShell.contains("bookshelfRefreshKey += 1"))
+        assertTrue(appShell.contains("onBookmarkSaved = readerBookmarkRefreshState::markDirty"))
+        assertTrue(appShell.contains("onClose = ::closeReaderRoute"))
         assertTrue(readerDestination.contains("onClose = onClose"))
     }
 

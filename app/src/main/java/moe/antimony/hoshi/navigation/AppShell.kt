@@ -80,6 +80,7 @@ fun AppShell(
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
+    val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(dictionarySettingsRepository) {
@@ -94,6 +95,13 @@ fun AppShell(
 
     fun popRoute() {
         backStack.popAppRoute()
+    }
+
+    fun closeReaderRoute() {
+        if (readerBookmarkRefreshState.consumeDirty()) {
+            bookshelfRefreshKey += 1
+        }
+        popRoute()
     }
 
     fun selectTopLevelRoute(route: AppRoute) {
@@ -192,8 +200,8 @@ fun AppShell(
                             readerSettings = currentReaderSettings,
                             onReaderSettingsChange = currentOnReaderSettingsChange,
                             onReaderKeyEventHandlerChange = currentOnReaderKeyEventHandlerChange,
-                            onBookmarkSaved = { bookshelfRefreshKey += 1 },
-                            onClose = ::popRoute,
+                            onBookmarkSaved = readerBookmarkRefreshState::markDirty,
+                            onClose = ::closeReaderRoute,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -227,6 +235,20 @@ fun AppShell(
             }
         },
     )
+}
+
+internal class ReaderBookmarkRefreshState {
+    private var dirty = false
+
+    fun markDirty() {
+        dirty = true
+    }
+
+    fun consumeDirty(): Boolean {
+        val wasDirty = dirty
+        dirty = false
+        return wasDirty
+    }
 }
 
 @Composable

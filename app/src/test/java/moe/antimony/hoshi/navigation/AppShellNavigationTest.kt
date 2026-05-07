@@ -108,6 +108,33 @@ class AppShellNavigationTest {
     }
 
     @Test
+    fun readerBookmarkRefreshIsCoalescedUntilReaderClose() {
+        val state = ReaderBookmarkRefreshState()
+
+        assertFalse(state.consumeDirty())
+        state.markDirty()
+        state.markDirty()
+        assertTrue(state.consumeDirty())
+        assertFalse(state.consumeDirty())
+    }
+
+    @Test
+    fun readerPageBookmarkSavesDoNotRefreshBookshelfDuringReaderSession() {
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+        val closeReaderRoute = appShell.substringAfter("fun closeReaderRoute()")
+            .substringBefore("fun selectTopLevelRoute")
+        val readerBranch = appShell.substringAfter("is AppRoute.ReaderRoute ->")
+            .substringBefore("is AppRoute.SasayakiMatchRoute")
+
+        assertTrue(appShell.contains("val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }"))
+        assertTrue(closeReaderRoute.contains("readerBookmarkRefreshState.consumeDirty()"))
+        assertTrue(closeReaderRoute.contains("bookshelfRefreshKey += 1"))
+        assertTrue(readerBranch.contains("onBookmarkSaved = readerBookmarkRefreshState::markDirty"))
+        assertTrue(readerBranch.contains("onClose = ::closeReaderRoute"))
+        assertFalse(readerBranch.contains("bookshelfRefreshKey += 1"))
+    }
+
+    @Test
     fun appShellDelegatesNonNavigationStateToFocusedHelpers() {
         val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
 
