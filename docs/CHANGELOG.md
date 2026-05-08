@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.3.3] - 2026-05-09
+
 ### Added
 
 - Add Hoshi to Android's selected-text context menu so text selected in other apps opens a lookup popup over the current app.
