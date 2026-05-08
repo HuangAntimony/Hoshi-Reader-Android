@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 This file is the short operational handoff for future agents.
 
@@ -53,6 +53,7 @@ Status: `in_progress`
 
 Status: `in_progress`
 
+- Android selected-text context menu lookups use the system `PROCESS_TEXT` action to show a top-safe, centered Hoshi lookup popup over the current app; nested lookups keep position-based popup placement.
 - Dictionary management now uses explicit drag handles and two-step swipe-to-delete to reduce accidental deletes.
 - Dictionary popup entry colors now follow Hoshi's active app theme instead of Android's system night mode.
 - Align recommended dictionary download/update state with iOS `DictionaryView`.

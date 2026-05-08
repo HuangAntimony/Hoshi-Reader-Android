@@ -1,6 +1,7 @@
 package moe.antimony.hoshi
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
@@ -35,6 +36,55 @@ class MainActivityConfigurationTest {
     }
 
     @Test
+    fun processTextLookupActivityAppearsInAndroidSelectedTextProcessMenu() {
+        val activity = processTextLookupActivityManifestElement()
+        val filters = activity.getElementsByTagName("intent-filter")
+        var hasProcessTextFilter = false
+
+        for (filterIndex in 0 until filters.length) {
+            val filter = filters.item(filterIndex) as Element
+            val actions = filter.getElementsByTagName("action")
+            val data = filter.getElementsByTagName("data")
+            val hasProcessTextAction = (0 until actions.length).any { index ->
+                val action = actions.item(index) as Element
+                action.getAttribute("android:name") == "android.intent.action.PROCESS_TEXT"
+            }
+            val hasTextPlainData = (0 until data.length).any { index ->
+                val item = data.item(index) as Element
+                item.getAttribute("android:mimeType") == "text/plain"
+            }
+            hasProcessTextFilter = hasProcessTextFilter || (hasProcessTextAction && hasTextPlainData)
+        }
+
+        assertTrue(
+            "The overlay lookup activity must be offered in Android's selected-text PROCESS_TEXT menu for plain text.",
+            hasProcessTextFilter,
+        )
+        assertTrue(
+            "The selected-text lookup entry must render as an overlay instead of opening the main app shell.",
+            activity.getAttribute("android:theme") == "@style/Theme.HoshiReader.ProcessTextOverlay",
+        )
+    }
+
+    @Test
+    fun processTextLookupActivityDoesNotRouteThroughMainAppShell() {
+        val processTextActivity = File("src/main/java/moe/antimony/hoshi/features/dictionary/ProcessTextLookupActivity.kt")
+            .readText()
+        val mainActivity = File("src/main/java/moe/antimony/hoshi/MainActivity.kt").readText()
+        val appShell = File("src/main/java/moe/antimony/hoshi/navigation/AppShell.kt").readText()
+
+        assertTrue(processTextActivity.contains("ProcessTextLookupRequest.fromIntent(intent)"))
+        assertTrue(processTextActivity.contains("LookupPopupStackView("))
+        assertTrue(processTextActivity.contains("finish()"))
+        assertTrue(processTextActivity.contains("WindowCompat.setDecorFitsSystemWindows(window, false)"))
+        assertTrue(processTextActivity.contains("ColorDrawable(Color.TRANSPARENT)"))
+        assertTrue(processTextActivity.contains("dictionaryRepository.rebuildLookupQuery()"))
+        assertTrue(processTextActivity.contains("LookupEngine.lookup("))
+        assertFalse(mainActivity.contains("processTextLookupRequest"))
+        assertFalse(appShell.contains("processTextLookupRequest"))
+    }
+
+    @Test
     fun launchThemeHasNightResourceVariant() {
         val lightTheme = themeElement(File("src/main/res/values/themes.xml"))
         val nightTheme = themeElement(File("src/main/res/values-night/themes.xml"))
@@ -44,17 +94,25 @@ class MainActivityConfigurationTest {
     }
 
     private fun mainActivityManifestElement(): Element {
+        return activityManifestElement(".MainActivity")
+    }
+
+    private fun processTextLookupActivityManifestElement(): Element {
+        return activityManifestElement(".features.dictionary.ProcessTextLookupActivity")
+    }
+
+    private fun activityManifestElement(name: String): Element {
         val document = DocumentBuilderFactory.newInstance()
             .newDocumentBuilder()
             .parse(File("src/main/AndroidManifest.xml"))
         val activities = document.getElementsByTagName("activity")
         for (index in 0 until activities.length) {
             val element = activities.item(index) as Element
-            if (element.getAttribute("android:name") == ".MainActivity") {
+            if (element.getAttribute("android:name") == name) {
                 return element
             }
         }
-        error("MainActivity not found in AndroidManifest.xml")
+        error("$name not found in AndroidManifest.xml")
     }
 
     private fun themeElement(file: File): Element {

@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add Hoshi to Android's selected-text context menu so text selected in other apps opens a lookup popup over the current app.
+
 ## [v0.3.2] - 2026-05-08
 
 ### Added
