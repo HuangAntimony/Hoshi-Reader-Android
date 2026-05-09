@@ -77,7 +77,7 @@ class AnkiRepository(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.let { addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it)) },
-            sasayakiAudioPath = context.sasayakiAudioPath?.let { addMediaFile(it, File(it).name, "audio/mp4") },
+            sasayakiAudioPath = context.sasayakiAudioPath?.let { addMediaFile(it, File(it).name, mimeTypeForPath(it)) },
             sentenceOffset = context.sentenceOffset,
         )
         val mediaPayload = payload.copy(
@@ -232,6 +232,7 @@ sealed interface AnkiFetchResult {
 fun mimeTypeForPath(path: String): String =
     when (path.substringAfterLast('.', missingDelimiterValue = "").lowercase()) {
         "mp3" -> "audio/mpeg"
+        "aac" -> "audio/aac"
         "m4a" -> "audio/mp4"
         "wav" -> "audio/wav"
         "ogg" -> "audio/ogg"

@@ -152,10 +152,14 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("class SasayakiCueAudioExporter("))
         assertTrue(source.contains("Transformer.Builder(appContext)"))
         assertTrue(source.contains("setAudioMimeType(MimeTypes.AUDIO_AAC)"))
+        assertTrue(source.contains("setMuxerFactory(FrameworkMuxer.Factory())"))
         assertTrue(source.contains("MediaItem.ClippingConfiguration.Builder()"))
         assertTrue(source.contains("CountDownLatch"))
         assertTrue(source.contains("ExportResult"))
         assertTrue(source.contains("ExportException"))
+        assertTrue(source.contains("AacAdtsCueAudioRewriter.rewrite("))
+        assertTrue(source.contains(""".tmp.m4a"""))
+        assertTrue(source.contains(""".aac""""))
         assertTrue(source.contains("if (output.exists()) output.delete()"))
         assertFalse(source.contains("android.media.MediaExtractor"))
         assertFalse(source.contains("android.media.MediaMuxer"))
@@ -163,6 +167,11 @@ class SasayakiPlayerSourceTest {
         assertFalse(source.contains("MediaExtractor("))
         assertFalse(source.contains("MediaMuxer("))
         assertFalse(source.contains("BufferInfo"))
+
+        val rewriter = File("src/main/java/moe/antimony/hoshi/features/sasayaki/AacAdtsCueAudioRewriter.kt").readText()
+        assertFalse(rewriter.contains("android.media.MediaExtractor"))
+        assertFalse(rewriter.contains("android.media.MediaMuxer"))
+        assertFalse(rewriter.contains("android.media.MediaCodec"))
     }
 
     @Test

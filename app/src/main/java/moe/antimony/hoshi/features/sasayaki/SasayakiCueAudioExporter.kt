@@ -14,6 +14,7 @@ import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.FrameworkMuxer
 import androidx.media3.transformer.Transformer
 import java.io.File
 import java.util.concurrent.CountDownLatch
@@ -36,7 +37,9 @@ internal class SasayakiCueAudioExporter(
     ): File? = runCatching {
         outputRoot.mkdirs()
         val output = outputRoot.resolve(outputFileName(cue))
+        val transformerOutput = outputRoot.resolve("${output.name}.tmp.m4a")
         if (output.exists()) output.delete()
+        if (transformerOutput.exists()) transformerOutput.delete()
         val completed = AtomicBoolean(false)
         val failure = AtomicReference<Throwable?>(null)
         val transformerRef = AtomicReference<Transformer?>(null)
@@ -50,6 +53,7 @@ internal class SasayakiCueAudioExporter(
                     val transformer = Transformer.Builder(appContext)
                         .setLooper(exportThread.looper)
                         .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                        .setMuxerFactory(FrameworkMuxer.Factory())
                         .addListener(
                             object : Transformer.Listener {
                                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
@@ -69,7 +73,7 @@ internal class SasayakiCueAudioExporter(
                         )
                         .build()
                     transformerRef.set(transformer)
-                    transformer.start(editedMediaItem(source = source, range = range), output.absolutePath)
+                    transformer.start(editedMediaItem(source = source, range = range), transformerOutput.absolutePath)
                 }.onFailure {
                     failure.set(it)
                     done.countDown()
@@ -80,15 +84,24 @@ internal class SasayakiCueAudioExporter(
             if (!finished) {
                 handler.post { transformerRef.get()?.cancel() }
                 output.delete()
+                transformerOutput.delete()
                 return@runCatching null
             }
             if (!completed.get() || failure.get() != null) {
                 output.delete()
+                transformerOutput.delete()
                 return@runCatching null
             }
+            if (!AacAdtsCueAudioRewriter.rewrite(input = transformerOutput, output = output)) {
+                output.delete()
+                transformerOutput.delete()
+                return@runCatching null
+            }
+            transformerOutput.delete()
             output.takeIf { it.isFile && it.length() > 0L }
         } finally {
             exportThread.quitSafely()
+            transformerOutput.delete()
         }
     }.getOrNull()
 
@@ -123,7 +136,7 @@ internal class SasayakiCueAudioExporter(
         get() = (endTime * 1000.0).toLong().coerceAtLeast(startPositionMs + 1L)
 
     private fun outputFileName(cue: SasayakiMatch): String =
-        "hoshi_sasayaki_${cue.id.hashCode().toLong().and(0xffffffffL)}.m4a"
+        "hoshi_sasayaki_${cue.id.hashCode().toLong().and(0xffffffffL)}.aac"
 
     private companion object {
         const val ExportTimeoutMs = 30_000L

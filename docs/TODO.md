@@ -74,7 +74,7 @@ Status: `in_progress`
 
 - Android now targets AnkiDroid's native API instead of AnkiMobile callbacks.
 - Current unit coverage tracks Anki settings field rows, duplicate collection/deck scope and cross-model settings, the tags editor sharing the same focused text editing path without handlebar choices, Fetch preserving still-available deck/model selections, blank/non-Lapis -> Lapis applying defaults, and Lapis -> Lapis Fetch/mining not refilling edited mappings.
-- Current emulator/device validation covers Lapis field mapping restore, field mapping list scrolling, dictionary-specific Anki handlebars without first-glossary fallback, MK3 SVG dictionary media/inline gaiji styling, selected sentence occurrence bolding, Sasayaki sentence-expanded cue audio mining with `.m4a` media names, and local audio source mining.
+- Current emulator/device validation covers Lapis field mapping restore, field mapping list scrolling, dictionary-specific Anki handlebars without first-glossary fallback, MK3 SVG dictionary media/inline gaiji styling, selected sentence occurrence bolding, Sasayaki sentence-expanded cue audio mining with playable `.aac` media, and local audio source mining.
 - Next: expand duplicate and future AnkiConnect backend coverage.
 - Keep AnkiConnect behind the Anki backend boundary; do not add it by coupling popup mining directly to HTTP calls.
 
