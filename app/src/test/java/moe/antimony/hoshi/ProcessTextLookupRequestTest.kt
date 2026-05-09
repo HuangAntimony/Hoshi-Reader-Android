@@ -30,4 +30,26 @@ class ProcessTextLookupRequestTest {
             ),
         )
     }
+
+    @Test
+    fun createsRequestForTranslateText() {
+        val request = ProcessTextLookupRequest.from(
+            action = "android.intent.action.TRANSLATE",
+            selectedText = null,
+            sharedText = "  食べる  ",
+        )
+
+        assertEquals("食べる", request?.query)
+    }
+
+    @Test
+    fun createsRequestForSharedPlainText() {
+        val request = ProcessTextLookupRequest.from(
+            action = "android.intent.action.SEND",
+            selectedText = null,
+            sharedText = "  食べる  ",
+        )
+
+        assertEquals("食べる", request?.query)
+    }
 }
