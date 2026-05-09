@@ -38,31 +38,45 @@ class MainActivityConfigurationTest {
     @Test
     fun processTextLookupActivityAppearsInAndroidSelectedTextProcessMenu() {
         val activity = processTextLookupActivityManifestElement()
-        val filters = activity.getElementsByTagName("intent-filter")
-        var hasProcessTextFilter = false
-
-        for (filterIndex in 0 until filters.length) {
-            val filter = filters.item(filterIndex) as Element
-            val actions = filter.getElementsByTagName("action")
-            val data = filter.getElementsByTagName("data")
-            val hasProcessTextAction = (0 until actions.length).any { index ->
-                val action = actions.item(index) as Element
-                action.getAttribute("android:name") == "android.intent.action.PROCESS_TEXT"
-            }
-            val hasTextPlainData = (0 until data.length).any { index ->
-                val item = data.item(index) as Element
-                item.getAttribute("android:mimeType") == "text/plain"
-            }
-            hasProcessTextFilter = hasProcessTextFilter || (hasProcessTextAction && hasTextPlainData)
-        }
 
         assertTrue(
             "The overlay lookup activity must be offered in Android's selected-text PROCESS_TEXT menu for plain text.",
-            hasProcessTextFilter,
+            activity.hasIntentFilter(
+                actionName = "android.intent.action.PROCESS_TEXT",
+                mimeType = "text/plain",
+            ),
         )
         assertTrue(
             "The selected-text lookup entry must render as an overlay instead of opening the main app shell.",
             activity.getAttribute("android:theme") == "@style/Theme.HoshiReader.ProcessTextOverlay",
+        )
+        assertTrue(
+            "External lookup actions must not reuse Hoshi's main task, otherwise SEND/TRANSLATE can show MainActivity behind the popup.",
+            activity.getAttribute("android:taskAffinity").isEmpty(),
+        )
+    }
+
+    @Test
+    fun processTextLookupActivityHandlesTranslateAndSendWithSeparateFilters() {
+        val activity = processTextLookupActivityManifestElement()
+
+        assertTrue(
+            "ACTION_TRANSLATE must be handled without a MIME type so Android can offer Hoshi as a Translate target.",
+            activity.hasIntentFilter(
+                actionName = "android.intent.action.TRANSLATE",
+                mimeType = null,
+            ),
+        )
+        assertTrue(
+            "ACTION_SEND must be handled for shared plain text.",
+            activity.hasIntentFilter(
+                actionName = "android.intent.action.SEND",
+                mimeType = "text/plain",
+            ),
+        )
+        assertFalse(
+            "PROCESS_TEXT, TRANSLATE, and SEND actions must stay in separate intent filters.",
+            activity.hasIntentFilterWithMultipleActions(),
         )
     }
 
@@ -99,6 +113,41 @@ class MainActivityConfigurationTest {
 
     private fun processTextLookupActivityManifestElement(): Element {
         return activityManifestElement(".features.dictionary.ProcessTextLookupActivity")
+    }
+
+    private fun Element.hasIntentFilter(
+        actionName: String,
+        mimeType: String? = null,
+    ): Boolean {
+        val filters = getElementsByTagName("intent-filter")
+        for (filterIndex in 0 until filters.length) {
+            val filter = filters.item(filterIndex) as Element
+            val actions = filter.getElementsByTagName("action")
+            val data = filter.getElementsByTagName("data")
+            val actionNames = (0 until actions.length).map { index ->
+                val action = actions.item(index) as Element
+                action.getAttribute("android:name")
+            }
+            val mimeTypes = (0 until data.length).map { index ->
+                val item = data.item(index) as Element
+                item.getAttribute("android:mimeType")
+            }
+            if (actionNames != listOf(actionName)) continue
+            if (mimeType == null && mimeTypes.isNotEmpty()) continue
+            if (mimeType != null && mimeType !in mimeTypes) continue
+            return true
+        }
+        return false
+    }
+
+    private fun Element.hasIntentFilterWithMultipleActions(): Boolean {
+        val filters = getElementsByTagName("intent-filter")
+        for (filterIndex in 0 until filters.length) {
+            val filter = filters.item(filterIndex) as Element
+            val actionCount = filter.getElementsByTagName("action").length
+            if (actionCount > 1) return true
+        }
+        return false
     }
 
     private fun activityManifestElement(name: String): Element {

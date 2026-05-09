@@ -60,9 +60,22 @@
             android:finishOnTaskLaunch="true"
             android:label="@string/app_name"
             android:noHistory="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.HoshiReader.ProcessTextOverlay">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.TRANSLATE" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
 
                 <category android:name="android.intent.category.DEFAULT" />
 

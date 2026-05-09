@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Let selected or shared text from Android Translate and Share actions open directly in Hoshi's lookup popup.
+
 ## [v0.3.3] - 2026-05-09
 
 ### Added
