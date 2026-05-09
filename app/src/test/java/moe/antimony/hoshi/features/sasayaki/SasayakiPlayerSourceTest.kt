@@ -61,8 +61,9 @@ class SasayakiPlayerSourceTest {
         assertTrue(source.contains("get() = playbackPersistence.playback"))
         assertTrue(source.contains("val audioStorageSummary: String"))
         assertTrue(source.contains("get() = playbackPersistence.audioStorageSummary"))
+        assertTrue(source.contains("private val cueAudioExporter = SasayakiCueAudioExporter("))
         assertTrue(source.contains("override fun exportCueAudio(cue: SasayakiMatch, sentence: String): File?"))
-        assertTrue(source.contains("File(appContext.cacheDir, \"anki-media/sasayaki\")"))
+        assertFalse(source.contains("File(appContext.cacheDir, \"anki-media/sasayaki\")"))
 
         assertTrue(restoreAudio.contains("audioRestoreWorkflow.restore("))
         assertTrue(restoreAudio.contains("releaseExistingMediaSession = mediaSessionHandle::releaseExisting"))
@@ -145,16 +146,32 @@ class SasayakiPlayerSourceTest {
     }
 
     @Test
-    fun cueAudioExporterUsesLocalExtractorInputAndStopsStalledReads() {
+    fun cueAudioExporterUsesMedia3TransformerInsteadOfPlatformExtractor() {
         val source = File("src/main/java/moe/antimony/hoshi/features/sasayaki/SasayakiCueAudioExporter.kt").readText()
 
-        assertTrue(source.contains("localExtractorFile(context = context, outputDir = outputDir)"))
-        assertTrue(source.contains("extractor.setDataSource(localSource.absolutePath)"))
-        assertTrue(source.contains("context.contentResolver.openInputStream(uri)"))
-        assertTrue(source.contains("input.copyTo(output)"))
-        assertTrue(source.contains("if (!extractor.advance() || extractor.sampleTime == previousSampleTime) break"))
-        assertTrue(source.contains("if (!wroteSample)"))
-        assertFalse(source.contains("extractor.setDataSource(context, source.uri, null)"))
+        assertTrue(source.contains("class SasayakiCueAudioExporter("))
+        assertTrue(source.contains("Transformer.Builder(appContext)"))
+        assertTrue(source.contains("setAudioMimeType(MimeTypes.AUDIO_AAC)"))
+        assertTrue(source.contains("MediaItem.ClippingConfiguration.Builder()"))
+        assertTrue(source.contains("CountDownLatch"))
+        assertTrue(source.contains("ExportResult"))
+        assertTrue(source.contains("ExportException"))
+        assertTrue(source.contains("if (output.exists()) output.delete()"))
+        assertFalse(source.contains("android.media.MediaExtractor"))
+        assertFalse(source.contains("android.media.MediaMuxer"))
+        assertFalse(source.contains("android.media.MediaCodec"))
+        assertFalse(source.contains("MediaExtractor("))
+        assertFalse(source.contains("MediaMuxer("))
+        assertFalse(source.contains("BufferInfo"))
+    }
+
+    @Test
+    fun media3TransformerDependencyIsDeclaredForSasayakiExport() {
+        val versions = File("../gradle/libs.versions.toml").readText()
+        val build = File("build.gradle.kts").readText()
+
+        assertTrue(versions.contains("androidx-media3-transformer"))
+        assertTrue(build.contains("implementation(libs.androidx.media3.transformer)"))
     }
 
     private fun playerSource(): String =

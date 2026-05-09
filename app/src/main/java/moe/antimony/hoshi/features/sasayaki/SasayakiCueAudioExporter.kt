@@ -3,107 +3,129 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import android.content.Context
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
+import android.net.Uri
+import android.os.Handler
+import android.os.HandlerThread
+import androidx.annotation.OptIn
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.ExportException
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.Transformer
 import java.io.File
-import java.io.InputStream
-import java.nio.ByteBuffer
-import kotlin.math.max
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
-internal object SasayakiCueAudioExporter {
+@OptIn(UnstableApi::class)
+internal class SasayakiCueAudioExporter(
+    context: Context,
+    private val outputRoot: File = File(context.applicationContext.cacheDir, "anki-media/sasayaki"),
+    private val timeoutMs: Long = ExportTimeoutMs,
+) {
+    private val appContext = context.applicationContext
+
     fun export(
-        context: Context,
         source: SasayakiPlaybackSource,
         cue: SasayakiMatch,
         range: SasayakiCueAudioRange,
-        outputDir: File,
     ): File? = runCatching {
-        outputDir.mkdirs()
-        val output = outputDir.resolve("hoshi_sasayaki_${cue.id.hashCode().toLong().and(0xffffffffL)}.m4a")
+        outputRoot.mkdirs()
+        val output = outputRoot.resolve(outputFileName(cue))
         if (output.exists()) output.delete()
-        val localSource = source.localExtractorFile(context = context, outputDir = outputDir)
-        val extractor = MediaExtractor()
+        val completed = AtomicBoolean(false)
+        val failure = AtomicReference<Throwable?>(null)
+        val transformerRef = AtomicReference<Transformer?>(null)
+        val done = CountDownLatch(1)
+        val exportThread = HandlerThread("HoshiSasayakiCueExport").also { it.start() }
+        val handler = Handler(exportThread.looper)
+
         try {
-            extractor.setDataSource(localSource.absolutePath)
-            val trackIndex = (0 until extractor.trackCount).firstOrNull { index ->
-                extractor.getTrackFormat(index)
-                    .getString(MediaFormat.KEY_MIME)
-                    ?.startsWith("audio/") == true
-            } ?: return@runCatching null
-            extractor.selectTrack(trackIndex)
-            val format = extractor.getTrackFormat(trackIndex)
-            val startUs = (range.startTime * 1_000_000).toLong().coerceAtLeast(0L)
-            val endUs = (range.endTime * 1_000_000).toLong().coerceAtLeast(startUs + 1L)
-            extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-            MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).use { muxer ->
-                val muxerTrack = muxer.addTrack(format)
-                muxer.start()
-                val bufferSize = max(
-                    64 * 1024,
-                    if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
-                        format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
-                    } else {
-                        0
-                    },
-                )
-                val buffer = ByteBuffer.allocateDirect(bufferSize)
-                val info = android.media.MediaCodec.BufferInfo()
-                var wroteSample = false
-                var previousSampleTime = Long.MIN_VALUE
-                while (true) {
-                    val sampleTime = extractor.sampleTime
-                    if (sampleTime < 0 || sampleTime > endUs) break
-                    buffer.clear()
-                    val size = extractor.readSampleData(buffer, 0)
-                    if (size < 0) break
-                    if (sampleTime >= startUs) {
-                        info.set(0, size, sampleTime - startUs, 0)
-                        muxer.writeSampleData(muxerTrack, buffer, info)
-                        wroteSample = true
-                    }
-                    if (!extractor.advance() || extractor.sampleTime == previousSampleTime) break
-                    previousSampleTime = sampleTime
-                }
-                if (!wroteSample) {
-                    output.delete()
-                    return@runCatching null
-                }
-                runCatching { muxer.stop() }.getOrElse {
-                    output.delete()
-                    return@runCatching null
+            handler.post {
+                runCatching {
+                    val transformer = Transformer.Builder(appContext)
+                        .setLooper(exportThread.looper)
+                        .setAudioMimeType(MimeTypes.AUDIO_AAC)
+                        .addListener(
+                            object : Transformer.Listener {
+                                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                                    completed.set(true)
+                                    done.countDown()
+                                }
+
+                                override fun onError(
+                                    composition: Composition,
+                                    exportResult: ExportResult,
+                                    exportException: ExportException,
+                                ) {
+                                    failure.set(exportException)
+                                    done.countDown()
+                                }
+                            },
+                        )
+                        .build()
+                    transformerRef.set(transformer)
+                    transformer.start(editedMediaItem(source = source, range = range), output.absolutePath)
+                }.onFailure {
+                    failure.set(it)
+                    done.countDown()
                 }
             }
+
+            val finished = done.await(timeoutMs, TimeUnit.MILLISECONDS)
+            if (!finished) {
+                handler.post { transformerRef.get()?.cancel() }
+                output.delete()
+                return@runCatching null
+            }
+            if (!completed.get() || failure.get() != null) {
+                output.delete()
+                return@runCatching null
+            }
+            output.takeIf { it.isFile && it.length() > 0L }
         } finally {
-            extractor.release()
+            exportThread.quitSafely()
         }
-        output.takeIf { it.isFile && it.length() > 0L }
     }.getOrNull()
 
-    private fun SasayakiPlaybackSource.localExtractorFile(context: Context, outputDir: File): File =
-        when (this) {
-            is SasayakiPlaybackSource.PrivateFile -> file
-            is SasayakiPlaybackSource.ExternalUri -> {
-                val input = context.contentResolver.openInputStream(uri) ?: error("Unable to open Sasayaki audio")
-                val cacheFile = outputDir.resolve("sasayaki_export_source_${uri.toString().hashCode().toLong().and(0xffffffffL)}")
-                input.useTo(cacheFile)
-                cacheFile
-            }
-        }
-
-    private fun InputStream.useTo(file: File) {
-        use { input ->
-            file.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
+    private fun editedMediaItem(
+        source: SasayakiPlaybackSource,
+        range: SasayakiCueAudioRange,
+    ): EditedMediaItem {
+        val mediaItem = MediaItem.Builder()
+            .setUri(source.uri)
+            .setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(range.startPositionMs)
+                    .setEndPositionMs(range.endPositionMs)
+                    .build(),
+            )
+            .build()
+        return EditedMediaItem.Builder(mediaItem)
+            .setRemoveVideo(true)
+            .build()
     }
-}
 
-private inline fun MediaMuxer.use(block: (MediaMuxer) -> Unit) {
-    try {
-        block(this)
-    } finally {
-        release()
+    private val SasayakiPlaybackSource.uri: Uri
+        get() = when (this) {
+            is SasayakiPlaybackSource.ExternalUri -> uri
+            is SasayakiPlaybackSource.PrivateFile -> Uri.fromFile(file)
+        }
+
+    private val SasayakiCueAudioRange.startPositionMs: Long
+        get() = (startTime * 1000.0).toLong().coerceAtLeast(0L)
+
+    private val SasayakiCueAudioRange.endPositionMs: Long
+        get() = (endTime * 1000.0).toLong().coerceAtLeast(startPositionMs + 1L)
+
+    private fun outputFileName(cue: SasayakiMatch): String =
+        "hoshi_sasayaki_${cue.id.hashCode().toLong().and(0xffffffffL)}.m4a"
+
+    private companion object {
+        const val ExportTimeoutMs = 30_000L
     }
 }

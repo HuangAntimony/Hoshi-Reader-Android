@@ -54,6 +54,9 @@ internal class SasayakiPlaybackController(
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
+    private val cueAudioExporter = SasayakiCueAudioExporter(
+        context = appContext,
+    )
     private val playbackPersistence = SasayakiPlaybackPersistenceState(
         playbackRepository = playbackRepository,
         audioSourceRepository = audioSourceRepository,
@@ -266,19 +269,16 @@ internal class SasayakiPlaybackController(
 
     override fun exportCueAudio(cue: SasayakiMatch, sentence: String): File? {
         val source = audioSourceRepository.playbackSource(playback) ?: return null
-        val outputDir = File(appContext.cacheDir, "anki-media/sasayaki")
         val range = SasayakiCueAudioRangeResolver.resolve(
             matchData = matchData,
             cue = cue,
             sentence = sentence,
             delay = delay,
         )
-        return SasayakiCueAudioExporter.export(
-            context = appContext,
+        return cueAudioExporter.export(
             source = source,
             cue = cue,
             range = range,
-            outputDir = outputDir,
         )
     }
 
