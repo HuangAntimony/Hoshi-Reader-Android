@@ -71,7 +71,7 @@ class AndroidAnkiContentApi(
     override fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? =
         api.addMediaFromUri(
             Uri.parse(uriString),
-            preferredName.substringBeforeLast('.'),
+            ankiPreferredMediaName(preferredName),
             if (mimeType.startsWith("audio/")) "audio" else "image",
         )
 
@@ -127,6 +127,12 @@ internal fun ankiDuplicateNoteSelection(
             checksumSelection,
         )
     }
+}
+
+internal fun ankiPreferredMediaName(preferredName: String): String {
+    val fileName = preferredName.substringAfterLast('/').substringAfterLast('\\')
+    return fileName.substringBeforeLast('.', missingDelimiterValue = fileName)
+        .ifBlank { "hoshi_media" }
 }
 
 internal fun ankiDuplicateScopeDeckIds(

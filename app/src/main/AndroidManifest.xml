@@ -20,7 +20,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HoshiReader">
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name="moe.antimony.hoshi.features.anki.HoshiFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">

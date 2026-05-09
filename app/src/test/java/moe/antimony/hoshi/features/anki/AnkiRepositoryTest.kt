@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.anki
 
 import moe.antimony.hoshi.features.audio.LocalAudioResolver
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,6 +21,19 @@ class AnkiRepositoryTest {
             "hoshi_sasayaki_123.m4a",
             ankiInlineMediaReference("[sound:hoshi_sasayaki_123.m4a]"),
         )
+    }
+
+    @Test
+    fun ankiDroidMediaImportPreservesPreferredFilenameExtension() {
+        val source = java.io.File("src/main/java/moe/antimony/hoshi/features/anki/AndroidAnkiContentApi.kt").readText()
+        val manifest = java.io.File("src/main/AndroidManifest.xml").readText()
+        val fileProvider = java.io.File("src/main/java/moe/antimony/hoshi/features/anki/HoshiFileProvider.kt").readText()
+
+        assertFalse(source.contains("preferredName.substringBeforeLast('.')"))
+        assertEquals("hoshi_sasayaki_123", ankiPreferredMediaName("hoshi_sasayaki_123.m4a"))
+        assertEquals("cover", ankiPreferredMediaName("/tmp/cover.jpg"))
+        assertTrue(manifest.contains("moe.antimony.hoshi.features.anki.HoshiFileProvider"))
+        assertTrue(fileProvider.contains(""""m4a" -> "audio/mp4""""))
     }
 
     @Test

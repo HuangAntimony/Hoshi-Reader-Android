@@ -14,6 +14,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep reader lookup popups responsive after configuring AnkiDroid by checking duplicate status asynchronously.
 - Export Sasayaki sentence audio for Anki cards through Media3 Transformer, improving compatibility with `.m4b` audiobooks that Android's legacy extractor cannot parse.
+- Preserve Sasayaki `.m4a` filenames when adding exported sentence audio to AnkiDroid, avoiding AAC audio being stored with a misleading `.mp3` suffix.
 
 ## [v0.3.3] - 2026-05-09
 
