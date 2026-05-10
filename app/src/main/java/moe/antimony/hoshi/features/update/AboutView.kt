@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.update
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +44,8 @@ import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import java.io.File
 
+private const val GitHubRepositoryUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android"
+
 @Composable
 fun AboutScreen(
     onClose: () -> Unit,
@@ -74,6 +78,37 @@ fun AboutScreen(
                             Text("Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                         },
                     )
+                }
+            }
+            item {
+                AboutCard {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            text = "GitHub",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "If you like this app, consider starring the project on GitHub.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(GitHubRepositoryUrl)),
+                                )
+                            },
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 8.dp),
+                            )
+                            Text("GitHub")
+                        }
+                    }
                 }
             }
             item {

@@ -19,6 +19,8 @@ class UpdateIntegrationSourceTest {
         assertTrue(about.contains("Check for Updates"))
         assertTrue(about.contains("VERSION_NAME"))
         assertTrue(about.contains("VERSION_CODE"))
+        assertTrue(about.contains("Hoshi-Reader-Android"))
+        assertTrue(about.contains("If you like this app, consider starring the project on GitHub."))
         assertTrue(prompt.contains("Update Downloaded"))
         assertTrue(prompt.contains("shouldPromptForInstall"))
         assertTrue(mainActivity.contains("DownloadedUpdatePrompt"))

@@ -12,6 +12,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Add GitHub release update checks with automatic APK downloads and a Settings -> About manual check.
 - Store downloaded update APKs under a stable file name so newer downloads replace older update packages.
 - Show a startup prompt when a newer downloaded update is ready to install.
+- Add a GitHub repository link to Settings -> About for starring this app's project.
 
 ### Fixed
 
