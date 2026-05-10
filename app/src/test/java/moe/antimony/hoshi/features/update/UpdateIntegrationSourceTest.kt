@@ -24,11 +24,15 @@ class UpdateIntegrationSourceTest {
     @Test
     fun appStartupAndManifestWirePersistentUpdateWorkWithoutInstallPermission() {
         val application = File("src/main/java/moe/antimony/hoshi/HoshiApplication.kt").readText()
+        val scheduler = File("src/main/java/moe/antimony/hoshi/features/update/UpdateScheduler.kt").readText()
         val manifest = File("src/main/AndroidManifest.xml").readText()
         val build = File("build.gradle.kts").readText() + File("../gradle/libs.versions.toml").readText()
 
         assertTrue(application.contains("UpdateScheduler.sync"))
+        assertTrue(scheduler.contains("OneTimeWorkRequestBuilder<UpdateCheckWorker>"))
+        assertTrue(scheduler.contains("UniqueImmediateWorkName"))
         assertTrue(manifest.contains("UpdateDownloadCompleteReceiver"))
+        assertTrue(manifest.contains("android:exported=\"true\""))
         assertFalse(manifest.contains("REQUEST_INSTALL_PACKAGES"))
         assertTrue(build.contains("work-runtime-ktx"))
     }

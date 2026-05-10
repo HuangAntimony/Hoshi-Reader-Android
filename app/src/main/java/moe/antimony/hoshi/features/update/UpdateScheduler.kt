@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -17,6 +19,7 @@ import java.util.concurrent.TimeUnit
 
 internal object UpdateScheduler {
     const val UniqueWorkName = "github-release-update-check"
+    const val UniqueImmediateWorkName = "github-release-update-check-now"
 
     fun sync(context: Context) {
         val appContext = context.applicationContext
@@ -29,6 +32,7 @@ internal object UpdateScheduler {
         val enabled = context.updateSettingsRepository().settings.first().autoDownloadUpdates
         if (enabled) {
             schedule(context)
+            scheduleImmediateCheck(context)
         } else {
             cancel(context)
         }
@@ -50,8 +54,26 @@ internal object UpdateScheduler {
     }
 
     fun cancel(context: Context) {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(UniqueWorkName)
+        val workManager = WorkManager.getInstance(context.applicationContext)
+        workManager.cancelUniqueWork(UniqueWorkName)
+        workManager.cancelUniqueWork(UniqueImmediateWorkName)
     }
+
+    fun scheduleImmediateCheck(context: Context) {
+        val request = OneTimeWorkRequestBuilder<UpdateCheckWorker>()
+            .setConstraints(networkConstraints())
+            .build()
+        WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+            UniqueImmediateWorkName,
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    private fun networkConstraints(): Constraints =
+        Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
 }
 
 internal class UpdateCheckWorker(

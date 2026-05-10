@@ -80,6 +80,7 @@ fun ReaderBehaviorScreen(
                                 }
                                 if (enabled) {
                                     UpdateScheduler.schedule(context)
+                                    UpdateScheduler.scheduleImmediateCheck(context)
                                 } else {
                                     UpdateScheduler.cancel(context)
                                 }
