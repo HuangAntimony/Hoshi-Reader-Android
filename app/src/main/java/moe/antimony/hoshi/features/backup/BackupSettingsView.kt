@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,6 +43,7 @@ import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +135,11 @@ fun BackupSettingsView(
 
     SettingsDetailScaffold(
         title = "Backup",
-        onClose = onClose,
+        onClose = {
+            if (operation == null) {
+                onClose()
+            }
+        },
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
@@ -169,27 +173,10 @@ fun BackupSettingsView(
                 }
             }
             operation?.let { current ->
-                Surface(
-                    color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f),
+                HoshiBlockingProgressOverlay(
+                    current.label,
                     modifier = Modifier.fillMaxSize(),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 4.dp,
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp),
-                            ) {
-                                CircularProgressIndicator()
-                                Text(current.label)
-                            }
-                        }
-                    }
-                }
+                )
             }
             SnackbarHost(
                 hostState = snackbarHostState,

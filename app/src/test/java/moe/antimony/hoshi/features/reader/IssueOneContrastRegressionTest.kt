@@ -84,7 +84,8 @@ class IssueOneContrastRegressionTest {
         assertTrue(appearanceSource.contains("scrimColor = sheetStyle.scrimColor"))
         assertTrue(chapterSource.contains("dragHandle = { ReaderSheetDragHandle(sheetStyle) }"))
         assertTrue(appearanceSource.contains("dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) }"))
-        assertTrue(sasayakiSource.contains("dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) }"))
+        assertTrue(sasayakiSource.contains("ReaderSheetDismissDragHandle(sheetStyle, sheetState)"))
+        assertTrue(sasayakiSource.contains("if (!isImporting) {\n                    onDismiss()"))
     }
 
     @Test
@@ -114,7 +115,8 @@ class IssueOneContrastRegressionTest {
         assertTrue(handle.contains("onDismiss()"))
         assertTrue(handle.contains(".background(sheetStyle.containerColor)"))
         assertTrue(sasayakiSource.contains("sheetGesturesEnabled = false"))
-        assertTrue(sasayakiSource.contains("dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) }"))
+        assertTrue(sasayakiSource.contains("ReaderSheetDismissDragHandle(sheetStyle, sheetState)"))
+        assertTrue(sasayakiSource.contains("if (!isImporting) {\n                    onDismiss()"))
         assertTrue(appearanceSource.contains("sheetGesturesEnabled = false"))
         assertTrue(appearanceSource.contains("dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) }"))
     }

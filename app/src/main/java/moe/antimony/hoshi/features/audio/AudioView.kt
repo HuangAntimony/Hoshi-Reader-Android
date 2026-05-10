@@ -33,7 +33,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -68,6 +67,7 @@ import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -216,7 +216,11 @@ fun AudioSettingsView(
         }
     }
 
-    BackHandler(onBack = onClose)
+    BackHandler {
+        if (!isImporting) {
+            onClose()
+        }
+    }
     val colorScheme = MaterialTheme.colorScheme
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -228,18 +232,28 @@ fun AudioSettingsView(
                     scrolledContainerColor = colorScheme.background,
                 ),
                 title = { Text("Audio", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = { BackIconButton(onClose) },
+                navigationIcon = {
+                    BackIconButton {
+                        if (!isImporting) {
+                            onClose()
+                        }
+                    }
+                },
             )
         },
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+                .padding(innerPadding),
         ) {
-            item {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                item {
                 SectionTitle("Sources")
                 GroupCard {
                     settings.audioSources.forEachIndexed { index, source ->
@@ -374,26 +388,6 @@ fun AudioSettingsView(
                                     }
                                 },
                             )
-                            importProgress?.let { progress ->
-                                GroupDivider()
-                                ListItem(
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    headlineContent = { Text("Copying android.db") },
-                                    supportingContent = {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            if (progress.totalBytes == null) {
-                                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                                            } else {
-                                                LinearProgressIndicator(
-                                                    progress = { progress.fraction },
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                )
-                                            }
-                                            Text(progress.label(context))
-                                        }
-                                    },
-                                )
-                            }
                             importError?.let { message ->
                                 GroupDivider()
                                 ListItem(
@@ -433,6 +427,15 @@ fun AudioSettingsView(
                     color = colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 24.dp),
+                )
+                }
+            }
+            if (isImporting) {
+                HoshiBlockingProgressOverlay(
+                    message = "Copying android.db",
+                    progress = importProgress?.takeIf { it.totalBytes != null }?.fraction,
+                    supportingText = importProgress?.label(context),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }

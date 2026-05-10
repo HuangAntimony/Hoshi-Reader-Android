@@ -62,19 +62,24 @@ internal class BookshelfViewModel(
         }
     }
 
-    fun importBook(uri: Uri) {
-        importBook(uri.toString()) {
+    fun importBook(uri: Uri, displayName: String? = null) {
+        importBook(uri.toString(), displayName) {
             repository.importBook(uri)
         }
     }
 
-    internal fun importBook(importKey: String, importOperation: suspend () -> String) {
+    internal fun importBook(
+        importKey: String,
+        displayName: String? = null,
+        importOperation: suspend () -> String,
+    ) {
         if (!importGate.tryStart(importKey)) {
             return
         }
         runLoading(
             errorPrefix = "Failed to import EPUB.",
             onComplete = { importGate.finish(importKey) },
+            blockingProgressMessage = "Importing ${displayName?.takeIf { it.isNotBlank() } ?: "EPUB"}...",
             block = {
                 val bookId = importOperation()
                 reloadBookEntriesSync()
@@ -244,10 +249,17 @@ internal class BookshelfViewModel(
     private fun runLoading(
         errorPrefix: String,
         onComplete: () -> Unit = {},
+        blockingProgressMessage: String? = null,
         block: suspend () -> Unit,
     ) {
         workScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    blockingProgressMessage = blockingProgressMessage,
+                    errorMessage = null,
+                )
+            }
             try {
                 block()
             } catch (error: Throwable) {
@@ -257,7 +269,7 @@ internal class BookshelfViewModel(
                     )
                 }
             } finally {
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(isLoading = false, blockingProgressMessage = null) }
                 onComplete()
             }
         }

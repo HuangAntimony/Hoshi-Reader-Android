@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.bookshelf
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
@@ -96,13 +97,40 @@ class BookshelfViewModelTest {
         val repository = FakeBookshelfRepository(importBookId = "imported-book")
         val viewModel = BookshelfViewModel(repository, testScope())
 
-        viewModel.importBook("content://books/import.epub") {
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
             repository.importBookId
         }
 
         assertEquals("imported-book", viewModel.uiState.value.openReaderBookId)
         assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
         assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun importingBookShowsAndClearsBlockingProgressMessage() {
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, testScope())
+        val continueImport = CompletableDeferred<Unit>()
+
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
+            continueImport.await()
+            "imported-book"
+        }
+
+        assertEquals("Importing import.epub...", viewModel.uiState.value.blockingProgressMessage)
+
+        continueImport.complete(Unit)
+
+        assertEquals("imported-book", viewModel.uiState.value.openReaderBookId)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+        assertFalse(viewModel.uiState.value.isLoading)
     }
 
     @Test
@@ -110,19 +138,60 @@ class BookshelfViewModelTest {
         val repository = FakeBookshelfRepository()
         val viewModel = BookshelfViewModel(repository, testScope())
 
-        viewModel.importBook("content://books/import.epub") {
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
             error("bad epub")
         }
 
         assertEquals("bad epub", viewModel.uiState.value.errorMessage)
         assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
 
-        viewModel.importBook("content://books/import.epub") {
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
             "retry-book"
         }
 
         assertEquals("retry-book", viewModel.uiState.value.openReaderBookId)
         assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun duplicatePendingImportDoesNotLeaveBlockingProgressMessage() {
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, testScope())
+        val continueImport = CompletableDeferred<Unit>()
+        var importCount = 0
+
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
+            importCount += 1
+            continueImport.await()
+            "imported-book"
+        }
+
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
+            importCount += 1
+            "duplicate-book"
+        }
+
+        assertEquals(1, importCount)
+        assertEquals("Importing import.epub...", viewModel.uiState.value.blockingProgressMessage)
+
+        continueImport.complete(Unit)
+
+        assertEquals("imported-book", viewModel.uiState.value.openReaderBookId)
+        assertEquals(1, importCount)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
     }
 
     @Test

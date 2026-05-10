@@ -117,6 +117,8 @@ import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.importDisplayName
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.io.File
@@ -169,7 +171,10 @@ fun BookshelfView(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
         }
-        booksViewModel.importBook(uri)
+        booksViewModel.importBook(
+            uri = uri,
+            displayName = context.contentResolver.importDisplayName(uri),
+        )
     }
 
     fun launchBookImporter() {
@@ -212,6 +217,7 @@ fun BookshelfView(
         bookRepository = bookRepository,
         hasLoadedBooks = uiState.hasLoadedBooks,
         isLoading = uiState.isLoading,
+        blockingProgressMessage = uiState.blockingProgressMessage,
         errorMessage = uiState.errorMessage,
         shelves = uiState.shelves,
         isSelecting = uiState.isSelecting,
@@ -493,6 +499,7 @@ private fun BooksTab(
     bookRepository: BookRepository,
     hasLoadedBooks: Boolean,
     isLoading: Boolean,
+    blockingProgressMessage: String?,
     errorMessage: String?,
     shelves: List<BookShelf>,
     isSelecting: Boolean,
@@ -519,6 +526,7 @@ private fun BooksTab(
     onMatchSasayaki: (BookEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val fileTaskBlocked = blockingProgressMessage != null
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -534,6 +542,7 @@ private fun BooksTab(
                 shelves = shelves,
                 isSelecting = isSelecting,
                 selectedCount = selectedBookIds.size,
+                enabled = !fileTaskBlocked,
                 onStartSelecting = onStartSelecting,
                 onClearSelection = onClearSelection,
                 onMoveSelectedBooks = onMoveSelectedBooks,
@@ -566,6 +575,7 @@ private fun BooksTab(
                 !hasLoadedBooks -> Box(Modifier.fillMaxSize())
                 hasLoadedBooks && bookEntries.isEmpty() -> EmptyBooksView(
                     errorMessage = errorMessage,
+                    enabled = !fileTaskBlocked,
                     onImport = onImport,
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -623,6 +633,7 @@ private fun BooksTab(
                                             layoutSpec = layoutSpec,
                                             isSelecting = isSelecting,
                                             isSelected = entry.metadata.id in selectedBookIds,
+                                            enabled = !fileTaskBlocked,
                                             onOpen = { onOpenBook(entry) },
                                             onToggleSelected = { onToggleSelectedBook(entry) },
                                             onLongPress = {
@@ -654,7 +665,7 @@ private fun BooksTab(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable {
+                                            .clickable(enabled = !fileTaskBlocked) {
                                                 collapseKey?.let { key ->
                                                     onShelfExpandedChange(key, true)
                                                 }
@@ -686,6 +697,12 @@ private fun BooksTab(
                     }
                 }
             }
+            blockingProgressMessage?.let { message ->
+                HoshiBlockingProgressOverlay(
+                    message = message,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
@@ -701,6 +718,7 @@ private fun BooksTopAppBar(
     shelves: List<BookShelf>,
     isSelecting: Boolean,
     selectedCount: Int,
+    enabled: Boolean,
     onStartSelecting: () -> Unit,
     onClearSelection: () -> Unit,
     onMoveSelectedBooks: (String?) -> Unit,
@@ -719,13 +737,16 @@ private fun BooksTopAppBar(
         },
         navigationIcon = {
             if (isSelecting) {
-                TextButton(onClick = onClearSelection) {
+                TextButton(onClick = onClearSelection, enabled = enabled) {
                     Text("Done", fontWeight = FontWeight.SemiBold)
                 }
             } else {
                 Row {
                     Box {
-                        IconButton(onClick = { onSortMenuExpandedChange(true) }) {
+                        IconButton(
+                            onClick = { onSortMenuExpandedChange(true) },
+                            enabled = enabled,
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.Sort,
                                 contentDescription = "Sort books",
@@ -749,7 +770,7 @@ private fun BooksTopAppBar(
                             )
                         }
                     }
-                    IconButton(onClick = onStartSelecting) {
+                    IconButton(onClick = onStartSelecting, enabled = enabled) {
                         Icon(
                             imageVector = Icons.Rounded.Done,
                             contentDescription = "Select books",
@@ -763,7 +784,7 @@ private fun BooksTopAppBar(
                 Box {
                     IconButton(
                         onClick = { moveMenuExpanded = true },
-                        enabled = selectedCount > 0,
+                        enabled = enabled && selectedCount > 0,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.FolderOpen,
@@ -794,7 +815,7 @@ private fun BooksTopAppBar(
                 }
                 IconButton(
                     onClick = onDeleteSelectedBooks,
-                    enabled = selectedCount > 0,
+                    enabled = enabled && selectedCount > 0,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Delete,
@@ -802,13 +823,13 @@ private fun BooksTopAppBar(
                     )
                 }
             } else {
-                IconButton(onClick = onManageShelves) {
+                IconButton(onClick = onManageShelves, enabled = enabled) {
                     Icon(
                         imageVector = Icons.Rounded.FolderOpen,
                         contentDescription = "Manage Shelves",
                     )
                 }
-                IconButton(onClick = onImport) {
+                IconButton(onClick = onImport, enabled = enabled) {
                     Icon(
                         imageVector = Icons.Rounded.Add,
                         contentDescription = "Import EPUB",
@@ -899,12 +920,14 @@ private fun BookGridCell(
     layoutSpec: MainShellLayoutSpec,
     isSelecting: Boolean,
     isSelected: Boolean,
+    enabled: Boolean,
     onOpen: () -> Unit,
     onToggleSelected: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     Column(
         modifier = Modifier.combinedClickable(
+            enabled = enabled,
             onClick = {
                 if (isSelecting) {
                     onToggleSelected()
@@ -1412,6 +1435,7 @@ private fun SettingsRow(row: SettingsRowModel, onClick: () -> Unit) {
 private fun EmptyBooksView(
     errorMessage: String?,
     onImport: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -1431,7 +1455,7 @@ private fun EmptyBooksView(
         )
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth()) {
-            Button(onClick = onImport) {
+            Button(onClick = onImport, enabled = enabled) {
                 Text("Import EPUB")
             }
         }

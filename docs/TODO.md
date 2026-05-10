@@ -37,6 +37,7 @@ Status: `in_progress`
 - Preserve iOS-shaped `Books/<safeTitle>` storage and sidecar JSON compatibility, including UUID book ids in `metadata.json`/`shelves.json` and `Books/<folder>/<cover>` metadata cover paths for backup/restore interop. Keep the legacy Android field migration isolated so it can be removed after the supported upgrade window.
 - Advanced -> Backup exports and restores iOS-shaped `Books` and `Dictionaries` `.hoshi` archives; iOS-created Books restore is device-validated, and next validation should cover Android-created archives restored by iOS.
 - Settings -> About includes a confirmed storage cleanup tool for interrupted restore/import residues, orphan Sasayaki audio, local audio temp files, and Anki media cache. Backup export interruptions can leave partial files only at the user-selected SAF destination, not under app-private storage.
+- EPUB imports now show a reusable e-ink-friendly blocking overlay while copying/parsing.
 
 ### Reader And Lookup
 
@@ -94,6 +95,7 @@ Status: `in_progress`
 - Sasayaki audiobook playback and dictionary word audio now use Media3 ExoPlayer; Sasayaki Anki cue export uses Media3 Transformer. Keep standard Android media previous/next controls, paused Sasayaki cue reveal, lookup audio, and Anki cue export behavior-protected.
 - Dictionary word audio now owns short audio-focus policy instead of delegating it to ExoPlayer, preserving Interrupt, best-effort Lower Volume, and Keep Volume background-audio behavior.
 - Local audio `android.db` import uses a broad Android picker MIME for vendor file-manager compatibility, with Hoshi-side `.db` validation after selection.
+- File-based audio/font/backup tasks now reuse the same e-ink-friendly blocking progress overlay instead of per-screen scrim implementations.
 
 ### Updates
 

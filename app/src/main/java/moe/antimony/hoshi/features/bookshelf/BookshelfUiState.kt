@@ -17,6 +17,7 @@ data class BookshelfUiState(
     val sasayakiEnabled: Boolean = false,
     val hasLoadedBooks: Boolean = false,
     val isLoading: Boolean = false,
+    val blockingProgressMessage: String? = null,
     val errorMessage: String? = null,
     val openReaderBookId: String? = null,
 )

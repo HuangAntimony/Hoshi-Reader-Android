@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,6 +28,8 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 fun HoshiBlockingProgressOverlay(
     message: String,
     modifier: Modifier = Modifier,
+    progress: Float? = null,
+    supportingText: String? = null,
 ) {
     val eInkMode = LocalHoshiEInkMode.current
     val scrimColor = if (eInkMode) Color.Transparent else MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)
@@ -43,6 +48,9 @@ fun HoshiBlockingProgressOverlay(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
+            modifier = Modifier
+                .padding(24.dp)
+                .widthIn(max = 320.dp),
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             border = if (eInkMode) {
@@ -57,12 +65,28 @@ fun HoshiBlockingProgressOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                CircularProgressIndicator()
+                if (progress == null) {
+                    CircularProgressIndicator()
+                } else {
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Text(
                     text = message,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                supportingText?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

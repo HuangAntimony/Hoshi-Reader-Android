@@ -61,6 +61,8 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.importing.importDisplayName
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import java.util.Locale
 import kotlin.math.round
 
@@ -149,19 +151,23 @@ private fun ReaderAppearanceContent(
     var fontMenuExpanded by remember { mutableStateOf(false) }
     var fontToDelete by remember { mutableStateOf<String?>(null) }
     var isImportingFont by remember { mutableStateOf(false) }
+    var importingFontMessage by remember { mutableStateOf<String?>(null) }
     val fontImporter = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        val displayName = context.contentResolver.importDisplayName(uri).ifBlank { "font" }
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         scope.launch {
             isImportingFont = true
+            importingFontMessage = "Importing $displayName..."
             runCatching {
                 withContext(Dispatchers.IO) {
                     fontManager.importFont(context.contentResolver, uri)
                 }
             }
             importedFonts = fontManager.storedFonts()
+            importingFontMessage = null
             isImportingFont = false
         }
     }
@@ -173,14 +179,17 @@ private fun ReaderAppearanceContent(
     val palette = appearancePalette()
 
     CompositionLocalProvider(LocalContentColor provides palette.onBackground) {
-        LazyColumn(
+        Box(
             modifier = modifier
                 .fillMaxWidth()
                 .background(palette.background),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (showTitle) item {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (showTitle) item {
                 Text(
                     text = "Appearance",
                     style = MaterialTheme.typography.headlineLarge,
@@ -445,6 +454,13 @@ private fun ReaderAppearanceContent(
                         Text("Done")
                     }
                 }
+            }
+        }
+            importingFontMessage?.let { message ->
+                HoshiBlockingProgressOverlay(
+                    message = message,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

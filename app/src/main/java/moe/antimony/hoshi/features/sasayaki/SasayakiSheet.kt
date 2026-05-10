@@ -6,8 +6,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -49,6 +51,7 @@ import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.OpenDocumentContent
 import moe.antimony.hoshi.importing.validateImportFile
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,23 +101,37 @@ fun SasayakiSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!isImporting) {
+                onDismiss()
+            }
+        },
         modifier = modifier,
         sheetState = sheetState,
         sheetGesturesEnabled = false,
         containerColor = sheetStyle.containerColor,
         contentColor = sheetStyle.contentColor,
         scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) },
+        dragHandle = {
+            ReaderSheetDismissDragHandle(sheetStyle, sheetState) {
+                if (!isImporting) {
+                    onDismiss()
+                }
+            }
+        },
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .readerMediumSheetContentHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 28.dp),
+                .readerMediumSheetContentHeight(),
         ) {
-            if (player.hasAudio) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 28.dp),
+            ) {
+                if (player.hasAudio) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -163,7 +180,7 @@ fun SasayakiSheet(
                     }
                 },
             )
-            SasayakiSettingsSwitchRow(
+                SasayakiSettingsSwitchRow(
                 label = "Copy Audiobook to App Storage",
                 checked = settings.copyAudiobookToPrivateStorage,
                 onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
@@ -182,7 +199,7 @@ fun SasayakiSheet(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             SliderRow(
                 label = "Delay",
                 valueText = String.format(java.util.Locale.US, "%+.2fs", player.delay),
@@ -222,8 +239,15 @@ fun SasayakiSheet(
                 checked = settings.autoPause,
                 onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
             )
+            }
+            if (isImporting) {
+                HoshiBlockingProgressOverlay(
+                    message = "Importing audio...",
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
-    }
+}
 }
 
 @Composable
