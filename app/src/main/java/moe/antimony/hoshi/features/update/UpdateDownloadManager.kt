@@ -54,13 +54,17 @@ internal class AndroidUpdateDownloadManager(
     }
 
     override suspend fun enqueue(update: AvailableUpdate): Long {
+        val previousFailedDownloadUrl = store.load()
+            ?.takeIf { it.matches(update) && it.status == UpdateDownloadRecordStatus.Failed }
+            ?.downloadUrl
+        val downloadUrl = update.downloadUrlAfterFailed(previousFailedDownloadUrl)
         val target = updateFile(UpdateFileName)
         target.parentFile?.mkdirs()
         deleteExistingUpdateApksExcept(target)
         if (target.exists()) {
             target.delete()
         }
-        val request = DownloadManager.Request(Uri.parse(update.downloadUrl))
+        val request = DownloadManager.Request(Uri.parse(downloadUrl))
             .setTitle("Hoshi Reader ${update.versionName}")
             .setDescription("Downloading update")
             .setMimeType(ApkMimeType)
@@ -69,7 +73,7 @@ internal class AndroidUpdateDownloadManager(
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(target))
         val downloadId = downloadManager.enqueue(request)
-        store.saveDownloading(update, target.name, downloadId)
+        store.saveDownloading(update, target.name, downloadId, downloadUrl)
         return downloadId
     }
 

@@ -40,6 +40,7 @@ internal data class GitHubReleaseAsset(
     val name: String,
     val browserDownloadUrl: String,
     val digest: String?,
+    val fallbackDownloadUrls: List<String> = emptyList(),
 )
 
 internal data class AvailableUpdate(
@@ -47,8 +48,20 @@ internal data class AvailableUpdate(
     val releaseUrl: String,
     val assetName: String,
     val downloadUrl: String,
+    val fallbackDownloadUrls: List<String> = emptyList(),
     val sha256: String?,
 )
+
+internal fun AvailableUpdate.downloadUrlCandidates(): List<String> =
+    (listOf(downloadUrl) + fallbackDownloadUrls).distinct()
+
+internal fun AvailableUpdate.downloadUrlAfterFailed(failedDownloadUrl: String?): String =
+    if (failedDownloadUrl == null) {
+        downloadUrl
+    } else {
+        val candidates = downloadUrlCandidates()
+        candidates.getOrNull(candidates.indexOf(failedDownloadUrl) + 1) ?: downloadUrl
+    }
 
 internal fun GitHubRelease.availableUpdateOrNull(currentVersionName: String): AvailableUpdate? {
     val releaseVersion = AppVersion.parse(tagName) ?: return null
@@ -66,6 +79,7 @@ internal fun GitHubRelease.availableUpdateOrNull(currentVersionName: String): Av
         releaseUrl = htmlUrl,
         assetName = selectedAsset.name,
         downloadUrl = selectedAsset.browserDownloadUrl,
+        fallbackDownloadUrls = selectedAsset.fallbackDownloadUrls,
         sha256 = selectedAsset.normalizedSha256(),
     )
 }
@@ -79,14 +93,68 @@ internal interface ReleaseUpdateRepository {
     suspend fun latestRelease(): GitHubRelease
 }
 
+internal interface GitHubHttpClient {
+    fun get(url: String, headers: Map<String, String>): String
+}
+
 internal class GitHubReleaseUpdateRepository(
     private val latestReleaseUrl: String = LatestReleaseUrl,
+    private val apiMirrorPrefixes: List<String> = DefaultApiMirrorPrefixes,
+    private val downloadMirrorPrefixes: List<String> = DefaultDownloadMirrorPrefixes,
+    private val httpClient: GitHubHttpClient = UrlConnectionGitHubHttpClient,
 ) : ReleaseUpdateRepository {
     override suspend fun latestRelease(): GitHubRelease {
-        val connection = URL(latestReleaseUrl).openConnection() as HttpURLConnection
+        val headers = mapOf(
+            "Accept" to "application/vnd.github+json",
+            "User-Agent" to "Hoshi-Reader-Android",
+        )
+        var lastError: Throwable? = null
+        latestReleaseCandidates().forEachIndexed { index, url ->
+            val preferMirrors = index > 0
+            runCatching {
+                GitHubReleaseJson
+                    .parse(httpClient.get(url, headers))
+                    .withDownloadMirrors(downloadMirrorPrefixes, preferMirrors)
+            }.onSuccess { release ->
+                return release
+            }.onFailure { error ->
+                lastError = error
+            }
+        }
+        throw GitHubReleaseException(lastError?.message ?: "GitHub update check failed.")
+    }
+
+    private fun latestReleaseCandidates(): List<String> =
+        (listOf(latestReleaseUrl) + apiMirrorPrefixes.map { prefix -> prefix + latestReleaseUrl }).distinct()
+
+    private fun GitHubRelease.withDownloadMirrors(
+        mirrorPrefixes: List<String>,
+        preferMirrors: Boolean,
+    ): GitHubRelease = copy(
+        assets = assets.map { asset ->
+            val mirroredUrls = mirrorPrefixes.map { prefix -> prefix + asset.browserDownloadUrl }.distinct()
+            if (preferMirrors && mirroredUrls.isNotEmpty()) {
+                asset.copy(
+                    browserDownloadUrl = mirroredUrls.first(),
+                    fallbackDownloadUrls = (mirroredUrls.drop(1) + asset.browserDownloadUrl).distinct(),
+                )
+            } else {
+                asset.copy(fallbackDownloadUrls = mirroredUrls)
+            }
+        },
+    )
+
+    companion object {
+        const val LatestReleaseUrl =
+            "https://api.github.com/repos/HuangAntimony/Hoshi-Reader-Android/releases/latest"
+    }
+}
+
+internal object UrlConnectionGitHubHttpClient : GitHubHttpClient {
+    override fun get(url: String, headers: Map<String, String>): String {
+        val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
-        connection.setRequestProperty("Accept", "application/vnd.github+json")
-        connection.setRequestProperty("User-Agent", "Hoshi-Reader-Android")
+        headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
         connection.connectTimeout = 15_000
         connection.readTimeout = 15_000
         return connection.use {
@@ -95,15 +163,22 @@ internal class GitHubReleaseUpdateRepository(
                 val retryAfter = it.getHeaderField("Retry-After")
                 throw GitHubReleaseException("GitHub update check failed with HTTP $code${retryAfter?.let { value -> " (retry after $value)" }.orEmpty()}.")
             }
-            GitHubReleaseJson.parse(it.inputStream.bufferedReader().use { reader -> reader.readText() })
+            it.inputStream.bufferedReader().use { reader -> reader.readText() }
         }
     }
-
-    companion object {
-        const val LatestReleaseUrl =
-            "https://api.github.com/repos/HuangAntimony/Hoshi-Reader-Android/releases/latest"
-    }
 }
+
+private val DefaultApiMirrorPrefixes = listOf(
+    "https://ghproxy.vip/",
+    "https://githubproxy.cc/",
+)
+
+private val DefaultDownloadMirrorPrefixes = listOf(
+    "https://gh-proxy.com/",
+    "https://gh.llkk.cc/",
+    "https://ghpull.com/",
+    "https://fastgit.cc/",
+)
 
 internal class GitHubReleaseException(message: String) : RuntimeException(message)
 

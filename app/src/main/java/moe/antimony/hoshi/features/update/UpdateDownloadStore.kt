@@ -17,6 +17,7 @@ internal data class UpdateDownloadRecord(
     val fileName: String,
     val downloadId: Long,
     val sha256: String?,
+    val downloadUrl: String? = null,
     val status: UpdateDownloadRecordStatus,
 ) {
     fun matches(update: AvailableUpdate): Boolean =
@@ -43,12 +44,18 @@ internal class UpdateDownloadStore(
 
     suspend fun load(): UpdateDownloadRecord? = dataStore.data.map { it.toRecord() }.first()
 
-    suspend fun saveDownloading(update: AvailableUpdate, fileName: String, downloadId: Long) {
+    suspend fun saveDownloading(
+        update: AvailableUpdate,
+        fileName: String,
+        downloadId: Long,
+        downloadUrl: String,
+    ) {
         dataStore.edit { preferences ->
             preferences[KEY_VERSION_NAME] = update.versionName
             preferences[KEY_ASSET_NAME] = update.assetName
             preferences[KEY_FILE_NAME] = fileName
             preferences[KEY_DOWNLOAD_ID] = downloadId
+            preferences[KEY_DOWNLOAD_URL] = downloadUrl
             preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Downloading.name
             update.sha256?.let { preferences[KEY_SHA256] = it } ?: preferences.remove(KEY_SHA256)
         }
@@ -84,6 +91,7 @@ internal class UpdateDownloadStore(
             fileName = fileName,
             downloadId = downloadId,
             sha256 = this[KEY_SHA256],
+            downloadUrl = this[KEY_DOWNLOAD_URL],
             status = status,
         )
     }
@@ -93,6 +101,7 @@ internal class UpdateDownloadStore(
         private val KEY_ASSET_NAME = stringPreferencesKey("assetName")
         private val KEY_FILE_NAME = stringPreferencesKey("fileName")
         private val KEY_DOWNLOAD_ID = longPreferencesKey("downloadId")
+        private val KEY_DOWNLOAD_URL = stringPreferencesKey("downloadUrl")
         private val KEY_SHA256 = stringPreferencesKey("sha256")
         private val KEY_STATUS = stringPreferencesKey("status")
     }

@@ -38,6 +38,100 @@ class GitHubReleaseUpdateRepositoryTest {
     }
 
     @Test
+    fun fallsBackToMirroredLatestReleaseAndPrefersMirroredDownloads() = runBlocking {
+        val client = FakeGitHubHttpClient(
+            responses = mapOf(
+                "https://ghproxy.vip/https://api.github.com/repos/HuangAntimony/Hoshi-Reader-Android/releases/latest" to """
+                    {
+                      "tag_name": "v0.3.5",
+                      "html_url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/tag/v0.3.5",
+                      "assets": [
+                        {
+                          "name": "Hoshi-Reader-v0.3.5.apk",
+                          "browser_download_url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk"
+                        }
+                      ]
+                    }
+                """.trimIndent(),
+            ),
+            failures = setOf(GitHubReleaseUpdateRepository.LatestReleaseUrl),
+        )
+        val repository = GitHubReleaseUpdateRepository(httpClient = client)
+
+        val release = repository.latestRelease()
+        val update = release.availableUpdateOrNull(currentVersionName = "0.3.4")
+
+        requireNotNull(update)
+        assertEquals(
+            listOf(
+                GitHubReleaseUpdateRepository.LatestReleaseUrl,
+                "https://ghproxy.vip/https://api.github.com/repos/HuangAntimony/Hoshi-Reader-Android/releases/latest",
+            ),
+            client.requestedUrls.take(2),
+        )
+        assertEquals(
+            "https://gh-proxy.com/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            update.downloadUrl,
+        )
+        assertTrue(update.fallbackDownloadUrls.contains("https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk"))
+    }
+
+    @Test
+    fun directGitHubReleaseKeepsOriginalDownloadBeforeMirrorFallbacks() = runBlocking {
+        val client = FakeGitHubHttpClient(
+            responses = mapOf(
+                GitHubReleaseUpdateRepository.LatestReleaseUrl to """
+                    {
+                      "tag_name": "v0.3.5",
+                      "html_url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/tag/v0.3.5",
+                      "assets": [
+                        {
+                          "name": "Hoshi-Reader-v0.3.5.apk",
+                          "browser_download_url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk"
+                        }
+                      ]
+                    }
+                """.trimIndent(),
+            ),
+        )
+        val repository = GitHubReleaseUpdateRepository(httpClient = client)
+
+        val update = repository.latestRelease().availableUpdateOrNull(currentVersionName = "0.3.4")
+
+        requireNotNull(update)
+        assertEquals(
+            "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            update.downloadUrl,
+        )
+        assertTrue(update.fallbackDownloadUrls.contains("https://gh-proxy.com/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk"))
+    }
+
+    @Test
+    fun failedDownloadRecordAdvancesToNextCandidateUrl() {
+        val update = AvailableUpdate(
+            versionName = "0.3.5",
+            releaseUrl = "https://example.com/releases/tag/v0.3.5",
+            assetName = "Hoshi-Reader-v0.3.5.apk",
+            downloadUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            fallbackDownloadUrls = listOf(
+                "https://gh-proxy.com/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+                "https://gh.llkk.cc/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            ),
+            sha256 = null,
+        )
+
+        assertEquals(update.downloadUrl, update.downloadUrlAfterFailed(null))
+        assertEquals(
+            "https://gh-proxy.com/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            update.downloadUrlAfterFailed(update.downloadUrl),
+        )
+        assertEquals(
+            "https://gh.llkk.cc/https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/v0.3.5/Hoshi-Reader-v0.3.5.apk",
+            update.downloadUrlAfterFailed(update.fallbackDownloadUrls.first()),
+        )
+    }
+
+    @Test
     fun fallsBackToOnlyApkAssetWhenFileNameDoesNotMatchExpectedPattern() {
         val release = GitHubRelease(
             tagName = "0.3.5",
@@ -118,6 +212,21 @@ class GitHubReleaseUpdateRepositoryTest {
         private val release: GitHubRelease,
     ) : ReleaseUpdateRepository {
         override suspend fun latestRelease(): GitHubRelease = release
+    }
+
+    private class FakeGitHubHttpClient(
+        private val responses: Map<String, String>,
+        private val failures: Set<String> = emptySet(),
+    ) : GitHubHttpClient {
+        val requestedUrls = mutableListOf<String>()
+
+        override fun get(url: String, headers: Map<String, String>): String {
+            requestedUrls += url
+            if (url in failures) {
+                throw GitHubReleaseException("failed")
+            }
+            return responses.getValue(url)
+        }
     }
 
     private class FakeUpdateDownloadController : UpdateDownloadController {
