@@ -33,8 +33,11 @@ internal class BookshelfViewModel(
     }
 
     fun changeSort(sortOption: BookSortOption) {
-        _uiState.update { it.copy(sortOption = sortOption) }
-        reloadBookEntries(sortOption)
+        workScope.launch {
+            repository.changeSort(sortOption)
+            _uiState.update { it.copy(sortOption = sortOption) }
+            reloadBookEntriesSync(sortOption)
+        }
     }
 
     fun openBook(entry: BookEntry) {
@@ -83,14 +86,100 @@ internal class BookshelfViewModel(
     fun deleteBook(entry: BookEntry) {
         workScope.launch {
             repository.deleteBook(entry)
-            val result = loadBookEntries(_uiState.value.sortOption)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun deleteSelectedBooks() {
+        val selectedEntries = _uiState.value.bookEntries.filter { it.metadata.id in _uiState.value.selectedBookIds }
+        if (selectedEntries.isEmpty()) return
+        workScope.launch {
+            repository.deleteBooks(selectedEntries)
+            clearSelection()
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun moveBook(entry: BookEntry, shelfName: String?) {
+        workScope.launch {
+            repository.moveBooks(setOf(entry.metadata.id), shelfName)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun moveSelectedBooks(shelfName: String?) {
+        val selectedIds = _uiState.value.selectedBookIds
+        if (selectedIds.isEmpty()) return
+        workScope.launch {
+            repository.moveBooks(selectedIds, shelfName)
+            clearSelection()
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun createShelf(name: String) {
+        workScope.launch {
+            repository.createShelf(name)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun deleteShelf(name: String) {
+        workScope.launch {
+            repository.deleteShelf(name)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun moveShelf(fromIndex: Int, toIndex: Int) {
+        workScope.launch {
+            repository.moveShelf(fromIndex, toIndex)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun markRead(entry: BookEntry) {
+        workScope.launch {
+            repository.markRead(entry)
+            reloadBookEntriesSync()
+        }
+    }
+
+    fun changeShowReading(showReading: Boolean) {
+        workScope.launch {
+            repository.changeShowReading(showReading)
             _uiState.update {
                 it.copy(
-                    bookEntries = result.entries,
-                    bookProgressById = result.progressById,
-                    hasLoadedBooks = true,
+                    showReading = showReading,
+                    sections = bookshelfSections(
+                        entries = it.bookEntries,
+                        shelves = it.shelves,
+                        progressById = it.bookProgressById,
+                        showReading = showReading,
+                        sortOption = it.sortOption,
+                    ),
                 )
             }
+        }
+    }
+
+    fun startSelecting() {
+        _uiState.update { it.copy(isSelecting = true, selectedBookIds = emptySet()) }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(isSelecting = false, selectedBookIds = emptySet()) }
+    }
+
+    fun toggleSelectedBook(entry: BookEntry) {
+        _uiState.update { state ->
+            val id = entry.metadata.id
+            val selected = if (id in state.selectedBookIds) {
+                state.selectedBookIds - id
+            } else {
+                state.selectedBookIds + id
+            }
+            state.copy(selectedBookIds = selected)
         }
     }
 
@@ -110,25 +199,35 @@ internal class BookshelfViewModel(
 
     private fun reloadBookEntries(sortOption: BookSortOption) {
         workScope.launch {
-            val result = loadBookEntries(sortOption)
-            _uiState.update {
-                it.copy(
-                    bookEntries = result.entries,
-                    bookProgressById = result.progressById,
-                    hasLoadedBooks = true,
-                    errorMessage = null,
-                )
-            }
+            reloadBookEntriesSync(sortOption)
         }
     }
 
-    private suspend fun reloadBookEntriesSync() {
-        val result = loadBookEntries(_uiState.value.sortOption)
+    private suspend fun reloadBookEntriesSync(sortOption: BookSortOption = _uiState.value.sortOption) {
+        val firstResult = loadBookEntries(sortOption)
+        val result = if (firstResult.settings.sortOption != sortOption) {
+            loadBookEntries(firstResult.settings.sortOption)
+        } else {
+            firstResult
+        }
         _uiState.update {
+            val validSelectedIds = it.selectedBookIds.intersect(result.entries.mapTo(mutableSetOf()) { entry -> entry.metadata.id })
             it.copy(
                 bookEntries = result.entries,
                 bookProgressById = result.progressById,
+                shelves = result.shelves,
+                sections = bookshelfSections(
+                    entries = result.entries,
+                    shelves = result.shelves,
+                    progressById = result.progressById,
+                    showReading = result.settings.showReading,
+                    sortOption = result.settings.sortOption,
+                ),
+                sortOption = result.settings.sortOption,
+                showReading = result.settings.showReading,
+                selectedBookIds = validSelectedIds,
                 hasLoadedBooks = true,
+                errorMessage = null,
             )
         }
     }

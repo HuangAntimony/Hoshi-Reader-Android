@@ -28,6 +28,25 @@ class BookCoverStorageTest {
     }
 
     @Test
+    fun coverFileResolvesIosStyleBooksRelativeMetadataCover() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-cover-ios").toFile())
+        val root = storage.createBookDirectory("book")
+        val cover = root.resolve("cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val entry = BookEntry(
+            root = root,
+            metadata = BookMetadata(
+                id = "00000000-0000-0000-0000-000000000001",
+                title = "Book",
+                cover = "Books/book/cover.jpg",
+                folder = "book",
+                lastAccess = 1.0,
+            ),
+        )
+
+        assertEquals(cover.canonicalFile, storage.coverFile(entry)?.canonicalFile)
+    }
+
+    @Test
     fun coverFileRejectsPathsOutsideBookRoot() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-cover-unsafe").toFile())
         val root = storage.createBookDirectory("book")

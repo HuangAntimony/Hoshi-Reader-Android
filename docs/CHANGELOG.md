@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add iOS-style bookshelf management with custom shelves, a Reading shelf toggle, shelf previews, toolbar action grouping, single-book and batch moves, batch deletion, and Mark Read.
+
 ### Fixed
 
 - Show concrete Java crash stack traces in Settings -> Diagnostics after Hoshi restarts from an uncaught exception.

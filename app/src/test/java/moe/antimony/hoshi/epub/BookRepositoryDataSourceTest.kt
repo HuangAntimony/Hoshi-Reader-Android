@@ -60,4 +60,35 @@ class BookRepositoryDataSourceTest {
 
         assertEquals(listOf(visible.canonicalFile), dataSource.loadAllBooks().map { it.canonicalFile })
     }
+
+    @Test
+    fun deletingBookRemovesItFromAllShelves() = runBlocking {
+        val repository = BookRepository(Files.createTempDirectory("hoshi-book-shelves-delete").toFile())
+        val keep = repository.createBookDirectory("keep")
+        val remove = repository.createBookDirectory("remove")
+        repository.saveMetadata(
+            keep,
+            BookMetadata(id = "keep-id", title = "Keep", cover = null, folder = "keep", lastAccess = 1.0),
+        )
+        repository.saveMetadata(
+            remove,
+            BookMetadata(id = "remove-id", title = "Remove", cover = null, folder = "remove", lastAccess = 2.0),
+        )
+        repository.saveShelves(
+            listOf(
+                BookShelf(name = "Shelf A", bookIds = listOf("remove-id", "keep-id")),
+                BookShelf(name = "Shelf B", bookIds = listOf("remove-id")),
+            ),
+        )
+
+        repository.deleteBook(remove)
+
+        assertEquals(
+            listOf(
+                BookShelf(name = "Shelf A", bookIds = listOf("keep-id")),
+                BookShelf(name = "Shelf B", bookIds = emptyList()),
+            ),
+            repository.loadShelves(),
+        )
+    }
 }

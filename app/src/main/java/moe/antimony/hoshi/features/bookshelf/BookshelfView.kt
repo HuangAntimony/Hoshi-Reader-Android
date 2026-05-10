@@ -37,12 +37,18 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Inventory2
@@ -50,7 +56,6 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -70,9 +75,11 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
@@ -80,6 +87,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -87,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -94,6 +103,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -104,6 +114,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -145,8 +156,11 @@ fun BookshelfView(
     )
     val uiState by booksViewModel.uiState.collectAsState()
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    var contextMenuEntry by remember { mutableStateOf<BookEntry?>(null) }
+    var contextMenuTarget by remember { mutableStateOf<BookContextMenuTarget?>(null) }
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
+    var markReadCandidate by remember { mutableStateOf<BookEntry?>(null) }
+    var showBulkDeleteConfirmation by remember { mutableStateOf(false) }
+    var showShelfManagement by remember { mutableStateOf(false) }
 
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -193,23 +207,35 @@ fun BookshelfView(
         modifier = modifier,
         layoutSpec = layoutSpec,
         bookEntries = uiState.bookEntries,
+        sections = uiState.sections,
         bookProgressById = uiState.bookProgressById,
+        sortOption = uiState.sortOption,
         bookRepository = bookRepository,
         hasLoadedBooks = uiState.hasLoadedBooks,
         isLoading = uiState.isLoading,
         errorMessage = uiState.errorMessage,
-        sortOption = uiState.sortOption,
+        shelves = uiState.shelves,
+        isSelecting = uiState.isSelecting,
+        selectedBookIds = uiState.selectedBookIds,
         sortMenuExpanded = sortMenuExpanded,
         onSortMenuExpandedChange = { sortMenuExpanded = it },
         onSortChange = {
             sortMenuExpanded = false
             booksViewModel.changeSort(it)
         },
+        onStartSelecting = booksViewModel::startSelecting,
+        onClearSelection = booksViewModel::clearSelection,
+        onToggleSelectedBook = booksViewModel::toggleSelectedBook,
+        onMoveSelectedBooks = booksViewModel::moveSelectedBooks,
+        onDeleteSelectedBooks = { showBulkDeleteConfirmation = true },
+        onManageShelves = { showShelfManagement = true },
         onImport = ::launchBookImporter,
         onOpenBook = booksViewModel::openBook,
-        contextMenuEntry = contextMenuEntry,
-        onContextMenuEntryChange = { contextMenuEntry = it },
+        contextMenuTarget = contextMenuTarget,
+        onContextMenuTargetChange = { contextMenuTarget = it },
         onDeleteCandidate = { deleteCandidate = it },
+        onMarkReadCandidate = { markReadCandidate = it },
+        onMoveBook = booksViewModel::moveBook,
         sasayakiEnabled = uiState.sasayakiEnabled,
         onMatchSasayaki = { entry ->
             onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))
@@ -235,6 +261,62 @@ fun BookshelfView(
                     Text("Cancel")
                 }
             },
+        )
+    }
+
+    markReadCandidate?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { markReadCandidate = null },
+            title = { Text("Mark \"${candidate.metadata.title ?: ""}\" as read?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        booksViewModel.markRead(candidate)
+                        markReadCandidate = null
+                    },
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { markReadCandidate = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (showBulkDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteConfirmation = false },
+            title = { Text("Delete ${uiState.selectedBookIds.size} book(s)?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        booksViewModel.deleteSelectedBooks()
+                        showBulkDeleteConfirmation = false
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteConfirmation = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (showShelfManagement) {
+        ShelfManagementDialog(
+            shelves = uiState.shelves,
+            showReading = uiState.showReading,
+            onShowReadingChange = booksViewModel::changeShowReading,
+            onCreateShelf = booksViewModel::createShelf,
+            onDeleteShelf = booksViewModel::deleteShelf,
+            onMoveShelf = booksViewModel::moveShelf,
+            onDismiss = { showShelfManagement = false },
         )
     }
 }
@@ -374,30 +456,67 @@ private fun MainShellFontWeight.toFontWeight(): FontWeight =
         MainShellFontWeight.SemiBold -> FontWeight.SemiBold
     }
 
+internal data class BookContextMenuTarget(
+    val sectionKey: String,
+    val bookId: String,
+)
+
+internal fun bookContextMenuTarget(
+    section: BookshelfSectionModel,
+    entry: BookEntry,
+): BookContextMenuTarget =
+    BookContextMenuTarget(
+        sectionKey = when {
+            section.isReading -> "reading"
+            section.shelfName != null -> "shelf:${section.shelfName}"
+            else -> "unshelved"
+        },
+        bookId = entry.metadata.id,
+    )
+
+internal fun isBookContextMenuExpanded(
+    activeTarget: BookContextMenuTarget?,
+    section: BookshelfSectionModel,
+    entry: BookEntry,
+): Boolean =
+    activeTarget == bookContextMenuTarget(section, entry)
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun BooksTab(
     layoutSpec: MainShellLayoutSpec,
     bookEntries: List<BookEntry>,
+    sections: List<BookshelfSectionModel>,
     bookProgressById: Map<String, Double>,
+    sortOption: BookSortOption,
     bookRepository: BookRepository,
     hasLoadedBooks: Boolean,
     isLoading: Boolean,
     errorMessage: String?,
-    sortOption: BookSortOption,
+    shelves: List<BookShelf>,
+    isSelecting: Boolean,
+    selectedBookIds: Set<String>,
     sortMenuExpanded: Boolean,
     onSortMenuExpandedChange: (Boolean) -> Unit,
     onSortChange: (BookSortOption) -> Unit,
+    onStartSelecting: () -> Unit,
+    onClearSelection: () -> Unit,
+    onToggleSelectedBook: (BookEntry) -> Unit,
+    onMoveSelectedBooks: (String?) -> Unit,
+    onDeleteSelectedBooks: () -> Unit,
+    onManageShelves: () -> Unit,
     onImport: () -> Unit,
     onOpenBook: (BookEntry) -> Unit,
-    contextMenuEntry: BookEntry?,
-    onContextMenuEntryChange: (BookEntry?) -> Unit,
+    contextMenuTarget: BookContextMenuTarget?,
+    onContextMenuTargetChange: (BookContextMenuTarget?) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
+    onMarkReadCandidate: (BookEntry) -> Unit,
+    onMoveBook: (BookEntry, String?) -> Unit,
     sasayakiEnabled: Boolean,
     onMatchSasayaki: (BookEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val sections = remember(bookEntries) { bookshelfSections(bookEntries) }
+    val expandedShelves = remember { mutableStateMapOf<String, Boolean>() }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -407,10 +526,18 @@ private fun BooksTab(
         topBar = {
             BooksTopAppBar(
                 layoutSpec = layoutSpec,
-                sortOption = sortOption,
                 sortMenuExpanded = sortMenuExpanded,
+                sortOption = sortOption,
                 onSortMenuExpandedChange = onSortMenuExpandedChange,
                 onSortChange = onSortChange,
+                shelves = shelves,
+                isSelecting = isSelecting,
+                selectedCount = selectedBookIds.size,
+                onStartSelecting = onStartSelecting,
+                onClearSelection = onClearSelection,
+                onMoveSelectedBooks = onMoveSelectedBooks,
+                onDeleteSelectedBooks = onDeleteSelectedBooks,
+                onManageShelves = onManageShelves,
                 onImport = onImport,
             )
         },
@@ -458,45 +585,81 @@ private fun BooksTab(
                         horizontalArrangement = Arrangement.spacedBy(layoutSpec.bookGridSpacingDp.dp),
                         verticalArrangement = Arrangement.spacedBy(layoutSpec.bookGridVerticalSpacingDp.dp),
                     ) {
-                        sections.forEach { section ->
-                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        sections.filter { it.books.isNotEmpty() }.forEach { section ->
+                            val isExpanded = !section.isCollapsible || expandedShelves[section.shelfName] == true
+                            item(
+                                key = "header:${section.title}",
+                                span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                            ) {
                                 BookshelfSectionHeader(
                                     title = section.title,
                                     count = section.books.size,
                                     layoutSpec = layoutSpec,
+                                    isCollapsible = section.isCollapsible,
+                                    isExpanded = isExpanded,
+                                    onToggle = {
+                                        section.shelfName?.let { shelfName ->
+                                            expandedShelves[shelfName] = expandedShelves[shelfName] != true
+                                        }
+                                    },
                                 )
                             }
-                            items(
-                                items = section.books,
-                                key = { it.metadata.id },
-                            ) { entry ->
-                                Box {
-                                    BookGridCell(
-                                        entry = entry,
-                                        progress = bookProgressById[entry.metadata.id] ?: 0.0,
-                                        bookRepository = bookRepository,
-                                        layoutSpec = layoutSpec,
-                                        onOpen = { onOpenBook(entry) },
-                                        onLongPress = { onContextMenuEntryChange(entry) },
-                                    )
-                                    DropdownMenu(
-                                        expanded = contextMenuEntry?.metadata?.id == entry.metadata.id,
-                                        onDismissRequest = { onContextMenuEntryChange(null) },
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Delete") },
-                                            onClick = {
-                                                contextMenuEntry?.let(onDeleteCandidate)
-                                                onContextMenuEntryChange(null)
+                            if (isExpanded) {
+                                items(
+                                    items = section.books,
+                                    key = { "${section.title}:${it.metadata.id}" },
+                                ) { entry ->
+                                    Box {
+                                        BookGridCell(
+                                            entry = entry,
+                                            progress = bookProgressById[entry.metadata.id] ?: 0.0,
+                                            bookRepository = bookRepository,
+                                            layoutSpec = layoutSpec,
+                                            isSelecting = isSelecting,
+                                            isSelected = entry.metadata.id in selectedBookIds,
+                                            onOpen = { onOpenBook(entry) },
+                                            onToggleSelected = { onToggleSelectedBook(entry) },
+                                            onLongPress = {
+                                                if (!isSelecting) {
+                                                    onContextMenuTargetChange(bookContextMenuTarget(section, entry))
+                                                }
                                             },
                                         )
-                                        if (sasayakiEnabled) {
-                                            DropdownMenuItem(
-                                                text = { Text("Match Sasayaki") },
-                                                onClick = {
-                                                    contextMenuEntry?.let(onMatchSasayaki)
-                                                    onContextMenuEntryChange(null)
-                                                },
+                                        BookContextMenu(
+                                            entry = entry,
+                                            shelves = shelves,
+                                            currentShelfName = section.shelfName,
+                                            hideMove = section.isReading,
+                                            expanded = isBookContextMenuExpanded(contextMenuTarget, section, entry),
+                                            sasayakiEnabled = sasayakiEnabled,
+                                            onDismiss = { onContextMenuTargetChange(null) },
+                                            onMoveBook = onMoveBook,
+                                            onMatchSasayaki = onMatchSasayaki,
+                                            onMarkReadCandidate = onMarkReadCandidate,
+                                            onDeleteCandidate = onDeleteCandidate,
+                                        )
+                                    }
+                                }
+                            } else {
+                                item(
+                                    key = "preview:${section.title}",
+                                    span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                section.shelfName?.let { shelfName ->
+                                                    expandedShelves[shelfName] = true
+                                                }
+                                            },
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        section.books.take(layoutSpec.bookGridColumns(contentWidthDp)).forEach { entry ->
+                                            BookCoverCard(
+                                                entry = entry,
+                                                bookRepository = bookRepository,
+                                                modifier = Modifier.width(64.dp),
                                             )
                                         }
                                     }
@@ -523,71 +686,126 @@ private fun BooksTab(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun BooksTopAppBar(
     layoutSpec: MainShellLayoutSpec,
-    sortOption: BookSortOption,
     sortMenuExpanded: Boolean,
+    sortOption: BookSortOption,
     onSortMenuExpandedChange: (Boolean) -> Unit,
     onSortChange: (BookSortOption) -> Unit,
+    shelves: List<BookShelf>,
+    isSelecting: Boolean,
+    selectedCount: Int,
+    onStartSelecting: () -> Unit,
+    onClearSelection: () -> Unit,
+    onMoveSelectedBooks: (String?) -> Unit,
+    onDeleteSelectedBooks: () -> Unit,
+    onManageShelves: () -> Unit,
     onImport: () -> Unit,
 ) {
+    var moveMenuExpanded by remember { mutableStateOf(false) }
     CenterAlignedTopAppBar(
         title = {
             Text(
-                text = "Books",
+                text = if (isSelecting) "$selectedCount Selected" else "Books",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
         },
         navigationIcon = {
-            Box {
-                IconButton(onClick = { onSortMenuExpandedChange(true) }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.Sort,
-                        contentDescription = "Sort books",
-                    )
+            if (isSelecting) {
+                TextButton(onClick = onClearSelection) {
+                    Text("Done", fontWeight = FontWeight.SemiBold)
                 }
-                DropdownMenu(
-                    expanded = sortMenuExpanded,
-                    onDismissRequest = { onSortMenuExpandedChange(false) },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Recent") },
-                        onClick = { onSortChange(BookSortOption.Recent) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Title") },
-                        onClick = { onSortChange(BookSortOption.Title) },
-                    )
+            } else {
+                Row {
+                    Box {
+                        IconButton(onClick = { onSortMenuExpandedChange(true) }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Sort,
+                                contentDescription = "Sort books",
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { onSortMenuExpandedChange(false) },
+                        ) {
+                            SortMenuHeader(text = "Sorting by...")
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Recent") },
+                                trailingIcon = selectedSortIcon(BookSortOption.Recent, sortOption),
+                                onClick = { onSortChange(BookSortOption.Recent) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Title") },
+                                trailingIcon = selectedSortIcon(BookSortOption.Title, sortOption),
+                                onClick = { onSortChange(BookSortOption.Title) },
+                            )
+                        }
+                    }
+                    IconButton(onClick = onStartSelecting) {
+                        Icon(
+                            imageVector = Icons.Rounded.Done,
+                            contentDescription = "Select books",
+                        )
+                    }
                 }
             }
         },
         actions = {
-            IconButton(
-                onClick = {
-                    onSortChange(
-                        if (sortOption == BookSortOption.Recent) {
-                            BookSortOption.Title
-                        } else {
-                            BookSortOption.Recent
-                        },
+            if (isSelecting) {
+                Box {
+                    IconButton(
+                        onClick = { moveMenuExpanded = true },
+                        enabled = selectedCount > 0,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FolderOpen,
+                            contentDescription = "Move selected books",
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = moveMenuExpanded,
+                        onDismissRequest = { moveMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("None") },
+                            onClick = {
+                                moveMenuExpanded = false
+                                onMoveSelectedBooks(null)
+                            },
+                        )
+                        shelves.forEach { shelf ->
+                            DropdownMenuItem(
+                                text = { Text(shelf.name) },
+                                onClick = {
+                                    moveMenuExpanded = false
+                                    onMoveSelectedBooks(shelf.name)
+                                },
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = onDeleteSelectedBooks,
+                    enabled = selectedCount > 0,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = "Delete selected books",
                     )
-                },
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.SwapVert,
-                    contentDescription = "Toggle book sort",
-                )
-            }
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Rounded.FolderOpen,
-                    contentDescription = "Shelves",
-                )
-            }
-            IconButton(onClick = onImport) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Import EPUB",
-                )
+                }
+            } else {
+                IconButton(onClick = onManageShelves) {
+                    Icon(
+                        imageVector = Icons.Rounded.FolderOpen,
+                        contentDescription = "Manage Shelves",
+                    )
+                }
+                IconButton(onClick = onImport) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Import EPUB",
+                    )
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -597,15 +815,47 @@ private fun BooksTopAppBar(
     )
 }
 
+private fun selectedSortIcon(
+    option: BookSortOption,
+    selectedOption: BookSortOption,
+): (@Composable () -> Unit)? =
+    if (option == selectedOption) {
+        {
+            Icon(
+                imageVector = Icons.Rounded.Done,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    } else {
+        null
+    }
+
+@Composable
+private fun SortMenuHeader(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun BookshelfSectionHeader(
     title: String,
     count: Int,
     layoutSpec: MainShellLayoutSpec,
+    isCollapsible: Boolean = false,
+    isExpanded: Boolean = true,
+    onToggle: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = isCollapsible, onClick = onToggle)
             .padding(vertical = layoutSpec.shelfHeaderVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -621,8 +871,15 @@ private fun BookshelfSectionHeader(
             style = layoutSpec.shelfCountTextStyle.toTextStyle(),
             color = Color(0xFF8C8C92),
         )
-        Spacer(Modifier.width(8.dp))
-        ChevronRightGlyph(MaterialTheme.colorScheme.onBackground, Modifier.size(20.dp))
+        if (isCollapsible) {
+            Spacer(Modifier.width(8.dp))
+            ChevronRightGlyph(
+                MaterialTheme.colorScheme.onBackground,
+                Modifier
+                    .size(20.dp)
+                    .rotate(if (isExpanded) 90f else 0f),
+            )
+        }
     }
 }
 
@@ -632,16 +889,39 @@ private fun BookGridCell(
     progress: Double,
     bookRepository: BookRepository,
     layoutSpec: MainShellLayoutSpec,
+    isSelecting: Boolean,
+    isSelected: Boolean,
     onOpen: () -> Unit,
+    onToggleSelected: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     Column(
         modifier = Modifier.combinedClickable(
-            onClick = onOpen,
+            onClick = {
+                if (isSelecting) {
+                    onToggleSelected()
+                } else {
+                    onOpen()
+                }
+            },
             onLongClick = onLongPress,
         ),
     ) {
-        BookCoverCard(entry = entry, bookRepository = bookRepository)
+        Box {
+            BookCoverCard(entry = entry, bookRepository = bookRepository)
+            if (isSelecting) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = if (isSelected) "Selected" else "Not selected",
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(100))
+                        .size(28.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
         ReadingProgressPill(
             progress = progress,
@@ -667,7 +947,11 @@ internal suspend fun loadBookProgressById(
     }
 
 @Composable
-private fun BookCoverCard(entry: BookEntry, bookRepository: BookRepository) {
+private fun BookCoverCard(
+    entry: BookEntry,
+    bookRepository: BookRepository,
+    modifier: Modifier = Modifier,
+) {
     val coverFile by produceState<File?>(initialValue = null, key1 = entry, key2 = bookRepository) {
         value = bookRepository.coverFile(entry)
     }
@@ -683,6 +967,7 @@ private fun BookCoverCard(entry: BookEntry, bookRepository: BookRepository) {
     }
     Box(
         modifier = Modifier
+            .then(modifier)
             .fillMaxWidth()
             .aspectRatio(0.72f)
             .clip(shape)
@@ -780,6 +1065,216 @@ private fun ReadingProgressPill(progress: Double, modifier: Modifier = Modifier)
             fontWeight = FontWeight.Bold,
         )
     }
+}
+
+@Composable
+private fun BookContextMenu(
+    entry: BookEntry,
+    shelves: List<BookShelf>,
+    currentShelfName: String?,
+    hideMove: Boolean,
+    expanded: Boolean,
+    sasayakiEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onMoveBook: (BookEntry, String?) -> Unit,
+    onMatchSasayaki: (BookEntry) -> Unit,
+    onMarkReadCandidate: (BookEntry) -> Unit,
+    onDeleteCandidate: (BookEntry) -> Unit,
+) {
+    var moveMenuExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(expanded, hideMove) {
+        if (!expanded || hideMove) {
+            moveMenuExpanded = false
+        }
+    }
+    DropdownMenu(
+        expanded = expanded && !moveMenuExpanded,
+        onDismissRequest = onDismiss,
+    ) {
+        if (!hideMove) {
+            DropdownMenuItem(
+                text = { Text("Move") },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                    )
+                },
+                onClick = { moveMenuExpanded = true },
+            )
+            HorizontalDivider()
+        }
+        if (sasayakiEnabled) {
+            DropdownMenuItem(
+                text = { Text("Match Sasayaki") },
+                onClick = {
+                    onMatchSasayaki(entry)
+                    onDismiss()
+                },
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("Mark Read") },
+            onClick = {
+                onMarkReadCandidate(entry)
+                onDismiss()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Delete") },
+            onClick = {
+                onDeleteCandidate(entry)
+                onDismiss()
+            },
+        )
+    }
+    MoveDestinationMenu(
+        entry = entry,
+        shelves = shelves,
+        currentShelfName = currentShelfName,
+        expanded = expanded && moveMenuExpanded,
+        onDismiss = onDismiss,
+        onMoveBook = onMoveBook,
+    )
+}
+
+@Composable
+private fun MoveDestinationMenu(
+    entry: BookEntry,
+    shelves: List<BookShelf>,
+    currentShelfName: String?,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onMoveBook: (BookEntry, String?) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+    ) {
+        SortMenuHeader(text = "Move")
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("None") },
+            enabled = currentShelfName != null,
+            onClick = {
+                onMoveBook(entry, null)
+                onDismiss()
+            },
+        )
+        shelves.forEach { shelf ->
+            DropdownMenuItem(
+                text = { Text(shelf.name) },
+                enabled = shelf.name != currentShelfName,
+                onClick = {
+                    onMoveBook(entry, shelf.name)
+                    onDismiss()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShelfManagementDialog(
+    shelves: List<BookShelf>,
+    showReading: Boolean,
+    onShowReadingChange: (Boolean) -> Unit,
+    onCreateShelf: (String) -> Unit,
+    onDeleteShelf: (String) -> Unit,
+    onMoveShelf: (Int, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newShelfName by remember { mutableStateOf("") }
+    val trimmedName = newShelfName.trim()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage Shelves") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Reading Shelf", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Shows books you've started but not finished.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = showReading,
+                        onCheckedChange = onShowReadingChange,
+                    )
+                }
+                HorizontalDivider()
+                Text("Shelves", style = MaterialTheme.typography.titleMedium)
+                if (shelves.isEmpty()) {
+                    Text(
+                        "No shelves",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    shelves.forEachIndexed { index, shelf ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = shelf.name,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            IconButton(
+                                onClick = { onMoveShelf(index, index - 1) },
+                                enabled = index > 0,
+                            ) {
+                                Icon(Icons.Rounded.ArrowUpward, contentDescription = "Move shelf up")
+                            }
+                            IconButton(
+                                onClick = { onMoveShelf(index, index + 1) },
+                                enabled = index < shelves.lastIndex,
+                            ) {
+                                Icon(Icons.Rounded.ArrowDownward, contentDescription = "Move shelf down")
+                            }
+                            IconButton(onClick = { onDeleteShelf(shelf.name) }) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete shelf")
+                            }
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedTextField(
+                        value = newShelfName,
+                        onValueChange = { newShelfName = it },
+                        label = { Text("Shelf name") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(
+                        onClick = {
+                            onCreateShelf(trimmedName)
+                            newShelfName = ""
+                        },
+                        enabled = trimmedName.isNotEmpty(),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Add shelf")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        },
+    )
 }
 
 @Composable

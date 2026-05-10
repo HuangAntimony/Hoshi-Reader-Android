@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.bookshelf
 
 import moe.antimony.hoshi.epub.BookEntry
+import moe.antimony.hoshi.epub.BookShelf
+import moe.antimony.hoshi.epub.BookSortOption
 
 enum class MainTab(val label: String) {
     Books("Books"),
@@ -134,6 +136,9 @@ data class SettingsRowModel(
 data class BookshelfSectionModel(
     val title: String,
     val books: List<BookEntry>,
+    val shelfName: String? = null,
+    val isReading: Boolean = false,
+    val isCollapsible: Boolean = false,
 )
 
 fun settingsGroups(): List<List<SettingsRowModel>> = listOf(
@@ -151,9 +156,54 @@ fun settingsGroups(): List<List<SettingsRowModel>> = listOf(
     ),
 )
 
-fun bookshelfSections(entries: List<BookEntry>): List<BookshelfSectionModel> =
-    if (entries.isEmpty()) {
-        emptyList()
-    } else {
-        listOf(BookshelfSectionModel("Unshelved", entries))
+fun bookshelfSections(
+    entries: List<BookEntry>,
+    shelves: List<BookShelf> = emptyList(),
+    progressById: Map<String, Double> = emptyMap(),
+    showReading: Boolean = false,
+    sortOption: BookSortOption = BookSortOption.Recent,
+): List<BookshelfSectionModel> {
+    if (entries.isEmpty()) return emptyList()
+
+    val entriesById = entries.associateBy { it.metadata.id }
+    val sections = mutableListOf<BookshelfSectionModel>()
+    fun List<BookEntry>.sortedForShelf(): List<BookEntry> =
+        when (sortOption) {
+            BookSortOption.Recent -> sortedByDescending { it.metadata.lastAccess }
+            BookSortOption.Title -> sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.metadata.title.orEmpty() })
+        }
+
+    if (showReading) {
+        val reading = entries
+            .filter { entry ->
+                val progress = progressById[entry.metadata.id] ?: 0.0
+                progress > 0.0 && progress < 0.999
+            }
+            .sortedForShelf()
+        if (reading.isNotEmpty()) {
+            sections += BookshelfSectionModel(
+                title = "Reading",
+                books = reading,
+                isReading = true,
+            )
+        }
     }
+
+    shelves.forEach { shelf ->
+        sections += BookshelfSectionModel(
+            title = shelf.name,
+            books = shelf.bookIds.mapNotNull(entriesById::get).sortedForShelf(),
+            shelfName = shelf.name,
+            isCollapsible = true,
+        )
+    }
+
+    val shelvedIds = shelves.flatMapTo(mutableSetOf()) { it.bookIds }
+    val unshelved = entries
+        .filterNot { it.metadata.id in shelvedIds }
+        .sortedForShelf()
+    if (unshelved.isNotEmpty()) {
+        sections += BookshelfSectionModel("Unshelved", unshelved)
+    }
+    return sections
+}

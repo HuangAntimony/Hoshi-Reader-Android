@@ -4,22 +4,26 @@ package moe.antimony.hoshi.epub
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.util.UUID
 
 class BookMetadataStorageTest {
     @Test
     fun saveMetadataWritesIosCompatibleMetadataJson() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata").toFile())
         val bookRoot = storage.createBookDirectory("book-a")
+        val bookId = UUID.randomUUID().toString()
         val metadata = BookMetadata(
-            id = "book-a",
+            id = bookId,
             title = "屍人荘の殺人",
-            cover = "item/image/cover.jpg",
+            cover = "Books/book-a/cover.jpg",
             folder = "book-a",
             lastAccess = 798720000.0,
         )
@@ -27,9 +31,10 @@ class BookMetadataStorageTest {
         storage.saveMetadata(bookRoot, metadata)
 
         val saved = Json.parseToJsonElement(bookRoot.resolve("metadata.json").readText()).jsonObject
-        assertEquals("book-a", saved.getValue("id").jsonPrimitive.content)
+        assertEquals(bookId, saved.getValue("id").jsonPrimitive.content)
+        UUID.fromString(saved.getValue("id").jsonPrimitive.content)
         assertEquals("屍人荘の殺人", saved.getValue("title").jsonPrimitive.content)
-        assertEquals("item/image/cover.jpg", saved.getValue("cover").jsonPrimitive.content)
+        assertEquals("Books/book-a/cover.jpg", saved.getValue("cover").jsonPrimitive.content)
         assertEquals("book-a", saved.getValue("folder").jsonPrimitive.content)
         assertEquals(798720000.0, saved.getValue("lastAccess").jsonPrimitive.double, 0.0)
     }
@@ -39,18 +44,20 @@ class BookMetadataStorageTest {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-list").toFile())
         val olderRoot = storage.createBookDirectory("older")
         val newerRoot = storage.createBookDirectory("newer")
+        val olderId = UUID.randomUUID().toString()
+        val newerId = UUID.randomUUID().toString()
         storage.saveMetadata(
             olderRoot,
-            BookMetadata(id = "older", title = "Older", cover = null, folder = "older", lastAccess = 10.0),
+            BookMetadata(id = olderId, title = "Older", cover = null, folder = "older", lastAccess = 10.0),
         )
         storage.saveMetadata(
             newerRoot,
-            BookMetadata(id = "newer", title = "Newer", cover = null, folder = "newer", lastAccess = 20.0),
+            BookMetadata(id = newerId, title = "Newer", cover = null, folder = "newer", lastAccess = 20.0),
         )
 
         val entries = storage.loadBookEntries()
 
-        assertEquals(listOf("newer", "older"), entries.map { it.metadata.id })
+        assertEquals(listOf(newerId, olderId), entries.map { it.metadata.id })
         assertEquals(listOf(newerRoot, olderRoot).map { it.canonicalFile }, entries.map { it.root.canonicalFile })
     }
 
@@ -61,42 +68,48 @@ class BookMetadataStorageTest {
         val aRoot = storage.createBookDirectory("a")
         storage.saveMetadata(
             zRoot,
-            BookMetadata(id = "z", title = "Zeta", cover = null, folder = "z", lastAccess = 20.0),
+            BookMetadata(id = UUID.randomUUID().toString(), title = "Zeta", cover = null, folder = "z", lastAccess = 20.0),
         )
         storage.saveMetadata(
             aRoot,
-            BookMetadata(id = "a", title = "Alpha", cover = null, folder = "a", lastAccess = 10.0),
+            BookMetadata(id = UUID.randomUUID().toString(), title = "Alpha", cover = null, folder = "a", lastAccess = 10.0),
         )
 
         val entries = storage.loadBookEntries(BookSortOption.Title)
 
-        assertEquals(listOf("a", "z"), entries.map { it.metadata.id })
+        assertEquals(listOf("Alpha", "Zeta"), entries.map { it.metadata.title })
     }
 
     @Test
     fun loadBookEntryFindsBooksByStableMetadataId() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-id").toFile())
         val root = storage.createBookDirectory("folder-a")
+        val bookId = UUID.randomUUID().toString()
         storage.saveMetadata(
             root,
-            BookMetadata(id = "stable-id", title = "Stable", cover = null, folder = "folder-a", lastAccess = 20.0),
+            BookMetadata(id = bookId, title = "Stable", cover = null, folder = "folder-a", lastAccess = 20.0),
         )
 
-        val entry = storage.loadBookEntry("stable-id")
+        val entry = storage.loadBookEntry(bookId)
 
         assertEquals(root.canonicalFile, entry?.root?.canonicalFile)
-        assertEquals("stable-id", entry?.metadata?.id)
+        assertEquals(bookId, entry?.metadata?.id)
     }
 
     @Test
-    fun loadBookEntryFallsBackToFolderIdWhenMetadataIsMissing() = runBlocking {
+    fun loadBookEntryMigratesLegacyFolderLookupToUuidMetadata() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-fallback-id").toFile())
         val root = storage.createBookDirectory("folder-only")
+        storage.saveShelves(listOf(BookShelf(name = "Legacy", bookIds = listOf("folder-only"))))
 
         val entry = storage.loadBookEntry("folder-only")
 
         assertEquals(root.canonicalFile, entry?.root?.canonicalFile)
-        assertEquals("folder-only", entry?.metadata?.id)
+        val migratedId = requireNotNull(entry).metadata.id
+        UUID.fromString(migratedId)
+        assertFalse(migratedId == "folder-only")
+        assertEquals(entry.metadata, storage.loadMetadata(root))
+        assertEquals(listOf(BookShelf(name = "Legacy", bookIds = listOf(migratedId))), storage.loadShelves())
     }
 
     @Test
@@ -109,6 +122,102 @@ class BookMetadataStorageTest {
 
         assertFalse(root.exists())
         assertEquals(emptyList<BookEntry>(), storage.loadBookEntries())
+    }
+
+    @Test
+    fun saveShelvesWritesIosCompatibleShelvesJsonAtBooksRoot() = runBlocking {
+        val filesDir = Files.createTempDirectory("hoshi-shelves").toFile()
+        val storage = BookStorage(filesDir)
+        val bookA = UUID.randomUUID().toString()
+        val bookB = UUID.randomUUID().toString()
+        val shelves = listOf(
+            BookShelf(name = "Manga", bookIds = listOf(bookA, bookB)),
+            BookShelf(name = "Novels", bookIds = emptyList()),
+        )
+
+        storage.saveShelves(shelves)
+
+        val shelvesFile = filesDir.resolve("Books/shelves.json")
+        val saved = Json.parseToJsonElement(shelvesFile.readText()).jsonArray
+        assertEquals("Manga", saved[0].jsonObject.getValue("name").jsonPrimitive.content)
+        assertEquals(bookA, saved[0].jsonObject.getValue("bookIds").jsonArray[0].jsonPrimitive.content)
+        assertEquals(bookB, saved[0].jsonObject.getValue("bookIds").jsonArray[1].jsonPrimitive.content)
+        assertEquals("Novels", saved[1].jsonObject.getValue("name").jsonPrimitive.content)
+        assertEquals(shelves, storage.loadShelves())
+    }
+
+    @Test
+    fun loadBookEntriesMigratesLegacyNonUuidBookIdsAndShelfMembershipsForIosBackupCompatibility() = runBlocking {
+        val filesDir = Files.createTempDirectory("hoshi-metadata-uuid-migration").toFile()
+        val storage = BookStorage(filesDir)
+        val root = storage.createBookDirectory("屍人荘の殺人")
+        storage.saveMetadata(
+            root,
+            BookMetadata(
+                id = "屍人荘の殺人",
+                title = "屍人荘の殺人",
+                cover = null,
+                folder = root.name,
+                lastAccess = 10.0,
+            ),
+        )
+        storage.saveShelves(listOf(BookShelf(name = "Manga", bookIds = listOf("屍人荘の殺人"))))
+
+        val entry = storage.loadBookEntries().single()
+
+        UUID.fromString(entry.metadata.id)
+        assertFalse(entry.metadata.id == "屍人荘の殺人")
+        assertEquals(listOf(BookShelf(name = "Manga", bookIds = listOf(entry.metadata.id))), storage.loadShelves())
+        assertEquals(entry.metadata.id, storage.loadMetadata(root)?.id)
+    }
+
+    @Test
+    fun loadBookEntriesCreatesIosCompatibleFallbackMetadataWhenMetadataIsMissing() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-fallback-migration").toFile())
+        val root = storage.createBookDirectory("folder-only")
+
+        val entry = storage.loadBookEntries().single()
+
+        UUID.fromString(entry.metadata.id)
+        assertEquals("folder-only", entry.metadata.folder)
+        assertEquals(entry.metadata, storage.loadMetadata(root))
+    }
+
+    @Test
+    fun loadBookEntriesMigratesLegacyRootRelativeCoverPathForIosBackupCompatibility() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-cover-path-migration").toFile())
+        val root = storage.createBookDirectory("book")
+        root.resolve("OPS/images").mkdirs()
+        root.resolve("OPS/images/cover.jpg").writeBytes(byteArrayOf(1, 2, 3))
+        storage.saveMetadata(
+            root,
+            BookMetadata(
+                id = UUID.randomUUID().toString(),
+                title = "Book",
+                cover = "OPS/images/cover.jpg",
+                folder = "book",
+                lastAccess = 1.0,
+            ),
+        )
+
+        val entry = storage.loadBookEntries().single()
+
+        assertEquals("Books/book/cover.jpg", entry.metadata.cover)
+        assertEquals("Books/book/cover.jpg", storage.loadMetadata(root)?.cover)
+        assertTrue(root.resolve("cover.jpg").isFile)
+    }
+
+    @Test
+    fun metadataCoverPathCopiesCoverToIosStyleBookRelativePath() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-cover-metadata-path").toFile())
+        val root = storage.createBookDirectory("book")
+        root.resolve("OPS/images").mkdirs()
+        root.resolve("OPS/images/cover.jpg").writeBytes(byteArrayOf(1, 2, 3))
+
+        val coverPath = storage.metadataCoverPath(root, "OPS/images/cover.jpg")
+
+        assertEquals("Books/book/cover.jpg", coverPath)
+        assertTrue(root.resolve("cover.jpg").isFile)
     }
 
     @Test

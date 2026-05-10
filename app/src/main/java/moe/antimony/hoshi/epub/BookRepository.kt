@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
@@ -30,13 +31,18 @@ class BookRepository(
     suspend fun loadAllBooks(): List<File> = fileDataSource.loadAllBooks()
 
     suspend fun loadBookEntries(sortOption: BookSortOption = BookSortOption.Recent): List<BookEntry> {
+        val idReplacements = linkedMapOf<String, String>()
         val entries = loadAllBooks()
             .map { root ->
-                BookEntry(
-                    root = root,
-                    metadata = loadMetadata(root) ?: root.fallbackMetadata(),
-                )
+                val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root))
+                if (migration.oldId != migration.metadata.id) {
+                    idReplacements[migration.oldId] = migration.metadata.id
+                }
+                BookEntry(root = root, metadata = migration.metadata)
             }
+        if (idReplacements.isNotEmpty()) {
+            replaceShelfBookIds(idReplacements)
+        }
         return when (sortOption) {
             BookSortOption.Recent -> entries.sortedByDescending { it.metadata.lastAccess }
             BookSortOption.Title -> entries.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.metadata.title.orEmpty() })
@@ -45,11 +51,13 @@ class BookRepository(
 
     override suspend fun loadBookEntry(bookId: String): BookEntry? {
         for (root in loadAllBooks()) {
-            val entry = BookEntry(
-                root = root,
-                metadata = loadMetadata(root) ?: root.fallbackMetadata(),
-            )
-            if (entry.metadata.id == bookId) return entry
+            val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root))
+            if (migration.oldId != migration.metadata.id) {
+                replaceShelfBookIds(mapOf(migration.oldId to migration.metadata.id))
+            }
+            if (migration.metadata.id == bookId || migration.oldId == bookId) {
+                return BookEntry(root = root, metadata = migration.metadata)
+            }
         }
         return null
     }
@@ -69,8 +77,31 @@ class BookRepository(
 
     suspend fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
 
+    override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
+        fileDataSource.metadataCoverPath(bookRoot, coverHref)
+
     suspend fun deleteBook(bookRoot: File) {
+        val removedId = loadMetadata(bookRoot)?.id ?: bookRoot.name
         fileDataSource.deleteBook(bookRoot)
+        val cleanedShelves = loadShelves().map { shelf ->
+            shelf.copy(bookIds = shelf.bookIds.filterNot { it == removedId })
+        }
+        saveShelves(cleanedShelves)
+    }
+
+    suspend fun loadShelves(): List<BookShelf> =
+        sidecarDataSource.loadShelves(fileDataSource.booksDirectory).orEmpty()
+
+    suspend fun saveShelves(shelves: List<BookShelf>) {
+        sidecarDataSource.saveShelves(fileDataSource.booksDirectory, shelves)
+    }
+
+    private suspend fun replaceShelfBookIds(idReplacements: Map<String, String>) {
+        saveShelves(
+            loadShelves().map { shelf ->
+                shelf.copy(bookIds = shelf.bookIds.map { idReplacements[it] ?: it })
+            },
+        )
     }
 
     override suspend fun loadBookmark(bookRoot: File): Bookmark? =
@@ -122,10 +153,39 @@ class BookRepository(
             lastAccess = (lastModified().toDouble() / 1000.0) - APPLE_REFERENCE_EPOCH_SECONDS,
         )
     }
+
+    private suspend fun migrateLegacyBookForIosBackupCompatibility(
+        root: File,
+        storedMetadata: BookMetadata?,
+    ): LegacyBookMigration {
+        val oldId = storedMetadata?.id ?: root.name
+        val baseMetadata = storedMetadata ?: root.fallbackMetadata()
+        val metadata = baseMetadata.withIosBackupCompatibleFields(root)
+        if (metadata != storedMetadata) {
+            saveMetadata(root, metadata)
+        }
+        return LegacyBookMigration(oldId = oldId, metadata = metadata)
+    }
+
+    // Legacy migration for Android builds that predate iOS-compatible Books backup.
+    // Once supported users have upgraded through this path, remove this function and
+    // the associated legacy migration tests; normal writes already produce this shape.
+    private suspend fun BookMetadata.withIosBackupCompatibleFields(root: File): BookMetadata =
+        copy(
+            id = id.takeIf { it.isUuidString() } ?: UUID.randomUUID().toString(),
+            folder = folder ?: root.name,
+            cover = cover?.let { metadataCoverPath(root, it) ?: it },
+        )
+
+    private data class LegacyBookMigration(
+        val oldId: String,
+        val metadata: BookMetadata,
+    )
 }
 
 interface ReaderRouteBookRepository {
     suspend fun loadBookEntry(bookId: String): BookEntry?
+    suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String?
     suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
     suspend fun loadBookmark(bookRoot: File): Bookmark?
     suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
@@ -144,7 +204,7 @@ class BookFileDataSource(
     filesDir: File,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val booksDirectory = File(filesDir, "Books")
+    val booksDirectory: File = File(filesDir, "Books")
 
     val currentBookFile: File = File(booksDirectory, "current.epub")
 
@@ -175,10 +235,35 @@ class BookFileDataSource(
 
     suspend fun coverFile(entry: BookEntry): File? = withContext(ioDispatcher) {
         val cover = entry.metadata.cover?.takeIf { it.isNotBlank() } ?: return@withContext null
-        val root = entry.root.canonicalFile
-        val file = root.resolve(cover).canonicalFile
-        if (file.path != root.path && !file.path.startsWith(root.path + File.separator)) return@withContext null
-        file.takeIf { it.isFile }
+        resolveCoverFile(entry.root, cover)
+    }
+
+    suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? = withContext(ioDispatcher) {
+        val cover = coverHref?.takeIf { it.isNotBlank() } ?: return@withContext null
+        val source = resolveCoverFile(bookRoot, cover) ?: return@withContext null
+        val root = bookRoot.canonicalFile
+        val destination = root.resolve(source.name).canonicalFile
+        if (destination.path != root.path && !destination.path.startsWith(root.path + File.separator)) {
+            return@withContext null
+        }
+        if (source.canonicalFile != destination) {
+            source.copyTo(destination, overwrite = true)
+        }
+        "Books/${root.name}/${destination.name}"
+    }
+
+    private fun resolveCoverFile(bookRoot: File, cover: String): File? {
+        val root = bookRoot.canonicalFile
+        val rootRelative = root.resolve(cover).canonicalFile
+        if ((rootRelative.path == root.path || rootRelative.path.startsWith(root.path + File.separator)) && rootRelative.isFile) {
+            return rootRelative
+        }
+        val appRoot = booksDirectory.parentFile?.canonicalFile ?: return null
+        val appRelative = appRoot.resolve(cover).canonicalFile
+        if ((appRelative.path == root.path || appRelative.path.startsWith(root.path + File.separator)) && appRelative.isFile) {
+            return appRelative
+        }
+        return null
     }
 
     suspend fun deleteBook(bookRoot: File) = withContext(ioDispatcher) {
@@ -290,6 +375,13 @@ class BookSidecarDataSource(
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
+    suspend fun loadShelves(booksRoot: File): List<BookShelf>? =
+        loadJson(ListSerializer(BookShelf.serializer()), booksRoot.resolve(SHELVES_FILE_NAME))
+
+    suspend fun saveShelves(booksRoot: File, shelves: List<BookShelf>) {
+        saveJson(booksRoot, SHELVES_FILE_NAME, ListSerializer(BookShelf.serializer()), shelves)
+    }
+
     private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = withContext(ioDispatcher) {
         if (!file.isFile) return@withContext null
         runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
@@ -315,6 +407,7 @@ object SystemBookClock : BookClock {
 private const val METADATA_FILE_NAME = "metadata.json"
 private const val BOOKMARK_FILE_NAME = "bookmark.json"
 private const val BOOKINFO_FILE_NAME = "bookinfo.json"
+private const val SHELVES_FILE_NAME = "shelves.json"
 private const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"
 private const val SASAYAKI_PLAYBACK_FILE_NAME = "sasayaki_playback.json"
 private const val APPLE_REFERENCE_EPOCH_SECONDS = 978_307_200.0
@@ -323,3 +416,6 @@ private fun String.sanitizeImportedBookTitle(): String =
     split(Regex("[\\\\/:*?\"<>|\\n\\r\\u0000-\\u001F]"))
         .joinToString("_")
         .trim()
+
+internal fun String.isUuidString(): Boolean =
+    runCatching { UUID.fromString(this) }.isSuccess

@@ -37,6 +37,12 @@ data class BookMetadata(
     val lastAccess: Double,
 )
 
+@Serializable
+data class BookShelf(
+    val name: String,
+    val bookIds: List<String>,
+)
+
 data class BookEntry(
     val root: File,
     val metadata: BookMetadata,
@@ -73,8 +79,17 @@ class BookStorage(filesDir: File) {
 
     suspend fun coverFile(entry: BookEntry): File? = repository.coverFile(entry)
 
+    suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
+        repository.metadataCoverPath(bookRoot, coverHref)
+
     suspend fun deleteBook(bookRoot: File) {
         repository.deleteBook(bookRoot)
+    }
+
+    suspend fun loadShelves(): List<BookShelf> = repository.loadShelves()
+
+    suspend fun saveShelves(shelves: List<BookShelf>) {
+        repository.saveShelves(shelves)
     }
 
     suspend fun loadBookmark(bookRoot: File): Bookmark? = repository.loadBookmark(bookRoot)

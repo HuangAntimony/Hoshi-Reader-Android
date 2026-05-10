@@ -6,6 +6,8 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.BookShelf
+import moe.antimony.hoshi.epub.BookSortOption
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,6 +52,50 @@ class MainShellUiTest {
         assertEquals(1, sections.size)
         assertEquals("Unshelved", sections.single().title)
         assertEquals(entries, sections.single().books)
+    }
+
+    @Test
+    fun bookshelfSectionsMatchIosShelvesReadingAndUnshelvedOrder() {
+        val unread = bookEntry(id = "unread", title = "Unread", lastAccess = 3.0)
+        val reading = bookEntry(id = "reading", title = "Reading", lastAccess = 2.0)
+        val shelved = bookEntry(id = "shelved", title = "Shelved", lastAccess = 1.0)
+        val entries = listOf(unread, reading, shelved)
+
+        val sections = bookshelfSections(
+            entries = entries,
+            shelves = listOf(
+                BookShelf(name = "Manga", bookIds = listOf("shelved", "missing")),
+            ),
+            progressById = mapOf(
+                "unread" to 0.0,
+                "reading" to 0.5,
+                "shelved" to 1.0,
+            ),
+            showReading = true,
+            sortOption = BookSortOption.Recent,
+        )
+
+        assertEquals(listOf("Reading", "Manga", "Unshelved"), sections.map { it.title })
+        assertEquals(true, sections[0].isReading)
+        assertEquals(listOf("reading"), sections[0].books.map { it.metadata.id })
+        assertEquals(listOf("shelved"), sections[1].books.map { it.metadata.id })
+        assertEquals(listOf("unread", "reading"), sections[2].books.map { it.metadata.id })
+    }
+
+    @Test
+    fun bookshelfSectionsSortEachSectionByTitleWhenRequested() {
+        val z = bookEntry(id = "z", title = "Zeta", lastAccess = 2.0)
+        val a = bookEntry(id = "a", title = "Alpha", lastAccess = 1.0)
+
+        val sections = bookshelfSections(
+            entries = listOf(z, a),
+            shelves = emptyList(),
+            progressById = emptyMap(),
+            showReading = false,
+            sortOption = BookSortOption.Title,
+        )
+
+        assertEquals(listOf("a", "z"), sections.single().books.map { it.metadata.id })
     }
 
     @Test
@@ -250,6 +296,65 @@ class MainShellUiTest {
     }
 
     @Test
+    fun bookshelfToolbarMatchesIosLeadingAndTrailingActionGrouping() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val topBar = source.substringAfter("private fun BooksTopAppBar(")
+            .substringBefore("@Composable\nprivate fun BookshelfSectionHeader")
+        val actions = topBar.substringAfter("actions = {")
+            .substringBefore("colors = TopAppBarDefaults")
+
+        assertTrue(topBar.contains("SortMenuHeader(text = \"Sorting by...\")"))
+        assertFalse(topBar.contains("enabled = false,\n                                onClick = {},"))
+        assertTrue(topBar.contains("sortOption: BookSortOption"))
+        assertTrue(topBar.contains("HorizontalDivider()"))
+        assertTrue(topBar.contains("trailingIcon = selectedSortIcon(BookSortOption.Recent, sortOption)"))
+        assertTrue(topBar.contains("trailingIcon = selectedSortIcon(BookSortOption.Title, sortOption)"))
+        assertTrue(topBar.contains("navigationIcon = {\n            if (isSelecting)"))
+        assertTrue(topBar.contains("Row"))
+        assertTrue(topBar.indexOf("contentDescription = \"Select books\"") < topBar.indexOf("actions = {"))
+        assertFalse(actions.contains("contentDescription = \"Select books\""))
+        assertTrue(actions.contains("contentDescription = \"Manage Shelves\""))
+        assertTrue(actions.contains("contentDescription = \"Import EPUB\""))
+    }
+
+    @Test
+    fun bookContextMenuTargetDistinguishesReadingCopyFromShelfCopy() {
+        val book = bookEntry(id = "same-book", title = "Same Book", lastAccess = 1.0)
+        val readingSection = BookshelfSectionModel(
+            title = "Reading",
+            books = listOf(book),
+            isReading = true,
+        )
+        val shelfSection = BookshelfSectionModel(
+            title = "Manga",
+            books = listOf(book),
+            shelfName = "Manga",
+        )
+
+        val readingTarget = bookContextMenuTarget(readingSection, book)
+        val shelfTarget = bookContextMenuTarget(shelfSection, book)
+
+        assertFalse(readingTarget == shelfTarget)
+        assertTrue(isBookContextMenuExpanded(readingTarget, readingSection, book))
+        assertFalse(isBookContextMenuExpanded(readingTarget, shelfSection, book))
+    }
+
+    @Test
+    fun bookContextMenuUsesMoveSubmenuInsteadOfListingShelvesAtTopLevel() {
+        val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
+        val menu = source.substringAfter("private fun BookContextMenu(")
+            .substringBefore("@Composable\nprivate fun ShelfManagementDialog")
+        val topLevelMoveBlock = menu.substringAfter("if (!hideMove) {")
+            .substringBefore("if (sasayakiEnabled)")
+
+        assertTrue(menu.contains("var moveMenuExpanded by remember"))
+        assertTrue(menu.contains("MoveDestinationMenu("))
+        assertTrue(topLevelMoveBlock.contains("onClick = { moveMenuExpanded = true }"))
+        assertFalse(topLevelMoveBlock.contains("text = { Text(\"None\") }"))
+        assertFalse(topLevelMoveBlock.contains("shelves.forEach"))
+    }
+
+    @Test
     fun mainShellDoesNotDoubleApplyTopSystemInsets() {
         val source = File("src/main/java/moe/antimony/hoshi/features/bookshelf/BookshelfView.kt").readText()
         val shell = source.substringAfter("internal fun HoshiMainShell(")
@@ -267,4 +372,16 @@ class MainShellUiTest {
         assertTrue(advanced.contains("SettingsDetailScaffold("))
         assertFalse(advanced.contains("LargeTopAppBar("))
     }
+
+    private fun bookEntry(id: String, title: String, lastAccess: Double): BookEntry =
+        BookEntry(
+            root = File(id),
+            metadata = BookMetadata(
+                id = id,
+                title = title,
+                cover = null,
+                folder = id,
+                lastAccess = lastAccess,
+            ),
+        )
 }

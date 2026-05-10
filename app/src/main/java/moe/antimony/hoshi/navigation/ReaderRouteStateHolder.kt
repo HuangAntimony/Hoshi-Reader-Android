@@ -23,7 +23,7 @@ internal class ReaderRouteStateHolder(
                 entry.root,
                 entry.metadata.copy(
                     title = parsedBook.title,
-                    cover = parsedBook.coverHref,
+                    cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref),
                     folder = entry.root.name,
                     lastAccess = repository.currentAppleReferenceDateSeconds(),
                 ),

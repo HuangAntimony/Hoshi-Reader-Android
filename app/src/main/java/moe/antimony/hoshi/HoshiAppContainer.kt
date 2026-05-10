@@ -15,6 +15,8 @@ import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
 import moe.antimony.hoshi.features.anki.ankiSettingsRepository
 import moe.antimony.hoshi.features.bookshelf.AndroidBookshelfRepository
 import moe.antimony.hoshi.features.bookshelf.BookshelfRepository
+import moe.antimony.hoshi.features.bookshelf.BookshelfSettingsRepository
+import moe.antimony.hoshi.features.bookshelf.bookshelfSettingsRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionaryViewModelRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsRepository
@@ -38,6 +40,7 @@ internal class HoshiAppContainer(context: Context) {
     val audioSettingsRepository: AudioSettingsRepository = appContext.audioSettingsRepository()
     val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()
+    val bookshelfSettingsRepository: BookshelfSettingsRepository = appContext.bookshelfSettingsRepository()
     val readerFontManager: ReaderFontManager = ReaderFontManager(appContext.filesDir)
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
     val ankiRepository: AnkiRepository = AnkiRepository(
@@ -54,6 +57,7 @@ internal class HoshiAppContainer(context: Context) {
             contentResolver = contentResolver,
             bookRepository = bookRepository,
             dictionaryRepository = dictionaryRepository,
+            settingsRepository = bookshelfSettingsRepository,
         )
 
     fun dictionaryViewModelRepository(contentResolver: ContentResolver): DictionaryViewModelRepository =

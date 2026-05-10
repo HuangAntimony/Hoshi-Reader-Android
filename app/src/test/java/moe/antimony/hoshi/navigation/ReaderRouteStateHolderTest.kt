@@ -46,7 +46,7 @@ class ReaderRouteStateHolderTest {
             BookMetadata(
                 id = "book-a",
                 title = "Parsed Title",
-                cover = "cover.jpg",
+                cover = "Books/book-a/cover.jpg",
                 folder = "book-a",
                 lastAccess = 42.0,
             ),
@@ -111,6 +111,9 @@ class ReaderRouteStateHolderTest {
             private set
 
         override suspend fun loadBookEntry(bookId: String): BookEntry? = entry
+
+        override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
+            coverHref?.let { "Books/${bookRoot.name}/${File(it).name}" }
 
         override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
             savedMetadata = metadata
