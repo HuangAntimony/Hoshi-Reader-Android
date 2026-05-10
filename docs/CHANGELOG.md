@@ -16,6 +16,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Show concrete Java crash stack traces in Settings -> Diagnostics after Hoshi restarts from an uncaught exception.
 - Prevent reader lookup popups from crashing when the popup is taller than the available screen area.
+- Open downloaded update APKs through Android's package installer and route users to the unknown-apps permission when required.
 
 ## [v0.3.4] - 2026-05-10
 
