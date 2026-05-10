@@ -6,10 +6,14 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.os.Build
 import androidx.annotation.RequiresApi
+import java.io.File
 import java.io.IOException
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlin.system.exitProcess
 
 enum class ProcessExitReason(val label: String) {
     Anr("ANR"),
@@ -35,11 +39,17 @@ data class ProcessExitRecord(
     val trace: String?,
 )
 
+data class CapturedCrashRecord(
+    val timestampMillis: Long,
+    val text: String,
+)
+
 data class ProcessExitDiagnosticsReport(
     val packageName: String,
     val versionName: String,
     val versionCode: Long,
     val sdkInt: Int,
+    val capturedCrashes: List<CapturedCrashRecord> = emptyList(),
     val records: List<ProcessExitRecord>,
 ) {
     fun toShareText(): String = buildString {
@@ -48,6 +58,18 @@ data class ProcessExitDiagnosticsReport(
         appendLine("Version: $versionName ($versionCode)")
         appendLine("Android SDK: $sdkInt")
         appendLine()
+
+        if (capturedCrashes.isNotEmpty()) {
+            appendLine("Captured Crashes")
+            capturedCrashes.forEachIndexed { index, crash ->
+                appendLine("Captured Crash ${index + 1}")
+                appendLine("Time: ${Instant.ofEpochMilli(crash.timestampMillis)}")
+                appendLine("Trace:")
+                appendLine(crash.text.takeBoundedTrace())
+                if (index != capturedCrashes.lastIndex) appendLine()
+            }
+            appendLine()
+        }
 
         if (records.isEmpty()) {
             if (sdkInt < Build.VERSION_CODES.R) {
@@ -81,7 +103,15 @@ data class ProcessExitDiagnosticsReport(
         if (length <= MAX_TRACE_CHARS) {
             this
         } else {
-            "${takeLast(MAX_TRACE_CHARS)}\n[trace truncated to last $MAX_TRACE_CHARS characters]"
+            val trace = this
+            val headLength = MAX_TRACE_CHARS / 2
+            val tailLength = MAX_TRACE_CHARS - headLength
+            buildString {
+                append(trace.take(headLength))
+                appendLine()
+                appendLine("[trace truncated to first and last $MAX_TRACE_CHARS characters]")
+                append(trace.takeLast(tailLength))
+            }
         }
 
     companion object {
@@ -102,12 +132,106 @@ fun loadProcessExitDiagnosticsReport(context: Context, maxRecords: Int = 10): Pr
         versionName = packageInfo.versionName ?: "unknown",
         versionCode = packageInfo.hoshiLongVersionCode(),
         sdkInt = Build.VERSION.SDK_INT,
+        capturedCrashes = loadCapturedCrashDiagnostics(context.crashDiagnosticsDir()),
         records = records,
     )
 }
 
 fun diagnosticsExportFileName(nowMillis: Long = System.currentTimeMillis()): String =
     "hoshi-diagnostics-${DiagnosticsFileNameFormatter.format(Instant.ofEpochMilli(nowMillis))}.txt"
+
+fun installCrashDiagnostics(context: Context) {
+    val appContext = context.applicationContext
+    val previous = Thread.getDefaultUncaughtExceptionHandler()
+    if (previous is HoshiCrashDiagnosticsHandler) return
+    Thread.setDefaultUncaughtExceptionHandler(HoshiCrashDiagnosticsHandler(appContext, previous))
+}
+
+private class HoshiCrashDiagnosticsHandler(
+    private val context: Context,
+    private val previous: Thread.UncaughtExceptionHandler?,
+) : Thread.UncaughtExceptionHandler {
+    override fun uncaughtException(thread: Thread, throwable: Throwable) {
+        runCatching {
+            val packageInfo = context.packageManager.getHoshiPackageInfo(context.packageName)
+            saveCapturedCrashDiagnostic(
+                diagnosticsDir = context.crashDiagnosticsDir(),
+                thread = thread,
+                throwable = throwable,
+                timestampMillis = System.currentTimeMillis(),
+                packageName = context.packageName,
+                versionName = packageInfo.versionName ?: "unknown",
+                versionCode = packageInfo.hoshiLongVersionCode(),
+                sdkInt = Build.VERSION.SDK_INT,
+            )
+        }
+        previous?.uncaughtException(thread, throwable) ?: run {
+            android.os.Process.killProcess(android.os.Process.myPid())
+            exitProcess(10)
+        }
+    }
+}
+
+internal fun saveCapturedCrashDiagnostic(
+    diagnosticsDir: File,
+    thread: Thread,
+    throwable: Throwable,
+    timestampMillis: Long,
+    packageName: String,
+    versionName: String,
+    versionCode: Long,
+    sdkInt: Int,
+): File {
+    diagnosticsDir.mkdirs()
+    val file = File(diagnosticsDir, "crash-$timestampMillis.txt")
+    file.writeText(
+        buildString {
+            appendLine("Captured Hoshi crash")
+            appendLine("Time: ${Instant.ofEpochMilli(timestampMillis)}")
+            appendLine("Package: $packageName")
+            appendLine("Version: $versionName ($versionCode)")
+            appendLine("Android SDK: $sdkInt")
+            appendLine("Thread: ${thread.name}")
+            appendLine()
+            appendLine(throwable.stackTraceText())
+        },
+    )
+    pruneCapturedCrashDiagnostics(diagnosticsDir)
+    return file
+}
+
+internal fun loadCapturedCrashDiagnostics(
+    diagnosticsDir: File,
+    maxRecords: Int = MAX_CAPTURED_CRASH_RECORDS,
+): List<CapturedCrashRecord> =
+    diagnosticsDir.listFiles { file -> file.isFile && file.name.startsWith("crash-") && file.extension == "txt" }
+        .orEmpty()
+        .sortedByDescending { it.name }
+        .take(maxRecords)
+        .mapNotNull { file ->
+            val text = runCatching { file.readText().readableDiagnosticTextOrNull() }.getOrNull() ?: return@mapNotNull null
+            CapturedCrashRecord(
+                timestampMillis = file.name.removePrefix("crash-").removeSuffix(".txt").toLongOrNull() ?: file.lastModified(),
+                text = text,
+            )
+        }
+
+private fun pruneCapturedCrashDiagnostics(diagnosticsDir: File) {
+    diagnosticsDir.listFiles { file -> file.isFile && file.name.startsWith("crash-") && file.extension == "txt" }
+        .orEmpty()
+        .sortedByDescending { it.name }
+        .drop(MAX_CAPTURED_CRASH_RECORDS)
+        .forEach { it.delete() }
+}
+
+private fun Throwable.stackTraceText(): String =
+    StringWriter().use { writer ->
+        PrintWriter(writer).use { printStackTrace(it) }
+        writer.toString()
+    }
+
+private fun Context.crashDiagnosticsDir(): File =
+    File(filesDir, "diagnostics/crashes")
 
 @RequiresApi(Build.VERSION_CODES.R)
 private fun loadProcessExitRecords(context: Context, maxRecords: Int): List<ProcessExitRecord> {
@@ -198,3 +322,5 @@ private fun PackageInfo.hoshiLongVersionCode(): Long =
 
 private val DiagnosticsFileNameFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
+
+private const val MAX_CAPTURED_CRASH_RECORDS = 5

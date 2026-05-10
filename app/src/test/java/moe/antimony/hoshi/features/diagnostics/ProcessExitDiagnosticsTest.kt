@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 
 class ProcessExitDiagnosticsTest {
     @Test
@@ -14,6 +15,18 @@ class ProcessExitDiagnosticsTest {
             versionName = "0.1.5",
             versionCode = 105,
             sdkInt = 35,
+            capturedCrashes = listOf(
+                CapturedCrashRecord(
+                    timestampMillis = 1_700_000_000_123,
+                    text = """
+                        Captured Hoshi crash
+                        Thread: main
+                        java.util.regex.PatternSyntaxException: Syntax error in regexp pattern near index 8
+                        \{[^}]+}
+                            at moe.antimony.hoshi.features.anki.AnkiRepositoryKt.<clinit>(AnkiRepository.kt:237)
+                    """.trimIndent(),
+                ),
+            ),
             records = listOf(
                 ProcessExitRecord(
                     timestampMillis = 1_700_000_000_000,
@@ -34,6 +47,9 @@ class ProcessExitDiagnosticsTest {
         assertTrue(text.contains("Package: moe.antimony.hoshi.debug"))
         assertTrue(text.contains("Version: 0.1.5 (105)"))
         assertTrue(text.contains("Android SDK: 35"))
+        assertTrue(text.contains("Captured Crash 1"))
+        assertTrue(text.contains("java.util.regex.PatternSyntaxException"))
+        assertTrue(text.contains("AnkiRepositoryKt.<clinit>"))
         assertTrue(text.contains("Reason: Java crash"))
         assertTrue(text.contains("Description: FATAL EXCEPTION: main"))
         assertTrue(text.contains("java.lang.IllegalStateException: boom"))
@@ -57,7 +73,10 @@ class ProcessExitDiagnosticsTest {
 
     @Test
     fun shareTextIsBoundedForAndroidShareTargets() {
-        val longTrace = "x".repeat(ProcessExitDiagnosticsReport.MAX_TRACE_CHARS + 500)
+        val tracePrefix = "java.lang.IllegalStateException: root cause\n"
+        val traceSuffix = "\n\tat android.os.Looper.loop(Looper.java:313)"
+        val omittedMiddle = "x".repeat(ProcessExitDiagnosticsReport.MAX_TRACE_CHARS + 500)
+        val longTrace = tracePrefix + omittedMiddle + traceSuffix
         val report = ProcessExitDiagnosticsReport(
             packageName = "moe.antimony.hoshi.debug",
             versionName = "0.1.5",
@@ -79,9 +98,10 @@ class ProcessExitDiagnosticsTest {
 
         val text = report.toShareText()
 
-        assertTrue(text.contains("[trace truncated to last ${ProcessExitDiagnosticsReport.MAX_TRACE_CHARS} characters]"))
+        assertTrue("missing trace prefix in ${text.take(500)}", text.contains(tracePrefix.trimEnd()))
+        assertTrue("missing trace suffix in ${text.takeLast(500)}", text.contains(traceSuffix.trimStart()))
+        assertTrue(text.contains("[trace truncated to first and last"))
         assertFalse(text.contains(longTrace))
-        assertEquals(ProcessExitDiagnosticsReport.MAX_TRACE_CHARS, text.substringAfter("Trace:\n").takeWhile { it == 'x' }.length)
     }
 
     @Test
@@ -114,6 +134,34 @@ class ProcessExitDiagnosticsTest {
     }
 
     @Test
+    fun capturedCrashWriterPersistsConcreteStackTraceBeforeAndroidHandlesTheCrash() {
+        val dir = Files.createTempDirectory("hoshi-crash-diagnostics").toFile()
+        val throwable = IllegalStateException(
+            "outer",
+            java.util.regex.PatternSyntaxException("Syntax error in regexp pattern", "\\{[^}]+}", 8),
+        )
+
+        saveCapturedCrashDiagnostic(
+            diagnosticsDir = dir,
+            thread = Thread("main"),
+            throwable = throwable,
+            timestampMillis = 1_700_000_000_000,
+            packageName = "moe.antimony.hoshi.debug",
+            versionName = "0.3.4",
+            versionCode = 304,
+            sdkInt = 35,
+        )
+
+        val crashes = loadCapturedCrashDiagnostics(dir)
+
+        assertEquals(1, crashes.size)
+        assertTrue(crashes.first().text.contains("Thread: main"))
+        assertTrue(crashes.first().text.contains("java.lang.IllegalStateException: outer"))
+        assertTrue(crashes.first().text.contains("java.util.regex.PatternSyntaxException"))
+        assertTrue(crashes.first().text.contains("""\{[^}]+}"""))
+    }
+
+    @Test
     fun exportFileNameIsStableAndSafeForAndroidDocumentPicker() {
         assertEquals(
             "hoshi-diagnostics-20231114-221320.txt",
@@ -126,5 +174,14 @@ class ProcessExitDiagnosticsTest {
         val source = File("src/main/java/moe/antimony/hoshi/features/diagnostics/DiagnosticsView.kt").readText()
 
         assertTrue(source.contains("BackHandler(onBack = onClose)"))
+    }
+
+    @Test
+    fun applicationInstallsPersistentCrashDiagnostics() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        val application = File("src/main/java/moe/antimony/hoshi/HoshiApplication.kt").readText()
+
+        assertTrue(manifest.contains("""android:name=".HoshiApplication""""))
+        assertTrue(application.contains("installCrashDiagnostics"))
     }
 }

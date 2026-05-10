@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Show concrete Java crash stack traces in Settings -> Diagnostics after Hoshi restarts from an uncaught exception.
+
 ## [v0.3.4] - 2026-05-10
 
 ### Added
