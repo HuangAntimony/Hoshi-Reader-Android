@@ -8,9 +8,6 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +41,7 @@ import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
+import moe.antimony.hoshi.features.update.AboutScreen
 
 private const val ReportIssueUrl = "https://github.com/HuangAntimony/Hoshi-Reader-Android/issues"
 
@@ -340,30 +338,10 @@ private fun SettingsDetailDestination(
             onClose = onClose,
             modifier = Modifier.fillMaxSize(),
         )
-        SettingsDetailSection.About,
-        -> {
-            TopLevelRouteContent(
-                selectedTab = MainTab.Settings,
-                pendingImportUri = null,
-                onPendingImportConsumed = {},
-                readerSettings = readerSettings,
-                onReaderSettingsChange = onReaderSettingsChange,
-                onOpenReader = {},
-                onOpenSasayakiMatch = {},
-                bookshelfRefreshKey = 0,
-                onSelectedTabChange = onSelectedTabChange,
-            )
-            AlertDialog(
-                onDismissRequest = onClose,
-                title = { Text(route.section.placeholderTitle()) },
-                text = { Text("This settings page is not implemented yet.") },
-                confirmButton = {
-                    TextButton(onClick = onClose) {
-                        Text("OK")
-                    }
-                },
-            )
-        }
+        SettingsDetailSection.About -> AboutScreen(
+            onClose = onClose,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
@@ -382,14 +360,4 @@ private fun SettingsDestination.toSection(): SettingsDetailSection = when (this)
     SettingsDestination.Diagnostics -> SettingsDetailSection.Diagnostics
     SettingsDestination.About -> SettingsDetailSection.About
     SettingsDestination.ReportIssue -> error("Report issue is handled outside Navigation3.")
-}
-
-private fun SettingsDetailSection.placeholderTitle(): String = when (this) {
-    SettingsDetailSection.About -> "About"
-    SettingsDetailSection.Appearance -> "Appearance"
-    SettingsDetailSection.Behavior -> "Behavior"
-    SettingsDetailSection.Advanced -> "Advanced"
-    SettingsDetailSection.Diagnostics -> "Diagnostics"
-    SettingsDetailSection.Dictionaries -> "Dictionaries"
-    SettingsDetailSection.Anki -> "Anki"
 }

@@ -91,6 +91,14 @@ Status: `in_progress`
 - Dictionary word audio now owns short audio-focus policy instead of delegating it to ExoPlayer, preserving Interrupt, best-effort Lower Volume, and Keep Volume background-audio behavior.
 - Local audio `android.db` import uses a broad Android picker MIME for vendor file-manager compatibility, with Hoshi-side `.db` validation after selection.
 
+### Updates
+
+Status: `in_progress`
+
+- GitHub Releases are the current update source. Behavior -> Automatically Download Updates defaults on, registers periodic WorkManager checks, and downloads newer APK assets through DownloadManager.
+- Settings -> About shows the current version and can manually check GitHub Releases regardless of the automatic update setting.
+- Next: before F-Droid distribution, split update behavior by distribution channel so F-Droid builds do not bypass F-Droid update checks.
+
 ### Sync
 
 Status: `todo`

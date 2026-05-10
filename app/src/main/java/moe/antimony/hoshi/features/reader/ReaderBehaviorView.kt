@@ -16,9 +16,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
+import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.update.UpdateScheduler
+import moe.antimony.hoshi.features.update.UpdateSettings
 
 @Composable
 fun ReaderBehaviorScreen(
@@ -27,6 +35,12 @@ fun ReaderBehaviorScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val appContainer = LocalHoshiAppContainer.current
+    val updateSettings by appContainer.updateSettingsRepository.settings.collectAsState(
+        initial = UpdateSettings(),
+    )
+    val scope = rememberCoroutineScope()
     SettingsDetailScaffold(
         title = "Behavior",
         onClose = onClose,
@@ -53,6 +67,23 @@ fun ReaderBehaviorScreen(
                         checked = settings.reverseVolumeKeyDirection,
                         onCheckedChange = {
                             onSettingsChange(settings.copy(reverseVolumeKeyDirection = it))
+                        },
+                    )
+                    BehaviorDivider()
+                    BehaviorSwitchRow(
+                        label = "Automatically Download Updates",
+                        checked = updateSettings.autoDownloadUpdates,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                appContainer.updateSettingsRepository.update {
+                                    it.copy(autoDownloadUpdates = enabled)
+                                }
+                                if (enabled) {
+                                    UpdateScheduler.schedule(context)
+                                } else {
+                                    UpdateScheduler.cancel(context)
+                                }
+                            }
                         },
                     )
                 }

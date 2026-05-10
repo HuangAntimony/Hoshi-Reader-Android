@@ -6,4 +6,7 @@
     <files-path
         name="files"
         path="." />
+    <external-files-path
+        name="update_downloads"
+        path="Download/" />
 </paths>

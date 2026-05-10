@@ -29,6 +29,13 @@ import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
+import moe.antimony.hoshi.features.update.AndroidUpdateDownloadManager
+import moe.antimony.hoshi.features.update.GitHubReleaseUpdateRepository
+import moe.antimony.hoshi.features.update.UpdateCheckService
+import moe.antimony.hoshi.features.update.UpdateDownloadStore
+import moe.antimony.hoshi.features.update.UpdateSettingsRepository
+import moe.antimony.hoshi.features.update.updateDownloadStore
+import moe.antimony.hoshi.features.update.updateSettingsRepository
 import moe.antimony.hoshi.navigation.ReaderRouteStateHolder
 
 internal class HoshiAppContainer(context: Context) {
@@ -42,6 +49,8 @@ internal class HoshiAppContainer(context: Context) {
     val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()
     val bookshelfSettingsRepository: BookshelfSettingsRepository = appContext.bookshelfSettingsRepository()
+    val updateSettingsRepository: UpdateSettingsRepository = appContext.updateSettingsRepository()
+    val updateDownloadStore: UpdateDownloadStore = appContext.updateDownloadStore()
     val readerFontManager: ReaderFontManager = ReaderFontManager(appContext.filesDir)
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
     val backupRepository: HoshiBackupRepository = HoshiBackupRepository(appContext.filesDir)
@@ -49,6 +58,15 @@ internal class HoshiAppContainer(context: Context) {
         context = appContext,
         backend = AnkiDroidBackendAdapter(AndroidAnkiContentApi(appContext)),
         settingsRepository = ankiSettingsRepository,
+    )
+    val updateDownloadManager: AndroidUpdateDownloadManager = AndroidUpdateDownloadManager(
+        context = appContext,
+        store = updateDownloadStore,
+    )
+    val updateCheckService: UpdateCheckService = UpdateCheckService(
+        currentVersionName = BuildConfig.VERSION_NAME,
+        releaseRepository = GitHubReleaseUpdateRepository(),
+        downloadController = updateDownloadManager,
     )
 
     fun readerRouteStateHolder(): ReaderRouteStateHolder =
