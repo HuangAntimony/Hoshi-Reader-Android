@@ -50,4 +50,22 @@ class UpdateDownloadRecordTest {
 
         assertTrue(record.matches(update.copy(sha256 = null)))
     }
+
+    @Test
+    fun onlyDownloadedRecordsNewerThanCurrentVersionShouldPromptForInstall() {
+        val record = UpdateDownloadRecord(
+            versionName = "0.3.5",
+            assetName = "Hoshi-Reader-v0.3.5.apk",
+            fileName = AndroidUpdateDownloadManager.UpdateFileName,
+            downloadId = 42L,
+            sha256 = null,
+            status = UpdateDownloadRecordStatus.Downloaded,
+        )
+
+        assertTrue(record.shouldPromptForInstall(currentVersionName = "0.3.4"))
+        assertFalse(record.shouldPromptForInstall(currentVersionName = "0.3.5"))
+        assertFalse(record.shouldPromptForInstall(currentVersionName = "0.3.6"))
+        assertFalse(record.copy(status = UpdateDownloadRecordStatus.Downloading).shouldPromptForInstall("0.3.4"))
+        assertFalse(record.copy(versionName = "latest").shouldPromptForInstall("0.3.4"))
+    }
 }
