@@ -95,7 +95,7 @@ Status: `in_progress`
 
 Status: `in_progress`
 
-- GitHub Releases are the current update source. Behavior -> Automatically Download Updates defaults on, registers immediate and periodic WorkManager checks, and downloads newer APK assets through DownloadManager.
+- GitHub Releases are the current update source. Behavior -> Automatically Download Updates defaults on, registers immediate and periodic WorkManager checks, and downloads newer APK assets through DownloadManager using a stable update package file name.
 - Settings -> About shows the current version and can manually check GitHub Releases regardless of the automatic update setting.
 - Next: before F-Droid distribution, split update behavior by distribution channel so F-Droid builds do not bypass F-Droid update checks.
 

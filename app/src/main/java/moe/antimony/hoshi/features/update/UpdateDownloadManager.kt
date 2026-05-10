@@ -22,7 +22,7 @@ internal class AndroidUpdateDownloadManager(
 
     override suspend fun statusFor(update: AvailableUpdate): UpdateDownloadStatus {
         val record = store.load()
-        if (record?.versionName != update.versionName) return UpdateDownloadStatus.None
+        if (record?.matches(update) != true) return UpdateDownloadStatus.None
         val file = updateFile(record.fileName)
         if (record.status == UpdateDownloadRecordStatus.Downloaded && file.isFile) {
             return UpdateDownloadStatus.Downloaded(file)
@@ -54,8 +54,9 @@ internal class AndroidUpdateDownloadManager(
     }
 
     override suspend fun enqueue(update: AvailableUpdate): Long {
-        val target = updateFile(update.assetName)
+        val target = updateFile(UpdateFileName)
         target.parentFile?.mkdirs()
+        deleteExistingUpdateApksExcept(target)
         if (target.exists()) {
             target.delete()
         }
@@ -68,12 +69,19 @@ internal class AndroidUpdateDownloadManager(
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(target))
         val downloadId = downloadManager.enqueue(request)
-        store.saveDownloading(update, downloadId)
+        store.saveDownloading(update, target.name, downloadId)
         return downloadId
     }
 
     internal fun updateFile(fileName: String): File =
         File(updateDirectory(), fileName)
+
+    private fun deleteExistingUpdateApksExcept(target: File) {
+        val directory = target.parentFile ?: return
+        directory.listFiles { file -> file.isFile && file.extension.equals("apk", ignoreCase = true) }
+            ?.filterNot { file -> file == target }
+            ?.forEach { file -> file.delete() }
+    }
 
     private fun updateDirectory(): File =
         appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
@@ -81,6 +89,7 @@ internal class AndroidUpdateDownloadManager(
 
     companion object {
         const val ApkMimeType = "application/vnd.android.package-archive"
+        const val UpdateFileName = "Hoshi-Reader-update.apk"
     }
 }
 
