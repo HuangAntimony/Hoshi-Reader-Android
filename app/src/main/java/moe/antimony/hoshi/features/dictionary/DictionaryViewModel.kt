@@ -21,7 +21,11 @@ import moe.antimony.hoshi.dictionary.DictionaryType
 
 internal interface DictionaryViewModelRepository {
     suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>>
-    suspend fun importDictionaries(uris: List<Uri>, type: DictionaryType)
+    suspend fun importDictionaries(
+        items: List<DictionaryImportItem>,
+        type: DictionaryType,
+        onProgress: (DictionaryImportItem) -> Unit,
+    )
     suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean)
     suspend fun deleteDictionary(type: DictionaryType, fileName: String)
     suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int)
@@ -29,6 +33,11 @@ internal interface DictionaryViewModelRepository {
     val settings: Flow<DictionarySettings>
     suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings)
 }
+
+internal data class DictionaryImportItem(
+    val displayName: String,
+    val uri: Uri? = null,
+)
 
 internal class AndroidDictionaryViewModelRepository(
     private val contentResolver: ContentResolver,
@@ -42,9 +51,14 @@ internal class AndroidDictionaryViewModelRepository(
             dictionaryRepository.loadDictionaries(type)
         }
 
-    override suspend fun importDictionaries(uris: List<Uri>, type: DictionaryType) {
-        uris.forEach { uri ->
-            dictionaryRepository.importDictionary(contentResolver, uri, type)
+    override suspend fun importDictionaries(
+        items: List<DictionaryImportItem>,
+        type: DictionaryType,
+        onProgress: (DictionaryImportItem) -> Unit,
+    ) {
+        items.forEach { item ->
+            onProgress(item)
+            dictionaryRepository.importDictionary(contentResolver, requireNotNull(item.uri), type)
         }
     }
 
@@ -102,27 +116,31 @@ internal class DictionaryViewModel(
         _uiState.update { it.copy(selectedType = type) }
     }
 
-    fun importDictionaries(uris: List<Uri>, type: DictionaryType) {
+    fun importDictionaries(items: List<DictionaryImportItem>, type: DictionaryType) {
         importDictionaries(
-            importKeys = uris.map { it.toString() },
+            importItems = items,
             type = type,
-            importOperation = {
-                repository.importDictionaries(uris, type)
+            importOperation = { onProgress ->
+                repository.importDictionaries(items, type, onProgress)
             },
         )
     }
 
     internal fun importDictionaries(
-        importKeys: List<String>,
+        importItems: List<DictionaryImportItem>,
         type: DictionaryType,
-        importOperation: suspend () -> Unit,
+        importOperation: suspend ((DictionaryImportItem) -> Unit) -> Unit,
     ) {
-        if (importKeys.isEmpty()) return
+        if (importItems.isEmpty()) return
         scope.launch {
-            _uiState.update { it.copy(isImporting = true, errorMessage = null) }
+            _uiState.update { it.copy(isImporting = true, currentImportMessage = null, errorMessage = null) }
             runCatching {
                 withContext(ioDispatcher) {
-                    importOperation()
+                    importOperation { item ->
+                        _uiState.update { state ->
+                            state.copy(currentImportMessage = "Importing ${item.displayName.ifBlank { "dictionary" }}")
+                        }
+                    }
                 }
             }.onSuccess {
                 reloadDictionaries(clearError = true)
@@ -133,7 +151,7 @@ internal class DictionaryViewModel(
                     )
                 }
             }
-            _uiState.update { it.copy(isImporting = false) }
+            _uiState.update { it.copy(isImporting = false, currentImportMessage = null) }
         }
     }
 

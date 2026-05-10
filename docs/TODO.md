@@ -65,6 +65,7 @@ Status: `in_progress`
 - Frequency and pitch dictionaries must stay type-specific; do not treat metadata dictionaries as term fallback dictionaries.
 - Dictionary imports write through hidden staging names inside `Dictionaries/<type>` before renaming into place, so interrupted imports should leave cleanup-visible staging files/folders instead of partial dictionary directories.
 - Duplicate dictionary imports are preflighted from the archive `index.json`; same type and title skip native import. Treat revision-based updates as a separate explicit update flow.
+- Batch dictionary imports show the current archive name in a reusable blocking progress overlay; e-ink mode keeps the background visually unchanged while still blocking input.
 
 ### Highlights And Notes
 

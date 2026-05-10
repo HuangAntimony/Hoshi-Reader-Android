@@ -104,6 +104,7 @@ import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.MultipleFileImportContent
 import moe.antimony.hoshi.importing.validateImportFile
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import kotlin.math.roundToInt
 
 private val DictionarySwitchColor = Color(0xFF34C759)
@@ -134,14 +135,18 @@ fun DictionaryView(
 
     val importer = rememberLauncherForActivityResult(MultipleFileImportContent()) { uris: List<Uri> ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
-        runCatching {
-            uris.forEach { uri ->
-                context.contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
+        val importItems = runCatching {
+            uris.map { uri ->
+                val displayName = context.contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
+                DictionaryImportItem(
+                    uri = uri,
+                    displayName = displayName.ifBlank { uri.lastPathSegment.orEmpty() },
+                )
             }
         }.onFailure { error ->
             dictionaryViewModel.showError(error.localizedMessage ?: "Select a .zip dictionary archive.")
             return@rememberLauncherForActivityResult
-        }
+        }.getOrThrow()
         uris.forEach { uri ->
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
@@ -150,7 +155,7 @@ fun DictionaryView(
                 )
             }
         }
-        dictionaryViewModel.importDictionaries(uris, importType)
+        dictionaryViewModel.importDictionaries(importItems, importType)
     }
 
     val selectedType = uiState.selectedType
@@ -322,12 +327,19 @@ fun DictionaryView(
 
     SettingsDetailScaffold(
         title = "Dictionaries",
-        onClose = onClose,
+        onClose = {
+            if (!uiState.isImporting) {
+                onClose()
+            }
+        },
         modifier = modifier.fillMaxSize(),
         containerColor = colorScheme.background,
         contentColor = colorScheme.onBackground,
         actions = {
-            IconButton(onClick = { destination = DictionaryDestination.CustomCss }) {
+            IconButton(
+                onClick = { destination = DictionaryDestination.CustomCss },
+                enabled = !uiState.isImporting,
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.DataObject,
                     contentDescription = "Custom CSS",
@@ -397,6 +409,7 @@ fun DictionaryView(
                                             onCheckedChange = { checked ->
                                                 dictionaryViewModel.updateSettings { it.copy(dictionaryTabDefault = checked) }
                                             },
+                                            enabled = !uiState.isImporting,
                                             colors = hoshiSwitchColors(),
                                         )
                                     },
@@ -422,7 +435,9 @@ fun DictionaryView(
                                             tint = colorScheme.onSurfaceVariant,
                                         )
                                     },
-                                    modifier = Modifier.clickable { destination = DictionaryDestination.Settings },
+                                    modifier = Modifier.clickable(enabled = !uiState.isImporting) {
+                                        destination = DictionaryDestination.Settings
+                                    },
                                 )
                             }
                         }
@@ -434,6 +449,7 @@ fun DictionaryView(
                                 SegmentedButton(
                                     selected = selectedType == type,
                                     onClick = { dictionaryViewModel.selectType(type) },
+                                    enabled = !uiState.isImporting,
                                     shape = SegmentedButtonDefaults.itemShape(
                                         index = index,
                                         count = DictionaryType.entries.size,
@@ -497,7 +513,8 @@ fun DictionaryView(
                                     revealedFileName.takeUnless { it == dictionary.path.name }
                                 }
                             },
-                            swipeEnabled = draggedFileName == null && !isDragSettling,
+                            enabled = !uiState.isImporting,
+                            swipeEnabled = draggedFileName == null && !isDragSettling && !uiState.isImporting,
                             modifier = reorderModifier
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -533,6 +550,14 @@ fun DictionaryView(
                     }
                 }
             }
+            if (uiState.isImporting) {
+                HoshiBlockingProgressOverlay(
+                    message = uiState.currentImportMessage ?: "Loading...",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2f),
+                )
+            }
         }
     }
 }
@@ -562,6 +587,7 @@ private fun DictionaryRow(
     onDelete: () -> Unit,
     isRevealed: Boolean,
     onRevealChange: (Boolean) -> Unit,
+    enabled: Boolean,
     swipeEnabled: Boolean,
     modifier: Modifier = Modifier,
     onDragStart: () -> Unit,
@@ -613,7 +639,7 @@ private fun DictionaryRow(
                 modifier = Modifier
                     .width(actionWidth)
                     .fillMaxHeight()
-                    .clickable { onDelete() },
+                    .clickable(enabled = enabled) { onDelete() },
                 shape = RoundedCornerShape(20.dp),
                 color = colorScheme.error,
             ) {
@@ -664,6 +690,7 @@ private fun DictionaryRow(
                     modifier = Modifier.draggable(
                         state = reorderDragState,
                         orientation = Orientation.Vertical,
+                        enabled = enabled,
                         startDragImmediately = true,
                         onDragStarted = { onDragStart() },
                         onDragStopped = { onDragEnd() },
@@ -693,6 +720,7 @@ private fun DictionaryRow(
                 HoshiSwitch(
                     checked = dictionary.isEnabled,
                     onCheckedChange = onEnabledChange,
+                    enabled = enabled,
                 )
             }
         }
@@ -729,10 +757,12 @@ private fun DictionaryDragHandle(modifier: Modifier = Modifier) {
 private fun HoshiSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = enabled,
         colors = hoshiSwitchColors(),
     )
 }

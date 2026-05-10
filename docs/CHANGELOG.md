@@ -15,6 +15,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Add a GitHub repository link to Settings -> About for starring this app's project.
 - Add GitHub release mirror fallbacks for update checks and APK downloads when direct GitHub access fails.
 - Add a Settings -> About storage cleanup tool that scans app-private leftovers by category and asks for confirmation before deleting them.
+- Show the current archive name while importing dictionaries in bulk, with a blocking progress overlay that supports e-ink mode.
 
 ### Fixed
 

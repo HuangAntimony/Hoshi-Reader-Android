@@ -37,13 +37,14 @@ class DictionarySettingsTest {
     @Test
     fun dictionaryImportProgressDoesNotDimEInkSurfaces() {
         val source = File("src/main/java/moe/antimony/hoshi/features/dictionary/DictionaryView.kt").readText()
-        val importingBlock = source.substringAfter("if (uiState.isImporting) {")
-            .substringBefore("private enum class DictionaryDestination")
+        val overlaySource = File("src/main/java/moe/antimony/hoshi/ui/HoshiBlockingProgressOverlay.kt").readText()
 
-        assertFalse(source.contains("colorScheme.scrim"))
-        assertFalse(source.contains(".background(colorScheme.scrim"))
+        assertTrue(source.contains("HoshiBlockingProgressOverlay("))
+        assertTrue(source.contains("message = uiState.currentImportMessage ?: \"Loading...\""))
         assertTrue(source.contains("enabled = !uiState.isImporting"))
-        assertTrue(importingBlock.contains("CircularProgressIndicator"))
+        assertTrue(overlaySource.contains("LocalHoshiEInkMode.current"))
+        assertTrue(overlaySource.contains("if (eInkMode) Color.Transparent"))
+        assertTrue(overlaySource.contains("BorderStroke(1.dp, MaterialTheme.colorScheme.outline"))
     }
 
     @Test

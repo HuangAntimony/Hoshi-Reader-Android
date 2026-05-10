@@ -8,6 +8,7 @@ internal data class DictionaryUiState(
     val dictionaries: Map<DictionaryType, List<DictionaryInfo>> = emptyMap(),
     val settings: DictionarySettings = DictionarySettings(),
     val isImporting: Boolean = false,
+    val currentImportMessage: String? = null,
     val errorMessage: String? = null,
 ) {
     val currentDictionaries: List<DictionaryInfo>

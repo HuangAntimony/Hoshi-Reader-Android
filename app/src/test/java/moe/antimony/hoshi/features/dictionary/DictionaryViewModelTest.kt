@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.dictionary
 
-import android.net.Uri
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,17 +69,72 @@ class DictionaryViewModelTest {
         repository.onImport = {
             repository.dictionaries = repository.dictionaries + (DictionaryType.Pitch to listOf(imported))
         }
+        val item = DictionaryImportItem(displayName = "pitch.zip")
 
         viewModel.importDictionaries(
-            importKeys = listOf("pitch.zip"),
+            importItems = listOf(item),
             type = DictionaryType.Pitch,
-            importOperation = { repository.onImport!!.invoke() },
+            importOperation = { onProgress ->
+                onProgress(item)
+                repository.onImport!!.invoke()
+            },
         )
 
         assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
         assertNull(viewModel.uiState.value.errorMessage)
         assertEquals(listOf(imported), viewModel.uiState.value.dictionaries[DictionaryType.Pitch])
         assertEquals(1, repository.rebuildCount)
+    }
+
+    @Test
+    fun importPublishesCurrentDictionaryProgressForEachItem() {
+        val repository = FakeDictionaryRepository()
+        val viewModel = DictionaryViewModel(
+            repository = repository,
+            coroutineScope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val first = DictionaryImportItem(displayName = "JMdict.zip")
+        val second = DictionaryImportItem(displayName = "Jiten.zip")
+        val messages = mutableListOf<String?>()
+
+        viewModel.importDictionaries(
+            importItems = listOf(first, second),
+            type = DictionaryType.Term,
+            importOperation = { onProgress ->
+                onProgress(first)
+                messages += viewModel.uiState.value.currentImportMessage
+                onProgress(second)
+                messages += viewModel.uiState.value.currentImportMessage
+            },
+        )
+
+        assertEquals(listOf("Importing JMdict.zip", "Importing Jiten.zip"), messages)
+        assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
+    }
+
+    @Test
+    fun publicImportPassesItemsToRepositoryAndPublishesProgress() {
+        val first = DictionaryImportItem(displayName = "First.zip")
+        val second = DictionaryImportItem(displayName = "Second.zip")
+        val repository = FakeDictionaryRepository()
+        val viewModel = DictionaryViewModel(
+            repository = repository,
+            coroutineScope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        viewModel.importDictionaries(listOf(first, second), DictionaryType.Frequency)
+
+        assertEquals(listOf(first, second), repository.importedItems)
+        assertEquals(
+            listOf("Importing First.zip", "Importing Second.zip"),
+            repository.progressMessages,
+        )
+        assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
     }
 
     @Test
@@ -95,25 +149,31 @@ class DictionaryViewModelTest {
             ioDispatcher = Dispatchers.Unconfined,
         )
         viewModel.reload()
+        val bad = DictionaryImportItem(displayName = "bad.zip")
 
         viewModel.importDictionaries(
-            importKeys = listOf("bad.zip"),
+            importItems = listOf(bad),
             type = DictionaryType.Term,
-            importOperation = { error("bad archive") },
+            importOperation = { onProgress ->
+                onProgress(bad)
+                error("bad archive")
+            },
         )
 
         assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
         assertEquals("bad archive", viewModel.uiState.value.errorMessage)
         assertEquals(listOf(existing), viewModel.uiState.value.currentDictionaries)
 
         viewModel.importDictionaries(
-            importKeys = listOf("good.zip"),
+            importItems = listOf(DictionaryImportItem(displayName = "good.zip")),
             type = DictionaryType.Term,
-            importOperation = {},
+            importOperation = { _ -> },
         )
 
         assertNull(viewModel.uiState.value.errorMessage)
         assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
     }
 
     @Test
@@ -191,6 +251,8 @@ private class FakeDictionaryRepository(
     val enabledCalls = mutableListOf<String>()
     val deleteCalls = mutableListOf<String>()
     val moveCalls = mutableListOf<Pair<DictionaryType, Pair<Int, Int>>>()
+    val importedItems = mutableListOf<DictionaryImportItem>()
+    val progressMessages = mutableListOf<String?>()
     var savedSettings: DictionarySettings? = null
 
     override suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>> {
@@ -198,7 +260,17 @@ private class FakeDictionaryRepository(
         return dictionaries
     }
 
-    override suspend fun importDictionaries(uris: List<Uri>, type: DictionaryType) = Unit
+    override suspend fun importDictionaries(
+        items: List<DictionaryImportItem>,
+        type: DictionaryType,
+        onProgress: (DictionaryImportItem) -> Unit,
+    ) {
+        items.forEach { item ->
+            importedItems += item
+            onProgress(item)
+            progressMessages += "Importing ${item.displayName}"
+        }
+    }
 
     override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean) {
         enabledCalls += "$fileName:$enabled"
