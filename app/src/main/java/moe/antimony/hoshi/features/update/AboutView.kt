@@ -55,6 +55,7 @@ fun AboutScreen(
     val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
     val record by appContainer.updateDownloadStore.record.collectAsState(initial = null)
+    val actionableRecord = record?.takeIf { it.shouldSurfaceInAbout(BuildConfig.VERSION_NAME) }
     var checkState by remember { mutableStateOf<AboutUpdateCheckState>(AboutUpdateCheckState.Idle) }
 
     SettingsDetailScaffold(
@@ -120,7 +121,7 @@ fun AboutScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = updateStatusText(checkState, record),
+                            text = updateStatusText(checkState, actionableRecord),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -160,7 +161,7 @@ fun AboutScreen(
                                 }
                                 Text("Check for Updates")
                             }
-                            val downloadedFile = record
+                            val downloadedFile = actionableRecord
                                 ?.takeIf { it.status == UpdateDownloadRecordStatus.Downloaded }
                                 ?.let { appContainer.updateDownloadManager.updateFile(it.fileName) }
                                 ?.takeIf(File::isFile)

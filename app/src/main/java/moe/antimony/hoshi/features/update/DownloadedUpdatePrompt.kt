@@ -73,6 +73,10 @@ internal fun DownloadedUpdatePrompt(
 
 internal fun UpdateDownloadRecord.shouldPromptForInstall(currentVersionName: String): Boolean {
     if (status != UpdateDownloadRecordStatus.Downloaded) return false
+    return shouldSurfaceInAbout(currentVersionName)
+}
+
+internal fun UpdateDownloadRecord.shouldSurfaceInAbout(currentVersionName: String): Boolean {
     val downloadedVersion = AppVersion.parse(versionName) ?: return false
     val currentVersion = AppVersion.parse(currentVersionName) ?: return false
     return downloadedVersion > currentVersion

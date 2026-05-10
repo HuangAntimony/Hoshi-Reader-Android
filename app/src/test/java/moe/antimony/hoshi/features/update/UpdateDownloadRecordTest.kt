@@ -68,4 +68,21 @@ class UpdateDownloadRecordTest {
         assertFalse(record.copy(status = UpdateDownloadRecordStatus.Downloading).shouldPromptForInstall("0.3.4"))
         assertFalse(record.copy(versionName = "latest").shouldPromptForInstall("0.3.4"))
     }
+
+    @Test
+    fun onlyRecordsForNewerVersionsShouldSurfaceInAbout() {
+        val record = UpdateDownloadRecord(
+            versionName = "0.3.5",
+            assetName = "Hoshi-Reader-v0.3.5.apk",
+            fileName = AndroidUpdateDownloadManager.UpdateFileName,
+            downloadId = 42L,
+            sha256 = null,
+            status = UpdateDownloadRecordStatus.Downloaded,
+        )
+
+        assertTrue(record.shouldSurfaceInAbout(currentVersionName = "0.3.4"))
+        assertFalse(record.shouldSurfaceInAbout(currentVersionName = "0.3.5"))
+        assertFalse(record.shouldSurfaceInAbout(currentVersionName = "0.3.6"))
+        assertFalse(record.copy(versionName = "latest").shouldSurfaceInAbout("0.3.4"))
+    }
 }
