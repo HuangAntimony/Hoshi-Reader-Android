@@ -261,6 +261,7 @@ fun LookupPopupView(
                     callbacks = PopupWebViewCallbacks(
                         onTapOutside = onTapOutside,
                         onSwipeDismiss = onSwipeDismiss,
+                        onOpenLink = context::openPopupExternalLink,
                         onTextSelected = onTextSelected,
                         onLookupRedirect = { query ->
                             LookupEngine.lookup(

@@ -156,6 +156,7 @@ fun DictionarySearchView(
                 callbacks = PopupWebViewCallbacks(
                     onTapOutside = searchViewModel::closePopups,
                     onSwipeDismiss = searchViewModel::closePopups,
+                    onOpenLink = context::openPopupExternalLink,
                     onTextSelected = { selection ->
                         searchViewModel.openRootPopup(selection, popupOptions)
                     },
