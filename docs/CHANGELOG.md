@@ -5,8 +5,9 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
+- Move the reader Sasayaki play/pause shortcut to the top-right chrome and let its visible state reserve top reader space like iOS.
 - Turn on Sasayaki, the reader Sasayaki toggle, auto-scroll, and lookup auto-pause by default, and expose the reader Sasayaki toggle from Appearance settings.
 
 ## [v0.4.2] - 2026-05-12

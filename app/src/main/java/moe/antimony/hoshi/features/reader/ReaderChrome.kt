@@ -44,8 +44,10 @@ data class ReaderChromeLayout(
 
 data class ReaderBottomChromeMetrics(
     val buttonSizeDp: Int,
+    val topSasayakiButtonSizeDp: Int,
     val primaryIconSizeDp: Int,
     val secondaryIconSizeDp: Int,
+    val topSasayakiIconSizeDp: Int,
     val horizontalPaddingDp: Int,
     val bottomPaddingDp: Int,
     val trailingButtonSpacingDp: Int,
@@ -60,28 +62,40 @@ data class ReaderBottomChromeMetrics(
     val menuBottomPaddingDp: Int = webViewBottomPaddingDp
 }
 
-fun readerChromeLayout(state: ReaderChromeState, settings: ReaderSettings): ReaderChromeLayout {
+fun readerChromeLayout(
+    state: ReaderChromeState,
+    settings: ReaderSettings,
+    showSasayakiToggle: Boolean = false,
+): ReaderChromeLayout {
     val progress = state.progressText(settings)
     return ReaderChromeLayout(
-        topWebViewPaddingDp = readerWebViewTopPaddingDp(state, settings),
+        topWebViewPaddingDp = readerWebViewTopPaddingDp(state, settings, showSasayakiToggle),
         showProgressInBottomBar = !settings.showProgressTop && progress.isNotBlank(),
     )
 }
 
-fun readerWebViewTopPaddingDp(state: ReaderChromeState, settings: ReaderSettings): Int {
+fun readerWebViewTopPaddingDp(
+    state: ReaderChromeState,
+    settings: ReaderSettings,
+    showSasayakiToggle: Boolean = false,
+): Int {
     val progress = state.progressText(settings)
-    val visibleRows = listOf(
+    val textRows = listOf(
         settings.showTitle,
         settings.showProgressTop && progress.isNotBlank(),
     ).count { it }
-    return ReaderWebViewTopBasePaddingDp + (visibleRows * ReaderChromeLineHeightDp)
+    val textHeight = textRows * ReaderChromeLineHeightDp
+    val buttonHeight = if (showSasayakiToggle) ReaderTopSasayakiButtonSizeDp else 0
+    return ReaderWebViewTopBasePaddingDp + maxOf(textHeight, buttonHeight)
 }
 
 fun readerBottomChromeMetrics(): ReaderBottomChromeMetrics =
     ReaderBottomChromeMetrics(
         buttonSizeDp = 44,
-        primaryIconSizeDp = 22,
-        secondaryIconSizeDp = 20,
+        topSasayakiButtonSizeDp = ReaderTopSasayakiButtonSizeDp,
+        primaryIconSizeDp = 28,
+        secondaryIconSizeDp = 28,
+        topSasayakiIconSizeDp = 20,
         horizontalPaddingDp = 22,
         bottomPaddingDp = 2,
         trailingButtonSpacingDp = 8,
@@ -138,3 +152,4 @@ fun readerChromeColors(settings: ReaderSettings, systemDark: Boolean): ReaderChr
 
 private const val ReaderWebViewTopBasePaddingDp = 4
 private const val ReaderChromeLineHeightDp = 20
+private const val ReaderTopSasayakiButtonSizeDp = 36

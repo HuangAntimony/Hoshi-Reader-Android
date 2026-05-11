@@ -90,7 +90,7 @@ For reader/dictionary/audio user flows, perform targeted emulator or device vali
 
 For reader/dictionary theme regressions, verify open Dictionary tab results, the Dictionary search cursor, and open reader lookup popups update immediately when switching between Light, Dark, System, and E-ink appearance modes.
 
-For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, compact bottom buttons, bottom reader-menu spacing, and all progress indicators hidden against the paginated reader text area.
+For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, compact bottom buttons, Sasayaki top-right toggle spacing, bottom reader-menu spacing, and all progress indicators hidden against the paginated reader text area.
 
 For reader appearance controls, verify Layout Mode shows both Paginated and Continuous labels without truncation in the settings page and reader sheet.
 

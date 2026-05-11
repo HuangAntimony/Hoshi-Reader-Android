@@ -62,7 +62,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -130,8 +129,9 @@ fun ReaderWebView(
     val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
     val bookRepository = appContainer.bookRepository
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
-    val sasayakiMatchData by produceState<SasayakiMatchData?>(initialValue = null, key1 = bookRoot, key2 = bookRepository) {
-        value = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
+    var sasayakiMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
+    LaunchedEffect(bookRoot, bookRepository) {
+        sasayakiMatchData = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
     }
     var sasayakiPlaybackData by remember(bookRoot) { mutableStateOf<SasayakiPlaybackData?>(null) }
     var isSasayakiPlaybackLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
@@ -440,8 +440,30 @@ fun ReaderWebView(
         }
     }
 
-    val chromeLayout = readerChromeLayout(chromeState, effectiveSettings)
     val bottomChromeMetrics = readerBottomChromeMetrics()
+    val showSasayakiTopToggle = sasayakiSettings.enabled &&
+        sasayakiSettings.showReaderToggle &&
+        sasayakiMatchData != null &&
+        (sasayakiPlayer?.hasAudio == true || sasayakiPlaybackData.hasStoredAudioSource())
+    val reserveSasayakiTopToggle = remember(bookRoot, sasayakiSettings) {
+        readerShouldReserveSasayakiTopToggle(bookRoot, sasayakiSettings)
+    }
+    val onSasayakiTopToggle = sasayakiPlayer
+        ?.takeIf { showSasayakiTopToggle && it.hasAudio }
+        ?.let { player ->
+            ({
+                if (sasayakiWasPausedByLookup) {
+                    stateHolder.clearSasayakiPauseState()
+                } else {
+                    player.togglePlayback()
+                }
+            })
+        }
+    val chromeLayout = readerChromeLayout(
+        chromeState,
+        effectiveSettings,
+        showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
+    )
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -532,10 +554,13 @@ fun ReaderWebView(
             state = chromeState,
             settings = effectiveSettings,
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
+            onSasayakiToggle = onSasayakiTopToggle,
+            sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
+            metrics = bottomChromeMetrics,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(start = 96.dp, end = 96.dp),
+                .padding(horizontal = 15.dp),
         )
         ReaderBottomChrome(
             state = chromeState,
@@ -553,18 +578,6 @@ fun ReaderWebView(
             } else {
                 null
             },
-            onSasayakiToggle = sasayakiPlayer
-                ?.takeIf { sasayakiSettings.enabled && sasayakiSettings.showReaderToggle && it.hasAudio }
-                ?.let { player ->
-                    ({
-                        if (sasayakiWasPausedByLookup) {
-                            stateHolder.clearSasayakiPauseState()
-                        } else {
-                            player.togglePlayback()
-                        }
-                    })
-                },
-            sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -612,29 +625,50 @@ private fun ReaderTopInfo(
     state: ReaderChromeState,
     settings: ReaderSettings,
     colors: ReaderChromeColors,
+    onSasayakiToggle: (() -> Unit)?,
+    sasayakiPlaying: Boolean,
+    metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
     val progress = state.progressText(settings)
-    if (!settings.showTitle && (progress.isBlank() || !settings.showProgressTop)) return
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        if (settings.showTitle) {
-            Text(
-                text = state.title,
-                color = Color(colors.infoText),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-            )
+    if (!settings.showTitle && onSasayakiToggle == null && (progress.isBlank() || !settings.showProgressTop)) return
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.align(Alignment.TopCenter),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            if (settings.showTitle) {
+                Text(
+                    text = state.title,
+                    color = Color(colors.infoText),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = if (onSasayakiToggle != null) 42.dp else 0.dp),
+                )
+            }
+            if (settings.showProgressTop && progress.isNotBlank()) {
+                Text(
+                    text = progress,
+                    color = Color(colors.infoText),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
-        if (settings.showProgressTop && progress.isNotBlank()) {
-            Text(
-                text = progress,
-                color = Color(colors.infoText),
-                style = MaterialTheme.typography.labelMedium,
-            )
+        if (onSasayakiToggle != null) {
+            ReaderRoundButton(
+                colors = colors,
+                sizeDp = metrics.topSasayakiButtonSizeDp,
+                onClick = onSasayakiToggle,
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Icon(
+                    imageVector = if (sasayakiPlaying) Icons.Rounded.Pause else Icons.Rounded.GraphicEq,
+                    contentDescription = if (sasayakiPlaying) "Pause Sasayaki" else "Play Sasayaki",
+                    modifier = Modifier.size(metrics.topSasayakiIconSizeDp.dp),
+                    tint = Color(colors.buttonContent),
+                )
+            }
         }
     }
 }
@@ -652,8 +686,6 @@ private fun BoxScope.ReaderBottomChrome(
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
     onSasayaki: (() -> Unit)?,
-    onSasayakiToggle: (() -> Unit)?,
-    sasayakiPlaying: Boolean,
     metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
@@ -708,17 +740,6 @@ private fun BoxScope.ReaderBottomChrome(
                 )
             }
             Spacer(Modifier.weight(1f))
-            if (onSasayakiToggle != null) {
-                ReaderGlassButton(colors = colors, metrics = metrics, onClick = onSasayakiToggle) {
-                    Icon(
-                        imageVector = if (sasayakiPlaying) Icons.Rounded.Pause else Icons.Rounded.GraphicEq,
-                        contentDescription = if (sasayakiPlaying) "Pause Sasayaki" else "Play Sasayaki",
-                        modifier = Modifier.size(metrics.secondaryIconSizeDp.dp),
-                        tint = Color(colors.buttonContent),
-                    )
-                }
-                Spacer(Modifier.width(metrics.trailingButtonSpacingDp.dp))
-            }
             ReaderGlassButton(colors = colors, metrics = metrics, onClick = onMenu) {
                 Icon(
                     imageVector = Icons.Rounded.Tune,
@@ -845,9 +866,24 @@ private fun ReaderGlassButton(
     onClick: () -> Unit,
     content: @Composable RowScope.() -> Unit,
 ) {
+    ReaderRoundButton(
+        colors = colors,
+        sizeDp = metrics.buttonSizeDp,
+        onClick = onClick,
+        content = content,
+    )
+}
+
+@Composable
+private fun ReaderRoundButton(
+    colors: ReaderChromeColors,
+    sizeDp: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
     Surface(
-        modifier = Modifier
-            .size(metrics.buttonSizeDp.dp),
+        modifier = modifier.size(sizeDp.dp),
         shape = CircleShape,
         color = Color(colors.buttonContainer),
         tonalElevation = 0.dp,
@@ -856,7 +892,7 @@ private fun ReaderGlassButton(
         Row(
             modifier = Modifier
                 .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp),
+                .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
             content = content,
@@ -917,6 +953,7 @@ private fun ChapterWebView(
         }
     }
     val chapter = book.chapters[chapterPosition.index]
+    var readerWebView by remember { mutableStateOf<WebView?>(null) }
     val fontFaceUrl = remember(readerSettings.selectedFont) {
         fontManager.webViewFontUrl(readerSettings.selectedFont)
     }
@@ -929,7 +966,6 @@ private fun ChapterWebView(
         fontFaceUrl,
         systemDark,
         scanNonJapaneseText,
-        sasayakiCuesJson,
         sasayakiTextColor,
         sasayakiBackgroundColor,
     ) {
@@ -940,9 +976,16 @@ private fun ChapterWebView(
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
-            sasayakiCuesJson = sasayakiCuesJson,
+            sasayakiCuesJson = null,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
+        )
+    }
+    LaunchedEffect(webViewViewportSize, isWebViewRestoring, sasayakiCuesJson) {
+        if (isWebViewRestoring || webViewViewportSize == IntSize.Zero) return@LaunchedEffect
+        readerWebView?.evaluateJavascript(
+            ReaderPaginationScripts.applySasayakiCuesInvocation(sasayakiCuesJson ?: "[]"),
+            null,
         )
     }
 
@@ -972,6 +1015,7 @@ private fun ChapterWebView(
                 webViewClient = EpubWebViewClient(book, fontManager, onInternalLink) { view ->
                     view.evaluateJavascript(readerSetupScript, null)
                 }
+                readerWebView = this
                 onWebViewReady(this)
             }
         },
@@ -1060,6 +1104,7 @@ private fun ChapterWebView(
                     }
                 })
             }
+            if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
             val loadKey = "$baseUrl#${readerSetupScript.hashCode()}#$webViewViewportSize"
             if (webView.tag != loadKey) {
                 webView.tag = loadKey
@@ -1073,6 +1118,15 @@ private fun ChapterWebView(
         },
     )
 }
+
+internal fun readerWebViewReadyToLoad(webViewViewportSize: IntSize): Boolean =
+    webViewViewportSize != IntSize.Zero
+
+internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: SasayakiSettings): Boolean =
+    settings.enabled &&
+        settings.showReaderToggle &&
+        bookRoot?.resolve(ReaderSasayakiMatchFileName)?.isFile == true &&
+        bookRoot.resolve(ReaderSasayakiPlaybackFileName).isFile
 
 private class EpubWebViewClient(
     private val book: EpubBook,
@@ -1347,6 +1401,12 @@ private fun SasayakiMatchData.cuesJsonForChapter(chapterIndex: Int): String {
         .map { SasayakiCueRange(id = it.id, start = it.start, length = it.length) }
     return Json.encodeToString(ListSerializer(SasayakiCueRange.serializer()), cues)
 }
+
+private fun SasayakiPlaybackData?.hasStoredAudioSource(): Boolean =
+    this?.audioUri?.isNotBlank() == true || this?.audioFileName?.isNotBlank() == true
+
+private const val ReaderSasayakiMatchFileName = "sasayaki_match.json"
+private const val ReaderSasayakiPlaybackFileName = "sasayaki_playback.json"
 
 internal fun androidPixelsToCssPixels(value: Float, density: Float): Float =
     value / density.coerceAtLeast(1f)

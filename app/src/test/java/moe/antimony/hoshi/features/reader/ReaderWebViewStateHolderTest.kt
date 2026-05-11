@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.reader
 
 import androidx.compose.ui.unit.IntSize
+import kotlin.io.path.createTempDirectory
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -74,6 +76,29 @@ class ReaderWebViewStateHolderTest {
 
         assertEquals(ReaderChapterPosition(index = 1, progress = 0.35), holder.readerPosition.loadPosition)
         assertEquals(IntSize(900, 1200), holder.webViewViewportSize)
+    }
+
+    @Test
+    fun readerWebViewWaitsForMeasuredViewportBeforeInitialLoad() {
+        assertFalse(readerWebViewReadyToLoad(IntSize.Zero))
+        assertTrue(readerWebViewReadyToLoad(IntSize(800, 1200)))
+    }
+
+    @Test
+    fun sasayakiTopToggleSpaceIsReservedBeforeSidecarsAreParsed() {
+        val root = createTempDirectory("hoshi-sasayaki-sidecar").toFile()
+        try {
+            assertFalse(readerShouldReserveSasayakiTopToggle(root, SasayakiSettings()))
+
+            root.resolve("sasayaki_match.json").writeText("{}")
+            root.resolve("sasayaki_playback.json").writeText("{}")
+
+            assertTrue(readerShouldReserveSasayakiTopToggle(root, SasayakiSettings()))
+            assertFalse(readerShouldReserveSasayakiTopToggle(root, SasayakiSettings(enabled = false)))
+            assertFalse(readerShouldReserveSasayakiTopToggle(root, SasayakiSettings(showReaderToggle = false)))
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

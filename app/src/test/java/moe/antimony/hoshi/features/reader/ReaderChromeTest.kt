@@ -52,6 +52,56 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun sasayakiTopToggleReservesTheTopChromeRowLikeIos() {
+        val state = ReaderChromeState(
+            title = "屍人荘の殺人",
+            currentCharacter = 355,
+            totalCharacters = 169325,
+        )
+
+        assertEquals(
+            40,
+            readerWebViewTopPaddingDp(
+                state,
+                ReaderSettings(showTitle = false, showProgressTop = false),
+                showSasayakiToggle = true,
+            ),
+        )
+        assertEquals(
+            4,
+            readerWebViewTopPaddingDp(
+                state,
+                ReaderSettings(showTitle = false, showProgressTop = false),
+                showSasayakiToggle = false,
+            ),
+        )
+        assertEquals(
+            40,
+            readerWebViewTopPaddingDp(
+                state,
+                ReaderSettings(showTitle = true, showProgressTop = false),
+                showSasayakiToggle = true,
+            ),
+        )
+        assertEquals(
+            44,
+            readerWebViewTopPaddingDp(
+                state,
+                ReaderSettings(showTitle = true, showProgressTop = true),
+                showSasayakiToggle = true,
+            ),
+        )
+    }
+
+    @Test
+    fun topSasayakiToggleUsesSmallerCircleWithoutShrinkingTheIcon() {
+        val metrics = readerBottomChromeMetrics()
+
+        assertEquals(36, metrics.topSasayakiButtonSizeDp)
+        assertEquals(20, metrics.topSasayakiIconSizeDp)
+    }
+
+    @Test
     fun bottomProgressBelongsToBottomChromeWhenProgressIsNotTop() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
@@ -77,8 +127,8 @@ class ReaderChromeTest {
         val metrics = readerBottomChromeMetrics()
 
         assertEquals(44, metrics.buttonSizeDp)
-        assertEquals(22, metrics.primaryIconSizeDp)
-        assertEquals(20, metrics.secondaryIconSizeDp)
+        assertEquals(28, metrics.primaryIconSizeDp)
+        assertEquals(28, metrics.secondaryIconSizeDp)
         assertEquals(8, metrics.trailingButtonSpacingDp)
         assertEquals(46, metrics.webViewBottomPaddingDp)
         assertEquals(metrics.webViewBottomPaddingDp, metrics.menuBottomPaddingDp)
