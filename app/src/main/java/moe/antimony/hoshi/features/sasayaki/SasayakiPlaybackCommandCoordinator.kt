@@ -65,6 +65,30 @@ class SasayakiPlaybackCommandCoordinator(
         seek(previous, startPlayback = isPlaying, revealCue = true)
     }
 
+    fun skipForward(
+        currentTime: Double,
+        duration: Double,
+        seconds: Int,
+        isPlaying: Boolean,
+    ) {
+        playbackState.clearStopPlaybackTime()
+        val target = if (duration > 0.0) {
+            (currentTime + seconds).coerceAtMost(duration)
+        } else {
+            currentTime + seconds
+        }
+        seek(target, startPlayback = isPlaying, revealCue = true)
+    }
+
+    fun skipBackward(
+        currentTime: Double,
+        seconds: Int,
+        isPlaying: Boolean,
+    ) {
+        playbackState.clearStopPlaybackTime()
+        seek((currentTime - seconds).coerceAtLeast(0.0), startPlayback = isPlaying, revealCue = true)
+    }
+
     fun playCue(
         cue: SasayakiMatch,
         stop: Boolean,

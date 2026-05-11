@@ -96,6 +96,8 @@ For reader appearance controls, verify Layout Mode shows both Paginated and Cont
 
 For Sasayaki settings regressions, verify fresh installs default Sasayaki, Show Sasayaki Toggle, Auto-Scroll, and Auto-Pause on Lookup on, and that Appearance can toggle the reader Sasayaki button.
 
+For Sasayaki skip-control regressions, verify the reader bottom skip buttons flank the existing Back/Menu buttons, and the same cue/5s/10s/15s/30s action applies from reader chrome, Sasayaki sheet controls, and Android system media controls.
+
 For reader text layout regressions, verify Appearance -> Layout changes such as Vertical Padding reload the current chapter at the displayed position and visibly affect text spacing.
 
 For continuous reader layout regressions, verify vertical-writing Horizontal Padding and horizontal-writing Vertical Padding inset the current visible viewport rather than only the chapter ends.

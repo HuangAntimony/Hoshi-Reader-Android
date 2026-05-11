@@ -18,6 +18,7 @@ internal interface SasayakiPlaybackControllerContract {
     val isPlaying: Boolean
     val errorMessage: String?
     var autoScroll: Boolean
+    var readerSkipButtonAction: SasayakiReaderSkipButtonAction
     val hasAudio: Boolean
     val hasMatch: Boolean
     val delay: Double
@@ -32,6 +33,8 @@ internal interface SasayakiPlaybackControllerContract {
     fun pausePlayback(restoreTemporaryPosition: Boolean)
     fun nextCue()
     fun previousCue()
+    fun skipForward(seconds: Int)
+    fun skipBackward(seconds: Int)
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch?
     fun playCue(cue: SasayakiMatch, stop: Boolean)
     fun exportCueAudio(cue: SasayakiMatch, sentence: String): File?
@@ -179,6 +182,7 @@ internal class SasayakiPlaybackController(
         set(value) {
             cuePresentation.autoScroll = value
         }
+    override var readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue
     override val hasAudio: Boolean get() = audioAvailability.hasAudio
     override val hasMatch: Boolean = matchData != null
     override val delay: Double get() = playback.delay
@@ -238,17 +242,53 @@ internal class SasayakiPlaybackController(
     }
 
     override fun nextCue() {
-        playbackCommands.nextCue(
+        val seconds = readerSkipButtonAction.seconds
+        if (seconds == null) {
+            playbackCommands.nextCue(
+                currentTime = currentTime,
+                delay = delay,
+                isPlaying = isPlaying,
+            )
+        } else {
+            playbackCommands.skipForward(
+                currentTime = currentTime,
+                duration = duration,
+                seconds = seconds,
+                isPlaying = isPlaying,
+            )
+        }
+    }
+
+    override fun previousCue() {
+        val seconds = readerSkipButtonAction.seconds
+        if (seconds == null) {
+            playbackCommands.previousCue(
+                currentTime = currentTime,
+                delay = delay,
+                isPlaying = isPlaying,
+            )
+        } else {
+            playbackCommands.skipBackward(
+                currentTime = currentTime,
+                seconds = seconds,
+                isPlaying = isPlaying,
+            )
+        }
+    }
+
+    override fun skipForward(seconds: Int) {
+        playbackCommands.skipForward(
             currentTime = currentTime,
-            delay = delay,
+            duration = duration,
+            seconds = seconds,
             isPlaying = isPlaying,
         )
     }
 
-    override fun previousCue() {
-        playbackCommands.previousCue(
+    override fun skipBackward(seconds: Int) {
+        playbackCommands.skipBackward(
             currentTime = currentTime,
-            delay = delay,
+            seconds = seconds,
             isPlaying = isPlaying,
         )
     }

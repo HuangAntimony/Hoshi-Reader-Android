@@ -52,6 +52,11 @@ class SasayakiPlayer internal constructor(
         set(value) {
             controller.autoScroll = value
         }
+    var readerSkipButtonAction: SasayakiReaderSkipButtonAction
+        get() = controller.readerSkipButtonAction
+        set(value) {
+            controller.readerSkipButtonAction = value
+        }
     val hasAudio: Boolean get() = controller.hasAudio
     val hasMatch: Boolean get() = controller.hasMatch
     val delay: Double get() = controller.delay
@@ -88,6 +93,14 @@ class SasayakiPlayer internal constructor(
 
     fun previousCue() {
         controller.previousCue()
+    }
+
+    fun skipForward(seconds: Int) {
+        controller.skipForward(seconds)
+    }
+
+    fun skipBackward(seconds: Int) {
+        controller.skipBackward(seconds)
     }
 
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =

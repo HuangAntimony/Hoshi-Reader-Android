@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Move the reader Sasayaki play/pause shortcut to the top-right chrome and let its visible state reserve top reader space like iOS.
 - Turn on Sasayaki, the reader Sasayaki toggle, auto-scroll, and lookup auto-pause by default, and expose the reader Sasayaki toggle from Appearance settings.
+- Add Sasayaki reader skip controls that can show bottom rewind/fast-forward buttons and choose whether all Sasayaki skip actions jump by cue or by 5, 10, 15, or 30 seconds.
 
 ## [v0.4.2] - 2026-05-12
 

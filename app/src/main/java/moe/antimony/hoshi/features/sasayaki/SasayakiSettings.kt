@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -14,9 +15,27 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
+enum class SasayakiReaderSkipButtonAction(
+    val label: String,
+    val seconds: Int?,
+) {
+    Cue("1 sentence", null),
+    Seconds5("5 seconds", 5),
+    Seconds10("10 seconds", 10),
+    Seconds15("15 seconds", 15),
+    Seconds30("30 seconds", 30);
+
+    companion object {
+        fun fromStorage(value: String?): SasayakiReaderSkipButtonAction =
+            entries.firstOrNull { it.name == value } ?: Cue
+    }
+}
+
 data class SasayakiSettings(
     val enabled: Boolean = true,
     val showReaderToggle: Boolean = true,
+    val showReaderSkipButtons: Boolean = true,
+    val readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue,
     val copyAudiobookToPrivateStorage: Boolean = false,
     val autoScroll: Boolean = true,
     val autoPause: Boolean = true,
@@ -43,6 +62,10 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         SasayakiSettings(
             enabled = preferences.getBoolean(KEY_ENABLE, true),
             showReaderToggle = preferences.getBoolean(KEY_SHOW_READER_TOGGLE, true),
+            showReaderSkipButtons = preferences.getBoolean(KEY_SHOW_READER_SKIP_BUTTONS, true),
+            readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(
+                preferences.getString(KEY_READER_SKIP_BUTTON_ACTION, null),
+            ),
             copyAudiobookToPrivateStorage = preferences.getBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, false),
             autoScroll = preferences.getBoolean(KEY_AUTO_SCROLL, true),
             autoPause = preferences.getBoolean(KEY_AUTO_PAUSE, true),
@@ -56,6 +79,8 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         preferences.edit()
             .putBoolean(KEY_ENABLE, settings.enabled)
             .putBoolean(KEY_SHOW_READER_TOGGLE, settings.showReaderToggle)
+            .putBoolean(KEY_SHOW_READER_SKIP_BUTTONS, settings.showReaderSkipButtons)
+            .putString(KEY_READER_SKIP_BUTTON_ACTION, settings.readerSkipButtonAction.name)
             .putBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, settings.copyAudiobookToPrivateStorage)
             .putBoolean(KEY_AUTO_SCROLL, settings.autoScroll)
             .putBoolean(KEY_AUTO_PAUSE, settings.autoPause)
@@ -69,6 +94,8 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
     private companion object {
         const val KEY_ENABLE = "enableSasayaki"
         const val KEY_SHOW_READER_TOGGLE = "readerShowSasayakiToggle"
+        const val KEY_SHOW_READER_SKIP_BUTTONS = "sasayakiShowReaderSkipButtons"
+        const val KEY_READER_SKIP_BUTTON_ACTION = "sasayakiReaderSkipButtonAction"
         const val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE = "sasayakiCopyAudiobookToPrivateStorage"
         const val KEY_AUTO_SCROLL = "sasayakiAutoScroll"
         const val KEY_AUTO_PAUSE = "sasayakiAutoPause"
@@ -116,6 +143,8 @@ class SasayakiSettingsRepository(
         SasayakiSettings(
             enabled = this[KEY_ENABLE] ?: true,
             showReaderToggle = this[KEY_SHOW_READER_TOGGLE] ?: true,
+            showReaderSkipButtons = this[KEY_SHOW_READER_SKIP_BUTTONS] ?: true,
+            readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(this[KEY_READER_SKIP_BUTTON_ACTION]),
             copyAudiobookToPrivateStorage = this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] ?: false,
             autoScroll = this[KEY_AUTO_SCROLL] ?: true,
             autoPause = this[KEY_AUTO_PAUSE] ?: true,
@@ -128,6 +157,8 @@ class SasayakiSettingsRepository(
     private fun MutablePreferences.writeSasayakiSettings(settings: SasayakiSettings) {
         this[KEY_ENABLE] = settings.enabled
         this[KEY_SHOW_READER_TOGGLE] = settings.showReaderToggle
+        this[KEY_SHOW_READER_SKIP_BUTTONS] = settings.showReaderSkipButtons
+        this[KEY_READER_SKIP_BUTTON_ACTION] = settings.readerSkipButtonAction.name
         this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] = settings.copyAudiobookToPrivateStorage
         this[KEY_AUTO_SCROLL] = settings.autoScroll
         this[KEY_AUTO_PAUSE] = settings.autoPause
@@ -144,6 +175,8 @@ class SasayakiSettingsRepository(
             booleanPreferencesKey("sasayakiSettingsMigratedFromSharedPreferences")
         private val KEY_ENABLE = booleanPreferencesKey("enableSasayaki")
         private val KEY_SHOW_READER_TOGGLE = booleanPreferencesKey("readerShowSasayakiToggle")
+        private val KEY_SHOW_READER_SKIP_BUTTONS = booleanPreferencesKey("sasayakiShowReaderSkipButtons")
+        private val KEY_READER_SKIP_BUTTON_ACTION = stringPreferencesKey("sasayakiReaderSkipButtonAction")
         private val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE =
             booleanPreferencesKey("sasayakiCopyAudiobookToPrivateStorage")
         private val KEY_AUTO_SCROLL = booleanPreferencesKey("sasayakiAutoScroll")

@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +52,7 @@ fun SasayakiSettingsView(
     val scope = rememberCoroutineScope()
     val repository = appContainer.sasayakiSettingsRepository
     var settings by remember { mutableStateOf(SasayakiSettings()) }
+    var skipActionMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(repository) {
         repository.settings.collect { latest ->
@@ -105,18 +110,6 @@ fun SasayakiSettingsView(
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text("Show Sasayaki Toggle") },
-                            supportingContent = { Text("Show the quick playback button in the reader after audio is loaded") },
-                            trailingContent = {
-                                Switch(
-                                    checked = settings.showReaderToggle,
-                                    onCheckedChange = { save(settings.copy(showReaderToggle = it)) },
-                                )
-                            },
-                        )
-                        SettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             headlineContent = { Text("Copy Audiobook to App Storage") },
                             supportingContent = { Text("Keep a private copy instead of linking to the selected external media file") },
                             trailingContent = {
@@ -124,6 +117,44 @@ fun SasayakiSettingsView(
                                     checked = settings.copyAudiobookToPrivateStorage,
                                     onCheckedChange = { save(settings.copy(copyAudiobookToPrivateStorage = it)) },
                                 )
+                            },
+                        )
+                        SettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Show Skip Buttons") },
+                            supportingContent = { Text("Add rewind and fast-forward buttons to the bottom of the reader.") },
+                            trailingContent = {
+                                Switch(
+                                    checked = settings.showReaderSkipButtons,
+                                    onCheckedChange = { save(settings.copy(showReaderSkipButtons = it)) },
+                                )
+                            },
+                        )
+                        SettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Skip Action") },
+                            trailingContent = {
+                                Box {
+                                    TextButton(onClick = { skipActionMenuExpanded = true }) {
+                                        Text(settings.readerSkipButtonAction.label)
+                                    }
+                                    DropdownMenu(
+                                        expanded = skipActionMenuExpanded,
+                                        onDismissRequest = { skipActionMenuExpanded = false },
+                                    ) {
+                                        SasayakiReaderSkipButtonAction.entries.forEach { action ->
+                                            DropdownMenuItem(
+                                                text = { Text(action.label) },
+                                                onClick = {
+                                                    skipActionMenuExpanded = false
+                                                    save(settings.copy(readerSkipButtonAction = action))
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             },
                         )
                         SettingsDivider()

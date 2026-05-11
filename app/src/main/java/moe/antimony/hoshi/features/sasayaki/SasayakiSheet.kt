@@ -18,6 +18,8 @@ import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,6 +31,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,6 +72,7 @@ fun SasayakiSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
+    var skipActionMenuExpanded by remember { mutableStateOf(false) }
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
         if (uri == null || isImporting) return@rememberLauncherForActivityResult
         isImporting = true
@@ -218,16 +222,34 @@ fun SasayakiSheet(
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             Text(
-                text = "Settings",
+                text = "Reader Controls",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
             )
             SasayakiSettingsSwitchRow(
-                label = "Show Sasayaki Toggle",
-                checked = settings.showReaderToggle,
-                onCheckedChange = { onSettingsChange(settings.copy(showReaderToggle = it)) },
+                label = "Show Skip Buttons",
+                checked = settings.showReaderSkipButtons,
+                onCheckedChange = { onSettingsChange(settings.copy(showReaderSkipButtons = it)) },
+            )
+            SasayakiSettingsActionRow(
+                label = "Skip Action",
+                selected = settings.readerSkipButtonAction,
+                expanded = skipActionMenuExpanded,
+                onExpandedChange = { skipActionMenuExpanded = it },
+                onSelected = { action ->
+                    skipActionMenuExpanded = false
+                    onSettingsChange(settings.copy(readerSkipButtonAction = action))
+                },
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            Text(
+                text = "Playback",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
             )
             SasayakiSettingsSwitchRow(
                 label = "Auto-Scroll",
@@ -270,6 +292,38 @@ private fun SliderRow(
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
     }
+}
+
+@Composable
+private fun SasayakiSettingsActionRow(
+    label: String,
+    selected: SasayakiReaderSkipButtonAction,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelected: (SasayakiReaderSkipButtonAction) -> Unit,
+) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        headlineContent = { Text(label) },
+        trailingContent = {
+            Box {
+                TextButton(onClick = { onExpandedChange(true) }) {
+                    Text(selected.label)
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { onExpandedChange(false) },
+                ) {
+                    SasayakiReaderSkipButtonAction.entries.forEach { action ->
+                        DropdownMenuItem(
+                            text = { Text(action.label) },
+                            onClick = { onSelected(action) },
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable

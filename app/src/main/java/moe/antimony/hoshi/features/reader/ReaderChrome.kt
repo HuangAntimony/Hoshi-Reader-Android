@@ -42,6 +42,13 @@ data class ReaderChromeLayout(
     val showProgressInBottomBar: Boolean,
 )
 
+data class ReaderSasayakiBottomSkipButtons(
+    val visible: Boolean,
+    val buttonSizeDp: Int,
+    val iconSizeDp: Int,
+    val adjacentSpacingDp: Int,
+)
+
 data class ReaderBottomChromeMetrics(
     val buttonSizeDp: Int,
     val topSasayakiButtonSizeDp: Int,
@@ -105,6 +112,18 @@ fun readerBottomChromeMetrics(): ReaderBottomChromeMetrics =
         menuItemVerticalPaddingDp = 8,
         menuItemIconBoxSizeDp = 24,
         menuItemSpacingDp = 12,
+    )
+
+fun readerSasayakiBottomSkipButtons(
+    settings: moe.antimony.hoshi.features.sasayaki.SasayakiSettings,
+    hasAudio: Boolean,
+    metrics: ReaderBottomChromeMetrics,
+): ReaderSasayakiBottomSkipButtons =
+    ReaderSasayakiBottomSkipButtons(
+        visible = settings.enabled && settings.showReaderSkipButtons && hasAudio,
+        buttonSizeDp = metrics.buttonSizeDp,
+        iconSizeDp = metrics.secondaryIconSizeDp,
+        adjacentSpacingDp = metrics.trailingButtonSpacingDp,
     )
 
 fun readerChromeColors(settings: ReaderSettings, systemDark: Boolean): ReaderChromeColors = when {

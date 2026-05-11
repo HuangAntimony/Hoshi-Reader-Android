@@ -31,8 +31,10 @@ class SasayakiPlayerFacadeTest {
         assertEquals("content URI", player.audioStorageSummary)
 
         player.autoScroll = true
+        player.readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds10
 
         assertTrue(controller.autoScroll)
+        assertEquals(SasayakiReaderSkipButtonAction.Seconds10, controller.readerSkipButtonAction)
     }
 
     @Test
@@ -48,6 +50,8 @@ class SasayakiPlayerFacadeTest {
         player.pausePlayback(restoreTemporaryPosition = false)
         player.nextCue()
         player.previousCue()
+        player.skipForward(10)
+        player.skipBackward(5)
         assertSame(cue, player.findCue(chapterIndex = 2, offset = 10))
         player.playCue(cue, stop = true)
         assertEquals(File("cue.m4a"), player.exportCueAudio(cue, "sentence"))
@@ -63,6 +67,8 @@ class SasayakiPlayerFacadeTest {
                 "pausePlayback:false",
                 "nextCue",
                 "previousCue",
+                "skipForward:10",
+                "skipBackward:5",
                 "findCue:2:10",
                 "playCue:cue:true",
                 "exportCueAudio:cue:sentence",
@@ -79,6 +85,7 @@ class SasayakiPlayerFacadeTest {
         override val isPlaying = true
         override val errorMessage = "restore failed"
         override var autoScroll = false
+        override var readerSkipButtonAction = SasayakiReaderSkipButtonAction.Cue
         override val hasAudio = true
         override val hasMatch = true
         override val delay = 0.35
@@ -115,6 +122,14 @@ class SasayakiPlayerFacadeTest {
 
         override fun previousCue() {
             commands += "previousCue"
+        }
+
+        override fun skipForward(seconds: Int) {
+            commands += "skipForward:$seconds"
+        }
+
+        override fun skipBackward(seconds: Int) {
+            commands += "skipBackward:$seconds"
         }
 
         override fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? {

@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -133,6 +134,39 @@ class ReaderChromeTest {
         assertEquals(46, metrics.webViewBottomPaddingDp)
         assertEquals(metrics.webViewBottomPaddingDp, metrics.menuBottomPaddingDp)
         assertEquals(metrics.buttonSizeDp + metrics.bottomPaddingDp, metrics.webViewBottomPaddingDp)
+    }
+
+    @Test
+    fun sasayakiBottomSkipButtonsMatchBottomChromeButtonsWhenEnabled() {
+        val metrics = readerBottomChromeMetrics()
+
+        assertEquals(
+            ReaderSasayakiBottomSkipButtons(
+                visible = true,
+                buttonSizeDp = metrics.buttonSizeDp,
+                iconSizeDp = metrics.secondaryIconSizeDp,
+                adjacentSpacingDp = metrics.trailingButtonSpacingDp,
+            ),
+            readerSasayakiBottomSkipButtons(
+                settings = SasayakiSettings(showReaderSkipButtons = true),
+                hasAudio = true,
+                metrics = metrics,
+            ),
+        )
+        assertFalse(
+            readerSasayakiBottomSkipButtons(
+                settings = SasayakiSettings(showReaderSkipButtons = false),
+                hasAudio = true,
+                metrics = metrics,
+            ).visible,
+        )
+        assertFalse(
+            readerSasayakiBottomSkipButtons(
+                settings = SasayakiSettings(showReaderSkipButtons = true),
+                hasAudio = false,
+                metrics = metrics,
+            ).visible,
+        )
     }
 
     @Test

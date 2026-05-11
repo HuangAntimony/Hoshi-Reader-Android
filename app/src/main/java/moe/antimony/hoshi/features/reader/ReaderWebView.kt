@@ -45,6 +45,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
@@ -270,6 +272,7 @@ fun ReaderWebView(
             sasayakiSettingsRepository.update { settings }
         }
         sasayakiPlayer?.autoScroll = settings.autoScroll
+        sasayakiPlayer?.readerSkipButtonAction = settings.readerSkipButtonAction
     }
     fun goToNextChapter(): Boolean {
         val next = stateHolder.goToNextChapter(book.chapters.lastIndex)
@@ -378,6 +381,7 @@ fun ReaderWebView(
         onDispose { sasayakiPlayer?.release() }
     }
     sasayakiPlayer?.autoScroll = sasayakiSettings.autoScroll
+    sasayakiPlayer?.readerSkipButtonAction = sasayakiSettings.readerSkipButtonAction
     val currentReaderKeyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { event ->
         val direction = readerNavigationDirectionForKeyEvent(
             keyCode = event.keyCode,
@@ -441,6 +445,11 @@ fun ReaderWebView(
     }
 
     val bottomChromeMetrics = readerBottomChromeMetrics()
+    val sasayakiBottomSkipButtons = readerSasayakiBottomSkipButtons(
+        settings = sasayakiSettings,
+        hasAudio = sasayakiPlayer?.hasAudio == true,
+        metrics = bottomChromeMetrics,
+    )
     val showSasayakiTopToggle = sasayakiSettings.enabled &&
         sasayakiSettings.showReaderToggle &&
         sasayakiMatchData != null &&
@@ -578,6 +587,9 @@ fun ReaderWebView(
             } else {
                 null
             },
+            sasayakiSkipButtons = sasayakiBottomSkipButtons,
+            onSasayakiSkipBackward = { sasayakiPlayer?.previousCue() },
+            onSasayakiSkipForward = { sasayakiPlayer?.nextCue() },
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -686,6 +698,9 @@ private fun BoxScope.ReaderBottomChrome(
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
     onSasayaki: (() -> Unit)?,
+    sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
+    onSasayakiSkipBackward: () -> Unit,
+    onSasayakiSkipForward: () -> Unit,
     metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
@@ -739,7 +754,29 @@ private fun BoxScope.ReaderBottomChrome(
                     tint = Color(colors.buttonContent),
                 )
             }
+            if (sasayakiSkipButtons.visible) {
+                Spacer(Modifier.width(sasayakiSkipButtons.adjacentSpacingDp.dp))
+                ReaderGlassButton(colors = colors, metrics = metrics, onClick = onSasayakiSkipBackward) {
+                    Icon(
+                        imageVector = Icons.Rounded.FastRewind,
+                        contentDescription = "Sasayaki Rewind",
+                        modifier = Modifier.size(sasayakiSkipButtons.iconSizeDp.dp),
+                        tint = Color(colors.buttonContent),
+                    )
+                }
+            }
             Spacer(Modifier.weight(1f))
+            if (sasayakiSkipButtons.visible) {
+                ReaderGlassButton(colors = colors, metrics = metrics, onClick = onSasayakiSkipForward) {
+                    Icon(
+                        imageVector = Icons.Rounded.FastForward,
+                        contentDescription = "Sasayaki Fast-forward",
+                        modifier = Modifier.size(sasayakiSkipButtons.iconSizeDp.dp),
+                        tint = Color(colors.buttonContent),
+                    )
+                }
+                Spacer(Modifier.width(sasayakiSkipButtons.adjacentSpacingDp.dp))
+            }
             ReaderGlassButton(colors = colors, metrics = metrics, onClick = onMenu) {
                 Icon(
                     imageVector = Icons.Rounded.Tune,
