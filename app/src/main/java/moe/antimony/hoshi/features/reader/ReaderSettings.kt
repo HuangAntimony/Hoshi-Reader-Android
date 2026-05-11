@@ -54,6 +54,20 @@ data class ReaderSettings(
     val imageWidthViewportRatio: Double
         get() = (100 - horizontalPadding).coerceAtLeast(1) / 100.0
 
+    val continuousViewportHorizontalPaddingRatio: Double
+        get() = if (continuousMode && verticalWriting) {
+            horizontalPadding.coerceAtLeast(0) / 200.0
+        } else {
+            0.0
+        }
+
+    val continuousViewportVerticalPaddingRatio: Double
+        get() = if (continuousMode && !verticalWriting) {
+            verticalPadding.coerceAtLeast(0) / 200.0
+        } else {
+            0.0
+        }
+
     val columnGapCss: String
         get() {
             if (verticalWriting) {

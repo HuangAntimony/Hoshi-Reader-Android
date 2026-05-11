@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep the reader text area aligned with iOS when hiding the title or moving progress to the bottom, avoiding unused top space and progress text overlapping the book text.
 - Apply saved reader text layout settings such as Vertical Padding to already-open reader WebViews instead of leaving the text rendered with stale defaults.
+- Make Continuous reader padding affect each visible viewport: Horizontal Padding in vertical writing and Vertical Padding in horizontal writing. #52
 
 ## [v0.4.1] - 2026-05-12
 

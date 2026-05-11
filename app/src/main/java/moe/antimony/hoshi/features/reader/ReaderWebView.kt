@@ -28,6 +28,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -443,48 +444,57 @@ fun ReaderWebView(
                 .navigationBarsPadding()
                 .padding(top = chromeLayout.topWebViewPaddingDp.dp, bottom = ReaderWebViewBottomPadding),
         ) {
-            ChapterWebView(
-                book = book,
-                chapterPosition = readerPosition.loadPosition,
-                chapterFragment = readerPosition.loadFragment,
-                webViewViewportSize = stateHolder.webViewViewportSize,
-                onReaderViewportSizeChanged = stateHolder::updateViewportSize,
-                onWebViewReady = { webView = it },
-                isWebViewRestoring = stateHolder.isWebViewRestoring,
-                webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
-                onRestoreStarted = stateHolder::markWebViewRestoring,
-                onRestoreCompleted = stateHolder::markWebViewRestored,
-                onNextChapter = {
-                    goToNextChapter()
-                },
-                onPreviousChapter = {
-                    goToPreviousChapter()
-                },
-                onSaveBookmark = { progress ->
-                    saveDisplayedProgress(progress)
-                },
-                onDisplayProgress = { progress ->
-                    displayPagedTurnProgress(progress)
-                },
-                onContinuousScrollProgress = { progress, restoreEpoch ->
-                    saveContinuousScrollProgress(progress, restoreEpoch)
-                },
-                onInternalLink = { target ->
-                    closeLookupPopupsAndSelection()
-                    val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
-                    onSaveBookmark(savedPosition.index, savedPosition.progress)
-                },
-                scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
-                readerSettings = effectiveSettings,
-                sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
-                sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
-                sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
-                onTextSelected = handleTextSelected,
-                onClearLookupPopup = ::closeLookupPopupsAndSelection,
-                fontManager = fontManager,
-                systemDark = systemDarkTheme,
-                modifier = Modifier.fillMaxSize(),
-            )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val viewportHorizontalPadding = maxWidth * effectiveSettings.continuousViewportHorizontalPaddingRatio.toFloat()
+                val viewportVerticalPadding = maxHeight * effectiveSettings.continuousViewportVerticalPaddingRatio.toFloat()
+                ChapterWebView(
+                    book = book,
+                    chapterPosition = readerPosition.loadPosition,
+                    chapterFragment = readerPosition.loadFragment,
+                    webViewViewportSize = stateHolder.webViewViewportSize,
+                    onReaderViewportSizeChanged = stateHolder::updateViewportSize,
+                    onWebViewReady = { webView = it },
+                    isWebViewRestoring = stateHolder.isWebViewRestoring,
+                    webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
+                    onRestoreStarted = stateHolder::markWebViewRestoring,
+                    onRestoreCompleted = stateHolder::markWebViewRestored,
+                    onNextChapter = {
+                        goToNextChapter()
+                    },
+                    onPreviousChapter = {
+                        goToPreviousChapter()
+                    },
+                    onSaveBookmark = { progress ->
+                        saveDisplayedProgress(progress)
+                    },
+                    onDisplayProgress = { progress ->
+                        displayPagedTurnProgress(progress)
+                    },
+                    onContinuousScrollProgress = { progress, restoreEpoch ->
+                        saveContinuousScrollProgress(progress, restoreEpoch)
+                    },
+                    onInternalLink = { target ->
+                        closeLookupPopupsAndSelection()
+                        val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
+                        onSaveBookmark(savedPosition.index, savedPosition.progress)
+                    },
+                    scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
+                    readerSettings = effectiveSettings,
+                    sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
+                    sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                    sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                    onTextSelected = handleTextSelected,
+                    onClearLookupPopup = ::closeLookupPopupsAndSelection,
+                    fontManager = fontManager,
+                    systemDark = systemDarkTheme,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            horizontal = viewportHorizontalPadding,
+                            vertical = viewportVerticalPadding,
+                        ),
+                )
+            }
             LookupPopupStackView(
                 popups = lookupPopups,
                 onPopupsChange = ::setLookupPopups,

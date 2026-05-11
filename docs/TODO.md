@@ -91,3 +91,5 @@ For reader/dictionary/audio user flows, perform targeted emulator or device vali
 For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, and all progress indicators hidden against the paginated reader text area.
 
 For reader text layout regressions, verify Appearance -> Layout changes such as Vertical Padding reload the current chapter at the displayed position and visibly affect text spacing.
+
+For continuous reader layout regressions, verify vertical-writing Horizontal Padding and horizontal-writing Vertical Padding inset the current visible viewport rather than only the chapter ends.

@@ -112,6 +112,68 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun verticalContinuousReaderUsesHorizontalPaddingAsViewportInset() {
+        assertEquals(
+            0.125,
+            ReaderSettings(
+                continuousMode = true,
+                verticalWriting = true,
+                horizontalPadding = 25,
+            ).continuousViewportHorizontalPaddingRatio,
+            0.0,
+        )
+        assertEquals(
+            0.0,
+            ReaderSettings(
+                continuousMode = true,
+                verticalWriting = false,
+                horizontalPadding = 25,
+            ).continuousViewportHorizontalPaddingRatio,
+            0.0,
+        )
+        assertEquals(
+            0.0,
+            ReaderSettings(
+                continuousMode = false,
+                verticalWriting = true,
+                horizontalPadding = 25,
+            ).continuousViewportHorizontalPaddingRatio,
+            0.0,
+        )
+    }
+
+    @Test
+    fun horizontalContinuousReaderUsesVerticalPaddingAsViewportInset() {
+        assertEquals(
+            0.16,
+            ReaderSettings(
+                continuousMode = true,
+                verticalWriting = false,
+                verticalPadding = 32,
+            ).continuousViewportVerticalPaddingRatio,
+            0.0,
+        )
+        assertEquals(
+            0.0,
+            ReaderSettings(
+                continuousMode = true,
+                verticalWriting = true,
+                verticalPadding = 32,
+            ).continuousViewportVerticalPaddingRatio,
+            0.0,
+        )
+        assertEquals(
+            0.0,
+            ReaderSettings(
+                continuousMode = false,
+                verticalWriting = false,
+                verticalPadding = 32,
+            ).continuousViewportVerticalPaddingRatio,
+            0.0,
+        )
+    }
+
+    @Test
     fun appInterfaceThemeMatchesIosColorSchemeMapping() {
         assertFalse(ReaderSettings(theme = ReaderTheme.Light).usesDarkInterface(systemDark = true))
         assertTrue(ReaderSettings(theme = ReaderTheme.Dark).usesDarkInterface(systemDark = false))
