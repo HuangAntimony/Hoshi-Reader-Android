@@ -389,13 +389,25 @@ fun ReaderWebView(
     sasayakiPlayer?.autoScroll = sasayakiSettings.autoScroll
     sasayakiPlayer?.readerSkipButtonAction = sasayakiSettings.readerSkipButtonAction
     val currentReaderKeyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { event ->
-        val direction = readerNavigationDirectionForKeyEvent(
+        val action = readerHardwareKeyActionForKeyEvent(
             keyCode = event.keyCode,
             action = event.action,
             repeatCount = event.repeatCount,
             settings = effectiveSettings,
+            sasayakiEnabled = sasayakiSettings.enabled,
+            hasSasayakiAudio = sasayakiPlayer?.hasAudio == true,
         ) ?: return@rememberUpdatedState false
-        navigateReaderPage(direction)
+        when (action) {
+            is ReaderHardwareKeyAction.ReaderNavigation -> navigateReaderPage(action.direction)
+            ReaderHardwareKeyAction.SasayakiSeekBackward -> {
+                sasayakiPlayer?.previousCue()
+                true
+            }
+            ReaderHardwareKeyAction.SasayakiSeekForward -> {
+                sasayakiPlayer?.nextCue()
+                true
+            }
+        }
     }
     DisposableEffect(onReaderKeyEventHandlerChange) {
         onReaderKeyEventHandlerChange { event -> currentReaderKeyHandler.value(event) }

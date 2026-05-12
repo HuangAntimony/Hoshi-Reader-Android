@@ -51,6 +51,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(settings.popupSwipeToDismiss)
             assertEquals(30, settings.popupSwipeThreshold)
             assertFalse(settings.volumeKeysTurnPages)
+            assertFalse(settings.volumeKeysSeekSasayaki)
             assertFalse(settings.reverseVolumeKeyDirection)
         }
     }
@@ -68,6 +69,7 @@ class ReaderSettingsRepositoryTest {
                 lineHeight = 1.9,
                 popupSwipeThreshold = 120,
                 volumeKeysTurnPages = true,
+                volumeKeysSeekSasayaki = true,
             ),
         )
 
@@ -83,6 +85,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(1.9, migrated.lineHeight, 0.000001)
             assertEquals(60, migrated.popupSwipeThreshold)
             assertTrue(migrated.volumeKeysTurnPages)
+            assertTrue(migrated.volumeKeysSeekSasayaki)
 
             repository.update { it.copy(fontSize = 31) }
             assertEquals(31, repository.settings.first().fontSize)
@@ -121,6 +124,7 @@ class ReaderSettingsRepositoryTest {
                     popupSwipeToDismiss = false,
                     popupSwipeThreshold = 35,
                     volumeKeysTurnPages = true,
+                    volumeKeysSeekSasayaki = true,
                     reverseVolumeKeyDirection = true,
                 )
             }
@@ -153,6 +157,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(saved.popupSwipeToDismiss)
             assertEquals(35, saved.popupSwipeThreshold)
             assertTrue(saved.volumeKeysTurnPages)
+            assertTrue(saved.volumeKeysSeekSasayaki)
             assertTrue(saved.reverseVolumeKeyDirection)
         }
     }

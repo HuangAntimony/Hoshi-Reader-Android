@@ -61,6 +61,16 @@ fun ReaderBehaviorScreen(
                             onSettingsChange(settings.copy(volumeKeysTurnPages = it))
                         },
                     )
+                    readerBehaviorSasayakiRows().forEach { label ->
+                        BehaviorDivider()
+                        BehaviorSwitchRow(
+                            label = label,
+                            checked = settings.volumeKeysSeekSasayaki,
+                            onCheckedChange = {
+                                onSettingsChange(settings.copy(volumeKeysSeekSasayaki = it))
+                            },
+                        )
+                    }
                     BehaviorDivider()
                     BehaviorSwitchRow(
                         label = "Reverse Volume Key Direction",
@@ -92,6 +102,9 @@ fun ReaderBehaviorScreen(
         }
     }
 }
+
+internal fun readerBehaviorSasayakiRows(): List<String> =
+    listOf("Volume Keys Seek Sasayaki")
 
 @Composable
 private fun BehaviorSettingsCard(content: @Composable () -> Unit) {

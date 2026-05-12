@@ -8,6 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Added
 
 - Focus the Dictionary tab search field when opening it and hint Japanese input to installed keyboards.
+- Add an optional Behavior setting that lets volume keys seek Sasayaki playback when the current book has an audiobook loaded.
 
 ### Fixed
 
