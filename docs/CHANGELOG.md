@@ -11,7 +11,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Changed
 
-- Align the reader Statistics sheet and top-left statistics toggle with iOS by removing the sheet header close row, using a timer icon while tracking, and opening the sheet at a stable expanded detent to avoid Android partial/full drag jitter.
+- Align the reader Statistics sheet and top-left statistics toggle with iOS by removing the sheet header close row and using a timer icon while tracking.
+- Stabilize reader bottom sheets so Chapters, Appearance, Statistics, and Sasayaki open half-height, expand to a taller handle-drag panel with a top dismiss area, and hand fast internal scrolling to their content instead of jittering between detents.
 
 ## [v0.4.4] - 2026-05-13
 

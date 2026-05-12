@@ -31,7 +31,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -40,7 +39,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -104,7 +102,6 @@ internal fun ReaderAppearanceScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderAppearanceSheet(
     settings: ReaderSettings,
@@ -119,15 +116,9 @@ internal fun ReaderAppearanceSheet(
         containerColor = palette.background,
         contentColor = palette.onBackground,
     )
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        sheetGesturesEnabled = false,
-        containerColor = sheetStyle.containerColor,
-        contentColor = sheetStyle.contentColor,
-        scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDismissDragHandle(sheetStyle, sheetState, onDismiss) },
+    ReaderBottomPanel(
+        sheetStyle = sheetStyle,
+        onDismiss = onDismiss,
     ) {
         ReaderAppearanceContent(
             settings = settings,
@@ -138,7 +129,9 @@ internal fun ReaderAppearanceSheet(
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
             showDone = true,
             onDone = onDismiss,
-            modifier = Modifier.readerMediumSheetContentHeight(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
         )
     }
 }

@@ -20,19 +20,16 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,15 +45,13 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import moe.antimony.hoshi.features.reader.ReaderSheetDismissDragHandle
-import moe.antimony.hoshi.features.reader.readerMediumSheetContentHeight
+import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.OpenDocumentContent
 import moe.antimony.hoshi.importing.validateImportFile
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SasayakiSheet(
     player: SasayakiPlayer,
@@ -69,7 +64,6 @@ fun SasayakiSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetStyle = readerSheetStyle()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
@@ -104,30 +98,19 @@ fun SasayakiSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = {
+    ReaderBottomPanel(
+        sheetStyle = sheetStyle,
+        onDismiss = {
             if (!isImporting) {
                 onDismiss()
             }
         },
         modifier = modifier,
-        sheetState = sheetState,
-        sheetGesturesEnabled = false,
-        containerColor = sheetStyle.containerColor,
-        contentColor = sheetStyle.contentColor,
-        scrimColor = sheetStyle.scrimColor,
-        dragHandle = {
-            ReaderSheetDismissDragHandle(sheetStyle, sheetState) {
-                if (!isImporting) {
-                    onDismiss()
-                }
-            }
-        },
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .readerMediumSheetContentHeight(),
+                .weight(1f),
         ) {
             Column(
                 modifier = Modifier

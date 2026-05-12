@@ -22,12 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,7 +50,6 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.text.NumberFormat
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderChapterSheet(
     book: EpubBook,
@@ -66,15 +63,14 @@ internal fun ReaderChapterSheet(
     val eInkMode = sheetStyle.eInkMode
     var showJumpDialog by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = sheetStyle.containerColor,
-        contentColor = sheetStyle.contentColor,
-        scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
+    ReaderBottomPanel(
+        sheetStyle = sheetStyle,
+        onDismiss = onDismiss,
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
         ) {
             item {

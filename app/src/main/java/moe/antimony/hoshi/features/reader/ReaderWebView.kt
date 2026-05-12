@@ -766,54 +766,54 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+        if (showAppearance) {
+            ReaderAppearanceSheet(
+                settings = effectiveSettings,
+                onSettingsChange = {
+                    stateHolder.applySettings(it)
+                    onReaderSettingsChange(it)
+                },
+                sasayakiSettings = sasayakiSettings,
+                onSasayakiSettingsChange = ::updateSasayakiSettings,
+                fontManager = fontManager,
+                onDismiss = stateHolder::dismissAppearance,
+            )
+        }
+        if (showChapters) {
+            ReaderChapterSheet(
+                book = book,
+                currentPosition = readerPosition.displayedPosition,
+                onJump = { target ->
+                    closeLookupPopupsAndSelection()
+                    val statistics = statisticsForSave()
+                    val savedPosition = stateHolder.jumpTo(target)
+                    resetStatisticsBaseline()
+                    saveReaderPosition(savedPosition, statistics)
+                    stateHolder.dismissChapters()
+                },
+                onDismiss = stateHolder::dismissChapters,
+            )
+        }
+        if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
+            SasayakiSheet(
+                player = requireNotNull(sasayakiPlayer),
+                audioRepository = sasayakiAudioRepository,
+                settings = sasayakiSettings,
+                onSettingsChange = ::updateSasayakiSettings,
+                onDismiss = stateHolder::dismissSasayaki,
+            )
+        }
+        if (showStatistics && statisticsState != null) {
+            ReaderStatisticsSheet(
+                state = requireNotNull(statisticsState),
+                currentCharacter = currentDisplayedCharacter(),
+                currentChapterEndCharacter = currentChapterEndCharacter(),
+                totalCharacters = book.bookInfo.characterCount,
+                onToggleTracking = ::toggleStatisticsTracking,
+                onDismiss = stateHolder::dismissStatistics,
+            )
+        }
         webView?.let { _ -> Unit }
-    }
-    if (showAppearance) {
-        ReaderAppearanceSheet(
-            settings = effectiveSettings,
-            onSettingsChange = {
-                stateHolder.applySettings(it)
-                onReaderSettingsChange(it)
-            },
-            sasayakiSettings = sasayakiSettings,
-            onSasayakiSettingsChange = ::updateSasayakiSettings,
-            fontManager = fontManager,
-            onDismiss = stateHolder::dismissAppearance,
-        )
-    }
-    if (showChapters) {
-        ReaderChapterSheet(
-            book = book,
-            currentPosition = readerPosition.displayedPosition,
-            onJump = { target ->
-                closeLookupPopupsAndSelection()
-                val statistics = statisticsForSave()
-                val savedPosition = stateHolder.jumpTo(target)
-                resetStatisticsBaseline()
-                saveReaderPosition(savedPosition, statistics)
-                stateHolder.dismissChapters()
-            },
-            onDismiss = stateHolder::dismissChapters,
-        )
-    }
-    if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
-        SasayakiSheet(
-            player = requireNotNull(sasayakiPlayer),
-            audioRepository = sasayakiAudioRepository,
-            settings = sasayakiSettings,
-            onSettingsChange = ::updateSasayakiSettings,
-            onDismiss = stateHolder::dismissSasayaki,
-        )
-    }
-    if (showStatistics && statisticsState != null) {
-        ReaderStatisticsSheet(
-            state = requireNotNull(statisticsState),
-            currentCharacter = currentDisplayedCharacter(),
-            currentChapterEndCharacter = currentChapterEndCharacter(),
-            totalCharacters = book.bookInfo.characterCount,
-            onToggleTracking = ::toggleStatisticsTracking,
-            onDismiss = stateHolder::dismissStatistics,
-        )
     }
 }
 

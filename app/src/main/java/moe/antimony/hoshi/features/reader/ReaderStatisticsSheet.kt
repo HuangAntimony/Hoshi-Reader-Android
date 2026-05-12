@@ -11,15 +11,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,17 +28,16 @@ import kotlin.math.max
 internal data class ReaderStatisticsSheetChrome(
     val showHeader: Boolean,
     val showCloseButton: Boolean,
-    val skipPartiallyExpanded: Boolean,
+    val opensAsReaderPanel: Boolean,
 )
 
 internal fun readerStatisticsSheetChrome(): ReaderStatisticsSheetChrome =
     ReaderStatisticsSheetChrome(
         showHeader = false,
         showCloseButton = false,
-        skipPartiallyExpanded = true,
+        opensAsReaderPanel = true,
     )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderStatisticsSheet(
     state: ReaderStatisticsState,
@@ -53,18 +49,14 @@ internal fun ReaderStatisticsSheet(
 ) {
     val sheetStyle = readerSheetStyle()
     val chrome = readerStatisticsSheetChrome()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = chrome.skipPartiallyExpanded)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = sheetStyle.containerColor,
-        contentColor = sheetStyle.contentColor,
-        scrimColor = sheetStyle.scrimColor,
-        dragHandle = { ReaderSheetDragHandle(sheetStyle) },
+    ReaderBottomPanel(
+        sheetStyle = sheetStyle,
+        onDismiss = onDismiss,
     ) {
         LazyColumn(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .weight(1f),
             contentPadding = PaddingValues(
                 start = 24.dp,
                 top = if (chrome.showHeader || chrome.showCloseButton) 0.dp else 8.dp,
