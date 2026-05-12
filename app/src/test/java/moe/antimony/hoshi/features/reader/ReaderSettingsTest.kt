@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -323,7 +324,29 @@ class ReaderSettingsTest {
 
     @Test
     fun twoOptionAppearanceSegmentsReserveEnoughWidthForContinuousLabel() {
-        assertEquals(220, segmentedControlWidthDp(optionCount = 2))
+        assertEquals(120, segmentedControlWidthDp(optionCount = 2))
+        assertEquals(100, segmentedControlWidthDp(listOf("縦", "横")))
+        assertEquals(120, segmentedControlWidthDp(listOf("Top", "Bottom")))
+        assertEquals(180, segmentedControlWidthDp(listOf("Paginated", "Continuous")))
+    }
+
+    @Test
+    fun eInkAppearanceSegmentsUseInverseSelectedColors() {
+        val colors = readerSegmentedControlColors(
+            eInkMode = true,
+            background = Color.White,
+            content = Color.Black,
+            surfaceVariant = Color.White,
+            primaryContainer = Color.Black,
+            onPrimaryContainer = Color.White,
+            outlineVariant = Color.Black,
+        )
+
+        assertEquals(Color.White, colors.container)
+        assertEquals(Color.Black, colors.selected)
+        assertEquals(Color.White, colors.selectedContent)
+        assertEquals(Color.Black, colors.unselectedContent)
+        assertEquals(Color.Black, colors.border)
     }
 
 }

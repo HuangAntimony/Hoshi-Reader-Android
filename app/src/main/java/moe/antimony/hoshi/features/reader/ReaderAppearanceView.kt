@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,9 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -63,6 +62,7 @@ import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.importDisplayName
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.util.Locale
 import kotlin.math.round
 
@@ -572,30 +572,24 @@ private fun SegmentedRow(
 ) {
     val metrics = readerSheetDensityMetrics()
     val controls = @Composable {
-        SingleChoiceSegmentedButtonRow(
-            modifier = if (options.size <= 2) Modifier.width(segmentedControlWidthDp(options.size).dp) else Modifier.fillMaxWidth(),
-        ) {
-            options.forEachIndexed { index, option ->
-                SegmentedButton(
-                    selected = option == selected,
-                    onClick = { onSelected(option) },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-                ) {
-                    Text(
-                        text = option,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
+        IosSegmentedControl(
+            options = options,
+            selected = selected,
+            onSelected = onSelected,
+            palette = palette,
+            modifier = if (options.size <= 2) {
+                Modifier.width(segmentedControlWidthDp(options).dp)
+            } else {
+                Modifier.fillMaxWidth()
+            },
+        )
     }
     if (options.size > 2) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = metrics.appearanceWideRowVerticalPaddingDp.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 14.dp, vertical = metrics.appearanceWideRowVerticalPaddingDp.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             controls()
@@ -604,7 +598,7 @@ private fun SegmentedRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
+                .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -620,8 +614,67 @@ private fun SegmentedRow(
     }
 }
 
+@Composable
+private fun IosSegmentedControl(
+    options: List<String>,
+    selected: String,
+    onSelected: (String) -> Unit,
+    palette: AppearancePalette,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(34.dp),
+        shape = RoundedCornerShape(17.dp),
+        color = palette.segmentContainer,
+        contentColor = palette.onGroup,
+        border = BorderStroke(1.dp, palette.segmentBorder),
+        tonalElevation = 0.dp,
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            options.forEachIndexed { index, option ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(if (option == selected) palette.segmentSelected else Color.Transparent)
+                        .clickable(enabled = option != selected) { onSelected(option) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = option,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (option == selected) {
+                            palette.segmentSelectedContent
+                        } else {
+                            palette.segmentUnselectedContent
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (index < options.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxSize()
+                            .background(palette.segmentBorder),
+                    )
+                }
+            }
+        }
+    }
+}
+
 internal fun segmentedControlWidthDp(optionCount: Int): Int =
-    if (optionCount <= 2) 220 else optionCount * 82
+    if (optionCount <= 2) 120 else optionCount * 82
+
+internal fun segmentedControlWidthDp(options: List<String>): Int =
+    when {
+        options.size > 2 -> options.size * 82
+        options.any { it.length >= 10 } -> 180
+        options.any { it.length >= 6 } -> 120
+        else -> 100
+    }
 
 @Composable
 private fun ReaderFontRow(
@@ -635,8 +688,8 @@ private fun ReaderFontRow(
 ) {
     val metrics = readerSheetDensityMetrics()
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = metrics.appearanceWideRowVerticalPaddingDp.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = metrics.appearanceWideRowVerticalPaddingDp.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Font", style = MaterialTheme.typography.bodyLarge)
         Row(
@@ -680,7 +733,7 @@ private fun ActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
+            .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -707,7 +760,7 @@ private fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
+            .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -733,8 +786,8 @@ private fun SliderRow(
 ) {
     val metrics = readerSheetDensityMetrics()
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = metrics.appearanceSliderVerticalPaddingDp.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = metrics.appearanceSliderVerticalPaddingDp.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
@@ -767,7 +820,7 @@ private fun StepperRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
+            .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -823,7 +876,7 @@ private fun StepperRow(
 @Composable
 private fun AppearanceDivider(palette: AppearancePalette) {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = 14.dp),
         color = palette.divider,
     )
 }
@@ -835,6 +888,11 @@ private data class AppearancePalette(
     val onGroup: Color,
     val onMuted: Color,
     val divider: Color,
+    val segmentContainer: Color,
+    val segmentSelected: Color,
+    val segmentSelectedContent: Color,
+    val segmentUnselectedContent: Color,
+    val segmentBorder: Color,
     val stepperContainer: Color,
     val stepperDivider: Color,
 )
@@ -842,6 +900,15 @@ private data class AppearancePalette(
 @Composable
 private fun appearancePalette(): AppearancePalette {
     val colorScheme = MaterialTheme.colorScheme
+    val segmentedControlColors = readerSegmentedControlColors(
+        eInkMode = LocalHoshiEInkMode.current,
+        background = colorScheme.background,
+        content = colorScheme.onBackground,
+        surfaceVariant = colorScheme.surfaceVariant,
+        primaryContainer = colorScheme.primaryContainer,
+        onPrimaryContainer = colorScheme.onPrimaryContainer,
+        outlineVariant = colorScheme.outlineVariant,
+    )
     return AppearancePalette(
         background = colorScheme.background,
         group = colorScheme.surface,
@@ -849,7 +916,47 @@ private fun appearancePalette(): AppearancePalette {
         onGroup = colorScheme.onSurface,
         onMuted = colorScheme.onSurfaceVariant,
         divider = colorScheme.outlineVariant,
+        segmentContainer = segmentedControlColors.container,
+        segmentSelected = segmentedControlColors.selected,
+        segmentSelectedContent = segmentedControlColors.selectedContent,
+        segmentUnselectedContent = segmentedControlColors.unselectedContent,
+        segmentBorder = segmentedControlColors.border,
         stepperContainer = colorScheme.surfaceVariant,
         stepperDivider = colorScheme.outline,
     )
 }
+
+internal data class ReaderSegmentedControlColors(
+    val container: Color,
+    val selected: Color,
+    val selectedContent: Color,
+    val unselectedContent: Color,
+    val border: Color,
+)
+
+internal fun readerSegmentedControlColors(
+    eInkMode: Boolean,
+    background: Color,
+    content: Color,
+    surfaceVariant: Color,
+    primaryContainer: Color,
+    onPrimaryContainer: Color,
+    outlineVariant: Color,
+): ReaderSegmentedControlColors =
+    if (eInkMode) {
+        ReaderSegmentedControlColors(
+            container = background,
+            selected = content,
+            selectedContent = background,
+            unselectedContent = content,
+            border = content,
+        )
+    } else {
+        ReaderSegmentedControlColors(
+            container = surfaceVariant.copy(alpha = 0.5f),
+            selected = primaryContainer,
+            selectedContent = onPrimaryContainer,
+            unselectedContent = content,
+            border = outlineVariant,
+        )
+    }

@@ -9,11 +9,11 @@ class ReaderSheetDensityTest {
     fun readerSheetRowsUseCompactVerticalMetrics() {
         val metrics = readerSheetDensityMetrics()
 
-        assertEquals(10, metrics.chapterRowVerticalPaddingDp)
-        assertEquals(8, metrics.appearanceRowVerticalPaddingDp)
-        assertEquals(8, metrics.statisticsRowVerticalPaddingDp)
-        assertEquals(8, metrics.sasayakiRowVerticalPaddingDp)
-        assertTrue(metrics.appearanceSectionSpacingDp <= 12)
+        assertEquals(8, metrics.chapterRowVerticalPaddingDp)
+        assertEquals(6, metrics.appearanceRowVerticalPaddingDp)
+        assertEquals(6, metrics.statisticsRowVerticalPaddingDp)
+        assertEquals(6, metrics.sasayakiRowVerticalPaddingDp)
+        assertTrue(metrics.appearanceSectionSpacingDp <= 10)
     }
 
     @Test

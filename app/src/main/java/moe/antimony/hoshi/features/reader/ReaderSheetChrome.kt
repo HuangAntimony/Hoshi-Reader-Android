@@ -60,23 +60,23 @@ internal data class ReaderSheetDensityMetrics(
 
 internal fun readerSheetDensityMetrics(): ReaderSheetDensityMetrics =
     ReaderSheetDensityMetrics(
-        appearanceSectionSpacingDp = 12,
-        appearanceSectionCornerRadiusDp = 20,
-        appearanceRowVerticalPaddingDp = 8,
-        appearanceWideRowVerticalPaddingDp = 10,
-        appearanceSliderVerticalPaddingDp = 8,
+        appearanceSectionSpacingDp = 10,
+        appearanceSectionCornerRadiusDp = 18,
+        appearanceRowVerticalPaddingDp = 6,
+        appearanceWideRowVerticalPaddingDp = 8,
+        appearanceSliderVerticalPaddingDp = 6,
         stepperButtonSizeDp = 36,
         stepperIconSizeDp = 20,
-        chapterRowVerticalPaddingDp = 10,
+        chapterRowVerticalPaddingDp = 8,
         chapterRowCornerRadiusDp = 8,
         chapterHeaderCoverWidthDp = 44,
         chapterHeaderCoverHeightDp = 66,
         chapterCloseButtonSizeDp = 40,
         chapterCloseIconSizeDp = 24,
-        statisticsSectionBottomPaddingDp = 16,
-        statisticsRowVerticalPaddingDp = 8,
-        sasayakiRowVerticalPaddingDp = 8,
-        sasayakiSliderVerticalPaddingDp = 8,
+        statisticsSectionBottomPaddingDp = 12,
+        statisticsRowVerticalPaddingDp = 6,
+        sasayakiRowVerticalPaddingDp = 6,
+        sasayakiSliderVerticalPaddingDp = 6,
     )
 
 @Immutable
