@@ -38,6 +38,48 @@ internal const val ReaderExpandedSheetHeightFraction = 0.75f
 private val ReaderBottomPanelSettleThreshold = 96.dp
 
 @Immutable
+internal data class ReaderSheetDensityMetrics(
+    val appearanceSectionSpacingDp: Int,
+    val appearanceSectionCornerRadiusDp: Int,
+    val appearanceRowVerticalPaddingDp: Int,
+    val appearanceWideRowVerticalPaddingDp: Int,
+    val appearanceSliderVerticalPaddingDp: Int,
+    val stepperButtonSizeDp: Int,
+    val stepperIconSizeDp: Int,
+    val chapterRowVerticalPaddingDp: Int,
+    val chapterRowCornerRadiusDp: Int,
+    val chapterHeaderCoverWidthDp: Int,
+    val chapterHeaderCoverHeightDp: Int,
+    val chapterCloseButtonSizeDp: Int,
+    val chapterCloseIconSizeDp: Int,
+    val statisticsSectionBottomPaddingDp: Int,
+    val statisticsRowVerticalPaddingDp: Int,
+    val sasayakiRowVerticalPaddingDp: Int,
+    val sasayakiSliderVerticalPaddingDp: Int,
+)
+
+internal fun readerSheetDensityMetrics(): ReaderSheetDensityMetrics =
+    ReaderSheetDensityMetrics(
+        appearanceSectionSpacingDp = 12,
+        appearanceSectionCornerRadiusDp = 20,
+        appearanceRowVerticalPaddingDp = 8,
+        appearanceWideRowVerticalPaddingDp = 10,
+        appearanceSliderVerticalPaddingDp = 8,
+        stepperButtonSizeDp = 36,
+        stepperIconSizeDp = 20,
+        chapterRowVerticalPaddingDp = 10,
+        chapterRowCornerRadiusDp = 8,
+        chapterHeaderCoverWidthDp = 44,
+        chapterHeaderCoverHeightDp = 66,
+        chapterCloseButtonSizeDp = 40,
+        chapterCloseIconSizeDp = 24,
+        statisticsSectionBottomPaddingDp = 16,
+        statisticsRowVerticalPaddingDp = 8,
+        sasayakiRowVerticalPaddingDp = 8,
+        sasayakiSliderVerticalPaddingDp = 8,
+    )
+
+@Immutable
 internal data class ReaderSheetStyle(
     val containerColor: Color,
     val contentColor: Color,

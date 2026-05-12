@@ -23,8 +23,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -38,7 +36,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
+import moe.antimony.hoshi.features.reader.readerSheetDensityMetrics
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.OpenDocumentContent
@@ -119,131 +117,122 @@ fun SasayakiSheet(
                     .padding(bottom = 28.dp),
             ) {
                 if (player.hasAudio) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = player::previousCue) {
-                        Icon(Icons.Rounded.FastRewind, contentDescription = "Previous Cue")
-                    }
-                    IconButton(onClick = player::togglePlayback) {
-                        Icon(
-                            if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (player.isPlaying) "Pause" else "Play",
-                        )
-                    }
-                    IconButton(onClick = player::nextCue) {
-                        Icon(Icons.Rounded.FastForward, contentDescription = "Next Cue")
-                    }
-                }
-                Text(
-                    text = "${formatDuration(player.currentTime)} / ${formatDuration(player.duration)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                )
-            }
-            ListItem(
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                headlineContent = { Text("Load Audio") },
-                supportingContent = {
-                    Text(player.audioStorageSummary)
-                },
-                trailingContent = {
-                    Button(
-                        enabled = !isImporting,
-                        onClick = {
-                            if (player.hasAudio) {
-                                player.clearAudio()
-                            } else {
-                                importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes)
-                            }
-                        },
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (player.hasAudio) "Remove" else if (isImporting) "Importing" else "Open")
+                        IconButton(onClick = player::previousCue) {
+                            Icon(Icons.Rounded.FastRewind, contentDescription = "Previous Cue")
+                        }
+                        IconButton(onClick = player::togglePlayback) {
+                            Icon(
+                                if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                contentDescription = if (player.isPlaying) "Pause" else "Play",
+                            )
+                        }
+                        IconButton(onClick = player::nextCue) {
+                            Icon(Icons.Rounded.FastForward, contentDescription = "Next Cue")
+                        }
                     }
-                },
-            )
+                    Text(
+                        text = "${formatDuration(player.currentTime)} / ${formatDuration(player.duration)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                }
+                SasayakiLoadAudioRow(
+                    summary = player.audioStorageSummary,
+                    button = if (player.hasAudio) "Remove" else if (isImporting) "Importing" else "Open",
+                    enabled = !isImporting,
+                    onClick = {
+                        if (player.hasAudio) {
+                            player.clearAudio()
+                        } else {
+                            importer.launch(ImportFileType.SasayakiAudiobook.mimeTypes)
+                        }
+                    },
+                )
                 SasayakiSettingsSwitchRow(
-                label = "Copy Audiobook to App Storage",
-                checked = settings.copyAudiobookToPrivateStorage,
-                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
-            )
-            importError?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    label = "Copy Audiobook to App Storage",
+                    checked = settings.copyAudiobookToPrivateStorage,
+                    onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
                 )
-            }
-            player.errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                importError?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
+                player.errorMessage?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                SliderRow(
+                    label = "Delay",
+                    valueText = String.format(java.util.Locale.US, "%+.2fs", player.delay),
+                    value = player.delay.toFloat(),
+                    range = -2f..2f,
+                    steps = 79,
+                    onValueChange = { player.setDelay(it.toDouble()) },
                 )
-            }
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            SliderRow(
-                label = "Delay",
-                valueText = String.format(java.util.Locale.US, "%+.2fs", player.delay),
-                value = player.delay.toFloat(),
-                range = -2f..2f,
-                steps = 79,
-                onValueChange = { player.setDelay(it.toDouble()) },
-            )
-            SliderRow(
-                label = "Speed",
-                valueText = String.format(java.util.Locale.US, "%.2fx", player.rate),
-                value = player.rate,
-                range = 0.5f..1.5f,
-                steps = 19,
-                onValueChange = { player.setRate(it) },
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            Text(
-                text = "Reader Controls",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
-            )
-            SasayakiSettingsSwitchRow(
-                label = "Show Skip Buttons",
-                checked = settings.showReaderSkipButtons,
-                onCheckedChange = { onSettingsChange(settings.copy(showReaderSkipButtons = it)) },
-            )
-            SasayakiSettingsActionRow(
-                label = "Skip Action",
-                selected = settings.readerSkipButtonAction,
-                expanded = skipActionMenuExpanded,
-                onExpandedChange = { skipActionMenuExpanded = it },
-                onSelected = { action ->
-                    skipActionMenuExpanded = false
-                    onSettingsChange(settings.copy(readerSkipButtonAction = action))
-                },
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-            Text(
-                text = "Playback",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
-            )
-            SasayakiSettingsSwitchRow(
-                label = "Auto-Scroll",
-                checked = settings.autoScroll,
-                onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
-            )
-            SasayakiSettingsSwitchRow(
-                label = "Auto-Pause on Lookup",
-                checked = settings.autoPause,
-                onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
-            )
+                SliderRow(
+                    label = "Speed",
+                    valueText = String.format(java.util.Locale.US, "%.2fx", player.rate),
+                    value = player.rate,
+                    range = 0.5f..1.5f,
+                    steps = 19,
+                    onValueChange = { player.setRate(it) },
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                Text(
+                    text = "Reader Controls",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                SasayakiSettingsSwitchRow(
+                    label = "Show Skip Buttons",
+                    checked = settings.showReaderSkipButtons,
+                    onCheckedChange = { onSettingsChange(settings.copy(showReaderSkipButtons = it)) },
+                )
+                SasayakiSettingsActionRow(
+                    label = "Skip Action",
+                    selected = settings.readerSkipButtonAction,
+                    expanded = skipActionMenuExpanded,
+                    onExpandedChange = { skipActionMenuExpanded = it },
+                    onSelected = { action ->
+                        skipActionMenuExpanded = false
+                        onSettingsChange(settings.copy(readerSkipButtonAction = action))
+                    },
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                Text(
+                    text = "Playback",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                SasayakiSettingsSwitchRow(
+                    label = "Auto-Scroll",
+                    checked = settings.autoScroll,
+                    onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
+                )
+                SasayakiSettingsSwitchRow(
+                    label = "Auto-Pause on Lookup",
+                    checked = settings.autoPause,
+                    onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
+                )
             }
             if (isImporting) {
                 HoshiBlockingProgressOverlay(
@@ -252,7 +241,7 @@ fun SasayakiSheet(
                 )
             }
         }
-}
+    }
 }
 
 @Composable
@@ -264,16 +253,46 @@ private fun SliderRow(
     steps: Int,
     onValueChange: (Float) -> Unit,
 ) {
+    val metrics = readerSheetDensityMetrics()
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp),
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiSliderVerticalPaddingDp.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, modifier = Modifier.weight(1f))
             Text(valueText, fontWeight = FontWeight.SemiBold)
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
+    }
+}
+
+@Composable
+private fun SasayakiLoadAudioRow(
+    summary: String,
+    button: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Load Audio", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = summary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        Button(enabled = enabled, onClick = onClick) {
+            Text(button)
+        }
     }
 }
 
@@ -285,28 +304,32 @@ private fun SasayakiSettingsActionRow(
     onExpandedChange: (Boolean) -> Unit,
     onSelected: (SasayakiReaderSkipButtonAction) -> Unit,
 ) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(label) },
-        trailingContent = {
-            Box {
-                TextButton(onClick = { onExpandedChange(true) }) {
-                    Text(selected.label)
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { onExpandedChange(false) },
-                ) {
-                    SasayakiReaderSkipButtonAction.entries.forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.label) },
-                            onClick = { onSelected(action) },
-                        )
-                    }
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Box {
+            TextButton(onClick = { onExpandedChange(true) }) {
+                Text(selected.label)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+            ) {
+                SasayakiReaderSkipButtonAction.entries.forEach { action ->
+                    DropdownMenuItem(
+                        text = { Text(action.label) },
+                        onClick = { onSelected(action) },
+                    )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -315,16 +338,20 @@ private fun SasayakiSettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(label) },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-            )
-        },
-    )
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
 }
 
 private fun formatDuration(seconds: Double): String =

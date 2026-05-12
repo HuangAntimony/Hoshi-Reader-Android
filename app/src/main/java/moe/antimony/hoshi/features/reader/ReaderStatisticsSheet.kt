@@ -58,10 +58,10 @@ internal fun ReaderStatisticsSheet(
                 .fillMaxWidth()
                 .weight(1f),
             contentPadding = PaddingValues(
-                start = 24.dp,
-                top = if (chrome.showHeader || chrome.showCloseButton) 0.dp else 8.dp,
-                end = 24.dp,
-                bottom = 32.dp,
+                start = 20.dp,
+                top = if (chrome.showHeader || chrome.showCloseButton) 0.dp else 4.dp,
+                end = 20.dp,
+                bottom = 24.dp,
             ),
         ) {
             item {
@@ -104,11 +104,12 @@ private fun StatisticsSection(
     onToggleTracking: () -> Unit = {},
     extraRows: List<Pair<String, String>> = emptyList(),
 ) {
-    Column(modifier = Modifier.padding(bottom = 22.dp)) {
+    val metrics = readerSheetDensityMetrics()
+    Column(modifier = Modifier.padding(bottom = metrics.statisticsSectionBottomPaddingDp.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
+                .padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -151,10 +152,11 @@ private fun StatisticsSection(
 
 @Composable
 private fun StatisticRow(label: String, value: String) {
+    val metrics = readerSheetDensityMetrics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = metrics.statisticsRowVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyLarge)

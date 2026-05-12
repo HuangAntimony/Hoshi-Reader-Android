@@ -61,6 +61,7 @@ internal fun ReaderChapterSheet(
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.US) }
     val sheetStyle = readerSheetStyle()
     val eInkMode = sheetStyle.eInkMode
+    val metrics = readerSheetDensityMetrics()
     var showJumpDialog by remember { mutableStateOf(false) }
 
     ReaderBottomPanel(
@@ -71,20 +72,20 @@ internal fun ReaderChapterSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         ) {
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp, bottom = 20.dp),
+                        .padding(top = 4.dp, bottom = 12.dp),
                 ) {
                     Text(
                         text = "Chapters",
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(top = 10.dp),
-                        style = MaterialTheme.typography.headlineSmall,
+                            .padding(top = 6.dp),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Surface(
@@ -98,11 +99,14 @@ internal fun ReaderChapterSheet(
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         border = if (eInkMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
                     ) {
-                        IconButton(onClick = onDismiss) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(metrics.chapterCloseButtonSizeDp.dp),
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
                                 contentDescription = "Close chapters",
-                                modifier = Modifier.size(34.dp),
+                                modifier = Modifier.size(metrics.chapterCloseIconSizeDp.dp),
                             )
                         }
                     }
@@ -114,7 +118,7 @@ internal fun ReaderChapterSheet(
                     currentPosition = currentPosition,
                     numberFormat = numberFormat,
                     onJumpToCharacter = { showJumpDialog = true },
-                    modifier = Modifier.padding(bottom = 22.dp),
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
             }
             items(
@@ -154,39 +158,43 @@ private fun ReaderChapterBookHeader(
     val currentCharacter = book.characterCountAt(currentPosition.index, currentPosition.progress)
     val totalCharacters = book.bookInfo.characterCount
     val percent = if (totalCharacters > 0) currentCharacter.toDouble() / totalCharacters.toDouble() * 100.0 else 0.0
+    val metrics = readerSheetDensityMetrics()
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onJumpToCharacter)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ReaderChapterCover(
             book = book,
-            modifier = Modifier.size(width = 58.dp, height = 86.dp),
+            modifier = Modifier.size(
+                width = metrics.chapterHeaderCoverWidthDp.dp,
+                height = metrics.chapterHeaderCoverHeightDp.dp,
+            ),
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = book.title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
             Text(
                 text = "${numberFormat.format(currentCharacter)} / ${numberFormat.format(totalCharacters)} (${String.format(Locale.US, "%.1f", percent)}%)",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
             contentDescription = "Jump to character",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(26.dp),
         )
     }
 }
@@ -240,29 +248,35 @@ private fun ReaderChapterListRow(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val metrics = readerSheetDensityMetrics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 color = currentRowColor,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(metrics.chapterRowCornerRadiusDp.dp),
             )
             .clickable(onClick = onClick)
-            .padding(start = (row.indentLevel * 22).dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
+            .padding(
+                start = (row.indentLevel * 18).dp,
+                top = metrics.chapterRowVerticalPaddingDp.dp,
+                end = 8.dp,
+                bottom = metrics.chapterRowVerticalPaddingDp.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
             text = row.label.ifBlank { "Untitled" },
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             color = rowContentColor,
         )
         row.characterCount?.let { count ->
             Text(
                 text = numberFormat.format(count),
                 color = rowMetaColor,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
