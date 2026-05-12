@@ -1,36 +1,32 @@
 package moe.antimony.hoshi.features.reader
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -60,77 +57,45 @@ internal fun ReaderChapterSheet(
     val rows = remember(book, currentPosition.index) { book.chapterRows(currentPosition.index) }
     val numberFormat = remember { NumberFormat.getIntegerInstance(Locale.US) }
     val sheetStyle = readerSheetStyle()
-    val eInkMode = sheetStyle.eInkMode
-    val metrics = readerSheetDensityMetrics()
+    val chrome = readerChapterSheetChrome()
+    val coverBitmap = remember(book) {
+        if (chrome.cacheCoverOutsideLazyList) book.decodeCoverImageBitmap() else null
+    }
+    val scrollState = rememberScrollState()
     var showJumpDialog by remember { mutableStateOf(false) }
 
     ReaderBottomPanel(
         sheetStyle = sheetStyle,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        CompositionLocalProvider(
+            LocalOverscrollFactory provides if (chrome.disableListOverscrollEffect) null else LocalOverscrollFactory.current,
         ) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 12.dp),
-                ) {
-                    Text(
-                        text = "Chapters",
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(top = 6.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            ) {
+                if (chrome.showBookHeader) {
+                    ReaderChapterBookHeader(
+                        book = book,
+                        coverBitmap = coverBitmap,
+                        currentPosition = currentPosition,
+                        numberFormat = numberFormat,
+                        onJumpToCharacter = { showJumpDialog = true },
+                        modifier = Modifier.padding(bottom = 12.dp),
                     )
-                    Surface(
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                        shape = CircleShape,
-                        color = if (eInkMode) {
-                            MaterialTheme.colorScheme.surface
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                        },
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        border = if (eInkMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
-                    ) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.size(metrics.chapterCloseButtonSizeDp.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close chapters",
-                                modifier = Modifier.size(metrics.chapterCloseIconSizeDp.dp),
-                            )
-                        }
-                    }
                 }
-            }
-            item {
-                ReaderChapterBookHeader(
-                    book = book,
-                    currentPosition = currentPosition,
-                    numberFormat = numberFormat,
-                    onJumpToCharacter = { showJumpDialog = true },
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-            }
-            items(
-                items = rows,
-                key = { "${it.spineIndex}:${it.fragment.orEmpty()}:${it.label}:${it.indentLevel}" },
-            ) { row ->
-                ReaderChapterListRow(
-                    row = row,
-                    numberFormat = numberFormat,
-                    onClick = { onJump(ReaderChapterPosition(index = row.spineIndex, progress = 0.0)) },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+                rows.forEach { row ->
+                    ReaderChapterListRow(
+                        row = row,
+                        numberFormat = numberFormat,
+                        onClick = { onJump(ReaderChapterPosition(index = row.spineIndex, progress = 0.0)) },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+                }
             }
         }
     }
@@ -150,6 +115,7 @@ internal fun ReaderChapterSheet(
 @Composable
 private fun ReaderChapterBookHeader(
     book: EpubBook,
+    coverBitmap: ImageBitmap?,
     currentPosition: ReaderChapterPosition,
     numberFormat: NumberFormat,
     onJumpToCharacter: () -> Unit,
@@ -168,7 +134,7 @@ private fun ReaderChapterBookHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ReaderChapterCover(
-            book = book,
+            coverBitmap = coverBitmap,
             modifier = Modifier.size(
                 width = metrics.chapterHeaderCoverWidthDp.dp,
                 height = metrics.chapterHeaderCoverHeightDp.dp,
@@ -201,17 +167,12 @@ private fun ReaderChapterBookHeader(
 
 @Composable
 private fun ReaderChapterCover(
-    book: EpubBook,
+    coverBitmap: ImageBitmap?,
     modifier: Modifier = Modifier,
 ) {
-    val coverBitmap = remember(book.coverHref) {
-        book.coverHref
-            ?.let(book::readResource)
-            ?.let { bytes -> runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }
-    }
     if (coverBitmap != null) {
         Image(
-            bitmap = coverBitmap.asImageBitmap(),
+            bitmap = coverBitmap,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = modifier.clip(RoundedCornerShape(2.dp)),
@@ -224,6 +185,12 @@ private fun ReaderChapterCover(
         )
     }
 }
+
+private fun EpubBook.decodeCoverImageBitmap(): ImageBitmap? =
+    coverHref
+        ?.let(::readResource)
+        ?.let { bytes -> runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }
+        ?.asImageBitmap()
 
 @Composable
 private fun ReaderChapterListRow(

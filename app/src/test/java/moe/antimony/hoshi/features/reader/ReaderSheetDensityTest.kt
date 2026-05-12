@@ -34,4 +34,15 @@ class ReaderSheetDensityTest {
         assertEquals(0, metrics.appearanceSwitchMinimumInteractiveSizeDp)
         assertEquals(metrics.appearanceRowVerticalPaddingDp, metrics.appearanceFontRowVerticalPaddingDp)
     }
+
+    @Test
+    fun chapterSheetKeepsBookHeaderButOmitsNavigationHeader() {
+        val chrome = readerChapterSheetChrome()
+
+        assertEquals(false, chrome.showNavigationHeader)
+        assertEquals(true, chrome.showBookHeader)
+        assertEquals(true, chrome.cacheCoverOutsideLazyList)
+        assertEquals(true, chrome.disableListOverscrollEffect)
+        assertEquals(true, chrome.useEagerScrollColumn)
+    }
 }

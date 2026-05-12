@@ -86,6 +86,24 @@ internal fun readerSheetDensityMetrics(): ReaderSheetDensityMetrics =
     )
 
 @Immutable
+internal data class ReaderChapterSheetChrome(
+    val showNavigationHeader: Boolean,
+    val showBookHeader: Boolean,
+    val cacheCoverOutsideLazyList: Boolean,
+    val disableListOverscrollEffect: Boolean,
+    val useEagerScrollColumn: Boolean,
+)
+
+internal fun readerChapterSheetChrome(): ReaderChapterSheetChrome =
+    ReaderChapterSheetChrome(
+        showNavigationHeader = false,
+        showBookHeader = true,
+        cacheCoverOutsideLazyList = true,
+        disableListOverscrollEffect = true,
+        useEagerScrollColumn = true,
+    )
+
+@Immutable
 internal data class ReaderSheetStyle(
     val containerColor: Color,
     val contentColor: Color,
