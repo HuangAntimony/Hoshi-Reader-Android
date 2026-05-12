@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -75,6 +76,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -868,7 +870,7 @@ private fun ReaderTopInfo(
                 modifier = Modifier.align(Alignment.TopStart),
             ) {
                 Icon(
-                    imageVector = if (statisticsTracking) Icons.Rounded.Pause else Icons.AutoMirrored.Rounded.ShowChart,
+                    imageVector = readerStatisticsTopToggleIcon(statisticsTracking),
                     contentDescription = if (statisticsTracking) "Pause statistics" else "Start statistics",
                     modifier = Modifier.size(metrics.topStatisticsIconSizeDp.dp),
                     tint = Color(colors.buttonContent),
@@ -883,7 +885,7 @@ private fun ReaderTopInfo(
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
                 Icon(
-                    imageVector = if (sasayakiPlaying) Icons.Rounded.Pause else Icons.Rounded.GraphicEq,
+                    imageVector = readerSasayakiTopToggleIcon(sasayakiPlaying),
                     contentDescription = if (sasayakiPlaying) "Pause Sasayaki" else "Play Sasayaki",
                     modifier = Modifier.size(metrics.topSasayakiIconSizeDp.dp),
                     tint = Color(colors.buttonContent),
@@ -892,6 +894,12 @@ private fun ReaderTopInfo(
         }
     }
 }
+
+internal fun readerStatisticsTopToggleIcon(isTracking: Boolean): ImageVector =
+    if (isTracking) Icons.Rounded.Timer else Icons.AutoMirrored.Rounded.ShowChart
+
+internal fun readerSasayakiTopToggleIcon(isPlaying: Boolean): ImageVector =
+    if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.GraphicEq
 
 @Composable
 private fun ReaderFocusModeToggleArea(

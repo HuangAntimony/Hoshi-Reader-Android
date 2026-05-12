@@ -1,8 +1,14 @@
 package moe.antimony.hoshi.features.reader
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Timer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.io.File
 
@@ -126,6 +132,15 @@ class ReaderChromeTest {
 
         assertEquals(metrics.topSasayakiButtonSizeDp, metrics.topStatisticsButtonSizeDp)
         assertEquals(metrics.topSasayakiIconSizeDp, metrics.topStatisticsIconSizeDp)
+    }
+
+    @Test
+    fun statisticsTopToggleUsesIosTimerIconWhenTracking() {
+        assertEquals(Icons.AutoMirrored.Rounded.ShowChart, readerStatisticsTopToggleIcon(isTracking = false))
+        assertEquals(Icons.Rounded.Timer, readerStatisticsTopToggleIcon(isTracking = true))
+        assertEquals(Icons.Rounded.GraphicEq, readerSasayakiTopToggleIcon(isPlaying = false))
+        assertEquals(Icons.Rounded.Pause, readerSasayakiTopToggleIcon(isPlaying = true))
+        assertNotEquals(readerSasayakiTopToggleIcon(isPlaying = true), readerStatisticsTopToggleIcon(isTracking = true))
     }
 
     @Test

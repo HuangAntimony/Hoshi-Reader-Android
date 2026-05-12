@@ -96,7 +96,7 @@ For reader appearance chrome regressions, verify Show Title off, Progress Positi
 
 For reader appearance controls, verify Layout Mode shows both Paginated and Continuous labels without truncation in the settings page and reader sheet.
 
-For reader statistics regressions, verify Advanced -> Statistics defaults off, enabling it turns on the three Appearance statistics toggles, Off/Page Turn/On autostart modes, the reader Statistics sheet, top-left session toggle, bottom speed/time display, page-turn delayed saves, and close/background `statistics.json` persistence.
+For reader statistics regressions, verify Advanced -> Statistics defaults off, enabling it turns on the three Appearance statistics toggles, Off/Page Turn/On autostart modes, the reader Statistics sheet without an extra header close row or partial/full drag jitter, the top-left session toggle using chart/timer icons, bottom speed/time display, page-turn delayed saves, and close/background `statistics.json` persistence.
 
 For Sasayaki settings regressions, verify fresh installs default Sasayaki, Show Sasayaki Toggle, Auto-Scroll, and Auto-Pause on Lookup on, and that Appearance can toggle the reader Sasayaki button.
 

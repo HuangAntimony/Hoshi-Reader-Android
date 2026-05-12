@@ -9,6 +9,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add iOS-compatible reader reading statistics with Advanced settings, reader Statistics sheet, optional session toggle, bottom speed/time display, and per-book `statistics.json` sidecar storage.
 
+### Changed
+
+- Align the reader Statistics sheet and top-left statistics toggle with iOS by removing the sheet header close row, using a timer icon while tracking, and opening the sheet at a stable expanded detent to avoid Android partial/full drag jitter.
+
 ## [v0.4.4] - 2026-05-13
 
 ### Added
