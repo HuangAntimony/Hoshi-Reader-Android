@@ -33,6 +33,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -128,6 +129,7 @@ internal fun ReaderAppearanceSheet(
             onSasayakiSettingsChange = onSasayakiSettingsChange,
             fontManager = fontManager,
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            showTitle = false,
             showDone = true,
             onDone = onDismiss,
             modifier = Modifier
@@ -623,7 +625,7 @@ private fun IosSegmentedControl(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.height(34.dp),
+        modifier = modifier.height(readerSheetDensityMetrics().appearanceSegmentedControlHeightDp.dp),
         shape = RoundedCornerShape(17.dp),
         color = palette.segmentContainer,
         contentColor = palette.onGroup,
@@ -687,35 +689,51 @@ private fun ReaderFontRow(
     onDeleteFont: () -> Unit,
 ) {
     val metrics = readerSheetDensityMetrics()
-    Column(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = metrics.appearanceWideRowVerticalPaddingDp.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = metrics.appearanceFontRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Font", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = "Font",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                TextButton(onClick = { onFontMenuExpandedChange(true) }) {
-                    Text(settings.selectedFont)
-                }
-                DropdownMenu(
-                    expanded = fontMenuExpanded,
-                    onDismissRequest = { onFontMenuExpandedChange(false) },
-                ) {
-                    fontOptions.forEach { fontName ->
-                        DropdownMenuItem(
-                            text = { Text(fontName) },
-                            onClick = { onFontSelected(fontName) },
+            Box {
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                    TextButton(onClick = { onFontMenuExpandedChange(true) }) {
+                        Text(
+                            text = settings.selectedFont,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
+                    }
+                    DropdownMenu(
+                        expanded = fontMenuExpanded,
+                        onDismissRequest = { onFontMenuExpandedChange(false) },
+                    ) {
+                        fontOptions.forEach { fontName ->
+                            DropdownMenuItem(
+                                text = { Text(fontName) },
+                                onClick = { onFontSelected(fontName) },
+                            )
+                        }
                     }
                 }
             }
             if (canDeleteFont) {
-                TextButton(onClick = onDeleteFont) {
-                    Text("Delete")
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                    TextButton(onClick = onDeleteFont) {
+                        Text("Delete")
+                    }
                 }
             }
         }
@@ -771,7 +789,9 @@ private fun SwitchRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides metrics.appearanceSwitchMinimumInteractiveSizeDp.dp) {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 

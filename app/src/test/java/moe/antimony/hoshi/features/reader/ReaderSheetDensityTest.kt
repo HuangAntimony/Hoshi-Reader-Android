@@ -25,4 +25,13 @@ class ReaderSheetDensityTest {
         assertEquals(24, metrics.chapterCloseIconSizeDp)
         assertEquals(40, metrics.chapterCloseButtonSizeDp)
     }
+
+    @Test
+    fun appearanceControlsUseMatchedCompactHeights() {
+        val metrics = readerSheetDensityMetrics()
+
+        assertEquals(34, metrics.appearanceSegmentedControlHeightDp)
+        assertEquals(0, metrics.appearanceSwitchMinimumInteractiveSizeDp)
+        assertEquals(metrics.appearanceRowVerticalPaddingDp, metrics.appearanceFontRowVerticalPaddingDp)
+    }
 }
