@@ -117,6 +117,13 @@ class BookRepository(
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
     }
 
+    override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
+        sidecarDataSource.loadStatistics(bookRoot).orEmpty()
+
+    override suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+        sidecarDataSource.saveStatistics(bookRoot, statistics)
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         sidecarDataSource.loadBookInfo(bookRoot)
 
@@ -195,6 +202,8 @@ interface ReaderRouteBookRepository {
     suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
     suspend fun loadBookmark(bookRoot: File): Bookmark?
     suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
+    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics>
+    suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>)
     suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
     fun currentAppleReferenceDateSeconds(): Double
 }
@@ -360,6 +369,19 @@ class BookSidecarDataSource(
         saveJson(bookRoot, BOOKMARK_FILE_NAME, Bookmark.serializer(), bookmark)
     }
 
+    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics>? =
+        loadJson(ListSerializer(ReadingStatistics.serializer()), bookRoot.resolve(STATISTICS_FILE_NAME))
+            ?.deduplicateReadingStatistics()
+
+    suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+        saveJson(
+            bookRoot,
+            STATISTICS_FILE_NAME,
+            ListSerializer(ReadingStatistics.serializer()),
+            statistics.deduplicateReadingStatistics(),
+        )
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         loadJson(BookInfo.serializer(), bookRoot.resolve(BOOKINFO_FILE_NAME))
 
@@ -412,6 +434,7 @@ object SystemBookClock : BookClock {
 
 private const val METADATA_FILE_NAME = "metadata.json"
 private const val BOOKMARK_FILE_NAME = "bookmark.json"
+private const val STATISTICS_FILE_NAME = "statistics.json"
 private const val BOOKINFO_FILE_NAME = "bookinfo.json"
 private const val SHELVES_FILE_NAME = "shelves.json"
 private const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"

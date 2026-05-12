@@ -25,6 +25,11 @@ data class ReaderSettings(
     val fontSize: Int = 22,
     val hideFurigana: Boolean = false,
     val continuousMode: Boolean = false,
+    val enableStatistics: Boolean = false,
+    val statisticsAutostartMode: StatisticsAutostartMode = StatisticsAutostartMode.Off,
+    val showStatisticsToggle: Boolean = false,
+    val showReadingSpeed: Boolean = false,
+    val showReadingTime: Boolean = false,
     val chapterSwipeDistance: Int = 20,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
@@ -123,6 +128,18 @@ data class ReaderSettings(
             ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) "#F2E2C9" else "#332A1B"
         }
     }
+
+    fun withStatisticsEnabled(enabled: Boolean): ReaderSettings {
+        if (enabled && !enableStatistics) {
+            return copy(
+                enableStatistics = true,
+                showStatisticsToggle = true,
+                showReadingSpeed = true,
+                showReadingTime = true,
+            )
+        }
+        return copy(enableStatistics = enabled)
+    }
 }
 
 enum class ReaderTheme(val label: String) {
@@ -130,6 +147,17 @@ enum class ReaderTheme(val label: String) {
     Light("Light"),
     Dark("Dark"),
     Sepia("Sepia"),
+}
+
+enum class StatisticsAutostartMode(val rawValue: String) {
+    Off("Off"),
+    PageTurn("Page Turn"),
+    On("On");
+
+    companion object {
+        fun fromRawValue(rawValue: String?): StatisticsAutostartMode =
+            entries.firstOrNull { it.rawValue == rawValue } ?: Off
+    }
 }
 
 fun ReaderSettings.usesDarkInterface(systemDark: Boolean): Boolean = when (theme) {
@@ -166,6 +194,13 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         fontSize = preferences.getInt("fontSize", 22),
         hideFurigana = preferences.getBoolean("readerHideFurigana", false),
         continuousMode = preferences.getBoolean("continuousMode", false),
+        enableStatistics = preferences.getBoolean("enableStatistics", false),
+        statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(
+            preferences.getString("statisticsAutostartMode", null),
+        ),
+        showStatisticsToggle = preferences.getBoolean("readerShowStatisticsToggle", false),
+        showReadingSpeed = preferences.getBoolean("readerShowReadingSpeed", false),
+        showReadingTime = preferences.getBoolean("readerShowReadingTime", false),
         chapterSwipeDistance = preferences.getInt("chapterSwipeDistance", 20).coerceIn(10, 60),
         horizontalPadding = preferences.getInt("layoutHorizontalPadding", 5),
         verticalPadding = preferences.getInt("layoutVerticalPadding", 0),
@@ -200,6 +235,11 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putInt("fontSize", settings.fontSize)
             .putBoolean("readerHideFurigana", settings.hideFurigana)
             .putBoolean("continuousMode", settings.continuousMode)
+            .putBoolean("enableStatistics", settings.enableStatistics)
+            .putString("statisticsAutostartMode", settings.statisticsAutostartMode.rawValue)
+            .putBoolean("readerShowStatisticsToggle", settings.showStatisticsToggle)
+            .putBoolean("readerShowReadingSpeed", settings.showReadingSpeed)
+            .putBoolean("readerShowReadingTime", settings.showReadingTime)
             .putInt("chapterSwipeDistance", settings.chapterSwipeDistance)
             .putInt("layoutHorizontalPadding", settings.horizontalPadding)
             .putInt("layoutVerticalPadding", settings.verticalPadding)
@@ -245,7 +285,7 @@ class ReaderSettingsRepository(
         migrateLegacySettingsIfNeeded()
         dataStore.edit { preferences ->
             val current = preferences.toReaderSettings()
-            preferences.writeReaderSettings(transform(current))
+            preferences.writeReaderSettings(transform(current).withStatisticsTransitionFrom(current))
             preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
         }
     }
@@ -273,6 +313,11 @@ class ReaderSettingsRepository(
             fontSize = this[KEY_FONT_SIZE] ?: 22,
             hideFurigana = this[KEY_HIDE_FURIGANA] ?: false,
             continuousMode = this[KEY_CONTINUOUS_MODE] ?: false,
+            enableStatistics = this[KEY_ENABLE_STATISTICS] ?: false,
+            statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(this[KEY_STATISTICS_AUTOSTART_MODE]),
+            showStatisticsToggle = this[KEY_SHOW_STATISTICS_TOGGLE] ?: false,
+            showReadingSpeed = this[KEY_SHOW_READING_SPEED] ?: false,
+            showReadingTime = this[KEY_SHOW_READING_TIME] ?: false,
             chapterSwipeDistance = (this[KEY_CHAPTER_SWIPE_DISTANCE] ?: 20).coerceIn(10, 60),
             horizontalPadding = this[KEY_HORIZONTAL_PADDING] ?: 5,
             verticalPadding = this[KEY_VERTICAL_PADDING] ?: 0,
@@ -306,6 +351,11 @@ class ReaderSettingsRepository(
         this[KEY_FONT_SIZE] = settings.fontSize
         this[KEY_HIDE_FURIGANA] = settings.hideFurigana
         this[KEY_CONTINUOUS_MODE] = settings.continuousMode
+        this[KEY_ENABLE_STATISTICS] = settings.enableStatistics
+        this[KEY_STATISTICS_AUTOSTART_MODE] = settings.statisticsAutostartMode.rawValue
+        this[KEY_SHOW_STATISTICS_TOGGLE] = settings.showStatisticsToggle
+        this[KEY_SHOW_READING_SPEED] = settings.showReadingSpeed
+        this[KEY_SHOW_READING_TIME] = settings.showReadingTime
         this[KEY_CHAPTER_SWIPE_DISTANCE] = settings.chapterSwipeDistance
         this[KEY_HORIZONTAL_PADDING] = settings.horizontalPadding
         this[KEY_VERTICAL_PADDING] = settings.verticalPadding
@@ -343,6 +393,11 @@ class ReaderSettingsRepository(
         private val KEY_FONT_SIZE = intPreferencesKey("fontSize")
         private val KEY_HIDE_FURIGANA = booleanPreferencesKey("readerHideFurigana")
         private val KEY_CONTINUOUS_MODE = booleanPreferencesKey("continuousMode")
+        private val KEY_ENABLE_STATISTICS = booleanPreferencesKey("enableStatistics")
+        private val KEY_STATISTICS_AUTOSTART_MODE = stringPreferencesKey("statisticsAutostartMode")
+        private val KEY_SHOW_STATISTICS_TOGGLE = booleanPreferencesKey("readerShowStatisticsToggle")
+        private val KEY_SHOW_READING_SPEED = booleanPreferencesKey("readerShowReadingSpeed")
+        private val KEY_SHOW_READING_TIME = booleanPreferencesKey("readerShowReadingTime")
         private val KEY_CHAPTER_SWIPE_DISTANCE = intPreferencesKey("chapterSwipeDistance")
         private val KEY_HORIZONTAL_PADDING = intPreferencesKey("layoutHorizontalPadding")
         private val KEY_VERTICAL_PADDING = intPreferencesKey("layoutVerticalPadding")
@@ -366,6 +421,17 @@ class ReaderSettingsRepository(
         private val KEY_REVERSE_VOLUME_KEY_DIRECTION = booleanPreferencesKey("reverseVolumeKeyDirection")
     }
 }
+
+private fun ReaderSettings.withStatisticsTransitionFrom(previous: ReaderSettings): ReaderSettings =
+    if (enableStatistics && !previous.enableStatistics) {
+        copy(
+            showStatisticsToggle = true,
+            showReadingSpeed = true,
+            showReadingTime = true,
+        )
+    } else {
+        this
+    }
 
 internal fun Double.cssNumber(): String =
     String.format(Locale.US, "%.1f", this)

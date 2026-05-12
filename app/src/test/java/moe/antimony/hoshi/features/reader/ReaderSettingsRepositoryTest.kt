@@ -33,6 +33,11 @@ class ReaderSettingsRepositoryTest {
             assertEquals(22, settings.fontSize)
             assertFalse(settings.hideFurigana)
             assertFalse(settings.continuousMode)
+            assertFalse(settings.enableStatistics)
+            assertEquals(StatisticsAutostartMode.Off, settings.statisticsAutostartMode)
+            assertFalse(settings.showStatisticsToggle)
+            assertFalse(settings.showReadingSpeed)
+            assertFalse(settings.showReadingTime)
             assertEquals(20, settings.chapterSwipeDistance)
             assertEquals(5, settings.horizontalPadding)
             assertEquals(0, settings.verticalPadding)
@@ -107,6 +112,11 @@ class ReaderSettingsRepositoryTest {
                     fontSize = 24,
                     hideFurigana = true,
                     continuousMode = true,
+                    enableStatistics = true,
+                    statisticsAutostartMode = StatisticsAutostartMode.PageTurn,
+                    showStatisticsToggle = true,
+                    showReadingSpeed = true,
+                    showReadingTime = true,
                     chapterSwipeDistance = 35,
                     horizontalPadding = 12,
                     verticalPadding = 6,
@@ -141,6 +151,11 @@ class ReaderSettingsRepositoryTest {
             assertEquals(24, saved.fontSize)
             assertTrue(saved.hideFurigana)
             assertTrue(saved.continuousMode)
+            assertTrue(saved.enableStatistics)
+            assertEquals(StatisticsAutostartMode.PageTurn, saved.statisticsAutostartMode)
+            assertTrue(saved.showStatisticsToggle)
+            assertTrue(saved.showReadingSpeed)
+            assertTrue(saved.showReadingTime)
             assertEquals(35, saved.chapterSwipeDistance)
             assertEquals(12, saved.horizontalPadding)
             assertEquals(6, saved.verticalPadding)
@@ -162,6 +177,27 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.volumeKeysTurnPages)
             assertTrue(saved.volumeKeysSeekSasayaki)
             assertTrue(saved.reverseVolumeKeyDirection)
+        }
+    }
+
+    @Test
+    fun falseToTrueStatisticsRepositoryUpdateEnablesDisplayControls() = runBlocking {
+        repository().use { repository ->
+            repository.update {
+                it.copy(
+                    enableStatistics = true,
+                    showStatisticsToggle = false,
+                    showReadingSpeed = false,
+                    showReadingTime = false,
+                )
+            }
+
+            val saved = repository.settings.first()
+
+            assertTrue(saved.enableStatistics)
+            assertTrue(saved.showStatisticsToggle)
+            assertTrue(saved.showReadingSpeed)
+            assertTrue(saved.showReadingTime)
         }
     }
 

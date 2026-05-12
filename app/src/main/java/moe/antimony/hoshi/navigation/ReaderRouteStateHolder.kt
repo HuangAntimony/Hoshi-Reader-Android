@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import java.io.File
 
@@ -43,6 +44,7 @@ internal class ReaderRouteStateHolder(
         state: ReaderRouteLoadState.Ready,
         chapterIndex: Int,
         progress: Double,
+        statistics: List<ReadingStatistics>? = null,
         onBookmarkSaved: () -> Unit,
     ) {
         withContext(ioDispatcher) {
@@ -53,6 +55,9 @@ internal class ReaderRouteStateHolder(
                 lastModified = repository.currentAppleReferenceDateSeconds(),
             )
             repository.saveBookmark(state.bookRoot, bookmark)
+            if (statistics != null) {
+                repository.saveStatistics(state.bookRoot, statistics)
+            }
         }
         onBookmarkSaved()
     }

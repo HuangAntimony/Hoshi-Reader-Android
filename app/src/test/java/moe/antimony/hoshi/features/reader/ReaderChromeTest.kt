@@ -19,6 +19,24 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun formatsStatisticsLikeIosReaderOverlay() {
+        val text = ReaderChromeState(
+            title = "屍人荘の殺人",
+            currentCharacter = 355,
+            totalCharacters = 169325,
+            statistics = ReaderStatisticsChromeState(readingSpeed = 3600, readingTimeSeconds = 65.0),
+        ).statisticsText(
+            ReaderSettings(
+                enableStatistics = true,
+                showReadingSpeed = true,
+                showReadingTime = true,
+            ),
+        )
+
+        assertEquals("3600 / h 0:01", text)
+    }
+
+    @Test
     fun hidesProgressPiecesFromAppearanceSettings() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
@@ -69,6 +87,14 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
+            40,
+            readerWebViewTopPaddingDp(
+                state,
+                ReaderSettings(showTitle = false, showProgressTop = false),
+                showStatisticsToggle = true,
+            ),
+        )
+        assertEquals(
             4,
             readerWebViewTopPaddingDp(
                 state,
@@ -92,6 +118,36 @@ class ReaderChromeTest {
                 showSasayakiToggle = true,
             ),
         )
+    }
+
+    @Test
+    fun statisticsTopToggleUsesSameMetricsAsSasayakiTopToggle() {
+        val metrics = readerBottomChromeMetrics()
+
+        assertEquals(metrics.topSasayakiButtonSizeDp, metrics.topStatisticsButtonSizeDp)
+        assertEquals(metrics.topSasayakiIconSizeDp, metrics.topStatisticsIconSizeDp)
+    }
+
+    @Test
+    fun bottomStatisticsAndProgressFitInsideBottomChromeButtonHeight() {
+        val state = ReaderChromeState(
+            title = "屍人荘の殺人",
+            currentCharacter = 355,
+            totalCharacters = 169325,
+            statistics = ReaderStatisticsChromeState(readingSpeed = 3600, readingTimeSeconds = 65.0),
+        )
+        val layout = readerChromeLayout(
+            state,
+            ReaderSettings(
+                showProgressTop = false,
+                enableStatistics = true,
+                showReadingSpeed = true,
+                showReadingTime = true,
+            ),
+        )
+
+        assertEquals(2, layout.bottomCenterLineCount)
+        assertEquals(readerBottomChromeMetrics().buttonSizeDp, layout.bottomCenterMaxHeightDp)
     }
 
     @Test

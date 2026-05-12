@@ -6,6 +6,7 @@ data class ReaderChromeState(
     val title: String,
     val currentCharacter: Int,
     val totalCharacters: Int,
+    val statistics: ReaderStatisticsChromeState? = null,
 ) {
     fun progressText(settings: ReaderSettings): String {
         val parts = mutableListOf<String>()
@@ -26,7 +27,24 @@ data class ReaderChromeState(
         return parts.joinToString(separator = " ")
     }
 
+    fun statisticsText(settings: ReaderSettings): String {
+        val statistics = statistics ?: return ""
+        if (!settings.enableStatistics) return ""
+        val parts = mutableListOf<String>()
+        if (settings.showReadingSpeed) {
+            parts += "${statistics.readingSpeed} / h"
+        }
+        if (settings.showReadingTime) {
+            parts += statistics.readingTimeText()
+        }
+        return parts.joinToString(separator = " ")
+    }
 }
+
+data class ReaderStatisticsChromeState(
+    val readingSpeed: Int,
+    val readingTimeSeconds: Double,
+)
 
 data class ReaderChromeColors(
     val buttonContainer: Long,
@@ -40,6 +58,9 @@ data class ReaderChromeColors(
 data class ReaderChromeLayout(
     val topWebViewPaddingDp: Int,
     val showProgressInBottomBar: Boolean,
+    val showStatisticsInBottomBar: Boolean,
+    val bottomCenterLineCount: Int,
+    val bottomCenterMaxHeightDp: Int,
 )
 
 data class ReaderSasayakiBottomSkipButtons(
@@ -56,9 +77,11 @@ data class ReaderFocusModeToggleArea(
 data class ReaderBottomChromeMetrics(
     val buttonSizeDp: Int,
     val topSasayakiButtonSizeDp: Int,
+    val topStatisticsButtonSizeDp: Int,
     val primaryIconSizeDp: Int,
     val secondaryIconSizeDp: Int,
     val topSasayakiIconSizeDp: Int,
+    val topStatisticsIconSizeDp: Int,
     val horizontalPaddingDp: Int,
     val bottomPaddingDp: Int,
     val trailingButtonSpacingDp: Int,
@@ -77,12 +100,24 @@ fun readerChromeLayout(
     state: ReaderChromeState,
     settings: ReaderSettings,
     showSasayakiToggle: Boolean = false,
+    showStatisticsToggle: Boolean = false,
     focusMode: Boolean = false,
 ): ReaderChromeLayout {
     val progress = state.progressText(settings)
+    val statistics = state.statisticsText(settings)
+    val showProgressInBottomBar = !settings.showProgressTop && progress.isNotBlank()
+    val showStatisticsInBottomBar = statistics.isNotBlank()
     return ReaderChromeLayout(
-        topWebViewPaddingDp = readerWebViewTopPaddingDp(state, settings, showSasayakiToggle),
-        showProgressInBottomBar = !settings.showProgressTop && progress.isNotBlank(),
+        topWebViewPaddingDp = readerWebViewTopPaddingDp(
+            state = state,
+            settings = settings,
+            showSasayakiToggle = showSasayakiToggle,
+            showStatisticsToggle = showStatisticsToggle,
+        ),
+        showProgressInBottomBar = showProgressInBottomBar,
+        showStatisticsInBottomBar = showStatisticsInBottomBar,
+        bottomCenterLineCount = listOf(showStatisticsInBottomBar, showProgressInBottomBar).count { it },
+        bottomCenterMaxHeightDp = ReaderBottomChromeButtonSizeDp,
     )
 }
 
@@ -90,6 +125,7 @@ fun readerWebViewTopPaddingDp(
     state: ReaderChromeState,
     settings: ReaderSettings,
     showSasayakiToggle: Boolean = false,
+    showStatisticsToggle: Boolean = false,
 ): Int {
     val progress = state.progressText(settings)
     val textRows = listOf(
@@ -97,17 +133,19 @@ fun readerWebViewTopPaddingDp(
         settings.showProgressTop && progress.isNotBlank(),
     ).count { it }
     val textHeight = textRows * ReaderChromeLineHeightDp
-    val buttonHeight = if (showSasayakiToggle) ReaderTopSasayakiButtonSizeDp else 0
+    val buttonHeight = if (showSasayakiToggle || showStatisticsToggle) ReaderTopButtonSizeDp else 0
     return ReaderWebViewTopBasePaddingDp + maxOf(textHeight, buttonHeight)
 }
 
 fun readerBottomChromeMetrics(): ReaderBottomChromeMetrics =
     ReaderBottomChromeMetrics(
-        buttonSizeDp = 44,
-        topSasayakiButtonSizeDp = ReaderTopSasayakiButtonSizeDp,
+        buttonSizeDp = ReaderBottomChromeButtonSizeDp,
+        topSasayakiButtonSizeDp = ReaderTopButtonSizeDp,
+        topStatisticsButtonSizeDp = ReaderTopButtonSizeDp,
         primaryIconSizeDp = 28,
         secondaryIconSizeDp = 28,
-        topSasayakiIconSizeDp = 20,
+        topSasayakiIconSizeDp = ReaderTopButtonIconSizeDp,
+        topStatisticsIconSizeDp = ReaderTopButtonIconSizeDp,
         horizontalPaddingDp = 22,
         bottomPaddingDp = 2,
         trailingButtonSpacingDp = 8,
@@ -192,6 +230,15 @@ fun readerChromeColors(settings: ReaderSettings, systemDark: Boolean): ReaderChr
     )
 }
 
+private fun ReaderStatisticsChromeState.readingTimeText(): String {
+    val totalMinutes = (readingTimeSeconds / 60.0).toLong()
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return "$hours:${minutes.toString().padStart(2, '0')}"
+}
+
 private const val ReaderWebViewTopBasePaddingDp = 4
 private const val ReaderChromeLineHeightDp = 20
-private const val ReaderTopSasayakiButtonSizeDp = 36
+private const val ReaderBottomChromeButtonSizeDp = 44
+private const val ReaderTopButtonSizeDp = 36
+private const val ReaderTopButtonIconSizeDp = 20

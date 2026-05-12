@@ -7,6 +7,19 @@ import org.junit.Test
 
 class ReaderAppearanceSasayakiTest {
     @Test
+    fun appearanceShowsStatisticsRowsWhenStatisticsAreEnabled() {
+        assertEquals(
+            listOf("Show Statistics Toggle", "Show Reading Speed", "Show Reading Time"),
+            readerAppearanceStatisticsRows(ReaderSettings(enableStatistics = true)),
+        )
+    }
+
+    @Test
+    fun appearanceHidesStatisticsRowsWhenStatisticsAreDisabled() {
+        assertTrue(readerAppearanceStatisticsRows(ReaderSettings(enableStatistics = false)).isEmpty())
+    }
+
+    @Test
     fun appearanceShowsSasayakiToggleWhenSasayakiIsEnabled() {
         assertEquals(
             listOf("Show Sasayaki Toggle"),

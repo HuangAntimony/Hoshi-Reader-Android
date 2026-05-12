@@ -406,6 +406,26 @@ private fun ReaderAppearanceContent(
                         palette = palette,
                     )
                 }
+                readerAppearanceStatisticsRows(settings).forEach { label ->
+                    AppearanceDivider(palette)
+                    SwitchRow(
+                        label = label,
+                        checked = when (label) {
+                            "Show Statistics Toggle" -> settings.showStatisticsToggle
+                            "Show Reading Speed" -> settings.showReadingSpeed
+                            else -> settings.showReadingTime
+                        },
+                        onCheckedChange = { checked ->
+                            onSettingsChange(
+                                when (label) {
+                                    "Show Statistics Toggle" -> settings.copy(showStatisticsToggle = checked)
+                                    "Show Reading Speed" -> settings.copy(showReadingSpeed = checked)
+                                    else -> settings.copy(showReadingTime = checked)
+                                },
+                            )
+                        },
+                    )
+                }
                 readerAppearanceSasayakiRows(sasayakiSettings).forEach { label ->
                     AppearanceDivider(palette)
                     SwitchRow(
@@ -521,6 +541,13 @@ private fun ReaderAppearanceContent(
 
 internal fun readerAppearanceSasayakiRows(settings: SasayakiSettings): List<String> =
     if (settings.enabled) listOf("Show Sasayaki Toggle") else emptyList()
+
+internal fun readerAppearanceStatisticsRows(settings: ReaderSettings): List<String> =
+    if (settings.enableStatistics) {
+        listOf("Show Statistics Toggle", "Show Reading Speed", "Show Reading Time")
+    } else {
+        emptyList()
+    }
 
 @Composable
 private fun AppearanceSection(

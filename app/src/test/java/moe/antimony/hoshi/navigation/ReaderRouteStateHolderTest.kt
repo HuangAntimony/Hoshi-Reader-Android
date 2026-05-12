@@ -7,6 +7,7 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -98,6 +99,29 @@ class ReaderRouteStateHolderTest {
         assertEquals(1, refreshCount)
     }
 
+    @Test
+    fun saveBookmarkPersistsStatisticsThroughSameRepositoryPath() = runBlocking {
+        val root = File("book-a")
+        val book = readerBook(html = "1234567890")
+        val statistics = listOf(ReadingStatistics(title = "Book", dateKey = "2026-05-13", charactersRead = 5))
+        val repository = FakeReaderRouteBookRepository(entry = null, now = 99.0)
+        val stateHolder = ReaderRouteStateHolder(repository, FakeReaderRouteEpubParser(book))
+
+        stateHolder.saveBookmark(
+            state = ReaderRouteLoadState.Ready(
+                bookRoot = root,
+                book = book,
+                bookmark = null,
+            ),
+            chapterIndex = 0,
+            progress = 0.5,
+            statistics = statistics,
+            onBookmarkSaved = {},
+        )
+
+        assertEquals(statistics, repository.savedStatistics)
+    }
+
     private class FakeReaderRouteBookRepository(
         private val entry: BookEntry?,
         private val bookmark: Bookmark? = null,
@@ -108,6 +132,8 @@ class ReaderRouteStateHolderTest {
         var savedBookInfo: BookInfo? = null
             private set
         var savedBookmark: Bookmark? = null
+            private set
+        var savedStatistics: List<ReadingStatistics>? = null
             private set
 
         override suspend fun loadBookEntry(bookId: String): BookEntry? = entry
@@ -123,6 +149,12 @@ class ReaderRouteStateHolderTest {
 
         override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
             savedBookmark = bookmark
+        }
+
+        override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> = emptyList()
+
+        override suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+            savedStatistics = statistics
         }
 
         override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {

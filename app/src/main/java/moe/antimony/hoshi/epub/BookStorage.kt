@@ -98,6 +98,13 @@ class BookStorage(filesDir: File) {
         repository.saveBookmark(bookRoot, bookmark)
     }
 
+    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
+        repository.loadStatistics(bookRoot)
+
+    suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+        repository.saveStatistics(bookRoot, statistics)
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? = repository.loadBookInfo(bookRoot)
 
     suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {

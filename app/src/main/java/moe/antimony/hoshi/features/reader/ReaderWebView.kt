@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -87,12 +89,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.util.WeakHashMap
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
@@ -121,7 +125,7 @@ fun ReaderWebView(
     readerSettings: ReaderSettings = ReaderSettings(),
     onReaderSettingsChange: (ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
-    onSaveBookmark: (chapterIndex: Int, progress: Double) -> Unit = { _, _ -> },
+    onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -199,8 +203,96 @@ fun ReaderWebView(
     val showAppearance = stateHolder.showAppearance
     val showChapters = stateHolder.showChapters
     val showSasayaki = stateHolder.showSasayaki
+    val showStatistics = stateHolder.showStatistics
     val focusMode = stateHolder.focusMode
     val sasayakiWasPausedByLookup = stateHolder.sasayakiWasPausedByLookup
+    var persistedStatistics by remember(bookRoot) {
+        mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
+    }
+    LaunchedEffect(bookRoot, bookRepository, effectiveSettings.enableStatistics) {
+        persistedStatistics = if (bookRoot != null && effectiveSettings.enableStatistics) {
+            bookRepository.loadStatistics(bookRoot)
+        } else {
+            emptyList()
+        }
+    }
+    val statisticsTracker = remember(bookRoot, book.title, effectiveSettings.enableStatistics, persistedStatistics) {
+        persistedStatistics?.let { statistics ->
+            ReaderStatisticsTracker(
+                title = book.title,
+                initialStatistics = statistics,
+                enabled = effectiveSettings.enableStatistics,
+            )
+        }
+    }
+    var statisticsState by remember(statisticsTracker) { mutableStateOf(statisticsTracker?.state) }
+    fun currentDisplayedCharacter(): Int =
+        book.characterCountAt(
+            stateHolder.readerPosition.displayedPosition.index,
+            stateHolder.readerPosition.displayedPosition.progress,
+        )
+    fun currentChapterEndCharacter(): Int {
+        val index = stateHolder.readerPosition.displayedPosition.index
+        return if (index < book.chapters.lastIndex) {
+            book.characterCountAt(index + 1, 0.0)
+        } else {
+            book.bookInfo.characterCount
+        }
+    }
+    fun syncStatisticsState() {
+        statisticsState = statisticsTracker?.state
+    }
+    fun startStatisticsForProgressChangeIfNeeded() {
+        if (effectiveSettings.statisticsAutostartMode == StatisticsAutostartMode.PageTurn) {
+            statisticsTracker?.startForPageTurnIfNeeded(currentDisplayedCharacter())
+            syncStatisticsState()
+        }
+    }
+    fun recordStatisticsAtDisplayedPosition() {
+        statisticsTracker?.update(currentDisplayedCharacter())
+        syncStatisticsState()
+    }
+    fun resetStatisticsBaseline() {
+        statisticsTracker?.resetBaseline(currentDisplayedCharacter())
+        syncStatisticsState()
+    }
+    fun statisticsForSave(): List<ReadingStatistics>? {
+        recordStatisticsAtDisplayedPosition()
+        return statisticsTracker?.statisticsForPersistenceOrNull()
+    }
+    fun saveReaderPosition(position: ReaderChapterPosition, statistics: List<ReadingStatistics>? = statisticsForSave()) {
+        onSaveBookmark(position.index, position.progress, statistics)
+    }
+    fun saveCurrentDisplayedPosition() {
+        saveReaderPosition(stateHolder.readerPosition.displayedPosition)
+    }
+    fun toggleStatisticsTracking() {
+        val tracker = statisticsTracker ?: return
+        if (tracker.state.isTracking) {
+            tracker.stop(currentDisplayedCharacter())
+            syncStatisticsState()
+            saveCurrentDisplayedPosition()
+        } else {
+            tracker.start(currentDisplayedCharacter())
+            syncStatisticsState()
+        }
+    }
+    LaunchedEffect(statisticsTracker, effectiveSettings.statisticsAutostartMode) {
+        if (effectiveSettings.enableStatistics && effectiveSettings.statisticsAutostartMode == StatisticsAutostartMode.On) {
+            statisticsTracker?.start(currentDisplayedCharacter())
+            syncStatisticsState()
+        }
+    }
+    LaunchedEffect(statisticsTracker, statisticsState?.isTracking) {
+        val tracker = statisticsTracker ?: return@LaunchedEffect
+        if (tracker.state.isTracking) {
+            while (tracker.state.isTracking) {
+                delay(1_000)
+                tracker.update(currentDisplayedCharacter())
+                syncStatisticsState()
+            }
+        }
+    }
     fun sasayakiCueForSelection(selection: ReaderSelectionData): SasayakiMatch? {
         val player = sasayakiPlayer ?: return null
         val offset = selection.normalizedOffset ?: return null
@@ -252,6 +344,7 @@ fun ReaderWebView(
 
     fun closeReader() {
         webView?.flushPendingPageTurnProgress()
+        saveCurrentDisplayedPosition()
         onClose()
     }
     fun clearReaderSelection() {
@@ -281,31 +374,41 @@ fun ReaderWebView(
         sasayakiPlayer?.readerSkipButtonAction = settings.readerSkipButtonAction
     }
     fun goToNextChapter(): Boolean {
+        startStatisticsForProgressChangeIfNeeded()
         val next = stateHolder.goToNextChapter(book.chapters.lastIndex)
         if (next != null) {
-            onSaveBookmark(next.index, next.progress)
+            recordStatisticsAtDisplayedPosition()
+            saveReaderPosition(next)
             return true
         }
         return false
     }
     fun goToPreviousChapter(): Boolean {
+        startStatisticsForProgressChangeIfNeeded()
         val previous = stateHolder.goToPreviousChapter()
         if (previous != null) {
-            onSaveBookmark(previous.index, previous.progress)
+            recordStatisticsAtDisplayedPosition()
+            saveReaderPosition(previous)
             return true
         }
         return false
     }
     fun saveDisplayedProgress(progress: Double) {
+        startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordDisplayedProgress(progress)
-        onSaveBookmark(savedPosition.index, savedPosition.progress)
+        recordStatisticsAtDisplayedPosition()
+        saveReaderPosition(savedPosition)
     }
     fun displayPagedTurnProgress(progress: Double) {
+        startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordDisplayedProgress(progress)
+        recordStatisticsAtDisplayedPosition()
     }
     fun saveContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordContinuousScrollProgress(progress, restoreEpoch) ?: return
-        onSaveBookmark(savedPosition.index, savedPosition.progress)
+        recordStatisticsAtDisplayedPosition()
+        saveReaderPosition(savedPosition)
     }
     fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean {
         val currentWebView = webView ?: return false
@@ -340,11 +443,17 @@ fun ReaderWebView(
             onTextSelected(selection)
         }
     }
-    val chromeState = remember(book, readerPosition.displayedPosition) {
+    val chromeState = remember(book, readerPosition.displayedPosition, statisticsState) {
         ReaderChromeState(
             title = book.title,
             currentCharacter = book.characterCountAt(readerPosition.displayedPosition.index, readerPosition.displayedPosition.progress),
             totalCharacters = book.bookInfo.characterCount,
+            statistics = statisticsState?.session?.let {
+                ReaderStatisticsChromeState(
+                    readingSpeed = it.lastReadingSpeed,
+                    readingTimeSeconds = it.readingTime,
+                )
+            },
         )
     }
     LaunchedEffect(bookRoot, sasayakiMatchData, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
@@ -365,8 +474,10 @@ fun ReaderWebView(
                         ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal),
                     ) { progressResult ->
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
+                            startStatisticsForProgressChangeIfNeeded()
                             val savedPosition = stateHolder.recordDisplayedProgress(progress)
-                            onSaveBookmark(savedPosition.index, savedPosition.progress)
+                            recordStatisticsAtDisplayedPosition()
+                            saveReaderPosition(savedPosition)
                         }
                     }
                 },
@@ -374,9 +485,11 @@ fun ReaderWebView(
                     webView?.evaluateJavascript(ReaderPaginationScripts.clearSasayakiCueInvocation(), null)
                 },
                 onLoadChapter = { chapterIndex ->
+                    statisticsForSave()
                     val target = ReaderChapterPosition(index = chapterIndex, progress = 0.0)
                     val savedPosition = stateHolder.jumpTo(target)
-                    onSaveBookmark(savedPosition.index, savedPosition.progress)
+                    resetStatisticsBaseline()
+                    saveReaderPosition(savedPosition, statisticsTracker?.statisticsForPersistenceOrNull())
                 },
             )
         } else {
@@ -434,11 +547,13 @@ fun ReaderWebView(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 webView?.flushPendingPageTurnProgress()
+                saveCurrentDisplayedPosition()
             }
         }
         lifecycle?.addObserver(observer)
         onDispose {
             webView?.flushPendingPageTurnProgress()
+            saveCurrentDisplayedPosition()
             lifecycle?.removeObserver(observer)
         }
     }
@@ -505,6 +620,7 @@ fun ReaderWebView(
         chromeState,
         effectiveSettings,
         showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
+        showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
     )
     Box(
@@ -553,8 +669,10 @@ fun ReaderWebView(
                     },
                     onInternalLink = { target ->
                         closeLookupPopupsAndSelection()
+                        val statistics = statisticsForSave()
                         val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
-                        onSaveBookmark(savedPosition.index, savedPosition.progress)
+                        resetStatisticsBaseline()
+                        saveReaderPosition(savedPosition, statistics)
                     },
                     scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
                     readerSettings = effectiveSettings,
@@ -597,6 +715,12 @@ fun ReaderWebView(
             state = chromeState,
             settings = effectiveSettings,
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
+            onStatisticsToggle = if (effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle) {
+                ::toggleStatisticsTracking
+            } else {
+                null
+            },
+            statisticsTracking = statisticsState?.isTracking == true,
             onSasayakiToggle = onSasayakiTopToggle,
             sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
             focusMode = focusMode,
@@ -624,6 +748,11 @@ fun ReaderWebView(
             onDismissMenu = stateHolder::dismissReaderMenu,
             onChapters = stateHolder::openChaptersFromMenu,
             onAppearance = stateHolder::openAppearanceFromMenu,
+            onStatistics = if (effectiveSettings.enableStatistics) {
+                stateHolder::openStatisticsFromMenu
+            } else {
+                null
+            },
             onSasayaki = if (sasayakiSettings.enabled && sasayakiMatchData != null) {
                 stateHolder::openSasayakiFromMenu
             } else {
@@ -656,8 +785,10 @@ fun ReaderWebView(
             currentPosition = readerPosition.displayedPosition,
             onJump = { target ->
                 closeLookupPopupsAndSelection()
+                val statistics = statisticsForSave()
                 val savedPosition = stateHolder.jumpTo(target)
-                onSaveBookmark(savedPosition.index, savedPosition.progress)
+                resetStatisticsBaseline()
+                saveReaderPosition(savedPosition, statistics)
                 stateHolder.dismissChapters()
             },
             onDismiss = stateHolder::dismissChapters,
@@ -672,6 +803,16 @@ fun ReaderWebView(
             onDismiss = stateHolder::dismissSasayaki,
         )
     }
+    if (showStatistics && statisticsState != null) {
+        ReaderStatisticsSheet(
+            state = requireNotNull(statisticsState),
+            currentCharacter = currentDisplayedCharacter(),
+            currentChapterEndCharacter = currentChapterEndCharacter(),
+            totalCharacters = book.bookInfo.characterCount,
+            onToggleTracking = ::toggleStatisticsTracking,
+            onDismiss = stateHolder::dismissStatistics,
+        )
+    }
 }
 
 @Composable
@@ -679,6 +820,8 @@ private fun ReaderTopInfo(
     state: ReaderChromeState,
     settings: ReaderSettings,
     colors: ReaderChromeColors,
+    onStatisticsToggle: (() -> Unit)?,
+    statisticsTracking: Boolean,
     onSasayakiToggle: (() -> Unit)?,
     sasayakiPlaying: Boolean,
     focusMode: Boolean,
@@ -686,7 +829,11 @@ private fun ReaderTopInfo(
     modifier: Modifier = Modifier,
 ) {
     val progress = state.progressText(settings)
-    if ((focusMode || !settings.showTitle) && onSasayakiToggle == null && (focusMode || progress.isBlank() || !settings.showProgressTop)) return
+    if ((focusMode || !settings.showTitle) &&
+        onStatisticsToggle == null &&
+        onSasayakiToggle == null &&
+        (focusMode || progress.isBlank() || !settings.showProgressTop)
+    ) return
     Box(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.align(Alignment.TopCenter),
@@ -699,7 +846,10 @@ private fun ReaderTopInfo(
                     color = Color(colors.infoText),
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
-                    modifier = Modifier.padding(horizontal = if (onSasayakiToggle != null) 42.dp else 0.dp),
+                    modifier = Modifier.padding(
+                        start = if (onStatisticsToggle != null) 42.dp else 0.dp,
+                        end = if (onSasayakiToggle != null) 42.dp else 0.dp,
+                    ),
                 )
             }
             if (!focusMode && settings.showProgressTop && progress.isNotBlank()) {
@@ -707,6 +857,21 @@ private fun ReaderTopInfo(
                     text = progress,
                     color = Color(colors.infoText),
                     style = MaterialTheme.typography.labelMedium,
+                )
+            }
+        }
+        if (onStatisticsToggle != null) {
+            ReaderRoundButton(
+                colors = colors,
+                sizeDp = metrics.topStatisticsButtonSizeDp,
+                onClick = onStatisticsToggle,
+                modifier = Modifier.align(Alignment.TopStart),
+            ) {
+                Icon(
+                    imageVector = if (statisticsTracking) Icons.Rounded.Pause else Icons.AutoMirrored.Rounded.ShowChart,
+                    contentDescription = if (statisticsTracking) "Pause statistics" else "Start statistics",
+                    modifier = Modifier.size(metrics.topStatisticsIconSizeDp.dp),
+                    tint = Color(colors.buttonContent),
                 )
             }
         }
@@ -776,6 +941,7 @@ private fun BoxScope.ReaderBottomChrome(
     onDismissMenu: () -> Unit,
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
+    onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
     sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     onSasayakiSkipBackward: () -> Unit,
@@ -795,6 +961,7 @@ private fun BoxScope.ReaderBottomChrome(
             metrics = metrics,
             onChapters = onChapters,
             onAppearance = onAppearance,
+            onStatistics = onStatistics,
             onSasayaki = onSasayaki,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -813,13 +980,31 @@ private fun BoxScope.ReaderBottomChrome(
                 bottom = metrics.bottomPaddingDp.dp,
             ),
     ) {
-        if (layout.showProgressInBottomBar) {
-            Text(
-                text = state.progressText(settings),
-                color = Color(colors.infoText),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.align(Alignment.Center),
-            )
+        if (layout.bottomCenterLineCount > 0) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .heightIn(max = layout.bottomCenterMaxHeightDp.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                if (layout.showStatisticsInBottomBar) {
+                    Text(
+                        text = state.statisticsText(settings),
+                        color = Color(colors.infoText),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
+                if (layout.showProgressInBottomBar) {
+                    Text(
+                        text = state.progressText(settings),
+                        color = Color(colors.infoText),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -874,6 +1059,7 @@ private fun ReaderMenuCard(
     metrics: ReaderBottomChromeMetrics,
     onChapters: () -> Unit,
     onAppearance: () -> Unit,
+    onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -919,6 +1105,25 @@ private fun ReaderMenuCard(
                 metrics = metrics,
                 onClick = onAppearance,
             )
+            if (onStatistics != null) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),
+                    color = Color(colors.menuBorder),
+                )
+                ReaderMenuItem(
+                    text = "Statistics",
+                    icon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ShowChart,
+                            contentDescription = null,
+                            tint = Color(colors.menuContent),
+                        )
+                    },
+                    colors = colors,
+                    metrics = metrics,
+                    onClick = onStatistics,
+                )
+            }
             if (onSasayaki != null) {
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),

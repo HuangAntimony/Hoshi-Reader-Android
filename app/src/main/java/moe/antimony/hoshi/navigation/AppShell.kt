@@ -356,6 +356,8 @@ private fun SettingsDetailDestination(
             modifier = Modifier.fillMaxSize(),
         )
         SettingsDetailSection.Advanced -> AdvancedSettingsView(
+            readerSettings = readerSettings,
+            onReaderSettingsChange = onReaderSettingsChange,
             onClose = onClose,
             onBooksRestored = onBooksRestored,
             modifier = Modifier.fillMaxSize(),

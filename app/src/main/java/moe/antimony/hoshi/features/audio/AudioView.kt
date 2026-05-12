@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -63,6 +64,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.backup.BackupSettingsView
+import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.reader.ReaderStatisticsSettingsView
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
@@ -72,6 +75,8 @@ import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdvancedSettingsView(
+    readerSettings: ReaderSettings,
+    onReaderSettingsChange: (ReaderSettings) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -79,6 +84,15 @@ fun AdvancedSettingsView(
     var destination by remember { mutableStateOf<AdvancedDestination?>(null) }
     if (destination == AdvancedDestination.Audio) {
         AudioSettingsView(
+            onClose = { destination = null },
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == AdvancedDestination.Statistics) {
+        ReaderStatisticsSettingsView(
+            settings = readerSettings,
+            onSettingsChange = onReaderSettingsChange,
             onClose = { destination = null },
             modifier = modifier,
         )
@@ -121,6 +135,14 @@ fun AdvancedSettingsView(
                         leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null) },
                         headlineContent = { Text("Audio") },
                         modifier = Modifier.clickable { destination = AdvancedDestination.Audio },
+                    )
+                    GroupDivider()
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = { Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null) },
+                        headlineContent = { Text("Statistics") },
+                        supportingContent = { Text("Track per-book reading time, speed, and characters read") },
+                        modifier = Modifier.clickable { destination = AdvancedDestination.Statistics },
                     )
                     GroupDivider()
                     ListItem(
@@ -546,6 +568,7 @@ private fun BackIconButton(onClick: () -> Unit) {
 
 private enum class AdvancedDestination {
     Audio,
+    Statistics,
     Sasayaki,
     Backup,
 }

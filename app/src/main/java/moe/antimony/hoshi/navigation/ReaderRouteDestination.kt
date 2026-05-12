@@ -67,12 +67,13 @@ internal fun ReaderRouteDestination(
             readerSettings = readerSettings,
             onReaderSettingsChange = onReaderSettingsChange,
             onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
-            onSaveBookmark = { chapterIndex, progress ->
+            onSaveBookmark = { chapterIndex, progress, statistics ->
                 bookmarkScope.launch {
                     stateHolder.saveBookmark(
                         state = state,
                         chapterIndex = chapterIndex,
                         progress = progress,
+                        statistics = statistics,
                         onBookmarkSaved = onBookmarkSaved,
                     )
                 }
