@@ -32,7 +32,7 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
-- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
+- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Re-check forward chapter-boundary landings at chapter start, visual-state-gated chapter jumps, and stable progress counters during rapid boundary flips after reader pagination changes.
 - Re-run diagonal popup swipe validation once a Reader or nested Dictionary popup state is reliably reachable.
 - Future reader fixes must start from `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift` plus the matching JS/CSS, and must keep WebView-based reading and lookup.

@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -105,13 +106,18 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun exposesCharacterBasedProgressCalculationLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
+    fun characterBasedProgressCountsEveryNodeBeforeViewportLikeIos() {
+        val progress = readerProgressFromVisibleNodeLayouts(
+            listOf(
+                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
+                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 66, beforeViewport = true),
+            ),
+        )
 
-        assertTrue(script.contains("calculateProgress: function()"))
-        assertTrue(script.contains("totalChars: totalChars"))
-        assertTrue(script.contains("progressStops: progressStops"))
-        assertTrue(script.contains("return exploredChars / metrics.totalChars"))
+        assertEquals(213.0 / 347.0, progress, 0.0)
     }
 
     @Test
@@ -200,16 +206,17 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun pagedProgressUsesCachedTextOffsetsInsteadOfScanningDomEveryTurn() {
-        val script = ReaderPaginationScripts.shellScript()
-        val calculateProgress = script.substringAfter("calculateProgress: function()")
-            .substringBefore("restoreProgress: async function(progress)")
+    fun characterBasedProgressDoesNotTreatSortedLayoutStopsAsDomPrefixes() {
+        val progress = readerProgressFromVisibleNodeLayouts(
+            listOf(
+                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
+                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
+            ),
+        )
 
-        assertTrue(script.contains("progressStops"))
-        assertTrue(calculateProgress.contains("var metrics = this.paginationMetrics || this.buildPaginationMetrics()"))
-        assertTrue(calculateProgress.contains("metrics.progressStops"))
-        assertFalse(calculateProgress.contains("this.createWalker()"))
-        assertFalse(calculateProgress.contains("range.selectNodeContents(node)"))
+        assertEquals(147.0 / 281.0, progress, 0.0)
     }
 
     @Test

@@ -383,24 +383,24 @@ internal object ReaderPaginationScripts {
             return metrics;
           },
           calculateProgress: function() {
-            var metrics = this.paginationMetrics || this.buildPaginationMetrics();
-            if (metrics.totalChars <= 0) return 0;
-            var context = this.getScrollContext();
-            var currentScroll = this.getPagePosition(context);
-            var stops = metrics.progressStops;
-            var low = 0;
-            var high = stops.length - 1;
+            var vertical = this.isVertical();
+            var walker = this.createWalker();
+            var totalChars = 0;
             var exploredChars = 0;
-            while (low <= high) {
-              var mid = Math.floor((low + high) / 2);
-              if (stops[mid].scroll <= currentScroll + 1) {
-                exploredChars = stops[mid].exploredChars;
-                low = mid + 1;
-              } else {
-                high = mid - 1;
+            var node;
+            while (node = walker.nextNode()) {
+              var nodeLen = this.countChars(node.textContent);
+              totalChars += nodeLen;
+              if (nodeLen > 0) {
+                var range = document.createRange();
+                range.selectNodeContents(node);
+                var rect = this.getRect(range);
+                if ((vertical ? rect.top : rect.left) < 0) {
+                  exploredChars += nodeLen;
+                }
               }
             }
-            return exploredChars / metrics.totalChars;
+            return totalChars > 0 ? exploredChars / totalChars : 0;
           },
           restoreProgress: async function(progress) {
             await document.fonts.ready;
