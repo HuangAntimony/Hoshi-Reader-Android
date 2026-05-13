@@ -5,7 +5,8 @@ import org.junit.Test
 
 internal data class ReaderProgressNodeLayout(
     val characterCount: Int,
-    val beforeViewport: Boolean,
+    val beforeViewport: Boolean = false,
+    val charactersBeforeViewport: Int = if (beforeViewport) characterCount else 0,
 )
 
 internal fun readerProgressFromVisibleNodeLayouts(nodes: List<ReaderProgressNodeLayout>): Double {
@@ -13,7 +14,7 @@ internal fun readerProgressFromVisibleNodeLayouts(nodes: List<ReaderProgressNode
     if (total <= 0) return 0.0
     val explored = nodes
         .filter { it.characterCount > 0 && it.beforeViewport }
-        .sumOf { it.characterCount }
+        .sumOf { it.charactersBeforeViewport }
     return explored.toDouble() / total.toDouble()
 }
 
@@ -45,5 +46,22 @@ class ReaderProgressCalculationTest {
             ),
             0.0,
         )
+    }
+
+    @Test
+    fun progressCountsOnlyTheInvisiblePrefixInsideLargeTextNodes() {
+        val progress = readerProgressFromVisibleNodeLayouts(
+            listOf(
+                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
+                ReaderProgressNodeLayout(
+                    characterCount = 200,
+                    beforeViewport = true,
+                    charactersBeforeViewport = 80,
+                ),
+                ReaderProgressNodeLayout(characterCount = 60, beforeViewport = false),
+            ),
+        )
+
+        assertEquals(200.0 / 380.0, progress, 0.0)
     }
 }

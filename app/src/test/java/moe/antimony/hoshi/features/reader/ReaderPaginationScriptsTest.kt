@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -157,11 +158,25 @@ class ReaderPaginationScriptsTest {
         assertTrue(script.contains("cueWrappers: new Map()"))
         assertTrue(script.contains("collectSasayakiCueRanges: function(cues)"))
         assertTrue(script.contains("applySasayakiCues: function(cues)"))
-        assertTrue(script.contains("highlightSasayakiCue: function(cueId, reveal)"))
+        assertTrue(script.contains("wrapSasayakiCue: function(cue)"))
+        assertTrue(script.contains("highlightSasayakiCue: function(cue, reveal)"))
         assertTrue(script.contains("clearSasayakiCue: function()"))
         assertTrue(script.contains("resetSasayakiCues: function()"))
         assertTrue(script.contains("className = 'hoshi-sasayaki-cue'"))
         assertTrue(script.contains("hoshi-sasayaki-active"))
+    }
+
+    @Test
+    fun sasayakiHighlightCommandCarriesCueRangeForLazyWrapping() {
+        val command = ReaderPaginationScripts.highlightSasayakiCueInvocation(
+            cue = SasayakiCueRange(id = "cue\"1", start = 42, length = 7),
+            reveal = true,
+        )
+
+        assertEquals(
+            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true)""",
+            command,
+        )
     }
 
     @Test

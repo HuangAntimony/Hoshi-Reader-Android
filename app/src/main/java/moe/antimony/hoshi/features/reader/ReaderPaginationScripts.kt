@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
+
 internal enum class ReaderNavigationDirection(val jsValue: String) {
     Forward("forward"),
     Backward("backward"),
@@ -15,8 +17,8 @@ internal object ReaderPaginationScripts {
     fun applySasayakiCuesInvocation(cuesJson: String): String =
         "window.hoshiReader.applySasayakiCues($cuesJson)"
 
-    fun highlightSasayakiCueInvocation(cueId: String, reveal: Boolean): String =
-        "window.hoshiReader.highlightSasayakiCue(${cueId.javaScriptStringLiteral()}, $reveal)"
+    fun highlightSasayakiCueInvocation(cue: SasayakiCueRange, reveal: Boolean): String =
+        "window.hoshiReader.highlightSasayakiCue(${cue.toJavaScriptObjectLiteral()}, $reveal)"
 
     fun clearSasayakiCueInvocation(): String =
         "window.hoshiReader.clearSasayakiCue()"
@@ -98,6 +100,61 @@ internal object ReaderPaginationScripts {
             this.nodeStartOffsets = offsets;
             this.paginationMetrics = null;
           },
+          countCharsBeforeViewport: function(node, context) {
+            var text = node.textContent || '';
+            var totalChars = this.countChars(text);
+            if (totalChars <= 0) return 0;
+            var range = document.createRange();
+            range.selectNodeContents(node);
+            var rects = range.getClientRects();
+            if (!rects.length) return 0;
+            var minStart = Infinity;
+            var maxEnd = -Infinity;
+            for (var i = 0; i < rects.length; i++) {
+              var rect = rects[i];
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              var start = context.vertical ? rect.top : rect.left;
+              var end = context.vertical ? rect.bottom : rect.right;
+              minStart = Math.min(minStart, start);
+              maxEnd = Math.max(maxEnd, end);
+            }
+            if (maxEnd <= 0) return totalChars;
+            if (minStart >= 0 || minStart === Infinity) return 0;
+            var offsets = [];
+            var prefixCounts = [0];
+            var count = 0;
+            var offset = 0;
+            while (offset < text.length) {
+              offsets.push(offset);
+              var char = String.fromCodePoint(text.codePointAt(offset));
+              offset += char.length;
+              if (this.isMatchableChar(char)) count += 1;
+              prefixCounts.push(count);
+            }
+            var low = 0;
+            var high = offsets.length - 1;
+            var firstVisible = offsets.length;
+            while (low <= high) {
+              var mid = Math.floor((low + high) / 2);
+              if (this.isTextOffsetBeforeViewport(node, offsets[mid], text, context)) {
+                low = mid + 1;
+              } else {
+                firstVisible = mid;
+                high = mid - 1;
+              }
+            }
+            return prefixCounts[firstVisible];
+          },
+          isTextOffsetBeforeViewport: function(node, offset, text, context) {
+            var char = String.fromCodePoint(text.codePointAt(offset));
+            if (!char) return false;
+            var range = document.createRange();
+            range.setStart(node, offset);
+            range.setEnd(node, offset + char.length);
+            var rect = this.getRect(range);
+            if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+            return (context.vertical ? rect.bottom : rect.right) <= 0;
+          },
           collectSasayakiCueRanges: function(cues) {
             var cueRanges = new Map();
             if (!cues.length) return [];
@@ -159,6 +216,19 @@ internal object ReaderPaginationScripts {
           applySasayakiCues: function(cues) {
             this.resetSasayakiCues();
             var cueRanges = this.collectSasayakiCueRanges(cues);
+            this.wrapSasayakiCueRanges(cueRanges);
+            this.buildNodeOffsets();
+          },
+          wrapSasayakiCue: function(cue) {
+            var existing = this.cueWrappers.get(cue.id);
+            if (existing && existing.length) return existing;
+            var cueRanges = this.collectSasayakiCueRanges([cue]);
+            var wrapped = this.wrapSasayakiCueRanges(cueRanges);
+            this.buildNodeOffsets();
+            return wrapped.get(cue.id) || [];
+          },
+          wrapSasayakiCueRanges: function(cueRanges) {
+            var wrapped = new Map();
             var range = document.createRange();
             for (var i = cueRanges.length - 1; i >= 0; i--) {
               var id = cueRanges[i].id;
@@ -177,12 +247,17 @@ internal object ReaderPaginationScripts {
               }
               wrappers.reverse();
               this.cueWrappers.set(id, wrappers);
+              wrapped.set(id, wrappers);
             }
-            this.buildNodeOffsets();
+            return wrapped;
           },
-          highlightSasayakiCue: function(cueId, reveal) {
+          highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
+            var cueId = typeof cue === 'string' ? cue : cue.id;
             var wrappers = this.cueWrappers.get(cueId);
+            if ((!wrappers || !wrappers.length) && typeof cue !== 'string') {
+              wrappers = this.wrapSasayakiCue(cue);
+            }
             if (!wrappers || !wrappers.length) return null;
             this.activeCueId = cueId;
             wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
@@ -383,7 +458,7 @@ internal object ReaderPaginationScripts {
             return metrics;
           },
           calculateProgress: function() {
-            var vertical = this.isVertical();
+            var context = this.getScrollContext();
             var walker = this.createWalker();
             var totalChars = 0;
             var exploredChars = 0;
@@ -391,14 +466,7 @@ internal object ReaderPaginationScripts {
             while (node = walker.nextNode()) {
               var nodeLen = this.countChars(node.textContent);
               totalChars += nodeLen;
-              if (nodeLen > 0) {
-                var range = document.createRange();
-                range.selectNodeContents(node);
-                var rect = this.getRect(range);
-                if ((vertical ? rect.top : rect.left) < 0) {
-                  exploredChars += nodeLen;
-                }
-              }
+              if (nodeLen > 0) exploredChars += this.countCharsBeforeViewport(node, context);
             }
             return totalChars > 0 ? exploredChars / totalChars : 0;
           },
@@ -643,6 +711,66 @@ internal object ReaderPaginationScripts {
             }
             this.nodeStartOffsets = offsets;
           },
+          countCharsBeforeViewport: function(node, vertical) {
+            var text = node.textContent || '';
+            var totalChars = this.countChars(text);
+            if (totalChars <= 0) return 0;
+            var range = document.createRange();
+            range.selectNodeContents(node);
+            var rects = range.getClientRects();
+            if (!rects.length) return 0;
+            var minStart = Infinity;
+            var maxEnd = -Infinity;
+            for (var i = 0; i < rects.length; i++) {
+              var rect = rects[i];
+              if (rect.width <= 0 || rect.height <= 0) continue;
+              var start = vertical ? rect.left : rect.top;
+              var end = vertical ? rect.right : rect.bottom;
+              minStart = Math.min(minStart, start);
+              maxEnd = Math.max(maxEnd, end);
+            }
+            if (vertical) {
+              if (minStart >= window.innerWidth) return totalChars;
+              if (maxEnd <= window.innerWidth || minStart === Infinity) return 0;
+            } else {
+              if (maxEnd <= 0) return totalChars;
+              if (minStart >= 0 || minStart === Infinity) return 0;
+            }
+            var offsets = [];
+            var prefixCounts = [0];
+            var count = 0;
+            var offset = 0;
+            while (offset < text.length) {
+              offsets.push(offset);
+              var char = String.fromCodePoint(text.codePointAt(offset));
+              offset += char.length;
+              if (this.isMatchableChar(char)) count += 1;
+              prefixCounts.push(count);
+            }
+            var low = 0;
+            var high = offsets.length - 1;
+            var firstVisible = offsets.length;
+            while (low <= high) {
+              var mid = Math.floor((low + high) / 2);
+              if (this.isTextOffsetBeforeViewport(node, offsets[mid], text, vertical)) {
+                low = mid + 1;
+              } else {
+                firstVisible = mid;
+                high = mid - 1;
+              }
+            }
+            return prefixCounts[firstVisible];
+          },
+          isTextOffsetBeforeViewport: function(node, offset, text, vertical) {
+            var char = String.fromCodePoint(text.codePointAt(offset));
+            if (!char) return false;
+            var range = document.createRange();
+            range.setStart(node, offset);
+            range.setEnd(node, offset + char.length);
+            var rect = this.getRect(range);
+            if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+            return vertical ? rect.left >= window.innerWidth : rect.bottom <= 0;
+          },
           scrollToTarget: function(target) {
             var rect = this.getRect(target);
             if (this.isVertical()) {
@@ -714,6 +842,19 @@ internal object ReaderPaginationScripts {
           applySasayakiCues: function(cues) {
             this.resetSasayakiCues();
             var cueRanges = this.collectSasayakiCueRanges(cues);
+            this.wrapSasayakiCueRanges(cueRanges);
+            this.buildNodeOffsets();
+          },
+          wrapSasayakiCue: function(cue) {
+            var existing = this.cueWrappers.get(cue.id);
+            if (existing && existing.length) return existing;
+            var cueRanges = this.collectSasayakiCueRanges([cue]);
+            var wrapped = this.wrapSasayakiCueRanges(cueRanges);
+            this.buildNodeOffsets();
+            return wrapped.get(cue.id) || [];
+          },
+          wrapSasayakiCueRanges: function(cueRanges) {
+            var wrapped = new Map();
             var range = document.createRange();
             for (var i = cueRanges.length - 1; i >= 0; i--) {
               var id = cueRanges[i].id;
@@ -732,12 +873,17 @@ internal object ReaderPaginationScripts {
               }
               wrappers.reverse();
               this.cueWrappers.set(id, wrappers);
+              wrapped.set(id, wrappers);
             }
-            this.buildNodeOffsets();
+            return wrapped;
           },
-          highlightSasayakiCue: function(cueId, reveal) {
+          highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
+            var cueId = typeof cue === 'string' ? cue : cue.id;
             var wrappers = this.cueWrappers.get(cueId);
+            if ((!wrappers || !wrappers.length) && typeof cue !== 'string') {
+              wrappers = this.wrapSasayakiCue(cue);
+            }
             if (!wrappers || !wrappers.length) return null;
             this.activeCueId = cueId;
             wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
@@ -778,14 +924,7 @@ internal object ReaderPaginationScripts {
             while (node = walker.nextNode()) {
               var nodeLen = this.countChars(node.textContent);
               totalChars += nodeLen;
-              if (nodeLen > 0) {
-                var range = document.createRange();
-                range.selectNodeContents(node);
-                var rect = this.getRect(range);
-                if (vertical ? (rect.left > window.innerWidth) : (rect.bottom < 0)) {
-                  exploredChars += nodeLen;
-                }
-              }
+              if (nodeLen > 0) exploredChars += this.countCharsBeforeViewport(node, vertical);
             }
             return totalChars > 0 ? exploredChars / totalChars : 0;
           },
@@ -926,3 +1065,6 @@ private fun String.javaScriptStringLiteral(): String =
         }
         append('"')
     }
+
+private fun SasayakiCueRange.toJavaScriptObjectLiteral(): String =
+    "{id:${id.javaScriptStringLiteral()},start:$start,length:$length}"

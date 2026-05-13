@@ -93,9 +93,6 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.util.WeakHashMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.ReadingStatistics
@@ -498,7 +495,7 @@ fun ReaderWebView(
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
                     webView?.evaluateJavascript(
-                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal),
+                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
                     ) { progressResult ->
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
                             startStatisticsForProgressChangeIfNeeded()
@@ -742,7 +739,6 @@ fun ReaderWebView(
                     },
                     scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
                     readerSettings = effectiveSettings,
-                    sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
                     sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                     sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                     onTextSelected = handleTextSelected,
@@ -1314,7 +1310,6 @@ private fun ChapterWebView(
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     scanNonJapaneseText: Boolean,
     readerSettings: ReaderSettings,
-    sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData) -> Int?,
@@ -1373,19 +1368,10 @@ private fun ChapterWebView(
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
-            sasayakiCuesJson = null,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
         )
     }
-    LaunchedEffect(webViewViewportSize, isWebViewRestoring, sasayakiCuesJson) {
-        if (isWebViewRestoring || webViewViewportSize == IntSize.Zero) return@LaunchedEffect
-        readerWebView?.evaluateJavascript(
-            ReaderPaginationScripts.applySasayakiCuesInvocation(sasayakiCuesJson ?: "[]"),
-            null,
-        )
-    }
-
     AndroidView(
         modifier = modifier
             .onSizeChanged(onReaderViewportSizeChanged)
@@ -1589,7 +1575,6 @@ private fun readerSetupScript(
     fontFaceUrl: String?,
     systemDark: Boolean,
     scanNonJapaneseText: Boolean,
-    sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
 ): String {
@@ -1605,7 +1590,6 @@ private fun readerSetupScript(
         initialProgress = initialProgress,
         initialFragment = initialFragment,
         settings = settings,
-        sasayakiCuesJson = sasayakiCuesJson,
     ).scriptTagBody()
     return """
         (function() {
@@ -1809,12 +1793,8 @@ private fun resolveBookCoverFile(bookRoot: File?, coverHref: String?): File? {
     return file.takeIf { it.isFile }
 }
 
-private fun SasayakiMatchData.cuesJsonForChapter(chapterIndex: Int): String {
-    val cues = matches
-        .filter { it.chapterIndex == chapterIndex }
-        .map { SasayakiCueRange(id = it.id, start = it.start, length = it.length) }
-    return Json.encodeToString(ListSerializer(SasayakiCueRange.serializer()), cues)
-}
+private fun SasayakiMatch.toCueRange(): SasayakiCueRange =
+    SasayakiCueRange(id = id, start = start, length = length)
 
 private fun SasayakiPlaybackData?.hasStoredAudioSource(): Boolean =
     this?.audioUri?.isNotBlank() == true || this?.audioFileName?.isNotBlank() == true
