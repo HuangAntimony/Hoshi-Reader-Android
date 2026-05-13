@@ -22,6 +22,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Prevent books from shifting text after opening at positions with Sasayaki matches, without slowing reader restore.
 - Align Advanced settings sync and backup entries with iOS by showing `ッツ Sync` with a cloud icon and moving Backup into its own section with a storage icon.
 - Prevent Behavior, Statistics, Sasayaki, Audio, and other settings pages from briefly rendering default switch values before saved settings load.
+- Show manual bookshelf sync success and failure messages in dialogs instead of inline text on the bookshelf.
 
 ## [v0.5.0] - 2026-05-13
 

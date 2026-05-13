@@ -311,6 +311,14 @@ internal class BookshelfViewModel(
         _uiState.update { it.copy(openReaderBookId = null) }
     }
 
+    fun consumeStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
+    }
+
+    fun consumeErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
     private fun reloadBookEntries(sortOption: BookSortOption) {
         workScope.launch {
             reloadBookEntriesSync(sortOption)

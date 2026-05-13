@@ -227,8 +227,6 @@ fun BookshelfView(
         hasLoadedBooks = uiState.hasLoadedBooks,
         isLoading = uiState.isLoading,
         blockingProgressMessage = uiState.blockingProgressMessage,
-        statusMessage = uiState.statusMessage,
-        errorMessage = uiState.errorMessage,
         shelves = uiState.shelves,
         isSelecting = uiState.isSelecting,
         selectedBookIds = uiState.selectedBookIds,
@@ -268,6 +266,31 @@ fun BookshelfView(
             )
         },
     )
+
+    uiState.statusMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = booksViewModel::consumeStatusMessage,
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = booksViewModel::consumeStatusMessage) {
+                    Text("OK")
+                }
+            },
+        )
+    }
+
+    uiState.errorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = booksViewModel::consumeErrorMessage,
+            title = { Text("Error") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = booksViewModel::consumeErrorMessage) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     deleteCandidate?.let { candidate ->
         AlertDialog(
@@ -520,8 +543,6 @@ private fun BooksTab(
     hasLoadedBooks: Boolean,
     isLoading: Boolean,
     blockingProgressMessage: String?,
-    statusMessage: String?,
-    errorMessage: String?,
     shelves: List<BookShelf>,
     isSelecting: Boolean,
     selectedBookIds: Set<String>,
@@ -597,7 +618,6 @@ private fun BooksTab(
                 }
                 !hasLoadedBooks -> Box(Modifier.fillMaxSize())
                 hasLoadedBooks && bookEntries.isEmpty() -> EmptyBooksView(
-                    errorMessage = errorMessage,
                     enabled = !fileTaskBlocked,
                     onImport = onImport,
                     modifier = Modifier
@@ -708,24 +728,6 @@ private fun BooksTab(
                                         }
                                     }
                                 }
-                            }
-                        }
-                        statusMessage?.let { message ->
-                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = message,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
-                            }
-                        }
-                        errorMessage?.let { message ->
-                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = message,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
                             }
                         }
                     }
@@ -1532,7 +1534,6 @@ private fun SettingsRow(row: SettingsRowModel, onClick: () -> Unit) {
 
 @Composable
 private fun EmptyBooksView(
-    errorMessage: String?,
     onImport: () -> Unit,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
@@ -1557,10 +1558,6 @@ private fun EmptyBooksView(
             Button(onClick = onImport, enabled = enabled) {
                 Text("Import EPUB")
             }
-        }
-        if (errorMessage != null) {
-            Spacer(Modifier.height(18.dp))
-            Text(errorMessage, color = MaterialTheme.colorScheme.error)
         }
     }
 }

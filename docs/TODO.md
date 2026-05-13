@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 This file is the short operational handoff for future agents.
 
@@ -60,7 +60,7 @@ This file is the short operational handoff for future agents.
 
 - Preserve the shared lifecycle-aware loaded-settings collection pattern when adding settings pages so controls do not flash default values before saved preferences load.
 - Keep reader auto-export save/upload work on a scope that survives reader route disposal so close and background flushes can finish after navigation.
-- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export, reader-open import-only, iOS-aligned paginated/continuous auto-export timing, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
+- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export result dialogs, reader-open import-only, iOS-aligned paginated/continuous auto-export timing, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
 - Future no-GMS sync auth should add Device Code or Browser PKCE behind `DriveAuthorizer` / `DriveAccessTokenProvider` without changing `SyncManager` or Drive sidecar rules.
 
 ### Release Distribution

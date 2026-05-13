@@ -346,6 +346,47 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun syncBookPublishesDismissibleSuccessFeedback() {
+        val entry = bookEntry("book-a")
+        val viewModel = BookshelfViewModel(
+            FakeBookshelfRepository(entries = listOf(entry)),
+            testScope(),
+        )
+
+        viewModel.syncBook(
+            entry = entry,
+            direction = SyncDirection.ExportToTtu,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+        )
+
+        assertEquals("book-a is already synced", viewModel.uiState.value.statusMessage)
+
+        viewModel.consumeStatusMessage()
+
+        assertNull(viewModel.uiState.value.statusMessage)
+    }
+
+    @Test
+    fun errorFeedbackCanBeDismissedAfterFailure() {
+        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
+
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
+            error("bad epub")
+        }
+
+        assertEquals("bad epub", viewModel.uiState.value.errorMessage)
+
+        viewModel.consumeErrorMessage()
+
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun shelfExpansionStateStaysInMemoryAcrossReloads() {
         val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
 
