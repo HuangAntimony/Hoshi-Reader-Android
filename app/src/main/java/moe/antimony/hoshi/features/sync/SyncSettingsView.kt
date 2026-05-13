@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.sync
 
+import android.content.ClipData
 import android.content.Context
+import android.content.ClipboardManager
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.IntentSenderRequest
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
@@ -67,6 +70,7 @@ fun SyncSettingsView(
     var authStatus by remember { mutableStateOf<DriveAuthStatus>(DriveAuthStatus.NotConnected) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var copyMessage by remember { mutableStateOf<String?>(null) }
     var isAuthorizing by remember { mutableStateOf(false) }
     var pendingAuthorizationResolution by remember { mutableStateOf<IntentSenderRequest?>(null) }
     val packageName = remember(context) { context.packageName }
@@ -121,6 +125,7 @@ fun SyncSettingsView(
         if (isAuthorizing) return
         isAuthorizing = true
         message = null
+        copyMessage = null
         scope.launch {
             when (val result = authorizer.authorize()) {
                 is DriveAuthorizationResult.Authorized -> {
@@ -244,12 +249,34 @@ fun SyncSettingsView(
                             Text("Package")
                         },
                         supportingContent = { Text(packageName) },
+                        trailingContent = {
+                            CopyValueButton(
+                                label = "package name",
+                                value = packageName,
+                                onCopied = { copyMessage = "Package name copied" },
+                            )
+                        },
                     )
                     SettingsDivider()
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("SHA-1") },
                         supportingContent = { Text(sha1) },
+                        trailingContent = {
+                            CopyValueButton(
+                                label = "SHA-1",
+                                value = sha1,
+                                onCopied = { copyMessage = "SHA-1 copied" },
+                            )
+                        },
+                    )
+                }
+                copyMessage?.let { text ->
+                    Text(
+                        text = text,
+                        color = colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                     )
                 }
                 message?.let { text ->
@@ -259,6 +286,28 @@ fun SyncSettingsView(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                     )
+                }
+            }
+            item {
+                SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = "Google Cloud OAuth setup",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.onSurface,
+                        )
+                        GoogleCloudOAuthConfiguration.instructions.forEachIndexed { index, instruction ->
+                            Text(
+                                text = "${index + 1}. $instruction",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
             item {
@@ -283,6 +332,19 @@ fun SyncSettingsView(
     }
 }
 
+@Composable
+private fun CopyValueButton(label: String, value: String, onCopied: () -> Unit) {
+    val context = LocalContext.current
+    IconButton(
+        onClick = {
+            context.copyTextToClipboard(label, value)
+            onCopied()
+        },
+    ) {
+        Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy $label")
+    }
+}
+
 private fun DriveAuthStatus.label(): String =
     when (this) {
         DriveAuthStatus.Connected -> "Connected"
@@ -302,6 +364,11 @@ private fun SettingsCard(content: @Composable () -> Unit) {
     ) {
         Column(content = { content() })
     }
+}
+
+private fun Context.copyTextToClipboard(label: String, value: String) {
+    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 @Composable
