@@ -29,12 +29,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
-internal const val ReaderMediumSheetHeightFraction = 0.5f
-internal const val ReaderExpandedSheetHeightFraction = 0.75f
+internal const val ReaderSheetHeightFraction = 0.7f
 private val ReaderBottomPanelSettleThreshold = 96.dp
 
 @Immutable
@@ -136,12 +134,11 @@ internal fun ReaderBottomPanel(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val maxHeightPx = with(density) { maxHeight.toPx() }
-        val expandedHeightPx = readerPanelExpandedHeight(maxHeightPx)
-        val partialHeightPx = maxHeightPx * ReaderMediumSheetHeightFraction
+        val targetHeightPx = readerPanelHeight(maxHeightPx)
         val settleThresholdPx = with(density) { ReaderBottomPanelSettleThreshold.toPx() }
-        val panelHeightPx = remember(maxHeightPx) { Animatable(partialHeightPx) }
+        val panelHeightPx = remember(maxHeightPx) { Animatable(targetHeightPx) }
         LaunchedEffect(maxHeightPx) {
-            panelHeightPx.snapTo(partialHeightPx)
+            panelHeightPx.snapTo(targetHeightPx)
         }
         val panelHeight = with(density) { panelHeightPx.value.toDp() }
         Box(
@@ -165,22 +162,16 @@ internal fun ReaderBottomPanel(
                     sheetStyle = sheetStyle,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(maxHeightPx, partialHeightPx, onDismiss) {
-                            var startHeight = 0f
+                        .pointerInput(maxHeightPx, targetHeightPx, onDismiss) {
                             var totalDrag = 0f
                             detectVerticalDragGestures(
                                 onDragStart = {
-                                    startHeight = panelHeightPx.value
                                     totalDrag = 0f
                                 },
                                 onDragCancel = {
                                     scope.launch {
                                         panelHeightPx.animateTo(
-                                            targetValue = nearestReaderPanelHeight(
-                                                currentHeight = panelHeightPx.value,
-                                                partialHeight = partialHeightPx,
-                                                maxHeight = expandedHeightPx,
-                                            ),
+                                            targetValue = targetHeightPx,
                                             animationSpec = tween(durationMillis = 180),
                                         )
                                     }
@@ -188,10 +179,8 @@ internal fun ReaderBottomPanel(
                                 onDragEnd = {
                                     val target = readerPanelSettleTarget(
                                         currentHeight = panelHeightPx.value,
-                                        startHeight = startHeight,
                                         totalDrag = totalDrag,
-                                        partialHeight = partialHeightPx,
-                                        maxHeight = expandedHeightPx,
+                                        targetHeight = targetHeightPx,
                                         threshold = settleThresholdPx,
                                     )
                                     if (target == null) {
@@ -211,7 +200,7 @@ internal fun ReaderBottomPanel(
                                     scope.launch {
                                         panelHeightPx.snapTo(
                                             (panelHeightPx.value - dragAmount)
-                                                .coerceIn(0f, expandedHeightPx),
+                                                .coerceIn(0f, targetHeightPx),
                                         )
                                     }
                                 },
@@ -226,31 +215,16 @@ internal fun ReaderBottomPanel(
 
 internal fun readerPanelSettleTarget(
     currentHeight: Float,
-    @Suppress("UNUSED_PARAMETER") startHeight: Float,
     totalDrag: Float,
-    partialHeight: Float,
-    maxHeight: Float,
+    targetHeight: Float,
     threshold: Float,
 ): Float? {
-    if (currentHeight < partialHeight - threshold && totalDrag > threshold) return null
-    if (totalDrag <= -threshold) return maxHeight
-    if (totalDrag >= threshold) return partialHeight
-    return nearestReaderPanelHeight(currentHeight, partialHeight, maxHeight)
+    if (currentHeight < targetHeight - threshold && totalDrag > threshold) return null
+    return targetHeight
 }
 
-internal fun readerPanelExpandedHeight(containerHeight: Float): Float =
-    containerHeight * ReaderExpandedSheetHeightFraction
-
-private fun nearestReaderPanelHeight(
-    currentHeight: Float,
-    partialHeight: Float,
-    maxHeight: Float,
-): Float =
-    if (abs(currentHeight - maxHeight) < abs(currentHeight - partialHeight)) {
-        maxHeight
-    } else {
-        partialHeight
-    }
+internal fun readerPanelHeight(containerHeight: Float): Float =
+    containerHeight * ReaderSheetHeightFraction
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)

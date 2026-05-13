@@ -23,58 +23,41 @@ class ReaderStatisticsSheetTest {
     }
 
     @Test
-    fun readerPanelExpandedHeightLeavesTopQuarterAsDismissArea() {
+    fun readerPanelHeightLeavesTopThirtyPercentAsDismissArea() {
         assertEquals(
-            750f,
-            readerPanelExpandedHeight(containerHeight = 1000f),
+            700f,
+            readerPanelHeight(containerHeight = 1000f),
         )
     }
 
     @Test
-    fun readerPanelHandleDragSettlesToFullPartialOrDismiss() {
-        val partial = 500f
-        val full = 750f
+    fun readerPanelHandleDragUsesSingleHeightOrDismisses() {
+        val targetHeight = 700f
         val threshold = 96f
 
         assertEquals(
-            full,
+            targetHeight,
             readerPanelSettleTarget(
                 currentHeight = 720f,
-                startHeight = partial,
                 totalDrag = -120f,
-                partialHeight = partial,
-                maxHeight = full,
+                targetHeight = targetHeight,
                 threshold = threshold,
             ),
         )
         assertEquals(
-            partial,
+            targetHeight,
             readerPanelSettleTarget(
-                currentHeight = 830f,
-                startHeight = full,
-                totalDrag = 140f,
-                partialHeight = partial,
-                maxHeight = full,
+                currentHeight = 640f,
+                totalDrag = 64f,
+                targetHeight = targetHeight,
                 threshold = threshold,
             ),
         )
         assertNull(
             readerPanelSettleTarget(
-                currentHeight = 360f,
-                startHeight = partial,
+                currentHeight = 560f,
                 totalDrag = 160f,
-                partialHeight = partial,
-                maxHeight = full,
-                threshold = threshold,
-            ),
-        )
-        assertNull(
-            readerPanelSettleTarget(
-                currentHeight = 320f,
-                startHeight = full,
-                totalDrag = 500f,
-                partialHeight = partial,
-                maxHeight = full,
+                targetHeight = targetHeight,
                 threshold = threshold,
             ),
         )
