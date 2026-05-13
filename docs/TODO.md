@@ -57,8 +57,7 @@ This file is the short operational handoff for future agents.
 
 ### Sync
 
-- Blocked: end-to-end Google Drive transfer validation still needs an Android OAuth client configured for the installed package/SHA-1 and a signed-in test account; this session validated the settings surface and bookshelf sync menu on emulator only.
-- Device-validate the first Android Google Drive sync slice with `testdata/test.epub`: connect Google Drive, long-press manual import/export, reader-open import-only, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
+- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export, reader-open import-only, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
 - Future no-GMS sync auth should add Device Code or Browser PKCE behind `DriveAuthorizer` / `DriveAccessTokenProvider` without changing `SyncManager` or Drive sidecar rules.
 
 ### Release Distribution

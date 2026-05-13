@@ -13,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -75,6 +76,7 @@ fun SyncSettingsView(
     var pendingAuthorizationResolution by remember { mutableStateOf<IntentSenderRequest?>(null) }
     val packageName = remember(context) { context.packageName }
     val sha1 = remember(context) { context.signingCertificateSha1() }
+    val connectionActions = syncConnectionActions(authStatus, isAuthorizing)
 
     fun save(next: SyncSettings) {
         settings = next
@@ -153,7 +155,9 @@ fun SyncSettingsView(
         scope.launch {
             authorizer.revokeAccess()
             appContainer.googleDriveClient.clearCache()
-            authStatus = authorizer.status()
+            authStatus = DriveAuthStatus.NotConnected
+            message = null
+            copyMessage = null
         }
     }
 
@@ -183,6 +187,7 @@ fun SyncSettingsView(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
                 SettingsCard {
@@ -312,19 +317,23 @@ fun SyncSettingsView(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = ::connectGoogleDrive,
-                        enabled = !isAuthorizing,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Connect Google Drive")
+                    if (connectionActions.showConnect) {
+                        Button(
+                            onClick = ::connectGoogleDrive,
+                            enabled = connectionActions.connectEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Connect Google Drive")
+                        }
                     }
-                    OutlinedButton(
-                        onClick = ::signOut,
-                        enabled = authStatus == DriveAuthStatus.Connected,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Sign out")
+                    if (connectionActions.showSignOut) {
+                        OutlinedButton(
+                            onClick = ::signOut,
+                            enabled = connectionActions.signOutEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Sign out")
+                        }
                     }
                 }
             }

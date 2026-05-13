@@ -66,9 +66,11 @@ class GmsDriveAuthorizer(
 
     override suspend fun revokeAccess() {
         if (!isGooglePlayServicesAvailable()) return
+        val account = lastAuthorizedAccount ?: return
         val builder = RevokeAccessRequest.builder().setScopes(scopes)
-        lastAuthorizedAccount?.let(builder::setAccount)
+        builder.setAccount(account)
         runCatching { authorizationClient.revokeAccess(builder.build()).await() }
+        lastAuthorizedAccount = null
     }
 
     override suspend fun status(): DriveAuthStatus =

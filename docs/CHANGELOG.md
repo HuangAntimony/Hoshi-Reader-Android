@@ -13,6 +13,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Fixed
 
 - Avoid falsely reporting Google Drive authorization as cancelled when the Android account chooser returns an authorization result with a cancelled activity code.
+- Hide the Google Drive connect button after syncing is connected and make Sign out immediately return the Syncing page to Not connected.
 
 ## [v0.5.0] - 2026-05-13
 
