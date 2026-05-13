@@ -3,6 +3,9 @@ package moe.antimony.hoshi
 import android.content.ContentResolver
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
@@ -49,6 +52,7 @@ import moe.antimony.hoshi.navigation.ReaderRouteStateHolder
 
 internal class HoshiAppContainer(context: Context) {
     private val appContext = context.applicationContext
+    val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val bookRepository: BookRepository = BookRepository(appContext.filesDir)
     val dictionaryRepository: DictionaryRepository = DictionaryRepository(appContext.filesDir)
