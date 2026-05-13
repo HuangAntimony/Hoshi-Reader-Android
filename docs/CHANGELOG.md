@@ -16,6 +16,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Make reader sheets denser and smooth Appearance sheet scrolling by reducing row heights across Chapters, Appearance, Statistics, and Sasayaki, tightening Appearance rows, and preventing Appearance segmented controls from truncating labels or losing selected-state contrast in E-ink mode.
 - Keep the reader Chapters sheet cover header while removing the extra large Chapters title and close button, and reduce boundary scroll jank in the chapter list.
 
+### Fixed
+
+- Pause active reader statistics tracking while the reader is backgrounded, persist the flushed values, and resume the active session on return so background time is not counted.
+
 ## [v0.4.4] - 2026-05-13
 
 ### Added

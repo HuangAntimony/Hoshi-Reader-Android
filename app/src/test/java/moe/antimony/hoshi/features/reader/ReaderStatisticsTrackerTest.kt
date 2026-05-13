@@ -102,6 +102,24 @@ class ReaderStatisticsTrackerTest {
     }
 
     @Test
+    fun lifecyclePauseFlushesWithoutCountingBackgroundTimeAndResumeUsesCurrentBaseline() {
+        val clock = FakeStatisticsClock()
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+
+        tracker.start(currentCharacter = 100)
+        clock.advance(seconds = 5)
+        assertTrue(tracker.pause(currentCharacter = 110))
+        clock.advance(seconds = 60)
+        tracker.start(currentCharacter = 110)
+        clock.advance(seconds = 5)
+        tracker.update(currentCharacter = 120)
+
+        assertTrue(tracker.state.isTracking)
+        assertEquals(20, tracker.state.session.charactersRead)
+        assertEquals(10.0, tracker.state.session.readingTime, 0.0)
+    }
+
+    @Test
     fun disabledTrackerDoesNotTrackOrPersist() {
         val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = false)
 

@@ -228,6 +228,7 @@ fun ReaderWebView(
         }
     }
     var statisticsState by remember(statisticsTracker) { mutableStateOf(statisticsTracker?.state) }
+    var resumeStatisticsTrackingOnStart by remember(statisticsTracker) { mutableStateOf(false) }
     fun currentDisplayedCharacter(): Int =
         book.characterCountAt(
             stateHolder.readerPosition.displayedPosition.index,
@@ -278,6 +279,20 @@ fun ReaderWebView(
             tracker.start(currentDisplayedCharacter())
             syncStatisticsState()
         }
+    }
+    fun pauseStatisticsForLifecycleStop(): Boolean {
+        val tracker = statisticsTracker ?: return false
+        val paused = tracker.pause(currentDisplayedCharacter())
+        if (paused) {
+            syncStatisticsState()
+        }
+        return paused
+    }
+    fun resumeStatisticsForLifecycleStartIfNeeded() {
+        if (!resumeStatisticsTrackingOnStart) return
+        resumeStatisticsTrackingOnStart = false
+        statisticsTracker?.start(currentDisplayedCharacter())
+        syncStatisticsState()
     }
     LaunchedEffect(statisticsTracker, effectiveSettings.statisticsAutostartMode) {
         if (effectiveSettings.enableStatistics && effectiveSettings.statisticsAutostartMode == StatisticsAutostartMode.On) {
@@ -544,18 +559,30 @@ fun ReaderWebView(
         }
     }
 
-    DisposableEffect(view) {
-        val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
+    val currentLifecycleStart = rememberUpdatedState {
+        resumeStatisticsForLifecycleStartIfNeeded()
+    }
+    val currentLifecycleStop = rememberUpdatedState {
+        webView?.flushPendingPageTurnProgress()
+        resumeStatisticsTrackingOnStart = pauseStatisticsForLifecycleStop()
+        saveCurrentDisplayedPosition()
+    }
+    val currentLifecycleDispose = rememberUpdatedState {
+        webView?.flushPendingPageTurnProgress()
+        saveCurrentDisplayedPosition()
+    }
+    val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
+    DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                webView?.flushPendingPageTurnProgress()
-                saveCurrentDisplayedPosition()
+            when (event) {
+                Lifecycle.Event.ON_START -> currentLifecycleStart.value()
+                Lifecycle.Event.ON_STOP -> currentLifecycleStop.value()
+                else -> Unit
             }
         }
         lifecycle?.addObserver(observer)
         onDispose {
-            webView?.flushPendingPageTurnProgress()
-            saveCurrentDisplayedPosition()
+            currentLifecycleDispose.value()
             lifecycle?.removeObserver(observer)
         }
     }

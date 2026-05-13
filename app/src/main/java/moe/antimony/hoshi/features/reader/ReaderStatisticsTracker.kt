@@ -56,9 +56,14 @@ class ReaderStatisticsTracker(
     }
 
     fun stop(currentCharacter: Int) {
-        if (!state.isTracking) return
+        pause(currentCharacter)
+    }
+
+    fun pause(currentCharacter: Int): Boolean {
+        if (!state.isTracking) return false
         update(currentCharacter)
         state = state.copy(isTracking = false)
+        return true
     }
 
     fun update(currentCharacter: Int) {
