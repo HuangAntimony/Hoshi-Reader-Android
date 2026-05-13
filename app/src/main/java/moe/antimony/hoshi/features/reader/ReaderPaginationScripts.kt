@@ -73,6 +73,22 @@ internal object ReaderPaginationScripts {
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
           },
+          textOffsetForCharCount: function(node, targetCount) {
+            var text = node.textContent || '';
+            var count = 0;
+            var offset = 0;
+            var fallbackOffset = 0;
+            while (offset < text.length) {
+              var char = String.fromCodePoint(text.codePointAt(offset));
+              if (this.isMatchableChar(char)) {
+                if (count >= targetCount) return offset;
+                fallbackOffset = offset;
+                count += 1;
+              }
+              offset += char.length;
+            }
+            return fallbackOffset;
+          },
           notifyRestoreComplete: function() {
             if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
               window.HoshiReaderRestore.postMessage('restoreCompleted');
@@ -500,18 +516,23 @@ internal object ReaderPaginationScripts {
             var targetCharCount = Math.ceil(totalChars * progress);
             var runningSum = 0;
             var targetNode = null;
+            var targetOffset = 0;
             walker = this.createWalker();
             while (node = walker.nextNode()) {
-              runningSum += this.countChars(node.textContent);
-              if (runningSum > targetCharCount) {
+              var nodeLen = this.countChars(node.textContent);
+              if ((runningSum + nodeLen) > targetCharCount) {
                 targetNode = node;
+                targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum));
                 break;
               }
+              runningSum += nodeLen;
             }
             if (targetNode) {
               var range = document.createRange();
-              range.setStart(targetNode, 0);
-              range.setEnd(targetNode, 1);
+              var targetText = targetNode.textContent || '';
+              var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
+              range.setStart(targetNode, targetOffset);
+              range.setEnd(targetNode, Math.min(targetText.length, targetOffset + Math.max(1, targetChar.length)));
               var rect = this.getRect(range);
               var currentScroll = this.getPagePosition(context);
               var anchor = (context.vertical ? rect.top : rect.left) + currentScroll;
@@ -674,6 +695,22 @@ internal object ReaderPaginationScripts {
           },
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
+          },
+          textOffsetForCharCount: function(node, targetCount) {
+            var text = node.textContent || '';
+            var count = 0;
+            var offset = 0;
+            var fallbackOffset = 0;
+            while (offset < text.length) {
+              var char = String.fromCodePoint(text.codePointAt(offset));
+              if (this.isMatchableChar(char)) {
+                if (count >= targetCount) return offset;
+                fallbackOffset = offset;
+                count += 1;
+              }
+              offset += char.length;
+            }
+            return fallbackOffset;
           },
           notifyRestoreComplete: function() {
             if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
@@ -951,18 +988,36 @@ internal object ReaderPaginationScripts {
             var targetCharCount = Math.ceil(totalChars * progress);
             var runningSum = 0;
             var targetNode = null;
+            var targetOffset = 0;
             walker = this.createWalker();
             while (node = walker.nextNode()) {
-              runningSum += this.countChars(node.textContent);
-              targetNode = node;
-              if (runningSum > targetCharCount) break;
+              var nodeLen = this.countChars(node.textContent);
+              if ((runningSum + nodeLen) > targetCharCount) {
+                targetNode = node;
+                targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum));
+                break;
+              }
+              runningSum += nodeLen;
             }
-            if (targetNode && targetNode.parentElement) {
-              targetNode.parentElement.scrollIntoView({
+            if (targetNode) {
+              var range = document.createRange();
+              var targetText = targetNode.textContent || '';
+              var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
+              range.setStart(targetNode, targetOffset);
+              range.setEnd(targetNode, Math.min(targetText.length, targetOffset + Math.max(1, targetChar.length)));
+              var marker = document.createElement('span');
+              marker.style.display = 'inline-block';
+              marker.style.width = '1px';
+              marker.style.height = '1px';
+              range.insertNode(marker);
+              marker.scrollIntoView({
                 block: progress >= 0.999999 ? 'end' : 'start',
                 inline: 'nearest',
                 behavior: 'instant'
               });
+              var parent = marker.parentNode;
+              marker.remove();
+              if (parent) parent.normalize();
             }
             requestAnimationFrame(() => {
               requestAnimationFrame(() => this.notifyRestoreComplete());

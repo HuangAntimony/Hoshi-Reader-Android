@@ -18,7 +18,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Prevent the Syncing settings page from briefly showing stale default switch, connection status, and connect button states while loading saved settings.
 - Align reader auto-sync import/export triggers with iOS so reader-open import waits for saved settings, foreground import uses the inactive threshold, page turns export from immediate bookmark saves, and continuous scrolling exports only after the scroll settles.
 - Keep reader auto-sync exports alive after closing the reader, waiting for the latest bookmark save before uploading progress to Google Drive.
-- Prevent paginated reader progress from moving backward on page turns when vertical text layout reorders text nodes across columns, while still updating progress inside large text nodes.
+- Prevent paginated reader progress from moving backward on page turns when vertical text layout reorders text nodes across columns, while still updating and restoring progress inside large text nodes.
 - Prevent books from shifting text after opening at positions with Sasayaki matches, without slowing reader restore.
 - Align Advanced settings sync and backup entries with iOS by showing `ッツ Sync` with a cloud icon and moving Backup into its own section with a storage icon.
 - Prevent Behavior, Statistics, Sasayaki, Audio, and other settings pages from briefly rendering default switch values before saved settings load.

@@ -128,8 +128,10 @@ class ReaderPaginationScriptsTest {
         assertTrue(script.contains("notifyRestoreComplete: function()"))
         assertTrue(script.contains("window.HoshiReaderRestore.postMessage('restoreCompleted')"))
         assertTrue(script.contains("var targetCharCount = Math.ceil(totalChars * progress)"))
-        assertTrue(script.contains("if (runningSum > targetCharCount)"))
-        assertTrue(script.contains("range.setStart(targetNode, 0)"))
+        assertTrue(script.contains("textOffsetForCharCount: function(node, targetCount)"))
+        assertTrue(script.contains("if ((runningSum + nodeLen) > targetCharCount)"))
+        assertTrue(script.contains("targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum))"))
+        assertTrue(script.contains("range.setStart(targetNode, targetOffset)"))
         assertTrue(script.contains("var anchor = (context.vertical ? rect.top : rect.left)"))
         assertTrue(script.contains("var targetScroll = this.alignToPage(context, anchor)"))
     }

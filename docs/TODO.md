@@ -32,7 +32,7 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
-- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
+- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates and restore landing inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Re-check forward chapter-boundary landings at chapter start, visual-state-gated chapter jumps, and stable progress counters during rapid boundary flips after reader pagination changes.
 - When touching Sasayaki reader highlighting, validate reader open/restore remains fast and stable at positions with matched cues.
 - Re-run diagonal popup swipe validation once a Reader or nested Dictionary popup state is reliably reachable.
