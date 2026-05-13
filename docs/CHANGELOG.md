@@ -9,6 +9,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add iOS-compatible Google Drive sync using Android Google Play services authorization, with Advanced -> Syncing settings, bookshelf long-press manual sync, reader auto import/export triggers, statistics sync options, and Sasayaki playback-position sync.
 
+### Fixed
+
+- Avoid falsely reporting Google Drive authorization as cancelled when the Android account chooser returns an authorization result with a cancelled activity code.
+
 ## [v0.5.0] - 2026-05-13
 
 ### Added

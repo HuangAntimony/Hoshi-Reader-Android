@@ -1,9 +1,9 @@
 package moe.antimony.hoshi.features.sync
 
-import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -68,6 +68,7 @@ fun SyncSettingsView(
     var directionMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var isAuthorizing by remember { mutableStateOf(false) }
+    var pendingAuthorizationResolution by remember { mutableStateOf<IntentSenderRequest?>(null) }
     val packageName = remember(context) { context.packageName }
     val sha1 = remember(context) { context.signingCertificateSha1() }
 
@@ -88,29 +89,23 @@ fun SyncSettingsView(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) { result ->
         isAuthorizing = false
-        if (result.resultCode != Activity.RESULT_OK) {
-            message = "Google Drive authorization was cancelled."
-            refreshStatus()
-            return@rememberLauncherForActivityResult
+        val resolved = resolveDriveAuthorizationActivityResult(
+            resultCode = result.resultCode,
+            hasData = result.data != null,
+            authorizationResult = { authorizer.authorizationResultFromIntent(result.data) },
+        )
+        authStatus = resolved.status
+        message = resolved.message
+        resolved.resolutionRequest?.let { request ->
+            pendingAuthorizationResolution = request
         }
-        when (val auth = authorizer.authorizationResultFromIntent(result.data)) {
-            is DriveAuthorizationResult.Authorized -> {
-                authStatus = DriveAuthStatus.Connected
-                message = null
-            }
-            DriveAuthorizationResult.GooglePlayServicesUnavailable -> {
-                authStatus = DriveAuthStatus.GooglePlayServicesUnavailable
-                message = GmsDriveAuthorizer.GmsRequiredMessage
-            }
-            is DriveAuthorizationResult.RequiresResolution -> {
-                authStatus = DriveAuthStatus.NotConnected
-                message = "Google Drive authorization needs to be started again."
-            }
-            is DriveAuthorizationResult.Failed -> {
-                authStatus = DriveAuthStatus.Failed(auth.message)
-                message = auth.message
-            }
-        }
+    }
+
+    LaunchedEffect(pendingAuthorizationResolution) {
+        val request = pendingAuthorizationResolution ?: return@LaunchedEffect
+        pendingAuthorizationResolution = null
+        isAuthorizing = true
+        authorizationLauncher.launch(request)
     }
 
     LaunchedEffect(repository) {
