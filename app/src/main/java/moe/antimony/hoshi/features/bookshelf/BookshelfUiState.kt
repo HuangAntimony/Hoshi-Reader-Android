@@ -18,6 +18,7 @@ data class BookshelfUiState(
     val hasLoadedBooks: Boolean = false,
     val isLoading: Boolean = false,
     val blockingProgressMessage: String? = null,
+    val statusMessage: String? = null,
     val errorMessage: String? = null,
     val openReaderBookId: String? = null,
 )

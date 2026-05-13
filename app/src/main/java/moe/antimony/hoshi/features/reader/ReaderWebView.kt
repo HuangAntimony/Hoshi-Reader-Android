@@ -128,6 +128,8 @@ fun ReaderWebView(
     onReaderSettingsChange: (ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
+    onFlushAutoSyncExport: () -> Unit = {},
+    onForegroundAutoSyncImport: () -> Unit = {},
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -362,6 +364,7 @@ fun ReaderWebView(
     fun closeReader() {
         webView?.flushPendingPageTurnProgress()
         saveCurrentDisplayedPosition()
+        onFlushAutoSyncExport()
         onClose()
     }
     fun clearReaderSelection() {
@@ -559,17 +562,26 @@ fun ReaderWebView(
         }
     }
 
+    var lastStoppedAtMillis by remember { mutableStateOf<Long?>(null) }
     val currentLifecycleStart = rememberUpdatedState {
+        val stoppedAt = lastStoppedAtMillis
+        lastStoppedAtMillis = null
+        if (stoppedAt != null && SystemClock.elapsedRealtime() - stoppedAt >= AutoSyncForegroundThresholdMillis) {
+            onForegroundAutoSyncImport()
+        }
         resumeStatisticsForLifecycleStartIfNeeded()
     }
     val currentLifecycleStop = rememberUpdatedState {
+        lastStoppedAtMillis = SystemClock.elapsedRealtime()
         webView?.flushPendingPageTurnProgress()
         resumeStatisticsTrackingOnStart = pauseStatisticsForLifecycleStop()
         saveCurrentDisplayedPosition()
+        onFlushAutoSyncExport()
     }
     val currentLifecycleDispose = rememberUpdatedState {
         webView?.flushPendingPageTurnProgress()
         saveCurrentDisplayedPosition()
+        onFlushAutoSyncExport()
     }
     val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
     DisposableEffect(lifecycle) {
@@ -1739,6 +1751,7 @@ private var readerPageTurnProgressRequestId = 0L
 private const val MAX_SELECTION_LENGTH = 16
 private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 250L
 private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 1_000L
+private const val AutoSyncForegroundThresholdMillis = 10L * 60L * 1_000L
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

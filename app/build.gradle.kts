@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.ankidroid.api)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.play.services.auth)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     testImplementation(libs.junit)
     testRuntimeOnly("net.java.dev.jna:jna:${libs.versions.jna.get()}@jar")

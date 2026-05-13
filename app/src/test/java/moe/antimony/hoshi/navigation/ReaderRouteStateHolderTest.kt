@@ -78,6 +78,7 @@ class ReaderRouteStateHolderTest {
 
         stateHolder.saveBookmark(
             state = ReaderRouteLoadState.Ready(
+                entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
                 bookRoot = root,
                 book = book,
                 bookmark = null,
@@ -109,6 +110,7 @@ class ReaderRouteStateHolderTest {
 
         stateHolder.saveBookmark(
             state = ReaderRouteLoadState.Ready(
+                entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
                 bookRoot = root,
                 book = book,
                 bookmark = null,

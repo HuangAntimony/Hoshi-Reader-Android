@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +71,7 @@ import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,6 +111,13 @@ fun AdvancedSettingsView(
         BackupSettingsView(
             onClose = { destination = null },
             onBooksRestored = onBooksRestored,
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == AdvancedDestination.Syncing) {
+        SyncSettingsView(
+            onClose = { destination = null },
             modifier = modifier,
         )
         return
@@ -161,6 +170,13 @@ fun AdvancedSettingsView(
                         leadingContent = { Icon(Icons.Rounded.Backup, contentDescription = null) },
                         headlineContent = { Text("Backup") },
                         modifier = Modifier.clickable { destination = AdvancedDestination.Backup },
+                    )
+                    GroupDivider()
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = { Icon(Icons.Rounded.Sync, contentDescription = null) },
+                        headlineContent = { Text("Syncing") },
+                        modifier = Modifier.clickable { destination = AdvancedDestination.Syncing },
                     )
                 }
             }
@@ -571,6 +587,7 @@ private enum class AdvancedDestination {
     Statistics,
     Sasayaki,
     Backup,
+    Syncing,
 }
 
 private const val ProgressUpdateBytes = 64L * 1024L * 1024L

@@ -33,6 +33,7 @@ enum class SasayakiReaderSkipButtonAction(
 
 data class SasayakiSettings(
     val enabled: Boolean = true,
+    val syncEnabled: Boolean = false,
     val showReaderToggle: Boolean = true,
     val showReaderSkipButtons: Boolean = true,
     val readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue,
@@ -61,6 +62,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
     override fun load(): SasayakiSettings =
         SasayakiSettings(
             enabled = preferences.getBoolean(KEY_ENABLE, true),
+            syncEnabled = preferences.getBoolean(KEY_SYNC_ENABLED, false),
             showReaderToggle = preferences.getBoolean(KEY_SHOW_READER_TOGGLE, true),
             showReaderSkipButtons = preferences.getBoolean(KEY_SHOW_READER_SKIP_BUTTONS, true),
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(
@@ -78,6 +80,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
     fun save(settings: SasayakiSettings) {
         preferences.edit()
             .putBoolean(KEY_ENABLE, settings.enabled)
+            .putBoolean(KEY_SYNC_ENABLED, settings.syncEnabled)
             .putBoolean(KEY_SHOW_READER_TOGGLE, settings.showReaderToggle)
             .putBoolean(KEY_SHOW_READER_SKIP_BUTTONS, settings.showReaderSkipButtons)
             .putString(KEY_READER_SKIP_BUTTON_ACTION, settings.readerSkipButtonAction.name)
@@ -93,6 +96,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
 
     private companion object {
         const val KEY_ENABLE = "enableSasayaki"
+        const val KEY_SYNC_ENABLED = "sasayakiEnableSync"
         const val KEY_SHOW_READER_TOGGLE = "readerShowSasayakiToggle"
         const val KEY_SHOW_READER_SKIP_BUTTONS = "sasayakiShowReaderSkipButtons"
         const val KEY_READER_SKIP_BUTTON_ACTION = "sasayakiReaderSkipButtonAction"
@@ -142,6 +146,7 @@ class SasayakiSettingsRepository(
     private fun Preferences.toSasayakiSettings(): SasayakiSettings =
         SasayakiSettings(
             enabled = this[KEY_ENABLE] ?: true,
+            syncEnabled = this[KEY_SYNC_ENABLED] ?: false,
             showReaderToggle = this[KEY_SHOW_READER_TOGGLE] ?: true,
             showReaderSkipButtons = this[KEY_SHOW_READER_SKIP_BUTTONS] ?: true,
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(this[KEY_READER_SKIP_BUTTON_ACTION]),
@@ -156,6 +161,7 @@ class SasayakiSettingsRepository(
 
     private fun MutablePreferences.writeSasayakiSettings(settings: SasayakiSettings) {
         this[KEY_ENABLE] = settings.enabled
+        this[KEY_SYNC_ENABLED] = settings.syncEnabled
         this[KEY_SHOW_READER_TOGGLE] = settings.showReaderToggle
         this[KEY_SHOW_READER_SKIP_BUTTONS] = settings.showReaderSkipButtons
         this[KEY_READER_SKIP_BUTTON_ACTION] = settings.readerSkipButtonAction.name
@@ -174,6 +180,7 @@ class SasayakiSettingsRepository(
         private val KEY_MIGRATED_FROM_SHARED_PREFERENCES =
             booleanPreferencesKey("sasayakiSettingsMigratedFromSharedPreferences")
         private val KEY_ENABLE = booleanPreferencesKey("enableSasayaki")
+        private val KEY_SYNC_ENABLED = booleanPreferencesKey("sasayakiEnableSync")
         private val KEY_SHOW_READER_TOGGLE = booleanPreferencesKey("readerShowSasayakiToggle")
         private val KEY_SHOW_READER_SKIP_BUTTONS = booleanPreferencesKey("sasayakiShowReaderSkipButtons")
         private val KEY_READER_SKIP_BUTTON_ACTION = stringPreferencesKey("sasayakiReaderSkipButtonAction")

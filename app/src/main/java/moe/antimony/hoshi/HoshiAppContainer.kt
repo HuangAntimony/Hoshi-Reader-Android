@@ -30,6 +30,11 @@ import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
+import moe.antimony.hoshi.features.sync.GmsDriveAuthorizer
+import moe.antimony.hoshi.features.sync.GoogleDriveClient
+import moe.antimony.hoshi.features.sync.SyncManager
+import moe.antimony.hoshi.features.sync.SyncSettingsRepository
+import moe.antimony.hoshi.features.sync.syncSettingsRepository
 import moe.antimony.hoshi.features.update.AndroidUpdateDownloadManager
 import moe.antimony.hoshi.features.update.GitHubReleaseUpdateRepository
 import moe.antimony.hoshi.features.update.UpdateCheckService
@@ -49,6 +54,7 @@ internal class HoshiAppContainer(context: Context) {
     val audioSettingsRepository: AudioSettingsRepository = appContext.audioSettingsRepository()
     val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()
+    val syncSettingsRepository: SyncSettingsRepository = appContext.syncSettingsRepository()
     val bookshelfSettingsRepository: BookshelfSettingsRepository = appContext.bookshelfSettingsRepository()
     val updateSettingsRepository: UpdateSettingsRepository = appContext.updateSettingsRepository()
     val updateDownloadStore: UpdateDownloadStore = appContext.updateDownloadStore()
@@ -56,6 +62,12 @@ internal class HoshiAppContainer(context: Context) {
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
     val backupRepository: HoshiBackupRepository = HoshiBackupRepository(appContext.filesDir)
     val storageCleanupRepository: StorageCleanupRepository = StorageCleanupRepository(appContext.filesDir, appContext.cacheDir)
+    val driveAuthorizer: GmsDriveAuthorizer = GmsDriveAuthorizer(appContext)
+    val googleDriveClient: GoogleDriveClient = GoogleDriveClient(appContext, driveAuthorizer)
+    val syncManager: SyncManager = SyncManager(
+        bookRepository = bookRepository,
+        drive = googleDriveClient,
+    )
     val ankiRepository: AnkiRepository = AnkiRepository(
         context = appContext,
         backend = AnkiDroidBackendAdapter(AndroidAnkiContentApi(appContext)),
@@ -80,6 +92,7 @@ internal class HoshiAppContainer(context: Context) {
             bookRepository = bookRepository,
             dictionaryRepository = dictionaryRepository,
             settingsRepository = bookshelfSettingsRepository,
+            syncManager = syncManager,
         )
 
     fun dictionaryViewModelRepository(contentResolver: ContentResolver): DictionaryViewModelRepository =

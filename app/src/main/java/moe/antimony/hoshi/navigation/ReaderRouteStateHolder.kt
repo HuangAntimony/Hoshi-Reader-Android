@@ -15,7 +15,10 @@ internal class ReaderRouteStateHolder(
     private val parser: ReaderRouteEpubParser = DefaultReaderRouteEpubParser,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    suspend fun load(bookId: String): ReaderRouteLoadState = withContext(ioDispatcher) {
+    suspend fun load(
+        bookId: String,
+        beforeBookmarkLoad: suspend (moe.antimony.hoshi.epub.BookEntry) -> Unit = {},
+    ): ReaderRouteLoadState = withContext(ioDispatcher) {
         runCatching {
             val entry = repository.loadBookEntry(bookId)
                 ?: error("Book not found.")
@@ -30,7 +33,9 @@ internal class ReaderRouteStateHolder(
                 ),
             )
             repository.saveBookInfo(entry.root, parsedBook.bookInfo)
+            beforeBookmarkLoad(entry)
             ReaderRouteLoadState.Ready(
+                entry = entry,
                 bookRoot = entry.root,
                 book = parsedBook,
                 bookmark = repository.loadBookmark(entry.root),
@@ -76,6 +81,7 @@ internal sealed interface ReaderRouteLoadState {
     data object Loading : ReaderRouteLoadState
 
     data class Ready(
+        val entry: moe.antimony.hoshi.epub.BookEntry,
         val bookRoot: File,
         val book: EpubBook,
         val bookmark: Bookmark?,

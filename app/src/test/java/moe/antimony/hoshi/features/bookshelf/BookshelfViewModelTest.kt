@@ -7,6 +7,9 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.SyncDirection
+import moe.antimony.hoshi.features.sync.SyncResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -434,5 +437,13 @@ class BookshelfViewModelTest {
         }
 
         override suspend fun rebuildLookupQuery() = Unit
+
+        override suspend fun syncBook(
+            entry: BookEntry,
+            direction: SyncDirection?,
+            syncStats: Boolean,
+            statsSyncMode: StatisticsSyncMode,
+            syncAudioBook: Boolean,
+        ): SyncResult = SyncResult.Synced(entry.metadata.title.orEmpty())
     }
 }

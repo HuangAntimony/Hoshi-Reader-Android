@@ -30,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
+import moe.antimony.hoshi.features.sync.SyncSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +53,7 @@ fun SasayakiSettingsView(
     val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
     val repository = appContainer.sasayakiSettingsRepository
+    val syncSettings by appContainer.syncSettingsRepository.settings.collectAsState(initial = SyncSettings())
     var settings by remember { mutableStateOf(SasayakiSettings()) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
 
@@ -119,6 +122,19 @@ fun SasayakiSettingsView(
                                 )
                             },
                         )
+                        if (settings.enabled && syncSettings.enabled) {
+                            SettingsDivider()
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text("ッツ Sync") },
+                                trailingContent = {
+                                    Switch(
+                                        checked = settings.syncEnabled,
+                                        onCheckedChange = { save(settings.copy(syncEnabled = it)) },
+                                    )
+                                },
+                            )
+                        }
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),

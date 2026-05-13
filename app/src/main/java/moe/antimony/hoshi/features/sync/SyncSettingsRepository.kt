@@ -1,0 +1,55 @@
+package moe.antimony.hoshi.features.sync
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.syncSettingsDataStore by preferencesDataStore(name = SyncSettingsRepository.DataStoreName)
+
+fun Context.syncSettingsRepository(): SyncSettingsRepository =
+    SyncSettingsRepository(syncSettingsDataStore)
+
+class SyncSettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+) {
+    val settings: Flow<SyncSettings> = dataStore.data
+        .map { preferences -> preferences.toSyncSettings() }
+
+    suspend fun update(transform: (SyncSettings) -> SyncSettings) {
+        dataStore.edit { preferences ->
+            val current = preferences.toSyncSettings()
+            preferences.writeSyncSettings(transform(current))
+        }
+    }
+
+    private fun Preferences.toSyncSettings(): SyncSettings =
+        SyncSettings(
+            enabled = this[KEY_ENABLED] ?: false,
+            mode = SyncMode.fromRawValue(this[KEY_MODE]),
+            autoSyncEnabled = this[KEY_AUTO_SYNC_ENABLED] ?: false,
+            authProvider = SyncAuthProvider.Gms,
+        )
+
+    private fun MutablePreferences.writeSyncSettings(settings: SyncSettings) {
+        this[KEY_ENABLED] = settings.enabled
+        this[KEY_MODE] = settings.mode.rawValue
+        this[KEY_AUTO_SYNC_ENABLED] = settings.autoSyncEnabled
+        this[KEY_AUTH_PROVIDER] = settings.authProvider.name
+    }
+
+    companion object {
+        const val DataStoreName = "sync-settings"
+
+        private val KEY_ENABLED = booleanPreferencesKey("syncEnabled")
+        private val KEY_MODE = stringPreferencesKey("syncMode")
+        private val KEY_AUTO_SYNC_ENABLED = booleanPreferencesKey("autoSyncEnabled")
+        private val KEY_AUTH_PROVIDER = stringPreferencesKey("syncAuthProvider")
+    }
+}
