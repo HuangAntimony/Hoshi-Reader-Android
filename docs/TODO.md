@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 This file is the short operational handoff for future agents.
 
@@ -32,8 +32,9 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
-- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
+- Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates and restore landing inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Re-check forward chapter-boundary landings at chapter start, visual-state-gated chapter jumps, and stable progress counters during rapid boundary flips after reader pagination changes.
+- When touching Sasayaki reader highlighting, validate reader open/restore remains fast and stable at positions with matched cues.
 - Re-run diagonal popup swipe validation once a Reader or nested Dictionary popup state is reliably reachable.
 - Future reader fixes must start from `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift` plus the matching JS/CSS, and must keep WebView-based reading and lookup.
 
@@ -57,11 +58,10 @@ This file is the short operational handoff for future agents.
 
 ### Sync
 
-- Implement Android Google Sign-In/OAuth/Drive API integration.
-- Match iOS upstream sync behavior by creating the root `ttu-reader-data` Drive folder when needed.
-- Sync the iOS-supported per-book data: bookmark/progress, statistics, and Sasayaki audiobook state.
-- Support iOS-style manual sync direction, auto sync, statistics sync mode, and Sasayaki sync toggles.
-- Do not reuse iOS token/keychain assumptions.
+- Preserve the shared lifecycle-aware loaded-settings collection pattern when adding settings pages so controls do not flash default values before saved preferences load.
+- Keep reader auto-export save/upload work on a scope that survives reader route disposal so close and background flushes can finish after navigation.
+- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export result dialogs, reader-open import-only, iOS-aligned paginated/continuous auto-export timing, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
+- Future no-GMS sync auth should add Device Code or Browser PKCE behind `DriveAuthorizer` / `DriveAccessTokenProvider` without changing `SyncManager` or Drive sidecar rules.
 
 ### Release Distribution
 

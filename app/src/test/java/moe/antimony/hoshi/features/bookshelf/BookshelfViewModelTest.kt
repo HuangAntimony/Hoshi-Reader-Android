@@ -7,6 +7,9 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.SyncDirection
+import moe.antimony.hoshi.features.sync.SyncResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -343,6 +346,47 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun syncBookPublishesDismissibleSuccessFeedback() {
+        val entry = bookEntry("book-a")
+        val viewModel = BookshelfViewModel(
+            FakeBookshelfRepository(entries = listOf(entry)),
+            testScope(),
+        )
+
+        viewModel.syncBook(
+            entry = entry,
+            direction = SyncDirection.ExportToTtu,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+        )
+
+        assertEquals("book-a is already synced", viewModel.uiState.value.statusMessage)
+
+        viewModel.consumeStatusMessage()
+
+        assertNull(viewModel.uiState.value.statusMessage)
+    }
+
+    @Test
+    fun errorFeedbackCanBeDismissedAfterFailure() {
+        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
+
+        viewModel.importBook(
+            importKey = "content://books/import.epub",
+            displayName = "import.epub",
+        ) {
+            error("bad epub")
+        }
+
+        assertEquals("bad epub", viewModel.uiState.value.errorMessage)
+
+        viewModel.consumeErrorMessage()
+
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun shelfExpansionStateStaysInMemoryAcrossReloads() {
         val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
 
@@ -434,5 +478,13 @@ class BookshelfViewModelTest {
         }
 
         override suspend fun rebuildLookupQuery() = Unit
+
+        override suspend fun syncBook(
+            entry: BookEntry,
+            direction: SyncDirection?,
+            syncStats: Boolean,
+            statsSyncMode: StatisticsSyncMode,
+            syncAudioBook: Boolean,
+        ): SyncResult = SyncResult.Synced(entry.metadata.title.orEmpty())
     }
 }

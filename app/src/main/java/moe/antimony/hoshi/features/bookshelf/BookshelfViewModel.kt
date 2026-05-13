@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.SyncDirection
+import moe.antimony.hoshi.features.sync.SyncResult
 
 internal data class BookImportItem(
     val uri: Uri,
@@ -280,8 +283,40 @@ internal class BookshelfViewModel(
         }
     }
 
+    fun syncBook(
+        entry: BookEntry,
+        direction: SyncDirection?,
+        syncStats: Boolean,
+        statsSyncMode: StatisticsSyncMode,
+        syncAudioBook: Boolean,
+    ) {
+        runLoading(
+            errorPrefix = "Sync failed.",
+            blockingProgressMessage = "Syncing...",
+            block = {
+                val result = repository.syncBook(
+                    entry = entry,
+                    direction = direction,
+                    syncStats = syncStats,
+                    statsSyncMode = statsSyncMode,
+                    syncAudioBook = syncAudioBook,
+                )
+                reloadBookEntriesSync()
+                _uiState.update { it.copy(statusMessage = result.bookshelfMessage()) }
+            },
+        )
+    }
+
     fun consumeOpenReaderEvent() {
         _uiState.update { it.copy(openReaderBookId = null) }
+    }
+
+    fun consumeStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
+    }
+
+    fun consumeErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
     private fun reloadBookEntries(sortOption: BookSortOption) {
@@ -333,6 +368,7 @@ internal class BookshelfViewModel(
                 it.copy(
                     isLoading = true,
                     blockingProgressMessage = blockingProgressMessage,
+                    statusMessage = null,
                     errorMessage = null,
                 )
             }
@@ -360,3 +396,11 @@ private fun PendingBookImport.failureDisplayName(): String =
     displayName?.takeIf { it.isNotBlank() }
         ?: importKey.substringAfterLast('/').takeIf { it.isNotBlank() }
         ?: "EPUB"
+
+private fun SyncResult.bookshelfMessage(): String? =
+    when (this) {
+        is SyncResult.Exported -> "Synced $title to ッツ\n$characterCount characters"
+        is SyncResult.Imported -> "Synced $title from ッツ\n$characterCount characters"
+        is SyncResult.Synced -> "$title is already synced"
+        SyncResult.Skipped -> null
+    }

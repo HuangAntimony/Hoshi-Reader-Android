@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -105,13 +107,18 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun exposesCharacterBasedProgressCalculationLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
+    fun characterBasedProgressCountsEveryNodeBeforeViewportLikeIos() {
+        val progress = readerProgressFromVisibleNodeLayouts(
+            listOf(
+                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
+                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 66, beforeViewport = true),
+            ),
+        )
 
-        assertTrue(script.contains("calculateProgress: function()"))
-        assertTrue(script.contains("totalChars: totalChars"))
-        assertTrue(script.contains("progressStops: progressStops"))
-        assertTrue(script.contains("return exploredChars / metrics.totalChars"))
+        assertEquals(213.0 / 347.0, progress, 0.0)
     }
 
     @Test
@@ -121,8 +128,10 @@ class ReaderPaginationScriptsTest {
         assertTrue(script.contains("notifyRestoreComplete: function()"))
         assertTrue(script.contains("window.HoshiReaderRestore.postMessage('restoreCompleted')"))
         assertTrue(script.contains("var targetCharCount = Math.ceil(totalChars * progress)"))
-        assertTrue(script.contains("if (runningSum > targetCharCount)"))
-        assertTrue(script.contains("range.setStart(targetNode, 0)"))
+        assertTrue(script.contains("textOffsetForCharCount: function(node, targetCount)"))
+        assertTrue(script.contains("if ((runningSum + nodeLen) > targetCharCount)"))
+        assertTrue(script.contains("targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum))"))
+        assertTrue(script.contains("range.setStart(targetNode, targetOffset)"))
         assertTrue(script.contains("var anchor = (context.vertical ? rect.top : rect.left)"))
         assertTrue(script.contains("var targetScroll = this.alignToPage(context, anchor)"))
     }
@@ -151,11 +160,25 @@ class ReaderPaginationScriptsTest {
         assertTrue(script.contains("cueWrappers: new Map()"))
         assertTrue(script.contains("collectSasayakiCueRanges: function(cues)"))
         assertTrue(script.contains("applySasayakiCues: function(cues)"))
-        assertTrue(script.contains("highlightSasayakiCue: function(cueId, reveal)"))
+        assertTrue(script.contains("wrapSasayakiCue: function(cue)"))
+        assertTrue(script.contains("highlightSasayakiCue: function(cue, reveal)"))
         assertTrue(script.contains("clearSasayakiCue: function()"))
         assertTrue(script.contains("resetSasayakiCues: function()"))
         assertTrue(script.contains("className = 'hoshi-sasayaki-cue'"))
         assertTrue(script.contains("hoshi-sasayaki-active"))
+    }
+
+    @Test
+    fun sasayakiHighlightCommandCarriesCueRangeForLazyWrapping() {
+        val command = ReaderPaginationScripts.highlightSasayakiCueInvocation(
+            cue = SasayakiCueRange(id = "cue\"1", start = 42, length = 7),
+            reveal = true,
+        )
+
+        assertEquals(
+            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true)""",
+            command,
+        )
     }
 
     @Test
@@ -200,16 +223,17 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun pagedProgressUsesCachedTextOffsetsInsteadOfScanningDomEveryTurn() {
-        val script = ReaderPaginationScripts.shellScript()
-        val calculateProgress = script.substringAfter("calculateProgress: function()")
-            .substringBefore("restoreProgress: async function(progress)")
+    fun characterBasedProgressDoesNotTreatSortedLayoutStopsAsDomPrefixes() {
+        val progress = readerProgressFromVisibleNodeLayouts(
+            listOf(
+                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
+                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
+                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
+            ),
+        )
 
-        assertTrue(script.contains("progressStops"))
-        assertTrue(calculateProgress.contains("var metrics = this.paginationMetrics || this.buildPaginationMetrics()"))
-        assertTrue(calculateProgress.contains("metrics.progressStops"))
-        assertFalse(calculateProgress.contains("this.createWalker()"))
-        assertFalse(calculateProgress.contains("range.selectNodeContents(node)"))
+        assertEquals(147.0 / 281.0, progress, 0.0)
     }
 
     @Test

@@ -3,6 +3,9 @@ package moe.antimony.hoshi
 import android.content.ContentResolver
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
@@ -30,6 +33,14 @@ import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
+import moe.antimony.hoshi.features.sync.DriveAuthorizer
+import moe.antimony.hoshi.features.sync.DriveConnectionAuthorizer
+import moe.antimony.hoshi.features.sync.GmsDriveAuthorizer
+import moe.antimony.hoshi.features.sync.GoogleDriveClient
+import moe.antimony.hoshi.features.sync.SharedPreferencesDriveConnectionStore
+import moe.antimony.hoshi.features.sync.SyncManager
+import moe.antimony.hoshi.features.sync.SyncSettingsRepository
+import moe.antimony.hoshi.features.sync.syncSettingsRepository
 import moe.antimony.hoshi.features.update.AndroidUpdateDownloadManager
 import moe.antimony.hoshi.features.update.GitHubReleaseUpdateRepository
 import moe.antimony.hoshi.features.update.UpdateCheckService
@@ -41,6 +52,7 @@ import moe.antimony.hoshi.navigation.ReaderRouteStateHolder
 
 internal class HoshiAppContainer(context: Context) {
     private val appContext = context.applicationContext
+    val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val bookRepository: BookRepository = BookRepository(appContext.filesDir)
     val dictionaryRepository: DictionaryRepository = DictionaryRepository(appContext.filesDir)
@@ -49,6 +61,7 @@ internal class HoshiAppContainer(context: Context) {
     val audioSettingsRepository: AudioSettingsRepository = appContext.audioSettingsRepository()
     val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()
+    val syncSettingsRepository: SyncSettingsRepository = appContext.syncSettingsRepository()
     val bookshelfSettingsRepository: BookshelfSettingsRepository = appContext.bookshelfSettingsRepository()
     val updateSettingsRepository: UpdateSettingsRepository = appContext.updateSettingsRepository()
     val updateDownloadStore: UpdateDownloadStore = appContext.updateDownloadStore()
@@ -56,6 +69,16 @@ internal class HoshiAppContainer(context: Context) {
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
     val backupRepository: HoshiBackupRepository = HoshiBackupRepository(appContext.filesDir)
     val storageCleanupRepository: StorageCleanupRepository = StorageCleanupRepository(appContext.filesDir, appContext.cacheDir)
+    private val gmsDriveAuthorizer: GmsDriveAuthorizer = GmsDriveAuthorizer(appContext)
+    val driveAuthorizer: DriveAuthorizer = DriveConnectionAuthorizer(
+        delegate = gmsDriveAuthorizer,
+        connectionStore = SharedPreferencesDriveConnectionStore(appContext),
+    )
+    val googleDriveClient: GoogleDriveClient = GoogleDriveClient(appContext, driveAuthorizer)
+    val syncManager: SyncManager = SyncManager(
+        bookRepository = bookRepository,
+        drive = googleDriveClient,
+    )
     val ankiRepository: AnkiRepository = AnkiRepository(
         context = appContext,
         backend = AnkiDroidBackendAdapter(AndroidAnkiContentApi(appContext)),
@@ -80,6 +103,7 @@ internal class HoshiAppContainer(context: Context) {
             bookRepository = bookRepository,
             dictionaryRepository = dictionaryRepository,
             settingsRepository = bookshelfSettingsRepository,
+            syncManager = syncManager,
         )
 
     fun dictionaryViewModelRepository(contentResolver: ContentResolver): DictionaryViewModelRepository =

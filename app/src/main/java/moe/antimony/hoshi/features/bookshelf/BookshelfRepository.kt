@@ -16,6 +16,10 @@ import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.isUuidString
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.SyncDirection
+import moe.antimony.hoshi.features.sync.SyncManager
+import moe.antimony.hoshi.features.sync.SyncResult
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
@@ -34,6 +38,13 @@ internal interface BookshelfRepository {
     suspend fun changeSort(sortOption: BookSortOption)
     suspend fun changeShowReading(showReading: Boolean)
     suspend fun rebuildLookupQuery()
+    suspend fun syncBook(
+        entry: BookEntry,
+        direction: SyncDirection?,
+        syncStats: Boolean,
+        statsSyncMode: StatisticsSyncMode,
+        syncAudioBook: Boolean,
+    ): SyncResult
 }
 
 internal class AndroidBookshelfRepository(
@@ -41,6 +52,7 @@ internal class AndroidBookshelfRepository(
     private val bookRepository: BookRepository,
     private val dictionaryRepository: DictionaryRepository,
     private val settingsRepository: BookshelfSettingsRepository,
+    private val syncManager: SyncManager,
     private val bookParser: EpubBookParser = EpubBookParser(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : BookshelfRepository {
@@ -141,6 +153,22 @@ internal class AndroidBookshelfRepository(
 
     override suspend fun rebuildLookupQuery() {
         dictionaryRepository.rebuildLookupQuery()
+    }
+
+    override suspend fun syncBook(
+        entry: BookEntry,
+        direction: SyncDirection?,
+        syncStats: Boolean,
+        statsSyncMode: StatisticsSyncMode,
+        syncAudioBook: Boolean,
+    ): SyncResult = withContext(ioDispatcher) {
+        syncManager.syncBook(
+            entry = entry,
+            direction = direction,
+            syncStats = syncStats,
+            statsSyncMode = statsSyncMode,
+            syncAudioBook = syncAudioBook,
+        )
     }
 
     private suspend fun saveMetadata(root: File, parsedBook: EpubBook, previous: BookMetadata? = null) {

@@ -25,9 +25,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,7 +48,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,9 +68,11 @@ import moe.antimony.hoshi.features.backup.BackupSettingsView
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderStatisticsSettingsView
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
+import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,6 +116,13 @@ fun AdvancedSettingsView(
         )
         return
     }
+    if (destination == AdvancedDestination.Syncing) {
+        SyncSettingsView(
+            onClose = { destination = null },
+            modifier = modifier,
+        )
+        return
+    }
 
     val colorScheme = MaterialTheme.colorScheme
     SettingsDetailScaffold(
@@ -128,40 +138,22 @@ fun AdvancedSettingsView(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null) },
-                        headlineContent = { Text("Audio") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Audio },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null) },
-                        headlineContent = { Text("Statistics") },
-                        supportingContent = { Text("Track per-book reading time, speed, and characters read") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Statistics },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
-                        headlineContent = { Text("Sasayaki (Audiobooks)") },
-                        supportingContent = { Text("Read along with matched audiobook subtitles") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Sasayaki },
-                    )
-                }
-            }
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.Rounded.Backup, contentDescription = null) },
-                        headlineContent = { Text("Backup") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Backup },
-                    )
+            advancedSettingsSections().forEach { section ->
+                item {
+                    GroupCard {
+                        section.rows.forEachIndexed { index, row ->
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
+                                headlineContent = { Text(row.title) },
+                                supportingContent = row.subtitle?.let { subtitle -> { Text(subtitle) } },
+                                modifier = Modifier.clickable { destination = row.destination },
+                            )
+                            if (index != section.rows.lastIndex) {
+                                GroupDivider()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -178,7 +170,7 @@ fun AudioSettingsView(
     val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
     val audioSettingsRepository = appContainer.audioSettingsRepository
-    var settings by remember { mutableStateOf(AudioSettings()) }
+    val settings = audioSettingsRepository.settings.collectAsLoadedSettings()
     val repository = appContainer.localAudioRepository
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
@@ -188,20 +180,13 @@ fun AudioSettingsView(
     var isImporting by remember { mutableStateOf(false) }
     val hasImportedDatabase = importedSize != null
 
-    LaunchedEffect(audioSettingsRepository) {
-        audioSettingsRepository.settings.collect { latest ->
-            settings = latest
-        }
-    }
-
     fun save(next: AudioSettings) {
-        settings = next
         scope.launch {
             audioSettingsRepository.update { next }
         }
     }
 
-    fun moveSource(from: Int, to: Int) {
+    fun moveSource(settings: AudioSettings, from: Int, to: Int) {
         val sources = settings.audioSources.toMutableList()
         if (from !in sources.indices || to !in sources.indices) return
         val source = sources.removeAt(from)
@@ -276,180 +261,184 @@ fun AudioSettingsView(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 item {
-                SectionTitle("Sources")
-                GroupCard {
-                    settings.audioSources.forEachIndexed { index, source ->
-                        AudioSourceRow(
-                            source = source,
-                            canDelete = !source.isDefault && source.url != AudioSettings.LocalAudioSource.url,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < settings.audioSources.lastIndex,
-                            onEnabledChange = { enabled ->
-                                save(
-                                    settings.copy(
-                                        audioSources = settings.audioSources.mapIndexed { sourceIndex, item ->
-                                            if (sourceIndex == index) item.copy(isEnabled = enabled) else item
-                                        },
-                                    ),
+                    val loadedSettings = settings ?: return@item
+                    SectionTitle("Sources")
+                    GroupCard {
+                        loadedSettings.audioSources.forEachIndexed { index, source ->
+                            AudioSourceRow(
+                                source = source,
+                                canDelete = !source.isDefault && source.url != AudioSettings.LocalAudioSource.url,
+                                canMoveUp = index > 0,
+                                canMoveDown = index < loadedSettings.audioSources.lastIndex,
+                                onEnabledChange = { enabled ->
+                                    save(
+                                        loadedSettings.copy(
+                                            audioSources = loadedSettings.audioSources.mapIndexed { sourceIndex, item ->
+                                                if (sourceIndex == index) item.copy(isEnabled = enabled) else item
+                                            },
+                                        ),
+                                    )
+                                },
+                                onDelete = {
+                                    save(loadedSettings.copy(audioSources = loadedSettings.audioSources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
+                                },
+                                onMoveUp = { moveSource(loadedSettings, index, index - 1) },
+                                onMoveDown = { moveSource(loadedSettings, index, index + 1) },
+                            )
+                            if (index < loadedSettings.audioSources.lastIndex) GroupDivider()
+                        }
+                    }
+                }
+                item {
+                    val loadedSettings = settings ?: return@item
+                    SectionTitle("Add Source")
+                    GroupCard {
+                        TextInputRow(label = "Name", value = nameInput, onValueChange = { nameInput = it })
+                        GroupDivider()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                TextInputRowContent(
+                                    label = "URL",
+                                    value = urlInput,
+                                    onValueChange = { urlInput = it },
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    save(loadedSettings.addSource(AudioSource(name = nameInput.trim(), url = urlInput.trim())))
+                                    nameInput = ""
+                                    urlInput = ""
+                                },
+                                enabled = nameInput.isNotBlank() && urlInput.isNotBlank(),
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = "Add Source")
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Yomitan JSON audio sources are supported",
+                        color = colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                    )
+                }
+                item {
+                    val loadedSettings = settings ?: return@item
+                    GroupCard {
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Auto-play on Lookup") },
+                            trailingContent = {
+                                Switch(
+                                    checked = loadedSettings.enableAutoplay,
+                                    onCheckedChange = { save(loadedSettings.copy(enableAutoplay = it)) },
                                 )
                             },
-                            onDelete = {
-                                save(settings.copy(audioSources = settings.audioSources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
-                            },
-                            onMoveUp = { moveSource(index, index - 1) },
-                            onMoveDown = { moveSource(index, index + 1) },
                         )
-                        if (index < settings.audioSources.lastIndex) GroupDivider()
-                    }
-                }
-            }
-            item {
-                SectionTitle("Add Source")
-                GroupCard {
-                    TextInputRow(label = "Name", value = nameInput, onValueChange = { nameInput = it })
-                    GroupDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            TextInputRowContent(
-                                label = "URL",
-                                value = urlInput,
-                                onValueChange = { urlInput = it },
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                save(settings.addSource(AudioSource(name = nameInput.trim(), url = urlInput.trim())))
-                                nameInput = ""
-                                urlInput = ""
-                            },
-                            enabled = nameInput.isNotBlank() && urlInput.isNotBlank(),
-                        ) {
-                            Icon(Icons.Rounded.Add, contentDescription = "Add Source")
-                        }
-                    }
-                }
-                Text(
-                    text = "Yomitan JSON audio sources are supported",
-                    color = colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                )
-            }
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Auto-play on Lookup") },
-                        trailingContent = {
-                            Switch(
-                                checked = settings.enableAutoplay,
-                                onCheckedChange = { save(settings.copy(enableAutoplay = it)) },
-                            )
-                        },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Background Audio") },
-                        supportingContent = {
-                            SingleChoiceSegmentedButtonRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                            ) {
-                                AudioPlaybackMode.entries.forEachIndexed { index, mode ->
-                                    SegmentedButton(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(58.dp),
-                                        selected = settings.playbackMode == mode,
-                                        onClick = { save(settings.copy(playbackMode = mode)) },
-                                        shape = SegmentedButtonDefaults.itemShape(index, AudioPlaybackMode.entries.size),
-                                    ) {
-                                        Text(mode.displayName)
+                        GroupDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Background Audio") },
+                            supportingContent = {
+                                SingleChoiceSegmentedButtonRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                ) {
+                                    AudioPlaybackMode.entries.forEachIndexed { index, mode ->
+                                        SegmentedButton(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(58.dp),
+                                            selected = loadedSettings.playbackMode == mode,
+                                            onClick = { save(loadedSettings.copy(playbackMode = mode)) },
+                                            shape = SegmentedButtonDefaults.itemShape(index, AudioPlaybackMode.entries.size),
+                                        ) {
+                                            Text(mode.displayName)
+                                        }
                                     }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
-            }
-            item {
-                SectionTitle("Local Audio")
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Enable") },
-                        trailingContent = {
-                            Switch(
-                                checked = settings.enableLocalAudio,
-                                onCheckedChange = { save(settings.withLocalAudioEnabled(it)) },
-                            )
-                        },
-                    )
-                    if (settings.enableLocalAudio) {
-                        GroupDivider()
-                        if (!hasImportedDatabase) {
-                            ListItem(
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                headlineContent = { Text("Import android.db") },
-                                supportingContent = {
-                                    Text("Copies the selected database in the background")
-                                },
-                                trailingContent = {
-                                    Button(
-                                        enabled = !isImporting,
-                                        onClick = { importer.launch(ImportFileType.LocalAudioDatabase.mimeTypes) },
-                                    ) {
-                                        Text(if (isImporting) "Importing" else "Import")
-                                    }
-                                },
-                            )
-                            importError?.let { message ->
+                item {
+                    val loadedSettings = settings ?: return@item
+                    SectionTitle("Local Audio")
+                    GroupCard {
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("Enable") },
+                            trailingContent = {
+                                Switch(
+                                    checked = loadedSettings.enableLocalAudio,
+                                    onCheckedChange = { save(loadedSettings.withLocalAudioEnabled(it)) },
+                                )
+                            },
+                        )
+                        if (loadedSettings.enableLocalAudio) {
+                            GroupDivider()
+                            if (!hasImportedDatabase) {
+                                ListItem(
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    headlineContent = { Text("Import android.db") },
+                                    supportingContent = {
+                                        Text("Copies the selected database in the background")
+                                    },
+                                    trailingContent = {
+                                        Button(
+                                            enabled = !isImporting,
+                                            onClick = { importer.launch(ImportFileType.LocalAudioDatabase.mimeTypes) },
+                                        ) {
+                                            Text(if (isImporting) "Importing" else "Import")
+                                        }
+                                    },
+                                )
+                                importError?.let { message ->
+                                    GroupDivider()
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = { Text("Import failed") },
+                                        supportingContent = { Text(message) },
+                                    )
+                                }
+                            }
+                            importedSize?.let { size ->
                                 GroupDivider()
                                 ListItem(
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    headlineContent = { Text("Import failed") },
-                                    supportingContent = { Text(message) },
+                                    headlineContent = {
+                                        Text("android.db (${Formatter.formatFileSize(context, size)})")
+                                    },
+                                    trailingContent = {
+                                        OutlinedButton(
+                                            enabled = !isImporting,
+                                            onClick = {
+                                                repository.deleteDatabase()
+                                                importedSize = null
+                                                importError = null
+                                                importProgress = null
+                                            },
+                                        ) {
+                                            Text("Delete")
+                                        }
+                                    },
                                 )
                             }
                         }
-                        importedSize?.let { size ->
-                            GroupDivider()
-                            ListItem(
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                headlineContent = {
-                                    Text("android.db (${Formatter.formatFileSize(context, size)})")
-                                },
-                                trailingContent = {
-                                    OutlinedButton(
-                                        enabled = !isImporting,
-                                        onClick = {
-                                            repository.deleteDatabase()
-                                            importedSize = null
-                                            importError = null
-                                            importProgress = null
-                                        },
-                                    ) {
-                                        Text("Delete")
-                                    }
-                                },
-                            )
-                        }
                     }
-                }
-                Text(
-                    text = "1. Import copies android.db into Hoshi's private storage, so keep enough free space for one extra copy before importing.\n" +
-                        "2. After import completes, you can safely delete the original external file to free space.",
-                    color = colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 24.dp),
-                )
+                    Text(
+                        text = "1. Import copies android.db into Hoshi's private storage, so keep enough free space for one extra copy before importing.\n" +
+                            "2. After import completes, you can safely delete the original external file to free space.",
+                        color = colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 24.dp),
+                    )
                 }
             }
             if (isImporting) {
@@ -566,12 +555,84 @@ private fun BackIconButton(onClick: () -> Unit) {
     }
 }
 
-private enum class AdvancedDestination {
+internal enum class AdvancedDestination {
     Audio,
     Statistics,
     Sasayaki,
     Backup,
+    Syncing,
 }
+
+internal enum class AdvancedSettingsIcon {
+    Speaker,
+    Chart,
+    Waveform,
+    Cloud,
+    ExternalDrive,
+}
+
+internal data class AdvancedSettingsRow(
+    val title: String,
+    val destination: AdvancedDestination,
+    val icon: AdvancedSettingsIcon,
+    val subtitle: String? = null,
+)
+
+internal data class AdvancedSettingsSection(
+    val rows: List<AdvancedSettingsRow>,
+)
+
+internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
+    listOf(
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "Audio",
+                    destination = AdvancedDestination.Audio,
+                    icon = AdvancedSettingsIcon.Speaker,
+                ),
+                AdvancedSettingsRow(
+                    title = "Statistics",
+                    destination = AdvancedDestination.Statistics,
+                    icon = AdvancedSettingsIcon.Chart,
+                    subtitle = "Track per-book reading time, speed, and characters read",
+                ),
+                AdvancedSettingsRow(
+                    title = "Sasayaki (Audiobooks)",
+                    destination = AdvancedDestination.Sasayaki,
+                    icon = AdvancedSettingsIcon.Waveform,
+                    subtitle = "Read along with matched audiobook subtitles",
+                ),
+            ),
+        ),
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "ッツ Sync",
+                    destination = AdvancedDestination.Syncing,
+                    icon = AdvancedSettingsIcon.Cloud,
+                ),
+            ),
+        ),
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "Backup",
+                    destination = AdvancedDestination.Backup,
+                    icon = AdvancedSettingsIcon.ExternalDrive,
+                ),
+            ),
+        ),
+    )
+
+private fun AdvancedSettingsIcon.imageVector(): ImageVector =
+    when (this) {
+        AdvancedSettingsIcon.Speaker -> Icons.AutoMirrored.Rounded.VolumeUp
+        AdvancedSettingsIcon.Chart -> Icons.AutoMirrored.Rounded.ShowChart
+        AdvancedSettingsIcon.Waveform -> Icons.Rounded.GraphicEq
+        AdvancedSettingsIcon.Cloud -> Icons.Rounded.Cloud
+        AdvancedSettingsIcon.ExternalDrive -> Icons.Rounded.Storage
+    }
 
 private const val ProgressUpdateBytes = 64L * 1024L * 1024L
 

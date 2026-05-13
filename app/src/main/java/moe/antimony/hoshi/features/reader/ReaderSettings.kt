@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import java.util.Locale
 
 data class ReaderSettings(
@@ -27,6 +28,8 @@ data class ReaderSettings(
     val continuousMode: Boolean = false,
     val enableStatistics: Boolean = false,
     val statisticsAutostartMode: StatisticsAutostartMode = StatisticsAutostartMode.Off,
+    val statisticsSyncEnabled: Boolean = false,
+    val statisticsSyncMode: StatisticsSyncMode = StatisticsSyncMode.Merge,
     val showStatisticsToggle: Boolean = false,
     val showReadingSpeed: Boolean = false,
     val showReadingTime: Boolean = false,
@@ -198,6 +201,8 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(
             preferences.getString("statisticsAutostartMode", null),
         ),
+        statisticsSyncEnabled = preferences.getBoolean("statisticsEnableSync", false),
+        statisticsSyncMode = StatisticsSyncMode.fromRawValue(preferences.getString("statisticsSyncMode", null)),
         showStatisticsToggle = preferences.getBoolean("readerShowStatisticsToggle", false),
         showReadingSpeed = preferences.getBoolean("readerShowReadingSpeed", false),
         showReadingTime = preferences.getBoolean("readerShowReadingTime", false),
@@ -237,6 +242,8 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("continuousMode", settings.continuousMode)
             .putBoolean("enableStatistics", settings.enableStatistics)
             .putString("statisticsAutostartMode", settings.statisticsAutostartMode.rawValue)
+            .putBoolean("statisticsEnableSync", settings.statisticsSyncEnabled)
+            .putString("statisticsSyncMode", settings.statisticsSyncMode.rawValue)
             .putBoolean("readerShowStatisticsToggle", settings.showStatisticsToggle)
             .putBoolean("readerShowReadingSpeed", settings.showReadingSpeed)
             .putBoolean("readerShowReadingTime", settings.showReadingTime)
@@ -315,6 +322,8 @@ class ReaderSettingsRepository(
             continuousMode = this[KEY_CONTINUOUS_MODE] ?: false,
             enableStatistics = this[KEY_ENABLE_STATISTICS] ?: false,
             statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(this[KEY_STATISTICS_AUTOSTART_MODE]),
+            statisticsSyncEnabled = this[KEY_STATISTICS_SYNC_ENABLED] ?: false,
+            statisticsSyncMode = StatisticsSyncMode.fromRawValue(this[KEY_STATISTICS_SYNC_MODE]),
             showStatisticsToggle = this[KEY_SHOW_STATISTICS_TOGGLE] ?: false,
             showReadingSpeed = this[KEY_SHOW_READING_SPEED] ?: false,
             showReadingTime = this[KEY_SHOW_READING_TIME] ?: false,
@@ -353,6 +362,8 @@ class ReaderSettingsRepository(
         this[KEY_CONTINUOUS_MODE] = settings.continuousMode
         this[KEY_ENABLE_STATISTICS] = settings.enableStatistics
         this[KEY_STATISTICS_AUTOSTART_MODE] = settings.statisticsAutostartMode.rawValue
+        this[KEY_STATISTICS_SYNC_ENABLED] = settings.statisticsSyncEnabled
+        this[KEY_STATISTICS_SYNC_MODE] = settings.statisticsSyncMode.rawValue
         this[KEY_SHOW_STATISTICS_TOGGLE] = settings.showStatisticsToggle
         this[KEY_SHOW_READING_SPEED] = settings.showReadingSpeed
         this[KEY_SHOW_READING_TIME] = settings.showReadingTime
@@ -395,6 +406,8 @@ class ReaderSettingsRepository(
         private val KEY_CONTINUOUS_MODE = booleanPreferencesKey("continuousMode")
         private val KEY_ENABLE_STATISTICS = booleanPreferencesKey("enableStatistics")
         private val KEY_STATISTICS_AUTOSTART_MODE = stringPreferencesKey("statisticsAutostartMode")
+        private val KEY_STATISTICS_SYNC_ENABLED = booleanPreferencesKey("statisticsEnableSync")
+        private val KEY_STATISTICS_SYNC_MODE = stringPreferencesKey("statisticsSyncMode")
         private val KEY_SHOW_STATISTICS_TOGGLE = booleanPreferencesKey("readerShowStatisticsToggle")
         private val KEY_SHOW_READING_SPEED = booleanPreferencesKey("readerShowReadingSpeed")
         private val KEY_SHOW_READING_TIME = booleanPreferencesKey("readerShowReadingTime")

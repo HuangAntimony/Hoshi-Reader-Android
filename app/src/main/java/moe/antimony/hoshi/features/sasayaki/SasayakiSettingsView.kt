@@ -29,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
+import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,17 +51,11 @@ fun SasayakiSettingsView(
     val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
     val repository = appContainer.sasayakiSettingsRepository
-    var settings by remember { mutableStateOf(SasayakiSettings()) }
+    val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
+    val settings = repository.settings.collectAsLoadedSettings()
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(repository) {
-        repository.settings.collect { latest ->
-            settings = latest
-        }
-    }
-
     fun save(next: SasayakiSettings) {
-        settings = next
         scope.launch {
             repository.update { next }
         }
@@ -95,18 +89,20 @@ fun SasayakiSettingsView(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
+                val loadedSettings = settings ?: return@item
+                val loadedSyncSettings = syncSettings ?: return@item
                 SettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Enable") },
                         trailingContent = {
                             Switch(
-                                checked = settings.enabled,
-                                onCheckedChange = { save(settings.copy(enabled = it)) },
+                                checked = loadedSettings.enabled,
+                                onCheckedChange = { save(loadedSettings.copy(enabled = it)) },
                             )
                         },
                     )
-                    if (settings.enabled) {
+                    if (loadedSettings.enabled) {
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -114,11 +110,24 @@ fun SasayakiSettingsView(
                             supportingContent = { Text("Keep a private copy instead of linking to the selected external media file") },
                             trailingContent = {
                                 Switch(
-                                    checked = settings.copyAudiobookToPrivateStorage,
-                                    onCheckedChange = { save(settings.copy(copyAudiobookToPrivateStorage = it)) },
+                                    checked = loadedSettings.copyAudiobookToPrivateStorage,
+                                    onCheckedChange = { save(loadedSettings.copy(copyAudiobookToPrivateStorage = it)) },
                                 )
                             },
                         )
+                        if (loadedSettings.enabled && loadedSyncSettings.enabled) {
+                            SettingsDivider()
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text("ッツ Sync") },
+                                trailingContent = {
+                                    Switch(
+                                        checked = loadedSettings.syncEnabled,
+                                        onCheckedChange = { save(loadedSettings.copy(syncEnabled = it)) },
+                                    )
+                                },
+                            )
+                        }
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -126,8 +135,8 @@ fun SasayakiSettingsView(
                             supportingContent = { Text("Add rewind and fast-forward buttons to the bottom of the reader.") },
                             trailingContent = {
                                 Switch(
-                                    checked = settings.showReaderSkipButtons,
-                                    onCheckedChange = { save(settings.copy(showReaderSkipButtons = it)) },
+                                    checked = loadedSettings.showReaderSkipButtons,
+                                    onCheckedChange = { save(loadedSettings.copy(showReaderSkipButtons = it)) },
                                 )
                             },
                         )
@@ -138,7 +147,7 @@ fun SasayakiSettingsView(
                             trailingContent = {
                                 Box {
                                     TextButton(onClick = { skipActionMenuExpanded = true }) {
-                                        Text(settings.readerSkipButtonAction.label)
+                                        Text(loadedSettings.readerSkipButtonAction.label)
                                     }
                                     DropdownMenu(
                                         expanded = skipActionMenuExpanded,
@@ -149,7 +158,7 @@ fun SasayakiSettingsView(
                                                 text = { Text(action.label) },
                                                 onClick = {
                                                     skipActionMenuExpanded = false
-                                                    save(settings.copy(readerSkipButtonAction = action))
+                                                    save(loadedSettings.copy(readerSkipButtonAction = action))
                                                 },
                                             )
                                         }
@@ -163,8 +172,8 @@ fun SasayakiSettingsView(
                             headlineContent = { Text("Auto-Scroll") },
                             trailingContent = {
                                 Switch(
-                                    checked = settings.autoScroll,
-                                    onCheckedChange = { save(settings.copy(autoScroll = it)) },
+                                    checked = loadedSettings.autoScroll,
+                                    onCheckedChange = { save(loadedSettings.copy(autoScroll = it)) },
                                 )
                             },
                         )
@@ -174,8 +183,8 @@ fun SasayakiSettingsView(
                             headlineContent = { Text("Auto-Pause on Lookup") },
                             trailingContent = {
                                 Switch(
-                                    checked = settings.autoPause,
-                                    onCheckedChange = { save(settings.copy(autoPause = it)) },
+                                    checked = loadedSettings.autoPause,
+                                    onCheckedChange = { save(loadedSettings.copy(autoPause = it)) },
                                 )
                             },
                         )

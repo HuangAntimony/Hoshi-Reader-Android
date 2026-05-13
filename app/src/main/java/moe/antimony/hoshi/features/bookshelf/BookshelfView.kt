@@ -115,6 +115,10 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.sync.SyncDirection
+import moe.antimony.hoshi.features.sync.SyncMode
+import moe.antimony.hoshi.features.sync.SyncSettings
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.MultipleFileImportContent
 import moe.antimony.hoshi.importing.importDisplayName
@@ -143,7 +147,11 @@ fun BookshelfView(
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
     val bookRepository = appContainer.bookRepository
-    val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
+    val syncSettings by appContainer.syncSettingsRepository.settings.collectAsState(initial = SyncSettings())
+    val readerSettings by appContainer.readerSettingsRepository.settings.collectAsState(initial = ReaderSettings())
+    val sasayakiSettings by appContainer.sasayakiSettingsRepository.settings.collectAsState(
+        initial = moe.antimony.hoshi.features.sasayaki.SasayakiSettings(),
+    )
     val booksViewModel: BookshelfViewModel = viewModel(
         factory = remember(context, appContainer) {
             object : ViewModelProvider.Factory {
@@ -192,10 +200,8 @@ fun BookshelfView(
         booksViewModel.rebuildLookupQuery()
     }
 
-    LaunchedEffect(sasayakiSettingsRepository) {
-        sasayakiSettingsRepository.settings.collect { settings ->
-            booksViewModel.setSasayakiEnabled(settings.enabled)
-        }
+    LaunchedEffect(sasayakiSettings.enabled) {
+        booksViewModel.setSasayakiEnabled(sasayakiSettings.enabled)
     }
 
     LaunchedEffect(pendingImportUri) {
@@ -221,7 +227,6 @@ fun BookshelfView(
         hasLoadedBooks = uiState.hasLoadedBooks,
         isLoading = uiState.isLoading,
         blockingProgressMessage = uiState.blockingProgressMessage,
-        errorMessage = uiState.errorMessage,
         shelves = uiState.shelves,
         isSelecting = uiState.isSelecting,
         selectedBookIds = uiState.selectedBookIds,
@@ -250,7 +255,42 @@ fun BookshelfView(
         onMatchSasayaki = { entry ->
             onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))
         },
+        syncSettings = syncSettings,
+        onSyncBook = { entry, direction ->
+            booksViewModel.syncBook(
+                entry = entry,
+                direction = direction,
+                syncStats = readerSettings.statisticsSyncEnabled,
+                statsSyncMode = readerSettings.statisticsSyncMode,
+                syncAudioBook = sasayakiSettings.enabled && sasayakiSettings.syncEnabled,
+            )
+        },
     )
+
+    uiState.statusMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = booksViewModel::consumeStatusMessage,
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = booksViewModel::consumeStatusMessage) {
+                    Text("OK")
+                }
+            },
+        )
+    }
+
+    uiState.errorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = booksViewModel::consumeErrorMessage,
+            title = { Text("Error") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = booksViewModel::consumeErrorMessage) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     deleteCandidate?.let { candidate ->
         AlertDialog(
@@ -503,7 +543,6 @@ private fun BooksTab(
     hasLoadedBooks: Boolean,
     isLoading: Boolean,
     blockingProgressMessage: String?,
-    errorMessage: String?,
     shelves: List<BookShelf>,
     isSelecting: Boolean,
     selectedBookIds: Set<String>,
@@ -527,6 +566,8 @@ private fun BooksTab(
     onMoveBook: (BookEntry, String?) -> Unit,
     sasayakiEnabled: Boolean,
     onMatchSasayaki: (BookEntry) -> Unit,
+    syncSettings: SyncSettings,
+    onSyncBook: (BookEntry, SyncDirection?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val fileTaskBlocked = blockingProgressMessage != null
@@ -577,7 +618,6 @@ private fun BooksTab(
                 }
                 !hasLoadedBooks -> Box(Modifier.fillMaxSize())
                 hasLoadedBooks && bookEntries.isEmpty() -> EmptyBooksView(
-                    errorMessage = errorMessage,
                     enabled = !fileTaskBlocked,
                     onImport = onImport,
                     modifier = Modifier
@@ -657,6 +697,8 @@ private fun BooksTab(
                                             onMatchSasayaki = onMatchSasayaki,
                                             onMarkReadCandidate = onMarkReadCandidate,
                                             onDeleteCandidate = onDeleteCandidate,
+                                            syncSettings = syncSettings,
+                                            onSyncBook = onSyncBook,
                                         )
                                     }
                                 }
@@ -686,15 +728,6 @@ private fun BooksTab(
                                         }
                                     }
                                 }
-                            }
-                        }
-                        errorMessage?.let { message ->
-                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = message,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
                             }
                         }
                     }
@@ -1125,17 +1158,46 @@ private fun BookContextMenu(
     onMatchSasayaki: (BookEntry) -> Unit,
     onMarkReadCandidate: (BookEntry) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
+    syncSettings: SyncSettings,
+    onSyncBook: (BookEntry, SyncDirection?) -> Unit,
 ) {
     var moveMenuExpanded by remember { mutableStateOf(false) }
+    var syncMenuExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(expanded, hideMove) {
         if (!expanded || hideMove) {
             moveMenuExpanded = false
         }
+        if (!expanded) {
+            syncMenuExpanded = false
+        }
     }
     DropdownMenu(
-        expanded = expanded && !moveMenuExpanded,
+        expanded = expanded && !moveMenuExpanded && !syncMenuExpanded,
         onDismissRequest = onDismiss,
     ) {
+        if (syncSettings.enabled) {
+            if (syncSettings.mode == SyncMode.Manual) {
+                DropdownMenuItem(
+                    text = { Text("Sync") },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = { syncMenuExpanded = true },
+                )
+            } else {
+                DropdownMenuItem(
+                    text = { Text("Sync") },
+                    onClick = {
+                        onSyncBook(entry, null)
+                        onDismiss()
+                    },
+                )
+            }
+            HorizontalDivider()
+        }
         if (!hideMove) {
             DropdownMenuItem(
                 text = { Text("Move") },
@@ -1181,6 +1243,42 @@ private fun BookContextMenu(
         onDismiss = onDismiss,
         onMoveBook = onMoveBook,
     )
+    SyncDirectionMenu(
+        entry = entry,
+        expanded = expanded && syncMenuExpanded,
+        onDismiss = onDismiss,
+        onSyncBook = onSyncBook,
+    )
+}
+
+@Composable
+private fun SyncDirectionMenu(
+    entry: BookEntry,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onSyncBook: (BookEntry, SyncDirection?) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+    ) {
+        SortMenuHeader(text = "Sync")
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("Import") },
+            onClick = {
+                onSyncBook(entry, SyncDirection.ImportFromTtu)
+                onDismiss()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Export") },
+            onClick = {
+                onSyncBook(entry, SyncDirection.ExportToTtu)
+                onDismiss()
+            },
+        )
+    }
 }
 
 @Composable
@@ -1436,7 +1534,6 @@ private fun SettingsRow(row: SettingsRowModel, onClick: () -> Unit) {
 
 @Composable
 private fun EmptyBooksView(
-    errorMessage: String?,
     onImport: () -> Unit,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
@@ -1461,10 +1558,6 @@ private fun EmptyBooksView(
             Button(onClick = onImport, enabled = enabled) {
                 Text("Import EPUB")
             }
-        }
-        if (errorMessage != null) {
-            Spacer(Modifier.height(18.dp))
-            Text(errorMessage, color = MaterialTheme.colorScheme.error)
         }
     }
 }

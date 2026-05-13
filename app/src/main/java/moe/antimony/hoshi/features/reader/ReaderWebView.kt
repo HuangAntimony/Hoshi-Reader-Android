@@ -93,9 +93,6 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.util.WeakHashMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.ReadingStatistics
@@ -128,6 +125,8 @@ fun ReaderWebView(
     onReaderSettingsChange: (ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
+    onFlushAutoSyncExport: () -> Unit = {},
+    onForegroundAutoSyncImport: () -> Unit = {},
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -360,8 +359,16 @@ fun ReaderWebView(
         }
 
     fun closeReader() {
-        webView?.flushPendingPageTurnProgress()
-        saveCurrentDisplayedPosition()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
         onClose()
     }
     fun clearReaderSelection() {
@@ -488,7 +495,7 @@ fun ReaderWebView(
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
                     webView?.evaluateJavascript(
-                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.id, reveal),
+                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
                     ) { progressResult ->
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
                             startStatisticsForProgressChangeIfNeeded()
@@ -559,24 +566,51 @@ fun ReaderWebView(
         }
     }
 
-    val currentLifecycleStart = rememberUpdatedState {
+    var lastInactiveAtMillis by remember { mutableStateOf<Long?>(null) }
+    val currentLifecycleResume = rememberUpdatedState {
+        val inactiveAt = lastInactiveAtMillis
+        lastInactiveAtMillis = null
+        val plan = readerLifecycleAutoSyncPlan(
+            event = ReaderLifecycleAutoSyncEvent.Resume,
+            inactiveElapsedMillis = inactiveAt?.let { SystemClock.elapsedRealtime() - it },
+        )
+        if (plan.importOnForeground) {
+            onForegroundAutoSyncImport()
+        }
         resumeStatisticsForLifecycleStartIfNeeded()
     }
-    val currentLifecycleStop = rememberUpdatedState {
-        webView?.flushPendingPageTurnProgress()
+    val currentLifecyclePause = rememberUpdatedState {
+        lastInactiveAtMillis = SystemClock.elapsedRealtime()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Pause)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
         resumeStatisticsTrackingOnStart = pauseStatisticsForLifecycleStop()
-        saveCurrentDisplayedPosition()
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
     }
     val currentLifecycleDispose = rememberUpdatedState {
-        webView?.flushPendingPageTurnProgress()
-        saveCurrentDisplayedPosition()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
     }
     val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> currentLifecycleStart.value()
-                Lifecycle.Event.ON_STOP -> currentLifecycleStop.value()
+                Lifecycle.Event.ON_RESUME -> currentLifecycleResume.value()
+                Lifecycle.Event.ON_PAUSE -> currentLifecyclePause.value()
                 else -> Unit
             }
         }
@@ -705,7 +739,6 @@ fun ReaderWebView(
                     },
                     scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
                     readerSettings = effectiveSettings,
-                    sasayakiCuesJson = sasayakiMatchData?.cuesJsonForChapter(readerPosition.loadPosition.index),
                     sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                     sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                     onTextSelected = handleTextSelected,
@@ -1277,7 +1310,6 @@ private fun ChapterWebView(
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     scanNonJapaneseText: Boolean,
     readerSettings: ReaderSettings,
-    sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData) -> Int?,
@@ -1298,6 +1330,7 @@ private fun ChapterWebView(
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     var lastContinuousProgressUpdate by remember { mutableStateOf(0L) }
+    var continuousScrollSaveRequestId by remember { mutableStateOf(0L) }
     val currentOnFragmentRestored = rememberUpdatedState<(WebView) -> Unit> { restoredWebView ->
         if (chapterFragment != null) {
             restoredWebView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
@@ -1335,19 +1368,10 @@ private fun ChapterWebView(
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
-            sasayakiCuesJson = null,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
         )
     }
-    LaunchedEffect(webViewViewportSize, isWebViewRestoring, sasayakiCuesJson) {
-        if (isWebViewRestoring || webViewViewportSize == IntSize.Zero) return@LaunchedEffect
-        readerWebView?.evaluateJavascript(
-            ReaderPaginationScripts.applySasayakiCuesInvocation(sasayakiCuesJson ?: "[]"),
-            null,
-        )
-    }
-
     AndroidView(
         modifier = modifier
             .onSizeChanged(onReaderViewportSizeChanged)
@@ -1418,14 +1442,39 @@ private fun ChapterWebView(
                     lastContinuousProgressUpdate = now
                     if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
                     val restoreEpoch = currentWebViewRestoreEpoch.value
+                    continuousScrollSaveRequestId += 1L
+                    val requestId = continuousScrollSaveRequestId
+                    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                     currentOnClearLookupPopup.value()
                     webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                        if (continuousScrollSaveRequestId != requestId) return@evaluateJavascript
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
-                            currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                            when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
+                                ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                ReaderProgressPersistenceAction.SaveBookmark -> {
+                                    currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                                }
+                            }
+                            lateinit var saveCallback: Runnable
+                            saveCallback = Runnable {
+                                if (continuousScrollSaveRequestId != requestId) return@Runnable
+                                if (readerPendingProgressSaveCallbacks[webView] == saveCallback) {
+                                    readerPendingProgressSaveCallbacks.remove(webView)
+                                }
+                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollIdle)) {
+                                    ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                    ReaderProgressPersistenceAction.SaveBookmark -> {
+                                        currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                                    }
+                                }
+                            }
+                            readerPendingProgressSaveCallbacks[webView] = saveCallback
+                            webView.postDelayed(saveCallback, CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS)
                         }
                     }
                 }
             } else {
+                readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                 webView.setOnScrollChangeListener(null)
                 webView.setOnTouchListener(object : SwipePageTouchListener() {
                     override fun onTap(x: Float, y: Float) {
@@ -1526,7 +1575,6 @@ private fun readerSetupScript(
     fontFaceUrl: String?,
     systemDark: Boolean,
     scanNonJapaneseText: Boolean,
-    sasayakiCuesJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
 ): String {
@@ -1542,7 +1590,6 @@ private fun readerSetupScript(
         initialProgress = initialProgress,
         initialFragment = initialFragment,
         settings = settings,
-        sasayakiCuesJson = sasayakiCuesJson,
     ).scriptTagBody()
     return """
         (function() {
@@ -1591,28 +1638,20 @@ private fun WebView.navigatePage(
 ) {
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
         if (ReaderPaginationScripts.didScroll(result)) {
-            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
             val webView = this
             val requestId = nextReaderPageTurnProgressRequestId()
             readerPageTurnProgressRequestIds[webView] = requestId
             webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
                 if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
+                readerPageTurnProgressRequestIds.remove(webView)
                 val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
                 onDisplayedProgress(progress)
-                lateinit var progressCallback: Runnable
-                progressCallback = Runnable {
-                    if (readerPageTurnProgressRequestIds[webView] != requestId) return@Runnable
-                    readerPageTurnProgressRequestIds.remove(webView)
-                    if (readerPageTurnProgressCallbacks[webView] == progressCallback) {
-                        readerPageTurnProgressCallbacks.remove(webView)
-                    }
-                    onSaveProgress(progress)
+                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
+                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
+                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
                 }
-                readerPageTurnProgressCallbacks[webView] = progressCallback
-                postDelayed(progressCallback, PAGE_TURN_PROGRESS_SAVE_DELAY_MS)
             }
         } else {
-            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
             readerPageTurnProgressRequestIds.remove(this)
             onLimit()
         }
@@ -1638,8 +1677,8 @@ private fun WebView.navigatePageForDirection(
     navigatePage(direction, onLimit, onDisplayedProgress, onSaveProgress)
 }
 
-private fun WebView.flushPendingPageTurnProgress() {
-    val progressCallback = readerPageTurnProgressCallbacks.remove(this) ?: return
+private fun WebView.flushPendingProgressSave() {
+    val progressCallback = readerPendingProgressSaveCallbacks.remove(this) ?: return
     removeCallbacks(progressCallback)
     progressCallback.run()
 }
@@ -1733,12 +1772,12 @@ private fun WebView.showAfterReaderRestore() {
 }
 
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()
-private val readerPageTurnProgressCallbacks = WeakHashMap<WebView, Runnable>()
+private val readerPendingProgressSaveCallbacks = WeakHashMap<WebView, Runnable>()
 private val readerPageTurnProgressRequestIds = WeakHashMap<WebView, Long>()
 private var readerPageTurnProgressRequestId = 0L
 private const val MAX_SELECTION_LENGTH = 16
-private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 250L
-private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 1_000L
+private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 50L
+private const val CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS = 250L
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -1754,12 +1793,8 @@ private fun resolveBookCoverFile(bookRoot: File?, coverHref: String?): File? {
     return file.takeIf { it.isFile }
 }
 
-private fun SasayakiMatchData.cuesJsonForChapter(chapterIndex: Int): String {
-    val cues = matches
-        .filter { it.chapterIndex == chapterIndex }
-        .map { SasayakiCueRange(id = it.id, start = it.start, length = it.length) }
-    return Json.encodeToString(ListSerializer(SasayakiCueRange.serializer()), cues)
-}
+private fun SasayakiMatch.toCueRange(): SasayakiCueRange =
+    SasayakiCueRange(id = id, start = start, length = length)
 
 private fun SasayakiPlaybackData?.hasStoredAudioSource(): Boolean =
     this?.audioUri?.isNotBlank() == true || this?.audioFileName?.isNotBlank() == true

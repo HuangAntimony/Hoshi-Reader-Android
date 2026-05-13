@@ -5,6 +5,17 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add iOS-compatible Google Drive sync using Android Google Play services authorization, with Advanced -> Syncing settings, Google Cloud OAuth setup guidance, bookshelf long-press manual sync, reader auto import/export triggers, statistics sync options, and Sasayaki playback-position sync.
+
+### Fixed
+
+- Prevent paginated reader progress from moving backward on page turns when vertical text layout reorders text nodes across columns, while still updating and restoring progress inside large text nodes.
+- Prevent books from shifting text after opening at positions with Sasayaki matches, without slowing reader restore.
+- Align the Advanced Backup entry with iOS by moving it into its own section with a storage icon.
+- Prevent Behavior, Statistics, Sasayaki, Audio, and other settings pages from briefly rendering default switch values before saved settings load.
+
 ## [v0.5.0] - 2026-05-13
 
 ### Added

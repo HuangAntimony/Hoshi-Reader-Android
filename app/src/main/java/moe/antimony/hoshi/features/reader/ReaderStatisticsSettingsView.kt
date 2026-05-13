@@ -36,6 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import moe.antimony.hoshi.LocalHoshiAppContainer
+import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +48,10 @@ fun ReaderStatisticsSettingsView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val appContainer = LocalHoshiAppContainer.current
+    val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
     var autostartMenuExpanded by remember { mutableStateOf(false) }
+    var syncModeMenuExpanded by remember { mutableStateOf(false) }
     BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
     Scaffold(
@@ -73,6 +79,7 @@ fun ReaderStatisticsSettingsView(
                 .padding(horizontal = 16.dp),
         ) {
             item {
+                val loadedSyncSettings = syncSettings ?: return@item
                 StatisticsSettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -113,6 +120,47 @@ fun ReaderStatisticsSettingsView(
                                 }
                             },
                         )
+                        if (loadedSyncSettings.enabled) {
+                            StatisticsSettingsDivider()
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text("ッツ Sync") },
+                                trailingContent = {
+                                    Switch(
+                                        checked = settings.statisticsSyncEnabled,
+                                        onCheckedChange = {
+                                            onSettingsChange(settings.copy(statisticsSyncEnabled = it))
+                                        },
+                                    )
+                                },
+                            )
+                            StatisticsSettingsDivider()
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text("Sync Behaviour") },
+                                trailingContent = {
+                                    Box {
+                                        TextButton(onClick = { syncModeMenuExpanded = true }) {
+                                            Text(settings.statisticsSyncMode.rawValue)
+                                        }
+                                        DropdownMenu(
+                                            expanded = syncModeMenuExpanded,
+                                            onDismissRequest = { syncModeMenuExpanded = false },
+                                        ) {
+                                            StatisticsSyncMode.entries.forEach { mode ->
+                                                DropdownMenuItem(
+                                                    text = { Text(mode.rawValue) },
+                                                    onClick = {
+                                                        syncModeMenuExpanded = false
+                                                        onSettingsChange(settings.copy(statisticsSyncMode = mode))
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
                 Text(
