@@ -25,10 +25,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -137,47 +138,22 @@ fun AdvancedSettingsView(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null) },
-                        headlineContent = { Text("Audio") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Audio },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null) },
-                        headlineContent = { Text("Statistics") },
-                        supportingContent = { Text("Track per-book reading time, speed, and characters read") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Statistics },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.Rounded.GraphicEq, contentDescription = null) },
-                        headlineContent = { Text("Sasayaki (Audiobooks)") },
-                        supportingContent = { Text("Read along with matched audiobook subtitles") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Sasayaki },
-                    )
-                }
-            }
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.Rounded.Backup, contentDescription = null) },
-                        headlineContent = { Text("Backup") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Backup },
-                    )
-                    GroupDivider()
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        leadingContent = { Icon(Icons.Rounded.Sync, contentDescription = null) },
-                        headlineContent = { Text("Syncing") },
-                        modifier = Modifier.clickable { destination = AdvancedDestination.Syncing },
-                    )
+            advancedSettingsSections().forEach { section ->
+                item {
+                    GroupCard {
+                        section.rows.forEachIndexed { index, row ->
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
+                                headlineContent = { Text(row.title) },
+                                supportingContent = row.subtitle?.let { subtitle -> { Text(subtitle) } },
+                                modifier = Modifier.clickable { destination = row.destination },
+                            )
+                            if (index != section.rows.lastIndex) {
+                                GroupDivider()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -582,13 +558,84 @@ private fun BackIconButton(onClick: () -> Unit) {
     }
 }
 
-private enum class AdvancedDestination {
+internal enum class AdvancedDestination {
     Audio,
     Statistics,
     Sasayaki,
     Backup,
     Syncing,
 }
+
+internal enum class AdvancedSettingsIcon {
+    Speaker,
+    Chart,
+    Waveform,
+    Cloud,
+    ExternalDrive,
+}
+
+internal data class AdvancedSettingsRow(
+    val title: String,
+    val destination: AdvancedDestination,
+    val icon: AdvancedSettingsIcon,
+    val subtitle: String? = null,
+)
+
+internal data class AdvancedSettingsSection(
+    val rows: List<AdvancedSettingsRow>,
+)
+
+internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
+    listOf(
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "Audio",
+                    destination = AdvancedDestination.Audio,
+                    icon = AdvancedSettingsIcon.Speaker,
+                ),
+                AdvancedSettingsRow(
+                    title = "Statistics",
+                    destination = AdvancedDestination.Statistics,
+                    icon = AdvancedSettingsIcon.Chart,
+                    subtitle = "Track per-book reading time, speed, and characters read",
+                ),
+                AdvancedSettingsRow(
+                    title = "Sasayaki (Audiobooks)",
+                    destination = AdvancedDestination.Sasayaki,
+                    icon = AdvancedSettingsIcon.Waveform,
+                    subtitle = "Read along with matched audiobook subtitles",
+                ),
+            ),
+        ),
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "ッツ Sync",
+                    destination = AdvancedDestination.Syncing,
+                    icon = AdvancedSettingsIcon.Cloud,
+                ),
+            ),
+        ),
+        AdvancedSettingsSection(
+            rows = listOf(
+                AdvancedSettingsRow(
+                    title = "Backup",
+                    destination = AdvancedDestination.Backup,
+                    icon = AdvancedSettingsIcon.ExternalDrive,
+                ),
+            ),
+        ),
+    )
+
+private fun AdvancedSettingsIcon.imageVector(): ImageVector =
+    when (this) {
+        AdvancedSettingsIcon.Speaker -> Icons.AutoMirrored.Rounded.VolumeUp
+        AdvancedSettingsIcon.Chart -> Icons.AutoMirrored.Rounded.ShowChart
+        AdvancedSettingsIcon.Waveform -> Icons.Rounded.GraphicEq
+        AdvancedSettingsIcon.Cloud -> Icons.Rounded.Cloud
+        AdvancedSettingsIcon.ExternalDrive -> Icons.Rounded.Storage
+    }
 
 private const val ProgressUpdateBytes = 64L * 1024L * 1024L
 

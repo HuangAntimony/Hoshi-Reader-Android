@@ -57,6 +57,7 @@ This file is the short operational handoff for future agents.
 
 ### Sync
 
+- Preserve the Syncing page's loaded-state gate when refactoring settings collection so saved switches, Google Drive status, and connect/sign-out actions do not flash stale defaults on entry.
 - Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export, reader-open import-only, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
 - Future no-GMS sync auth should add Device Code or Browser PKCE behind `DriveAuthorizer` / `DriveAccessTokenProvider` without changing `SyncManager` or Drive sidecar rules.
 

@@ -70,8 +70,8 @@ fun SyncSettingsView(
     val repository = appContainer.syncSettingsRepository
     val authorizer = appContainer.driveAuthorizer
     val scope = rememberCoroutineScope()
-    var settings by remember { mutableStateOf(SyncSettings()) }
-    var authStatus by remember { mutableStateOf<DriveAuthStatus>(DriveAuthStatus.NotConnected) }
+    var settings by remember { mutableStateOf<SyncSettings?>(null) }
+    var authStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var copyMessage by remember { mutableStateOf<String?>(null) }
@@ -79,18 +79,15 @@ fun SyncSettingsView(
     var pendingAuthorizationResolution by remember { mutableStateOf<IntentSenderRequest?>(null) }
     val packageName = remember(context) { context.packageName }
     val sha1 = remember(context) { context.signingCertificateSha1() }
-    val connectionActions = syncConnectionActions(authStatus, isAuthorizing)
+    val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
+    val currentSettings = settings
+    val currentAuthStatus = authStatus
+    val connectionActions = currentAuthStatus?.let { syncConnectionActions(it, isAuthorizing) }
 
     fun save(next: SyncSettings) {
         settings = next
         scope.launch {
             repository.update { next }
-        }
-    }
-
-    fun refreshStatus() {
-        scope.launch {
-            authStatus = authorizer.status()
         }
     }
 
@@ -193,14 +190,17 @@ fun SyncSettingsView(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
+                if (!screenState.isContentReady || currentSettings == null || currentAuthStatus == null) {
+                    return@item
+                }
                 SettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Enable") },
                         trailingContent = {
                             Switch(
-                                checked = settings.enabled,
-                                onCheckedChange = { save(settings.copy(enabled = it)) },
+                                checked = currentSettings.enabled,
+                                onCheckedChange = { save(currentSettings.copy(enabled = it)) },
                             )
                         },
                     )
@@ -211,7 +211,7 @@ fun SyncSettingsView(
                         trailingContent = {
                             Box {
                                 TextButton(onClick = { directionMenuExpanded = true }) {
-                                    Text(settings.mode.rawValue)
+                                    Text(currentSettings.mode.rawValue)
                                 }
                                 DropdownMenu(
                                     expanded = directionMenuExpanded,
@@ -222,7 +222,7 @@ fun SyncSettingsView(
                                             text = { Text(mode.rawValue) },
                                             onClick = {
                                                 directionMenuExpanded = false
-                                                save(settings.copy(mode = mode))
+                                                save(currentSettings.copy(mode = mode))
                                             },
                                         )
                                     }
@@ -236,19 +236,22 @@ fun SyncSettingsView(
                         headlineContent = { Text("Auto Sync") },
                         trailingContent = {
                             Switch(
-                                checked = settings.autoSyncEnabled,
-                                onCheckedChange = { save(settings.copy(autoSyncEnabled = it)) },
+                                checked = currentSettings.autoSyncEnabled,
+                                onCheckedChange = { save(currentSettings.copy(autoSyncEnabled = it)) },
                             )
                         },
                     )
                 }
             }
             item {
+                if (!screenState.isContentReady || currentAuthStatus == null) {
+                    return@item
+                }
                 SettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text("Google Drive") },
-                        supportingContent = { Text(authStatus.label()) },
+                        supportingContent = { Text(currentAuthStatus.label()) },
                     )
                     SettingsDivider()
                     ListItem(
@@ -297,6 +300,9 @@ fun SyncSettingsView(
                 }
             }
             item {
+                if (!screenState.isContentReady || connectionActions == null) {
+                    return@item
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     if (connectionActions.showConnect) {
                         Button(

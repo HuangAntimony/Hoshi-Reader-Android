@@ -15,6 +15,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Avoid falsely reporting Google Drive authorization as cancelled when the Android account chooser returns an authorization result with a cancelled activity code.
 - Hide the Google Drive connect button after syncing is connected and make Sign out immediately return the Syncing page to Not connected.
+- Prevent the Syncing settings page from briefly showing stale default switch, connection status, and connect button states while loading saved settings.
+- Align Advanced settings sync and backup entries with iOS by showing `ッツ Sync` with a cloud icon and moving Backup into its own section with a storage icon.
 
 ## [v0.5.0] - 2026-05-13
 
