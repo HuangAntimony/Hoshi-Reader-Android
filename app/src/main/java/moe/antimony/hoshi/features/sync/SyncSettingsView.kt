@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import java.security.MessageDigest
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
+import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +71,7 @@ fun SyncSettingsView(
     val repository = appContainer.syncSettingsRepository
     val authorizer = appContainer.driveAuthorizer
     val scope = rememberCoroutineScope()
-    var settings by remember { mutableStateOf<SyncSettings?>(null) }
+    val settings = repository.settings.collectAsLoadedSettings()
     var authStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -85,7 +86,6 @@ fun SyncSettingsView(
     val connectionActions = currentAuthStatus?.let { syncConnectionActions(it, isAuthorizing) }
 
     fun save(next: SyncSettings) {
-        settings = next
         scope.launch {
             repository.update { next }
         }
@@ -114,11 +114,6 @@ fun SyncSettingsView(
         authorizationLauncher.launch(request)
     }
 
-    LaunchedEffect(repository) {
-        repository.settings.collect { latest ->
-            settings = latest
-        }
-    }
     LaunchedEffect(authorizer) {
         authStatus = authorizer.status()
     }
