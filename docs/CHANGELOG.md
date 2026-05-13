@@ -7,22 +7,14 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Added
 
-- Add iOS-compatible Google Drive sync using Android Google Play services authorization, with Advanced -> Syncing settings, bookshelf long-press manual sync, reader auto import/export triggers, statistics sync options, and Sasayaki playback-position sync.
-- Add Google Cloud Android OAuth setup instructions and copy buttons for the debug package name and SHA-1 on the Syncing settings page.
-- Add a TTU setup link and clearer first-time Google Cloud setup guidance to the Syncing page.
+- Add iOS-compatible Google Drive sync using Android Google Play services authorization, with Advanced -> Syncing settings, Google Cloud OAuth setup guidance, bookshelf long-press manual sync, reader auto import/export triggers, statistics sync options, and Sasayaki playback-position sync.
 
 ### Fixed
 
-- Avoid falsely reporting Google Drive authorization as cancelled when the Android account chooser returns an authorization result with a cancelled activity code.
-- Hide the Google Drive connect button after syncing is connected and make Sign out immediately return the Syncing page to Not connected.
-- Prevent the Syncing settings page from briefly showing stale default switch, connection status, and connect button states while loading saved settings.
-- Align reader auto-sync import/export triggers with iOS so reader-open import waits for saved settings, foreground import uses the inactive threshold, page turns export from immediate bookmark saves, and continuous scrolling exports only after the scroll settles.
-- Keep reader auto-sync exports alive after closing the reader, waiting for the latest bookmark save before uploading progress to Google Drive.
 - Prevent paginated reader progress from moving backward on page turns when vertical text layout reorders text nodes across columns, while still updating and restoring progress inside large text nodes.
 - Prevent books from shifting text after opening at positions with Sasayaki matches, without slowing reader restore.
-- Align Advanced settings sync and backup entries with iOS by showing `ッツ Sync` with a cloud icon and moving Backup into its own section with a storage icon.
+- Align the Advanced Backup entry with iOS by moving it into its own section with a storage icon.
 - Prevent Behavior, Statistics, Sasayaki, Audio, and other settings pages from briefly rendering default switch values before saved settings load.
-- Show manual bookshelf sync success and failure messages in dialogs instead of inline text on the bookshelf.
 
 ## [v0.5.0] - 2026-05-13
 
