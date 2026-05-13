@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.6.1] - 2026-05-14
+
 ### Fixed
 
 - Replace Google Drive sync authorization with user-configured Device Code flow so Android can use the same Google Cloud project as iOS/ッツ sync.
