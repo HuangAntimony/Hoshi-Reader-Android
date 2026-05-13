@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add iOS-compatible Google Drive sync using Android Google Play services authorization, with Advanced -> Syncing settings, bookshelf long-press manual sync, reader auto import/export triggers, statistics sync options, and Sasayaki playback-position sync.
 - Add Google Cloud Android OAuth setup instructions and copy buttons for the debug package name and SHA-1 on the Syncing settings page.
+- Add a TTU setup link and clearer first-time Google Cloud setup guidance to the Syncing page.
 
 ### Fixed
 

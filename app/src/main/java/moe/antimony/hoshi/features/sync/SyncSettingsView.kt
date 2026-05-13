@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.sync
 import android.content.ClipData
 import android.content.Context
 import android.content.ClipboardManager
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.IntentSenderRequest
@@ -21,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -294,29 +297,7 @@ fun SyncSettingsView(
                 }
             }
             item {
-                SettingsCard {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            text = "Google Cloud OAuth setup",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colorScheme.onSurface,
-                        )
-                        GoogleCloudOAuthConfiguration.instructions.forEachIndexed { index, instruction ->
-                            Text(
-                                text = "${index + 1}. $instruction",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     if (connectionActions.showConnect) {
                         Button(
                             onClick = ::connectGoogleDrive,
@@ -335,7 +316,53 @@ fun SyncSettingsView(
                             Text("Sign out")
                         }
                     }
+                    GoogleCloudOAuthSetupCard()
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoogleCloudOAuthSetupCard() {
+    val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Google Cloud OAuth setup",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colorScheme.onSurface,
+            )
+            Text(
+                text = GoogleCloudOAuthConfiguration.introduction,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(GoogleCloudOAuthConfiguration.ttuSetupUrl)),
+                    )
+                },
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text("TTU Google Cloud setup")
+            }
+            GoogleCloudOAuthConfiguration.instructions.forEachIndexed { index, instruction ->
+                Text(
+                    text = "${index + 1}. $instruction",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
