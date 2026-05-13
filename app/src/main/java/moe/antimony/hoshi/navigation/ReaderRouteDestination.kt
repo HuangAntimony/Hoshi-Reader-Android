@@ -8,7 +8,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,10 +25,9 @@ import moe.antimony.hoshi.features.reader.ReaderWebView
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.BookEntry
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
+import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
-import moe.antimony.hoshi.features.sync.SyncSettings
 
 @Composable
 internal fun ReaderRouteDestination(
@@ -43,8 +41,12 @@ internal fun ReaderRouteDestination(
     modifier: Modifier = Modifier,
 ) {
     val appContainer = LocalHoshiAppContainer.current
-    val syncSettings by appContainer.syncSettingsRepository.settings.collectAsState(initial = SyncSettings())
-    val sasayakiSettings by appContainer.sasayakiSettingsRepository.settings.collectAsState(initial = SasayakiSettings())
+    val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
+    val sasayakiSettings = appContainer.sasayakiSettingsRepository.settings.collectAsLoadedSettings()
+    val autoSyncState = ReaderRouteAutoSyncState(
+        syncSettings = syncSettings,
+        sasayakiSettings = sasayakiSettings,
+    )
     val bookmarkScope = rememberCoroutineScope()
     var reloadKey by remember(bookId) { mutableIntStateOf(0) }
     var pendingExport by remember(bookId) { mutableStateOf(false) }
@@ -55,20 +57,27 @@ internal fun ReaderRouteDestination(
         Color(readerSettings.backgroundColor(systemDarkTheme)),
     )
     val routeState by produceState<ReaderRouteLoadState>(
-        initialValue = ReaderRouteLoadState.Loading,
-        key1 = bookId,
-        key2 = stateHolder,
-        key3 = reloadKey,
+        ReaderRouteLoadState.Loading,
+        bookId,
+        stateHolder,
+        reloadKey,
+        autoSyncState.isReadyToLoad,
     ) {
+        if (!autoSyncState.isReadyToLoad) {
+            value = ReaderRouteLoadState.Loading
+            return@produceState
+        }
+        val shouldSyncOnOpen = autoSyncState.shouldSyncOnOpen
+        val shouldSyncAudioBook = autoSyncState.shouldSyncAudioBook
         value = stateHolder.load(bookId) { entry ->
-            if (syncSettings.isReaderAutoSyncEnabled()) {
+            if (shouldSyncOnOpen) {
                 runCatching {
                     appContainer.syncManager.syncBook(
                         entry = entry,
                         direction = null,
                         syncStats = readerSettings.statisticsSyncEnabled,
                         statsSyncMode = readerSettings.statisticsSyncMode,
-                        syncAudioBook = sasayakiSettings.enabled && sasayakiSettings.syncEnabled,
+                        syncAudioBook = shouldSyncAudioBook,
                         importOnly = true,
                     )
                 }
@@ -85,14 +94,14 @@ internal fun ReaderRouteDestination(
                     direction = SyncDirection.ExportToTtu,
                     syncStats = readerSettings.statisticsSyncEnabled,
                     statsSyncMode = readerSettings.statisticsSyncMode,
-                    syncAudioBook = sasayakiSettings.enabled && sasayakiSettings.syncEnabled,
+                    syncAudioBook = autoSyncState.shouldSyncAudioBook,
                 )
             }
         }
     }
 
     fun scheduleExport(entry: BookEntry) {
-        if (!syncSettings.isReaderAutoSyncEnabled()) return
+        if (!autoSyncState.isReaderAutoSyncEnabled) return
         pendingExport = true
         if (exportJob?.isActive == true) return
         exportJob = bookmarkScope.launch {
@@ -106,7 +115,7 @@ internal fun ReaderRouteDestination(
     }
 
     fun flushExport(entry: BookEntry) {
-        if (!syncSettings.isReaderAutoSyncEnabled() || !pendingExport) return
+        if (!autoSyncState.isReaderAutoSyncEnabled || !pendingExport) return
         pendingExport = false
         exportJob?.cancel()
         exportJob = null
@@ -114,7 +123,7 @@ internal fun ReaderRouteDestination(
     }
 
     fun importOnForeground(entry: BookEntry) {
-        if (!syncSettings.isReaderAutoSyncEnabled()) return
+        if (!autoSyncState.isReaderAutoSyncEnabled) return
         bookmarkScope.launch {
             val result = runCatching {
                 appContainer.syncManager.syncBook(
@@ -122,7 +131,7 @@ internal fun ReaderRouteDestination(
                     direction = null,
                     syncStats = readerSettings.statisticsSyncEnabled,
                     statsSyncMode = readerSettings.statisticsSyncMode,
-                    syncAudioBook = sasayakiSettings.enabled && sasayakiSettings.syncEnabled,
+                    syncAudioBook = autoSyncState.shouldSyncAudioBook,
                     importOnly = true,
                 )
             }.getOrNull()
@@ -177,8 +186,5 @@ internal fun ReaderRouteDestination(
         )
     }
 }
-
-private fun SyncSettings.isReaderAutoSyncEnabled(): Boolean =
-    enabled && autoSyncEnabled
 
 private const val ReaderAutoSyncDebounceMillis = 30_000L

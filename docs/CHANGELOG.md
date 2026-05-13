@@ -16,6 +16,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Avoid falsely reporting Google Drive authorization as cancelled when the Android account chooser returns an authorization result with a cancelled activity code.
 - Hide the Google Drive connect button after syncing is connected and make Sign out immediately return the Syncing page to Not connected.
 - Prevent the Syncing settings page from briefly showing stale default switch, connection status, and connect button states while loading saved settings.
+- Align reader auto-sync import/export triggers with iOS so reader-open import waits for saved settings, foreground import uses the inactive threshold, page turns export from immediate bookmark saves, and continuous scrolling exports only after the scroll settles.
 - Align Advanced settings sync and backup entries with iOS by showing `ッツ Sync` with a cloud icon and moving Backup into its own section with a storage icon.
 - Prevent Behavior, Statistics, Sasayaki, Audio, and other settings pages from briefly rendering default switch values before saved settings load.
 

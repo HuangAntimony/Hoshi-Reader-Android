@@ -58,7 +58,7 @@ This file is the short operational handoff for future agents.
 ### Sync
 
 - Preserve the shared lifecycle-aware loaded-settings collection pattern when adding settings pages so controls do not flash default values before saved preferences load.
-- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export, reader-open import-only, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
+- Device-validate the first Android Google Drive sync slice with `testdata/test.epub` on a configured debug OAuth client: connect/sign-out state, long-press manual import/export, reader-open import-only, iOS-aligned paginated/continuous auto-export timing, close/background flush export, statistics Merge/Replace, and Sasayaki last-position sync.
 - Future no-GMS sync auth should add Device Code or Browser PKCE behind `DriveAuthorizer` / `DriveAccessTokenProvider` without changing `SyncManager` or Drive sidecar rules.
 
 ### Release Distribution

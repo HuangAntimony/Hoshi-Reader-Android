@@ -362,9 +362,16 @@ fun ReaderWebView(
         }
 
     fun closeReader() {
-        webView?.flushPendingPageTurnProgress()
-        saveCurrentDisplayedPosition()
-        onFlushAutoSyncExport()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
         onClose()
     }
     fun clearReaderSelection() {
@@ -562,33 +569,51 @@ fun ReaderWebView(
         }
     }
 
-    var lastStoppedAtMillis by remember { mutableStateOf<Long?>(null) }
-    val currentLifecycleStart = rememberUpdatedState {
-        val stoppedAt = lastStoppedAtMillis
-        lastStoppedAtMillis = null
-        if (stoppedAt != null && SystemClock.elapsedRealtime() - stoppedAt >= AutoSyncForegroundThresholdMillis) {
+    var lastInactiveAtMillis by remember { mutableStateOf<Long?>(null) }
+    val currentLifecycleResume = rememberUpdatedState {
+        val inactiveAt = lastInactiveAtMillis
+        lastInactiveAtMillis = null
+        val plan = readerLifecycleAutoSyncPlan(
+            event = ReaderLifecycleAutoSyncEvent.Resume,
+            inactiveElapsedMillis = inactiveAt?.let { SystemClock.elapsedRealtime() - it },
+        )
+        if (plan.importOnForeground) {
             onForegroundAutoSyncImport()
         }
         resumeStatisticsForLifecycleStartIfNeeded()
     }
-    val currentLifecycleStop = rememberUpdatedState {
-        lastStoppedAtMillis = SystemClock.elapsedRealtime()
-        webView?.flushPendingPageTurnProgress()
+    val currentLifecyclePause = rememberUpdatedState {
+        lastInactiveAtMillis = SystemClock.elapsedRealtime()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Pause)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
         resumeStatisticsTrackingOnStart = pauseStatisticsForLifecycleStop()
-        saveCurrentDisplayedPosition()
-        onFlushAutoSyncExport()
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
     }
     val currentLifecycleDispose = rememberUpdatedState {
-        webView?.flushPendingPageTurnProgress()
-        saveCurrentDisplayedPosition()
-        onFlushAutoSyncExport()
+        val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
+        if (plan.flushPendingProgressSave) {
+            webView?.flushPendingProgressSave()
+        }
+        if (plan.saveCurrentDisplayedPosition) {
+            saveCurrentDisplayedPosition()
+        }
+        if (plan.flushAutoSyncExport) {
+            onFlushAutoSyncExport()
+        }
     }
     val lifecycle = view.findViewTreeLifecycleOwner()?.lifecycle
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> currentLifecycleStart.value()
-                Lifecycle.Event.ON_STOP -> currentLifecycleStop.value()
+                Lifecycle.Event.ON_RESUME -> currentLifecycleResume.value()
+                Lifecycle.Event.ON_PAUSE -> currentLifecyclePause.value()
                 else -> Unit
             }
         }
@@ -1310,6 +1335,7 @@ private fun ChapterWebView(
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     var lastContinuousProgressUpdate by remember { mutableStateOf(0L) }
+    var continuousScrollSaveRequestId by remember { mutableStateOf(0L) }
     val currentOnFragmentRestored = rememberUpdatedState<(WebView) -> Unit> { restoredWebView ->
         if (chapterFragment != null) {
             restoredWebView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
@@ -1430,14 +1456,39 @@ private fun ChapterWebView(
                     lastContinuousProgressUpdate = now
                     if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
                     val restoreEpoch = currentWebViewRestoreEpoch.value
+                    continuousScrollSaveRequestId += 1L
+                    val requestId = continuousScrollSaveRequestId
+                    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                     currentOnClearLookupPopup.value()
                     webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                        if (continuousScrollSaveRequestId != requestId) return@evaluateJavascript
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
-                            currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                            when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
+                                ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                ReaderProgressPersistenceAction.SaveBookmark -> {
+                                    currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                                }
+                            }
+                            lateinit var saveCallback: Runnable
+                            saveCallback = Runnable {
+                                if (continuousScrollSaveRequestId != requestId) return@Runnable
+                                if (readerPendingProgressSaveCallbacks[webView] == saveCallback) {
+                                    readerPendingProgressSaveCallbacks.remove(webView)
+                                }
+                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollIdle)) {
+                                    ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                    ReaderProgressPersistenceAction.SaveBookmark -> {
+                                        currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                                    }
+                                }
+                            }
+                            readerPendingProgressSaveCallbacks[webView] = saveCallback
+                            webView.postDelayed(saveCallback, CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS)
                         }
                     }
                 }
             } else {
+                readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                 webView.setOnScrollChangeListener(null)
                 webView.setOnTouchListener(object : SwipePageTouchListener() {
                     override fun onTap(x: Float, y: Float) {
@@ -1603,28 +1654,20 @@ private fun WebView.navigatePage(
 ) {
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
         if (ReaderPaginationScripts.didScroll(result)) {
-            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
             val webView = this
             val requestId = nextReaderPageTurnProgressRequestId()
             readerPageTurnProgressRequestIds[webView] = requestId
             webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
                 if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
+                readerPageTurnProgressRequestIds.remove(webView)
                 val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
                 onDisplayedProgress(progress)
-                lateinit var progressCallback: Runnable
-                progressCallback = Runnable {
-                    if (readerPageTurnProgressRequestIds[webView] != requestId) return@Runnable
-                    readerPageTurnProgressRequestIds.remove(webView)
-                    if (readerPageTurnProgressCallbacks[webView] == progressCallback) {
-                        readerPageTurnProgressCallbacks.remove(webView)
-                    }
-                    onSaveProgress(progress)
+                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
+                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
+                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
                 }
-                readerPageTurnProgressCallbacks[webView] = progressCallback
-                postDelayed(progressCallback, PAGE_TURN_PROGRESS_SAVE_DELAY_MS)
             }
         } else {
-            readerPageTurnProgressCallbacks.remove(this)?.let(::removeCallbacks)
             readerPageTurnProgressRequestIds.remove(this)
             onLimit()
         }
@@ -1650,8 +1693,8 @@ private fun WebView.navigatePageForDirection(
     navigatePage(direction, onLimit, onDisplayedProgress, onSaveProgress)
 }
 
-private fun WebView.flushPendingPageTurnProgress() {
-    val progressCallback = readerPageTurnProgressCallbacks.remove(this) ?: return
+private fun WebView.flushPendingProgressSave() {
+    val progressCallback = readerPendingProgressSaveCallbacks.remove(this) ?: return
     removeCallbacks(progressCallback)
     progressCallback.run()
 }
@@ -1745,13 +1788,12 @@ private fun WebView.showAfterReaderRestore() {
 }
 
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()
-private val readerPageTurnProgressCallbacks = WeakHashMap<WebView, Runnable>()
+private val readerPendingProgressSaveCallbacks = WeakHashMap<WebView, Runnable>()
 private val readerPageTurnProgressRequestIds = WeakHashMap<WebView, Long>()
 private var readerPageTurnProgressRequestId = 0L
 private const val MAX_SELECTION_LENGTH = 16
-private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 250L
-private const val PAGE_TURN_PROGRESS_SAVE_DELAY_MS = 1_000L
-private const val AutoSyncForegroundThresholdMillis = 10L * 60L * 1_000L
+private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 50L
+private const val CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS = 250L
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
