@@ -262,9 +262,7 @@ internal object LookupPopupHtml {
                             if (posted) return;
                             posted = true;
                             requestAnimationFrame(function() {
-                                requestAnimationFrame(function() {
-                                    webkit.messageHandlers.contentReady.postMessage(null);
-                                });
+                                webkit.messageHandlers.contentReady.postMessage(null);
                             });
                         }
                         if (container) {
