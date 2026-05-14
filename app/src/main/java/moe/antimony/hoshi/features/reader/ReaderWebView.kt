@@ -1761,16 +1761,26 @@ private fun WebView.navigatePage(
             val webView = this
             val requestId = nextReaderPageTurnProgressRequestId()
             readerPageTurnProgressRequestIds[webView] = requestId
-            webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
-                readerPageTurnProgressRequestIds.remove(webView)
-                val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
-                onDisplayedProgress(progress)
-                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
-                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
-                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
-                }
-            }
+            webView.postVisualStateCallback(
+                requestId,
+                object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        if (readerPageTurnProgressRequestIds[webView] != requestId) return
+                        webView.postOnAnimation {
+                            webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                                if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
+                                readerPageTurnProgressRequestIds.remove(webView)
+                                val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
+                                onDisplayedProgress(progress)
+                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
+                                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
+                                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
+                                }
+                            }
+                        }
+                    }
+                },
+            )
         } else {
             readerPageTurnProgressRequestIds.remove(this)
             onLimit()
