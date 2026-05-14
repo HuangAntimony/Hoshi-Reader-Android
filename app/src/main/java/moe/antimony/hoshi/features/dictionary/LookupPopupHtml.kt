@@ -17,7 +17,15 @@ internal data class LookupPopupAssets(
     val selectionJs: String = "",
 ) {
     companion object {
-        fun load(context: Context): LookupPopupAssets = LookupPopupAssets(
+        @Volatile
+        private var cached: LookupPopupAssets? = null
+
+        fun load(context: Context): LookupPopupAssets =
+            cached ?: synchronized(this) {
+                cached ?: read(context.applicationContext).also { cached = it }
+            }
+
+        private fun read(context: Context): LookupPopupAssets = LookupPopupAssets(
             popupJs = context.assets.open("hoshi-popup/popup.js")
                 .bufferedReader()
                 .use { it.readText() },

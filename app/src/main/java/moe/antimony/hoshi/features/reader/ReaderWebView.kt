@@ -122,8 +122,8 @@ import kotlin.math.abs
 
 private data class PendingRootSelectionHighlight(
     val popupId: String,
-    val count: Int,
-    val loadRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit,
+    val rects: List<ReaderSelectionRect>? = null,
+    val contentReady: Boolean = false,
 )
 
 private fun selectionBounds(rects: List<ReaderSelectionRect>): ReaderSelectionRect? {
@@ -444,30 +444,46 @@ fun ReaderWebView(
             setLookupPopups(emptyList())
         }
     }
-    fun applyPendingRootSelectionHighlight(popupId: String) {
+    fun updateRootPopupSelectionBounds(popupId: String, rects: List<ReaderSelectionRect>) {
+        selectionBounds(rects)?.let { bounds ->
+            setLookupPopups(
+                stateHolder.lookupPopups.map { popup ->
+                    if (popup.id == popupId) {
+                        popup.copy(
+                            state = popup.state.copy(
+                                selection = popup.state.selection.copy(rect = bounds),
+                            ),
+                        )
+                    } else {
+                        popup
+                    }
+                },
+            )
+        }
+    }
+    fun revealPendingRootSelectionHighlight(popupId: String) {
         val pending = pendingRootSelectionHighlight ?: return
         if (pending.popupId != popupId) return
-        pending.loadRects(pending.count) { rects ->
-            val fallbackRect = lookupPopups.firstOrNull { it.id == popupId }?.state?.selection?.rect
-            rootSelectionHighlightRects = rects.ifEmpty { fallbackRect?.let(::listOf).orEmpty() }
-            selectionBounds(rootSelectionHighlightRects)?.let { bounds ->
-                setLookupPopups(
-                    lookupPopups.map { popup ->
-                        if (popup.id == popupId) {
-                            popup.copy(
-                                state = popup.state.copy(
-                                    selection = popup.state.selection.copy(rect = bounds),
-                                ),
-                            )
-                        } else {
-                            popup
-                        }
-                    },
-                )
-            }
-            visibleLookupPopupIds = visibleLookupPopupIds + popupId
-        }
+        val rects = pending.rects ?: return
+        if (!pending.contentReady) return
+        rootSelectionHighlightRects = rects
+        visibleLookupPopupIds = visibleLookupPopupIds + popupId
         pendingRootSelectionHighlight = null
+    }
+    fun setPendingRootSelectionRects(popupId: String, rects: List<ReaderSelectionRect>) {
+        val pending = pendingRootSelectionHighlight ?: return
+        if (pending.popupId != popupId) return
+        val fallbackRect = stateHolder.lookupPopups.firstOrNull { it.id == popupId }?.state?.selection?.rect
+        val displayRects = rects.ifEmpty { fallbackRect?.let(::listOf).orEmpty() }
+        updateRootPopupSelectionBounds(popupId, displayRects)
+        pendingRootSelectionHighlight = pending.copy(rects = displayRects)
+        revealPendingRootSelectionHighlight(popupId)
+    }
+    fun markRootPopupContentReady(popupId: String) {
+        val pending = pendingRootSelectionHighlight ?: return
+        if (pending.popupId != popupId) return
+        pendingRootSelectionHighlight = pending.copy(contentReady = true)
+        revealPendingRootSelectionHighlight(popupId)
     }
     fun updateSasayakiSettings(settings: SasayakiSettings) {
         sasayakiSettings = settings
@@ -544,12 +560,14 @@ fun ReaderWebView(
         if (lookup != null) {
             val (popup, highlightCount) = lookup
             pauseSasayakiForLookupIfNeeded()
+            val selectionCount = onTextSelected(selection) ?: highlightCount
             pendingRootSelectionHighlight = PendingRootSelectionHighlight(
                 popupId = popup.id,
-                count = onTextSelected(selection) ?: highlightCount,
-                loadRects = selectionRects,
             )
             setLookupPopups(listOf(popup))
+            selectionRects(selectionCount) { rects ->
+                setPendingRootSelectionRects(popup.id, rects)
+            }
         } else {
             pendingRootSelectionHighlight = null
             onTextSelected(selection)?.let { selectionRects(it) { rootSelectionHighlightRects = it } }
@@ -856,7 +874,7 @@ fun ReaderWebView(
                     true
                 },
                 isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
-                onPopupContentReady = ::applyPendingRootSelectionHighlight,
+                onPopupContentReady = ::markRootPopupContentReady,
                 sasayakiWasPaused = sasayakiWasPausedByLookup,
                 sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
                 onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
