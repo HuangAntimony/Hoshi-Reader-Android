@@ -858,13 +858,22 @@ fun ReaderWebView(
                             vertical = viewportVerticalPadding,
                         ),
                 )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            horizontal = viewportHorizontalPadding,
+                            vertical = viewportVerticalPadding,
+                        ),
+                ) {
+                    RootSelectionHighlightOverlay(
+                        rects = rootSelectionHighlightRects,
+                        darkMode = popupDarkMode,
+                        eInkMode = effectiveSettings.eInkMode,
+                        verticalWriting = effectiveSettings.verticalWriting,
+                    )
+                }
             }
-            RootSelectionHighlightOverlay(
-                rects = rootSelectionHighlightRects,
-                darkMode = popupDarkMode,
-                eInkMode = effectiveSettings.eInkMode,
-                verticalWriting = effectiveSettings.verticalWriting,
-            )
             LookupPopupStackView(
                 popups = themedLookupPopups,
                 onPopupsChange = ::setLookupPopups,
