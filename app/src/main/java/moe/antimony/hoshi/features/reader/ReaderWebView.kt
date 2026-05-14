@@ -126,19 +126,8 @@ private data class PendingRootSelectionHighlight(
     val contentReady: Boolean = false,
 )
 
-private fun selectionBounds(rects: List<ReaderSelectionRect>): ReaderSelectionRect? {
-    if (rects.isEmpty()) return null
-    val left = rects.minOf { it.x }
-    val top = rects.minOf { it.y }
-    val right = rects.maxOf { it.x + it.width }
-    val bottom = rects.maxOf { it.y + it.height }
-    return ReaderSelectionRect(
-        x = left,
-        y = top,
-        width = right - left,
-        height = bottom - top,
-    )
-}
+private fun popupAnchorRect(rects: List<ReaderSelectionRect>): ReaderSelectionRect? =
+    rects.firstOrNull()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -445,13 +434,13 @@ fun ReaderWebView(
         }
     }
     fun updateRootPopupSelectionBounds(popupId: String, rects: List<ReaderSelectionRect>) {
-        selectionBounds(rects)?.let { bounds ->
+        popupAnchorRect(rects)?.let { anchor ->
             setLookupPopups(
                 stateHolder.lookupPopups.map { popup ->
                     if (popup.id == popupId) {
                         popup.copy(
                             state = popup.state.copy(
-                                selection = popup.state.selection.copy(rect = bounds),
+                                selection = popup.state.selection.copy(rect = anchor),
                             ),
                         )
                     } else {
