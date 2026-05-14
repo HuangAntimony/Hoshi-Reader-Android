@@ -77,6 +77,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -813,6 +815,8 @@ fun ReaderWebView(
             RootSelectionHighlightOverlay(
                 rects = rootSelectionHighlightRects,
                 darkMode = popupDarkMode,
+                eInkMode = effectiveSettings.eInkMode,
+                verticalWriting = effectiveSettings.verticalWriting,
             )
             LookupPopupStackView(
                 popups = themedLookupPopups,
@@ -947,8 +951,11 @@ fun ReaderWebView(
 private fun RootSelectionHighlightOverlay(
     rects: List<ReaderSelectionRect>,
     darkMode: Boolean,
+    eInkMode: Boolean,
+    verticalWriting: Boolean,
 ) {
     val blendMode = if (darkMode) BlendMode.Screen else BlendMode.Multiply
+    val underlineColor = if (darkMode) Color.White else Color.Black
     rects.forEachIndexed { index, rect ->
         if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
         Box(
@@ -957,10 +964,29 @@ private fun RootSelectionHighlightOverlay(
                 .width(rect.width.dp)
                 .height(rect.height.dp)
                 .drawBehind {
-                    drawRect(
-                        color = Color(0x66A0A0A0),
-                        blendMode = blendMode,
-                    )
+                    if (eInkMode) {
+                        val lineHeight = 1.5.dp.toPx()
+                        if (verticalWriting) {
+                            val lineLeft = (size.width - 2.dp.toPx() - lineHeight).coerceAtLeast(0f)
+                            drawRect(
+                                color = underlineColor,
+                                topLeft = Offset(lineLeft, 0f),
+                                size = Size(lineHeight, size.height),
+                            )
+                        } else {
+                            val lineTop = (size.height - 2.dp.toPx()).coerceAtLeast(0f)
+                            drawRect(
+                                color = underlineColor,
+                                topLeft = Offset(0f, lineTop),
+                                size = Size(size.width, lineHeight),
+                            )
+                        }
+                    } else {
+                        drawRect(
+                            color = Color(0x66A0A0A0),
+                            blendMode = blendMode,
+                        )
+                    }
                 }
                 .zIndex(1f + index * 0.001f),
         )

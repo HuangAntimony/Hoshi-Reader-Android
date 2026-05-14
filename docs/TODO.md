@@ -31,6 +31,7 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
+- Device-validate E-ink reader lookup underlines in horizontal and vertical text, confirming the line sits close to selected text without obscuring glyphs.
 - Device-validate reader popup Reduced Motion Scrolling on an E-ink target, including vertical swipe threshold, 40%-100% scroll amount, mouse wheel/page-wheel input, and coexistence with horizontal swipe-to-dismiss.
 - Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming the Compose-drawn selected-word highlight appears and disappears with the popup and does not gray out text.
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
