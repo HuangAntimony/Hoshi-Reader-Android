@@ -286,6 +286,28 @@ internal object ReaderSelectionScripts {
             }
             CSS.highlights.set('hoshi-selection', new Highlight(...highlights));
           },
+          selectionRects: function(charCount) {
+            if (!this.selection || !this.selection.ranges.length) return [];
+            var rects = [];
+            var remaining = charCount;
+            for (var i = 0; i < this.selection.ranges.length; i++) {
+              var r = this.selection.ranges[i];
+              if (remaining <= 0) break;
+              var end = r.start;
+              while (end < r.end && remaining > 0) {
+                var char = String.fromCodePoint(r.node.textContent.codePointAt(end));
+                end += char.length;
+                remaining--;
+              }
+              var range = document.createRange();
+              range.setStart(r.node, r.start);
+              range.setEnd(r.node, end);
+              Array.from(range.getClientRects()).forEach(function(rect) {
+                rects.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+              });
+            }
+            return rects;
+          },
           getNormalizedOffset: function(targetNode, offset) {
             if (!window.hoshiReader || !window.hoshiReader.nodeStartOffsets) return null;
             var count = window.hoshiReader.nodeStartOffsets.get(targetNode) || 0;

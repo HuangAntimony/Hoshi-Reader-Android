@@ -31,6 +31,7 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
+- Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming the Compose-drawn selected-word highlight appears and disappears with the popup and does not gray out text.
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
 - Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates and restore landing inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Re-check forward chapter-boundary landings at chapter start, visual-state-gated chapter jumps, and stable progress counters during rapid boundary flips after reader pagination changes.

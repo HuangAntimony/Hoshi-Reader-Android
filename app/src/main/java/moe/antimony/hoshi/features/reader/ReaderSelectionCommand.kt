@@ -19,6 +19,13 @@ internal sealed interface ReaderSelectionCommand {
             "window.hoshiSelection.highlightSelection($count)"
     }
 
+    data class SelectionRects(
+        val count: Int,
+    ) : ReaderSelectionCommand {
+        override val source: String =
+            "JSON.stringify(window.hoshiSelection.selectionRects($count))"
+    }
+
     data object ClearSelection : ReaderSelectionCommand {
         override val source: String =
             "window.hoshiSelection.clearSelection()"

@@ -194,7 +194,10 @@ private fun ProcessTextLookupOverlay(
                         ),
                     )
                 },
-                onRootPopupDismissed = onClose,
+                onRootPopupDismissed = {
+                    onClose()
+                    true
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

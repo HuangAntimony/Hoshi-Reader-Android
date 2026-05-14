@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -75,6 +76,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -85,6 +88,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
@@ -113,6 +117,12 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import java.io.File
 import kotlin.math.abs
+
+private data class PendingRootSelectionHighlight(
+    val popupId: String,
+    val count: Int,
+    val loadRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -192,6 +202,9 @@ fun ReaderWebView(
     val effectiveSettings = stateHolder.effectiveSettings
     val readerPosition = stateHolder.readerPosition
     val lookupPopups = stateHolder.lookupPopups
+    var pendingRootSelectionHighlight by remember { mutableStateOf<PendingRootSelectionHighlight?>(null) }
+    var visibleLookupPopupIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var rootSelectionHighlightRects by remember { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
     val popupDarkMode = effectiveSettings.usesDarkInterface(systemDarkTheme)
     val themedLookupPopups = remember(lookupPopups, popupDarkMode, effectiveSettings.eInkMode, audioSettings) {
         lookupPopups.withLookupPopupVisualOptions(
@@ -371,8 +384,15 @@ fun ReaderWebView(
         }
         onClose()
     }
-    fun clearReaderSelection() {
-        webView?.evaluateJavascript(ReaderSelectionCommand.ClearSelection.source, null)
+    fun clearReaderSelection(onCleared: () -> Unit = {}) {
+        val currentWebView = webView
+        if (currentWebView == null) {
+            onCleared()
+        } else {
+            currentWebView.evaluateJavascript(ReaderSelectionCommand.ClearSelection.source) {
+                onCleared()
+            }
+        }
     }
     fun resumeSasayakiAfterLookupIfNeeded() {
         val player = sasayakiPlayer
@@ -381,13 +401,36 @@ fun ReaderWebView(
         }
     }
     fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
+        visibleLookupPopupIds = visibleLookupPopupIds.intersect(nextPopups.mapTo(mutableSetOf()) { it.id })
         stateHolder.setLookupPopups(nextPopups, ::resumeSasayakiAfterLookupIfNeeded)
     }
+    fun dismissRootLookupPopup() {
+        pendingRootSelectionHighlight = null
+        visibleLookupPopupIds = emptySet()
+        rootSelectionHighlightRects = emptyList()
+        clearReaderSelection()
+        setLookupPopups(emptyList())
+    }
     fun closeLookupPopupsAndSelection() {
+        pendingRootSelectionHighlight = null
+        visibleLookupPopupIds = emptySet()
+        rootSelectionHighlightRects = emptyList()
         if (lookupPopups.isNotEmpty()) {
             clearReaderSelection()
+            setLookupPopups(emptyList())
+        } else {
+            setLookupPopups(emptyList())
         }
-        setLookupPopups(emptyList())
+    }
+    fun applyPendingRootSelectionHighlight(popupId: String) {
+        val pending = pendingRootSelectionHighlight ?: return
+        if (pending.popupId != popupId) return
+        pending.loadRects(pending.count) { rects ->
+            val fallbackRect = lookupPopups.firstOrNull { it.id == popupId }?.state?.selection?.rect
+            rootSelectionHighlightRects = rects.ifEmpty { fallbackRect?.let(::listOf).orEmpty() }
+            visibleLookupPopupIds = visibleLookupPopupIds + popupId
+        }
+        pendingRootSelectionHighlight = null
     }
     fun updateSasayakiSettings(settings: SasayakiSettings) {
         sasayakiSettings = settings
@@ -455,16 +498,24 @@ fun ReaderWebView(
             player?.pausePlayback()
         }
     }
-    val handleTextSelected: (ReaderSelectionData) -> Int? = { selection ->
+    val handleTextSelected: (ReaderSelectionData, (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit = { selection, selectionRects ->
+        pendingRootSelectionHighlight = null
+        visibleLookupPopupIds = emptySet()
+        rootSelectionHighlightRects = emptyList()
         setLookupPopups(emptyList())
         val lookup = lookupRootPopup(selection)
         if (lookup != null) {
             val (popup, highlightCount) = lookup
             pauseSasayakiForLookupIfNeeded()
+            pendingRootSelectionHighlight = PendingRootSelectionHighlight(
+                popupId = popup.id,
+                count = onTextSelected(selection) ?: highlightCount,
+                loadRects = selectionRects,
+            )
             setLookupPopups(listOf(popup))
-            onTextSelected(selection) ?: highlightCount
         } else {
-            onTextSelected(selection)
+            pendingRootSelectionHighlight = null
+            onTextSelected(selection)?.let { selectionRects(it) { rootSelectionHighlightRects = it } }
         }
     }
     val chromeState = remember(book, readerPosition.displayedPosition, statisticsState) {
@@ -753,11 +804,20 @@ fun ReaderWebView(
                         ),
                 )
             }
+            RootSelectionHighlightOverlay(
+                rects = rootSelectionHighlightRects,
+                darkMode = popupDarkMode,
+            )
             LookupPopupStackView(
                 popups = themedLookupPopups,
                 onPopupsChange = ::setLookupPopups,
                 lookupChildPopup = ::lookupChildPopup,
-                onRootPopupDismissed = ::clearReaderSelection,
+                onRootPopupDismissed = {
+                    dismissRootLookupPopup()
+                    true
+                },
+                isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
+                onPopupContentReady = ::applyPendingRootSelectionHighlight,
                 sasayakiWasPaused = sasayakiWasPausedByLookup,
                 sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
                 onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
@@ -765,7 +825,7 @@ fun ReaderWebView(
                 onSasayakiPauseStateCleared = stateHolder::clearSasayakiPauseState,
                 onSasayakiPlayForward = { cue ->
                     sasayakiPlayer?.playCue(cue, stop = false)
-                    setLookupPopups(emptyList())
+                    closeLookupPopupsAndSelection()
                 },
                 onPrepareSasayakiAudio = { cue, sentence ->
                     sasayakiPlayer?.exportCueAudio(cue, sentence)?.absolutePath
@@ -874,6 +934,30 @@ fun ReaderWebView(
             )
         }
         webView?.let { _ -> Unit }
+    }
+}
+
+@Composable
+private fun RootSelectionHighlightOverlay(
+    rects: List<ReaderSelectionRect>,
+    darkMode: Boolean,
+) {
+    val blendMode = if (darkMode) BlendMode.Screen else BlendMode.Multiply
+    rects.forEachIndexed { index, rect ->
+        if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = rect.x.dp, y = rect.y.dp)
+                .width(rect.width.dp)
+                .height(rect.height.dp)
+                .drawBehind {
+                    drawRect(
+                        color = Color(0x66A0A0A0),
+                        blendMode = blendMode,
+                    )
+                }
+                .zIndex(1f + index * 0.001f),
+        )
     }
 }
 
@@ -1316,7 +1400,7 @@ private fun ChapterWebView(
     readerSettings: ReaderSettings,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
-    onTextSelected: (ReaderSelectionData) -> Int?,
+    onTextSelected: (ReaderSelectionData, selectionRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit,
     onClearLookupPopup: () -> Unit,
     fontManager: ReaderFontManager,
     systemDark: Boolean,
@@ -1388,8 +1472,8 @@ private fun ChapterWebView(
                 hideForReaderRestore()
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
-                    ReaderSelectionBridge(this) { selection ->
-                        currentOnTextSelected.value(selection)
+                    ReaderSelectionBridge(this) { selection, selectionRects ->
+                        currentOnTextSelected.value(selection, selectionRects)
                     },
                     "HoshiTextSelection",
                 )

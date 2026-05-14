@@ -253,7 +253,10 @@ fun DictionarySearchView(
             popups = themedPopups,
             onPopupsChange = searchViewModel::setPopups,
             lookupChildPopup = lookupPopup,
-            onRootPopupDismissed = searchViewModel::dismissRootPopup,
+            onRootPopupDismissed = {
+                searchViewModel.dismissRootPopup()
+                true
+            },
             modifier = Modifier.fillMaxSize(),
         )
     }

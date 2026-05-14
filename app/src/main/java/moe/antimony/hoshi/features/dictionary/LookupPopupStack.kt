@@ -125,7 +125,9 @@ internal fun LookupPopupStackView(
     onPopupsChange: (List<LookupPopupItem>) -> Unit,
     lookupChildPopup: (ReaderSelectionData) -> Pair<LookupPopupItem, Int>?,
     modifier: Modifier = Modifier,
-    onRootPopupDismissed: () -> Unit = {},
+    onRootPopupDismissed: () -> Boolean = { false },
+    isPopupVisible: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
+    onPopupContentReady: (String) -> Unit = {},
     sasayakiWasPaused: Boolean = false,
     sasayakiIsPlaying: Boolean = false,
     onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
@@ -146,8 +148,10 @@ internal fun LookupPopupStackView(
                     onPopupsChange(closeChildPopups(popups, index))
                 },
                 onSwipeDismiss = {
-                    if (index == 0) onRootPopupDismissed()
-                    onPopupsChange(dismissPopupAt(popups, index))
+                    val rootDismissHandled = index == 0 && onRootPopupDismissed()
+                    if (!rootDismissHandled) {
+                        onPopupsChange(dismissPopupAt(popups, index))
+                    }
                 },
                 onTextSelected = { selection ->
                     val nextPopups = closeChildPopups(popups, index)
@@ -161,6 +165,8 @@ internal fun LookupPopupStackView(
                 onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = onSasayakiPlayForward,
                 onPrepareSasayakiAudio = onPrepareSasayakiAudio,
+                isContentVisible = isPopupVisible(popup, index),
+                onContentReady = { onPopupContentReady(popup.id) },
                 modifier = modifier
                     .fillMaxSize()
                     .zIndex(2f + index),

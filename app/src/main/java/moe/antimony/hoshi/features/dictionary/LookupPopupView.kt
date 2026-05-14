@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,6 +107,8 @@ fun LookupPopupView(
     onSasayakiPauseStateCleared: () -> Unit = {},
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
+    isContentVisible: Boolean = true,
+    onContentReady: () -> Unit = {},
 ) {
     if (state.results.isEmpty()) return
     val context = LocalContext.current
@@ -149,6 +152,11 @@ fun LookupPopupView(
     var forwardCount by remember(html) { mutableStateOf(0) }
     var backSignal by remember(html) { mutableStateOf(0) }
     var forwardSignal by remember(html) { mutableStateOf(0) }
+    LaunchedEffect(contentReady) {
+        if (contentReady) {
+            onContentReady()
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val frame = LookupPopupLayout(
@@ -190,7 +198,7 @@ fun LookupPopupView(
                 )
                 .width(frame.width.dp)
                 .height(frame.height.dp)
-                .alpha(if (contentReady) 1f else 0f)
+                .alpha(if (contentReady && isContentVisible) 1f else 0f)
                 .zIndex(2f),
             shape = if (state.eInkMode) RectangleShape else RoundedCornerShape(8.dp),
             color = popupBackground,
