@@ -84,6 +84,82 @@ internal object ReaderSelectionScripts {
             var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
             return !!(el && el.closest('rt, rp'));
           },
+          isVertical: function() {
+            return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+          },
+          rectObject: function(rect) {
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          },
+          rectWithBounds: function(rect) {
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+          },
+          unionRect: function(a, b) {
+            var left = Math.min(a.left, b.left);
+            var top = Math.min(a.top, b.top);
+            var right = Math.max(a.right, b.right);
+            var bottom = Math.max(a.bottom, b.bottom);
+            return { x: left, y: top, width: right - left, height: bottom - top, left: left, top: top, right: right, bottom: bottom };
+          },
+          rubyForNode: function(node) {
+            var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            return el && el.closest('ruby');
+          },
+          rubyTextRects: function(node) {
+            var ruby = this.rubyForNode(node);
+            if (!ruby || !this.isVertical()) return [];
+            var rects = [];
+            ruby.querySelectorAll('rt').forEach(function(rt) {
+              Array.from(rt.getClientRects()).forEach(function(rect) {
+                rects.push(rect);
+              });
+            });
+            return rects;
+          },
+          rubyAwareRect: function(rect, node) {
+            var rubyRects = this.rubyTextRects(node);
+            if (!rubyRects.length) {
+              return this.rectObject(rect);
+            }
+            var result = this.rectWithBounds(rect);
+            rubyRects.forEach(function(rubyRect) {
+              if (this.rubyRectMatchesLine(result, rubyRect)) {
+                result = this.unionRect(result, rubyRect);
+              }
+            }, this);
+            return this.rectObject(result);
+          },
+          rubyRectMatchesLine: function(lineRect, rubyRect) {
+            var rubyCenterX = (rubyRect.left + rubyRect.right) / 2;
+            return rubyCenterX >= lineRect.left && rubyCenterX <= lineRect.right + lineRect.width;
+          },
+          unifyVerticalColumnRects: function(rects) {
+            if (!this.isVertical() || !rects.length) return rects;
+            var groups = [];
+            var groupForIndex = new Array(rects.length);
+            rects.forEach(function(rect, index) {
+              var left = rect.x;
+              var right = rect.x + rect.width;
+              var group = null;
+              for (var i = 0; i < groups.length; i++) {
+                if (left < groups[i].right && right > groups[i].left) {
+                  group = groups[i];
+                  break;
+                }
+              }
+              if (group) {
+                group.left = Math.min(group.left, left);
+                group.right = Math.max(group.right, right);
+              } else {
+                group = { left: left, right: right };
+                groups.push(group);
+              }
+              groupForIndex[index] = group;
+            });
+            return rects.map(function(rect, index) {
+              var group = groupForIndex[index];
+              return { x: group.left, y: rect.y, width: group.right - group.left, height: rect.height };
+            });
+          },
           findParagraph: function(node) {
             var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
             return (el && el.closest('p, .glossary-content')) || null;
@@ -264,7 +340,7 @@ internal object ReaderSelectionScripts {
             range.setEnd(first.node, first.start + 1);
             var rects = Array.from(range.getClientRects());
             var rect = rects.find(function(rect) { return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }) || range.getBoundingClientRect();
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            return this.rubyAwareRect(rect, first.node);
           },
           highlightSelection: function(charCount) {
             if (!this.selection || !this.selection.ranges.length || !CSS.highlights) return;
@@ -285,6 +361,28 @@ internal object ReaderSelectionScripts {
               highlights.push(range);
             }
             CSS.highlights.set('hoshi-selection', new Highlight(...highlights));
+          },
+          selectionRects: function(charCount) {
+            if (!this.selection || !this.selection.ranges.length) return [];
+            var rects = [];
+            var remaining = charCount;
+            for (var i = 0; i < this.selection.ranges.length; i++) {
+              var r = this.selection.ranges[i];
+              if (remaining <= 0) break;
+              var end = r.start;
+              while (end < r.end && remaining > 0) {
+                var char = String.fromCodePoint(r.node.textContent.codePointAt(end));
+                end += char.length;
+                remaining--;
+              }
+              var range = document.createRange();
+              range.setStart(r.node, r.start);
+              range.setEnd(r.node, end);
+              Array.from(range.getClientRects()).forEach(function(rect) {
+                rects.push(this.rubyAwareRect(rect, r.node));
+              }, this);
+            }
+            return this.unifyVerticalColumnRects(rects);
           },
           getNormalizedOffset: function(targetNode, offset) {
             if (!window.hoshiReader || !window.hoshiReader.nodeStartOffsets) return null;

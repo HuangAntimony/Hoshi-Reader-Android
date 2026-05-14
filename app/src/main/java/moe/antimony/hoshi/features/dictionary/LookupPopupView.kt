@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -34,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +66,7 @@ import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
+import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 private const val SasayakiPopupControlsTotalHeightValue = 37.0
@@ -81,6 +87,9 @@ data class LookupPopupState(
     val height: Int = 250,
     val swipeToDismiss: Boolean = false,
     val swipeThreshold: Int = 40,
+    val reducedMotionScrolling: Boolean = false,
+    val reducedMotionScrollPercent: Int = 100,
+    val reducedMotionSwipeThreshold: Int = 40,
     val topInset: Double = 0.0,
     val bottomInset: Double = 0.0,
     val darkMode: Boolean = false,
@@ -101,13 +110,19 @@ fun LookupPopupView(
     clearSelectionSignal: Int = 0,
     onTapOutside: () -> Unit = onSwipeDismiss,
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
+    onPopupScrolled: () -> Unit = {},
     onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
     onSasayakiTogglePlayback: () -> Unit = {},
     onSasayakiPauseStateCleared: () -> Unit = {},
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
+    isContentVisible: Boolean = true,
+    isPopupActive: Boolean = true,
+    onContentReady: () -> Unit = {},
+    warmShell: Boolean = false,
+    contentResetKey: Any? = null,
 ) {
-    if (state.results.isEmpty()) return
+    if (state.results.isEmpty() && !warmShell) return
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
     val ankiViewModel: AnkiViewModel = viewModel(
@@ -121,34 +136,56 @@ fun LookupPopupView(
     )
     val ankiUiState by ankiViewModel.uiState.collectAsState()
     val assets = remember(context) { LookupPopupAssets.load(context) }
+    val htmlResults = if (warmShell) emptyList() else state.results
     val html = remember(
-        state.results,
+        htmlResults,
         state.dictionaryStyles,
         state.dictionarySettings,
         state.swipeToDismiss,
         state.swipeThreshold,
+        state.reducedMotionScrolling,
+        state.reducedMotionScrollPercent,
+        state.reducedMotionSwipeThreshold,
         state.darkMode,
         state.eInkMode,
         state.audioSettings,
         ankiUiState.popupSettings,
     ) {
         LookupPopupHtml.render(
-            results = state.results,
+            results = htmlResults,
             dictionaryStyles = state.dictionaryStyles,
             settings = state.dictionarySettings,
             swipeToDismiss = state.swipeToDismiss,
             swipeThreshold = state.swipeThreshold,
+            reducedMotionScrolling = state.reducedMotionScrolling,
+            reducedMotionScrollPercent = state.reducedMotionScrollPercent,
+            reducedMotionSwipeThreshold = state.reducedMotionSwipeThreshold,
             darkMode = state.darkMode,
             eInkMode = state.eInkMode,
             audioSettings = state.audioSettings,
             ankiSettings = ankiUiState.popupSettings,
         )
     }
-    var contentReady by remember(html) { mutableStateOf(false) }
-    var backCount by remember(html) { mutableStateOf(0) }
-    var forwardCount by remember(html) { mutableStateOf(0) }
-    var backSignal by remember(html) { mutableStateOf(0) }
-    var forwardSignal by remember(html) { mutableStateOf(0) }
+    val warmContentKey = if (warmShell) contentResetKey else null
+    var contentReady by remember(html, warmContentKey) { mutableStateOf(false) }
+    var backCount by remember(html, warmContentKey) { mutableStateOf(0) }
+    var forwardCount by remember(html, warmContentKey) { mutableStateOf(0) }
+    var backSignal by remember(html, warmContentKey) { mutableStateOf(0) }
+    var forwardSignal by remember(html, warmContentKey) { mutableStateOf(0) }
+    var selectionHighlightRects by remember(html, warmContentKey) { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
+    LaunchedEffect(clearSelectionSignal) {
+        selectionHighlightRects = emptyList()
+    }
+    LaunchedEffect(isPopupActive) {
+        if (!isPopupActive) {
+            selectionHighlightRects = emptyList()
+        }
+    }
+    LaunchedEffect(contentReady) {
+        if (contentReady) {
+            onContentReady()
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val frame = LookupPopupLayout(
@@ -185,12 +222,12 @@ fun LookupPopupView(
         Surface(
             modifier = Modifier
                 .absoluteOffset(
-                    x = frameX.dp,
-                    y = frameY.dp,
+                    x = if (isPopupActive) frameX.dp else (-10_000).dp,
+                    y = if (isPopupActive) frameY.dp else (-10_000).dp,
                 )
-                .width(frame.width.dp)
-                .height(frame.height.dp)
-                .alpha(if (contentReady) 1f else 0f)
+                .width(if (isPopupActive) frame.width.dp else 1.dp)
+                .height(if (isPopupActive) frame.height.dp else 1.dp)
+                .alpha(if (isPopupActive && contentReady && isContentVisible) 1f else 0f)
                 .zIndex(2f),
             shape = if (state.eInkMode) RectangleShape else RoundedCornerShape(8.dp),
             color = popupBackground,
@@ -259,10 +296,22 @@ fun LookupPopupView(
                     backSignal = backSignal,
                     forwardSignal = forwardSignal,
                     callbacks = PopupWebViewCallbacks(
-                        onTapOutside = onTapOutside,
-                        onSwipeDismiss = onSwipeDismiss,
+                        onTapOutside = {
+                            selectionHighlightRects = emptyList()
+                            onTapOutside()
+                        },
+                        onSwipeDismiss = {
+                            selectionHighlightRects = emptyList()
+                            onSwipeDismiss()
+                        },
                         onOpenLink = context::openPopupExternalLink,
-                        onTextSelected = onTextSelected,
+                        onTextSelected = { selection ->
+                            selectionHighlightRects = emptyList()
+                            onTextSelected(selection)
+                        },
+                        onSelectionRectsLoaded = { rects ->
+                            selectionHighlightRects = rects
+                        },
                         onLookupRedirect = { query ->
                             LookupEngine.lookup(
                                 query,
@@ -296,11 +345,59 @@ fun LookupPopupView(
                         onContentReady = {
                             contentReady = true
                         },
+                        onScroll = {
+                            selectionHighlightRects = emptyList()
+                            onPopupScrolled()
+                        },
                     ),
+                    warmShell = warmShell,
                     modifier = Modifier.weight(1f),
                 )
             }
         }
+        if (isPopupActive && isContentVisible) {
+            PopupSelectionHighlightOverlay(
+                rects = selectionHighlightRects,
+                darkMode = state.darkMode,
+                eInkMode = state.eInkMode,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PopupSelectionHighlightOverlay(
+    rects: List<ReaderSelectionRect>,
+    darkMode: Boolean,
+    eInkMode: Boolean,
+) {
+    val blendMode = if (darkMode) BlendMode.Screen else BlendMode.Multiply
+    val underlineColor = if (darkMode) Color.White else Color.Black
+    rects.forEachIndexed { index, rect ->
+        if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = rect.x.dp, y = rect.y.dp)
+                .width(rect.width.dp)
+                .height(rect.height.dp)
+                .drawBehind {
+                    if (eInkMode) {
+                        val lineHeight = 1.5.dp.toPx()
+                        val lineTop = (size.height - 2.dp.toPx()).coerceAtLeast(0f)
+                        drawRect(
+                            color = underlineColor,
+                            topLeft = Offset(0f, lineTop),
+                            size = Size(size.width, lineHeight),
+                        )
+                    } else {
+                        drawRect(
+                            color = Color(0x66A0A0A0),
+                            blendMode = blendMode,
+                        )
+                    }
+                }
+                .zIndex(3f + index * 0.001f),
+        )
     }
 }
 
@@ -441,15 +538,23 @@ private fun LookupPopupWebView(
     backSignal: Int,
     forwardSignal: Int,
     callbacks: PopupWebViewCallbacks,
+    warmShell: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
     callbackHolder.callbacks = callbacks
     val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
+    val selectionOffsetHolder = remember {
+        PopupSelectionOffsetHolder(offsetX = selectionOffsetX, offsetY = selectionOffsetY)
+    }
+    selectionOffsetHolder.offsetX = selectionOffsetX
+    selectionOffsetHolder.offsetY = selectionOffsetY
     var loadedHtml by remember { mutableStateOf<String?>(null) }
     var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
     var appliedBackSignal by remember { mutableStateOf(backSignal) }
     var appliedForwardSignal by remember { mutableStateOf(forwardSignal) }
+    var shellReady by remember { mutableStateOf(false) }
+    var appliedWarmResults by remember { mutableStateOf<List<LookupResult>?>(null) }
     AndroidView(
         modifier = modifier
             .fillMaxSize()
@@ -468,8 +573,10 @@ private fun LookupPopupWebView(
                         webView = this,
                         callbackHolder = callbackHolder,
                         lookupResultsHolder = lookupResultsHolder,
-                        selectionOffsetX = selectionOffsetX,
-                        selectionOffsetY = selectionOffsetY,
+                        selectionOffsetHolder = selectionOffsetHolder,
+                        onShellReady = {
+                            shellReady = true
+                        },
                     ),
                     "HoshiPopup",
                 )
@@ -480,8 +587,12 @@ private fun LookupPopupWebView(
             callbackHolder.callbacks = callbacks
             webView.setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
             if (loadedHtml != html) {
-                lookupResultsHolder.results = results
                 loadedHtml = html
+                shellReady = false
+                appliedWarmResults = null
+                if (!warmShell) {
+                    lookupResultsHolder.results = results
+                }
                 webView.loadDataWithBaseURL(
                     "https://hoshi.local/popup/",
                     html,
@@ -489,6 +600,11 @@ private fun LookupPopupWebView(
                     "UTF-8",
                     null,
                 )
+            }
+            if (warmShell && shellReady && appliedWarmResults !== results) {
+                appliedWarmResults = results
+                lookupResultsHolder.results = results
+                webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
             }
             if (appliedClearSelectionSignal != clearSelectionSignal) {
                 appliedClearSelectionSignal = clearSelectionSignal

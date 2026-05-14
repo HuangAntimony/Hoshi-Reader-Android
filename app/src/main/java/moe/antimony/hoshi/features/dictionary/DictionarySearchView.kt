@@ -94,6 +94,9 @@ internal fun dictionarySearchPopupOptions(
     height = readerSettings.popupHeight,
     swipeToDismiss = readerSettings.popupSwipeToDismiss,
     swipeThreshold = readerSettings.popupSwipeThreshold,
+    reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
+    reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
+    reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
     popupActionBar = false,
     topInset = DictionaryPopupTopInset,
     bottomInset = DictionaryPopupBottomInset,
@@ -253,7 +256,10 @@ fun DictionarySearchView(
             popups = themedPopups,
             onPopupsChange = searchViewModel::setPopups,
             lookupChildPopup = lookupPopup,
-            onRootPopupDismissed = searchViewModel::dismissRootPopup,
+            onRootPopupDismissed = {
+                searchViewModel.dismissRootPopup()
+                true
+            },
             modifier = Modifier.fillMaxSize(),
         )
     }

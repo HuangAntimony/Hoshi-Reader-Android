@@ -51,6 +51,9 @@ data class ReaderSettings(
     val popupFullWidth: Boolean = false,
     val popupSwipeToDismiss: Boolean = true,
     val popupSwipeThreshold: Int = 30,
+    val popupReducedMotionScrolling: Boolean = false,
+    val popupReducedMotionScrollPercent: Int = 100,
+    val popupReducedMotionSwipeThreshold: Int = 40,
     val volumeKeysTurnPages: Boolean = false,
     val volumeKeysSeekSasayaki: Boolean = false,
     val reverseVolumeKeyDirection: Boolean = false,
@@ -224,6 +227,9 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         popupFullWidth = preferences.getBoolean("popupFullWidth", false),
         popupSwipeToDismiss = preferences.getBoolean("popupSwipeToDismiss", true),
         popupSwipeThreshold = preferences.getInt("popupSwipeThreshold", 30).coerceIn(20, 60),
+        popupReducedMotionScrolling = preferences.getBoolean("popupReducedMotionScrolling", false),
+        popupReducedMotionScrollPercent = preferences.getInt("popupReducedMotionScrollPercent", 100).coerceIn(40, 100),
+        popupReducedMotionSwipeThreshold = preferences.getInt("popupReducedMotionSwipeThreshold", 40).coerceIn(0, 100),
         volumeKeysTurnPages = preferences.getBoolean("volumeKeysTurnPages", false),
         volumeKeysSeekSasayaki = preferences.getBoolean("volumeKeysSeekSasayaki", false),
         reverseVolumeKeyDirection = preferences.getBoolean("reverseVolumeKeyDirection", false),
@@ -265,6 +271,9 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("popupFullWidth", settings.popupFullWidth)
             .putBoolean("popupSwipeToDismiss", settings.popupSwipeToDismiss)
             .putInt("popupSwipeThreshold", settings.popupSwipeThreshold)
+            .putBoolean("popupReducedMotionScrolling", settings.popupReducedMotionScrolling)
+            .putInt("popupReducedMotionScrollPercent", settings.popupReducedMotionScrollPercent)
+            .putInt("popupReducedMotionSwipeThreshold", settings.popupReducedMotionSwipeThreshold)
             .putBoolean("volumeKeysTurnPages", settings.volumeKeysTurnPages)
             .putBoolean("volumeKeysSeekSasayaki", settings.volumeKeysSeekSasayaki)
             .putBoolean("reverseVolumeKeyDirection", settings.reverseVolumeKeyDirection)
@@ -345,6 +354,9 @@ class ReaderSettingsRepository(
             popupFullWidth = this[KEY_POPUP_FULL_WIDTH] ?: false,
             popupSwipeToDismiss = this[KEY_POPUP_SWIPE_TO_DISMISS] ?: true,
             popupSwipeThreshold = (this[KEY_POPUP_SWIPE_THRESHOLD] ?: 30).coerceIn(20, 60),
+            popupReducedMotionScrolling = this[KEY_POPUP_REDUCED_MOTION_SCROLLING] ?: false,
+            popupReducedMotionScrollPercent = (this[KEY_POPUP_REDUCED_MOTION_SCROLL_PERCENT] ?: 100).coerceIn(40, 100),
+            popupReducedMotionSwipeThreshold = (this[KEY_POPUP_REDUCED_MOTION_SWIPE_THRESHOLD] ?: 40).coerceIn(0, 100),
             volumeKeysTurnPages = this[KEY_VOLUME_KEYS_TURN_PAGES] ?: false,
             volumeKeysSeekSasayaki = this[KEY_VOLUME_KEYS_SEEK_SASAYAKI] ?: false,
             reverseVolumeKeyDirection = this[KEY_REVERSE_VOLUME_KEY_DIRECTION] ?: false,
@@ -385,6 +397,9 @@ class ReaderSettingsRepository(
         this[KEY_POPUP_FULL_WIDTH] = settings.popupFullWidth
         this[KEY_POPUP_SWIPE_TO_DISMISS] = settings.popupSwipeToDismiss
         this[KEY_POPUP_SWIPE_THRESHOLD] = settings.popupSwipeThreshold
+        this[KEY_POPUP_REDUCED_MOTION_SCROLLING] = settings.popupReducedMotionScrolling
+        this[KEY_POPUP_REDUCED_MOTION_SCROLL_PERCENT] = settings.popupReducedMotionScrollPercent
+        this[KEY_POPUP_REDUCED_MOTION_SWIPE_THRESHOLD] = settings.popupReducedMotionSwipeThreshold
         this[KEY_VOLUME_KEYS_TURN_PAGES] = settings.volumeKeysTurnPages
         this[KEY_VOLUME_KEYS_SEEK_SASAYAKI] = settings.volumeKeysSeekSasayaki
         this[KEY_REVERSE_VOLUME_KEY_DIRECTION] = settings.reverseVolumeKeyDirection
@@ -429,6 +444,9 @@ class ReaderSettingsRepository(
         private val KEY_POPUP_FULL_WIDTH = booleanPreferencesKey("popupFullWidth")
         private val KEY_POPUP_SWIPE_TO_DISMISS = booleanPreferencesKey("popupSwipeToDismiss")
         private val KEY_POPUP_SWIPE_THRESHOLD = intPreferencesKey("popupSwipeThreshold")
+        private val KEY_POPUP_REDUCED_MOTION_SCROLLING = booleanPreferencesKey("popupReducedMotionScrolling")
+        private val KEY_POPUP_REDUCED_MOTION_SCROLL_PERCENT = intPreferencesKey("popupReducedMotionScrollPercent")
+        private val KEY_POPUP_REDUCED_MOTION_SWIPE_THRESHOLD = intPreferencesKey("popupReducedMotionSwipeThreshold")
         private val KEY_VOLUME_KEYS_TURN_PAGES = booleanPreferencesKey("volumeKeysTurnPages")
         private val KEY_VOLUME_KEYS_SEEK_SASAYAKI = booleanPreferencesKey("volumeKeysSeekSasayaki")
         private val KEY_REVERSE_VOLUME_KEY_DIRECTION = booleanPreferencesKey("reverseVolumeKeyDirection")

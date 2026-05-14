@@ -20,6 +20,9 @@ internal data class LookupPopupOptions(
     val height: Int = 250,
     val swipeToDismiss: Boolean = false,
     val swipeThreshold: Int = 40,
+    val reducedMotionScrolling: Boolean = false,
+    val reducedMotionScrollPercent: Int = 100,
+    val reducedMotionSwipeThreshold: Int = 40,
     val topInset: Double = 0.0,
     val bottomInset: Double = 0.0,
     val dictionarySettings: DictionarySettings = DictionarySettings(),
@@ -37,6 +40,9 @@ internal data class LookupPopupItem(
     val clearSelectionSignal: Int = 0,
     val sasayakiCue: SasayakiMatch? = null,
 )
+
+internal fun clearPopupSelectionHighlights(popups: List<LookupPopupItem>): List<LookupPopupItem> =
+    popups.map { popup -> popup.copy(clearSelectionSignal = popup.clearSelectionSignal + 1) }
 
 internal fun createLookupPopupItem(
     selection: ReaderSelectionData,
@@ -62,6 +68,9 @@ internal fun createLookupPopupItem(
             height = options.height,
             swipeToDismiss = options.swipeToDismiss,
             swipeThreshold = options.swipeThreshold,
+            reducedMotionScrolling = options.reducedMotionScrolling,
+            reducedMotionScrollPercent = options.reducedMotionScrollPercent,
+            reducedMotionSwipeThreshold = options.reducedMotionSwipeThreshold,
             topInset = options.topInset,
             bottomInset = options.bottomInset,
             darkMode = options.darkMode,
@@ -119,13 +128,33 @@ internal fun List<LookupPopupItem>.withLookupPopupVisualOptions(
         )
     }
 
+internal fun closeChildPopupsForScrolledParent(
+    popups: List<LookupPopupItem>,
+    parentIndex: Int,
+): List<LookupPopupItem> =
+    if (parentIndex >= popups.lastIndex) {
+        popups
+    } else {
+        closeChildPopups(popups, parentIndex).mapIndexed { index, popup ->
+            if (index == parentIndex) {
+                popup.copy(clearSelectionSignal = popup.clearSelectionSignal + 1)
+            } else {
+                popup
+            }
+        }
+    }
+
 @Composable
 internal fun LookupPopupStackView(
     popups: List<LookupPopupItem>,
     onPopupsChange: (List<LookupPopupItem>) -> Unit,
     lookupChildPopup: (ReaderSelectionData) -> Pair<LookupPopupItem, Int>?,
     modifier: Modifier = Modifier,
-    onRootPopupDismissed: () -> Unit = {},
+    onRootPopupDismissed: () -> Boolean = { false },
+    isPopupVisible: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
+    isPopupActive: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
+    onPopupContentReady: (String) -> Unit = {},
+    warmRootShell: Boolean = false,
     sasayakiWasPaused: Boolean = false,
     sasayakiIsPlaying: Boolean = false,
     onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
@@ -135,7 +164,7 @@ internal fun LookupPopupStackView(
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
 ) {
     popups.forEachIndexed { index, popup ->
-        key(popup.id) {
+        key(if (warmRootShell && index == 0) "warm-root-popup" else popup.id) {
             LookupPopupView(
                 state = popup.state,
                 sasayakiCue = popup.sasayakiCue,
@@ -146,8 +175,10 @@ internal fun LookupPopupStackView(
                     onPopupsChange(closeChildPopups(popups, index))
                 },
                 onSwipeDismiss = {
-                    if (index == 0) onRootPopupDismissed()
-                    onPopupsChange(dismissPopupAt(popups, index))
+                    val rootDismissHandled = index == 0 && onRootPopupDismissed()
+                    if (!rootDismissHandled) {
+                        onPopupsChange(dismissPopupAt(popups, index))
+                    }
                 },
                 onTextSelected = { selection ->
                     val nextPopups = closeChildPopups(popups, index)
@@ -156,11 +187,19 @@ internal fun LookupPopupStackView(
                         highlightCount
                     }
                 },
+                onPopupScrolled = {
+                    onPopupsChange(closeChildPopupsForScrolledParent(popups, index))
+                },
                 onSasayakiReplayCue = onSasayakiReplayCue,
                 onSasayakiTogglePlayback = onSasayakiTogglePlayback,
                 onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = onSasayakiPlayForward,
                 onPrepareSasayakiAudio = onPrepareSasayakiAudio,
+                isContentVisible = isPopupVisible(popup, index),
+                isPopupActive = isPopupActive(popup, index),
+                onContentReady = { onPopupContentReady(popup.id) },
+                warmShell = warmRootShell && index == 0,
+                contentResetKey = if (warmRootShell && index == 0) popup.id else null,
                 modifier = modifier
                     .fillMaxSize()
                     .zIndex(2f + index),

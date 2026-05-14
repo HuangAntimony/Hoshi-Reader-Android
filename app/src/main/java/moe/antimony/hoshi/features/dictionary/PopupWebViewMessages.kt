@@ -17,6 +17,7 @@ import moe.antimony.hoshi.features.audio.AudioPlaybackMode
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
+import moe.antimony.hoshi.features.reader.ReaderSelectionBridgePayload
 import org.json.JSONObject
 
 internal class PopupWebViewCallbacks(
@@ -24,10 +25,12 @@ internal class PopupWebViewCallbacks(
     val onSwipeDismiss: () -> Unit = {},
     val onOpenLink: (String) -> Unit = {},
     val onTextSelected: (ReaderSelectionData) -> Int? = { null },
+    val onSelectionRectsLoaded: ((List<ReaderSelectionRect>) -> Unit)? = null,
     val onLookupRedirect: (String) -> List<LookupResult> = { query -> LookupEngine.lookup(query) },
     val onLookupRedirected: (Int) -> Unit = {},
     val onPlayWordAudio: (String, AudioPlaybackMode) -> Unit = { _, _ -> },
     val onContentReady: () -> Unit = {},
+    val onScroll: () -> Unit = {},
     val onMineEntry: (String) -> Boolean = { false },
     val onDuplicateCheck: (String, (Boolean) -> Unit) -> Unit = { _, reply -> reply(false) },
 )
@@ -38,6 +41,11 @@ internal class PopupWebViewCallbackHolder(
 
 internal class PopupLookupResultsHolder(
     var results: List<LookupResult>,
+)
+
+internal class PopupSelectionOffsetHolder(
+    var offsetX: Double = 0.0,
+    var offsetY: Double = 0.0,
 )
 
 internal class PopupMessageWebViewClient(
@@ -138,8 +146,8 @@ internal class PopupWebViewBridge(
     private val webView: WebView,
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
-    private val selectionOffsetX: Double = 0.0,
-    private val selectionOffsetY: Double = 0.0,
+    private val selectionOffsetHolder: PopupSelectionOffsetHolder = PopupSelectionOffsetHolder(),
+    private val onShellReady: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -172,16 +180,34 @@ internal class PopupWebViewBridge(
                 webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
             }
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
+            "shellReady" -> mainHandler.post(onShellReady)
             "contentReady" -> mainHandler.post(callbacks.onContentReady)
+            "popupScrolled" -> mainHandler.post(callbacks.onScroll)
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return
                 val mode = AudioPlaybackMode.fromRawValue(body.optString("mode"))
                 mainHandler.post { callbacks.onPlayWordAudio(url, mode) }
             }
-            "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetX, selectionOffsetY)?.let { selection ->
+            "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetHolder.offsetX, selectionOffsetHolder.offsetY)?.let { selection ->
                 mainHandler.post {
                     val highlightCount = callbacks.onTextSelected(selection) ?: return@post
-                    webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
+                    val onSelectionRectsLoaded = callbacks.onSelectionRectsLoaded
+                    if (onSelectionRectsLoaded == null) {
+                        webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
+                        return@post
+                    }
+                    webView.evaluateJavascript("JSON.stringify(window.hoshiSelection.selectionRects($highlightCount))") { result ->
+                        onSelectionRectsLoaded(
+                            ReaderSelectionBridgePayload.rectsFromJavascriptResult(result).map { rect ->
+                                ReaderSelectionRect(
+                                    x = selectionOffsetHolder.offsetX + rect.x,
+                                    y = selectionOffsetHolder.offsetY + rect.y,
+                                    width = rect.width,
+                                    height = rect.height,
+                                )
+                            },
+                        )
+                    }
                 }
             }
             "duplicateCheck" -> {
