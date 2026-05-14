@@ -73,31 +73,31 @@ window.hoshiSelection = {
     isCodePointJapanese(codePoint) {
         return JAPANESE_RANGES.some(([start, end]) => codePoint >= start && codePoint <= end);
     },
-    
+
     isScanBoundary(char) {
         return /^[\s\u3000]$/.test(char) ||
             this.scanDelimiters.includes(char) ||
             (window.scanNonJapaneseText === false && !this.isCodePointJapanese(char.codePointAt(0)));
     },
-    
+
     isFurigana(node) {
         const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         return !!el?.closest('rt, rp');
     },
-    
+
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         return el?.closest('p, .glossary-content') || null;
     },
-    
+
     createWalker(rootNode) {
         const root = rootNode || document.body;
-        
+
         return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
             acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
         });
     },
-    
+
     inCharRange(charRange, x, y) {
         const rects = charRange.getClientRects();
         if (rects.length) {
@@ -111,14 +111,14 @@ window.hoshiSelection = {
         const rect = charRange.getBoundingClientRect();
         return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     },
-    
+
     getCaretRange(x, y) {
         if (document.caretPositionFromPoint) {
             const pos = document.caretPositionFromPoint(x, y);
             if (!pos) {
                 return null;
             }
-            
+
             const range = document.createRange();
             range.setStart(pos.offsetNode, pos.offset);
             range.collapse(true);
@@ -128,10 +128,10 @@ window.hoshiSelection = {
             if (!element) {
                 return null;
             }
-            
+
             const container = element.closest('p, div, span, ruby, a') || document.body;
             const walker = this.createWalker(container);
-            
+
             const range = document.createRange();
             let node;
             while (node = walker.nextNode()) {
@@ -147,30 +147,30 @@ window.hoshiSelection = {
             return document.caretRangeFromPoint(x, y);
         }
     },
-    
+
     getCharacterAtPoint(x, y) {
         const range = this.getCaretRange(x, y);
         if (!range) {
             return null;
         }
-        
+
         const node = range.startContainer;
         if (node.nodeType !== Node.TEXT_NODE) {
             return null;
         }
-        
+
         if (this.isFurigana(node)) {
             return null;
         }
-        
+
         const text = node.textContent;
         const caret = range.startOffset;
-        
+
         for (const offset of [caret, caret - 1, caret + 1]) {
             if (offset < 0 || offset >= text.length) {
                 continue;
             }
-            
+
             const charRange = document.createRange();
             charRange.setStart(node, offset);
             charRange.setEnd(node, offset + 1);
@@ -181,19 +181,19 @@ window.hoshiSelection = {
                 return { node, offset };
             }
         }
-        
+
         return null;
     },
-    
+
     getSentenceContext(startNode, startOffset) {
         const container = this.findParagraph(startNode) || document.body;
         const walker = this.createWalker(container);
-        
+
         walker.currentNode = startNode;
         const partsBefore = [];
         let node = startNode;
         let limit = startOffset;
-        
+
         while (node) {
             const text = node.textContent;
             let foundStart = false;
@@ -204,29 +204,29 @@ window.hoshiSelection = {
                     break;
                 }
             }
-            
+
             if (foundStart) {
                 break;
             }
-            
+
             partsBefore.push(text.slice(0, limit));
             node = walker.previousNode();
             if (node) limit = node.textContent.length;
         }
-        
+
         walker.currentNode = startNode;
         const partsAfter = [];
         node = startNode;
         let start = startOffset;
-        
+
         while (node) {
             const text = node.textContent;
             let foundEnd = false;
-            
+
             for (let i = start; i < text.length; i++) {
                 if (this.sentenceDelimiters.includes(text[i])) {
                     let end = i + 1;
-                    
+
                     while (end < text.length) {
                         if (!this.trailingSentenceChars.includes(text[end])) break;
                         end += 1;
@@ -236,17 +236,17 @@ window.hoshiSelection = {
                     break;
                 }
             }
-            
+
             if (foundEnd) {
                 break;
             }
-            
+
             partsAfter.push(text.slice(start));
-            
+
             node = walker.nextNode();
             start = 0;
         }
-        
+
         const beforeText = partsBefore.reverse().join('');
         const rawSentence = beforeText + partsAfter.join('');
         const leadingTrim = rawSentence.length - rawSentence.trimStart().length;
@@ -257,7 +257,7 @@ window.hoshiSelection = {
         const openBrackets = new Set(Object.keys(this.brackets));
         let stack = [];
         let unmatchedClose = [];
-        
+
         for (let i = 0; i < sentence.length; i++) {
             const ch = sentence[i];
             if (openBrackets.has(ch)) {
@@ -283,7 +283,7 @@ window.hoshiSelection = {
         let endSlice = sentence.length - 1;
         let endIdx = sentence.length - 1;
         while (unmatchedClose.length > 0 && endIdx > startSlice) {
-            if (unmatchedClose[unmatchedClose.length - 1] === sentence[endIdx]) {     
+            if (unmatchedClose[unmatchedClose.length - 1] === sentence[endIdx]) {
                 unmatchedClose.pop();
                 endSlice = endIdx - 1;
             // sentenceDelimiters used as trailingSentenceDelimiters as it does not have any overlap with brackets
@@ -302,40 +302,40 @@ window.hoshiSelection = {
     getSentence(startNode, startOffset) {
         return this.getSentenceContext(startNode, startOffset).sentence;
     },
-    
+
     selectText(x, y, maxLength) {
         if (document.elementFromPoint(x, y)?.closest('a')) {
             return null;
         }
         const hit = this.getCharacterAtPoint(x, y);
-        
+
         if (!hit) {
             this.clearSelection();
             return null;
         }
-        
+
         if (this.selection &&
             hit.node === this.selection.startNode &&
             hit.offset === this.selection.startOffset) {
             this.clearSelection();
             return null;
         }
-        
+
         this.clearSelection();
-        
+
         const container = this.findParagraph(hit.node) || document.body;
         const walker = this.createWalker(container);
-        
+
         let text = '';
         let node = hit.node;
         let offset = hit.offset;
         let ranges = [];
-        
+
         walker.currentNode = node;
         while (text.length < maxLength && node) {
             const content = node.textContent;
             const start = offset;
-            
+
             while (offset < content.length && text.length < maxLength) {
                 const char = content[offset];
                 if (this.isScanBoundary(char)) {
@@ -344,30 +344,30 @@ window.hoshiSelection = {
                 text += char;
                 offset++;
             }
-            
+
             if (offset > start) {
                 ranges.push({ node, start, end: offset });
             }
-            
+
             if (offset < content.length || text.length >= maxLength) {
                 break;
             }
-            
+
             node = walker.nextNode();
             offset = 0;
         }
-        
+
         if (!text) {
             return null;
         }
-        
+
         this.selection = {
             startNode: hit.node,
             startOffset: hit.offset,
             ranges,
             text
         };
-        
+
         const sentenceContext = this.getSentenceContext(hit.node, hit.offset);
         const normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
         webkit.messageHandlers.textSelected.postMessage({
@@ -377,20 +377,20 @@ window.hoshiSelection = {
             normalizedOffset,
             sentenceOffset: sentenceContext.sentenceOffset
         });
-        
+
         return text;
     },
-    
+
     getSelectionRect(x, y) {
         if (!this.selection?.ranges.length) {
             return null;
         }
-        
+
         const first = this.selection.ranges[0];
         const range = document.createRange();
         range.setStart(first.node, first.start);
         range.setEnd(first.node, first.start + 1);
-        
+
         const rects = Array.from(range.getClientRects());
         const rect = rects.find(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ?? range.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
@@ -400,22 +400,22 @@ window.hoshiSelection = {
         if (!this.selection?.ranges.length) {
             return [];
         }
-        
+
         const rects = [];
         let remaining = charCount;
-        
+
         for (const r of this.selection.ranges) {
             if (remaining <= 0) {
                 break;
             }
-            
+
             let end = r.start;
             while (end < r.end && remaining > 0) {
                 const char = String.fromCodePoint(r.node.textContent.codePointAt(end));
                 end += char.length;
                 remaining--;
             }
-            
+
             const range = document.createRange();
             range.setStart(r.node, r.start);
             range.setEnd(r.node, end);
@@ -423,39 +423,39 @@ window.hoshiSelection = {
                 rects.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
             });
         }
-        
+
         return rects;
     },
-    
+
     highlightSelection(charCount) {
         if (!this.selection?.ranges.length) {
             return;
         }
-        
+
         const highlights = [];
         let remaining = charCount;
-        
+
         for (const r of this.selection.ranges) {
             if (remaining <= 0) {
                 break;
             }
-            
+
             let end = r.start;
             while (end < r.end && remaining > 0) {
                 const char = String.fromCodePoint(r.node.textContent.codePointAt(end));
                 end += char.length;
                 remaining--;
             }
-            
+
             const range = document.createRange();
             range.setStart(r.node, r.start);
             range.setEnd(r.node, end);
             highlights.push(range);
         }
-        
+
         CSS.highlights?.set('hoshi-selection', new Highlight(...highlights));
     },
-    
+
     getNormalizedOffset(targetNode, offset) {
         let count = window.hoshiReader.nodeStartOffsets.get(targetNode) ?? 0;
         const text = targetNode.textContent;
@@ -468,7 +468,7 @@ window.hoshiSelection = {
         }
         return count;
     },
-    
+
     clearSelection() {
         window.getSelection()?.removeAllRanges();
         CSS.highlights?.get('hoshi-selection')?.clear();
