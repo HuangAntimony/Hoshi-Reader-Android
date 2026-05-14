@@ -16,6 +16,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Fixed
 
 - Reuse a warm reader root lookup popup shell so repeated reader lookups avoid rebuilding the popup WebView.
+- Keep reader popup internal dictionary redirects from rendering stale entries from the previous popup result.
 - Synchronize popup-to-popup selection marks with child popup display and draw E-ink popup selections as underlines.
 - Keep vertical lookup selection marks and popup placement aligned to one ruby-aware selection area so furigana is not covered.
 - Keep reader progress counters from refreshing ahead of paginated page turns on slow E-ink screens by waiting for the WebView page state to be ready to draw.

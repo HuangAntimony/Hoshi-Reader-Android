@@ -585,12 +585,14 @@ private fun LookupPopupWebView(
         },
         update = { webView ->
             callbackHolder.callbacks = callbacks
-            lookupResultsHolder.results = results
             webView.setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
             if (loadedHtml != html) {
                 loadedHtml = html
                 shellReady = false
                 appliedWarmResults = null
+                if (!warmShell) {
+                    lookupResultsHolder.results = results
+                }
                 webView.loadDataWithBaseURL(
                     "https://hoshi.local/popup/",
                     html,
@@ -601,6 +603,7 @@ private fun LookupPopupWebView(
             }
             if (warmShell && shellReady && appliedWarmResults !== results) {
                 appliedWarmResults = results
+                lookupResultsHolder.results = results
                 webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
             }
             if (appliedClearSelectionSignal != clearSelectionSignal) {
