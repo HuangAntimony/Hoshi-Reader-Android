@@ -122,20 +122,42 @@ internal object ReaderSelectionScripts {
             }
             var result = this.rectWithBounds(rect);
             rubyRects.forEach(function(rubyRect) {
-              result = this.unionRect(result, rubyRect);
+              if (this.rubyRectMatchesLine(result, rubyRect)) {
+                result = this.unionRect(result, rubyRect);
+              }
             }, this);
             return this.rectObject(result);
           },
-          normalizeVerticalRects: function(rects) {
+          rubyRectMatchesLine: function(lineRect, rubyRect) {
+            var rubyCenterX = (rubyRect.left + rubyRect.right) / 2;
+            return rubyCenterX >= lineRect.left && rubyCenterX <= lineRect.right + lineRect.width;
+          },
+          unifyVerticalColumnRects: function(rects) {
             if (!this.isVertical() || !rects.length) return rects;
-            var left = rects[0].x;
-            var right = rects[0].x + rects[0].width;
-            rects.forEach(function(rect) {
-              left = Math.min(left, rect.x);
-              right = Math.max(right, rect.x + rect.width);
+            var groups = [];
+            var groupForIndex = new Array(rects.length);
+            rects.forEach(function(rect, index) {
+              var left = rect.x;
+              var right = rect.x + rect.width;
+              var group = null;
+              for (var i = 0; i < groups.length; i++) {
+                if (left < groups[i].right && right > groups[i].left) {
+                  group = groups[i];
+                  break;
+                }
+              }
+              if (group) {
+                group.left = Math.min(group.left, left);
+                group.right = Math.max(group.right, right);
+              } else {
+                group = { left: left, right: right };
+                groups.push(group);
+              }
+              groupForIndex[index] = group;
             });
-            return rects.map(function(rect) {
-              return { x: left, y: rect.y, width: right - left, height: rect.height };
+            return rects.map(function(rect, index) {
+              var group = groupForIndex[index];
+              return { x: group.left, y: rect.y, width: group.right - group.left, height: rect.height };
             });
           },
           findParagraph: function(node) {
@@ -360,7 +382,7 @@ internal object ReaderSelectionScripts {
                 rects.push(this.rubyAwareRect(rect, r.node));
               }, this);
             }
-            return this.normalizeVerticalRects(rects);
+            return this.unifyVerticalColumnRects(rects);
           },
           getNormalizedOffset: function(targetNode, offset) {
             if (!window.hoshiReader || !window.hoshiReader.nodeStartOffsets) return null;
