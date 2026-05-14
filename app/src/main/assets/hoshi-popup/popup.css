@@ -415,6 +415,10 @@ a {
     padding: 0;
 }
 
+.pitch-group + .pitch-group {
+    margin-top: 5px;
+}
+
 /* https://github.com/yomidevs/yomitan/blob/master/ext/css/display-pronunciation.css */
 .pronunciation-mora {
     position: relative;
