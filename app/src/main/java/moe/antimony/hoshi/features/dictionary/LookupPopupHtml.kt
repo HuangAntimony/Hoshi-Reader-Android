@@ -138,6 +138,7 @@ internal object LookupPopupHtml {
                             tapOutside: { postMessage: function() { window.HoshiAndroidPopup.postMessage('tapOutside'); } },
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
+                            shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
                             duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
@@ -258,22 +259,40 @@ internal object LookupPopupHtml {
                     (function() {
                         var container = document.getElementById('entries-container');
                         var posted = false;
+                        var observer = null;
                         function postReady() {
                             if (posted) return;
                             posted = true;
                             requestAnimationFrame(function() {
-                                webkit.messageHandlers.contentReady.postMessage(null);
+                                requestAnimationFrame(function() {
+                                    webkit.messageHandlers.contentReady.postMessage(null);
+                                });
                             });
                         }
-                        if (container) {
-                            var observer = new MutationObserver(function() {
+                        window.hoshiPopupObserveContentReady = function() {
+                            posted = false;
+                            if (observer) {
+                                observer.disconnect();
+                                observer = null;
+                            }
+                            if (!container || !window.entryCount) {
+                                postReady();
+                                return;
+                            }
+                            observer = new MutationObserver(function() {
                                 if (container.querySelector('.entry')) {
                                     postReady();
                                     observer.disconnect();
+                                    observer = null;
                                 }
                             });
                             observer.observe(container, { childList: true, subtree: true });
-                        }
+                            if (container.querySelector('.entry')) {
+                                postReady();
+                            }
+                        };
+                        webkit.messageHandlers.shellReady.postMessage(null);
+                        window.hoshiPopupObserveContentReady();
                         window.renderPopup();
                     })();
                 </script>

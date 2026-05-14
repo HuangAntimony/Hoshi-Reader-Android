@@ -107,7 +107,9 @@ import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
+import moe.antimony.hoshi.features.dictionary.LookupPopupState
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
+import moe.antimony.hoshi.features.dictionary.currentDictionaryStyles
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
@@ -128,6 +130,39 @@ private data class PendingRootSelectionHighlight(
 
 private fun popupAnchorRect(rects: List<ReaderSelectionRect>): ReaderSelectionRect? =
     rects.firstOrNull()
+
+private fun warmRootLookupPopupItem(
+    settings: ReaderSettings,
+    dictionarySettings: DictionarySettings,
+    darkMode: Boolean,
+    audioSettings: AudioSettings,
+): LookupPopupItem = LookupPopupItem(
+    id = "warm-root-popup",
+    state = LookupPopupState(
+        selection = ReaderSelectionData(
+            text = "",
+            sentence = "",
+            rect = ReaderSelectionRect(x = 0.0, y = 0.0, width = 1.0, height = 1.0),
+            normalizedOffset = null,
+        ),
+        results = emptyList(),
+        dictionaryStyles = currentDictionaryStyles(),
+        dictionarySettings = dictionarySettings,
+        isVertical = settings.verticalWriting,
+        isFullWidth = settings.popupFullWidth,
+        width = settings.popupWidth,
+        height = settings.popupHeight,
+        swipeToDismiss = settings.popupSwipeToDismiss,
+        swipeThreshold = settings.popupSwipeThreshold,
+        reducedMotionScrolling = settings.popupReducedMotionScrolling,
+        reducedMotionScrollPercent = settings.popupReducedMotionScrollPercent,
+        reducedMotionSwipeThreshold = settings.popupReducedMotionSwipeThreshold,
+        darkMode = darkMode,
+        eInkMode = settings.eInkMode,
+        audioSettings = audioSettings,
+        popupActionBar = false,
+    ),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,12 +245,42 @@ fun ReaderWebView(
     var pendingRootSelectionHighlight by remember { mutableStateOf<PendingRootSelectionHighlight?>(null) }
     var visibleLookupPopupIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var rootSelectionHighlightRects by remember { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
+    var warmRootLookupPopup by remember { mutableStateOf<LookupPopupItem?>(null) }
     val popupDarkMode = effectiveSettings.usesDarkInterface(systemDarkTheme)
     val themedLookupPopups = remember(lookupPopups, popupDarkMode, effectiveSettings.eInkMode, audioSettings) {
         lookupPopups.withLookupPopupVisualOptions(
             darkMode = popupDarkMode,
             eInkMode = effectiveSettings.eInkMode,
             audioSettings = audioSettings,
+        )
+    }
+    val warmRootSeedPopup = remember(effectiveSettings, dictionarySettings, popupDarkMode, audioSettings) {
+        warmRootLookupPopupItem(
+            settings = effectiveSettings,
+            dictionarySettings = dictionarySettings,
+            darkMode = popupDarkMode,
+            audioSettings = audioSettings,
+        )
+    }
+    val renderedLookupPopups = if (themedLookupPopups.isNotEmpty()) {
+        themedLookupPopups
+    } else {
+        listOf(
+            listOf(
+                (warmRootLookupPopup ?: warmRootSeedPopup).let { popup ->
+                    popup.copy(
+                        state = popup.state.copy(
+                            results = emptyList(),
+                            popupActionBar = false,
+                        ),
+                        sasayakiCue = null,
+                    )
+                },
+            ).withLookupPopupVisualOptions(
+                darkMode = popupDarkMode,
+                eInkMode = effectiveSettings.eInkMode,
+                audioSettings = audioSettings,
+            ).first(),
         )
     }
     val showReaderMenu = stateHolder.showReaderMenu
@@ -412,6 +477,7 @@ fun ReaderWebView(
         }
     }
     fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
+        nextPopups.firstOrNull()?.let { warmRootLookupPopup = it }
         visibleLookupPopupIds = visibleLookupPopupIds.intersect(nextPopups.mapTo(mutableSetOf()) { it.id })
         stateHolder.setLookupPopups(nextPopups, ::resumeSasayakiAfterLookupIfNeeded)
     }
@@ -864,7 +930,7 @@ fun ReaderWebView(
                 }
             }
             LookupPopupStackView(
-                popups = themedLookupPopups,
+                popups = renderedLookupPopups,
                 onPopupsChange = ::setLookupPopups,
                 lookupChildPopup = ::lookupChildPopup,
                 onRootPopupDismissed = {
@@ -872,7 +938,9 @@ fun ReaderWebView(
                     true
                 },
                 isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
+                isPopupActive = { _, index -> index != 0 || lookupPopups.isNotEmpty() },
                 onPopupContentReady = ::markRootPopupContentReady,
+                warmRootShell = true,
                 sasayakiWasPaused = sasayakiWasPausedByLookup,
                 sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
                 onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },

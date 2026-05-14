@@ -1470,6 +1470,25 @@ function redirect(count) {
     });
 }
 
+window.replacePopupResults = function(count) {
+    flushPendingHistoryRestore();
+    backStack.length = 0;
+    forwardStack.length = 0;
+    window.lookupEntries = undefined;
+    window.entryCount = count;
+    audioUrls = {};
+    selectedDictionaries = {};
+    const container = document.getElementById('entries-container');
+    if (container) {
+        container.innerHTML = '';
+    }
+    window.hoshiPopupObserveContentReady?.();
+    window.renderPopup();
+    requestAnimationFrame(() => {
+        document.scrollingElement.scrollTop = 0;
+    });
+};
+
 function snapshot() {
     flushPendingHistoryRestore();
     const container = document.getElementById('entries-container');

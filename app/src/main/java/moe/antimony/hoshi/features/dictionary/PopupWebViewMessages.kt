@@ -144,6 +144,7 @@ internal class PopupWebViewBridge(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
     private val selectionOffsetHolder: PopupSelectionOffsetHolder = PopupSelectionOffsetHolder(),
+    private val onShellReady: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -176,6 +177,7 @@ internal class PopupWebViewBridge(
                 webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
             }
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
+            "shellReady" -> mainHandler.post(onShellReady)
             "contentReady" -> mainHandler.post(callbacks.onContentReady)
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return

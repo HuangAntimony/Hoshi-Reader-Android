@@ -133,7 +133,9 @@ internal fun LookupPopupStackView(
     modifier: Modifier = Modifier,
     onRootPopupDismissed: () -> Boolean = { false },
     isPopupVisible: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
+    isPopupActive: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
     onPopupContentReady: (String) -> Unit = {},
+    warmRootShell: Boolean = false,
     sasayakiWasPaused: Boolean = false,
     sasayakiIsPlaying: Boolean = false,
     onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
@@ -143,7 +145,7 @@ internal fun LookupPopupStackView(
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
 ) {
     popups.forEachIndexed { index, popup ->
-        key(popup.id) {
+        key(if (warmRootShell && index == 0) "warm-root-popup" else popup.id) {
             LookupPopupView(
                 state = popup.state,
                 sasayakiCue = popup.sasayakiCue,
@@ -172,7 +174,10 @@ internal fun LookupPopupStackView(
                 onSasayakiPlayForward = onSasayakiPlayForward,
                 onPrepareSasayakiAudio = onPrepareSasayakiAudio,
                 isContentVisible = isPopupVisible(popup, index),
+                isPopupActive = isPopupActive(popup, index),
                 onContentReady = { onPopupContentReady(popup.id) },
+                warmShell = warmRootShell && index == 0,
+                contentResetKey = if (warmRootShell && index == 0) popup.id else null,
                 modifier = modifier
                     .fillMaxSize()
                     .zIndex(2f + index),

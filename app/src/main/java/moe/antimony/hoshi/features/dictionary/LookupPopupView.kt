@@ -111,9 +111,12 @@ fun LookupPopupView(
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
     isContentVisible: Boolean = true,
+    isPopupActive: Boolean = true,
     onContentReady: () -> Unit = {},
+    warmShell: Boolean = false,
+    contentResetKey: Any? = null,
 ) {
-    if (state.results.isEmpty()) return
+    if (state.results.isEmpty() && !warmShell) return
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
     val ankiViewModel: AnkiViewModel = viewModel(
@@ -127,8 +130,9 @@ fun LookupPopupView(
     )
     val ankiUiState by ankiViewModel.uiState.collectAsState()
     val assets = remember(context) { LookupPopupAssets.load(context) }
+    val htmlResults = if (warmShell) emptyList() else state.results
     val html = remember(
-        state.results,
+        htmlResults,
         state.dictionaryStyles,
         state.dictionarySettings,
         state.swipeToDismiss,
@@ -142,7 +146,7 @@ fun LookupPopupView(
         ankiUiState.popupSettings,
     ) {
         LookupPopupHtml.render(
-            results = state.results,
+            results = htmlResults,
             dictionaryStyles = state.dictionaryStyles,
             settings = state.dictionarySettings,
             swipeToDismiss = state.swipeToDismiss,
@@ -156,11 +160,12 @@ fun LookupPopupView(
             ankiSettings = ankiUiState.popupSettings,
         )
     }
-    var contentReady by remember(html) { mutableStateOf(false) }
-    var backCount by remember(html) { mutableStateOf(0) }
-    var forwardCount by remember(html) { mutableStateOf(0) }
-    var backSignal by remember(html) { mutableStateOf(0) }
-    var forwardSignal by remember(html) { mutableStateOf(0) }
+    val warmContentKey = if (warmShell) contentResetKey else null
+    var contentReady by remember(html, warmContentKey) { mutableStateOf(false) }
+    var backCount by remember(html, warmContentKey) { mutableStateOf(0) }
+    var forwardCount by remember(html, warmContentKey) { mutableStateOf(0) }
+    var backSignal by remember(html, warmContentKey) { mutableStateOf(0) }
+    var forwardSignal by remember(html, warmContentKey) { mutableStateOf(0) }
     LaunchedEffect(contentReady) {
         if (contentReady) {
             onContentReady()
@@ -202,12 +207,12 @@ fun LookupPopupView(
         Surface(
             modifier = Modifier
                 .absoluteOffset(
-                    x = frameX.dp,
-                    y = frameY.dp,
+                    x = if (isPopupActive) frameX.dp else (-10_000).dp,
+                    y = if (isPopupActive) frameY.dp else (-10_000).dp,
                 )
-                .width(frame.width.dp)
-                .height(frame.height.dp)
-                .alpha(if (contentReady && isContentVisible) 1f else 0f)
+                .width(if (isPopupActive) frame.width.dp else 1.dp)
+                .height(if (isPopupActive) frame.height.dp else 1.dp)
+                .alpha(if (isPopupActive && contentReady && isContentVisible) 1f else 0f)
                 .zIndex(2f),
             shape = if (state.eInkMode) RectangleShape else RoundedCornerShape(8.dp),
             color = popupBackground,
@@ -314,6 +319,7 @@ fun LookupPopupView(
                             contentReady = true
                         },
                     ),
+                    warmShell = warmShell,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -458,6 +464,7 @@ private fun LookupPopupWebView(
     backSignal: Int,
     forwardSignal: Int,
     callbacks: PopupWebViewCallbacks,
+    warmShell: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
@@ -472,6 +479,8 @@ private fun LookupPopupWebView(
     var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
     var appliedBackSignal by remember { mutableStateOf(backSignal) }
     var appliedForwardSignal by remember { mutableStateOf(forwardSignal) }
+    var shellReady by remember { mutableStateOf(false) }
+    var appliedWarmResults by remember { mutableStateOf<List<LookupResult>?>(null) }
     AndroidView(
         modifier = modifier
             .fillMaxSize()
@@ -491,6 +500,9 @@ private fun LookupPopupWebView(
                         callbackHolder = callbackHolder,
                         lookupResultsHolder = lookupResultsHolder,
                         selectionOffsetHolder = selectionOffsetHolder,
+                        onShellReady = {
+                            shellReady = true
+                        },
                     ),
                     "HoshiPopup",
                 )
@@ -499,10 +511,12 @@ private fun LookupPopupWebView(
         },
         update = { webView ->
             callbackHolder.callbacks = callbacks
+            lookupResultsHolder.results = results
             webView.setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
             if (loadedHtml != html) {
-                lookupResultsHolder.results = results
                 loadedHtml = html
+                shellReady = false
+                appliedWarmResults = null
                 webView.loadDataWithBaseURL(
                     "https://hoshi.local/popup/",
                     html,
@@ -510,6 +524,10 @@ private fun LookupPopupWebView(
                     "UTF-8",
                     null,
                 )
+            }
+            if (warmShell && shellReady && appliedWarmResults !== results) {
+                appliedWarmResults = results
+                webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
             }
             if (appliedClearSelectionSignal != clearSelectionSignal) {
                 appliedClearSelectionSignal = clearSelectionSignal
