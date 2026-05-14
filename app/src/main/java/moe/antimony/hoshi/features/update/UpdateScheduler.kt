@@ -29,7 +29,7 @@ internal object UpdateScheduler {
     }
 
     suspend fun syncNow(context: Context) {
-        val enabled = context.updateSettingsRepository().settings.first().autoDownloadUpdates
+        val enabled = context.updateSettingsRepository().settings.first().autoCheckUpdates
         if (enabled) {
             schedule(context)
             scheduleImmediateCheck(context)
@@ -81,10 +81,10 @@ internal class UpdateCheckWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        val enabled = applicationContext.updateSettingsRepository().settings.first().autoDownloadUpdates
+        val enabled = applicationContext.updateSettingsRepository().settings.first().autoCheckUpdates
         if (!enabled) return Result.success()
         return runCatching {
-            updateCheckService(applicationContext).check(downloadIfAvailable = true)
+            updateCheckService(applicationContext).check()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() },
@@ -100,4 +100,5 @@ internal fun updateCheckService(context: Context): UpdateCheckService =
             context = context.applicationContext,
             store = context.applicationContext.updateDownloadStore(),
         ),
+        updateStore = context.applicationContext.updateDownloadStore(),
     )

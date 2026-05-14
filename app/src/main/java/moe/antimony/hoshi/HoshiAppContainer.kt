@@ -87,6 +87,7 @@ internal class HoshiAppContainer(context: Context) {
         currentVersionName = BuildConfig.VERSION_NAME,
         releaseRepository = GitHubReleaseUpdateRepository(),
         downloadController = updateDownloadManager,
+        updateStore = updateDownloadStore,
     )
 
     fun readerRouteStateHolder(): ReaderRouteStateHolder =

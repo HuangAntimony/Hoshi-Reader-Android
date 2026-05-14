@@ -11,10 +11,12 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Changed
 
+- Change GitHub release updates to automatically check only, prompt before downloading, support skipping a version, and clean up installed-version APKs.
 - Draw reader lookup selection marks as close underlines in E-ink mode instead of filled highlights.
 
 ### Fixed
 
+- Prevent the About update section from flashing stale default status while loading saved update state, and keep update prompt actions aligned on one row.
 - Reuse a warm reader root lookup popup shell so repeated reader lookups avoid rebuilding the popup WebView.
 - Keep reader popup internal dictionary redirects from rendering stale entries from the previous popup result.
 - Synchronize popup-to-popup selection marks with child popup display and draw E-ink popup selections as underlines.

@@ -72,6 +72,7 @@ This file is the short operational handoff for future agents.
 ### Release Distribution
 
 - Before F-Droid distribution, split update behavior by distribution channel so F-Droid builds do not bypass F-Droid update checks.
+- Device-validate GitHub update prompts after the check/download split, covering skip-version, manual checks, completed-download prompts, user-triggered install, and same-version APK cleanup.
 
 ## Required Validation
 

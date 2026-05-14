@@ -178,42 +178,6 @@ class GitHubReleaseUpdateRepositoryTest {
         assertTrue(AppVersion.parse("0.3.4")!! < AppVersion.parse("0.3.5")!!)
     }
 
-    @Test
-    fun checkServiceDownloadsNewVersionsAndSkipsRepeatDownloads() = runBlocking {
-        val repository = FakeReleaseRepository(
-            GitHubRelease(
-                tagName = "v0.3.5",
-                htmlUrl = "https://example.com/releases/tag/v0.3.5",
-                assets = listOf(
-                    GitHubReleaseAsset(
-                        name = "Hoshi-Reader-v0.3.5.apk",
-                        browserDownloadUrl = "https://example.com/Hoshi-Reader-v0.3.5.apk",
-                        digest = "sha256:7977f9e95adec03fce35ef0640fdd2fe662c6521d625dc12242df5b66fb2254b",
-                    ),
-                ),
-            ),
-        )
-        val downloads = FakeUpdateDownloadController()
-        val service = UpdateCheckService(
-            currentVersionName = "0.3.4",
-            releaseRepository = repository,
-            downloadController = downloads,
-        )
-
-        val first = service.check(downloadIfAvailable = true)
-        val second = service.check(downloadIfAvailable = true)
-
-        assertTrue(first is UpdateCheckOutcome.DownloadStarted)
-        assertTrue(second is UpdateCheckOutcome.DownloadInProgress)
-        assertEquals(1, downloads.startedDownloads)
-    }
-
-    private class FakeReleaseRepository(
-        private val release: GitHubRelease,
-    ) : ReleaseUpdateRepository {
-        override suspend fun latestRelease(): GitHubRelease = release
-    }
-
     private class FakeGitHubHttpClient(
         private val responses: Map<String, String>,
         private val failures: Set<String> = emptySet(),
@@ -226,20 +190,6 @@ class GitHubReleaseUpdateRepositoryTest {
                 throw GitHubReleaseException("failed")
             }
             return responses.getValue(url)
-        }
-    }
-
-    private class FakeUpdateDownloadController : UpdateDownloadController {
-        var startedDownloads = 0
-            private set
-        private var status: UpdateDownloadStatus = UpdateDownloadStatus.None
-
-        override suspend fun statusFor(update: AvailableUpdate): UpdateDownloadStatus = status
-
-        override suspend fun enqueue(update: AvailableUpdate): Long {
-            startedDownloads += 1
-            status = UpdateDownloadStatus.Downloading(42L)
-            return 42L
         }
     }
 }

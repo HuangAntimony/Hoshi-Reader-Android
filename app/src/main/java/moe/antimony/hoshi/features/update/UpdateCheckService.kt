@@ -16,6 +16,7 @@ internal interface UpdateDownloadController {
 internal sealed interface UpdateCheckOutcome {
     data object UpToDate : UpdateCheckOutcome
     data object NoInstallableAsset : UpdateCheckOutcome
+    data class Skipped(val update: AvailableUpdate) : UpdateCheckOutcome
     data class Available(val update: AvailableUpdate) : UpdateCheckOutcome
     data class DownloadStarted(val update: AvailableUpdate, val downloadId: Long) : UpdateCheckOutcome
     data class DownloadInProgress(val update: AvailableUpdate, val downloadId: Long) : UpdateCheckOutcome
@@ -26,8 +27,9 @@ internal class UpdateCheckService(
     private val currentVersionName: String,
     private val releaseRepository: ReleaseUpdateRepository,
     private val downloadController: UpdateDownloadController,
+    private val updateStore: UpdateDownloadStore,
 ) {
-    suspend fun check(downloadIfAvailable: Boolean): UpdateCheckOutcome {
+    suspend fun check(ignoreSkipped: Boolean = false): UpdateCheckOutcome {
         val release = releaseRepository.latestRelease()
         val releaseVersion = AppVersion.parse(release.tagName) ?: return UpdateCheckOutcome.NoInstallableAsset
         val currentVersion = AppVersion.parse(currentVersionName) ?: return UpdateCheckOutcome.UpToDate
@@ -37,12 +39,20 @@ internal class UpdateCheckService(
             is UpdateDownloadStatus.Downloaded -> UpdateCheckOutcome.DownloadAlreadyFinished(update, status.file)
             is UpdateDownloadStatus.Downloading -> UpdateCheckOutcome.DownloadInProgress(update, status.downloadId)
             UpdateDownloadStatus.None -> {
-                if (!downloadIfAvailable) {
-                    UpdateCheckOutcome.Available(update)
-                } else {
-                    UpdateCheckOutcome.DownloadStarted(update, downloadController.enqueue(update))
+                val record = updateStore.load()?.takeIf { it.matches(update) }
+                if (record?.status == UpdateDownloadRecordStatus.Skipped && !ignoreSkipped) {
+                    return UpdateCheckOutcome.Skipped(update)
                 }
+                if (record?.status != UpdateDownloadRecordStatus.Skipped &&
+                    record?.status != UpdateDownloadRecordStatus.Failed
+                ) {
+                    updateStore.saveAvailable(update)
+                }
+                UpdateCheckOutcome.Available(update)
             }
         }
     }
+
+    suspend fun download(update: AvailableUpdate): UpdateCheckOutcome.DownloadStarted =
+        UpdateCheckOutcome.DownloadStarted(update, downloadController.enqueue(update))
 }

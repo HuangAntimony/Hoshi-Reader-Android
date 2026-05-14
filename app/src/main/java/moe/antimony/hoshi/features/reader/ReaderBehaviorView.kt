@@ -78,12 +78,12 @@ fun ReaderBehaviorScreen(
                     )
                     BehaviorDivider()
                     BehaviorSwitchRow(
-                        label = "Automatically Download Updates",
-                        checked = loadedUpdateSettings.autoDownloadUpdates,
+                        label = "Automatically Check for Updates",
+                        checked = loadedUpdateSettings.autoCheckUpdates,
                         onCheckedChange = { enabled ->
                             scope.launch {
                                 appContainer.updateSettingsRepository.update {
-                                    it.copy(autoDownloadUpdates = enabled)
+                                    it.copy(autoCheckUpdates = enabled)
                                 }
                                 if (enabled) {
                                     UpdateScheduler.schedule(context)

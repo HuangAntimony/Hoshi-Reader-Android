@@ -27,26 +27,30 @@ internal class AndroidUpdateDownloadManager(
         if (record.status == UpdateDownloadRecordStatus.Downloaded && file.isFile) {
             return UpdateDownloadStatus.Downloaded(file)
         }
-        val downloadStatus = downloadManager.queryStatus(record.downloadId)
+        if (record.status != UpdateDownloadRecordStatus.Downloading && record.status != UpdateDownloadRecordStatus.Failed) {
+            return UpdateDownloadStatus.None
+        }
+        val downloadId = record.downloadId ?: return UpdateDownloadStatus.None
+        val downloadStatus = downloadManager.queryStatus(downloadId)
         return when (downloadStatus) {
             DownloadManager.STATUS_PENDING,
             DownloadManager.STATUS_PAUSED,
             DownloadManager.STATUS_RUNNING,
-            -> UpdateDownloadStatus.Downloading(record.downloadId)
+            -> UpdateDownloadStatus.Downloading(downloadId)
             DownloadManager.STATUS_SUCCESSFUL -> {
                 val valid = file.isFile &&
                     (record.sha256 == null || file.sha256Hex().equals(record.sha256, ignoreCase = true))
                 if (valid) {
-                    store.markDownloaded(record.downloadId)
+                    store.markDownloaded(downloadId)
                     UpdateDownloadStatus.Downloaded(file)
                 } else {
                     file.delete()
-                    store.markFailed(record.downloadId)
+                    store.markFailed(downloadId)
                     UpdateDownloadStatus.None
                 }
             }
             DownloadManager.STATUS_FAILED -> {
-                store.markFailed(record.downloadId)
+                store.markFailed(downloadId)
                 UpdateDownloadStatus.None
             }
             else -> UpdateDownloadStatus.None
@@ -80,6 +84,12 @@ internal class AndroidUpdateDownloadManager(
     internal fun updateFile(fileName: String): File =
         File(updateDirectory(), fileName)
 
+    internal fun updateApkFiles(): List<File> =
+        updateDirectory()
+            .listFiles { file -> file.isFile && file.extension.equals("apk", ignoreCase = true) }
+            ?.toList()
+            .orEmpty()
+
     private fun deleteExistingUpdateApksExcept(target: File) {
         val directory = target.parentFile ?: return
         directory.listFiles { file -> file.isFile && file.extension.equals("apk", ignoreCase = true) }
@@ -87,7 +97,7 @@ internal class AndroidUpdateDownloadManager(
             ?.forEach { file -> file.delete() }
     }
 
-    private fun updateDirectory(): File =
+    internal fun updateDirectory(): File =
         appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             ?: File(appContext.filesDir, "downloads")
 

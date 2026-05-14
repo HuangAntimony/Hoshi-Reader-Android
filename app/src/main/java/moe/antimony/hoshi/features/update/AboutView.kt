@@ -30,7 +30,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +45,8 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.features.settings.collectAsSettingsLoadState
 import moe.antimony.hoshi.features.storage.StorageCleanupReport
 import java.io.File
 import java.util.Locale
@@ -60,11 +61,14 @@ fun AboutScreen(
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
     val scope = rememberCoroutineScope()
-    val record by appContainer.updateDownloadStore.record.collectAsState(initial = null)
+    val recordLoadState = appContainer.updateDownloadStore.record.collectAsSettingsLoadState()
+    val record = (recordLoadState as? SettingsLoadState.Loaded)?.value
     val actionableRecord = record?.takeIf { it.shouldSurfaceInAbout(BuildConfig.VERSION_NAME) }
     var checkState by remember { mutableStateOf<AboutUpdateCheckState>(AboutUpdateCheckState.Idle) }
     var cleanupState by remember { mutableStateOf<StorageCleanupUiState>(StorageCleanupUiState.Idle) }
     var pendingCleanupConfirmation by remember { mutableStateOf<StorageCleanupReport?>(null) }
+    var pendingAvailableUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
+    var updatePromptMessage by remember { mutableStateOf<String?>(null) }
 
     pendingCleanupConfirmation?.let { report ->
         AlertDialog(
@@ -107,12 +111,53 @@ fun AboutScreen(
             },
         )
     }
+    pendingAvailableUpdate?.let { update ->
+        AvailableUpdatePromptDialog(
+            versionName = update.versionName,
+            message = updatePromptMessage,
+            onLater = {
+                pendingAvailableUpdate = null
+                updatePromptMessage = null
+            },
+            onSkip = {
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        appContainer.updateDownloadStore.skip(update)
+                    }
+                    pendingAvailableUpdate = null
+                    updatePromptMessage = null
+                }
+            },
+            onDownload = {
+                scope.launch {
+                    val outcome = runCatching {
+                        withContext(Dispatchers.IO) {
+                            appContainer.updateCheckService.download(update)
+                        }
+                    }.fold(
+                        onSuccess = { AboutUpdateCheckState.Result(it) },
+                        onFailure = { error ->
+                            AboutUpdateCheckState.Error(error.localizedMessage ?: "Failed to download update.")
+                        },
+                    )
+                    checkState = outcome
+                    if (outcome is AboutUpdateCheckState.Error) {
+                        updatePromptMessage = outcome.message
+                    } else {
+                        pendingAvailableUpdate = null
+                        updatePromptMessage = null
+                    }
+                }
+            },
+        )
+    }
 
     SettingsDetailScaffold(
         title = "About",
         onClose = onClose,
         modifier = modifier,
     ) { innerPadding ->
+        if (recordLoadState !is SettingsLoadState.Loaded) return@SettingsDetailScaffold
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -265,10 +310,15 @@ fun AboutScreen(
                                         checkState = AboutUpdateCheckState.Checking
                                         checkState = runCatching {
                                             withContext(Dispatchers.IO) {
-                                                appContainer.updateCheckService.check(downloadIfAvailable = true)
+                                                appContainer.updateCheckService.check(ignoreSkipped = true)
                                             }
                                         }.fold(
-                                            onSuccess = { AboutUpdateCheckState.Result(it) },
+                                            onSuccess = { outcome ->
+                                                if (outcome is UpdateCheckOutcome.Available) {
+                                                    pendingAvailableUpdate = outcome.update
+                                                }
+                                                AboutUpdateCheckState.Result(outcome)
+                                            },
                                             onFailure = { error ->
                                                 AboutUpdateCheckState.Error(
                                                     error.localizedMessage ?: "Failed to check for updates.",
@@ -293,6 +343,36 @@ fun AboutScreen(
                                 ?.takeIf { it.status == UpdateDownloadRecordStatus.Downloaded }
                                 ?.let { appContainer.updateDownloadManager.updateFile(it.fileName) }
                                 ?.takeIf(File::isFile)
+                            val availableUpdate = actionableRecord
+                                ?.takeIf {
+                                    it.status == UpdateDownloadRecordStatus.Available ||
+                                        it.status == UpdateDownloadRecordStatus.Skipped ||
+                                        it.status == UpdateDownloadRecordStatus.Failed
+                                }
+                                ?.toAvailableUpdate()
+                            if (availableUpdate != null) {
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            checkState = runCatching {
+                                                withContext(Dispatchers.IO) {
+                                                    appContainer.updateCheckService.download(availableUpdate)
+                                                }
+                                            }.fold(
+                                                onSuccess = { AboutUpdateCheckState.Result(it) },
+                                                onFailure = { error ->
+                                                    AboutUpdateCheckState.Error(
+                                                        error.localizedMessage ?: "Failed to download update.",
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    },
+                                    enabled = checkState !is AboutUpdateCheckState.Checking,
+                                ) {
+                                    Text("Download")
+                                }
+                            }
                             if (downloadedFile != null) {
                                 OutlinedButton(
                                     onClick = {
@@ -397,6 +477,8 @@ private fun updateStatusText(
 ): String =
     when (checkState) {
         AboutUpdateCheckState.Idle -> when (record?.status) {
+            UpdateDownloadRecordStatus.Available -> "Update ${record.versionName} is available."
+            UpdateDownloadRecordStatus.Skipped -> "Update ${record.versionName} has been skipped."
             UpdateDownloadRecordStatus.Downloading -> "An update is downloading."
             UpdateDownloadRecordStatus.Downloaded -> "Update ${record.versionName} has been downloaded."
             UpdateDownloadRecordStatus.Failed -> "The last update download failed."
@@ -407,6 +489,7 @@ private fun updateStatusText(
         is AboutUpdateCheckState.Result -> when (val outcome = checkState.outcome) {
             UpdateCheckOutcome.UpToDate -> "You are running the latest version."
             UpdateCheckOutcome.NoInstallableAsset -> "A newer release was found, but it does not include a single matching APK."
+            is UpdateCheckOutcome.Skipped -> "Update ${outcome.update.versionName} has been skipped."
             is UpdateCheckOutcome.Available -> "Update ${outcome.update.versionName} is available."
             is UpdateCheckOutcome.DownloadStarted -> "Downloading update ${outcome.update.versionName}."
             is UpdateCheckOutcome.DownloadInProgress -> "Update ${outcome.update.versionName} is already downloading."

@@ -12,4 +12,11 @@ class SettingsLoadStateTest {
         assertTrue(settingsContentReady("settings"))
         assertTrue(settingsContentReady("settings", "sync"))
     }
+
+    @Test
+    fun nullableSettingsCanBeLoadedWithNullValue() {
+        assertFalse(SettingsLoadState.Loading.isLoaded)
+        assertTrue(SettingsLoadState.Loaded(null).isLoaded)
+        assertTrue(SettingsLoadState.Loaded("settings").isLoaded)
+    }
 }
