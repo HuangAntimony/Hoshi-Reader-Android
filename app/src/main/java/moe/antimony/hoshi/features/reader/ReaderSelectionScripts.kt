@@ -84,6 +84,60 @@ internal object ReaderSelectionScripts {
             var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
             return !!(el && el.closest('rt, rp'));
           },
+          isVertical: function() {
+            return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+          },
+          rectObject: function(rect) {
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          },
+          rectWithBounds: function(rect) {
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+          },
+          unionRect: function(a, b) {
+            var left = Math.min(a.left, b.left);
+            var top = Math.min(a.top, b.top);
+            var right = Math.max(a.right, b.right);
+            var bottom = Math.max(a.bottom, b.bottom);
+            return { x: left, y: top, width: right - left, height: bottom - top, left: left, top: top, right: right, bottom: bottom };
+          },
+          rubyForNode: function(node) {
+            var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            return el && el.closest('ruby');
+          },
+          rubyTextRects: function(node) {
+            var ruby = this.rubyForNode(node);
+            if (!ruby || !this.isVertical()) return [];
+            var rects = [];
+            ruby.querySelectorAll('rt').forEach(function(rt) {
+              Array.from(rt.getClientRects()).forEach(function(rect) {
+                rects.push(rect);
+              });
+            });
+            return rects;
+          },
+          rubyAwareRect: function(rect, node) {
+            var rubyRects = this.rubyTextRects(node);
+            if (!rubyRects.length) {
+              return this.rectObject(rect);
+            }
+            var result = this.rectWithBounds(rect);
+            rubyRects.forEach(function(rubyRect) {
+              result = this.unionRect(result, rubyRect);
+            }, this);
+            return this.rectObject(result);
+          },
+          normalizeVerticalRects: function(rects) {
+            if (!this.isVertical() || !rects.length) return rects;
+            var left = rects[0].x;
+            var right = rects[0].x + rects[0].width;
+            rects.forEach(function(rect) {
+              left = Math.min(left, rect.x);
+              right = Math.max(right, rect.x + rect.width);
+            });
+            return rects.map(function(rect) {
+              return { x: left, y: rect.y, width: right - left, height: rect.height };
+            });
+          },
           findParagraph: function(node) {
             var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
             return (el && el.closest('p, .glossary-content')) || null;
@@ -264,7 +318,7 @@ internal object ReaderSelectionScripts {
             range.setEnd(first.node, first.start + 1);
             var rects = Array.from(range.getClientRects());
             var rect = rects.find(function(rect) { return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }) || range.getBoundingClientRect();
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            return this.rubyAwareRect(rect, first.node);
           },
           highlightSelection: function(charCount) {
             if (!this.selection || !this.selection.ranges.length || !CSS.highlights) return;
@@ -303,10 +357,10 @@ internal object ReaderSelectionScripts {
               range.setStart(r.node, r.start);
               range.setEnd(r.node, end);
               Array.from(range.getClientRects()).forEach(function(rect) {
-                rects.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-              });
+                rects.push(this.rubyAwareRect(rect, r.node));
+              }, this);
             }
-            return rects;
+            return this.normalizeVerticalRects(rects);
           },
           getNormalizedOffset: function(targetNode, offset) {
             if (!window.hoshiReader || !window.hoshiReader.nodeStartOffsets) return null;

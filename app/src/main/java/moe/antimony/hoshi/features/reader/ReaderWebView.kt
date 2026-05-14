@@ -126,6 +126,20 @@ private data class PendingRootSelectionHighlight(
     val loadRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit,
 )
 
+private fun selectionBounds(rects: List<ReaderSelectionRect>): ReaderSelectionRect? {
+    if (rects.isEmpty()) return null
+    val left = rects.minOf { it.x }
+    val top = rects.minOf { it.y }
+    val right = rects.maxOf { it.x + it.width }
+    val bottom = rects.maxOf { it.y + it.height }
+    return ReaderSelectionRect(
+        x = left,
+        y = top,
+        width = right - left,
+        height = bottom - top,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderWebView(
@@ -436,6 +450,21 @@ fun ReaderWebView(
         pending.loadRects(pending.count) { rects ->
             val fallbackRect = lookupPopups.firstOrNull { it.id == popupId }?.state?.selection?.rect
             rootSelectionHighlightRects = rects.ifEmpty { fallbackRect?.let(::listOf).orEmpty() }
+            selectionBounds(rootSelectionHighlightRects)?.let { bounds ->
+                setLookupPopups(
+                    lookupPopups.map { popup ->
+                        if (popup.id == popupId) {
+                            popup.copy(
+                                state = popup.state.copy(
+                                    selection = popup.state.selection.copy(rect = bounds),
+                                ),
+                            )
+                        } else {
+                            popup
+                        }
+                    },
+                )
+            }
             visibleLookupPopupIds = visibleLookupPopupIds + popupId
         }
         pendingRootSelectionHighlight = null
