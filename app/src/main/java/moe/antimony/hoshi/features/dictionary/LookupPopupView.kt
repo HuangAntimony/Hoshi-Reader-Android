@@ -463,6 +463,11 @@ private fun LookupPopupWebView(
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
     callbackHolder.callbacks = callbacks
     val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
+    val selectionOffsetHolder = remember {
+        PopupSelectionOffsetHolder(offsetX = selectionOffsetX, offsetY = selectionOffsetY)
+    }
+    selectionOffsetHolder.offsetX = selectionOffsetX
+    selectionOffsetHolder.offsetY = selectionOffsetY
     var loadedHtml by remember { mutableStateOf<String?>(null) }
     var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
     var appliedBackSignal by remember { mutableStateOf(backSignal) }
@@ -485,8 +490,7 @@ private fun LookupPopupWebView(
                         webView = this,
                         callbackHolder = callbackHolder,
                         lookupResultsHolder = lookupResultsHolder,
-                        selectionOffsetX = selectionOffsetX,
-                        selectionOffsetY = selectionOffsetY,
+                        selectionOffsetHolder = selectionOffsetHolder,
                     ),
                     "HoshiPopup",
                 )

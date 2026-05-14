@@ -40,6 +40,11 @@ internal class PopupLookupResultsHolder(
     var results: List<LookupResult>,
 )
 
+internal class PopupSelectionOffsetHolder(
+    var offsetX: Double = 0.0,
+    var offsetY: Double = 0.0,
+)
+
 internal class PopupMessageWebViewClient(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val audioRequestHandler: AudioRequestHandler? = null,
@@ -138,8 +143,7 @@ internal class PopupWebViewBridge(
     private val webView: WebView,
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
-    private val selectionOffsetX: Double = 0.0,
-    private val selectionOffsetY: Double = 0.0,
+    private val selectionOffsetHolder: PopupSelectionOffsetHolder = PopupSelectionOffsetHolder(),
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -178,7 +182,7 @@ internal class PopupWebViewBridge(
                 val mode = AudioPlaybackMode.fromRawValue(body.optString("mode"))
                 mainHandler.post { callbacks.onPlayWordAudio(url, mode) }
             }
-            "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetX, selectionOffsetY)?.let { selection ->
+            "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetHolder.offsetX, selectionOffsetHolder.offsetY)?.let { selection ->
                 mainHandler.post {
                     val highlightCount = callbacks.onTextSelected(selection) ?: return@post
                     webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
