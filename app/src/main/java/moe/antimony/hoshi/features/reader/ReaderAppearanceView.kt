@@ -453,6 +453,36 @@ private fun ReaderAppearanceContent(
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
+                        label = "Reduced Motion Scrolling",
+                        checked = settings.popupReducedMotionScrolling,
+                        onCheckedChange = { onSettingsChange(settings.copy(popupReducedMotionScrolling = it)) },
+                    )
+                    if (settings.popupReducedMotionScrolling) {
+                        AppearanceDivider(palette)
+                        SliderRow(
+                            label = "Scroll Amount",
+                            value = "${settings.popupReducedMotionScrollPercent}%",
+                            sliderValue = settings.popupReducedMotionScrollPercent.toFloat(),
+                            valueRange = 40f..100f,
+                            steps = 5,
+                            onValueChange = { value ->
+                                onSettingsChange(settings.copy(popupReducedMotionScrollPercent = (round(value / 10) * 10).toInt()))
+                            },
+                        )
+                        AppearanceDivider(palette)
+                        SliderRow(
+                            label = "Scroll Swipe Threshold",
+                            value = settings.popupReducedMotionSwipeThreshold.toString(),
+                            sliderValue = settings.popupReducedMotionSwipeThreshold.toFloat(),
+                            valueRange = 0f..100f,
+                            steps = 9,
+                            onValueChange = { value ->
+                                onSettingsChange(settings.copy(popupReducedMotionSwipeThreshold = (round(value / 10) * 10).toInt()))
+                            },
+                        )
+                    }
+                    AppearanceDivider(palette)
+                    SwitchRow(
                         label = "Show Action Bar",
                         checked = settings.popupActionBar,
                         onCheckedChange = { onSettingsChange(settings.copy(popupActionBar = it)) },

@@ -40,6 +40,9 @@ internal object LookupPopupHtml {
         settings: DictionarySettings = DictionarySettings(),
         swipeToDismiss: Boolean = false,
         swipeThreshold: Int = 40,
+        reducedMotionScrolling: Boolean = false,
+        reducedMotionScrollPercent: Int = 100,
+        reducedMotionSwipeThreshold: Int = 40,
         darkMode: Boolean = false,
         eInkMode: Boolean = false,
         audioSettings: AudioSettings = AudioSettings(),
@@ -55,6 +58,8 @@ internal object LookupPopupHtml {
         val normalizedSettings = settings.normalized()
         val collapsedDictionaries = dictionaryNamesJson(normalizedSettings.collapsedDictionaries)
         val effectiveSwipeThreshold = if (swipeToDismiss) swipeThreshold.coerceAtLeast(0) else 0
+        val effectiveReducedMotionScrollScale = reducedMotionScrollPercent.coerceIn(40, 100) / 100.0
+        val effectiveReducedMotionSwipeThreshold = reducedMotionSwipeThreshold.coerceAtLeast(0)
         val colorScheme = if (darkMode) "dark" else "light"
         val popupCss = assets?.let { """<style>${it.popupCss}</style>""" }
             ?: """<link rel="stylesheet" href="$PopupAssetBaseUrl/popup.css">"""
@@ -165,12 +170,55 @@ internal object LookupPopupHtml {
                     window.compactGlossariesAnki = ${ankiSettings.compactGlossaries};
                     window.customCSS = ${JsonPrimitive(normalizedSettings.customCSS)};
                     window.swipeThreshold = $effectiveSwipeThreshold;
+                    window.reducedMotionScrolling = $reducedMotionScrolling;
+                    window.reducedMotionScrollScale = $effectiveReducedMotionScrollScale;
+                    window.reducedMotionSwipeThreshold = $effectiveReducedMotionSwipeThreshold;
                     window.dictionaryStyles = $styles;
                     window.lookupEntries = $entries;
                     window.entryCount = $entryCount;
                 </script>
                 <script>
                     (function() {
+                        if (window.reducedMotionScrolling) {
+                            var reducedMotionStartY = 0;
+                            var root = function() {
+                                return document.scrollingElement || document.documentElement || document.body;
+                            };
+                            var scrollByPopupHeight = function(direction) {
+                                var scrollRoot = root();
+                                var popupHeight = document.documentElement.clientHeight || window.innerHeight || scrollRoot.clientHeight;
+                                var maxScroll = Math.max(0, scrollRoot.scrollHeight - popupHeight);
+                                var current = scrollRoot.scrollTop || window.scrollY || 0;
+                                var target = Math.max(0, Math.min(maxScroll, current + popupHeight * window.reducedMotionScrollScale * direction));
+                                scrollRoot.scrollTop = target;
+                                window.scrollTo(0, target);
+                            };
+                            document.addEventListener('touchstart', function(e) {
+                                if (e.touches.length === 1) {
+                                    reducedMotionStartY = e.touches[0].clientY;
+                                }
+                            }, { passive: true });
+                            document.addEventListener('touchmove', function(e) {
+                                if (e.touches.length === 1 && e.cancelable) {
+                                    e.preventDefault();
+                                }
+                            }, { passive: false });
+                            document.addEventListener('touchend', function(e) {
+                                if (!e.changedTouches.length) return;
+                                var delta = reducedMotionStartY - e.changedTouches[0].clientY;
+                                var threshold = window.reducedMotionSwipeThreshold;
+                                if (delta > threshold) {
+                                    scrollByPopupHeight(1);
+                                } else if (delta < -threshold) {
+                                    scrollByPopupHeight(-1);
+                                }
+                            }, { passive: true });
+                            document.addEventListener('wheel', function(e) {
+                                if (e.deltaY === 0) return;
+                                scrollByPopupHeight(e.deltaY > 0 ? 1 : -1);
+                                e.preventDefault();
+                            }, { passive: false });
+                        }
                         if (!window.swipeThreshold) {
                             return;
                         }

@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add a reader popup Reduced Motion Scrolling option that scrolls lookup popups by a configurable percentage of the current popup height.
+
 ### Fixed
 
 - Synchronize reader lookup popup visibility with the selected-word highlight on slow E-ink screens, while keeping highlighted text readable.
