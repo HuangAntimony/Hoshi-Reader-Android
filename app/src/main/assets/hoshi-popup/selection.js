@@ -395,6 +395,37 @@ window.hoshiSelection = {
         const rect = rects.find(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ?? range.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     },
+
+    selectionRects(charCount) {
+        if (!this.selection?.ranges.length) {
+            return [];
+        }
+        
+        const rects = [];
+        let remaining = charCount;
+        
+        for (const r of this.selection.ranges) {
+            if (remaining <= 0) {
+                break;
+            }
+            
+            let end = r.start;
+            while (end < r.end && remaining > 0) {
+                const char = String.fromCodePoint(r.node.textContent.codePointAt(end));
+                end += char.length;
+                remaining--;
+            }
+            
+            const range = document.createRange();
+            range.setStart(r.node, r.start);
+            range.setEnd(r.node, end);
+            Array.from(range.getClientRects()).forEach(rect => {
+                rects.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+            });
+        }
+        
+        return rects;
+    },
     
     highlightSelection(charCount) {
         if (!this.selection?.ranges.length) {

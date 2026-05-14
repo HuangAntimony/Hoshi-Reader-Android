@@ -41,6 +41,9 @@ internal data class LookupPopupItem(
     val sasayakiCue: SasayakiMatch? = null,
 )
 
+internal fun clearPopupSelectionHighlights(popups: List<LookupPopupItem>): List<LookupPopupItem> =
+    popups.map { popup -> popup.copy(clearSelectionSignal = popup.clearSelectionSignal + 1) }
+
 internal fun createLookupPopupItem(
     selection: ReaderSelectionData,
     options: LookupPopupOptions,
@@ -125,6 +128,22 @@ internal fun List<LookupPopupItem>.withLookupPopupVisualOptions(
         )
     }
 
+internal fun closeChildPopupsForScrolledParent(
+    popups: List<LookupPopupItem>,
+    parentIndex: Int,
+): List<LookupPopupItem> =
+    if (parentIndex >= popups.lastIndex) {
+        popups
+    } else {
+        closeChildPopups(popups, parentIndex).mapIndexed { index, popup ->
+            if (index == parentIndex) {
+                popup.copy(clearSelectionSignal = popup.clearSelectionSignal + 1)
+            } else {
+                popup
+            }
+        }
+    }
+
 @Composable
 internal fun LookupPopupStackView(
     popups: List<LookupPopupItem>,
@@ -167,6 +186,9 @@ internal fun LookupPopupStackView(
                         onPopupsChange(nextPopups + childPopup)
                         highlightCount
                     }
+                },
+                onPopupScrolled = {
+                    onPopupsChange(closeChildPopupsForScrolledParent(popups, index))
                 },
                 onSasayakiReplayCue = onSasayakiReplayCue,
                 onSasayakiTogglePlayback = onSasayakiTogglePlayback,

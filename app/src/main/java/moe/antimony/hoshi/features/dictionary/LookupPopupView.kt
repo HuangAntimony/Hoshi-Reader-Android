@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -62,6 +66,7 @@ import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
+import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 private const val SasayakiPopupControlsTotalHeightValue = 37.0
@@ -105,6 +110,7 @@ fun LookupPopupView(
     clearSelectionSignal: Int = 0,
     onTapOutside: () -> Unit = onSwipeDismiss,
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
+    onPopupScrolled: () -> Unit = {},
     onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
     onSasayakiTogglePlayback: () -> Unit = {},
     onSasayakiPauseStateCleared: () -> Unit = {},
@@ -166,6 +172,15 @@ fun LookupPopupView(
     var forwardCount by remember(html, warmContentKey) { mutableStateOf(0) }
     var backSignal by remember(html, warmContentKey) { mutableStateOf(0) }
     var forwardSignal by remember(html, warmContentKey) { mutableStateOf(0) }
+    var selectionHighlightRects by remember(html, warmContentKey) { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
+    LaunchedEffect(clearSelectionSignal) {
+        selectionHighlightRects = emptyList()
+    }
+    LaunchedEffect(isPopupActive) {
+        if (!isPopupActive) {
+            selectionHighlightRects = emptyList()
+        }
+    }
     LaunchedEffect(contentReady) {
         if (contentReady) {
             onContentReady()
@@ -281,10 +296,22 @@ fun LookupPopupView(
                     backSignal = backSignal,
                     forwardSignal = forwardSignal,
                     callbacks = PopupWebViewCallbacks(
-                        onTapOutside = onTapOutside,
-                        onSwipeDismiss = onSwipeDismiss,
+                        onTapOutside = {
+                            selectionHighlightRects = emptyList()
+                            onTapOutside()
+                        },
+                        onSwipeDismiss = {
+                            selectionHighlightRects = emptyList()
+                            onSwipeDismiss()
+                        },
                         onOpenLink = context::openPopupExternalLink,
-                        onTextSelected = onTextSelected,
+                        onTextSelected = { selection ->
+                            selectionHighlightRects = emptyList()
+                            onTextSelected(selection)
+                        },
+                        onSelectionRectsLoaded = { rects ->
+                            selectionHighlightRects = rects
+                        },
                         onLookupRedirect = { query ->
                             LookupEngine.lookup(
                                 query,
@@ -318,12 +345,59 @@ fun LookupPopupView(
                         onContentReady = {
                             contentReady = true
                         },
+                        onScroll = {
+                            selectionHighlightRects = emptyList()
+                            onPopupScrolled()
+                        },
                     ),
                     warmShell = warmShell,
                     modifier = Modifier.weight(1f),
                 )
             }
         }
+        if (isPopupActive && isContentVisible) {
+            PopupSelectionHighlightOverlay(
+                rects = selectionHighlightRects,
+                darkMode = state.darkMode,
+                eInkMode = state.eInkMode,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PopupSelectionHighlightOverlay(
+    rects: List<ReaderSelectionRect>,
+    darkMode: Boolean,
+    eInkMode: Boolean,
+) {
+    val blendMode = if (darkMode) BlendMode.Screen else BlendMode.Multiply
+    val underlineColor = if (darkMode) Color.White else Color.Black
+    rects.forEachIndexed { index, rect ->
+        if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = rect.x.dp, y = rect.y.dp)
+                .width(rect.width.dp)
+                .height(rect.height.dp)
+                .drawBehind {
+                    if (eInkMode) {
+                        val lineHeight = 1.5.dp.toPx()
+                        val lineTop = (size.height - 2.dp.toPx()).coerceAtLeast(0f)
+                        drawRect(
+                            color = underlineColor,
+                            topLeft = Offset(0f, lineTop),
+                            size = Size(size.width, lineHeight),
+                        )
+                    } else {
+                        drawRect(
+                            color = Color(0x66A0A0A0),
+                            blendMode = blendMode,
+                        )
+                    }
+                }
+                .zIndex(3f + index * 0.001f),
+        )
     }
 }
 

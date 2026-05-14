@@ -17,6 +17,7 @@ import moe.antimony.hoshi.features.audio.AudioPlaybackMode
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
+import moe.antimony.hoshi.features.reader.ReaderSelectionBridgePayload
 import org.json.JSONObject
 
 internal class PopupWebViewCallbacks(
@@ -24,10 +25,12 @@ internal class PopupWebViewCallbacks(
     val onSwipeDismiss: () -> Unit = {},
     val onOpenLink: (String) -> Unit = {},
     val onTextSelected: (ReaderSelectionData) -> Int? = { null },
+    val onSelectionRectsLoaded: ((List<ReaderSelectionRect>) -> Unit)? = null,
     val onLookupRedirect: (String) -> List<LookupResult> = { query -> LookupEngine.lookup(query) },
     val onLookupRedirected: (Int) -> Unit = {},
     val onPlayWordAudio: (String, AudioPlaybackMode) -> Unit = { _, _ -> },
     val onContentReady: () -> Unit = {},
+    val onScroll: () -> Unit = {},
     val onMineEntry: (String) -> Boolean = { false },
     val onDuplicateCheck: (String, (Boolean) -> Unit) -> Unit = { _, reply -> reply(false) },
 )
@@ -179,6 +182,7 @@ internal class PopupWebViewBridge(
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
             "shellReady" -> mainHandler.post(onShellReady)
             "contentReady" -> mainHandler.post(callbacks.onContentReady)
+            "popupScrolled" -> mainHandler.post(callbacks.onScroll)
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return
                 val mode = AudioPlaybackMode.fromRawValue(body.optString("mode"))
@@ -187,7 +191,23 @@ internal class PopupWebViewBridge(
             "textSelected" -> payload.optJSONObject("body")?.toSelectionData(selectionOffsetHolder.offsetX, selectionOffsetHolder.offsetY)?.let { selection ->
                 mainHandler.post {
                     val highlightCount = callbacks.onTextSelected(selection) ?: return@post
-                    webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
+                    val onSelectionRectsLoaded = callbacks.onSelectionRectsLoaded
+                    if (onSelectionRectsLoaded == null) {
+                        webView.evaluateJavascript("window.hoshiSelection.highlightSelection($highlightCount)", null)
+                        return@post
+                    }
+                    webView.evaluateJavascript("JSON.stringify(window.hoshiSelection.selectionRects($highlightCount))") { result ->
+                        onSelectionRectsLoaded(
+                            ReaderSelectionBridgePayload.rectsFromJavascriptResult(result).map { rect ->
+                                ReaderSelectionRect(
+                                    x = selectionOffsetHolder.offsetX + rect.x,
+                                    y = selectionOffsetHolder.offsetY + rect.y,
+                                    width = rect.width,
+                                    height = rect.height,
+                                )
+                            },
+                        )
+                    }
                 }
             }
             "duplicateCheck" -> {

@@ -1662,3 +1662,7 @@ window.renderPopup = function() {
         }
     });
 };
+
+document.addEventListener('scroll', () => {
+    webkit.messageHandlers.popupScrolled.postMessage(null);
+}, { passive: true });

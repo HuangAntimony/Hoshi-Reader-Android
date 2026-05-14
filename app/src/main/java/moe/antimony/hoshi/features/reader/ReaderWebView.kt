@@ -108,6 +108,7 @@ import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
 import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.LookupPopupState
+import moe.antimony.hoshi.features.dictionary.clearPopupSelectionHighlights
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 import moe.antimony.hoshi.features.dictionary.currentDictionaryStyles
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
@@ -485,6 +486,7 @@ fun ReaderWebView(
         pendingRootSelectionHighlight = null
         visibleLookupPopupIds = emptySet()
         rootSelectionHighlightRects = emptyList()
+        setLookupPopups(clearPopupSelectionHighlights(stateHolder.lookupPopups))
         clearReaderSelection()
         setLookupPopups(emptyList())
     }
@@ -493,6 +495,7 @@ fun ReaderWebView(
         visibleLookupPopupIds = emptySet()
         rootSelectionHighlightRects = emptyList()
         if (lookupPopups.isNotEmpty()) {
+            setLookupPopups(clearPopupSelectionHighlights(stateHolder.lookupPopups))
             clearReaderSelection()
             setLookupPopups(emptyList())
         } else {

@@ -140,6 +140,7 @@ internal object LookupPopupHtml {
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
                             shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
+                            popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
                             mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
                             duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
                             getEntry: { postMessage: async function(index) {
@@ -264,9 +265,7 @@ internal object LookupPopupHtml {
                             if (posted) return;
                             posted = true;
                             requestAnimationFrame(function() {
-                                requestAnimationFrame(function() {
-                                    webkit.messageHandlers.contentReady.postMessage(null);
-                                });
+                                webkit.messageHandlers.contentReady.postMessage(null);
                             });
                         }
                         window.hoshiPopupObserveContentReady = function() {
