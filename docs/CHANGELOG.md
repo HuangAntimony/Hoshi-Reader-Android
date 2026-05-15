@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep continuous-mode reader lookup popups aligned with selected text when reader padding is applied.
+
 ## [v0.6.2] - 2026-05-14
 
 ### Added
@@ -25,6 +29,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep vertical lookup selection marks and popup placement aligned to one ruby-aware selection area so furigana is not covered.
 - Keep reader progress counters from refreshing ahead of paginated page turns on slow E-ink screens by waiting for the WebView page state to be ready to draw.
 - Synchronize reader lookup popup visibility with the selected-word highlight on slow E-ink screens, while keeping highlighted text readable.
+- Prevent reader lookup popups from briefly showing a blank white shell while opening or dismissing on slow E-ink screens.
 
 ## [v0.6.1] - 2026-05-14
 

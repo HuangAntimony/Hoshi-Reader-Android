@@ -931,33 +931,35 @@ fun ReaderWebView(
                         verticalWriting = effectiveSettings.verticalWriting,
                     )
                 }
+                LookupPopupStackView(
+                    popups = renderedLookupPopups,
+                    onPopupsChange = ::setLookupPopups,
+                    lookupChildPopup = ::lookupChildPopup,
+                    onRootPopupDismissed = {
+                        dismissRootLookupPopup()
+                        true
+                    },
+                    isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
+                    isPopupActive = { _, index -> index != 0 || lookupPopups.isNotEmpty() },
+                    onPopupContentReady = ::markRootPopupContentReady,
+                    warmRootShell = true,
+                    sasayakiWasPaused = sasayakiWasPausedByLookup,
+                    sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                    onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
+                    onSasayakiTogglePlayback = { sasayakiPlayer?.togglePlayback() },
+                    onSasayakiPauseStateCleared = stateHolder::clearSasayakiPauseState,
+                    onSasayakiPlayForward = { cue ->
+                        sasayakiPlayer?.playCue(cue, stop = false)
+                        closeLookupPopupsAndSelection()
+                    },
+                    onPrepareSasayakiAudio = { cue, sentence ->
+                        sasayakiPlayer?.exportCueAudio(cue, sentence)?.absolutePath
+                    },
+                    rootSelectionOffsetX = viewportHorizontalPadding.value.toDouble(),
+                    rootSelectionOffsetY = viewportVerticalPadding.value.toDouble(),
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
-            LookupPopupStackView(
-                popups = renderedLookupPopups,
-                onPopupsChange = ::setLookupPopups,
-                lookupChildPopup = ::lookupChildPopup,
-                onRootPopupDismissed = {
-                    dismissRootLookupPopup()
-                    true
-                },
-                isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
-                isPopupActive = { _, index -> index != 0 || lookupPopups.isNotEmpty() },
-                onPopupContentReady = ::markRootPopupContentReady,
-                warmRootShell = true,
-                sasayakiWasPaused = sasayakiWasPausedByLookup,
-                sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
-                onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
-                onSasayakiTogglePlayback = { sasayakiPlayer?.togglePlayback() },
-                onSasayakiPauseStateCleared = stateHolder::clearSasayakiPauseState,
-                onSasayakiPlayForward = { cue ->
-                    sasayakiPlayer?.playCue(cue, stop = false)
-                    closeLookupPopupsAndSelection()
-                },
-                onPrepareSasayakiAudio = { cue, sentence ->
-                    sasayakiPlayer?.exportCueAudio(cue, sentence)?.absolutePath
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
         }
         ReaderTopInfo(
             state = chromeState,
