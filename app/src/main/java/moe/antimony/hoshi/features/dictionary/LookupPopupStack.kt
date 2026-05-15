@@ -128,6 +128,30 @@ internal fun List<LookupPopupItem>.withLookupPopupVisualOptions(
         )
     }
 
+internal fun List<LookupPopupItem>.withRootSelectionOffset(
+    offsetX: Double,
+    offsetY: Double,
+): List<LookupPopupItem> {
+    if (isEmpty() || offsetX == 0.0 && offsetY == 0.0) return this
+    return mapIndexed { index, popup ->
+        if (index != 0) {
+            popup
+        } else {
+            val rect = popup.state.selection.rect
+            popup.copy(
+                state = popup.state.copy(
+                    selection = popup.state.selection.copy(
+                        rect = rect.copy(
+                            x = rect.x + offsetX,
+                            y = rect.y + offsetY,
+                        ),
+                    ),
+                ),
+            )
+        }
+    }
+}
+
 internal fun closeChildPopupsForScrolledParent(
     popups: List<LookupPopupItem>,
     parentIndex: Int,
@@ -162,8 +186,11 @@ internal fun LookupPopupStackView(
     onSasayakiPauseStateCleared: () -> Unit = {},
     onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
     onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
+    rootSelectionOffsetX: Double = 0.0,
+    rootSelectionOffsetY: Double = 0.0,
 ) {
-    popups.forEachIndexed { index, popup ->
+    val displayPopups = popups.withRootSelectionOffset(rootSelectionOffsetX, rootSelectionOffsetY)
+    displayPopups.forEachIndexed { index, popup ->
         key(if (warmRootShell && index == 0) "warm-root-popup" else popup.id) {
             LookupPopupView(
                 state = popup.state,

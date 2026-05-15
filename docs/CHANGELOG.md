@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep continuous-mode reader lookup popups aligned with selected text when reader padding is applied.
+
 ## [v0.6.2] - 2026-05-14
 
 ### Added

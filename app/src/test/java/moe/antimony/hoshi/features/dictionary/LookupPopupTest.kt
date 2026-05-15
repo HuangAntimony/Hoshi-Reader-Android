@@ -84,6 +84,36 @@ class LookupPopupTest {
     }
 
     @Test
+    fun rootSelectionOffsetMovesOnlyRootPopupAnchor() {
+        val popups = listOf("root", "child").mapIndexed { index, id ->
+            LookupPopupItem(
+                id = id,
+                state = LookupPopupState(
+                    selection = ReaderSelectionData(
+                        text = id,
+                        sentence = id,
+                        rect = ReaderSelectionRect(
+                            x = 10.0 + index,
+                            y = 20.0 + index,
+                            width = 30.0,
+                            height = 40.0,
+                        ),
+                        normalizedOffset = null,
+                    ),
+                    results = emptyList(),
+                ),
+            )
+        }
+
+        val shifted = popups.withRootSelectionOffset(offsetX = 5.0, offsetY = 7.0)
+
+        assertEquals(15.0, shifted[0].state.selection.rect.x, 0.0)
+        assertEquals(27.0, shifted[0].state.selection.rect.y, 0.0)
+        assertEquals(11.0, shifted[1].state.selection.rect.x, 0.0)
+        assertEquals(21.0, shifted[1].state.selection.rect.y, 0.0)
+    }
+
+    @Test
     fun dismissPopupAtClosesTheSelectedPopupAndItsChildren() {
         val popups = listOf("root", "child", "grandchild").map { id ->
             LookupPopupItem(
