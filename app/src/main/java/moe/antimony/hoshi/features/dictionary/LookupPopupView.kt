@@ -8,7 +8,6 @@ import android.webkit.WebView
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -219,6 +218,7 @@ fun LookupPopupView(
             state.darkMode -> Color(0xFFEBEBF5)
             else -> Color(0x993C3C43)
         }
+        val popupVisible = isPopupActive && contentReady && isContentVisible
         Surface(
             modifier = Modifier
                 .absoluteOffset(
@@ -227,7 +227,7 @@ fun LookupPopupView(
                 )
                 .width(if (isPopupActive) frame.width.dp else 1.dp)
                 .height(if (isPopupActive) frame.height.dp else 1.dp)
-                .alpha(if (isPopupActive && contentReady && isContentVisible) 1f else 0f)
+                .alpha(if (popupVisible) 1f else 0f)
                 .zIndex(2f),
             shape = if (state.eInkMode) RectangleShape else RoundedCornerShape(8.dp),
             color = popupBackground,
@@ -289,7 +289,6 @@ fun LookupPopupView(
                     results = state.results,
                     assets = assets,
                     audioSettings = state.audioSettings,
-                    darkMode = state.darkMode,
                     selectionOffsetX = frameX,
                     selectionOffsetY = frameY + controlsHeight,
                     clearSelectionSignal = clearSelectionSignal,
@@ -343,7 +342,9 @@ fun LookupPopupView(
                             ankiViewModel.duplicateCheckAsync(expression, reply)
                         },
                         onContentReady = {
-                            contentReady = true
+                            if (state.results.isNotEmpty()) {
+                                contentReady = true
+                            }
                         },
                         onScroll = {
                             selectionHighlightRects = emptyList()
@@ -531,7 +532,6 @@ private fun LookupPopupWebView(
     results: List<LookupResult>,
     assets: LookupPopupAssets,
     audioSettings: AudioSettings,
-    darkMode: Boolean,
     selectionOffsetX: Double,
     selectionOffsetY: Double,
     clearSelectionSignal: Int,
@@ -544,6 +544,7 @@ private fun LookupPopupWebView(
     val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
     callbackHolder.callbacks = callbacks
     val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
+    val contentReadyGate = remember { PopupContentReadyGate() }
     val selectionOffsetHolder = remember {
         PopupSelectionOffsetHolder(offsetX = selectionOffsetX, offsetY = selectionOffsetY)
     }
@@ -557,8 +558,7 @@ private fun LookupPopupWebView(
     var appliedWarmResults by remember { mutableStateOf<List<LookupResult>?>(null) }
     AndroidView(
         modifier = modifier
-            .fillMaxSize()
-            .background(if (darkMode) Color.Black else Color.White),
+            .fillMaxSize(),
         factory = { context ->
             val audioRequestHandler = AudioRequestHandler(
                 LocalAudioRepository.fromContext(context),
@@ -567,13 +567,14 @@ private fun LookupPopupWebView(
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
-                setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
                     PopupWebViewBridge(
                         webView = this,
                         callbackHolder = callbackHolder,
                         lookupResultsHolder = lookupResultsHolder,
                         selectionOffsetHolder = selectionOffsetHolder,
+                        contentReadyGate = contentReadyGate,
                         onShellReady = {
                             shellReady = true
                         },
@@ -585,11 +586,12 @@ private fun LookupPopupWebView(
         },
         update = { webView ->
             callbackHolder.callbacks = callbacks
-            webView.setBackgroundColor(if (darkMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             if (loadedHtml != html) {
                 loadedHtml = html
                 shellReady = false
                 appliedWarmResults = null
+                contentReadyGate.reset()
                 if (!warmShell) {
                     lookupResultsHolder.results = results
                 }
@@ -604,6 +606,7 @@ private fun LookupPopupWebView(
             if (warmShell && shellReady && appliedWarmResults !== results) {
                 appliedWarmResults = results
                 lookupResultsHolder.results = results
+                contentReadyGate.reset()
                 webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
             }
             if (appliedClearSelectionSignal != clearSelectionSignal) {

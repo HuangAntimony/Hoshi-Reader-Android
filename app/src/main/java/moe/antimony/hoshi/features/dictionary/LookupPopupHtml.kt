@@ -268,25 +268,31 @@ internal object LookupPopupHtml {
                                 webkit.messageHandlers.contentReady.postMessage(null);
                             });
                         }
+                        function hasRenderableContent() {
+                            if (!container || !window.entryCount) {
+                                return true;
+                            }
+                            return !!container.querySelector('.entry .glossary-content');
+                        }
                         window.hoshiPopupObserveContentReady = function() {
                             posted = false;
                             if (observer) {
                                 observer.disconnect();
                                 observer = null;
                             }
-                            if (!container || !window.entryCount) {
+                            if (hasRenderableContent()) {
                                 postReady();
                                 return;
                             }
                             observer = new MutationObserver(function() {
-                                if (container.querySelector('.entry')) {
+                                if (hasRenderableContent()) {
                                     postReady();
                                     observer.disconnect();
                                     observer = null;
                                 }
                             });
                             observer.observe(container, { childList: true, subtree: true });
-                            if (container.querySelector('.entry')) {
+                            if (hasRenderableContent()) {
                                 postReady();
                             }
                         };

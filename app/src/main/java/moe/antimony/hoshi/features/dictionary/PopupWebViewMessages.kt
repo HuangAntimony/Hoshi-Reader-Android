@@ -48,6 +48,33 @@ internal class PopupSelectionOffsetHolder(
     var offsetY: Double = 0.0,
 )
 
+internal class PopupContentReadyGate {
+    private var generation = 0L
+    private var requestId = 0L
+
+    fun reset() {
+        generation += 1
+        requestId += 1
+    }
+
+    fun awaitReadyToDraw(webView: WebView, onReady: () -> Unit) {
+        val currentGeneration = generation
+        val currentRequestId = requestId + 1
+        requestId = currentRequestId
+        webView.postVisualStateCallback(
+            currentRequestId,
+            object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) {
+                    if (generation != currentGeneration || this@PopupContentReadyGate.requestId != currentRequestId) {
+                        return
+                    }
+                    onReady()
+                }
+            },
+        )
+    }
+}
+
 internal class PopupMessageWebViewClient(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val audioRequestHandler: AudioRequestHandler? = null,
@@ -147,6 +174,7 @@ internal class PopupWebViewBridge(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
     private val selectionOffsetHolder: PopupSelectionOffsetHolder = PopupSelectionOffsetHolder(),
+    private val contentReadyGate: PopupContentReadyGate = PopupContentReadyGate(),
     private val onShellReady: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -181,7 +209,11 @@ internal class PopupWebViewBridge(
             }
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
             "shellReady" -> mainHandler.post(onShellReady)
-            "contentReady" -> mainHandler.post(callbacks.onContentReady)
+            "contentReady" -> mainHandler.post {
+                contentReadyGate.awaitReadyToDraw(webView) {
+                    callbackHolder.callbacks.onContentReady()
+                }
+            }
             "popupScrolled" -> mainHandler.post(callbacks.onScroll)
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return
