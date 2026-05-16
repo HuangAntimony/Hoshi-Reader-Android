@@ -14,6 +14,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Align the reader text-selection highlight action with iOS by showing one Highlight action directly in the Android selection toolbar, then replacing the toolbar with a nearby color picker.
 - Prevent native reader text-selection drags from scrolling paginated content to another page while creating highlights.
 - Keep reader text-selection handle drags from being treated as page swipes while extending a selection.
+- Keep reader highlights from saving ruby/furigana text when selecting around annotated kanji.
 - Avoid intermittent reader highlight creation failures by keeping the WebView selection alive until the highlight is created.
 - Keep reader long-press text selection available for highlight creation instead of converting the long press into a lookup tap.
 - Show iOS-aligned deinflection explanation popups when tapping conjugation tags in dictionary lookup results.
