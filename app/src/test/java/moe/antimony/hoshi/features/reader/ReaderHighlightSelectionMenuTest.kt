@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import android.view.Menu
+import android.view.MenuItem
 import moe.antimony.hoshi.epub.HighlightColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -13,6 +15,14 @@ class ReaderHighlightSelectionMenuTest {
             ReaderHighlightSelectionMenu.actionModeItems.map { it.id },
         )
         assertEquals("Highlight", ReaderHighlightSelectionMenu.parentTitle)
+    }
+
+    @Test
+    fun requestsHighlightAsLeadingVisibleToolbarAction() {
+        val item = ReaderHighlightSelectionMenu.actionModeItems.single()
+
+        assertEquals(Menu.NONE, item.order)
+        assertEquals(MenuItem.SHOW_AS_ACTION_ALWAYS, item.showAsAction)
     }
 
     @Test

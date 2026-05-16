@@ -1993,6 +1993,7 @@ private class ReaderHighlightActionModeCallback(
     private val delegate: ActionMode.Callback,
 ) : ActionMode.Callback2() {
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+        addHighlightMenu(menu)
         val created = delegate.onCreateActionMode(mode, menu)
         if (created) {
             webView.setNativeSelectionActionMode(mode)
@@ -2036,7 +2037,7 @@ private class ReaderHighlightActionModeCallback(
                 item.id,
                 item.order,
                 item.title,
-            ).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            ).setShowAsAction(item.showAsAction)
         }
     }
 }
