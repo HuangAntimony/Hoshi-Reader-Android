@@ -55,7 +55,7 @@ This file is the short operational handoff for future agents.
 
 ### Highlights And Notes
 
-- Device-validate reader highlight creation, restore, jump, delete, and color behavior in paginated and continuous modes against iOS.
+- Device-validate remaining reader highlight restore, jump, delete, all-color, and continuous-mode behavior against iOS after paginated creation was verified on emulator.
 - Add note editing only if/when iOS exposes a user-visible notes flow.
 
 ### Anki

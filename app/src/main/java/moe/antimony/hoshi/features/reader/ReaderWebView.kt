@@ -2102,6 +2102,7 @@ private class ContinuousScrollTouchListener(
 ) : View.OnTouchListener {
     private var downX = 0f
     private var downY = 0f
+    private var downTime = 0L
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         val webView = view as? WebView ?: return false
@@ -2109,11 +2110,13 @@ private class ContinuousScrollTouchListener(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                downTime = event.eventTime
             }
             MotionEvent.ACTION_UP -> {
                 val dx = event.x - downX
                 val dy = event.y - downY
-                if (abs(dx) < TAP_SLOP && abs(dy) < TAP_SLOP) {
+                val elapsedMs = event.eventTime - downTime
+                if (elapsedMs <= MAX_TAP_DURATION_MS && abs(dx) < TAP_SLOP && abs(dy) < TAP_SLOP) {
                     onTap(event.x, event.y)
                     return false
                 }
@@ -2142,6 +2145,7 @@ private class ContinuousScrollTouchListener(
 
     private companion object {
         const val TAP_SLOP = 12f
+        const val MAX_TAP_DURATION_MS = 500L
     }
 }
 

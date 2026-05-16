@@ -46,7 +46,7 @@ class ReaderSwipeGestureTrackerTest {
 
         assertTrue(tracker.onMove(150f, 104f, eventTime = 1_120L) == ReaderSwipeGestureTracker.Result.LeftSwipe)
         assertTrue(tracker.onMove(120f, 104f, eventTime = 1_140L) == ReaderSwipeGestureTracker.Result.None)
-        assertTrue(tracker.onUp(120f, 104f) == ReaderSwipeGestureTracker.Result.None)
+        assertTrue(tracker.onUp(120f, 104f, eventTime = 1_160L) == ReaderSwipeGestureTracker.Result.None)
     }
 
     @Test
@@ -88,11 +88,22 @@ class ReaderSwipeGestureTrackerTest {
 
         tracker.onDown(240f, 100f, eventTime = 1_000L)
 
-        val result = tracker.onUp(242f, 103f)
+        val result = tracker.onUp(242f, 103f, eventTime = 1_120L)
 
         assertTrue(result is ReaderSwipeGestureTracker.Result.Tap)
         result as ReaderSwipeGestureTracker.Result.Tap
         assertEquals(242f, result.x)
         assertEquals(103f, result.y)
+    }
+
+    @Test
+    fun longPressIsNotReportedAsTapOnPointerUp() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+
+        val result = tracker.onUp(242f, 103f, eventTime = 1_800L)
+
+        assertTrue(result == ReaderSwipeGestureTracker.Result.None)
     }
 }

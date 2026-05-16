@@ -11,7 +11,7 @@ abstract class SwipePageTouchListener : View.OnTouchListener {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> tracker.onDown(event.x, event.y, event.eventTime)
             MotionEvent.ACTION_MOVE -> dispatch(tracker.onMove(event.x, event.y, event.eventTime))
-            MotionEvent.ACTION_UP -> dispatch(tracker.onUp(event.x, event.y))
+            MotionEvent.ACTION_UP -> dispatch(tracker.onUp(event.x, event.y, event.eventTime))
             MotionEvent.ACTION_CANCEL -> tracker.onCancel()
         }
         return false
@@ -72,13 +72,19 @@ internal class ReaderSwipeGestureTracker(
         return if (dx < 0f) Result.LeftSwipe else Result.RightSwipe
     }
 
-    fun onUp(x: Float, y: Float): Result {
+    fun onUp(x: Float, y: Float, eventTime: Long): Result {
         if (!hasDown) return Result.None
         val dx = x - downX
         val dy = y - downY
+        val elapsedMs = eventTime - downTime
         val wasSwipeDispatched = swipeDispatched
         onCancel()
-        return if (!wasSwipeDispatched && abs(dx) < minDistance && abs(dy) < minDistance) {
+        return if (
+            !wasSwipeDispatched &&
+            elapsedMs <= MAX_TAP_DURATION_MS &&
+            abs(dx) < minDistance &&
+            abs(dy) < minDistance
+        ) {
             Result.Tap(x, y)
         } else {
             Result.None
@@ -101,6 +107,7 @@ internal class ReaderSwipeGestureTracker(
         const val MIN_FAST_FLICK_DISTANCE = 36f
         const val MIN_FAST_FLICK_VELOCITY_PX_PER_SECOND = 900f
         const val MAX_EARLY_SWIPE_DURATION_MS = 300L
+        const val MAX_TAP_DURATION_MS = 500L
         const val MIN_EARLY_SWIPE_VELOCITY_PX_PER_SECOND = 360f
     }
 }
