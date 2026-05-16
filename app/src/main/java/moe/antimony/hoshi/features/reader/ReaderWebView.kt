@@ -2060,7 +2060,11 @@ private class ReaderHighlightActionModeCallback(
     }
 
     override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
-        (delegate as? ActionMode.Callback2)?.onGetContentRect(mode, view, outRect)
+        if (delegate is ActionMode.Callback2) {
+            delegate.onGetContentRect(mode, view, outRect)
+        } else {
+            super.onGetContentRect(mode, view, outRect)
+        }
         webView.setNativeSelectionContentRect(outRect)
     }
 
