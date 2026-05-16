@@ -5,6 +5,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+## [v0.7.0] - 2026-05-16
+
 ### Added
 
 - Add iOS-style reader highlights with color selection, persistent `highlights.json` storage, restore on chapter load, and a reader Highlights sheet for jumping to or deleting highlights.
