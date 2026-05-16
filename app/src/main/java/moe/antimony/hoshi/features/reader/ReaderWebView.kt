@@ -1902,6 +1902,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
         nativeSelectionActionModeActive = mode != null
+        evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
         if (mode == null) {
             nativeSelectionDragMoved = false
             dismissFallbackHighlightPopup()

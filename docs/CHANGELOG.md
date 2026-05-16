@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Prevent native reader text-selection drags from scrolling paginated content to another page while creating highlights.
 - Keep reader text-selection handle drags from being treated as page swipes, so the highlight context menu can appear after extending a selection.
 - Avoid intermittent reader highlight creation failures by keeping the WebView selection alive until the highlight is created.
 - Keep reader long-press text selection available for highlight creation instead of converting the long press into a lookup tap.
