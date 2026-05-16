@@ -82,11 +82,43 @@ body {
     gap: 6px;
 }
 
-.button-slot {
-    display: inline-block;
-    width: 28px;
-    height: 28px;
+.audio-button,
+.mine-button {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 18px;
+    line-height: 1;
+    opacity: 0.5;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease, opacity 120ms ease;
+}
+
+.mine-button {
+    margin-left: 6px;
+}
+
+.mine-button.duplicate {
+    transform: translateY(0.5px);
+}
+
+.mine-button:disabled {
+    opacity: 0.15;
+}
+
+.audio-button.pressed,
+.audio-button:active {
+    background-color: rgba(128, 128, 128, 0.25);
+    opacity: 0.7;
 }
 
 .entry-tags {

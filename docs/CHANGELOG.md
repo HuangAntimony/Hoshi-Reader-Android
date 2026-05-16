@@ -22,7 +22,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Use the selected EPUB file name as the visible book title when imported metadata has no usable title.
 - Remove deleted dictionaries from the collapsed dictionary configuration.
-- Keep popup audio and Anki controls aligned after scrolling, zoom, redirects, and dictionary collapse/expand changes by drawing them as native Android controls.
+- Group highlights from unlabeled EPUB spine entries under the nearest previous visible chapter in the reader Highlights sheet.
 
 ## [v0.6.3] - 2026-05-15
 

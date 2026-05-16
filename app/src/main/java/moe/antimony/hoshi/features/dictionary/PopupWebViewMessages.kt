@@ -12,13 +12,6 @@ import org.json.JSONObject.quote
 import java.io.ByteArrayInputStream
 import de.manhhao.hoshi.HoshiDicts
 import de.manhhao.hoshi.LookupResult
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray as KotlinJsonArray
-import kotlinx.serialization.json.JsonObject as KotlinJsonObject
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioPlaybackMode
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
@@ -27,10 +20,9 @@ import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.reader.ReaderSelectionBridgePayload
 import moe.antimony.hoshi.features.reader.mediaType
-import org.json.JSONArray
 import org.json.JSONObject
 
-internal data class PopupWebViewCallbacks(
+internal class PopupWebViewCallbacks(
     val onTapOutside: () -> Unit = {},
     val onSwipeDismiss: () -> Unit = {},
     val onOpenLink: (String) -> Unit = {},
@@ -43,71 +35,7 @@ internal data class PopupWebViewCallbacks(
     val onScroll: () -> Unit = {},
     val onMineEntry: (String) -> Boolean = { false },
     val onDuplicateCheck: (String, (Boolean) -> Unit) -> Unit = { _, reply -> reply(false) },
-    val onButtonFrames: (List<PopupButtonFrame>) -> Unit = {},
 )
-
-internal enum class PopupButtonKind(val rawValue: String) {
-    Audio("audio"),
-    Mine("mine");
-
-    companion object {
-        fun fromRawValue(value: String): PopupButtonKind? =
-            entries.firstOrNull { it.rawValue == value }
-    }
-}
-
-internal enum class PopupButtonState(val rawValue: String) {
-    Default("default"),
-    Error("error"),
-    Duplicate("duplicate");
-
-    companion object {
-        fun fromRawValue(value: String): PopupButtonState =
-            entries.firstOrNull { it.rawValue == value } ?: Default
-    }
-}
-
-internal data class PopupButtonFrame(
-    val kind: PopupButtonKind,
-    val entryIndex: Int,
-    val x: Double,
-    val y: Double,
-    val width: Double,
-    val height: Double,
-    val state: PopupButtonState = PopupButtonState.Default,
-    val enabled: Boolean = true,
-) {
-    val actionScript: String
-        get() = when (kind) {
-            PopupButtonKind.Audio -> "playEntryAudio($entryIndex)"
-            PopupButtonKind.Mine -> "mineEntryAtIndex($entryIndex)"
-    }
-}
-
-private val popupButtonFrameJson = Json { ignoreUnknownKeys = true }
-
-internal fun popupButtonFramesFromJson(json: String): List<PopupButtonFrame> =
-    runCatching {
-        val element = popupButtonFrameJson.parseToJsonElement(json)
-        popupButtonFramesFromJsonArray(element as? KotlinJsonArray ?: return@runCatching emptyList())
-    }.getOrDefault(emptyList())
-
-internal fun popupButtonFramesFromMessageJson(message: String): List<PopupButtonFrame> =
-    runCatching {
-        val element = popupButtonFrameJson.parseToJsonElement(message) as? KotlinJsonObject
-            ?: return@runCatching emptyList()
-        popupButtonFramesFromJsonArray(element["body"] as? KotlinJsonArray ?: return@runCatching emptyList())
-    }.getOrDefault(emptyList())
-
-internal fun popupButtonFramesFromJson(array: JSONArray?): List<PopupButtonFrame> {
-    if (array == null) return emptyList()
-    return buildList {
-        for (index in 0 until array.length()) {
-            val frame = array.optJSONObject(index)?.toPopupButtonFrame() ?: continue
-            add(frame)
-        }
-    }
-}
 
 internal class PopupWebViewCallbackHolder(
     var callbacks: PopupWebViewCallbacks,
@@ -304,10 +232,6 @@ internal class PopupWebViewBridge(
                 }
             }
             "popupScrolled" -> mainHandler.post(callbacks.onScroll)
-            "buttonFrames" -> {
-                val frames = popupButtonFramesFromMessageJson(message)
-                mainHandler.post { callbacks.onButtonFrames(frames) }
-            }
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
                 val url = body.optString("url").takeIf { it.isNotBlank() } ?: return
                 val mode = AudioPlaybackMode.fromRawValue(body.optString("mode"))
@@ -367,49 +291,5 @@ private fun JSONObject.toSelectionData(
         ),
         normalizedOffset = opt("normalizedOffset")?.let { if (it == JSONObject.NULL) null else (it as? Number)?.toInt() },
         sentenceOffset = opt("sentenceOffset")?.let { if (it == JSONObject.NULL) null else (it as? Number)?.toInt() },
-    )
-}
-
-private fun JSONObject.toPopupButtonFrame(): PopupButtonFrame? {
-    val kind = PopupButtonKind.fromRawValue(optString("kind")) ?: return null
-    val entryIndex = optInt("entryIndex", -1).takeIf { it >= 0 } ?: return null
-    val x = finiteDouble("x") ?: return null
-    val y = finiteDouble("y") ?: return null
-    val width = finiteDouble("width")?.takeIf { it > 0.0 } ?: return null
-    val height = finiteDouble("height")?.takeIf { it > 0.0 } ?: return null
-    return PopupButtonFrame(
-        kind = kind,
-        entryIndex = entryIndex,
-        x = x,
-        y = y,
-        width = width,
-        height = height,
-        state = PopupButtonState.fromRawValue(optString("state")),
-        enabled = if (has("enabled")) optBoolean("enabled") else true,
-    )
-}
-
-private fun JSONObject.finiteDouble(name: String): Double? =
-    optDouble(name, Double.NaN).takeIf { it.isFinite() }
-
-private fun popupButtonFramesFromJsonArray(array: KotlinJsonArray): List<PopupButtonFrame> =
-    array.mapNotNull { (it as? KotlinJsonObject)?.toPopupButtonFrame() }
-
-private fun KotlinJsonObject.toPopupButtonFrame(): PopupButtonFrame? {
-    val kind = PopupButtonKind.fromRawValue(this["kind"]?.jsonPrimitive?.content.orEmpty()) ?: return null
-    val entryIndex = this["entryIndex"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return null
-    val x = this["x"]?.jsonPrimitive?.doubleOrNull?.takeIf { it.isFinite() } ?: return null
-    val y = this["y"]?.jsonPrimitive?.doubleOrNull?.takeIf { it.isFinite() } ?: return null
-    val width = this["width"]?.jsonPrimitive?.doubleOrNull?.takeIf { it > 0.0 && it.isFinite() } ?: return null
-    val height = this["height"]?.jsonPrimitive?.doubleOrNull?.takeIf { it > 0.0 && it.isFinite() } ?: return null
-    return PopupButtonFrame(
-        kind = kind,
-        entryIndex = entryIndex,
-        x = x,
-        y = y,
-        width = width,
-        height = height,
-        state = PopupButtonState.fromRawValue(this["state"]?.jsonPrimitive?.content.orEmpty()),
-        enabled = this["enabled"]?.jsonPrimitive?.booleanOrNull ?: true,
     )
 }

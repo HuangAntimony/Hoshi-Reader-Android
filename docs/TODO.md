@@ -32,7 +32,7 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
-- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; it is synced through iOS `1e2aa8d` and should be rechecked before new upstream work.
+- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; next remaining slice is popup action-button frame sync.
 - Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.
 - Device-validate paginated page turns with top and bottom progress counters enabled on E-ink, confirming the counter no longer refreshes before the page flip.

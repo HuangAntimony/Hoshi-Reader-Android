@@ -38,7 +38,7 @@ Validation:
 
 ### 2. Popup action buttons and frame sync
 
-Status: synced on Android.
+Status: queued
 
 Commits:
 
@@ -59,14 +59,14 @@ iOS behavior to mirror:
 Android notes:
 
 - Do not copy the iOS UIKit implementation. Implement with Android/Compose/WebView primitives while preserving the same user-visible control behavior.
-- Android popup JS now emits placeholder button slots and frame/state messages through the WebView bridge.
-- Dictionary-tab popups and reader popups draw audio and mining controls as Compose overlays on top of a horizontal-scroll-clamped popup WebView.
-- Button frames are refreshed after popup scrolling, resize, popup scale changes, redirect/back/forward restore, result replacement, and document-level dictionary `toggle` events.
+- Existing popup JS still owns much of the button rendering path; keep the WebView bridge as the integration point.
+- This slice should also re-check child popup selections and action-bar history, because button-frame refresh touches redirect/back/forward state.
 
 Validation:
 
-- Unit coverage: `LookupPopupHtmlTest`, `PopupWebViewMessagesTest`, `LookupPopupTest`, and `HoshiPopupWebViewTest`.
-- Device validation remains recommended for Dictionary tab lookup and reader lookup: audio/mining alignment, duplicate state, Anki add state, audio error state, autoplay, redirect history, collapsed dictionary toggles, child popups, and slow horizontal drags/long presses on controls.
+- Dictionary tab lookup and reader lookup both show audio/mining controls aligned to entry headers.
+- Duplicate state, Anki add state, audio error state, autoplay, redirect history, collapsed dictionary toggles, and child popups all keep controls aligned.
+- Slow horizontal drags/long presses on controls do not move popup content sideways.
 
 ### 3. Bookshelf title rename and metadata fallback
 
@@ -173,13 +173,15 @@ Validation:
 | `130f6cf` | 2026-05-16 | Reader background safe area | No direct Android action |
 | `2f5d71a` | 2026-05-16 | Autodetect dictionary type | Synced |
 | `b3312d9` | 2026-05-16 | Clean collapsed config on delete | Synced |
-| `851202d` | 2026-05-16 | Native popup action buttons | Synced |
-| `8f0d827` | 2026-05-16 | Prevent popup horizontal scroll | Synced |
+| `851202d` | 2026-05-16 | Native popup action buttons | Queued |
+| `8f0d827` | 2026-05-16 | Prevent popup horizontal scroll | Queued with popup buttons |
 | `478f78d` | 2026-05-16 | iOS build bump | No Android action |
 | `a7f4750` | 2026-05-16 | Rename seek to skip | Covered |
-| `cd8ecf2` | 2026-05-16 | Refresh popup button frames on toggle | Synced |
-| `1e2aa8d` | 2026-05-16 | Move toggle frame refresh listener to document | Synced |
+| `cd8ecf2` | 2026-05-16 | Refresh popup button frames on toggle | Queued with popup buttons |
+| `1e2aa8d` | 2026-05-16 | Move toggle frame refresh listener to document | Queued with popup buttons |
 
 ## Suggested Implementation Order
 
-No queued slices remain in this document. Re-fetch `reference/Hoshi-Reader-iOS` and update this queue before starting the next upstream sync.
+1. Popup action buttons and frame sync.
+
+This keeps the remaining risky WebView/popup work grouped together.

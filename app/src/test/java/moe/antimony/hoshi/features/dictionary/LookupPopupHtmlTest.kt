@@ -84,21 +84,6 @@ class LookupPopupHtmlTest {
     }
 
     @Test
-    fun popupHtmlExposesButtonFrameBridgeForNativeOverlayControls() {
-        val html = LookupPopupHtml.render(
-            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
-            assets = LookupPopupAssets(
-                popupJs = "window.renderPopup = function() {};",
-                popupCss = ".entry-header {}",
-                selectionJs = "window.hoshiSelection = { selectText: function() {} };",
-            ),
-        )
-
-        assertTrue(html.contains("buttonFrames: { postMessage: function(frames)"))
-        assertTrue(html.contains("window.HoshiAndroidPopup.postMessage('buttonFrames', frames);"))
-    }
-
-    @Test
     fun popupHtmlExposesActiveAnkiConnectBackendToPopupJavascript() {
         val html = LookupPopupHtml.render(
             listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
