@@ -88,6 +88,25 @@ internal object ReaderContentStyles {
             }
             """.trimIndent()
         }
+        val rubyAnnotationHitAreaCss = if (settings.verticalWriting) {
+            """
+            ruby > span::after {
+                top: 0;
+                bottom: 0;
+                right: -0.8em;
+                width: 0.8em;
+            }
+            """.trimIndent()
+        } else {
+            """
+            ruby > span::after {
+                left: 0;
+                right: 0;
+                top: -0.8em;
+                height: 0.8em;
+            }
+            """.trimIndent()
+        }
         val layoutCss = if (settings.continuousMode) {
             val hiddenOverflowAxis = if (settings.verticalWriting) "overflow-y" else "overflow-x"
             val viewportConstraintCss = if (settings.verticalWriting) {
@@ -187,6 +206,15 @@ internal object ReaderContentStyles {
             user-select: none;
             pointer-events: none;
         }
+        ruby > span {
+            position: relative;
+            z-index: 1;
+        }
+        ruby > span::after {
+            content: "";
+            position: absolute;
+        }
+        $rubyAnnotationHitAreaCss
         ::highlight(hoshi-selection) {
             background-color: rgba(160, 160, 160, 0.4) !important;
             color: inherit;

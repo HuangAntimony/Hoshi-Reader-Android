@@ -1909,6 +1909,16 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         nativeSelectionContentRect = Rect(rect)
     }
 
+    fun refreshNativeSelectionActionModeContentRect(mode: ActionMode) {
+        val refresh = Runnable {
+            if (nativeSelectionActionMode === mode) {
+                mode.invalidateContentRect()
+            }
+        }
+        postDelayed(refresh, ACTION_MODE_CONTENT_RECT_REFRESH_DELAY_MS)
+        postDelayed(refresh, ACTION_MODE_CONTENT_RECT_SECOND_REFRESH_DELAY_MS)
+    }
+
     fun prepareHighlightColorPicker(mode: ActionMode) {
         val anchor = nativeSelectionContentRect?.let { Rect(it) }
         evaluateJavascript(ReaderHighlightCommand.PrepareSelection.source) { result ->
@@ -2020,6 +2030,11 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     override fun startActionMode(callback: ActionMode.Callback, type: Int): ActionMode? =
         super.startActionMode(ReaderHighlightActionModeCallback(this, callback), type)
+
+    private companion object {
+        const val ACTION_MODE_CONTENT_RECT_REFRESH_DELAY_MS = 80L
+        const val ACTION_MODE_CONTENT_RECT_SECOND_REFRESH_DELAY_MS = 180L
+    }
 }
 
 private class ReaderHighlightActionModeCallback(
@@ -2032,12 +2047,14 @@ private class ReaderHighlightActionModeCallback(
         if (created) {
             webView.setNativeSelectionActionMode(mode)
             addHighlightMenu(menu)
+            webView.refreshNativeSelectionActionModeContentRect(mode)
         }
         return created
     }
 
     override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
         addHighlightMenu(menu)
+        webView.refreshNativeSelectionActionModeContentRect(mode)
         return delegate.onPrepareActionMode(mode, menu)
     }
 
