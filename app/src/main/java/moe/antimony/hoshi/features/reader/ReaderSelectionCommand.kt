@@ -37,6 +37,11 @@ internal sealed interface ReaderSelectionCommand {
 internal sealed interface ReaderHighlightCommand {
     val source: String
 
+    data object PrepareSelection : ReaderHighlightCommand {
+        override val source: String =
+            "window.hoshiHighlights.prepareHighlightSelection()"
+    }
+
     data class Create(
         val color: HighlightColor,
         val id: String,

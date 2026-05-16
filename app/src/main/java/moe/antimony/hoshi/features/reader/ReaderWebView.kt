@@ -1891,6 +1891,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
     private var nativeSelectionActionModeActive = false
     private var nativeSelectionActionMode: ActionMode? = null
+    private var nativeSelectionContentRect: Rect? = null
     private var highlightColorPopup: PopupWindow? = null
 
     fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
@@ -1899,11 +1900,26 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         nativeSelectionActionModeActive = mode != null
         evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
         if (mode == null) {
+            nativeSelectionContentRect = null
             dismissHighlightColorPopup()
         }
     }
 
-    fun showHighlightColorPicker() {
+    fun setNativeSelectionContentRect(rect: Rect) {
+        nativeSelectionContentRect = Rect(rect)
+    }
+
+    fun prepareHighlightColorPicker(mode: ActionMode) {
+        val anchor = nativeSelectionContentRect?.let { Rect(it) }
+        evaluateJavascript(ReaderHighlightCommand.PrepareSelection.source) { result ->
+            if (result?.trim() == "true") {
+                mode.finish()
+                post { showHighlightColorPicker(anchor) }
+            }
+        }
+    }
+
+    fun showHighlightColorPicker(anchorRect: Rect? = nativeSelectionContentRect) {
         dismissHighlightColorPopup()
         val density = resources.displayMetrics.density
         val popupContent = LinearLayout(context).apply {
@@ -1940,11 +1956,29 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         getLocationOnScreen(location)
         val margin = (16f * density).toInt()
         val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
         val popupWidth = popupContent.measuredWidth
-        val x = (location[0] + width / 2 - popupWidth / 2)
-            .coerceIn(0, (screenWidth - popupWidth).coerceAtLeast(0))
-        val y = location[1] + margin
-        highlightColorPopup?.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+        val popupHeight = popupContent.measuredHeight
+        val anchor = anchorRect?.let {
+            ReaderHighlightSelectionAnchor(
+                left = it.left,
+                top = it.top,
+                right = it.right,
+                bottom = it.bottom,
+            )
+        }
+        val position = ReaderHighlightSelectionMenu.colorPickerPopupPosition(
+            viewLeft = location[0],
+            viewTop = location[1],
+            viewWidth = width,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
+            popupWidth = popupWidth,
+            popupHeight = popupHeight,
+            margin = margin,
+            anchor = anchor,
+        )
+        highlightColorPopup?.showAtLocation(this, Gravity.NO_GRAVITY, position.x, position.y)
     }
 
     private fun highlightColorButton(item: ReaderHighlightSelectionMenuItem, density: Float): TextView {
@@ -2009,7 +2043,7 @@ private class ReaderHighlightActionModeCallback(
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         if (item.itemId == ReaderHighlightSelectionMenu.parentItemId) {
-            webView.showHighlightColorPicker()
+            webView.prepareHighlightColorPicker(mode)
             return true
         }
         val color = ReaderHighlightSelectionMenu.colorForItemId(item.itemId)
@@ -2027,6 +2061,7 @@ private class ReaderHighlightActionModeCallback(
 
     override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
         (delegate as? ActionMode.Callback2)?.onGetContentRect(mode, view, outRect)
+        webView.setNativeSelectionContentRect(outRect)
     }
 
     private fun addHighlightMenu(menu: Menu) {

@@ -26,6 +26,24 @@ class ReaderHighlightSelectionMenuTest {
     }
 
     @Test
+    fun positionsColorPickerNearSelectedTextWhenAnchorIsAvailable() {
+        val position = ReaderHighlightSelectionMenu.colorPickerPopupPosition(
+            viewLeft = 0,
+            viewTop = 288,
+            viewWidth = 1280,
+            screenWidth = 1280,
+            screenHeight = 2856,
+            popupWidth = 720,
+            popupHeight = 160,
+            margin = 24,
+            anchor = ReaderHighlightSelectionAnchor(left = 520, top = 600, right = 760, bottom = 1000),
+        )
+
+        assertEquals(280, position.x)
+        assertEquals(704, position.y)
+    }
+
+    @Test
     fun exposesPaletteColorsOnlyAfterHighlightIsClicked() {
         assertEquals(5, ReaderHighlightSelectionMenu.colorItems.size)
         assertEquals(

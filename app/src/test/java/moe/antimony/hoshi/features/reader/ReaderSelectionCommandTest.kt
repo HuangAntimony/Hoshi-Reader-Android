@@ -36,6 +36,10 @@ class ReaderSelectionCommandTest {
     @Test
     fun readerHighlightCommandsBuildIosHighlightInvocations() {
         assertEquals(
+            "window.hoshiHighlights.prepareHighlightSelection()",
+            ReaderHighlightCommand.PrepareSelection.source,
+        )
+        assertEquals(
             """window.hoshiHighlights.createHighlight('yellow', 'highlight-1')""",
             ReaderHighlightCommand.Create(HighlightColor.Yellow, "highlight-1").source,
         )

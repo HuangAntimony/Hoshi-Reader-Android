@@ -1170,21 +1170,39 @@ internal object ReaderPaginationScripts {
 private fun readerHighlightsScript(): String = """
     window.hoshiHighlights = {
       wrappers: new Map(),
+      pendingRange: null,
+      prepareHighlightSelection: function() {
+        var selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return false;
+        var range = selection.getRangeAt(0);
+        if (range.collapsed) return false;
+        this.pendingRange = range.cloneRange();
+        return true;
+      },
       createHighlight: function(color, id) {
         var selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return null;
-        var range = selection.getRangeAt(0);
-        if (range.collapsed) return null;
+        var range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        if ((!range || range.collapsed) && this.pendingRange) {
+          range = this.pendingRange;
+        }
+        if (!range || range.collapsed) {
+          this.pendingRange = null;
+          return null;
+        }
         var startPrefix = range.startContainer.textContent.substring(0, range.startOffset);
         var endPrefix = range.endContainer.textContent.substring(0, range.endOffset);
         var start = (window.hoshiReader.nodeStartOffsets.get(range.startContainer) || 0) + window.hoshiReader.countChars(startPrefix);
         var rawStart = (window.hoshiReader.nodeStartRawOffsets.get(range.startContainer) || 0) + window.hoshiReader.countRawChars(startPrefix);
         var rawEnd = (window.hoshiReader.nodeStartRawOffsets.get(range.endContainer) || 0) + window.hoshiReader.countRawChars(endPrefix);
-        if (rawEnd <= rawStart) return null;
+        if (rawEnd <= rawStart) {
+          this.pendingRange = null;
+          return null;
+        }
         var fragment = range.cloneContents();
         fragment.querySelectorAll('rt, rp').forEach(function(el) { el.remove(); });
         var text = fragment.textContent || '';
-        selection.removeAllRanges();
+        if (selection) selection.removeAllRanges();
+        this.pendingRange = null;
         this.wrapHighlight({ id: id, color: color, offset: rawStart, text: text });
         window.hoshiReader.buildNodeOffsets();
         requestAnimationFrame(function() {
