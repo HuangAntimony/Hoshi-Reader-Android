@@ -1236,37 +1236,101 @@ function playWordAudio(audioUrl) {
     }
 }
 
-function showAudioError(button) {
-    button.textContent = '✕';
-    setTimeout(() => {
-        button.textContent = '♪';
-    }, 1500);
+let buttonFrameSyncScheduled = false;
+
+function syncButtonFrames() {
+    const handler = window.webkit?.messageHandlers?.buttonFrames;
+    if (!handler) { return; }
+    const frames = [...document.querySelectorAll('.button-slot')].map(slot => {
+        const rect = slot.getBoundingClientRect();
+        return {
+            kind: slot.dataset.kind,
+            entryIndex: Number(slot.dataset.entryIndex),
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+            state: slot.dataset.state || 'default',
+            enabled: slot.dataset.enabled !== 'false'
+        };
+    });
+    handler.postMessage(frames);
 }
 
-function createAudioButton(expression, reading, entryIndex) {
-    const button = el('button', {
-        className: 'audio-button',
-        textContent: '♪',
-        onclick: async () => {
-            button.classList.add('pressed');
-            setTimeout(() => button.classList.remove('pressed'), 180);
-            if (!audioUrls[entryIndex]) {
-                audioUrls[entryIndex] = await fetchAudioUrl(expression, reading);
-            }
-            if (!audioUrls[entryIndex]) {
-                showAudioError(button);
-                return;
-            }
-            if (!playWordAudio(audioUrls[entryIndex])) {
-                showAudioError(button);
-            }
-        }
+function scheduleButtonFrameSync() {
+    if (buttonFrameSyncScheduled) { return; }
+    buttonFrameSyncScheduled = true;
+    requestAnimationFrame(() => {
+        buttonFrameSyncScheduled = false;
+        syncButtonFrames();
     });
-    return button;
+}
+
+window.addEventListener('resize', scheduleButtonFrameSync);
+window.addEventListener('scroll', scheduleButtonFrameSync, { passive: true });
+document.addEventListener('toggle', scheduleButtonFrameSync, true);
+
+function createButtonSlot(kind, entryIndex, enabled = true) {
+    return el('span', {
+        className: 'button-slot',
+        'data-kind': kind,
+        'data-entry-index': entryIndex,
+        'data-enabled': String(enabled)
+    });
+}
+
+function getButtonSlot(kind, entryIndex) {
+    return document.querySelector(`.button-slot[data-kind="${kind}"][data-entry-index="${entryIndex}"]`);
+}
+
+function updateButtonSlot(slot, changes) {
+    if (!slot || !slot.isConnected) { return; }
+    if ('state' in changes) { slot.dataset.state = changes.state; }
+    if ('enabled' in changes) { slot.dataset.enabled = String(changes.enabled); }
+    scheduleButtonFrameSync();
+}
+
+async function playEntryAudio(entryIndex) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry) { return; }
+    const audioSlot = getButtonSlot('audio', entryIndex);
+
+    if (!audioUrls[entryIndex]) {
+        audioUrls[entryIndex] = await fetchAudioUrl(entry.expression, entry.reading);
+    }
+    if (!audioUrls[entryIndex] || !playWordAudio(audioUrls[entryIndex])) {
+        updateButtonSlot(audioSlot, { state: 'error' });
+        setTimeout(() => updateButtonSlot(audioSlot, { state: 'default' }), 1500);
+    }
+}
+
+async function mineEntryAtIndex(entryIndex) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry) { return; }
+    const { expression, reading, frequencies, pitches, rules, matched } = entry;
+    const mineSlot = getButtonSlot('mine', entryIndex);
+
+    lastSelection = getPopupSelectionText();
+    updateButtonSlot(mineSlot, { enabled: false });
+
+    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
+    const checkDuplicate = async () => {
+        const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
+        updateButtonSlot(mineSlot, {
+            state: wasAdded ? 'duplicate' : 'default',
+            enabled: !(wasAdded && !window.allowDupes)
+        });
+    };
+
+    if (isAnkiConnect) {
+        await checkDuplicate();
+    } else {
+        setTimeout(checkDuplicate, 1000);
+    }
 }
 
 function createEntryHeader(entry, idx) {
-    const { expression, reading, matched, frequencies, pitches, rules } = entry;
+    const { expression, reading } = entry;
     const header = el('div', { className: 'entry-header' });
 
     const expressionSpan = el('span', { className: 'expression' });
@@ -1287,45 +1351,20 @@ function createEntryHeader(entry, idx) {
     const buttonsContainer = el('div', { className: 'header-buttons' });
 
     if (window.audioSources?.length) {
-        buttonsContainer.appendChild(createAudioButton(expression, reading, idx));
+        buttonsContainer.appendChild(createButtonSlot('audio', idx));
     }
 
-    const mineButton = el('button', {
-        className: 'mine-button',
-        textContent: '+',
-        disabled: true,
-        ontouchstart: () => {
-            lastSelection = getPopupSelectionText();
-        },
-        onclick: async () => {
-            mineButton.disabled = true;
-            const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, idx, lastSelection);
-            const checkDuplicate = async () => {
-                const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
-                mineButton.textContent = wasAdded ? '✓' : '+';
-                if (wasAdded) {
-                    mineButton.classList.add('duplicate');
-                }
-                mineButton.disabled = wasAdded && !window.allowDupes;
-            };
-
-            if (isAnkiConnect) {
-                await checkDuplicate();
-            } else {
-                setTimeout(checkDuplicate, 1000);
-            }
-        }
-    });
-    buttonsContainer.appendChild(mineButton);
+    const mineSlot = createButtonSlot('mine', idx, false);
+    buttonsContainer.appendChild(mineSlot);
     webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
-        if (isDuplicate) {
-            mineButton.textContent = '✓';
-            mineButton.classList.add('duplicate');
-        }
-        mineButton.disabled = isDuplicate && !window.allowDupes;
+        updateButtonSlot(mineSlot, {
+            state: isDuplicate ? 'duplicate' : 'default',
+            enabled: !(isDuplicate && !window.allowDupes)
+        });
     });
 
     header.appendChild(buttonsContainer);
+    scheduleButtonFrameSync();
 
     return header;
 }
@@ -1438,6 +1477,7 @@ function appendPendingHistoryRestore(flush = false) {
     const chunk = pending.nodes.splice(0, count);
     if (chunk.length) {
         pending.container.append(...chunk);
+        scheduleButtonFrameSync();
     }
     if (!pending.nodes.length) {
         pendingHistoryRestore = null;
@@ -1461,6 +1501,7 @@ function redirect(count) {
     audioUrls = {};
     selectedDictionaries = {};
     document.getElementById('entries-container').innerHTML = '';
+    syncButtonFrames();
     window.renderPopup();
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = 0;
@@ -1482,6 +1523,7 @@ window.replacePopupResults = function(count) {
     if (container) {
         container.innerHTML = '';
     }
+    syncButtonFrames();
     window.hoshiPopupObserveContentReady?.();
     window.renderPopup();
     requestAnimationFrame(() => {
@@ -1516,6 +1558,7 @@ function restore(snapshot) {
     window.entryCount = snapshot.entryCount;
     audioUrls = {};
     selectedDictionaries = {};
+    scheduleButtonFrameSync();
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = snapshot.scrollTop;
     });
@@ -1555,10 +1598,7 @@ window.renderPopup = function() {
 
             if (window.audioEnableAutoplay && window.audioSources?.length && idx === 0) {
                 setTimeout(() => {
-                    const audioButton = entryDiv.querySelector('.audio-button');
-                    if (audioButton) {
-                        audioButton.click();
-                    }
+                    playEntryAudio(idx);
                 }, 70);
             }
 
@@ -1664,5 +1704,6 @@ window.renderPopup = function() {
 };
 
 document.addEventListener('scroll', () => {
+    scheduleButtonFrameSync();
     webkit.messageHandlers.popupScrolled.postMessage(null);
 }, { passive: true });

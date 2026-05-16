@@ -7,6 +7,8 @@ import android.util.Log
 import android.webkit.WebView
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,7 +29,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddBox
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.LibraryAddCheck
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -67,6 +71,7 @@ import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
+import moe.antimony.hoshi.webview.HoshiPopupWebView
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 private const val SasayakiPopupControlsTotalHeightValue = 37.0
@@ -75,6 +80,15 @@ private val SasayakiPopupControlsHeight = 36.dp
 private val LookupPopupActionBarHeight = 36.dp
 private val SasayakiPopupControlSize = 32.dp
 private val SasayakiPopupControlIconSize = 20.dp
+
+internal fun lookupPopupWebContentOffsetY(
+    frameY: Double,
+    hasActionBar: Boolean,
+    hasSasayakiControls: Boolean,
+): Double =
+    frameY +
+        (if (hasActionBar) LookupPopupActionBarTotalHeightValue else 0.0) +
+        (if (hasSasayakiControls) SasayakiPopupControlsTotalHeightValue else 0.0)
 
 data class LookupPopupState(
     val selection: ReaderSelectionData,
@@ -209,9 +223,6 @@ fun LookupPopupView(
         val frameY = frame.centerY - frame.height / 2
         val hasActionBar = state.popupActionBar || backCount > 0 || forwardCount > 0
         val hasSasayakiControls = sasayakiCue != null
-        val controlsHeight =
-            (if (hasActionBar) LookupPopupActionBarTotalHeightValue else 0.0) +
-                (if (hasSasayakiControls) SasayakiPopupControlsTotalHeightValue else 0.0)
         val popupBackground = if (state.darkMode) Color.Black else Color.White
         val popupBorder = when {
             state.eInkMode && state.darkMode -> Color.White
@@ -299,10 +310,15 @@ fun LookupPopupView(
                     audioSettings = state.audioSettings,
                     popupScale = state.popupScale,
                     selectionOffsetX = frameX,
-                    selectionOffsetY = frameY + controlsHeight,
+                    selectionOffsetY = lookupPopupWebContentOffsetY(
+                        frameY = frameY,
+                        hasActionBar = hasActionBar,
+                        hasSasayakiControls = hasSasayakiControls,
+                    ),
                     clearSelectionSignal = clearSelectionSignal,
                     backSignal = backSignal,
                     forwardSignal = forwardSignal,
+                    controlContentColor = controlContentColor,
                     callbacks = PopupWebViewCallbacks(
                         onTapOutside = {
                             selectionHighlightRects = emptyList()
@@ -534,6 +550,47 @@ private fun SasayakiPopupControlButton(
     }
 }
 
+@Composable
+internal fun PopupActionButtonOverlay(
+    frames: List<PopupButtonFrame>,
+    contentColor: Color,
+    onAction: (PopupButtonFrame) -> Unit,
+) {
+    frames.forEach { frame ->
+        Box(
+            modifier = Modifier
+                .absoluteOffset(x = frame.x.dp, y = frame.y.dp)
+                .width(frame.width.dp)
+                .height(frame.height.dp)
+                .alpha(if (frame.enabled) 0.85f else 0.55f)
+                .clickable(enabled = frame.enabled) { onAction(frame) }
+                .zIndex(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = when (frame.kind) {
+                    PopupButtonKind.Audio -> if (frame.state == PopupButtonState.Error) {
+                        Icons.AutoMirrored.Rounded.VolumeOff
+                    } else {
+                        Icons.AutoMirrored.Rounded.VolumeUp
+                    }
+                    PopupButtonKind.Mine -> if (frame.state == PopupButtonState.Duplicate) {
+                        Icons.Rounded.LibraryAddCheck
+                    } else {
+                        Icons.Rounded.AddBox
+                    }
+                },
+                contentDescription = when (frame.kind) {
+                    PopupButtonKind.Audio -> "Play Audio"
+                    PopupButtonKind.Mine -> "Add to Anki"
+                },
+                tint = contentColor,
+                modifier = Modifier.size(SasayakiPopupControlIconSize),
+            )
+        }
+    }
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun LookupPopupWebView(
@@ -548,12 +605,16 @@ private fun LookupPopupWebView(
     clearSelectionSignal: Int,
     backSignal: Int,
     forwardSignal: Int,
+    controlContentColor: Color,
     callbacks: PopupWebViewCallbacks,
     warmShell: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
-    callbackHolder.callbacks = callbacks
+    var buttonFrames by remember(html) { mutableStateOf<List<PopupButtonFrame>>(emptyList()) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    val popupCallbacks = callbacks.copy(onButtonFrames = { frames -> buttonFrames = frames })
+    val callbackHolder = remember { PopupWebViewCallbackHolder(popupCallbacks) }
+    callbackHolder.callbacks = popupCallbacks
     val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
     val contentReadyGate = remember { PopupContentReadyGate() }
     val selectionOffsetHolder = remember {
@@ -568,83 +629,95 @@ private fun LookupPopupWebView(
     var appliedPopupScale by remember { mutableStateOf(popupScale) }
     var shellReady by remember { mutableStateOf(false) }
     var appliedWarmResults by remember { mutableStateOf<List<LookupResult>?>(null) }
-    AndroidView(
-        modifier = modifier
-            .fillMaxSize(),
-        factory = { context ->
-            val audioRequestHandler = AudioRequestHandler(
-                LocalAudioRepository.fromContext(context),
-            )
-            WebView(context).apply {
-                applyHoshiWebViewSecurityDefaults()
-                isVerticalScrollBarEnabled = false
-                isHorizontalScrollBarEnabled = false
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                addJavascriptInterface(
-                    PopupWebViewBridge(
-                        webView = this,
+    Box(modifier = modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                val audioRequestHandler = AudioRequestHandler(
+                    LocalAudioRepository.fromContext(context),
+                )
+                HoshiPopupWebView(context).apply {
+                    webViewRef = this
+                    applyHoshiWebViewSecurityDefaults()
+                    isVerticalScrollBarEnabled = false
+                    isHorizontalScrollBarEnabled = false
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    addJavascriptInterface(
+                        PopupWebViewBridge(
+                            webView = this,
+                            callbackHolder = callbackHolder,
+                            lookupResultsHolder = lookupResultsHolder,
+                            selectionOffsetHolder = selectionOffsetHolder,
+                            contentReadyGate = contentReadyGate,
+                            onShellReady = {
+                                shellReady = true
+                            },
+                        ),
+                        "HoshiPopup",
+                    )
+                    webViewClient = PopupMessageWebViewClient(
                         callbackHolder = callbackHolder,
-                        lookupResultsHolder = lookupResultsHolder,
-                        selectionOffsetHolder = selectionOffsetHolder,
-                        contentReadyGate = contentReadyGate,
-                        onShellReady = {
-                            shellReady = true
-                        },
-                    ),
-                    "HoshiPopup",
-                )
-                webViewClient = PopupMessageWebViewClient(
-                    callbackHolder = callbackHolder,
-                    audioRequestHandler = audioRequestHandler,
-                    assets = assets,
-                    fontManager = fontManager,
-                )
-            }
-        },
-        update = { webView ->
-            callbackHolder.callbacks = callbacks
-            webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            if (loadedHtml != html) {
-                loadedHtml = html
-                shellReady = false
-                appliedWarmResults = null
-                contentReadyGate.reset()
-                if (!warmShell) {
-                    lookupResultsHolder.results = results
+                        audioRequestHandler = audioRequestHandler,
+                        assets = assets,
+                        fontManager = fontManager,
+                    )
                 }
-                webView.loadDataWithBaseURL(
-                    "https://hoshi.local/popup/",
-                    html,
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-            if (appliedPopupScale != popupScale) {
-                appliedPopupScale = popupScale
-                webView.evaluateJavascript(
-                    "document.documentElement.style.zoom = '${popupScale.coerceIn(0.8, 1.5)}'",
-                    null,
-                )
-            }
-            if (warmShell && shellReady && appliedWarmResults !== results) {
-                appliedWarmResults = results
-                lookupResultsHolder.results = results
-                contentReadyGate.reset()
-                webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
-            }
-            if (appliedClearSelectionSignal != clearSelectionSignal) {
-                appliedClearSelectionSignal = clearSelectionSignal
-                webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
-            }
-            if (appliedBackSignal != backSignal) {
-                appliedBackSignal = backSignal
-                webView.evaluateJavascript("window.navigateBack()", null)
-            }
-            if (appliedForwardSignal != forwardSignal) {
-                appliedForwardSignal = forwardSignal
-                webView.evaluateJavascript("window.navigateForward()", null)
-            }
-        },
-    )
+            },
+            update = { webView ->
+                webViewRef = webView
+                callbackHolder.callbacks = popupCallbacks
+                webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                if (loadedHtml != html) {
+                    loadedHtml = html
+                    shellReady = false
+                    appliedWarmResults = null
+                    buttonFrames = emptyList()
+                    contentReadyGate.reset()
+                    if (!warmShell) {
+                        lookupResultsHolder.results = results
+                    }
+                    webView.loadDataWithBaseURL(
+                        "https://hoshi.local/popup/",
+                        html,
+                        "text/html",
+                        "UTF-8",
+                        null,
+                    )
+                }
+                if (appliedPopupScale != popupScale) {
+                    appliedPopupScale = popupScale
+                    webView.evaluateJavascript(
+                        "document.documentElement.style.zoom = '${popupScale.coerceIn(0.8, 1.5)}'; if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)",
+                        null,
+                    )
+                }
+                if (warmShell && shellReady && appliedWarmResults !== results) {
+                    appliedWarmResults = results
+                    buttonFrames = emptyList()
+                    lookupResultsHolder.results = results
+                    contentReadyGate.reset()
+                    webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
+                }
+                if (appliedClearSelectionSignal != clearSelectionSignal) {
+                    appliedClearSelectionSignal = clearSelectionSignal
+                    webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
+                }
+                if (appliedBackSignal != backSignal) {
+                    appliedBackSignal = backSignal
+                    webView.evaluateJavascript("window.navigateBack(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
+                }
+                if (appliedForwardSignal != forwardSignal) {
+                    appliedForwardSignal = forwardSignal
+                    webView.evaluateJavascript("window.navigateForward(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
+                }
+            },
+        )
+        PopupActionButtonOverlay(
+            frames = buttonFrames,
+            contentColor = controlContentColor,
+            onAction = { frame ->
+                webViewRef?.evaluateJavascript(frame.actionScript, null)
+            },
+        )
+    }
 }

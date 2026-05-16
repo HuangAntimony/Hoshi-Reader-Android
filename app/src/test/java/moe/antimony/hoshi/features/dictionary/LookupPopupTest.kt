@@ -193,4 +193,27 @@ class LookupPopupTest {
         assertTrue(themed.single().state.audioSettings.enableAutoplay)
     }
 
+    @Test
+    fun popupWebContentOffsetIsSeparateFromButtonFrameCoordinates() {
+        val contentOffset = lookupPopupWebContentOffsetY(
+            frameY = 80.0,
+            hasActionBar = true,
+            hasSasayakiControls = true,
+        )
+        val buttonFrame = PopupButtonFrame(
+            kind = PopupButtonKind.Audio,
+            entryIndex = 0,
+            x = 18.0,
+            y = 24.0,
+            width = 28.0,
+            height = 28.0,
+            state = PopupButtonState.Default,
+            enabled = true,
+        )
+
+        assertEquals(154.0, contentOffset, 0.0)
+        assertEquals(18.0, buttonFrame.x, 0.0)
+        assertEquals(24.0, buttonFrame.y, 0.0)
+    }
+
 }

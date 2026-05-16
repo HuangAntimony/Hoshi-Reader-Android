@@ -25,6 +25,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Detect dictionary archive types during manual import and place term, frequency, and pitch data in their matching tabs without choosing a type first.
 - Remove deleted dictionaries from the collapsed dictionary configuration.
 - Group highlights from unlabeled EPUB spine entries under the nearest previous visible chapter in the reader Highlights sheet.
+- Keep popup audio and Anki controls aligned after scrolling, zoom, redirects, and dictionary collapse/expand changes by drawing them as native Android controls.
 
 ## [v0.6.3] - 2026-05-15
 
