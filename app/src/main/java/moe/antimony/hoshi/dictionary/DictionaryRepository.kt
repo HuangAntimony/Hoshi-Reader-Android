@@ -3,6 +3,7 @@ package moe.antimony.hoshi.dictionary
 import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
+import java.io.InputStream
 
 internal class DictionaryRepository(
     filesDir: File,
@@ -17,14 +18,28 @@ internal class DictionaryRepository(
     fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         storage.updatableDictionaries()
 
-    fun importDictionary(contentResolver: ContentResolver, uri: Uri, type: DictionaryType) {
-        val imported = importDataSource.importDictionary(
+    fun importDictionary(contentResolver: ContentResolver, uri: Uri) {
+        val imported = importDataSource.importDictionaryByDetectedTypes(
             contentResolver = contentResolver,
             uri = uri,
-            typeDirectory = storage.typeDirectory(type),
-            shouldSkip = { index -> storage.hasDictionaryWithIndex(type, index) },
-        )
-        if (imported) {
+            importRootDirectory = storage.importRootDirectory(),
+            typeDirectories = typeDirectories(),
+            shouldSkip = { type, index -> storage.hasDictionaryWithIndex(type, index) },
+        ).values.sumOf { it.size }
+        if (imported > 0) {
+            storage.saveConfigFromStorage()
+            rebuildLookupQuery()
+        }
+    }
+
+    fun importDictionary(input: InputStream) {
+        val imported = importDataSource.importDictionaryByDetectedTypes(
+            input = input,
+            importRootDirectory = storage.importRootDirectory(),
+            typeDirectories = typeDirectories(),
+            shouldSkip = { type, index -> storage.hasDictionaryWithIndex(type, index) },
+        ).values.sumOf { it.size }
+        if (imported > 0) {
             storage.saveConfigFromStorage()
             rebuildLookupQuery()
         }
@@ -133,4 +148,7 @@ internal class DictionaryRepository(
             pitchDictionaries = storage.enabledDictionaryPaths(DictionaryType.Pitch),
         )
     }
+
+    private fun typeDirectories(): Map<DictionaryType, File> =
+        DictionaryType.entries.associateWith { type -> storage.typeDirectory(type) }
 }

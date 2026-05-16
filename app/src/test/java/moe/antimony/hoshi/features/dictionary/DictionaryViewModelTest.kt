@@ -80,7 +80,6 @@ class DictionaryViewModelTest {
 
         viewModel.importDictionaries(
             importItems = listOf(item),
-            type = DictionaryType.Pitch,
             importOperation = { onProgress ->
                 onProgress(item)
                 repository.onImport!!.invoke()
@@ -108,7 +107,6 @@ class DictionaryViewModelTest {
 
         viewModel.importDictionaries(
             importItems = listOf(first, second),
-            type = DictionaryType.Term,
             importOperation = { onProgress ->
                 onProgress(first)
                 messages += viewModel.uiState.value.currentImportMessage
@@ -133,7 +131,7 @@ class DictionaryViewModelTest {
             ioDispatcher = Dispatchers.Unconfined,
         )
 
-        viewModel.importDictionaries(listOf(first, second), DictionaryType.Frequency)
+        viewModel.importDictionaries(listOf(first, second))
 
         assertEquals(listOf(first, second), repository.importedItems)
         assertEquals(
@@ -279,7 +277,6 @@ class DictionaryViewModelTest {
 
         viewModel.importDictionaries(
             importItems = listOf(bad),
-            type = DictionaryType.Term,
             importOperation = { onProgress ->
                 onProgress(bad)
                 error("bad archive")
@@ -293,7 +290,6 @@ class DictionaryViewModelTest {
 
         viewModel.importDictionaries(
             importItems = listOf(DictionaryImportItem(displayName = "good.zip")),
-            type = DictionaryType.Term,
             importOperation = { _ -> },
         )
 
@@ -327,6 +323,27 @@ class DictionaryViewModelTest {
         assertFalse(viewModel.uiState.value.settings.compactPitchAccents)
         assertEquals(viewModel.uiState.value.settings, repository.savedSettings)
         assertTrue(repository.loadDictionariesCount >= 4)
+    }
+
+    @Test
+    fun deleteDictionaryRemovesCollapsedTitleFromSettings() {
+        val dictionary = dictionary("term", "JMdict")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(dictionary)),
+            settings = DictionarySettings(collapsedDictionaries = setOf("JMdict", "Other")),
+        )
+        val viewModel = DictionaryViewModel(
+            repository = repository,
+            coroutineScope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.reload()
+
+        viewModel.deleteDictionary(dictionary)
+
+        assertEquals(listOf("term"), repository.deleteCalls)
+        assertEquals(setOf("Other"), viewModel.uiState.value.settings.collapsedDictionaries)
+        assertEquals(viewModel.uiState.value.settings, repository.savedSettings)
     }
 
     @Test
@@ -405,7 +422,6 @@ private class FakeDictionaryRepository(
 
     override suspend fun importDictionaries(
         items: List<DictionaryImportItem>,
-        type: DictionaryType,
         onProgress: (DictionaryImportItem) -> Unit,
     ) {
         items.forEach { item ->

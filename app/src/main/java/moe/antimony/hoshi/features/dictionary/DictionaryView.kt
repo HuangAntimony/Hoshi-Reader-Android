@@ -134,8 +134,6 @@ fun DictionaryView(
         },
     )
     val uiState by dictionaryViewModel.uiState.collectAsState()
-    var importType by remember { mutableStateOf(DictionaryType.Term) }
-    var importMenuExpanded by remember { mutableStateOf(false) }
     var destination by remember { mutableStateOf<DictionaryDestination?>(null) }
     var showUpdateConfirmation by remember { mutableStateOf(false) }
     var showDownloadConfirmation by remember { mutableStateOf(false) }
@@ -162,7 +160,7 @@ fun DictionaryView(
                 )
             }
         }
-        dictionaryViewModel.importDictionaries(importItems, importType)
+        dictionaryViewModel.importDictionaries(importItems)
     }
 
     val selectedType = uiState.selectedType
@@ -355,34 +353,17 @@ fun DictionaryView(
                     contentDescription = "Custom CSS",
                 )
             }
-            Box {
-                IconButton(
-                    onClick = { importMenuExpanded = true },
-                    enabled = !isBusy,
-                ) {
-                    if (isBusy) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "Import Dictionary",
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = importMenuExpanded,
-                    onDismissRequest = { importMenuExpanded = false },
-                ) {
-                    DictionaryType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.displayName) },
-                            onClick = {
-                                importMenuExpanded = false
-                                importType = type
-                                importer.launch(ImportFileType.DictionaryArchive.mimeTypes)
-                            },
-                        )
-                    }
+            IconButton(
+                onClick = { importer.launch(ImportFileType.DictionaryArchive.mimeTypes) },
+                enabled = !isBusy,
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Import Dictionary",
+                    )
                 }
             }
         },

@@ -32,7 +32,6 @@ internal interface DictionaryViewModelRepository {
     suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate>
     suspend fun importDictionaries(
         items: List<DictionaryImportItem>,
-        type: DictionaryType,
         onProgress: (DictionaryImportItem) -> Unit,
     )
     suspend fun importRecommendedDictionaries(
@@ -69,12 +68,11 @@ internal class AndroidDictionaryViewModelRepository(
 
     override suspend fun importDictionaries(
         items: List<DictionaryImportItem>,
-        type: DictionaryType,
         onProgress: (DictionaryImportItem) -> Unit,
     ) {
         items.forEach { item ->
             onProgress(item)
-            dictionaryRepository.importDictionary(contentResolver, requireNotNull(item.uri), type)
+            dictionaryRepository.importDictionary(contentResolver, requireNotNull(item.uri))
         }
     }
 
@@ -151,12 +149,11 @@ internal class DictionaryViewModel(
         _uiState.update { it.copy(selectedType = type) }
     }
 
-    fun importDictionaries(items: List<DictionaryImportItem>, type: DictionaryType) {
+    fun importDictionaries(items: List<DictionaryImportItem>) {
         importDictionaries(
             importItems = items,
-            type = type,
             importOperation = { onProgress ->
-                repository.importDictionaries(items, type, onProgress)
+                repository.importDictionaries(items, onProgress)
             },
         )
     }
@@ -228,7 +225,6 @@ internal class DictionaryViewModel(
 
     internal fun importDictionaries(
         importItems: List<DictionaryImportItem>,
-        type: DictionaryType,
         importOperation: suspend ((DictionaryImportItem) -> Unit) -> Unit,
     ) {
         if (importItems.isEmpty()) return
@@ -270,6 +266,9 @@ internal class DictionaryViewModel(
         scope.launch {
             withContext(ioDispatcher) {
                 repository.deleteDictionary(type, dictionary.path.name)
+            }
+            repository.updateSettings { current ->
+                current.copy(collapsedDictionaries = current.collapsedDictionaries - dictionary.index.title)
             }
             reloadDictionaries(clearError = false)
         }

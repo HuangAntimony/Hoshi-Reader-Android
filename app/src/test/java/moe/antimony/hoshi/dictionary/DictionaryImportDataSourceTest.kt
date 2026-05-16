@@ -184,25 +184,41 @@ class DictionaryImportDataSourceTest {
     ) : DictionaryNativeBridge {
         val outputDirs = mutableListOf<String>()
 
-        override fun importDictionary(zipPath: String, outputDir: String): Boolean {
+        override fun importDictionary(zipPath: String, outputDir: String): NativeDictionaryImportResult {
             outputDirs += outputDir
             File(outputDir, "$dictionaryName/index.json").also { file ->
                 file.parentFile!!.mkdirs()
                 file.writeText("""{"title":"$dictionaryName","format":3,"revision":"rev"}""")
             }
-            return true
+            return NativeDictionaryImportResult(
+                success = true,
+                title = dictionaryName,
+                termCount = 1,
+                metaCount = 0,
+                freqCount = 0,
+                pitchCount = 0,
+                mediaCount = 0,
+            )
         }
 
         override fun rebuildQuery(termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
     }
 
     private class FailingDictionaryBridge : DictionaryNativeBridge {
-        override fun importDictionary(zipPath: String, outputDir: String): Boolean {
+        override fun importDictionary(zipPath: String, outputDir: String): NativeDictionaryImportResult {
             File(outputDir, "Partial/index.json").also { file ->
                 file.parentFile!!.mkdirs()
                 file.writeText("""{"title":"Partial"}""")
             }
-            return false
+            return NativeDictionaryImportResult(
+                success = false,
+                title = "Partial",
+                termCount = 0,
+                metaCount = 0,
+                freqCount = 0,
+                pitchCount = 0,
+                mediaCount = 0,
+            )
         }
 
         override fun rebuildQuery(termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit

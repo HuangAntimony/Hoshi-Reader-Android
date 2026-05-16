@@ -31,7 +31,7 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
-- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; next remaining slices are popup action-button frame sync, dictionary import/recommendation cleanup, and highlight unlabeled-chapter grouping.
+- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; next remaining slices are popup action-button frame sync and highlight unlabeled-chapter grouping.
 - Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.
 - Device-validate paginated page turns with top and bottom progress counters enabled on E-ink, confirming the counter no longer refreshes before the page flip.
@@ -50,7 +50,7 @@ This file is the short operational handoff for future agents.
 
 ### Dictionary
 
-- Device-validate recommended dictionary downloads from the Dictionaries screen, covering JMdict, Jiten, and Jitendex individual downloads and confirming each imported dictionary remains updatable.
+- Device-validate recommended dictionary downloads from the Dictionaries screen, covering JMdict, JMnedict, Jiten, and Jitendex individual downloads and confirming each imported dictionary remains updatable.
 - For deinflection regressions, verify conjugated lookup results such as `食べた` show iOS-style explanation overlays when tapping deinflection tags.
 - Keep frequency and pitch dictionaries type-specific; do not treat metadata dictionaries as term fallback dictionaries.
 - Do not reimplement Yomitan import, lookup, media, or style extraction outside `third_party/hoshidicts-kotlin-bridge` unless the bridge gap is documented first.

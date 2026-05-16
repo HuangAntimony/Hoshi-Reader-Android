@@ -26,7 +26,16 @@ class DictionaryLookupQueryServiceTest {
         lateinit var freqPaths: Array<String>
         lateinit var pitchPaths: Array<String>
 
-        override fun importDictionary(zipPath: String, outputDir: String): Boolean = true
+        override fun importDictionary(zipPath: String, outputDir: String): NativeDictionaryImportResult =
+            NativeDictionaryImportResult(
+                success = true,
+                title = "",
+                termCount = 1,
+                metaCount = 0,
+                freqCount = 0,
+                pitchCount = 0,
+                mediaCount = 0,
+            )
 
         override fun rebuildQuery(
             termPaths: Array<String>,

@@ -99,7 +99,7 @@ Validation:
 
 ### 4. Dictionary import, recommendation list, and collapsed cleanup
 
-Status: queued
+Status: synced on Android
 
 Commits:
 
@@ -117,16 +117,14 @@ iOS behavior to mirror:
 
 Android notes:
 
-- Android currently offers JMdict, Jiten, and Jitendex individually; this differs from latest iOS and should be intentionally reconciled.
-- Android manual import remains type-specific through the Dictionaries screen.
-- `de.manhhao.hoshi.HoshiDicts.importDictionary` exposes an `ImportResult`, but `DictionaryNativeBridge` currently discards the counts. Use the bridge result instead of guessing type from filenames.
-- Android already migrates collapsed titles during dictionary update rename; deletion still needs collapsed-setting cleanup.
+- Android now offers JMdict without proper names, JMnedict, and Jiten individually, while intentionally retaining Jitendex as an additional Android recommendation.
+- Android manual import uses the native `ImportResult` counts to place term, frequency, and pitch dictionaries in their matching tabs.
+- Android now removes deleted dictionary titles from collapsed settings and still migrates collapsed titles during dictionary update rename.
 
 Validation:
 
-- Import a term, frequency, pitch, and mixed dictionary archive from one picker path and confirm each lands in the right tab.
-- Delete a collapsed dictionary and confirm it disappears from Collapse Dictionaries -> Configure.
-- Download recommended dictionaries and confirm the resulting titles, update eligibility, enabled state, ordering, and lookup query rebuild.
+- Unit coverage: `DictionaryRepositoryTest` and `DictionaryViewModelTest`.
+- Device validation remains recommended for importing term, frequency, pitch, and mixed archives from one picker path; deleting a collapsed dictionary from Collapse Dictionaries -> Configure; and downloading JMdict, JMnedict, Jiten, and Jitendex from the recommended list.
 
 ### 5. Highlight grouping for unlabeled chapters
 
@@ -170,10 +168,10 @@ Validation:
 | `53c6980` | 2026-05-15 | Simplify iOS reader buttons | No direct Android action |
 | `9626f84` | 2026-05-15 | Avoid direct popup index access | Covered; re-test with popup work |
 | `d5e966f` | 2026-05-15 | Group unlabeled highlight chapters | Queued |
-| `4cd688f` | 2026-05-15 | Recommended dictionary changes | Queued |
+| `4cd688f` | 2026-05-15 | Recommended dictionary changes | Synced |
 | `130f6cf` | 2026-05-16 | Reader background safe area | No direct Android action |
-| `2f5d71a` | 2026-05-16 | Autodetect dictionary type | Queued |
-| `b3312d9` | 2026-05-16 | Clean collapsed config on delete | Queued |
+| `2f5d71a` | 2026-05-16 | Autodetect dictionary type | Synced |
+| `b3312d9` | 2026-05-16 | Clean collapsed config on delete | Synced |
 | `14cd6f2` | 2026-05-16 | Native popup action buttons | Queued |
 | `6f94682` | 2026-05-16 | Prevent popup horizontal scroll | Queued with popup buttons |
 | `6b2c3e8` | 2026-05-16 | iOS build bump | No Android action |
@@ -183,7 +181,6 @@ Validation:
 ## Suggested Implementation Order
 
 1. Popup action buttons and frame sync.
-2. Dictionary import/recommendation cleanup.
-3. Highlight grouping.
+2. Highlight grouping.
 
-This order keeps the riskiest WebView/popup work together, then moves to dictionary storage/import behavior, then lower-risk model/UI slices.
+This order keeps the riskiest WebView/popup work together before the lower-risk highlight model/UI slice.

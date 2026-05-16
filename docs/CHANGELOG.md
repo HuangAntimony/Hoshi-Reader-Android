@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Add iOS-style reader jump return controls so chapter, character, highlight, and internal-link jumps can return to the previous reading position.
 - Add iOS-style lookup popup font CSS support and a popup scale setting, including Custom CSS insertion menus for imported reader fonts and dictionary selectors.
 - Add iOS-style book title renaming from the Books long-press menu, including renamed titles in sorting, reader metadata, confirmations, and sync messages.
+- Add JMnedict to recommended dictionary downloads and switch the recommended JMdict package to the no-proper-names edition while keeping Jitendex available.
 
 ### Fixed
 
@@ -21,6 +22,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Keep reader long-press text selection available for highlight creation instead of converting the long press into a lookup tap.
 - Show iOS-aligned deinflection explanation popups when tapping conjugation tags in dictionary lookup results.
 - Use the selected EPUB file name as the visible book title when imported metadata has no usable title.
+- Detect dictionary archive types during manual import and place term, frequency, and pitch data in their matching tabs without choosing a type first.
+- Remove deleted dictionaries from the collapsed dictionary configuration.
 
 ## [v0.6.3] - 2026-05-15
 

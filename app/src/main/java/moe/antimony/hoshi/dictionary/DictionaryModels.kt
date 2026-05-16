@@ -64,8 +64,15 @@ val RecommendedDictionaries = listOf(
         id = "jmdict",
         name = "JMdict",
         type = DictionaryType.Term,
-        indexUrl = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.json",
+        indexUrl = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english_without_proper_names.json",
         description = "Term",
+    ),
+    RecommendedDictionary(
+        id = "jmnedict",
+        name = "JMnedict",
+        type = DictionaryType.Term,
+        indexUrl = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.json",
+        description = "Names",
     ),
     RecommendedDictionary(
         id = "jiten",

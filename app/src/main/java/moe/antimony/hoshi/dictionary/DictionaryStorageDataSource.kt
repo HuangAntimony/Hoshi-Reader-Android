@@ -110,6 +110,8 @@ internal class DictionaryStorageDataSource(
     fun typeDirectory(type: DictionaryType): File =
         File(dictionariesDir, type.directoryName)
 
+    fun importRootDirectory(): File = dictionariesDir
+
     private fun storedDictionaries(type: DictionaryType): List<DictionaryInfo> {
         val directory = typeDirectory(type)
         directory.mkdirs()
