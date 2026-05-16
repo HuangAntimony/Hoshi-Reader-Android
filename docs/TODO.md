@@ -55,7 +55,7 @@ This file is the short operational handoff for future agents.
 
 ### Highlights And Notes
 
-- Device-validate remaining reader highlight restore, jump, delete, all-color, continuous-mode, and real-device selection-toolbar behavior against iOS after paginated creation, primary Highlight toolbar placement, anchored color-picker placement, native selection drag page-locking, and ruby/furigana-safe highlight saving were verified on Android targets.
+- Device-validate remaining reader highlight restore, jump, delete, all-color, continuous-mode, and real-device selection-toolbar behavior against iOS after paginated creation, primary Highlight toolbar placement, anchored color-picker placement, and native selection drag page-locking were verified on Android targets.
 - Add note editing only if/when iOS exposes a user-visible notes flow.
 
 ### Anki

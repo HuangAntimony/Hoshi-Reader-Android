@@ -84,17 +84,6 @@ internal object ReaderPaginationScripts {
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
           },
-          prepareRubyForHighlighting: function() {
-            Array.from(document.querySelectorAll('ruby')).forEach(function(ruby) {
-              Array.from(ruby.childNodes).forEach(function(node) {
-                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                  var span = document.createElement('span');
-                  span.textContent = node.textContent;
-                  node.replaceWith(span);
-                }
-              });
-            });
-          },
           textOffsetForCharCount: function(node, targetCount) {
             var text = node.textContent || '';
             var count = 0;
@@ -677,7 +666,6 @@ internal object ReaderPaginationScripts {
           document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, pageHeight - ${settings.bottomOverlapPx}) + 'px');
           window.hoshiReader.pageHeight = pageHeight;
           window.hoshiReader.pageWidth = pageWidth;
-          window.hoshiReader.prepareRubyForHighlighting();
           Array.from(document.querySelectorAll('svg')).forEach(function(svg) {
             if (svg.querySelector('image') && svg.getAttribute('preserveAspectRatio') === 'none') {
               svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -762,17 +750,6 @@ internal object ReaderPaginationScripts {
           },
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
-          },
-          prepareRubyForHighlighting: function() {
-            Array.from(document.querySelectorAll('ruby')).forEach(function(ruby) {
-              Array.from(ruby.childNodes).forEach(function(node) {
-                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                  var span = document.createElement('span');
-                  span.textContent = node.textContent;
-                  node.replaceWith(span);
-                }
-              });
-            });
           },
           textOffsetForCharCount: function(node, targetCount) {
             var text = node.textContent || '';
@@ -1148,7 +1125,6 @@ internal object ReaderPaginationScripts {
           document.documentElement.style.setProperty('--hoshi-continuous-height', window.innerHeight + 'px');
           document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(window.innerWidth * ${settings.imageWidthViewportRatio})) + 'px');
           document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, window.innerHeight - ${settings.bottomOverlapPx}) + 'px');
-          window.hoshiReader.prepareRubyForHighlighting();
           Array.from(document.querySelectorAll('svg')).forEach(function(svg) {
             if (svg.querySelector('image') && svg.getAttribute('preserveAspectRatio') === 'none') {
               svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1195,61 +1171,11 @@ private fun readerHighlightsScript(): String = """
     window.hoshiHighlights = {
       wrappers: new Map(),
       pendingRange: null,
-      closestElement: function(node) {
-        if (!node) return null;
-        return node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-      },
-      isFuriganaNode: function(node) {
-        var el = this.closestElement(node);
-        return !!(el && el.closest('rt, rp'));
-      },
-      closestRuby: function(node) {
-        var el = this.closestElement(node);
-        return el ? el.closest('ruby') : null;
-      },
-      rubyBaseTextNodes: function(ruby) {
-        var nodes = [];
-        if (!ruby) return nodes;
-        var walker = window.hoshiReader.createWalker(ruby);
-        var node;
-        while (node = walker.nextNode()) {
-          if ((node.textContent || '').length > 0) nodes.push(node);
-        }
-        return nodes;
-      },
-      rubyBoundary: function(ruby, isEnd) {
-        var nodes = this.rubyBaseTextNodes(ruby);
-        if (!nodes.length) return null;
-        var node = isEnd ? nodes[nodes.length - 1] : nodes[0];
-        return { node: node, offset: isEnd ? (node.textContent || '').length : 0 };
-      },
-      highlightBoundary: function(node, offset, isEnd) {
-        if (this.isFuriganaNode(node)) {
-          return this.rubyBoundary(this.closestRuby(node), isEnd);
-        }
-        if (node && node.nodeType === Node.ELEMENT_NODE && node.tagName && node.tagName.toLowerCase() === 'ruby') {
-          return this.rubyBoundary(node, isEnd);
-        }
-        if (!node || node.nodeType !== Node.TEXT_NODE) return null;
-        if (!window.hoshiReader.nodeStartRawOffsets.has(node)) return null;
-        var text = node.textContent || '';
-        return { node: node, offset: Math.max(0, Math.min(offset, text.length)) };
-      },
-      normalizedHighlightRange: function(range) {
-        if (!range || range.collapsed) return null;
-        var start = this.highlightBoundary(range.startContainer, range.startOffset, false);
-        var end = this.highlightBoundary(range.endContainer, range.endOffset, true);
-        if (!start || !end) return null;
-        var normalized = document.createRange();
-        normalized.setStart(start.node, start.offset);
-        normalized.setEnd(end.node, end.offset);
-        return normalized.collapsed ? null : normalized;
-      },
       prepareHighlightSelection: function() {
         var selection = window.getSelection();
         if (!selection || selection.rangeCount === 0) return false;
-        var range = this.normalizedHighlightRange(selection.getRangeAt(0));
-        if (!range) return false;
+        var range = selection.getRangeAt(0);
+        if (range.collapsed) return false;
         this.pendingRange = range.cloneRange();
         return true;
       },
@@ -1259,23 +1185,15 @@ private fun readerHighlightsScript(): String = """
         if ((!range || range.collapsed) && this.pendingRange) {
           range = this.pendingRange;
         }
-        range = this.normalizedHighlightRange(range);
-        if (!range) {
+        if (!range || range.collapsed) {
           this.pendingRange = null;
           return null;
         }
         var startPrefix = range.startContainer.textContent.substring(0, range.startOffset);
         var endPrefix = range.endContainer.textContent.substring(0, range.endOffset);
-        var startBase = window.hoshiReader.nodeStartOffsets.get(range.startContainer);
-        var rawStartBase = window.hoshiReader.nodeStartRawOffsets.get(range.startContainer);
-        var rawEndBase = window.hoshiReader.nodeStartRawOffsets.get(range.endContainer);
-        if (startBase === undefined || rawStartBase === undefined || rawEndBase === undefined) {
-          this.pendingRange = null;
-          return null;
-        }
-        var start = startBase + window.hoshiReader.countChars(startPrefix);
-        var rawStart = rawStartBase + window.hoshiReader.countRawChars(startPrefix);
-        var rawEnd = rawEndBase + window.hoshiReader.countRawChars(endPrefix);
+        var start = (window.hoshiReader.nodeStartOffsets.get(range.startContainer) || 0) + window.hoshiReader.countChars(startPrefix);
+        var rawStart = (window.hoshiReader.nodeStartRawOffsets.get(range.startContainer) || 0) + window.hoshiReader.countRawChars(startPrefix);
+        var rawEnd = (window.hoshiReader.nodeStartRawOffsets.get(range.endContainer) || 0) + window.hoshiReader.countRawChars(endPrefix);
         if (rawEnd <= rawStart) {
           this.pendingRange = null;
           return null;
@@ -1283,10 +1201,6 @@ private fun readerHighlightsScript(): String = """
         var fragment = range.cloneContents();
         fragment.querySelectorAll('rt, rp').forEach(function(el) { el.remove(); });
         var text = fragment.textContent || '';
-        if (!text) {
-          this.pendingRange = null;
-          return null;
-        }
         if (selection) selection.removeAllRanges();
         this.pendingRange = null;
         this.wrapHighlight({ id: id, color: color, offset: rawStart, text: text });

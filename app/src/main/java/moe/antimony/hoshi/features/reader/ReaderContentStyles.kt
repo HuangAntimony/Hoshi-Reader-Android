@@ -185,7 +185,6 @@ internal object ReaderContentStyles {
         ruby > rt, ruby > rp {
             -webkit-user-select: none;
             user-select: none;
-            pointer-events: none;
         }
         ::highlight(hoshi-selection) {
             background-color: rgba(160, 160, 160, 0.4) !important;
