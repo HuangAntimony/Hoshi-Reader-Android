@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add iOS-style reader highlights with color selection, persistent `highlights.json` storage, restore on chapter load, and a reader Highlights sheet for jumping to or deleting highlights.
+
 ### Fixed
 
 - Show iOS-aligned deinflection explanation popups when tapping conjugation tags in dictionary lookup results.

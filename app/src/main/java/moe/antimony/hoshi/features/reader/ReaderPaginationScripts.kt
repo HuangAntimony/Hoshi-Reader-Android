@@ -33,6 +33,7 @@ internal object ReaderPaginationScripts {
         initialProgress: Double = 0.0,
         settings: ReaderSettings = ReaderSettings(),
         sasayakiCuesJson: String? = null,
+        highlightsJson: String? = null,
         initialFragment: String? = null,
     ): String {
         if (settings.continuousMode) {
@@ -40,6 +41,7 @@ internal object ReaderPaginationScripts {
                 initialProgress = initialProgress,
                 settings = settings,
                 sasayakiCuesJson = sasayakiCuesJson,
+                highlightsJson = highlightsJson,
                 initialFragment = initialFragment,
             )
         }
@@ -56,6 +58,7 @@ internal object ReaderPaginationScripts {
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
           nodeStartOffsets: new WeakMap(),
+          nodeStartRawOffsets: new WeakMap(),
           paginationMetrics: null,
           isVertical: function() {
             return window.getComputedStyle(document.body).writingMode === "vertical-rl";
@@ -69,6 +72,9 @@ internal object ReaderPaginationScripts {
           },
           countChars: function(text) {
             return Array.from(this.normalizeText(text)).length;
+          },
+          countRawChars: function(text) {
+            return Array.from(text || '').length;
           },
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
@@ -106,14 +112,19 @@ internal object ReaderPaginationScripts {
           },
           buildNodeOffsets: function() {
             var offsets = new WeakMap();
+            var rawOffsets = new WeakMap();
             var walker = this.createWalker();
             var count = 0;
+            var rawCount = 0;
             var node;
             while (node = walker.nextNode()) {
               offsets.set(node, count);
+              rawOffsets.set(node, rawCount);
               count += this.countChars(node.textContent);
+              rawCount += this.countRawChars(node.textContent);
             }
             this.nodeStartOffsets = offsets;
+            this.nodeStartRawOffsets = rawOffsets;
             this.paginationMetrics = null;
           },
           countCharsBeforeViewport: function(node, context) {
@@ -598,6 +609,7 @@ internal object ReaderPaginationScripts {
             }
           }
         };
+        ${readerHighlightsScript()}
         window.hoshiReader.initialize = function() {
           if (window.hoshiReader.didInitialize) return;
           window.hoshiReader.didInitialize = true;
@@ -650,6 +662,7 @@ internal object ReaderPaginationScripts {
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
             ${sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" }.orEmpty()}
+            ${highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" }.orEmpty()}
             $initialRestoreScript
           });
         };
@@ -667,6 +680,7 @@ internal object ReaderPaginationScripts {
         initialProgress: Double,
         settings: ReaderSettings,
         sasayakiCuesJson: String?,
+        highlightsJson: String?,
         initialFragment: String?,
     ): String {
         val initialRestoreScript = initialFragment?.let { fragment ->
@@ -680,6 +694,7 @@ internal object ReaderPaginationScripts {
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
           nodeStartOffsets: new WeakMap(),
+          nodeStartRawOffsets: new WeakMap(),
           isVertical: function() {
             return window.getComputedStyle(document.body).writingMode === "vertical-rl";
           },
@@ -692,6 +707,9 @@ internal object ReaderPaginationScripts {
           },
           countChars: function(text) {
             return Array.from(this.normalizeText(text)).length;
+          },
+          countRawChars: function(text) {
+            return Array.from(text || '').length;
           },
           isMatchableChar: function(char) {
             return this.ttuRegex.test(char || '');
@@ -739,14 +757,19 @@ internal object ReaderPaginationScripts {
           },
           buildNodeOffsets: function() {
             var offsets = new WeakMap();
+            var rawOffsets = new WeakMap();
             var walker = this.createWalker();
             var count = 0;
+            var rawCount = 0;
             var node;
             while (node = walker.nextNode()) {
               offsets.set(node, count);
+              rawOffsets.set(node, rawCount);
               count += this.countChars(node.textContent);
+              rawCount += this.countRawChars(node.textContent);
             }
             this.nodeStartOffsets = offsets;
+            this.nodeStartRawOffsets = rawOffsets;
           },
           countCharsBeforeViewport: function(node, vertical) {
             var text = node.textContent || '';
@@ -1050,6 +1073,7 @@ internal object ReaderPaginationScripts {
             return Math.abs(after - before) > 1 ? "scrolled" : "limit";
           }
         };
+        ${readerHighlightsScript()}
         window.hoshiReader.initialize = function() {
           if (window.hoshiReader.didInitialize) return;
           window.hoshiReader.didInitialize = true;
@@ -1091,6 +1115,7 @@ internal object ReaderPaginationScripts {
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
             ${sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" }.orEmpty()}
+            ${highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" }.orEmpty()}
             $initialRestoreScript
           });
         };
@@ -1104,6 +1129,103 @@ internal object ReaderPaginationScripts {
         """.trimIndent()
     }
 }
+
+private fun readerHighlightsScript(): String = """
+    window.hoshiHighlights = {
+      wrappers: new Map(),
+      createHighlight: function(color, id) {
+        var selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return null;
+        var range = selection.getRangeAt(0);
+        if (range.collapsed) return null;
+        var startPrefix = range.startContainer.textContent.substring(0, range.startOffset);
+        var endPrefix = range.endContainer.textContent.substring(0, range.endOffset);
+        var start = (window.hoshiReader.nodeStartOffsets.get(range.startContainer) || 0) + window.hoshiReader.countChars(startPrefix);
+        var rawStart = (window.hoshiReader.nodeStartRawOffsets.get(range.startContainer) || 0) + window.hoshiReader.countRawChars(startPrefix);
+        var rawEnd = (window.hoshiReader.nodeStartRawOffsets.get(range.endContainer) || 0) + window.hoshiReader.countRawChars(endPrefix);
+        if (rawEnd <= rawStart) return null;
+        var fragment = range.cloneContents();
+        fragment.querySelectorAll('rt, rp').forEach(function(el) { el.remove(); });
+        var text = fragment.textContent || '';
+        selection.removeAllRanges();
+        this.wrapHighlight({ id: id, color: color, offset: rawStart, text: text });
+        window.hoshiReader.buildNodeOffsets();
+        requestAnimationFrame(function() {
+          document.body.style.transform = 'translateZ(0)';
+          requestAnimationFrame(function() { document.body.style.transform = ''; });
+        });
+        return { start: start, offset: rawStart, text: text };
+      },
+      collectSegments: function(offset, length) {
+        var end = offset + length;
+        var segments = [];
+        var cursor = 0;
+        var segment = null;
+        var flushSegment = function() {
+          if (!segment) return;
+          segments.push(segment);
+          segment = null;
+        };
+        var walker = window.hoshiReader.createWalker();
+        var node;
+        while (cursor < end && (node = walker.nextNode())) {
+          var text = node.textContent || '';
+          var i = 0;
+          while (i < text.length && cursor < end) {
+            var char = String.fromCodePoint(text.codePointAt(i));
+            var next = i + char.length;
+            if (cursor >= offset) {
+              if (!segment || segment.node !== node) {
+                flushSegment();
+                segment = { node: node, start: i, end: next };
+              } else {
+                segment.end = next;
+              }
+            }
+            cursor += 1;
+            i = next;
+          }
+          flushSegment();
+        }
+        return segments;
+      },
+      wrapHighlight: function(highlight) {
+        var segments = this.collectSegments(highlight.offset, Array.from(highlight.text || '').length);
+        if (!segments.length) return;
+        var range = document.createRange();
+        var wrappers = [];
+        for (var i = segments.length - 1; i >= 0; i--) {
+          var segment = segments[i];
+          range.setStart(segment.node, segment.start);
+          range.setEnd(segment.node, segment.end);
+          var wrapper = document.createElement('span');
+          wrapper.className = 'hoshi-highlight hoshi-highlight-' + highlight.color;
+          wrapper.appendChild(range.extractContents());
+          range.insertNode(wrapper);
+          wrappers.push(wrapper);
+        }
+        wrappers.reverse();
+        this.wrappers.set(highlight.id, wrappers);
+      },
+      applyHighlights: function(highlights) {
+        for (var i = 0; i < highlights.length; i++) {
+          this.wrapHighlight(highlights[i]);
+        }
+        window.hoshiReader.buildNodeOffsets();
+      },
+      removeHighlight: function(id) {
+        var wrappers = this.wrappers.get(id);
+        if (!wrappers) return;
+        window.hoshiReader.unwrap(wrappers);
+        this.wrappers.delete(id);
+        window.hoshiReader.buildNodeOffsets();
+        requestAnimationFrame(function() {
+          document.body.style.transform = 'translateZ(0)';
+          requestAnimationFrame(function() { document.body.style.transform = ''; });
+        });
+      }
+    };
+""".trimIndent()
 
 private fun String.javaScriptStringLiteral(): String =
     buildString(length + 2) {

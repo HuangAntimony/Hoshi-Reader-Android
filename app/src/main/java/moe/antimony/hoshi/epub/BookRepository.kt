@@ -124,6 +124,13 @@ class BookRepository(
         sidecarDataSource.saveStatistics(bookRoot, statistics)
     }
 
+    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
+        sidecarDataSource.loadHighlights(bookRoot).orEmpty()
+
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+        sidecarDataSource.saveHighlights(bookRoot, highlights)
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         sidecarDataSource.loadBookInfo(bookRoot)
 
@@ -382,6 +389,13 @@ class BookSidecarDataSource(
         )
     }
 
+    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight>? =
+        loadJson(ListSerializer(ReaderHighlight.serializer()), bookRoot.resolve(HIGHLIGHTS_FILE_NAME))
+
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+        saveJson(bookRoot, HIGHLIGHTS_FILE_NAME, ListSerializer(ReaderHighlight.serializer()), highlights)
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
         loadJson(BookInfo.serializer(), bookRoot.resolve(BOOKINFO_FILE_NAME))
 
@@ -435,6 +449,7 @@ object SystemBookClock : BookClock {
 private const val METADATA_FILE_NAME = "metadata.json"
 private const val BOOKMARK_FILE_NAME = "bookmark.json"
 private const val STATISTICS_FILE_NAME = "statistics.json"
+private const val HIGHLIGHTS_FILE_NAME = "highlights.json"
 private const val BOOKINFO_FILE_NAME = "bookinfo.json"
 private const val SHELVES_FILE_NAME = "shelves.json"
 private const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"

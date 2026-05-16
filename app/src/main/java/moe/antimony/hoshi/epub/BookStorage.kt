@@ -105,6 +105,13 @@ class BookStorage(filesDir: File) {
         repository.saveStatistics(bookRoot, statistics)
     }
 
+    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
+        repository.loadHighlights(bookRoot)
+
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+        repository.saveHighlights(bookRoot, highlights)
+    }
+
     suspend fun loadBookInfo(bookRoot: File): BookInfo? = repository.loadBookInfo(bookRoot)
 
     suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {

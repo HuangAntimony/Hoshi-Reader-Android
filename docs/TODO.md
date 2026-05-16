@@ -55,9 +55,8 @@ This file is the short operational handoff for future agents.
 
 ### Highlights And Notes
 
-- Store highlight anchors from WebView range data.
-- Restore highlights after chapter load through JS.
-- Align highlight tap, delete, and color behavior with iOS.
+- Device-validate reader highlight creation, restore, jump, delete, and color behavior in paginated and continuous modes against iOS.
+- Add note editing only if/when iOS exposes a user-visible notes flow.
 
 ### Anki
 

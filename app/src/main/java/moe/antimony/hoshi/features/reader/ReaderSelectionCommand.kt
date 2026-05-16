@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.epub.HighlightColor
+
 internal sealed interface ReaderSelectionCommand {
     val source: String
 
@@ -32,6 +34,25 @@ internal sealed interface ReaderSelectionCommand {
     }
 }
 
+internal sealed interface ReaderHighlightCommand {
+    val source: String
+
+    data class Create(
+        val color: HighlightColor,
+        val id: String,
+    ) : ReaderHighlightCommand {
+        override val source: String =
+            "window.hoshiHighlights.createHighlight('${color.rawValue}', '${id.javaScriptSingleQuotedString()}')"
+    }
+
+    data class Remove(
+        val id: String,
+    ) : ReaderHighlightCommand {
+        override val source: String =
+            "window.hoshiHighlights.removeHighlight(${id.javaScriptDoubleQuotedString()})"
+    }
+}
+
 internal data class ReaderSelectionResult(
     val selectedNothing: Boolean,
 ) {
@@ -44,3 +65,22 @@ internal data class ReaderSelectionResult(
             )
     }
 }
+
+private fun String.javaScriptSingleQuotedString(): String =
+    replace("\\", "\\\\").replace("'", "\\'")
+
+private fun String.javaScriptDoubleQuotedString(): String =
+    buildString(length + 2) {
+        append('"')
+        this@javaScriptDoubleQuotedString.forEach { ch ->
+            when (ch) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(ch)
+            }
+        }
+        append('"')
+    }

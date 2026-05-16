@@ -22,6 +22,9 @@ internal class ReaderWebViewStateHolder(
     var showSasayaki by mutableStateOf(false)
         private set
 
+    var showHighlights by mutableStateOf(false)
+        private set
+
     var showStatistics by mutableStateOf(false)
         private set
 
@@ -105,6 +108,15 @@ internal class ReaderWebViewStateHolder(
 
     fun dismissSasayaki() {
         showSasayaki = false
+    }
+
+    fun openHighlightsFromMenu() {
+        showReaderMenu = false
+        showHighlights = true
+    }
+
+    fun dismissHighlights() {
+        showHighlights = false
     }
 
     fun openStatisticsFromMenu() {

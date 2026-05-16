@@ -267,6 +267,34 @@ class BookMetadataStorageTest {
     }
 
     @Test
+    fun savesAndLoadsIosCompatibleHighlightSidecar() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-highlight-sidecars").toFile())
+        val root = storage.createBookDirectory("book")
+        val highlightId = UUID.randomUUID().toString()
+        val highlights = listOf(
+            ReaderHighlight(
+                id = highlightId,
+                character = 42,
+                offset = 7,
+                text = "食べる",
+                color = HighlightColor.Green,
+                createdAt = 801187200.5,
+            ),
+        )
+
+        storage.saveHighlights(root, highlights)
+
+        val saved = Json.parseToJsonElement(root.resolve("highlights.json").readText()).jsonArray.single().jsonObject
+        assertEquals(highlightId, saved.getValue("id").jsonPrimitive.content)
+        assertEquals(42, saved.getValue("character").jsonPrimitive.content.toInt())
+        assertEquals(7, saved.getValue("offset").jsonPrimitive.content.toInt())
+        assertEquals("食べる", saved.getValue("text").jsonPrimitive.content)
+        assertEquals("green", saved.getValue("color").jsonPrimitive.content)
+        assertEquals(801187200.5, saved.getValue("createdAt").jsonPrimitive.double, 0.0)
+        assertEquals(highlights, storage.loadHighlights(root))
+    }
+
+    @Test
     fun loadsExistingIosSasayakiSidecarJsonWithoutMigration() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-ios-sasayaki-sidecars").toFile())
         val root = storage.createBookDirectory("book")

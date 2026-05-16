@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.reader
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiMatch
+import moe.antimony.hoshi.epub.HighlightColor
+import moe.antimony.hoshi.epub.ReaderHighlight
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -16,7 +18,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.ActionMode
 import android.view.KeyEvent
+import android.view.Menu
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -52,6 +57,7 @@ import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
@@ -97,6 +103,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.util.WeakHashMap
+import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiAppContainer
@@ -195,6 +202,16 @@ fun ReaderWebView(
     LaunchedEffect(bookRoot, bookRepository) {
         sasayakiMatchData = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
     }
+    var highlights by remember(bookRoot) {
+        mutableStateOf<List<ReaderHighlight>?>(if (bookRoot == null) emptyList() else null)
+    }
+    LaunchedEffect(bookRoot, bookRepository) {
+        highlights = if (bookRoot != null) {
+            bookRepository.loadHighlights(bookRoot)
+        } else {
+            emptyList()
+        }
+    }
     var sasayakiPlaybackData by remember(bookRoot) { mutableStateOf<SasayakiPlaybackData?>(null) }
     var isSasayakiPlaybackLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
     LaunchedEffect(bookRoot, bookRepository) {
@@ -286,6 +303,7 @@ fun ReaderWebView(
     val showReaderMenu = stateHolder.showReaderMenu
     val showAppearance = stateHolder.showAppearance
     val showChapters = stateHolder.showChapters
+    val showHighlights = stateHolder.showHighlights
     val showSasayaki = stateHolder.showSasayaki
     val showStatistics = stateHolder.showStatistics
     val focusMode = stateHolder.focusMode
@@ -350,6 +368,34 @@ fun ReaderWebView(
     }
     fun saveCurrentDisplayedPosition() {
         saveReaderPosition(stateHolder.readerPosition.displayedPosition)
+    }
+    fun currentLoadChapter(): moe.antimony.hoshi.epub.EpubChapter =
+        book.chapters[stateHolder.readerPosition.loadPosition.index.coerceIn(0, book.chapters.lastIndex)]
+    fun persistHighlights(nextHighlights: List<ReaderHighlight>) {
+        highlights = nextHighlights
+        val root = bookRoot ?: return
+        scope.launch {
+            bookRepository.saveHighlights(root, nextHighlights)
+        }
+    }
+    fun addHighlight(color: HighlightColor, id: String, creation: ReaderHighlightCreationResult) {
+        val chapter = currentLoadChapter()
+        val info = book.bookInfo.chapterInfo[chapter.href] ?: return
+        val highlight = ReaderHighlight(
+            id = id,
+            character = info.currentTotal + creation.start,
+            offset = creation.offset,
+            text = creation.text,
+            color = color,
+            createdAt = bookRepository.currentAppleReferenceDateSeconds(),
+        )
+        persistHighlights(highlights.orEmpty() + highlight)
+    }
+    fun removeHighlight(highlight: ReaderHighlight) {
+        persistHighlights(highlights.orEmpty().filterNot { it.id == highlight.id })
+        if (ReaderHighlights.chapterContains(highlight, book.bookInfo, currentLoadChapter())) {
+            webView?.evaluateJavascript(ReaderHighlightCommand.Remove(highlight.id).source, null)
+        }
     }
     fun toggleStatisticsTracking() {
         val tracker = statisticsTracker ?: return
@@ -868,54 +914,62 @@ fun ReaderWebView(
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val viewportHorizontalPadding = maxWidth * effectiveSettings.continuousViewportHorizontalPaddingRatio.toFloat()
                 val viewportVerticalPadding = maxHeight * effectiveSettings.continuousViewportVerticalPaddingRatio.toFloat()
-                ChapterWebView(
-                    book = book,
-                    chapterPosition = readerPosition.loadPosition,
-                    chapterFragment = readerPosition.loadFragment,
-                    webViewViewportSize = stateHolder.webViewViewportSize,
-                    onReaderViewportSizeChanged = stateHolder::updateViewportSize,
-                    onWebViewReady = { webView = it },
-                    isWebViewRestoring = stateHolder.isWebViewRestoring,
-                    webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
-                    onRestoreStarted = stateHolder::markWebViewRestoring,
-                    onRestoreCompleted = stateHolder::markWebViewRestored,
-                    onNextChapter = {
-                        goToNextChapter()
-                    },
-                    onPreviousChapter = {
-                        goToPreviousChapter()
-                    },
-                    onSaveBookmark = { progress ->
-                        saveDisplayedProgress(progress)
-                    },
-                    onDisplayProgress = { progress ->
-                        displayPagedTurnProgress(progress)
-                    },
-                    onContinuousScrollProgress = { progress, restoreEpoch ->
-                        saveContinuousScrollProgress(progress, restoreEpoch)
-                    },
-                    onInternalLink = { target ->
-                        closeLookupPopupsAndSelection()
-                        val statistics = statisticsForSave()
-                        val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
-                        resetStatisticsBaseline()
-                        saveReaderPosition(savedPosition, statistics)
-                    },
-                    scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
-                    readerSettings = effectiveSettings,
-                    sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
-                    sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
-                    onTextSelected = handleTextSelected,
-                    onClearLookupPopup = ::closeLookupPopupsAndSelection,
-                    fontManager = fontManager,
-                    systemDark = systemDarkTheme,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            horizontal = viewportHorizontalPadding,
-                            vertical = viewportVerticalPadding,
+                highlights?.let { loadedHighlights ->
+                    ChapterWebView(
+                        book = book,
+                        chapterPosition = readerPosition.loadPosition,
+                        chapterFragment = readerPosition.loadFragment,
+                        webViewViewportSize = stateHolder.webViewViewportSize,
+                        onReaderViewportSizeChanged = stateHolder::updateViewportSize,
+                        onWebViewReady = { webView = it },
+                        isWebViewRestoring = stateHolder.isWebViewRestoring,
+                        webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
+                        onRestoreStarted = stateHolder::markWebViewRestoring,
+                        onRestoreCompleted = stateHolder::markWebViewRestored,
+                        onNextChapter = {
+                            goToNextChapter()
+                        },
+                        onPreviousChapter = {
+                            goToPreviousChapter()
+                        },
+                        onSaveBookmark = { progress ->
+                            saveDisplayedProgress(progress)
+                        },
+                        onDisplayProgress = { progress ->
+                            displayPagedTurnProgress(progress)
+                        },
+                        onContinuousScrollProgress = { progress, restoreEpoch ->
+                            saveContinuousScrollProgress(progress, restoreEpoch)
+                        },
+                        onInternalLink = { target ->
+                            closeLookupPopupsAndSelection()
+                            val statistics = statisticsForSave()
+                            val savedPosition = stateHolder.jumpTo(target.position, target.fragment)
+                            resetStatisticsBaseline()
+                            saveReaderPosition(savedPosition, statistics)
+                        },
+                        scanNonJapaneseText = dictionarySettings.scanNonJapaneseText,
+                        readerSettings = effectiveSettings,
+                        chapterHighlightsJson = ReaderHighlights.chapterHighlightsJson(
+                            highlights = loadedHighlights,
+                            bookInfo = book.bookInfo,
+                            chapter = currentLoadChapter(),
                         ),
-                )
+                        sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                        sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                        onTextSelected = handleTextSelected,
+                        onClearLookupPopup = ::closeLookupPopupsAndSelection,
+                        onHighlightCreated = ::addHighlight,
+                        fontManager = fontManager,
+                        systemDark = systemDarkTheme,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                horizontal = viewportHorizontalPadding,
+                                vertical = viewportVerticalPadding,
+                            ),
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -997,6 +1051,7 @@ fun ReaderWebView(
             menuExpanded = showReaderMenu,
             onDismissMenu = stateHolder::dismissReaderMenu,
             onChapters = stateHolder::openChaptersFromMenu,
+            onHighlights = stateHolder::openHighlightsFromMenu,
             onAppearance = stateHolder::openAppearanceFromMenu,
             onStatistics = if (effectiveSettings.enableStatistics) {
                 stateHolder::openStatisticsFromMenu
@@ -1040,6 +1095,23 @@ fun ReaderWebView(
                     stateHolder.dismissChapters()
                 },
                 onDismiss = stateHolder::dismissChapters,
+            )
+        }
+        if (showHighlights && highlights != null) {
+            ReaderHighlightSheet(
+                book = book,
+                highlights = highlights.orEmpty(),
+                onJump = { highlight ->
+                    closeLookupPopupsAndSelection()
+                    val statistics = statisticsForSave()
+                    val target = ReaderHighlights.positionForCharacter(book.bookInfo, highlight.character)
+                    val savedPosition = stateHolder.jumpTo(target)
+                    resetStatisticsBaseline()
+                    saveReaderPosition(savedPosition, statistics)
+                    stateHolder.dismissHighlights()
+                },
+                onDelete = ::removeHighlight,
+                onDismiss = stateHolder::dismissHighlights,
             )
         }
         if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
@@ -1246,6 +1318,7 @@ private fun BoxScope.ReaderBottomChrome(
     menuExpanded: Boolean,
     onDismissMenu: () -> Unit,
     onChapters: () -> Unit,
+    onHighlights: () -> Unit,
     onAppearance: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
@@ -1266,6 +1339,7 @@ private fun BoxScope.ReaderBottomChrome(
             colors = colors,
             metrics = metrics,
             onChapters = onChapters,
+            onHighlights = onHighlights,
             onAppearance = onAppearance,
             onStatistics = onStatistics,
             onSasayaki = onSasayaki,
@@ -1364,6 +1438,7 @@ private fun ReaderMenuCard(
     colors: ReaderChromeColors,
     metrics: ReaderBottomChromeMetrics,
     onChapters: () -> Unit,
+    onHighlights: () -> Unit,
     onAppearance: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
@@ -1393,6 +1468,23 @@ private fun ReaderMenuCard(
                 colors = colors,
                 metrics = metrics,
                 onClick = onChapters,
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),
+                color = Color(colors.menuBorder),
+            )
+            ReaderMenuItem(
+                text = "Highlights",
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.BorderColor,
+                        contentDescription = null,
+                        tint = Color(colors.menuContent),
+                    )
+                },
+                colors = colors,
+                metrics = metrics,
+                onClick = onHighlights,
             )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),
@@ -1548,10 +1640,12 @@ private fun ChapterWebView(
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     scanNonJapaneseText: Boolean,
     readerSettings: ReaderSettings,
+    chapterHighlightsJson: String?,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData, selectionRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit,
     onClearLookupPopup: () -> Unit,
+    onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit,
     fontManager: ReaderFontManager,
     systemDark: Boolean,
     modifier: Modifier = Modifier,
@@ -1561,6 +1655,7 @@ private fun ChapterWebView(
     val currentOnDisplayProgress = rememberUpdatedState(onDisplayProgress)
     val currentOnContinuousScrollProgress = rememberUpdatedState(onContinuousScrollProgress)
     val currentOnClearLookupPopup = rememberUpdatedState(onClearLookupPopup)
+    val currentOnHighlightCreated = rememberUpdatedState(onHighlightCreated)
     val currentOnNextChapter = rememberUpdatedState(onNextChapter)
     val currentOnPreviousChapter = rememberUpdatedState(onPreviousChapter)
     val currentIsWebViewRestoring = rememberUpdatedState(isWebViewRestoring)
@@ -1608,6 +1703,7 @@ private fun ChapterWebView(
             scanNonJapaneseText = scanNonJapaneseText,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
+            highlightsJson = chapterHighlightsJson,
         )
     }
     AndroidView(
@@ -1615,10 +1711,13 @@ private fun ChapterWebView(
             .onSizeChanged(onReaderViewportSizeChanged)
             .background(Color(readerSettings.backgroundColor(systemDark))),
         factory = { context ->
-            WebView(context).apply {
+            HoshiReaderWebView(context).apply {
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
+                this.onHighlightCreated = { color, id, creation ->
+                    currentOnHighlightCreated.value(color, id, creation)
+                }
                 hideForReaderRestore()
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
@@ -1774,6 +1873,68 @@ internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: Sas
         bookRoot?.resolve(ReaderSasayakiMatchFileName)?.isFile == true &&
         bookRoot.resolve(ReaderSasayakiPlaybackFileName).isFile
 
+private class HoshiReaderWebView(context: Context) : WebView(context) {
+    var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
+
+    override fun startActionMode(callback: ActionMode.Callback): ActionMode? =
+        super.startActionMode(ReaderHighlightActionModeCallback(this, callback))
+
+    override fun startActionMode(callback: ActionMode.Callback, type: Int): ActionMode? =
+        super.startActionMode(ReaderHighlightActionModeCallback(this, callback), type)
+}
+
+private class ReaderHighlightActionModeCallback(
+    private val webView: WebView,
+    private val delegate: ActionMode.Callback,
+) : ActionMode.Callback {
+    override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+        val created = delegate.onCreateActionMode(mode, menu)
+        addHighlightItems(menu)
+        return created
+    }
+
+    override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+        addHighlightItems(menu)
+        return delegate.onPrepareActionMode(mode, menu)
+    }
+
+    override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+        val index = item.itemId - ReaderHighlightMenuItemBaseId
+        val color = HighlightColor.entries.getOrNull(index)
+        if (color != null && webView is HoshiReaderWebView) {
+            val id = UUID.randomUUID().toString()
+            webView.evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
+                ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
+                    webView.onHighlightCreated(color, id, creation)
+                }
+            }
+            mode.finish()
+            return true
+        }
+        return delegate.onActionItemClicked(mode, item)
+    }
+
+    override fun onDestroyActionMode(mode: ActionMode) {
+        delegate.onDestroyActionMode(mode)
+    }
+
+    private fun addHighlightItems(menu: Menu) {
+        if (menu.findItem(ReaderHighlightMenuItemBaseId) != null) return
+        HighlightColor.entries.forEachIndexed { index, color ->
+            menu.add(
+                ReaderHighlightMenuGroupId,
+                ReaderHighlightMenuItemBaseId + index,
+                ReaderHighlightMenuOrderBase + index,
+                color.rawValue.replaceFirstChar { it.uppercase() },
+            ).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        }
+    }
+}
+
+private const val ReaderHighlightMenuGroupId = 0x4849
+private const val ReaderHighlightMenuItemBaseId = 0x484900
+private const val ReaderHighlightMenuOrderBase = 200
+
 private class EpubWebViewClient(
     private val book: EpubBook,
     private val fontManager: ReaderFontManager,
@@ -1815,6 +1976,7 @@ private fun readerSetupScript(
     scanNonJapaneseText: Boolean,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
+    highlightsJson: String?,
 ): String {
     val css = ReaderContentStyles.css(
         settings = settings,
@@ -1828,6 +1990,7 @@ private fun readerSetupScript(
         initialProgress = initialProgress,
         initialFragment = initialFragment,
         settings = settings,
+        highlightsJson = highlightsJson,
     ).scriptTagBody()
     return """
         (function() {
