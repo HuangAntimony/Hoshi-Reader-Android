@@ -72,6 +72,17 @@ class ReaderSwipeGestureTrackerTest {
     }
 
     @Test
+    fun nativeTextSelectionSuppressesCurrentReaderGesture() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+        tracker.suppressCurrentGesture()
+
+        assertTrue(tracker.onMove(150f, 104f, eventTime = 1_120L) == ReaderSwipeGestureTracker.Result.None)
+        assertTrue(tracker.onUp(150f, 104f, eventTime = 1_160L) == ReaderSwipeGestureTracker.Result.None)
+    }
+
+    @Test
     fun horizontalDragPastThresholdCanPageEvenWhenDiagonal() {
         val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
 

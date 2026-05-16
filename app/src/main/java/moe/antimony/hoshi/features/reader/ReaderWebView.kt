@@ -10,6 +10,10 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.Color as AndroidColor
+import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.SystemClock
 import android.webkit.JavascriptInterface
@@ -24,7 +28,13 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.View.MeasureSpec
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -1758,6 +1768,7 @@ private fun ChapterWebView(
                 webView.setOnTouchListener(
                     ContinuousScrollTouchListener(
                         settings = readerSettings,
+                        shouldIgnoreReaderGesture = webView::isNativeSelectionActionModeActive,
                         onTap = ::selectAt,
                         onNextChapter = {
                             currentOnClearLookupPopup.value()
@@ -1814,6 +1825,9 @@ private fun ChapterWebView(
                 readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                 webView.setOnScrollChangeListener(null)
                 webView.setOnTouchListener(object : SwipePageTouchListener() {
+                    override fun shouldIgnoreReaderGesture(): Boolean =
+                        webView.isNativeSelectionActionModeActive()
+
                     override fun onTap(x: Float, y: Float) {
                         selectAt(x, y)
                     }
@@ -1875,6 +1889,162 @@ internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: Sas
 
 private class HoshiReaderWebView(context: Context) : WebView(context) {
     var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
+    private var nativeSelectionActionModeActive = false
+    private var nativeSelectionActionMode: ActionMode? = null
+    private var nativeSelectionDragMoved = false
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private var fallbackHighlightPopup: PopupWindow? = null
+
+    fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
+    fun setNativeSelectionActionMode(mode: ActionMode?) {
+        nativeSelectionActionMode = mode
+        nativeSelectionActionModeActive = mode != null
+        if (mode == null) {
+            nativeSelectionDragMoved = false
+            dismissFallbackHighlightPopup()
+        }
+    }
+
+    fun populateSelectionToolbarContentRect(outRect: Rect) {
+        val rect = ReaderFloatingToolbarAnchor.rectForTouch(
+            viewWidth = width,
+            viewHeight = height,
+            touchX = lastTouchX,
+            touchY = lastTouchY,
+            density = resources.displayMetrics.density,
+        )
+        outRect.set(rect.left, rect.top, rect.right, rect.bottom)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDownX = event.x
+                touchDownY = event.y
+                lastTouchX = event.x
+                lastTouchY = event.y
+                nativeSelectionDragMoved = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                lastTouchX = event.x
+                lastTouchY = event.y
+                if (nativeSelectionActionModeActive && movedPastSelectionDragSlop(event.x, event.y)) {
+                    nativeSelectionDragMoved = true
+                    dismissFallbackHighlightPopup()
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                lastTouchX = event.x
+                lastTouchY = event.y
+                refreshSelectionToolbarAfterDrag()
+            }
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun refreshSelectionToolbarAfterDrag() {
+        val mode = nativeSelectionActionMode ?: return
+        postDelayed(
+            {
+                if (nativeSelectionActionMode === mode) {
+                    mode.invalidateContentRect()
+                    mode.invalidate()
+                    if (nativeSelectionDragMoved) {
+                        showFallbackHighlightPopup()
+                    }
+                }
+            },
+            SelectionToolbarRefreshDelayMs,
+        )
+    }
+
+    private fun movedPastSelectionDragSlop(x: Float, y: Float): Boolean {
+        val slop = SelectionDragSlopDp * resources.displayMetrics.density
+        return abs(x - touchDownX) > slop || abs(y - touchDownY) > slop
+    }
+
+    private fun showFallbackHighlightPopup() {
+        dismissFallbackHighlightPopup()
+        val density = resources.displayMetrics.density
+        val popupContent = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(AndroidColor.WHITE)
+                cornerRadius = 20f * density
+                setStroke((1f * density).toInt().coerceAtLeast(1), 0x22000000)
+            }
+            elevation = 8f * density
+            val paddingHorizontal = (8f * density).toInt()
+            val paddingVertical = (6f * density).toInt()
+            setPadding(paddingHorizontal, paddingVertical, paddingHorizontal, paddingVertical)
+            HighlightColor.entries.forEach { color ->
+                addView(fallbackHighlightButton(color, density))
+            }
+        }
+        popupContent.measure(
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+        )
+        fallbackHighlightPopup = PopupWindow(
+            popupContent,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            false,
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            elevation = 8f * density
+        }
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        val margin = (12f * density).toInt()
+        val screenWidth = resources.displayMetrics.widthPixels
+        val popupWidth = popupContent.measuredWidth
+        val popupHeight = popupContent.measuredHeight
+        val x = (location[0] + lastTouchX.toInt() - popupWidth / 2)
+            .coerceIn(0, (screenWidth - popupWidth).coerceAtLeast(0))
+        val aboveY = location[1] + lastTouchY.toInt() - popupHeight - margin
+        val belowY = location[1] + lastTouchY.toInt() + margin
+        val y = if (aboveY >= 0) aboveY else belowY
+        fallbackHighlightPopup?.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+    }
+
+    private fun fallbackHighlightButton(color: HighlightColor, density: Float): TextView {
+        val size = (42f * density).toInt()
+        val margin = (3f * density).toInt()
+        return TextView(context).apply {
+            contentDescription = color.rawValue.replaceFirstChar { it.uppercase() }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(color.swatchArgb.toInt())
+                setStroke((1f * density).toInt().coerceAtLeast(1), 0x33000000)
+            }
+            setOnClickListener { createHighlightFromNativeSelection(color) }
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                setMargins(margin, 0, margin, 0)
+            }
+        }
+    }
+
+    fun createHighlightFromNativeSelection(color: HighlightColor) {
+        val mode = nativeSelectionActionMode
+        val id = UUID.randomUUID().toString()
+        dismissFallbackHighlightPopup()
+        evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
+            ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
+                onHighlightCreated(color, id, creation)
+            }
+            mode?.finish()
+        }
+    }
+
+    private fun dismissFallbackHighlightPopup() {
+        fallbackHighlightPopup?.dismiss()
+        fallbackHighlightPopup = null
+    }
 
     override fun startActionMode(callback: ActionMode.Callback): ActionMode? =
         super.startActionMode(ReaderHighlightActionModeCallback(this, callback))
@@ -1884,12 +2054,15 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 }
 
 private class ReaderHighlightActionModeCallback(
-    private val webView: WebView,
+    private val webView: HoshiReaderWebView,
     private val delegate: ActionMode.Callback,
-) : ActionMode.Callback {
+) : ActionMode.Callback2() {
     override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
         val created = delegate.onCreateActionMode(mode, menu)
-        addHighlightItems(menu)
+        if (created) {
+            webView.setNativeSelectionActionMode(mode)
+            addHighlightItems(menu)
+        }
         return created
     }
 
@@ -1901,22 +2074,21 @@ private class ReaderHighlightActionModeCallback(
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         val index = item.itemId - ReaderHighlightMenuItemBaseId
         val color = HighlightColor.entries.getOrNull(index)
-        if (color != null && webView is HoshiReaderWebView) {
-            val id = UUID.randomUUID().toString()
-            // Finishing the action mode clears WebView's DOM selection, so wait until JS reads it.
-            webView.evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
-                ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
-                    webView.onHighlightCreated(color, id, creation)
-                }
-                mode.finish()
-            }
+        if (color != null) {
+            webView.createHighlightFromNativeSelection(color)
             return true
         }
         return delegate.onActionItemClicked(mode, item)
     }
 
     override fun onDestroyActionMode(mode: ActionMode) {
+        webView.setNativeSelectionActionMode(null)
         delegate.onDestroyActionMode(mode)
+    }
+
+    override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
+        (delegate as? ActionMode.Callback2)?.onGetContentRect(mode, view, outRect)
+        webView.populateSelectionToolbarContentRect(outRect)
     }
 
     private fun addHighlightItems(menu: Menu) {
@@ -1935,6 +2107,8 @@ private class ReaderHighlightActionModeCallback(
 private const val ReaderHighlightMenuGroupId = 0x4849
 private const val ReaderHighlightMenuItemBaseId = 0x484900
 private const val ReaderHighlightMenuOrderBase = 200
+private const val SelectionToolbarRefreshDelayMs = 80L
+private const val SelectionDragSlopDp = 8f
 
 private class EpubWebViewClient(
     private val book: EpubBook,
@@ -2097,6 +2271,7 @@ private fun WebView.flushPendingProgressSave() {
 
 private class ContinuousScrollTouchListener(
     private val settings: ReaderSettings,
+    private val shouldIgnoreReaderGesture: () -> Boolean,
     private val onTap: (Float, Float) -> Unit,
     private val onNextChapter: () -> Boolean,
     private val onPreviousChapter: () -> Boolean,
@@ -2104,16 +2279,29 @@ private class ContinuousScrollTouchListener(
     private var downX = 0f
     private var downY = 0f
     private var downTime = 0L
+    private var currentGestureIgnored = false
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         val webView = view as? WebView ?: return false
+        if (shouldIgnoreReaderGesture()) {
+            currentGestureIgnored = true
+            return false
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
                 downTime = event.eventTime
+                currentGestureIgnored = false
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                currentGestureIgnored = false
             }
             MotionEvent.ACTION_UP -> {
+                if (currentGestureIgnored) {
+                    currentGestureIgnored = false
+                    return false
+                }
                 val dx = event.x - downX
                 val dy = event.y - downY
                 val elapsedMs = event.eventTime - downTime
