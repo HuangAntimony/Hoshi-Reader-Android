@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Avoid intermittent reader highlight creation failures by keeping the WebView selection alive until the highlight is created.
 - Keep reader long-press text selection available for highlight creation instead of converting the long press into a lookup tap.
 - Show iOS-aligned deinflection explanation popups when tapping conjugation tags in dictionary lookup results.
 

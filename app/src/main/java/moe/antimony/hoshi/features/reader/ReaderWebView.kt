@@ -1903,12 +1903,13 @@ private class ReaderHighlightActionModeCallback(
         val color = HighlightColor.entries.getOrNull(index)
         if (color != null && webView is HoshiReaderWebView) {
             val id = UUID.randomUUID().toString()
+            // Finishing the action mode clears WebView's DOM selection, so wait until JS reads it.
             webView.evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
                 ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
                     webView.onHighlightCreated(color, id, creation)
                 }
+                mode.finish()
             }
-            mode.finish()
             return true
         }
         return delegate.onActionItemClicked(mode, item)
