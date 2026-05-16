@@ -10,7 +10,10 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.Color as AndroidColor
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.SystemClock
 import android.webkit.JavascriptInterface
@@ -25,7 +28,13 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.View.MeasureSpec
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -1882,23 +1891,94 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
     private var nativeSelectionActionModeActive = false
     private var nativeSelectionActionMode: ActionMode? = null
+    private var highlightColorPopup: PopupWindow? = null
 
     fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
         nativeSelectionActionModeActive = mode != null
         evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
+        if (mode == null) {
+            dismissHighlightColorPopup()
+        }
+    }
+
+    fun showHighlightColorPicker() {
+        dismissHighlightColorPopup()
+        val density = resources.displayMetrics.density
+        val popupContent = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(AndroidColor.WHITE)
+                cornerRadius = 20f * density
+                setStroke((1f * density).toInt().coerceAtLeast(1), 0x22000000)
+            }
+            elevation = 8f * density
+            val paddingHorizontal = (8f * density).toInt()
+            val paddingVertical = (6f * density).toInt()
+            setPadding(paddingHorizontal, paddingVertical, paddingHorizontal, paddingVertical)
+            ReaderHighlightSelectionMenu.colorItems.forEach { item ->
+                addView(highlightColorButton(item, density))
+            }
+        }
+        popupContent.measure(
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+        )
+        highlightColorPopup = PopupWindow(
+            popupContent,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            false,
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            elevation = 8f * density
+        }
+
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        val margin = (16f * density).toInt()
+        val screenWidth = resources.displayMetrics.widthPixels
+        val popupWidth = popupContent.measuredWidth
+        val x = (location[0] + width / 2 - popupWidth / 2)
+            .coerceIn(0, (screenWidth - popupWidth).coerceAtLeast(0))
+        val y = location[1] + margin
+        highlightColorPopup?.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+    }
+
+    private fun highlightColorButton(item: ReaderHighlightSelectionMenuItem, density: Float): TextView {
+        val size = (42f * density).toInt()
+        val margin = (3f * density).toInt()
+        return TextView(context).apply {
+            contentDescription = item.title
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(item.color.swatchArgb.toInt())
+                setStroke((1f * density).toInt().coerceAtLeast(1), 0x33000000)
+            }
+            setOnClickListener { createHighlightFromNativeSelection(item.color) }
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                setMargins(margin, 0, margin, 0)
+            }
+        }
     }
 
     fun createHighlightFromNativeSelection(color: HighlightColor) {
         val mode = nativeSelectionActionMode
         val id = UUID.randomUUID().toString()
+        dismissHighlightColorPopup()
         evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
             ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
                 onHighlightCreated(color, id, creation)
             }
             mode?.finish()
         }
+    }
+
+    private fun dismissHighlightColorPopup() {
+        highlightColorPopup?.dismiss()
+        highlightColorPopup = null
     }
 
     override fun startActionMode(callback: ActionMode.Callback): ActionMode? =
@@ -1927,6 +2007,10 @@ private class ReaderHighlightActionModeCallback(
     }
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+        if (item.itemId == ReaderHighlightSelectionMenu.parentItemId) {
+            webView.showHighlightColorPicker()
+            return true
+        }
         val color = ReaderHighlightSelectionMenu.colorForItemId(item.itemId)
         if (color != null) {
             webView.createHighlightFromNativeSelection(color)
@@ -1946,15 +2030,8 @@ private class ReaderHighlightActionModeCallback(
 
     private fun addHighlightMenu(menu: Menu) {
         if (menu.findItem(ReaderHighlightSelectionMenu.parentItemId) != null) return
-        val subMenu = menu.addSubMenu(
-            ReaderHighlightSelectionMenu.groupId,
-            ReaderHighlightSelectionMenu.parentItemId,
-            ReaderHighlightSelectionMenu.itemOrder,
-            ReaderHighlightSelectionMenu.parentTitle,
-        )
-        subMenu.item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
-        ReaderHighlightSelectionMenu.colorItems.forEach { item ->
-            subMenu.add(
+        ReaderHighlightSelectionMenu.actionModeItems.forEach { item ->
+            menu.add(
                 ReaderHighlightSelectionMenu.groupId,
                 item.id,
                 item.order,

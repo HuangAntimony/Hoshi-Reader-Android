@@ -7,8 +7,16 @@ import org.junit.Test
 
 class ReaderHighlightSelectionMenuTest {
     @Test
-    fun exposesSingleHighlightParentWithPaletteChildren() {
+    fun exposesOnlySingleHighlightItemToAndroidSelectionToolbar() {
+        assertEquals(
+            listOf(ReaderHighlightSelectionMenu.parentItemId),
+            ReaderHighlightSelectionMenu.actionModeItems.map { it.id },
+        )
         assertEquals("Highlight", ReaderHighlightSelectionMenu.parentTitle)
+    }
+
+    @Test
+    fun exposesPaletteColorsOnlyAfterHighlightIsClicked() {
         assertEquals(5, ReaderHighlightSelectionMenu.colorItems.size)
         assertEquals(
             listOf("Yellow", "Green", "Blue", "Pink", "Purple"),

@@ -8,6 +8,15 @@ internal object ReaderHighlightSelectionMenu {
     const val parentItemId = 0x484900
     const val itemOrder = 200
 
+    val actionModeItems: List<ReaderHighlightActionModeItem> =
+        listOf(
+            ReaderHighlightActionModeItem(
+                id = parentItemId,
+                order = itemOrder,
+                title = parentTitle,
+            ),
+        )
+
     val colorItems: List<ReaderHighlightSelectionMenuItem> =
         HighlightColor.entries.mapIndexed { index, color ->
             ReaderHighlightSelectionMenuItem(
@@ -27,4 +36,10 @@ internal data class ReaderHighlightSelectionMenuItem(
     val order: Int,
     val title: String,
     val color: HighlightColor,
+)
+
+internal data class ReaderHighlightActionModeItem(
+    val id: Int,
+    val order: Int,
+    val title: String,
 )
