@@ -4,7 +4,6 @@ import moe.antimony.hoshi.epub.SasayakiMatch
 
 import android.annotation.SuppressLint
 import android.util.Log
-import android.webkit.WebView
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.foundation.BorderStroke
@@ -51,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -298,6 +298,7 @@ fun LookupPopupView(
                     fontManager = fontManager,
                     audioSettings = state.audioSettings,
                     popupScale = state.popupScale,
+                    actionButtonTintColor = controlContentColor,
                     selectionOffsetX = frameX,
                     selectionOffsetY = frameY + controlsHeight,
                     clearSelectionSignal = clearSelectionSignal,
@@ -543,6 +544,7 @@ private fun LookupPopupWebView(
     fontManager: ReaderFontManager,
     audioSettings: AudioSettings,
     popupScale: Double,
+    actionButtonTintColor: Color,
     selectionOffsetX: Double,
     selectionOffsetY: Double,
     clearSelectionSignal: Int,
@@ -575,7 +577,7 @@ private fun LookupPopupWebView(
             val audioRequestHandler = AudioRequestHandler(
                 LocalAudioRepository.fromContext(context),
             )
-            WebView(context).apply {
+            PopupActionButtonWebView(context).apply {
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
@@ -608,6 +610,7 @@ private fun LookupPopupWebView(
                 loadedHtml = html
                 shellReady = false
                 appliedWarmResults = null
+                (webView as? PopupActionButtonWebView)?.clearActionButtons()
                 contentReadyGate.reset()
                 if (!warmShell) {
                     lookupResultsHolder.results = results
@@ -620,15 +623,17 @@ private fun LookupPopupWebView(
                     null,
                 )
             }
+            (webView as? PopupActionButtonWebView)?.setActionButtonTint(actionButtonTintColor.toArgb())
             if (appliedPopupScale != popupScale) {
                 appliedPopupScale = popupScale
                 webView.evaluateJavascript(
-                    "document.documentElement.style.zoom = '${popupScale.coerceIn(0.8, 1.5)}'",
+                    "document.documentElement.style.zoom = '${popupScale.coerceIn(0.8, 1.5)}'; if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)",
                     null,
                 )
             }
             if (warmShell && shellReady && appliedWarmResults !== results) {
                 appliedWarmResults = results
+                (webView as? PopupActionButtonWebView)?.clearActionButtons()
                 lookupResultsHolder.results = results
                 contentReadyGate.reset()
                 webView.evaluateJavascript("window.replacePopupResults && window.replacePopupResults(${results.size})", null)
@@ -639,11 +644,11 @@ private fun LookupPopupWebView(
             }
             if (appliedBackSignal != backSignal) {
                 appliedBackSignal = backSignal
-                webView.evaluateJavascript("window.navigateBack()", null)
+                webView.evaluateJavascript("window.navigateBack(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
             }
             if (appliedForwardSignal != forwardSignal) {
                 appliedForwardSignal = forwardSignal
-                webView.evaluateJavascript("window.navigateForward()", null)
+                webView.evaluateJavascript("window.navigateForward(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
             }
         },
     )

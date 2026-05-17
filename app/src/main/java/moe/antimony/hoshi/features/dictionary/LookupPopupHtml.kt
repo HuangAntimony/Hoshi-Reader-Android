@@ -148,6 +148,7 @@ internal object LookupPopupHtml {
                             tapOutside: { postMessage: function() { window.HoshiAndroidPopup.postMessage('tapOutside'); } },
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
+                            buttonFrames: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('buttonFrames', frames); } },
                             shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
@@ -492,17 +493,14 @@ internal object LookupPopupHtml {
             color: #000 !important;
         }
 
-        html[data-hoshi-eink-mode="true"] .audio-button,
-        html[data-hoshi-eink-mode="true"] .mine-button {
+        html[data-hoshi-eink-mode="true"] .button-slot {
             border-radius: 0 !important;
             background-color: transparent !important;
             color: #000 !important;
             opacity: 1 !important;
         }
 
-        html[data-hoshi-eink-mode="true"] .audio-button.pressed,
-        html[data-hoshi-eink-mode="true"] .audio-button:active,
-        html[data-hoshi-eink-mode="true"] .mine-button:active {
+        html[data-hoshi-eink-mode="true"] .button-slot:active {
             background-color: #fff !important;
             outline: 1px solid #000 !important;
             outline-offset: -1px !important;
@@ -552,16 +550,13 @@ internal object LookupPopupHtml {
         }
 
         html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-values,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-button,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .mine-button,
+        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot,
         html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .overlay {
             background-color: #000 !important;
             color: #fff !important;
         }
 
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-button.pressed,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-button:active,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .mine-button:active {
+        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot:active {
             outline: 1px solid #fff !important;
         }
 

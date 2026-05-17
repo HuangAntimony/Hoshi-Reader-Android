@@ -38,7 +38,7 @@ Validation:
 
 ### 2. Popup action buttons and frame sync
 
-Status: queued
+Status: synced on Android.
 
 Commits:
 
@@ -58,15 +58,16 @@ iOS behavior to mirror:
 
 Android notes:
 
-- Do not copy the iOS UIKit implementation. Implement with Android/Compose/WebView primitives while preserving the same user-visible control behavior.
-- Existing popup JS still owns much of the button rendering path; keep the WebView bridge as the integration point.
-- This slice should also re-check child popup selections and action-bar history, because button-frame refresh touches redirect/back/forward state.
+- Android mirrors the iOS ownership split: popup JS owns placeholder slots, button state, duplicate checks, and action entry points, while `PopupActionButtonWebView` owns native `ImageButton` children inside WebView content coordinates.
+- Button frames are routed through the popup WebView bridge directly into the native WebView host; Compose no longer stores or renders popup action-button frames.
+- Native buttons clamp horizontal WebView scrolling while preserving vertical scroll, and because they are WebView children they move with content scroll without per-scroll JS frame resync.
+- Button-frame refresh is triggered by slot creation, duplicate/audio state changes, resize, popup scale changes, redirect/replace, history restore/back/forward, deferred history append, and document-level dictionary toggle events.
 
 Validation:
 
-- Dictionary tab lookup and reader lookup both show audio/mining controls aligned to entry headers.
-- Duplicate state, Anki add state, audio error state, autoplay, redirect history, collapsed dictionary toggles, and child popups all keep controls aligned.
-- Slow horizontal drags/long presses on controls do not move popup content sideways.
+- Unit coverage: `PopupWebViewMessagesTest` and `LookupPopupHtmlTest`.
+- Instrumented coverage: `PopupActionButtonWebViewTest`.
+- Device validation remains recommended for Dictionary tab lookup, reader lookup, duplicate state, Anki add state, audio error/autoplay, redirect back/forward, collapsed dictionary toggles, child popups, and slow horizontal drags/long presses on controls.
 
 ### 3. Bookshelf title rename and metadata fallback
 
@@ -173,15 +174,13 @@ Validation:
 | `130f6cf` | 2026-05-16 | Reader background safe area | No direct Android action |
 | `2f5d71a` | 2026-05-16 | Autodetect dictionary type | Synced |
 | `b3312d9` | 2026-05-16 | Clean collapsed config on delete | Synced |
-| `851202d` | 2026-05-16 | Native popup action buttons | Queued |
-| `8f0d827` | 2026-05-16 | Prevent popup horizontal scroll | Queued with popup buttons |
+| `851202d` | 2026-05-16 | Native popup action buttons | Synced |
+| `8f0d827` | 2026-05-16 | Prevent popup horizontal scroll | Synced |
 | `478f78d` | 2026-05-16 | iOS build bump | No Android action |
 | `a7f4750` | 2026-05-16 | Rename seek to skip | Covered |
-| `cd8ecf2` | 2026-05-16 | Refresh popup button frames on toggle | Queued with popup buttons |
-| `1e2aa8d` | 2026-05-16 | Move toggle frame refresh listener to document | Queued with popup buttons |
+| `cd8ecf2` | 2026-05-16 | Refresh popup button frames on toggle | Synced |
+| `1e2aa8d` | 2026-05-16 | Move toggle frame refresh listener to document | Synced |
 
 ## Suggested Implementation Order
 
-1. Popup action buttons and frame sync.
-
-This keeps the remaining risky WebView/popup work grouped together.
+All currently checked iOS upstream user-visible slices are synced or covered on Android.

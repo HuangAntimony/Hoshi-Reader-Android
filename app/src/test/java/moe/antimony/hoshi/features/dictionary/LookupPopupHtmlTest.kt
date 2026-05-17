@@ -102,6 +102,37 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun popupHtmlExposesNativeButtonFrameBridge() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".button-slot {}",
+                selectionJs = "window.hoshiSelection = { selectText: function() {} };",
+            ),
+        )
+
+        assertTrue(html.contains("buttonFrames: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('buttonFrames', frames); } }"))
+    }
+
+    @Test
+    fun eInkPopupCssTargetsNativeButtonSlots() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".button-slot {}",
+                selectionJs = "window.hoshiSelection = { selectText: function() {} };",
+            ),
+            eInkMode = true,
+        )
+
+        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .button-slot"""))
+        assertFalse(html.contains("""html[data-hoshi-eink-mode="true"] .audio-button"""))
+        assertFalse(html.contains("""html[data-hoshi-eink-mode="true"] .mine-button"""))
+    }
+
+    @Test
     fun deinflectionTraceIncludesBridgeDescriptionsForPopupOverlay() {
         val html = LookupPopupHtml.render(
             listOf(
