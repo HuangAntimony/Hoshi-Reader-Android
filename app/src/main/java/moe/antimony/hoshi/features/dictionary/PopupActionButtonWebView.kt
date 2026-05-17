@@ -3,9 +3,11 @@ package moe.antimony.hoshi.features.dictionary
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.ImageButton
@@ -55,10 +57,12 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
 
     override fun scrollTo(x: Int, y: Int) {
         super.scrollTo(0, y)
+        refreshActionButtonClipping()
     }
 
     override fun scrollBy(x: Int, y: Int) {
         super.scrollBy(0, y)
+        refreshActionButtonClipping()
     }
 
     override fun onScrollChanged(left: Int, top: Int, oldLeft: Int, oldTop: Int) {
@@ -66,6 +70,12 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
         if (scrollX != 0) {
             super.scrollTo(0, scrollY)
         }
+        refreshActionButtonClipping()
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        refreshActionButtonClipping()
     }
 
     private fun updateActionButton(frame: PopupButtonFrame) {
@@ -95,6 +105,7 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
         }
         button.x = frame.x.cssPxToAndroidPx().toFloat()
         button.y = frame.y.cssPxToAndroidPx().toFloat()
+        refreshActionButtonClipping()
         button.bringToFront()
     }
 
@@ -116,6 +127,53 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
 
     private fun Double.cssPxToAndroidPx(): Int =
         (this * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
+    private fun refreshActionButtonClipping() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            post(::refreshActionButtonClipping)
+            return
+        }
+        val viewportLeft = scrollX
+        val viewportTop = scrollY
+        val viewportRight = scrollX + width
+        val viewportBottom = scrollY + height
+        buttons.values.forEach { button ->
+            val buttonWidth = button.contentWidth()
+            val buttonHeight = button.contentHeight()
+            if (buttonWidth <= 0 || buttonHeight <= 0) {
+                button.visibility = View.INVISIBLE
+                button.clipBounds = null
+                return@forEach
+            }
+
+            val buttonLeft = button.x.toInt()
+            val buttonTop = button.y.toInt()
+            val clipLeft = (viewportLeft - buttonLeft).coerceIn(0, buttonWidth)
+            val clipTop = (viewportTop - buttonTop).coerceIn(0, buttonHeight)
+            val clipRight = (viewportRight - buttonLeft).coerceIn(0, buttonWidth)
+            val clipBottom = (viewportBottom - buttonTop).coerceIn(0, buttonHeight)
+
+            if (clipLeft >= clipRight || clipTop >= clipBottom) {
+                button.visibility = View.INVISIBLE
+                button.clipBounds = null
+                return@forEach
+            }
+
+            button.visibility = View.VISIBLE
+            button.clipBounds =
+                if (clipLeft == 0 && clipTop == 0 && clipRight == buttonWidth && clipBottom == buttonHeight) {
+                    null
+                } else {
+                    Rect(clipLeft, clipTop, clipRight, clipBottom)
+                }
+        }
+    }
+
+    private fun View.contentWidth(): Int =
+        width.takeIf { it > 0 } ?: layoutParams?.width?.takeIf { it > 0 } ?: 0
+
+    private fun View.contentHeight(): Int =
+        height.takeIf { it > 0 } ?: layoutParams?.height?.takeIf { it > 0 } ?: 0
 
     private val PopupButtonFrame.iconResId: Int
         get() = when (kind) {
