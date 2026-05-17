@@ -22,6 +22,15 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
 ) : WebView(context, attrs) {
     private val buttons = mutableMapOf<String, ImageButton>()
     private var actionButtonTint = ColorStateList.valueOf(DefaultActionButtonTint)
+    private var popupInputEnabled = true
+
+    fun setPopupInputEnabled(enabled: Boolean) {
+        popupInputEnabled = enabled
+        if (!enabled) {
+            parent?.requestDisallowInterceptTouchEvent(false)
+            buttons.values.forEach { it.isPressed = false }
+        }
+    }
 
     fun setActionButtonTint(color: Int) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -65,6 +74,13 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
     override fun scrollBy(x: Int, y: Int) {
         super.scrollBy(0, y)
         refreshActionButtonClipping()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (!popupWebViewDispatchesTouch(popupInputEnabled)) {
+            return false
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onScrollChanged(left: Int, top: Int, oldLeft: Int, oldTop: Int) {
@@ -215,3 +231,5 @@ internal fun popupActionButtonIconPaddingPx(width: Int, height: Int): Int {
 }
 
 private const val PopupActionButtonIconPaddingRatio = 4f / 28f
+
+internal fun popupWebViewDispatchesTouch(isPopupInputEnabled: Boolean): Boolean = isPopupInputEnabled

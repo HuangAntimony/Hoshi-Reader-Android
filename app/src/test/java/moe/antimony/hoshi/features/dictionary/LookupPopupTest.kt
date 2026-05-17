@@ -226,4 +226,50 @@ class LookupPopupTest {
         )
     }
 
+    @Test
+    fun activePopupKeepsRenderSurfaceBeforeItReceivesInput() {
+        assertTrue(
+            lookupPopupRendersSurface(
+                isPopupActive = true,
+            ),
+        )
+        assertFalse(
+            lookupPopupReceivesInput(
+                isPopupActive = true,
+                isContentVisible = false,
+                contentReady = false,
+            ),
+        )
+        assertFalse(
+            lookupPopupRendersSurface(
+                isPopupActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun activePopupStaysOffscreenUntilItReceivesInput() {
+        assertFalse(
+            lookupPopupUsesOnscreenFrame(
+                isPopupActive = true,
+                isContentVisible = false,
+                contentReady = false,
+            ),
+        )
+        assertFalse(
+            lookupPopupUsesOnscreenFrame(
+                isPopupActive = true,
+                isContentVisible = true,
+                contentReady = false,
+            ),
+        )
+        assertTrue(
+            lookupPopupUsesOnscreenFrame(
+                isPopupActive = true,
+                isContentVisible = true,
+                contentReady = true,
+            ),
+        )
+    }
+
 }

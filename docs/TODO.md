@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 
 This file is the short operational handoff for future agents.
 
@@ -41,7 +41,7 @@ This file is the short operational handoff for future agents.
 - Device-validate reader popup Reduced Motion Scrolling on an E-ink target, including vertical swipe threshold, 40%-100% scroll amount, mouse wheel/page-wheel input, and coexistence with horizontal swipe-to-dismiss.
 - Device-validate the warm reader root lookup popup shell on additional devices, confirming repeated root lookups reuse the popup without breaking child popups, redirects, action-bar history, or dismiss/touch passthrough after popup scroll.
 - Device-validate popup-to-popup lookup selections, confirming child popup display syncs with Compose-drawn parent selection marks, E-ink mode uses underlines, and scrolling a parent popup dismisses child popups.
-- Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming popup content does not flash a blank white shell, the Compose-drawn selected-word highlight appears and disappears with the popup, and highlighted text stays readable.
+- Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming popup content pre-renders before becoming touchable, autoplay does not outrun first visible content, no blank white shell flashes, the Compose-drawn selected-word highlight appears and disappears with the popup, and highlighted text stays readable.
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
 - Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates and restore landing inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Device-validate iOS-style reader jump return controls after chapter, character, highlight, and internal-link jumps, confirming back/forward targets remain stable through paginated and continuous manual movement.

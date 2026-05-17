@@ -107,6 +107,20 @@ internal fun lookupPopupReceivesInput(
     contentReady: Boolean,
 ): Boolean = isPopupActive && isContentVisible && contentReady
 
+internal fun lookupPopupRendersSurface(
+    isPopupActive: Boolean,
+): Boolean = isPopupActive
+
+internal fun lookupPopupUsesOnscreenFrame(
+    isPopupActive: Boolean,
+    isContentVisible: Boolean,
+    contentReady: Boolean,
+): Boolean = lookupPopupReceivesInput(
+    isPopupActive = isPopupActive,
+    isContentVisible = isContentVisible,
+    contentReady = contentReady,
+)
+
 @Composable
 fun LookupPopupView(
     state: LookupPopupState,
@@ -237,14 +251,22 @@ fun LookupPopupView(
             isContentVisible = isContentVisible,
             contentReady = contentReady,
         )
+        val popupRendersSurface = lookupPopupRendersSurface(
+            isPopupActive = isPopupActive,
+        )
+        val popupUsesOnscreenFrame = lookupPopupUsesOnscreenFrame(
+            isPopupActive = isPopupActive,
+            isContentVisible = isContentVisible,
+            contentReady = contentReady,
+        )
         Surface(
             modifier = Modifier
                 .absoluteOffset(
-                    x = if (popupReceivesInput) frameX.dp else (-10_000).dp,
-                    y = if (popupReceivesInput) frameY.dp else (-10_000).dp,
+                    x = if (popupUsesOnscreenFrame) frameX.dp else (-10_000).dp,
+                    y = if (popupUsesOnscreenFrame) frameY.dp else (-10_000).dp,
                 )
-                .width(if (popupReceivesInput) frame.width.dp else 1.dp)
-                .height(if (popupReceivesInput) frame.height.dp else 1.dp)
+                .width(if (popupRendersSurface) frame.width.dp else 1.dp)
+                .height(if (popupRendersSurface) frame.height.dp else 1.dp)
                 .alpha(if (popupReceivesInput) 1f else 0f)
                 .zIndex(2f),
             shape = if (state.eInkMode) RectangleShape else RoundedCornerShape(8.dp),
@@ -254,7 +276,7 @@ fun LookupPopupView(
             shadowElevation = 0.dp,
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (hasActionBar && popupReceivesInput) {
+                if (hasActionBar) {
                     LookupPopupActionBar(
                         backCount = backCount,
                         forwardCount = forwardCount,
@@ -277,7 +299,7 @@ fun LookupPopupView(
                         dividerColor = popupBorder,
                     )
                 }
-                if (sasayakiCue != null && popupReceivesInput) {
+                if (sasayakiCue != null) {
                     SasayakiPopupControls(
                         isPlaying = sasayakiIsPlaying,
                         wasPaused = sasayakiWasPaused,
@@ -373,6 +395,7 @@ fun LookupPopupView(
                         },
                     ),
                     warmShell = warmShell,
+                    isRendered = popupRendersSurface,
                     isInteractive = popupReceivesInput,
                     modifier = Modifier.weight(1f),
                 )
@@ -564,6 +587,7 @@ private fun LookupPopupWebView(
     forwardSignal: Int,
     callbacks: PopupWebViewCallbacks,
     warmShell: Boolean,
+    isRendered: Boolean,
     isInteractive: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -594,6 +618,7 @@ private fun LookupPopupWebView(
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
+                settings.offscreenPreRaster = true
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
                     PopupWebViewBridge(
@@ -619,9 +644,10 @@ private fun LookupPopupWebView(
         update = { webView ->
             callbackHolder.callbacks = callbacks
             webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            webView.visibility = if (isInteractive) View.VISIBLE else View.INVISIBLE
-            webView.isEnabled = isInteractive
+            webView.visibility = if (isRendered) View.VISIBLE else View.INVISIBLE
+            webView.isEnabled = isRendered
             webView.isClickable = isInteractive
+            (webView as? PopupActionButtonWebView)?.setPopupInputEnabled(isInteractive)
             if (!isInteractive) {
                 webView.clearFocus()
             }
