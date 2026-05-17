@@ -13,6 +13,8 @@ import android.webkit.WebView
 import android.widget.ImageButton
 import android.widget.ImageView
 import moe.antimony.hoshi.R
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 internal class PopupActionButtonWebView @JvmOverloads constructor(
     context: Context,
@@ -95,6 +97,7 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
 
         val width = frame.width.cssPxToAndroidPx()
         val height = frame.height.cssPxToAndroidPx()
+        val iconPadding = popupActionButtonIconPaddingPx(width, height)
         val currentParams = button.layoutParams
         if (currentParams == null) {
             button.layoutParams = ViewGroup.LayoutParams(width, height)
@@ -103,6 +106,7 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
             currentParams.height = height
             button.layoutParams = currentParams
         }
+        button.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
         button.x = frame.x.cssPxToAndroidPx().toFloat()
         button.y = frame.y.cssPxToAndroidPx().toFloat()
         refreshActionButtonClipping()
@@ -113,7 +117,7 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
         ImageButton(context).apply {
             tag = frame.key
             setBackgroundColor(Color.TRANSPARENT)
-            scaleType = ImageView.ScaleType.CENTER
+            scaleType = ImageView.ScaleType.FIT_CENTER
             isFocusable = false
             setPadding(0, 0, 0, 0)
             setOnTouchListener { view, event ->
@@ -201,3 +205,13 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
         const val DisabledAlpha = 0.55f
     }
 }
+
+internal fun popupActionButtonIconPaddingPx(width: Int, height: Int): Int {
+    val minDimension = min(width, height).coerceAtLeast(0)
+    val maximumPadding = ((minDimension - 1) / 2).coerceAtLeast(0)
+    return (minDimension * PopupActionButtonIconPaddingRatio)
+        .roundToInt()
+        .coerceIn(0, maximumPadding)
+}
+
+private const val PopupActionButtonIconPaddingRatio = 4f / 28f

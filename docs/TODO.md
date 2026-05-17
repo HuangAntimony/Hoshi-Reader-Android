@@ -33,7 +33,7 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; all currently checked user-visible slices are synced or covered on Android.
-- Device-validate remaining native popup audio/Anki control states in Dictionary tab and reader lookup beyond the verified Sasayaki control-bar clipping path, covering duplicate state, audio error/autoplay, redirect history, collapsed dictionary toggles, child popups, and slow horizontal drags/long presses on controls.
+- Device-validate remaining native popup audio/Anki control states in Dictionary tab and reader lookup beyond the verified Sasayaki control-bar clipping path, covering duplicate state, audio error/autoplay, popup scale levels, redirect history, collapsed dictionary toggles, child popups, and slow horizontal drags/long presses on controls.
 - Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.
 - Device-validate paginated page turns with top and bottom progress counters enabled on E-ink, confirming the counter no longer refreshes before the page flip.

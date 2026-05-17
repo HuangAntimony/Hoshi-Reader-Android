@@ -5,6 +5,7 @@ import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ImageView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -64,6 +65,14 @@ class PopupActionButtonWebViewTest {
             val density = context.resources.displayMetrics.density
             assertEquals((20.0 * density).toFloat(), button.x, 0.5f)
             assertEquals((240.0 * density).toFloat(), button.y, 0.5f)
+            assertEquals(ImageView.ScaleType.FIT_CENTER, (button as ImageView).scaleType)
+            assertEquals(
+                popupActionButtonIconPaddingPx(
+                    width = (28.0 * density).toInt(),
+                    height = (28.0 * density).toInt(),
+                ),
+                button.paddingLeft,
+            )
             assertEquals(0, webView.scrollX)
 
             webView.scrollTo(0, (160 * density).toInt())
