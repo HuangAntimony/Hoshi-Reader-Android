@@ -23,6 +23,8 @@
 - 修复 GitHub Issue 时，在 commit message 中使用 closing keyword（如 `Closes #123`）。
 - 小型 GitHub Issue 修复（如文案、链接、配置等低风险单点修改）直接在 `main` 分支完成并提交；较大功能、跨模块重构或高风险改动再开 `codex/` 前缀分支。
 - 禁止新增读取 `src/main` 源文件后用 `contains`、`substringAfter`、`indexOf` 等字符串方式断言实现细节的源码文本测试；这类断言浪费 token 和上下文，不能替代行为测试。需要回归覆盖时，优先写行为/API/状态流测试；只有 Manifest、资源 XML、Gradle 依赖、权限/Provider 声明等结构化配置，才可用解析结构后的断言。
+- 禁止对已连接设备或模拟器运行会清除、重装或卸载 app 数据的测试命令，例如 `connectedDebugAndroidTest`、`connectedAndroidTest`、`installDebugAndroidTest` 或其他 Android instrumentation Gradle 任务；除非用户明确指定一次性设备并允许清数据。需要此类覆盖时，先使用专用空模拟器或让用户确认。
+- 禁止使用手绘、自造或临时拼接的图标；新增或替换图标时使用 Material 3 / Material Icons 已有图标（Compose `Icons.*` 或官方 Material vector asset），只有明确的品牌资产需求才例外。
 
 ## 参考源码
 

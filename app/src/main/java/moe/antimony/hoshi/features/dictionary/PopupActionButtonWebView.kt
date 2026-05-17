@@ -178,14 +178,14 @@ internal class PopupActionButtonWebView @JvmOverloads constructor(
     private val PopupButtonFrame.iconResId: Int
         get() = when (kind) {
             PopupButtonKind.Audio -> if (state == PopupButtonState.Error) {
-                R.drawable.ic_popup_audio_error
+                R.drawable.ic_material_rounded_volume_off
             } else {
-                R.drawable.ic_popup_audio
+                R.drawable.ic_material_rounded_volume_up
             }
             PopupButtonKind.Mine -> if (state == PopupButtonState.Duplicate) {
-                R.drawable.ic_popup_mine_duplicate
+                R.drawable.ic_material_rounded_check_box
             } else {
-                R.drawable.ic_popup_mine
+                R.drawable.ic_material_rounded_add_box
             }
         }
 
