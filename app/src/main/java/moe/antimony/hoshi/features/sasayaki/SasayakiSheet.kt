@@ -65,6 +65,7 @@ fun SasayakiSheet(
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
+    var mediaControlsMenuExpanded by remember { mutableStateOf(false) }
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
         if (uri == null || isImporting) return@rememberLauncherForActivityResult
         isImporting = true
@@ -215,6 +216,16 @@ fun SasayakiSheet(
                         onSettingsChange(settings.copy(readerSkipButtonAction = action))
                     },
                 )
+                SasayakiSystemMediaControlsActionRow(
+                    label = "System Media Controls",
+                    selected = settings.systemMediaControls,
+                    expanded = mediaControlsMenuExpanded,
+                    onExpandedChange = { mediaControlsMenuExpanded = it },
+                    onSelected = { mode ->
+                        mediaControlsMenuExpanded = false
+                        onSettingsChange(settings.copy(systemMediaControls = mode))
+                    },
+                )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
                 Text(
                     text = "Playback",
@@ -325,6 +336,42 @@ private fun SasayakiSettingsActionRow(
                     DropdownMenuItem(
                         text = { Text(action.label) },
                         onClick = { onSelected(action) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SasayakiSystemMediaControlsActionRow(
+    label: String,
+    selected: SasayakiSystemMediaControlsMode,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelected: (SasayakiSystemMediaControlsMode) -> Unit,
+) {
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Box {
+            TextButton(onClick = { onExpandedChange(true) }) {
+                Text(selected.label)
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+            ) {
+                SasayakiSystemMediaControlsMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(mode.label) },
+                        onClick = { onSelected(mode) },
                     )
                 }
             }

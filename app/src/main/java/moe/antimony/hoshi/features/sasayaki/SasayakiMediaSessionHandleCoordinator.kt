@@ -11,6 +11,10 @@ class SasayakiMediaSessionHandleCoordinator {
         mediaSession?.activate()
     }
 
+    fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode) {
+        mediaSession?.setSystemMediaControls(mode)
+    }
+
     fun update(
         isPlaying: Boolean,
         currentTimeMs: Long,

@@ -753,6 +753,7 @@ fun ReaderWebView(
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,
                 initialPlayback = sasayakiPlaybackData,
+                systemMediaControls = sasayakiSettings.systemMediaControls,
                 persistenceScope = scope,
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
@@ -787,6 +788,7 @@ fun ReaderWebView(
     }
     sasayakiPlayer?.autoScroll = sasayakiSettings.autoScroll
     sasayakiPlayer?.readerSkipButtonAction = sasayakiSettings.readerSkipButtonAction
+    sasayakiPlayer?.systemMediaControls = sasayakiSettings.systemMediaControls
     val currentReaderKeyHandler = rememberUpdatedState<(KeyEvent) -> Boolean> { event ->
         val action = readerHardwareKeyActionForKeyEvent(
             keyCode = event.keyCode,

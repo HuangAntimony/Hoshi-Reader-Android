@@ -31,12 +31,26 @@ enum class SasayakiReaderSkipButtonAction(
     }
 }
 
+enum class SasayakiSystemMediaControlsMode(
+    val label: String,
+) {
+    Auto("Auto"),
+    On("On"),
+    Off("Off");
+
+    companion object {
+        fun fromStorage(value: String?): SasayakiSystemMediaControlsMode =
+            entries.firstOrNull { it.name == value } ?: Auto
+    }
+}
+
 data class SasayakiSettings(
     val enabled: Boolean = true,
     val syncEnabled: Boolean = false,
     val showReaderToggle: Boolean = true,
     val showReaderSkipButtons: Boolean = true,
     val readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue,
+    val systemMediaControls: SasayakiSystemMediaControlsMode = SasayakiSystemMediaControlsMode.Auto,
     val copyAudiobookToPrivateStorage: Boolean = false,
     val autoScroll: Boolean = true,
     val autoPause: Boolean = true,
@@ -68,6 +82,9 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(
                 preferences.getString(KEY_READER_SKIP_BUTTON_ACTION, null),
             ),
+            systemMediaControls = SasayakiSystemMediaControlsMode.fromStorage(
+                preferences.getString(KEY_SYSTEM_MEDIA_CONTROLS, null),
+            ),
             copyAudiobookToPrivateStorage = preferences.getBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, false),
             autoScroll = preferences.getBoolean(KEY_AUTO_SCROLL, true),
             autoPause = preferences.getBoolean(KEY_AUTO_PAUSE, true),
@@ -84,6 +101,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             .putBoolean(KEY_SHOW_READER_TOGGLE, settings.showReaderToggle)
             .putBoolean(KEY_SHOW_READER_SKIP_BUTTONS, settings.showReaderSkipButtons)
             .putString(KEY_READER_SKIP_BUTTON_ACTION, settings.readerSkipButtonAction.name)
+            .putString(KEY_SYSTEM_MEDIA_CONTROLS, settings.systemMediaControls.name)
             .putBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, settings.copyAudiobookToPrivateStorage)
             .putBoolean(KEY_AUTO_SCROLL, settings.autoScroll)
             .putBoolean(KEY_AUTO_PAUSE, settings.autoPause)
@@ -100,6 +118,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         const val KEY_SHOW_READER_TOGGLE = "readerShowSasayakiToggle"
         const val KEY_SHOW_READER_SKIP_BUTTONS = "sasayakiShowReaderSkipButtons"
         const val KEY_READER_SKIP_BUTTON_ACTION = "sasayakiReaderSkipButtonAction"
+        const val KEY_SYSTEM_MEDIA_CONTROLS = "sasayakiSystemMediaControls"
         const val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE = "sasayakiCopyAudiobookToPrivateStorage"
         const val KEY_AUTO_SCROLL = "sasayakiAutoScroll"
         const val KEY_AUTO_PAUSE = "sasayakiAutoPause"
@@ -150,6 +169,7 @@ class SasayakiSettingsRepository(
             showReaderToggle = this[KEY_SHOW_READER_TOGGLE] ?: true,
             showReaderSkipButtons = this[KEY_SHOW_READER_SKIP_BUTTONS] ?: true,
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(this[KEY_READER_SKIP_BUTTON_ACTION]),
+            systemMediaControls = SasayakiSystemMediaControlsMode.fromStorage(this[KEY_SYSTEM_MEDIA_CONTROLS]),
             copyAudiobookToPrivateStorage = this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] ?: false,
             autoScroll = this[KEY_AUTO_SCROLL] ?: true,
             autoPause = this[KEY_AUTO_PAUSE] ?: true,
@@ -165,6 +185,7 @@ class SasayakiSettingsRepository(
         this[KEY_SHOW_READER_TOGGLE] = settings.showReaderToggle
         this[KEY_SHOW_READER_SKIP_BUTTONS] = settings.showReaderSkipButtons
         this[KEY_READER_SKIP_BUTTON_ACTION] = settings.readerSkipButtonAction.name
+        this[KEY_SYSTEM_MEDIA_CONTROLS] = settings.systemMediaControls.name
         this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] = settings.copyAudiobookToPrivateStorage
         this[KEY_AUTO_SCROLL] = settings.autoScroll
         this[KEY_AUTO_PAUSE] = settings.autoPause
@@ -184,6 +205,7 @@ class SasayakiSettingsRepository(
         private val KEY_SHOW_READER_TOGGLE = booleanPreferencesKey("readerShowSasayakiToggle")
         private val KEY_SHOW_READER_SKIP_BUTTONS = booleanPreferencesKey("sasayakiShowReaderSkipButtons")
         private val KEY_READER_SKIP_BUTTON_ACTION = stringPreferencesKey("sasayakiReaderSkipButtonAction")
+        private val KEY_SYSTEM_MEDIA_CONTROLS = stringPreferencesKey("sasayakiSystemMediaControls")
         private val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE =
             booleanPreferencesKey("sasayakiCopyAudiobookToPrivateStorage")
         private val KEY_AUTO_SCROLL = booleanPreferencesKey("sasayakiAutoScroll")

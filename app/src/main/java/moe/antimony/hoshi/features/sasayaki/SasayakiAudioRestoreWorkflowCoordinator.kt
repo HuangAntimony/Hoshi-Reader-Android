@@ -9,6 +9,7 @@ class SasayakiAudioRestoreWorkflowCoordinator(
 ) {
     fun restore(
         playback: SasayakiPlaybackData,
+        systemMediaControls: SasayakiSystemMediaControlsMode,
         currentTime: () -> Double,
         releaseExistingMediaSession: () -> Unit,
         updateMediaSession: () -> Unit,
@@ -23,6 +24,7 @@ class SasayakiAudioRestoreWorkflowCoordinator(
         val result = runCatching {
             audioRestore.restore(
                 playback = playback,
+                systemMediaControls = systemMediaControls,
                 releaseExistingMediaSession = releaseExistingMediaSession,
                 callbacks = audioRestoreCallbacks.build(
                     updateMediaSession = updateMediaSession,

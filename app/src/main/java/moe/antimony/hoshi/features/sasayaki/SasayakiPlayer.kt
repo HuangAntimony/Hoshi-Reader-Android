@@ -20,6 +20,7 @@ class SasayakiPlayer internal constructor(
         bookCoverFile: File?,
         matchData: SasayakiMatchData?,
         initialPlayback: SasayakiPlaybackData?,
+        systemMediaControls: SasayakiSystemMediaControlsMode,
         persistenceScope: CoroutineScope,
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
@@ -34,6 +35,7 @@ class SasayakiPlayer internal constructor(
             bookCoverFile = bookCoverFile,
             matchData = matchData,
             initialPlayback = initialPlayback,
+            initialSystemMediaControls = systemMediaControls,
             persistenceScope = persistenceScope,
             getCurrentChapterIndex = getCurrentChapterIndex,
             onCue = onCue,
@@ -56,6 +58,11 @@ class SasayakiPlayer internal constructor(
         get() = controller.readerSkipButtonAction
         set(value) {
             controller.readerSkipButtonAction = value
+        }
+    var systemMediaControls: SasayakiSystemMediaControlsMode
+        get() = controller.systemMediaControls
+        set(value) {
+            controller.systemMediaControls = value
         }
     val hasAudio: Boolean get() = controller.hasAudio
     val hasMatch: Boolean get() = controller.hasMatch

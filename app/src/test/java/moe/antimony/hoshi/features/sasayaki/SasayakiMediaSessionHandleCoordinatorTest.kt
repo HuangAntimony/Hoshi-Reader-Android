@@ -12,6 +12,7 @@ class SasayakiMediaSessionHandleCoordinatorTest {
 
         coordinator.replace(first)
         coordinator.activate()
+        coordinator.setSystemMediaControls(SasayakiSystemMediaControlsMode.Off)
         coordinator.update(isPlaying = true, currentTimeMs = 1000, durationMs = 2000, rate = 1.25f)
         coordinator.replace(second)
         coordinator.releaseExisting()
@@ -21,6 +22,7 @@ class SasayakiMediaSessionHandleCoordinatorTest {
         assertEquals(
             listOf(
                 "activate",
+                "mediaControls:Off",
                 "update:true:1000:2000:1.25",
             ),
             first.events,
@@ -33,6 +35,10 @@ class SasayakiMediaSessionHandleCoordinatorTest {
 
         override fun activate() {
             events += "activate"
+        }
+
+        override fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode) {
+            events += "mediaControls:${mode.name}"
         }
 
         override fun update(

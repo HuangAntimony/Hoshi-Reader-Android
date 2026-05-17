@@ -54,6 +54,7 @@ fun SasayakiSettingsView(
     val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
     val settings = repository.settings.collectAsLoadedSettings()
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
+    var mediaControlsMenuExpanded by remember { mutableStateOf(false) }
 
     fun save(next: SasayakiSettings) {
         scope.launch {
@@ -138,6 +139,33 @@ fun SasayakiSettingsView(
                                     checked = loadedSettings.showReaderSkipButtons,
                                     onCheckedChange = { save(loadedSettings.copy(showReaderSkipButtons = it)) },
                                 )
+                            },
+                        )
+                        SettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text("System Media Controls") },
+                            supportingContent = { Text("Use Auto unless media notifications cause device-specific system issues.") },
+                            trailingContent = {
+                                Box {
+                                    TextButton(onClick = { mediaControlsMenuExpanded = true }) {
+                                        Text(loadedSettings.systemMediaControls.label)
+                                    }
+                                    DropdownMenu(
+                                        expanded = mediaControlsMenuExpanded,
+                                        onDismissRequest = { mediaControlsMenuExpanded = false },
+                                    ) {
+                                        SasayakiSystemMediaControlsMode.entries.forEach { mode ->
+                                            DropdownMenuItem(
+                                                text = { Text(mode.label) },
+                                                onClick = {
+                                                    mediaControlsMenuExpanded = false
+                                                    save(loadedSettings.copy(systemMediaControls = mode))
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             },
                         )
                         SettingsDivider()

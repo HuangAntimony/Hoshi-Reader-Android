@@ -29,12 +29,15 @@ class SasayakiPlayerFacadeTest {
         assertEquals(0.35, player.delay, 0.0)
         assertEquals(1.25f, player.rate, 0.0f)
         assertEquals("content URI", player.audioStorageSummary)
+        assertEquals(SasayakiSystemMediaControlsMode.Auto, player.systemMediaControls)
 
         player.autoScroll = true
         player.readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds10
+        player.systemMediaControls = SasayakiSystemMediaControlsMode.Off
 
         assertTrue(controller.autoScroll)
         assertEquals(SasayakiReaderSkipButtonAction.Seconds10, controller.readerSkipButtonAction)
+        assertEquals(SasayakiSystemMediaControlsMode.Off, controller.systemMediaControls)
     }
 
     @Test
@@ -86,6 +89,7 @@ class SasayakiPlayerFacadeTest {
         override val errorMessage = "restore failed"
         override var autoScroll = false
         override var readerSkipButtonAction = SasayakiReaderSkipButtonAction.Cue
+        override var systemMediaControls = SasayakiSystemMediaControlsMode.Auto
         override val hasAudio = true
         override val hasMatch = true
         override val delay = 0.35

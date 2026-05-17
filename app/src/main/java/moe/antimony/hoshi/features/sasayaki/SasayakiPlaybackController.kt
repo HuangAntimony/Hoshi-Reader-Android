@@ -19,6 +19,7 @@ internal interface SasayakiPlaybackControllerContract {
     val errorMessage: String?
     var autoScroll: Boolean
     var readerSkipButtonAction: SasayakiReaderSkipButtonAction
+    var systemMediaControls: SasayakiSystemMediaControlsMode
     val hasAudio: Boolean
     val hasMatch: Boolean
     val delay: Double
@@ -49,6 +50,7 @@ internal class SasayakiPlaybackController(
     bookCoverFile: File?,
     private val matchData: SasayakiMatchData?,
     initialPlayback: SasayakiPlaybackData?,
+    initialSystemMediaControls: SasayakiSystemMediaControlsMode,
     persistenceScope: CoroutineScope,
     private val getCurrentChapterIndex: () -> Int,
     onCue: (SasayakiMatch, Boolean) -> Unit,
@@ -183,6 +185,11 @@ internal class SasayakiPlaybackController(
             cuePresentation.autoScroll = value
         }
     override var readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue
+    override var systemMediaControls: SasayakiSystemMediaControlsMode = initialSystemMediaControls
+        set(value) {
+            field = value
+            mediaSessionPublishing.setSystemMediaControls(value)
+        }
     override val hasAudio: Boolean get() = audioAvailability.hasAudio
     override val hasMatch: Boolean = matchData != null
     override val delay: Double get() = playback.delay
@@ -349,6 +356,7 @@ internal class SasayakiPlaybackController(
     private fun restoreAudio() {
         audioRestoreWorkflow.restore(
             playback = playback,
+            systemMediaControls = systemMediaControls,
             currentTime = { currentTime },
             releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
             updateMediaSession = ::updateMediaSession,

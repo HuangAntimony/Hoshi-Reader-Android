@@ -62,6 +62,8 @@ class SasayakiAudioRestoreResultCoordinatorTest {
             events += "activate"
         }
 
+        override fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode) = Unit
+
         override fun update(
             isPlaying: Boolean,
             currentTimeMs: Long,

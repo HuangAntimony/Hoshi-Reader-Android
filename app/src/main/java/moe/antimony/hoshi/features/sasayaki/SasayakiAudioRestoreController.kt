@@ -34,6 +34,7 @@ class SasayakiAudioRestoreController(
 
     fun restore(
         playback: SasayakiPlaybackData,
+        systemMediaControls: SasayakiSystemMediaControlsMode,
         releaseExistingMediaSession: () -> Unit,
         callbacks: SasayakiAudioRestoreCallbacks,
     ): SasayakiAudioRestoreResult? {
@@ -60,6 +61,7 @@ class SasayakiAudioRestoreController(
                 onSkipToPrevious = callbacks.onSkipToPrevious,
                 onSkipToNext = callbacks.onSkipToNext,
                 onSeekTo = callbacks.onSeekTo,
+                systemMediaControls = systemMediaControls,
             ),
             durationMs = engine.durationMs,
         )

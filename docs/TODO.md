@@ -118,9 +118,11 @@ For Sasayaki settings regressions, verify fresh installs default Sasayaki, Show 
 
 For Sasayaki matching regressions, verify short low-confidence `＊` subtitle cues are skipped while longer `＊` cues still match and advance playback alignment.
 
-For Sasayaki skip-control regressions, verify the reader bottom skip buttons flank the existing Back/Menu buttons, and the same cue/5s/10s/15s/30s action applies from reader chrome, Sasayaki sheet controls, and Android system media controls.
+For Sasayaki skip-control regressions, verify the reader bottom skip buttons flank the existing Back/Menu buttons, and the same cue/5s/10s/15s/30s action applies from reader chrome, Sasayaki sheet controls, and Android system media controls when Sasayaki System Media Controls is On or Auto-enabled.
 
 For Sasayaki volume-key regressions, verify volume-key seek with loaded audiobook audio, fallback without loaded audio, priority over Volume Keys Turn Pages, and Reverse Volume Key Direction affecting both seek and page-turn controls.
+
+For Hisense A5 Pro Android 10 regressions, verify Sasayaki System Media Controls Auto and Off do not publish the Sasayaki media notification, while play, pause, lookup auto-pause, and lookup popup controls do not trigger SystemUI lock-screen sleep.
 
 For reader keep-screen-on regressions, verify Behavior -> Keep Screen On defaults off, persists after leaving settings, keeps the display awake while the reader is foregrounded when enabled, clears after closing the reader when disabled, and still keeps Sasayaki playback awake only while playback and Auto-Scroll are active.
 

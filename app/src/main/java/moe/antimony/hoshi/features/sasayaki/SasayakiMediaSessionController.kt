@@ -7,6 +7,8 @@ import java.io.File
 interface SasayakiMediaSessionHandle {
     fun activate()
 
+    fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode)
+
     fun update(
         isPlaying: Boolean,
         currentTimeMs: Long,
@@ -27,6 +29,7 @@ class AndroidSasayakiMediaSessionHandle(
     onSkipToPrevious: () -> Unit,
     onSkipToNext: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    systemMediaControls: SasayakiSystemMediaControlsMode,
 ) : SasayakiMediaSessionHandle {
     private val session = SasayakiMediaSession(
         context = context,
@@ -38,10 +41,15 @@ class AndroidSasayakiMediaSessionHandle(
         onSkipToPrevious = onSkipToPrevious,
         onSkipToNext = onSkipToNext,
         onSeekTo = onSeekTo,
+        systemMediaControls = systemMediaControls,
     )
 
     override fun activate() {
         session.activate()
+    }
+
+    override fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode) {
+        session.setSystemMediaControls(mode)
     }
 
     override fun update(

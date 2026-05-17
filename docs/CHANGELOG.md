@@ -5,6 +5,14 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add a Sasayaki System Media Controls setting with Auto, On, and Off modes for devices with unstable media notification support.
+
+### Fixed
+
+- Prevent Sasayaki playback controls from triggering an immediate lock screen on Hisense A5 Pro Android 10 devices by disabling the crashing system media notification path in Auto mode.
+
 ## [v0.7.2] - 2026-05-18
 
 ### Fixed

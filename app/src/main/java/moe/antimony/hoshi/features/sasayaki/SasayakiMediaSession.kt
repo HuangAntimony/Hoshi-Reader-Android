@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.ForwardingSimpleBasePlayer
@@ -37,9 +38,12 @@ class SasayakiMediaSession(
     private val onSkipToPrevious: () -> Unit,
     private val onSkipToNext: () -> Unit,
     private val onSeekTo: (Long) -> Unit,
+    systemMediaControls: SasayakiSystemMediaControlsMode,
 ) {
     private val appContext = context.applicationContext
     private val notificationManager = appContext.getSystemService(NotificationManager::class.java)
+    private var systemMediaControls = systemMediaControls
+    private var loggedSuppressionReason: String? = null
     private var isPlaying = false
     private var notificationPlaying: Boolean? = null
     private var hasPublishedNotification = false
@@ -73,12 +77,22 @@ class SasayakiMediaSession(
         .build()
 
     init {
-        ensureNotificationChannel()
+        suppressNotificationIfNeeded()
         publishMetadata()
     }
 
     fun activate() {
+        if (suppressNotificationIfNeeded()) return
         publishNotification()
+    }
+
+    fun setSystemMediaControls(mode: SasayakiSystemMediaControlsMode) {
+        if (systemMediaControls == mode) return
+        systemMediaControls = mode
+        if (suppressNotificationIfNeeded()) return
+        if (isPlaying || session.connectedControllers.isNotEmpty()) {
+            publishNotification()
+        }
     }
 
     fun update(
@@ -88,6 +102,7 @@ class SasayakiMediaSession(
         rate: Float,
     ) {
         this.isPlaying = isPlaying
+        if (suppressNotificationIfNeeded()) return
         if ((session.connectedControllers.isNotEmpty() || hasPublishedNotification) && notificationPlaying != isPlaying) {
             publishNotification()
         }
@@ -131,8 +146,23 @@ class SasayakiMediaSession(
         )
     }
 
+    private fun suppressNotificationIfNeeded(): Boolean {
+        val reason = SasayakiMediaNotificationCompatibility.suppressionReason(systemMediaControls) ?: return false
+        if (hasPublishedNotification || notificationPlaying != null) {
+            notificationManager.cancel(NotificationId)
+        }
+        notificationPlaying = null
+        hasPublishedNotification = false
+        if (loggedSuppressionReason != reason) {
+            Log.w(Tag, "Sasayaki media notification suppressed: $reason")
+            loggedSuppressionReason = reason
+        }
+        return true
+    }
+
     @SuppressLint("NotificationPermission")
     private fun publishNotification() {
+        ensureNotificationChannel()
         val builder = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_stat_hoshi)
             .setContentTitle(title)
@@ -237,6 +267,7 @@ class SasayakiMediaSession(
         private const val ChannelId = "sasayaki_playback"
         private const val NotificationId = 2407
         private const val MaxArtworkDimensionPx = 900
+        private const val Tag = "SasayakiMediaSession"
 
         fun loadCoverArt(file: File?): Bitmap? {
             file?.takeIf { it.isFile } ?: return null
