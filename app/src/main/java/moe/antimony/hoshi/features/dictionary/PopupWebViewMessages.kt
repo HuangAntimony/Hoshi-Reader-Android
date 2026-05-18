@@ -262,6 +262,7 @@ internal class PopupWebViewBridge(
     private val onShellReady: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var buttonFrameVisualStateRequestId = 0L
 
     @JavascriptInterface
     fun getEntry(index: Int): String? =
@@ -294,7 +295,9 @@ internal class PopupWebViewBridge(
             "swipeDismiss" -> mainHandler.post(callbacks.onSwipeDismiss)
             "shellReady" -> mainHandler.post(onShellReady)
             "contentReady" -> mainHandler.post {
+                val frames = popupButtonFramesFromMessageJson(message)
                 contentReadyGate.awaitReadyToDraw(webView) {
+                    updateActionButtonFrames(frames)
                     callbackHolder.callbacks.onContentReady()
                 }
             }
@@ -302,7 +305,24 @@ internal class PopupWebViewBridge(
             "buttonFrames" -> {
                 val frames = popupButtonFramesFromMessageJson(message)
                 mainHandler.post {
-                    (webView as? PopupActionButtonWebView)?.updateActionButtonFrames(frames)
+                    updateActionButtonFrames(frames)
+                }
+            }
+            "visualStateButtonFrames" -> {
+                val frames = popupButtonFramesFromMessageJson(message)
+                mainHandler.post {
+                    val requestId = buttonFrameVisualStateRequestId + 1
+                    buttonFrameVisualStateRequestId = requestId
+                    webView.postVisualStateCallback(
+                        requestId,
+                        object : WebView.VisualStateCallback() {
+                            override fun onComplete(requestId: Long) {
+                                if (buttonFrameVisualStateRequestId == requestId) {
+                                    updateActionButtonFrames(frames)
+                                }
+                            }
+                        },
+                    )
                 }
             }
             "playWordAudio" -> payload.optJSONObject("body")?.let { body ->
@@ -345,6 +365,10 @@ internal class PopupWebViewBridge(
                 }
             }
         }
+    }
+
+    private fun updateActionButtonFrames(frames: List<PopupButtonFrame>) {
+        (webView as? PopupActionButtonWebView)?.updateActionButtonFrames(frames)
     }
 }
 

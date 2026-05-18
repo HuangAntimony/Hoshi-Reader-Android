@@ -196,6 +196,8 @@ internal fun LookupPopupStackView(
     val displayPopups = popups.withRootSelectionOffset(rootSelectionOffsetX, rootSelectionOffsetY)
     displayPopups.forEachIndexed { index, popup ->
         key(if (warmRootShell && index == 0) "warm-root-popup" else popup.id) {
+            val popupActive = isPopupActive(popup, index)
+            val popupVisible = isPopupVisible(popup, index)
             LookupPopupView(
                 state = popup.state,
                 sasayakiCue = popup.sasayakiCue,
@@ -203,31 +205,44 @@ internal fun LookupPopupStackView(
                 sasayakiIsPlaying = sasayakiIsPlaying,
                 clearSelectionSignal = popup.clearSelectionSignal,
                 onTapOutside = {
-                    onPopupsChange(closeChildPopups(popups, index))
+                    if (popupActive) {
+                        onPopupsChange(closeChildPopups(popups, index))
+                    }
                 },
                 onSwipeDismiss = {
-                    val rootDismissHandled = index == 0 && onRootPopupDismissed()
-                    if (!rootDismissHandled) {
-                        onPopupsChange(dismissPopupAt(popups, index))
+                    if (popupActive) {
+                        val rootDismissHandled = index == 0 && onRootPopupDismissed()
+                        if (!rootDismissHandled) {
+                            onPopupsChange(dismissPopupAt(popups, index))
+                        }
                     }
                 },
                 onTextSelected = { selection ->
-                    val nextPopups = closeChildPopups(popups, index)
-                    lookupChildPopup(selection)?.let { (childPopup, highlightCount) ->
-                        onPopupsChange(nextPopups + childPopup)
-                        highlightCount
+                    if (!popupActive) {
+                        null
+                    } else {
+                        val nextPopups = closeChildPopups(popups, index)
+                        lookupChildPopup(selection)?.let { (childPopup, highlightCount) ->
+                            onPopupsChange(nextPopups + childPopup)
+                            highlightCount
+                        }
                     }
                 },
                 onPopupScrolled = {
-                    onPopupsChange(closeChildPopupsForScrolledParent(popups, index))
+                    if (popupActive) {
+                        val nextPopups = closeChildPopupsForScrolledParent(popups, index)
+                        if (nextPopups != popups) {
+                            onPopupsChange(nextPopups)
+                        }
+                    }
                 },
                 onSasayakiReplayCue = onSasayakiReplayCue,
                 onSasayakiTogglePlayback = onSasayakiTogglePlayback,
                 onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = onSasayakiPlayForward,
                 onPrepareSasayakiAudio = onPrepareSasayakiAudio,
-                isContentVisible = isPopupVisible(popup, index),
-                isPopupActive = isPopupActive(popup, index),
+                isContentVisible = popupVisible,
+                isPopupActive = popupActive,
                 onContentReady = { onPopupContentReady(popup.id) },
                 warmShell = warmRootShell && index == 0,
                 contentResetKey = if (warmRootShell && index == 0) popup.id else null,

@@ -149,8 +149,9 @@ internal object LookupPopupHtml {
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
                             buttonFrames: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('buttonFrames', frames); } },
+                            visualStateButtonFrames: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('visualStateButtonFrames', frames); } },
                             shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
-                            contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
+                            contentReady: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('contentReady', frames); } },
                             popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
                             mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
                             duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
@@ -276,7 +277,7 @@ internal object LookupPopupHtml {
                             if (posted) return;
                             posted = true;
                             requestAnimationFrame(function() {
-                                webkit.messageHandlers.contentReady.postMessage(null);
+                                webkit.messageHandlers.contentReady.postMessage(collectButtonFrames());
                             });
                         }
                         function hasRenderableContent() {

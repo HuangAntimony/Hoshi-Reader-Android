@@ -5,6 +5,11 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent scrolled reader lookup popups from leaving the hidden warm shell at the old position and blocking reader input after dismissal.
+- Prevent stale native lookup popup audio and Anki button positions from being drawn while dictionary sections expand or collapse on slow E-ink devices.
+
 ## [v0.7.2] - 2026-05-18
 
 ### Fixed

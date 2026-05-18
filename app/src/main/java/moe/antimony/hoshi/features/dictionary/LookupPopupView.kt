@@ -111,15 +111,12 @@ internal fun lookupPopupRendersSurface(
     isPopupActive: Boolean,
 ): Boolean = isPopupActive
 
+@Suppress("UNUSED_PARAMETER")
 internal fun lookupPopupUsesOnscreenFrame(
     isPopupActive: Boolean,
     isContentVisible: Boolean,
     contentReady: Boolean,
-): Boolean = lookupPopupReceivesInput(
-    isPopupActive = isPopupActive,
-    isContentVisible = isContentVisible,
-    contentReady = contentReady,
-)
+): Boolean = isPopupActive
 
 @Composable
 fun LookupPopupView(
@@ -645,7 +642,7 @@ private fun LookupPopupWebView(
             callbackHolder.callbacks = callbacks
             webView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             webView.visibility = if (isRendered) View.VISIBLE else View.INVISIBLE
-            webView.isEnabled = isRendered
+            webView.isEnabled = isInteractive
             webView.isClickable = isInteractive
             (webView as? PopupActionButtonWebView)?.setPopupInputEnabled(isInteractive)
             if (!isInteractive) {

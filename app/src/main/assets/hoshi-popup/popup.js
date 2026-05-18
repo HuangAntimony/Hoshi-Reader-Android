@@ -1237,11 +1237,10 @@ function playWordAudio(audioUrl) {
 }
 
 let buttonFrameSyncScheduled = false;
+let visualStateButtonFrameSyncScheduled = false;
 
-function syncButtonFrames() {
-    const handler = window.webkit?.messageHandlers?.buttonFrames;
-    if (!handler) { return; }
-    const frames = [...document.querySelectorAll('.button-slot')].map(slot => {
+function collectButtonFrames() {
+    return [...document.querySelectorAll('.button-slot')].map(slot => {
         const rect = slot.getBoundingClientRect();
         return {
             kind: slot.dataset.kind,
@@ -1254,7 +1253,22 @@ function syncButtonFrames() {
             enabled: slot.dataset.enabled !== 'false'
         };
     });
+}
+
+function postButtonFrames(frames, visualState = false) {
+    const handler = visualState
+        ? window.webkit?.messageHandlers?.visualStateButtonFrames
+        : window.webkit?.messageHandlers?.buttonFrames;
+    if (!handler) { return; }
     handler.postMessage(frames);
+}
+
+function syncButtonFrames() {
+    postButtonFrames(collectButtonFrames());
+}
+
+function syncButtonFramesAtVisualState() {
+    postButtonFrames(collectButtonFrames(), true);
 }
 
 function scheduleButtonFrameSync() {
@@ -1266,8 +1280,17 @@ function scheduleButtonFrameSync() {
     });
 }
 
+function scheduleButtonFrameSyncAtVisualState() {
+    if (visualStateButtonFrameSyncScheduled) { return; }
+    visualStateButtonFrameSyncScheduled = true;
+    requestAnimationFrame(() => {
+        visualStateButtonFrameSyncScheduled = false;
+        syncButtonFramesAtVisualState();
+    });
+}
+
 window.addEventListener('resize', scheduleButtonFrameSync);
-document.addEventListener('toggle', scheduleButtonFrameSync, true);
+document.addEventListener('toggle', scheduleButtonFrameSyncAtVisualState, true);
 
 function createButtonSlot(kind, entryIndex, enabled = true) {
     return el('span', {
@@ -1395,7 +1418,15 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     const cancel = () => { clearTimeout(timer); };
     summary.addEventListener('pointerup', cancel);
     summary.addEventListener('pointercancel', cancel);
-    summary.addEventListener('click', (e) => { if (longPressed) e.preventDefault(); });
+    summary.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (longPressed) {
+            return;
+        }
+        details.open = !details.open;
+        syncButtonFramesAtVisualState();
+        scheduleButtonFrameSyncAtVisualState();
+    });
     details.appendChild(summary);
 
     const dictWrapper = document.createElement('div');

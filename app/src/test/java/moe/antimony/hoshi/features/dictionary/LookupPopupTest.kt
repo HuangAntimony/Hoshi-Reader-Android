@@ -160,6 +160,49 @@ class LookupPopupTest {
     }
 
     @Test
+    fun scrollingRootOnlyPopupDoesNotRewritePopupState() {
+        val popups = listOf("root").map { id ->
+            LookupPopupItem(
+                id = id,
+                state = LookupPopupState(
+                    selection = ReaderSelectionData(
+                        text = id,
+                        sentence = id,
+                        rect = ReaderSelectionRect(x = 0.0, y = 0.0, width = 1.0, height = 1.0),
+                        normalizedOffset = null,
+                    ),
+                    results = emptyList(),
+                ),
+            )
+        }
+
+        assertTrue(closeChildPopupsForScrolledParent(popups, 0) === popups)
+    }
+
+    @Test
+    fun scrollingParentPopupClosesChildrenAndClearsSelection() {
+        val popups = listOf("root", "child").map { id ->
+            LookupPopupItem(
+                id = id,
+                state = LookupPopupState(
+                    selection = ReaderSelectionData(
+                        text = id,
+                        sentence = id,
+                        rect = ReaderSelectionRect(x = 0.0, y = 0.0, width = 1.0, height = 1.0),
+                        normalizedOffset = null,
+                    ),
+                    results = emptyList(),
+                ),
+            )
+        }
+
+        val scrolled = closeChildPopupsForScrolledParent(popups, 0)
+
+        assertEquals(listOf("root"), scrolled.map { it.id })
+        assertEquals(1, scrolled.single().clearSelectionSignal)
+    }
+
+    @Test
     fun existingPopupsRetainSelectionAndHistorySignalsWhenThemeChanges() {
         val popups = listOf(
             LookupPopupItem(
@@ -248,15 +291,15 @@ class LookupPopupTest {
     }
 
     @Test
-    fun activePopupStaysOffscreenUntilItReceivesInput() {
-        assertFalse(
+    fun activePopupKeepsOnscreenFrameBeforeItReceivesInput() {
+        assertTrue(
             lookupPopupUsesOnscreenFrame(
                 isPopupActive = true,
                 isContentVisible = false,
                 contentReady = false,
             ),
         )
-        assertFalse(
+        assertTrue(
             lookupPopupUsesOnscreenFrame(
                 isPopupActive = true,
                 isContentVisible = true,
@@ -268,6 +311,13 @@ class LookupPopupTest {
                 isPopupActive = true,
                 isContentVisible = true,
                 contentReady = true,
+            ),
+        )
+        assertFalse(
+            lookupPopupUsesOnscreenFrame(
+                isPopupActive = false,
+                isContentVisible = false,
+                contentReady = false,
             ),
         )
     }
