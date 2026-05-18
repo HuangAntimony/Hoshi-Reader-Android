@@ -110,6 +110,7 @@ class SasayakiMediaSession(
 
     fun release() {
         notificationManager.cancel(NotificationId)
+        SasayakiMediaNotificationActionRegistry.unregister(session.id)
         session.release()
     }
 
@@ -151,6 +152,7 @@ class SasayakiMediaSession(
         if (hasPublishedNotification || notificationPlaying != null) {
             notificationManager.cancel(NotificationId)
         }
+        SasayakiMediaNotificationActionRegistry.unregister(session.id)
         notificationPlaying = null
         hasPublishedNotification = false
         if (loggedSuppressionReason != reason) {
@@ -163,6 +165,10 @@ class SasayakiMediaSession(
     @SuppressLint("NotificationPermission")
     private fun publishNotification() {
         ensureNotificationChannel()
+        SasayakiMediaNotificationActionRegistry.register(
+            sessionId = session.id,
+            onAction = ::handleNotificationAction,
+        )
         val builder = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_stat_hoshi)
             .setContentTitle(title)
@@ -174,8 +180,16 @@ class SasayakiMediaSession(
             .setOnlyAlertOnce(true)
             .setStyle(
                 MediaStyleNotificationHelper.MediaStyle(session)
-                    .setShowActionsInCompactView(0, 1),
+                    .setShowActionsInCompactView(*SasayakiMediaNotificationActions.CompactViewIndices),
             )
+        SasayakiMediaNotificationActions.forPlaybackState(isPlaying).forEach { action ->
+            builder.addAction(
+                action.toNotificationCompatAction(
+                    context = appContext,
+                    sessionId = session.id,
+                ),
+            )
+        }
         artwork?.let { builder.setLargeIcon(artwork) }
         val notification = builder.build()
         notificationManager.notify(NotificationId, notification)
@@ -196,6 +210,15 @@ class SasayakiMediaSession(
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             }
+
+    private fun handleNotificationAction(action: String) {
+        when (action) {
+            SasayakiMediaNotificationActions.ActionPrevious -> onSkipToPrevious()
+            SasayakiMediaNotificationActions.ActionPlay -> onPlay()
+            SasayakiMediaNotificationActions.ActionPause -> onPause()
+            SasayakiMediaNotificationActions.ActionNext -> onSkipToNext()
+        }
+    }
 
     private fun artworkBytes(): ByteArray? {
         val image = artwork ?: return null
