@@ -2,11 +2,6 @@ package moe.antimony.hoshi.features.dictionary
 
 import moe.antimony.hoshi.epub.SasayakiMatch
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
@@ -171,85 +166,3 @@ internal fun closeChildPopupsForScrolledParent(
             }
         }
     }
-
-@Composable
-internal fun LookupPopupStackView(
-    popups: List<LookupPopupItem>,
-    onPopupsChange: (List<LookupPopupItem>) -> Unit,
-    lookupChildPopup: (ReaderSelectionData) -> Pair<LookupPopupItem, Int>?,
-    modifier: Modifier = Modifier,
-    onRootPopupDismissed: () -> Boolean = { false },
-    isPopupVisible: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
-    isPopupActive: (LookupPopupItem, Int) -> Boolean = { _, _ -> true },
-    onPopupContentReady: (String) -> Unit = {},
-    warmRootShell: Boolean = false,
-    sasayakiWasPaused: Boolean = false,
-    sasayakiIsPlaying: Boolean = false,
-    onSasayakiReplayCue: (SasayakiMatch) -> Unit = {},
-    onSasayakiTogglePlayback: () -> Unit = {},
-    onSasayakiPauseStateCleared: () -> Unit = {},
-    onSasayakiPlayForward: (SasayakiMatch) -> Unit = {},
-    onPrepareSasayakiAudio: (SasayakiMatch, String) -> String? = { _, _ -> null },
-    rootSelectionOffsetX: Double = 0.0,
-    rootSelectionOffsetY: Double = 0.0,
-) {
-    val displayPopups = popups.withRootSelectionOffset(rootSelectionOffsetX, rootSelectionOffsetY)
-    displayPopups.forEachIndexed { index, popup ->
-        key(if (warmRootShell && index == 0) "warm-root-popup" else popup.id) {
-            val popupActive = isPopupActive(popup, index)
-            val popupVisible = isPopupVisible(popup, index)
-            LookupPopupView(
-                state = popup.state,
-                sasayakiCue = popup.sasayakiCue,
-                sasayakiWasPaused = sasayakiWasPaused,
-                sasayakiIsPlaying = sasayakiIsPlaying,
-                clearSelectionSignal = popup.clearSelectionSignal,
-                onTapOutside = {
-                    if (popupActive) {
-                        onPopupsChange(closeChildPopups(popups, index))
-                    }
-                },
-                onSwipeDismiss = {
-                    if (popupActive) {
-                        val rootDismissHandled = index == 0 && onRootPopupDismissed()
-                        if (!rootDismissHandled) {
-                            onPopupsChange(dismissPopupAt(popups, index))
-                        }
-                    }
-                },
-                onTextSelected = { selection ->
-                    if (!popupActive) {
-                        null
-                    } else {
-                        val nextPopups = closeChildPopups(popups, index)
-                        lookupChildPopup(selection)?.let { (childPopup, highlightCount) ->
-                            onPopupsChange(nextPopups + childPopup)
-                            highlightCount
-                        }
-                    }
-                },
-                onPopupScrolled = {
-                    if (popupActive) {
-                        val nextPopups = closeChildPopupsForScrolledParent(popups, index)
-                        if (nextPopups != popups) {
-                            onPopupsChange(nextPopups)
-                        }
-                    }
-                },
-                onSasayakiReplayCue = onSasayakiReplayCue,
-                onSasayakiTogglePlayback = onSasayakiTogglePlayback,
-                onSasayakiPauseStateCleared = onSasayakiPauseStateCleared,
-                onSasayakiPlayForward = onSasayakiPlayForward,
-                onPrepareSasayakiAudio = onPrepareSasayakiAudio,
-                isContentVisible = popupVisible,
-                isPopupActive = popupActive,
-                onContentReady = { onPopupContentReady(popup.id) },
-                warmShell = warmRootShell && index == 0,
-                contentResetKey = if (warmRootShell && index == 0) popup.id else null,
-                modifier = modifier
-                    .fillMaxSize()
-                    .zIndex(2f + index),
-            )
-        }
-    }
-}

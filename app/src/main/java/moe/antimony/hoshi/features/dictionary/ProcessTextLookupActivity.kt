@@ -168,7 +168,7 @@ private fun ProcessTextLookupOverlay(
             }
         }
         if (error == null) {
-            LookupPopupStackView(
+            LookupPopupAndroidStack(
                 popups = displayedPopups,
                 onPopupsChange = { next ->
                     if (next.isEmpty()) onClose() else popups = next

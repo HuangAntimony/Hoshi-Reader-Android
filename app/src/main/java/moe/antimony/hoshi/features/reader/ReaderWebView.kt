@@ -50,7 +50,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -93,10 +92,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -107,7 +102,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
@@ -122,9 +116,9 @@ import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
+import moe.antimony.hoshi.features.dictionary.LookupPopupAndroidOverlay
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
-import moe.antimony.hoshi.features.dictionary.LookupPopupStackView
 import moe.antimony.hoshi.features.dictionary.LookupPopupState
 import moe.antimony.hoshi.features.dictionary.clearPopupSelectionHighlights
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
@@ -298,28 +292,21 @@ fun ReaderWebView(
             audioSettings = audioSettings,
         )
     }
-    val renderedLookupPopups = if (themedLookupPopups.isNotEmpty()) {
-        themedLookupPopups
-    } else {
-        listOf(
-            listOf(
-                (warmRootLookupPopup ?: warmRootSeedPopup).let { popup ->
-                    popup.copy(
-                        state = popup.state.copy(
-                            results = emptyList(),
-                            popupActionBar = false,
-                        ),
-                        sasayakiCue = null,
-                    )
-                },
-            ).withLookupPopupVisualOptions(
-                darkMode = popupDarkMode,
-                eInkMode = effectiveSettings.eInkMode,
-                audioSettings = audioSettings,
-                popupScale = effectiveSettings.popupScale,
-            ).first(),
-        )
-    }
+    val warmRootSourcePopup = warmRootLookupPopup ?: warmRootSeedPopup
+    val warmRootPopup = listOf(
+        warmRootSourcePopup.copy(
+            state = warmRootSourcePopup.state.copy(
+                results = emptyList(),
+                popupActionBar = false,
+            ),
+            sasayakiCue = null,
+        ),
+    ).withLookupPopupVisualOptions(
+        darkMode = popupDarkMode,
+        eInkMode = effectiveSettings.eInkMode,
+        audioSettings = audioSettings,
+        popupScale = effectiveSettings.popupScale,
+    ).first()
     val showReaderMenu = stateHolder.showReaderMenu
     val showAppearance = stateHolder.showAppearance
     val showChapters = stateHolder.showChapters
@@ -1020,33 +1007,19 @@ fun ReaderWebView(
                             ),
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            horizontal = viewportHorizontalPadding,
-                            vertical = viewportVerticalPadding,
-                        ),
-                ) {
-                    RootSelectionHighlightOverlay(
-                        rects = rootSelectionHighlightRects,
-                        darkMode = popupDarkMode,
-                        eInkMode = effectiveSettings.eInkMode,
-                        verticalWriting = effectiveSettings.verticalWriting,
-                    )
-                }
-                LookupPopupStackView(
-                    popups = renderedLookupPopups,
+                LookupPopupAndroidOverlay(
+                    popups = themedLookupPopups,
+                    warmRootPopup = warmRootPopup,
+                    rootHighlightRects = rootSelectionHighlightRects,
+                    rootHighlightVerticalWriting = effectiveSettings.verticalWriting,
                     onPopupsChange = ::setLookupPopups,
                     lookupChildPopup = ::lookupChildPopup,
                     onRootPopupDismissed = {
                         dismissRootLookupPopup()
                         true
                     },
-                    isPopupVisible = { popup, index -> index != 0 || popup.id in visibleLookupPopupIds },
-                    isPopupActive = { _, index -> index != 0 || lookupPopups.isNotEmpty() },
-                    onPopupContentReady = ::markRootPopupContentReady,
-                    warmRootShell = true,
+                    isRootPopupVisible = { popup -> popup.id in visibleLookupPopupIds },
+                    onRootPopupContentReady = ::markRootPopupContentReady,
                     sasayakiWasPaused = sasayakiWasPausedByLookup,
                     sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
                     onSasayakiReplayCue = { cue -> sasayakiPlayer?.playCue(cue, stop = true) },
@@ -1190,52 +1163,6 @@ fun ReaderWebView(
             )
         }
         webView?.let { _ -> Unit }
-    }
-}
-
-@Composable
-private fun RootSelectionHighlightOverlay(
-    rects: List<ReaderSelectionRect>,
-    darkMode: Boolean,
-    eInkMode: Boolean,
-    verticalWriting: Boolean,
-) {
-    val blendMode = if (darkMode) BlendMode.Screen else BlendMode.Multiply
-    val underlineColor = if (darkMode) Color.White else Color.Black
-    rects.forEachIndexed { index, rect ->
-        if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
-        Box(
-            modifier = Modifier
-                .absoluteOffset(x = rect.x.dp, y = rect.y.dp)
-                .width(rect.width.dp)
-                .height(rect.height.dp)
-                .drawBehind {
-                    if (eInkMode) {
-                        val lineHeight = 1.5.dp.toPx()
-                        if (verticalWriting) {
-                            val lineLeft = (size.width - 2.dp.toPx() - lineHeight).coerceAtLeast(0f)
-                            drawRect(
-                                color = underlineColor,
-                                topLeft = Offset(lineLeft, 0f),
-                                size = Size(lineHeight, size.height),
-                            )
-                        } else {
-                            val lineTop = (size.height - 2.dp.toPx()).coerceAtLeast(0f)
-                            drawRect(
-                                color = underlineColor,
-                                topLeft = Offset(0f, lineTop),
-                                size = Size(size.width, lineHeight),
-                            )
-                        }
-                    } else {
-                        drawRect(
-                            color = Color(0x66A0A0A0),
-                            blendMode = blendMode,
-                        )
-                    }
-                }
-                .zIndex(1f + index * 0.001f),
-        )
     }
 }
 

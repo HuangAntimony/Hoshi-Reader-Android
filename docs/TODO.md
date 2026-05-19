@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 This file is the short operational handoff for future agents.
 
@@ -33,15 +33,15 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; all currently checked user-visible slices are synced or covered on Android.
-- Device-validate remaining native popup audio/Anki control states in Dictionary tab and reader lookup beyond the verified Sasayaki control-bar clipping path, covering duplicate state, audio error/autoplay, popup scale levels, redirect history, collapsed dictionary toggles on slow E-ink devices, child popups, and slow horizontal drags/long presses on controls.
-- Device-validate vertical lookup selection on ruby text, including partial ruby-base matches that should start at the tapped character, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
+- Device-validate the shared native Android popup overlay rewrite across reader lookup, Dictionary tab, and Process Text, covering warmed reader root lookup reuse, duplicate state, audio error/autoplay, popup scale levels, redirect history, collapsed dictionary toggles on slow E-ink devices, child popups, E-ink line highlights, lower-screen recursive popup placement, and slow horizontal drags/long presses on controls.
+- Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.
 - Device-validate paginated page turns with top and bottom progress counters enabled on E-ink, confirming the counter no longer refreshes before the page flip.
 - Device-validate E-ink reader lookup underlines in horizontal and vertical text, confirming the line sits close to selected text without obscuring glyphs.
 - Device-validate reader popup Reduced Motion Scrolling on an E-ink target, including vertical swipe threshold, 40%-100% scroll amount, mouse wheel/page-wheel input, and coexistence with horizontal swipe-to-dismiss.
 - Device-validate the warm reader root lookup popup shell on additional devices, confirming repeated root lookups reuse the popup without breaking child popups, redirects, action-bar history, or dismiss/touch passthrough after popup scroll.
-- Device-validate popup-to-popup lookup selections, confirming child popup display syncs with Compose-drawn parent selection marks, E-ink mode uses underlines, and scrolling a parent popup dismisses child popups.
-- Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming popup content pre-renders before becoming touchable, autoplay does not outrun first visible content, no blank white shell flashes, the Compose-drawn selected-word highlight appears and disappears with the popup, and highlighted text stays readable.
+- Device-validate popup-to-popup lookup selections, confirming child popup display syncs with native overlay parent selection marks, E-ink mode uses underlines, and scrolling a parent popup dismisses child popups.
+- Device-validate reader lookup popup open and dismiss on a slow E-ink target, confirming popup content pre-renders before becoming touchable, autoplay does not outrun first visible content, no blank white shell flashes, the native overlay selected-word highlight appears and disappears with the popup, and highlighted text stays readable.
 - Finish remaining iOS `PopupWebView` Anki mining behavior beyond selected popup text export.
 - Validate paginated and continuous reader modes together for cover image pages, multi-image illustration pages, long text paging, forward/backward progress monotonicity, per-page progress updates and restore landing inside large text nodes, forward and backward chapter boundaries, reverse cross-chapter landing, lookup popup open, and bookmark restore.
 - Device-validate iOS-style reader jump return controls after chapter, character, highlight, and internal-link jumps, confirming back/forward targets remain stable through paginated and continuous manual movement.

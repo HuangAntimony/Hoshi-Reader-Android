@@ -69,11 +69,12 @@ import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import kotlin.math.abs
 
 private const val DictionaryPopupTopInset = 118.0
-private const val DictionaryPopupBottomInset = 150.0
+private const val DictionaryPopupBottomInset = 0.0
 
 internal fun dictionarySearchCursorColor(foregroundColor: Color): Color = foregroundColor
 
@@ -136,6 +137,7 @@ fun DictionarySearchView(
     )
     val uiState by searchViewModel.uiState.collectAsState()
     val ankiUiState by ankiViewModel.uiState.collectAsState()
+    var rootHighlightRects by remember { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
     val localAudioRepository = appContainer.localAudioRepository
     val fontManager = appContainer.readerFontManager
     val fontFaceCss = fontManager.popupFontFaceCss()
@@ -193,6 +195,7 @@ fun DictionarySearchView(
         )
     }
     val runLookup = {
+        rootHighlightRects = emptyList()
         searchViewModel.runLookup(
             assets = assets,
             darkMode = popupDarkMode,
@@ -228,11 +231,20 @@ fun DictionarySearchView(
                 backSignal = uiState.backSignal,
                 forwardSignal = uiState.forwardSignal,
                 callbacks = PopupWebViewCallbacks(
-                    onTapOutside = searchViewModel::closePopups,
-                    onSwipeDismiss = searchViewModel::closePopups,
+                    onTapOutside = {
+                        rootHighlightRects = emptyList()
+                        searchViewModel.closePopups()
+                    },
+                    onSwipeDismiss = {
+                        rootHighlightRects = emptyList()
+                        searchViewModel.closePopups()
+                    },
                     onOpenLink = context::openPopupExternalLink,
                     onTextSelected = { selection ->
                         searchViewModel.openRootPopup(selection, popupOptions)
+                    },
+                    onSelectionRectsLoaded = { rects ->
+                        rootHighlightRects = rects
                     },
                     onLookupRedirect = searchViewModel::lookupRedirect,
                     onLookupRedirected = searchViewModel::recordLookupRedirected,
@@ -277,14 +289,21 @@ fun DictionarySearchView(
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 10.dp),
         )
-        LookupPopupStackView(
+        LookupPopupAndroidStack(
             popups = themedPopups,
-            onPopupsChange = searchViewModel::setPopups,
+            onPopupsChange = { next ->
+                if (next.isEmpty()) rootHighlightRects = emptyList()
+                searchViewModel.setPopups(next)
+            },
             lookupChildPopup = lookupPopup,
             onRootPopupDismissed = {
+                rootHighlightRects = emptyList()
                 searchViewModel.dismissRootPopup()
                 true
             },
+            rootHighlightRects = rootHighlightRects,
+            rootHighlightDarkMode = popupDarkMode,
+            rootHighlightEInkMode = readerSettings.eInkMode,
             modifier = Modifier.fillMaxSize(),
         )
     }

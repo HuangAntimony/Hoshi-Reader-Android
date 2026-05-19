@@ -5,6 +5,14 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Changed
+
+- Rewrite lookup popup presentation around a shared native Android overlay for reader, Dictionary tab, and Process Text popups. Popup WebViews now render through Android-managed popup hosts instead of Compose popup surfaces, while preserving the warmed reader root popup path for faster repeated lookups.
+
+### Fixed
+
+- Keep Dictionary tab recursive lookup highlights and popup placement aligned in E-ink mode, including line-style selection marks and lower-screen child popups.
+
 ## [v0.7.3] - 2026-05-18
 
 ### Fixed
