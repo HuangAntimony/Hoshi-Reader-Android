@@ -420,7 +420,6 @@ private class LookupPopupHostView(
     private val callbacks = PopupWebViewCallbackHolder(PopupWebViewCallbacks())
     private val lookupResultsHolder = PopupLookupResultsHolder(emptyList())
     private val selectionOffsetHolder = PopupSelectionOffsetHolder()
-    private val contentReadyGate = PopupContentReadyGate()
     private val webView = createWebView(context)
     private val content = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -487,7 +486,6 @@ private class LookupPopupHostView(
             backCount = 0
             forwardCount = 0
             webView.clearActionButtons()
-            contentReadyGate.reset()
             lookupResultsHolder.results = htmlResults
             webView.loadDataWithBaseURL("https://hoshi.local/popup/", html, "text/html", "UTF-8", null)
         }
@@ -497,7 +495,6 @@ private class LookupPopupHostView(
             backCount = 0
             forwardCount = 0
             webView.clearActionButtons()
-            contentReadyGate.reset()
             pendingWarmResults = state.results
             applyWarmResultsIfReady()
         } else if (!warmRoot && loadedPopupId != popup.id) {
@@ -793,7 +790,6 @@ private class LookupPopupHostView(
                     callbackHolder = callbacks,
                     lookupResultsHolder = lookupResultsHolder,
                     selectionOffsetHolder = selectionOffsetHolder,
-                    contentReadyGate = contentReadyGate,
                     onShellReady = {
                         shellReady = true
                         applyWarmResultsIfReady()

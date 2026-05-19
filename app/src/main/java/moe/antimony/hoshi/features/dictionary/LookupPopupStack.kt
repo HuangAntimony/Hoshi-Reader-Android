@@ -1,7 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
+import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.epub.SasayakiMatch
-
 import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
@@ -35,6 +35,30 @@ internal data class LookupPopupItem(
     val state: LookupPopupState,
     val clearSelectionSignal: Int = 0,
     val sasayakiCue: SasayakiMatch? = null,
+)
+
+internal data class LookupPopupState(
+    val selection: ReaderSelectionData,
+    val results: List<LookupResult>,
+    val dictionaryStyles: Map<String, String> = emptyMap(),
+    val dictionarySettings: DictionarySettings = DictionarySettings(),
+    val isVertical: Boolean = true,
+    val isFullWidth: Boolean = false,
+    val width: Int = 320,
+    val height: Int = 250,
+    val swipeToDismiss: Boolean = false,
+    val swipeThreshold: Int = 40,
+    val reducedMotionScrolling: Boolean = false,
+    val reducedMotionScrollPercent: Int = 100,
+    val reducedMotionSwipeThreshold: Int = 40,
+    val popupScale: Double = 1.0,
+    val topInset: Double = 0.0,
+    val bottomInset: Double = 0.0,
+    val darkMode: Boolean = false,
+    val eInkMode: Boolean = false,
+    val audioSettings: AudioSettings = AudioSettings(),
+    val popupActionBar: Boolean = false,
+    val ankiContext: AnkiMiningContext = AnkiMiningContext(sentence = selection.sentence),
 )
 
 internal fun clearPopupSelectionHighlights(popups: List<LookupPopupItem>): List<LookupPopupItem> =

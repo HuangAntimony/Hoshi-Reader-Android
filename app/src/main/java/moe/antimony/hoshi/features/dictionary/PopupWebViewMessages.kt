@@ -117,33 +117,6 @@ internal class PopupSelectionOffsetHolder(
     var offsetY: Double = 0.0,
 )
 
-internal class PopupContentReadyGate {
-    private var generation = 0L
-    private var requestId = 0L
-
-    fun reset() {
-        generation += 1
-        requestId += 1
-    }
-
-    fun awaitReadyToDraw(webView: WebView, onReady: () -> Unit) {
-        val currentGeneration = generation
-        val currentRequestId = requestId + 1
-        requestId = currentRequestId
-        webView.postVisualStateCallback(
-            currentRequestId,
-            object : WebView.VisualStateCallback() {
-                override fun onComplete(requestId: Long) {
-                    if (generation != currentGeneration || this@PopupContentReadyGate.requestId != currentRequestId) {
-                        return
-                    }
-                    onReady()
-                }
-            },
-        )
-    }
-}
-
 internal class PopupMessageWebViewClient(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val audioRequestHandler: AudioRequestHandler? = null,
@@ -258,7 +231,6 @@ internal class PopupWebViewBridge(
     private val callbackHolder: PopupWebViewCallbackHolder,
     private val lookupResultsHolder: PopupLookupResultsHolder = PopupLookupResultsHolder(emptyList()),
     private val selectionOffsetHolder: PopupSelectionOffsetHolder = PopupSelectionOffsetHolder(),
-    private val contentReadyGate: PopupContentReadyGate = PopupContentReadyGate(),
     private val onShellReady: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -296,10 +268,8 @@ internal class PopupWebViewBridge(
             "shellReady" -> mainHandler.post(onShellReady)
             "contentReady" -> mainHandler.post {
                 val frames = popupButtonFramesFromMessageJson(message)
-                contentReadyGate.awaitReadyToDraw(webView) {
-                    updateActionButtonFrames(frames)
-                    callbackHolder.callbacks.onContentReady()
-                }
+                updateActionButtonFrames(frames)
+                callbackHolder.callbacks.onContentReady()
             }
             "popupScrolled" -> mainHandler.post(callbacks.onScroll)
             "buttonFrames" -> {
