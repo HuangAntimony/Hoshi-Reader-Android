@@ -236,4 +236,30 @@ class LookupPopupTest {
         assertTrue(themed.single().state.audioSettings.enableAutoplay)
     }
 
+    @Test
+    fun popupSelectionOffsetTracksHistoryControls() {
+        assertEquals(
+            50.0,
+            popupSelectionOffsetY(
+                frameTopDp = 50.0,
+                popupActionBar = false,
+                backCount = 0,
+                forwardCount = 0,
+                hasSasayakiCue = false,
+            ),
+            0.0,
+        )
+        assertEquals(
+            87.0,
+            popupSelectionOffsetY(
+                frameTopDp = 50.0,
+                popupActionBar = false,
+                backCount = 1,
+                forwardCount = 0,
+                hasSasayakiCue = false,
+            ),
+            0.0,
+        )
+    }
+
 }

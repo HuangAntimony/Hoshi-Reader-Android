@@ -435,6 +435,7 @@ private class LookupPopupHostView(
     private var popupScale = 1.0
     private var backCount = 0
     private var forwardCount = 0
+    private var currentFrame: PopupFrameDp? = null
 
     init {
         addView(
@@ -516,9 +517,8 @@ private class LookupPopupHostView(
 
         val overlayView = parent as? View
         val frame = state.popupFrame(overlayView?.width ?: 0, overlayView?.height ?: 0)
-        val controlsHeight = controlsHeight(state, popup.sasayakiCue)
-        selectionOffsetHolder.offsetX = frame.leftDp
-        selectionOffsetHolder.offsetY = frame.topDp + controlsHeight
+        currentFrame = frame
+        syncSelectionOffset(frame, state, popup.sasayakiCue)
         callbacks.callbacks = callbacksFor(
             popup = popup,
             index = index,
@@ -607,6 +607,7 @@ private class LookupPopupHostView(
                     backCount += 1
                     forwardCount = 0
                     updateControlBar(state)
+                    syncSelectionOffsetForCurrentFrame(state, popup.sasayakiCue)
                 }
             },
             onPlayWordAudio = { url, mode ->
@@ -670,6 +671,7 @@ private class LookupPopupHostView(
                     null,
                 )
                 updateControlBar(state)
+                syncSelectionOffsetForCurrentFrame(state, popup.sasayakiCue)
             }
         }
         actionBar.onSecond = {
@@ -681,6 +683,7 @@ private class LookupPopupHostView(
                     null,
                 )
                 updateControlBar(state)
+                syncSelectionOffsetForCurrentFrame(state, popup.sasayakiCue)
             }
         }
         actionBar.onThird = {
@@ -842,13 +845,39 @@ private class LookupPopupHostView(
         )
     }
 
-    private fun controlsHeight(state: LookupPopupState, sasayakiCue: SasayakiMatch?): Double =
-        (if (state.popupActionBar || backCount > 0 || forwardCount > 0) PopupControlTotalHeightDp else 0.0) +
-            (if (sasayakiCue != null) PopupControlTotalHeightDp else 0.0)
+    private fun syncSelectionOffsetForCurrentFrame(state: LookupPopupState, sasayakiCue: SasayakiMatch?) {
+        syncSelectionOffset(currentFrame ?: return, state, sasayakiCue)
+    }
+
+    private fun syncSelectionOffset(
+        frame: PopupFrameDp,
+        state: LookupPopupState,
+        sasayakiCue: SasayakiMatch?,
+    ) {
+        selectionOffsetHolder.offsetX = frame.leftDp
+        selectionOffsetHolder.offsetY = popupSelectionOffsetY(
+            frameTopDp = frame.topDp,
+            popupActionBar = state.popupActionBar,
+            backCount = backCount,
+            forwardCount = forwardCount,
+            hasSasayakiCue = sasayakiCue != null,
+        )
+    }
 
     private fun Double.dpToPx(): Int = (this * density).toInt().coerceAtLeast(1)
     private fun Int.dpToPx(): Int = (this * density).toInt().coerceAtLeast(1)
 }
+
+internal fun popupSelectionOffsetY(
+    frameTopDp: Double,
+    popupActionBar: Boolean,
+    backCount: Int,
+    forwardCount: Int,
+    hasSasayakiCue: Boolean,
+): Double =
+    frameTopDp +
+        (if (popupActionBar || backCount > 0 || forwardCount > 0) PopupControlTotalHeightDp else 0.0) +
+        (if (hasSasayakiCue) PopupControlTotalHeightDp else 0.0)
 
 private class PopupControlBar(context: Context) : LinearLayout(context) {
     var onFirst: () -> Unit = {}
