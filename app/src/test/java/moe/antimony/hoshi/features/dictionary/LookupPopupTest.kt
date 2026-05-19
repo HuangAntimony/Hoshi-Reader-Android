@@ -3,7 +3,9 @@ package moe.antimony.hoshi.features.dictionary
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.audio.AudioSettings
+import android.view.MotionEvent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -260,6 +262,18 @@ class LookupPopupTest {
             ),
             0.0,
         )
+    }
+
+    @Test
+    fun popupTouchStreamContinuesAfterMovingOutsideInitialHost() {
+        val tracker = PopupTouchStreamTracker()
+
+        assertTrue(tracker.shouldDispatch(MotionEvent.ACTION_DOWN, hitPopup = true))
+        tracker.onDispatchResult(MotionEvent.ACTION_DOWN, handled = true)
+        assertTrue(tracker.shouldDispatch(MotionEvent.ACTION_MOVE, hitPopup = false))
+        assertTrue(tracker.shouldDispatch(MotionEvent.ACTION_UP, hitPopup = false))
+        tracker.onDispatchResult(MotionEvent.ACTION_UP, handled = true)
+        assertFalse(tracker.shouldDispatch(MotionEvent.ACTION_MOVE, hitPopup = false))
     }
 
 }

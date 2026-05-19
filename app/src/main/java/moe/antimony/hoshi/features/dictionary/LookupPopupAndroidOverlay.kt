@@ -391,6 +391,7 @@ private data class OverlayUpdate(
 
 private class LookupPopupOverlayLayout(context: Context) : FrameLayout(context) {
     var onOverlaySizeChanged: () -> Unit = {}
+    private val touchStreamTracker = PopupTouchStreamTracker()
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         super.onSizeChanged(width, height, oldWidth, oldHeight)
@@ -398,14 +399,45 @@ private class LookupPopupOverlayLayout(context: Context) : FrameLayout(context) 
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val hitPopup = hitPopup(event)
+        val shouldDispatch = touchStreamTracker.shouldDispatch(event.actionMasked, hitPopup)
+        if (!shouldDispatch) return false
+        val handled = super.dispatchTouchEvent(event)
+        touchStreamTracker.onDispatchResult(event.actionMasked, handled)
+        return handled
+    }
+
+    private fun hitPopup(event: MotionEvent): Boolean {
         for (index in childCount - 1 downTo 0) {
             val child = getChildAt(index)
             if (child !is LookupPopupHostView || child.visibility != VISIBLE || child.alpha == 0f) continue
             if (event.x >= child.left && event.x < child.right && event.y >= child.top && event.y < child.bottom) {
-                return super.dispatchTouchEvent(event)
+                return true
             }
         }
         return false
+    }
+}
+
+internal class PopupTouchStreamTracker {
+    private var activePopupStream = false
+
+    fun shouldDispatch(actionMasked: Int, hitPopup: Boolean): Boolean =
+        when (actionMasked) {
+            MotionEvent.ACTION_DOWN -> hitPopup
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> activePopupStream || hitPopup
+            else -> activePopupStream || hitPopup
+        }
+
+    fun onDispatchResult(actionMasked: Int, handled: Boolean) {
+        when (actionMasked) {
+            MotionEvent.ACTION_DOWN -> activePopupStream = handled
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> activePopupStream = false
+        }
     }
 }
 
