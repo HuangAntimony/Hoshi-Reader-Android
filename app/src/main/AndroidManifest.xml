@@ -38,6 +38,9 @@
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".features.sasayaki.SasayakiMediaNotificationActionReceiver"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

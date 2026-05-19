@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -25,6 +26,17 @@ import moe.antimony.hoshi.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
+
+private const val NotificationActionPrevious =
+    "moe.antimony.hoshi.features.sasayaki.action.PREVIOUS"
+private const val NotificationActionPlay =
+    "moe.antimony.hoshi.features.sasayaki.action.PLAY"
+private const val NotificationActionPause =
+    "moe.antimony.hoshi.features.sasayaki.action.PAUSE"
+private const val NotificationActionNext =
+    "moe.antimony.hoshi.features.sasayaki.action.NEXT"
+private const val NotificationExtraSessionId =
+    "moe.antimony.hoshi.features.sasayaki.extra.SESSION_ID"
 
 @OptIn(UnstableApi::class)
 class SasayakiMediaSession(
@@ -95,6 +107,7 @@ class SasayakiMediaSession(
 
     fun release() {
         notificationManager.cancel(NotificationId)
+        SasayakiMediaNotificationActionRegistry.unregister(session.id)
         session.release()
     }
 
@@ -133,6 +146,11 @@ class SasayakiMediaSession(
 
     @SuppressLint("NotificationPermission")
     private fun publishNotification() {
+        SasayakiMediaNotificationActionRegistry.register(
+            sessionId = session.id,
+            onAction = ::handleNotificationAction,
+        )
+        val actions = notificationActions()
         val builder = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_stat_hoshi)
             .setContentTitle(title)
@@ -144,13 +162,46 @@ class SasayakiMediaSession(
             .setOnlyAlertOnce(true)
             .setStyle(
                 MediaStyleNotificationHelper.MediaStyle(session)
-                    .setShowActionsInCompactView(0, 1),
+                    .setShowActionsInCompactView(0, 1, 2),
             )
+        actions.forEach { action ->
+            builder.addAction(action.toNotificationCompatAction(appContext, session.id))
+        }
         artwork?.let { builder.setLargeIcon(artwork) }
         val notification = builder.build()
         notificationManager.notify(NotificationId, notification)
         notificationPlaying = isPlaying
         hasPublishedNotification = true
+    }
+
+    private fun notificationActions(): List<SasayakiMediaNotificationAction> =
+        listOf(
+            SasayakiMediaNotificationAction(
+                iconResId = CommandButton.getIconResIdForIconConstant(CommandButton.ICON_PREVIOUS),
+                title = "Previous Cue",
+                action = NotificationActionPrevious,
+            ),
+            SasayakiMediaNotificationAction(
+                iconResId = CommandButton.getIconResIdForIconConstant(
+                    if (isPlaying) CommandButton.ICON_PAUSE else CommandButton.ICON_PLAY,
+                ),
+                title = if (isPlaying) "Pause" else "Play",
+                action = if (isPlaying) NotificationActionPause else NotificationActionPlay,
+            ),
+            SasayakiMediaNotificationAction(
+                iconResId = CommandButton.getIconResIdForIconConstant(CommandButton.ICON_NEXT),
+                title = "Next Cue",
+                action = NotificationActionNext,
+            ),
+        )
+
+    private fun handleNotificationAction(action: String) {
+        when (action) {
+            NotificationActionPrevious -> onSkipToPrevious()
+            NotificationActionPlay -> onPlay()
+            NotificationActionPause -> onPause()
+            NotificationActionNext -> onSkipToNext()
+        }
     }
 
     private fun contentIntent(): PendingIntent? =
@@ -259,5 +310,81 @@ class SasayakiMediaSession(
             }
             return sampleSize
         }
+    }
+}
+
+private data class SasayakiMediaNotificationAction(
+    val iconResId: Int,
+    val title: String,
+    val action: String,
+) {
+    fun toNotificationCompatAction(
+        context: Context,
+        sessionId: String,
+    ): NotificationCompat.Action =
+        NotificationCompat.Action.Builder(
+            iconResId,
+            title,
+            SasayakiMediaNotificationActionReceiver.pendingIntent(
+                context = context,
+                sessionId = sessionId,
+                action = action,
+            ),
+        ).build()
+}
+
+private object SasayakiMediaNotificationActionRegistry {
+    private val callbacks = mutableMapOf<String, (String) -> Unit>()
+
+    fun register(sessionId: String, onAction: (String) -> Unit) {
+        synchronized(callbacks) {
+            callbacks[sessionId] = onAction
+        }
+    }
+
+    fun unregister(sessionId: String) {
+        synchronized(callbacks) {
+            callbacks.remove(sessionId)
+        }
+    }
+
+    fun dispatch(sessionId: String, action: String) {
+        val callback = synchronized(callbacks) {
+            callbacks[sessionId]
+        }
+        callback?.invoke(action)
+    }
+}
+
+class SasayakiMediaNotificationActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        val sessionId = intent.getStringExtra(NotificationExtraSessionId) ?: return
+        SasayakiMediaNotificationActionRegistry.dispatch(sessionId, action)
+    }
+
+    companion object {
+        fun pendingIntent(
+            context: Context,
+            sessionId: String,
+            action: String,
+        ): PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                action.requestCode(),
+                Intent(context, SasayakiMediaNotificationActionReceiver::class.java)
+                    .setAction(action)
+                    .putExtra(NotificationExtraSessionId, sessionId),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+        private fun String.requestCode(): Int =
+            when (this) {
+                NotificationActionPrevious -> 24070
+                NotificationActionPlay -> 24071
+                NotificationActionPause -> 24072
+                NotificationActionNext -> 24073
+                else -> 24079
+            }
     }
 }
