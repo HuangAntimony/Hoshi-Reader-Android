@@ -33,7 +33,7 @@ This file is the short operational handoff for future agents.
 ### Reader And Lookup
 
 - Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; all currently checked user-visible slices are synced or covered on Android.
-- Device-validate the shared native Android popup overlay rewrite across reader lookup, Dictionary tab, and Process Text, covering warmed reader root lookup reuse, duplicate state, audio error/autoplay, popup scale levels, redirect history, redirected child popup placement, edge-crossing popup gestures, collapsed dictionary toggles on slow E-ink devices, E-ink line highlights, lower-screen recursive popup placement, and slow horizontal drags/long presses on controls.
+- Device-validate the shared native Android popup overlay rewrite across reader lookup, Dictionary tab, and Process Text, covering warmed reader root lookup reuse, duplicate state, audio error/autoplay, popup scale levels, redirect history, redirected child popup placement, edge-crossing popup gestures, Sasayaki popup controls, collapsed dictionary toggles on slow E-ink devices, E-ink line highlights, lower-screen recursive popup placement, and slow horizontal drags/long presses on controls.
 - Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.
 - Device-validate paginated page turns with top and bottom progress counters enabled on E-ink, confirming the counter no longer refreshes before the page flip.

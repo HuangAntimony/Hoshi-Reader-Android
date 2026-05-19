@@ -719,7 +719,7 @@ private class LookupPopupHostView(
             sasayakiBar.configure(
                 tint = state.controlContentColor(),
                 dividerColor = state.popupBorderColor(),
-                firstIcon = R.drawable.ic_material_rounded_refresh,
+                firstIcon = R.drawable.ic_material_rounded_replay,
                 secondIcon = if (sasayakiIsPlaying || sasayakiWasPaused) R.drawable.ic_material_rounded_pause else R.drawable.ic_material_rounded_play_arrow,
                 thirdIcon = R.drawable.ic_material_rounded_start,
                 firstDescription = "Replay Sasayaki Cue",
