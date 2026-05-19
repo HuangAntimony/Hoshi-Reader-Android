@@ -115,6 +115,8 @@ internal class PopupLookupResultsHolder(
 internal class PopupSelectionOffsetHolder(
     var offsetX: Double = 0.0,
     var offsetY: Double = 0.0,
+    var highlightOffsetX: Double = 0.0,
+    var highlightOffsetY: Double = 0.0,
 )
 
 internal class PopupMessageWebViewClient(
@@ -312,8 +314,8 @@ internal class PopupWebViewBridge(
                         onSelectionRectsLoaded(
                             ReaderSelectionBridgePayload.rectsFromJavascriptResult(result).map { rect ->
                                 ReaderSelectionRect(
-                                    x = selectionOffsetHolder.offsetX + rect.x,
-                                    y = selectionOffsetHolder.offsetY + rect.y,
+                                    x = selectionOffsetHolder.highlightOffsetX + rect.x,
+                                    y = selectionOffsetHolder.highlightOffsetY + rect.y,
                                     width = rect.width,
                                     height = rect.height,
                                 )

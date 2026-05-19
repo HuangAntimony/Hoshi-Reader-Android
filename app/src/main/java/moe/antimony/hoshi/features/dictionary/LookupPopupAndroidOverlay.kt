@@ -196,7 +196,6 @@ private class LookupPopupOverlayController(
     }
     private val childHosts = linkedMapOf<String, LookupPopupHostView>()
     private val rootHighlightView = PopupSelectionHighlightView(context)
-    private val popupSelectionOverlay = PopupSelectionHighlightView(context)
     private var lastUpdate: OverlayUpdate? = null
 
     init {
@@ -209,13 +208,6 @@ private class LookupPopupOverlayController(
             ),
         )
         rootHost?.let { host -> view.addView(host) }
-        view.addView(
-            popupSelectionOverlay,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ),
-        )
     }
 
     fun update(
@@ -270,13 +262,6 @@ private class LookupPopupOverlayController(
     }
 
     private fun applyUpdate(update: OverlayUpdate) {
-        if (update.popups.isEmpty()) {
-            popupSelectionOverlay.update(
-                emptyList(),
-                update.warmRootPopup?.state?.darkMode ?: false,
-                update.warmRootPopup?.state?.eInkMode ?: false,
-            )
-        }
         val rootPopup = if (warmRootEnabled) {
             update.popups.firstOrNull()
                 ?.withRootSelectionOffset(update.rootSelectionOffsetX, update.rootSelectionOffsetY)
@@ -315,7 +300,6 @@ private class LookupPopupOverlayController(
                 onSasayakiPauseStateCleared = update.onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = update.onSasayakiPlayForward,
                 onPrepareSasayakiAudio = update.onPrepareSasayakiAudio,
-                selectionOverlay = popupSelectionOverlay,
             )
             rootHost.bringToFront()
         } else {
@@ -356,11 +340,9 @@ private class LookupPopupOverlayController(
                 onSasayakiPauseStateCleared = update.onSasayakiPauseStateCleared,
                 onSasayakiPlayForward = update.onSasayakiPlayForward,
                 onPrepareSasayakiAudio = update.onPrepareSasayakiAudio,
-                selectionOverlay = popupSelectionOverlay,
             )
             host.bringToFront()
         }
-        view.bringChildToFront(popupSelectionOverlay)
     }
 }
 
@@ -453,6 +435,7 @@ private class LookupPopupHostView(
     private val lookupResultsHolder = PopupLookupResultsHolder(emptyList())
     private val selectionOffsetHolder = PopupSelectionOffsetHolder()
     private val webView = createWebView(context)
+    private val selectionHighlightView = PopupSelectionHighlightView(context)
     private val content = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
@@ -480,6 +463,13 @@ private class LookupPopupHostView(
         content.addView(actionBar)
         content.addView(sasayakiBar)
         content.addView(webView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(
+            selectionHighlightView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
         actionBar.visibility = GONE
         sasayakiBar.visibility = GONE
         visibility = INVISIBLE
@@ -505,7 +495,6 @@ private class LookupPopupHostView(
         onSasayakiPauseStateCleared: () -> Unit,
         onSasayakiPlayForward: (SasayakiMatch) -> Unit,
         onPrepareSasayakiAudio: (SasayakiMatch, String) -> String?,
-        selectionOverlay: PopupSelectionHighlightView,
     ) {
         val state = popup.state
         val htmlResults = if (warmRoot) emptyList() else state.results
@@ -543,7 +532,7 @@ private class LookupPopupHostView(
         }
         if (clearSelectionSignal != popup.clearSelectionSignal) {
             clearSelectionSignal = popup.clearSelectionSignal
-            selectionOverlay.update(emptyList(), state.darkMode, state.eInkMode)
+            selectionHighlightView.update(emptyList(), state.darkMode, state.eInkMode)
             webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
         }
 
@@ -563,7 +552,6 @@ private class LookupPopupHostView(
             onContentReady = onContentReady,
             isContentVisible = isContentVisible,
             onPrepareSasayakiAudio = onPrepareSasayakiAudio,
-            selectionOverlay = selectionOverlay,
         )
         updateBars(
             popup = popup,
@@ -590,6 +578,7 @@ private class LookupPopupHostView(
         layoutAt(frame)
         visibility = if (isPopupActive || warmRoot) VISIBLE else INVISIBLE
         alpha = if (interactive) 1f else 0f
+        if (!isPopupActive) selectionHighlightView.update(emptyList(), state.darkMode, state.eInkMode)
     }
 
     private fun callbacksFor(
@@ -604,12 +593,11 @@ private class LookupPopupHostView(
         onContentReady: (String) -> Unit,
         isContentVisible: Boolean,
         onPrepareSasayakiAudio: (SasayakiMatch, String) -> String?,
-        selectionOverlay: PopupSelectionHighlightView,
     ): PopupWebViewCallbacks {
         val state = popup.state
         return PopupWebViewCallbacks(
             onTapOutside = {
-                selectionOverlay.update(emptyList(), state.darkMode, state.eInkMode)
+                selectionHighlightView.update(emptyList(), state.darkMode, state.eInkMode)
                 if (isPopupActive) onPopupsChange(closeChildPopups(allPopups, index))
             },
             onSwipeDismiss = {
@@ -620,16 +608,20 @@ private class LookupPopupHostView(
                 if (!isPopupActive) {
                     null
                 } else {
-                    selectionOverlay.update(emptyList(), state.darkMode, state.eInkMode)
                     val nextPopups = closeChildPopups(allPopups, index)
-                    lookupChildPopup(selection)?.let { (childPopup, highlightCount) ->
+                    val lookup = lookupChildPopup(selection)
+                    if (lookup == null) {
+                        selectionHighlightView.update(emptyList(), state.darkMode, state.eInkMode)
+                        null
+                    } else {
+                        val (childPopup, highlightCount) = lookup
                         onPopupsChange(nextPopups + childPopup.withoutRootInsets())
                         highlightCount
                     }
                 }
             },
             onSelectionRectsLoaded = { rects ->
-                selectionOverlay.update(rects, state.darkMode, state.eInkMode)
+                selectionHighlightView.update(rects, state.darkMode, state.eInkMode)
             },
             onLookupRedirect = { query ->
                 LookupEngine.lookup(query, state.dictionarySettings.maxResults, state.dictionarySettings.scanLength)
@@ -670,7 +662,7 @@ private class LookupPopupHostView(
                 }
             },
             onScroll = {
-                selectionOverlay.update(emptyList(), state.darkMode, state.eInkMode)
+                selectionHighlightView.update(emptyList(), state.darkMode, state.eInkMode)
                 if (isPopupActive) {
                     val nextPopups = closeChildPopupsForScrolledParent(allPopups, index)
                     if (nextPopups != allPopups) onPopupsChange(nextPopups)
@@ -886,14 +878,16 @@ private class LookupPopupHostView(
         state: LookupPopupState,
         sasayakiCue: SasayakiMatch?,
     ) {
-        selectionOffsetHolder.offsetX = frame.leftDp
-        selectionOffsetHolder.offsetY = popupSelectionOffsetY(
-            frameTopDp = frame.topDp,
+        val controlsHeight = popupSelectionControlsHeight(
             popupActionBar = state.popupActionBar,
             backCount = backCount,
             forwardCount = forwardCount,
             hasSasayakiCue = sasayakiCue != null,
         )
+        selectionOffsetHolder.offsetX = frame.leftDp
+        selectionOffsetHolder.offsetY = frame.topDp + controlsHeight
+        selectionOffsetHolder.highlightOffsetX = 0.0
+        selectionOffsetHolder.highlightOffsetY = controlsHeight
     }
 
     private fun Double.dpToPx(): Int = (this * density).toInt().coerceAtLeast(1)
@@ -907,8 +901,20 @@ internal fun popupSelectionOffsetY(
     forwardCount: Int,
     hasSasayakiCue: Boolean,
 ): Double =
-    frameTopDp +
-        (if (popupActionBar || backCount > 0 || forwardCount > 0) PopupControlTotalHeightDp else 0.0) +
+    frameTopDp + popupSelectionControlsHeight(
+        popupActionBar = popupActionBar,
+        backCount = backCount,
+        forwardCount = forwardCount,
+        hasSasayakiCue = hasSasayakiCue,
+    )
+
+private fun popupSelectionControlsHeight(
+    popupActionBar: Boolean,
+    backCount: Int,
+    forwardCount: Int,
+    hasSasayakiCue: Boolean,
+): Double =
+    (if (popupActionBar || backCount > 0 || forwardCount > 0) PopupControlTotalHeightDp else 0.0) +
         (if (hasSasayakiCue) PopupControlTotalHeightDp else 0.0)
 
 private class PopupControlBar(context: Context) : LinearLayout(context) {
