@@ -1542,6 +1542,7 @@ function redirect(count) {
 }
 
 window.replacePopupResults = function(count) {
+    closeOverlay();
     flushPendingHistoryRestore();
     backStack.length = 0;
     forwardStack.length = 0;
