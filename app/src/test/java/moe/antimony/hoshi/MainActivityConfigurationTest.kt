@@ -9,6 +9,24 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class MainActivityConfigurationTest {
     @Test
+    fun appLabelsComeFromBuildVariantPlaceholder() {
+        val expectedLabel = "\${appLabel}"
+
+        assertTrue(
+            "The application label must come from the build variant so localized app_name resources cannot override the debug label.",
+            applicationManifestElement().getAttribute("android:label") == expectedLabel,
+        )
+        assertTrue(
+            "MainActivity must use the same build variant label as the application.",
+            mainActivityManifestElement().getAttribute("android:label") == expectedLabel,
+        )
+        assertTrue(
+            "ProcessTextLookupActivity must use the same build variant label as the application.",
+            processTextLookupActivityManifestElement().getAttribute("android:label") == expectedLabel,
+        )
+    }
+
+    @Test
     fun mainActivityHandlesReaderOrientationChangesInPlace() {
         val activity = mainActivityManifestElement()
         val configChanges = activity
@@ -88,6 +106,12 @@ class MainActivityConfigurationTest {
         return activityManifestElement(".features.dictionary.ProcessTextLookupActivity")
     }
 
+    private fun applicationManifestElement(): Element {
+        return manifestDocument().documentElement
+            .getElementsByTagName("application")
+            .item(0) as Element
+    }
+
     private fun Element.hasIntentFilter(
         actionName: String,
         mimeType: String? = null,
@@ -124,9 +148,7 @@ class MainActivityConfigurationTest {
     }
 
     private fun activityManifestElement(name: String): Element {
-        val document = DocumentBuilderFactory.newInstance()
-            .newDocumentBuilder()
-            .parse(File("src/main/AndroidManifest.xml"))
+        val document = manifestDocument()
         val activities = document.getElementsByTagName("activity")
         for (index in 0 until activities.length) {
             val element = activities.item(index) as Element
@@ -136,5 +158,9 @@ class MainActivityConfigurationTest {
         }
         error("$name not found in AndroidManifest.xml")
     }
+
+    private fun manifestDocument() = DocumentBuilderFactory.newInstance()
+        .newDocumentBuilder()
+        .parse(File("src/main/AndroidManifest.xml"))
 
 }

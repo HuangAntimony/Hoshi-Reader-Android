@@ -99,7 +99,7 @@ For settings/navigation changes, verify settings controls update immediately and
 
 For dark-theme cold-start regressions, use emulator screen recording with the App Appearance theme set to Dark and confirm no light `No Books` app frame appears before the bookshelf loads.
 
-For build label regressions, verify release builds keep the launcher label `Hoshi Reader` and debug builds show `Hoshi Debug`.
+For build label regressions, verify build variant manifest labels override localized app name resources: release builds keep the launcher label `Hoshi Reader` and debug builds show `Hoshi Debug` on English and Simplified Chinese devices.
 
 For bookshelf tab-switch regressions, use real-device screen recording to confirm cover placeholders do not flash white when returning to Books from the bottom tab bar.
 
