@@ -200,6 +200,7 @@ private class LookupPopupOverlayController(
 
     init {
         view.onOverlaySizeChanged = { lastUpdate?.let(::applyUpdate) }
+        view.onTapOutsidePopup = { dismissAllPopups() }
         view.addView(
             rootHighlightView,
             FrameLayout.LayoutParams(
@@ -208,6 +209,16 @@ private class LookupPopupOverlayController(
             ),
         )
         rootHost?.let { host -> view.addView(host) }
+    }
+
+    private fun dismissAllPopups() {
+        val update = lastUpdate ?: return
+        if (update.popups.isEmpty()) return
+        // Same path as the root popup's close button (dismiss at index 0): the reader
+        // handles it, falling back to clearing the popup list if it does not.
+        if (!update.onRootPopupDismissed()) {
+            update.onPopupsChange(emptyList())
+        }
     }
 
     fun update(
@@ -262,6 +273,13 @@ private class LookupPopupOverlayController(
     }
 
     private fun applyUpdate(update: OverlayUpdate) {
+        // The overlay sits on top of the reader WebView. With no popup to show it must be
+        // fully out of the input path — a VISIBLE full-screen overlay that merely returns
+        // false from dispatchTouchEvent still swallows Samsung S Pen input meant for the
+        // reader WebView behind it (regression from the v0.7.4 popup overlay rewrite).
+        // GONE keeps it clear of touch and hover dispatch until a popup actually needs it.
+        view.visibility = if (update.popups.isEmpty()) View.GONE else View.VISIBLE
+
         val rootPopup = if (warmRootEnabled) {
             update.popups.firstOrNull()
                 ?.withRootSelectionOffset(update.rootSelectionOffsetX, update.rootSelectionOffsetY)
@@ -373,6 +391,7 @@ private data class OverlayUpdate(
 
 private class LookupPopupOverlayLayout(context: Context) : FrameLayout(context) {
     var onOverlaySizeChanged: () -> Unit = {}
+    var onTapOutsidePopup: () -> Unit = {}
     private val touchStreamTracker = PopupTouchStreamTracker()
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -382,6 +401,13 @@ private class LookupPopupOverlayLayout(context: Context) : FrameLayout(context) 
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         val hitPopup = hitPopup(event)
+        // A press that misses every popup dismisses the stack. The overlay is GONE while
+        // no popup is shown, so reaching here means a popup is up. This must be handled
+        // here rather than left to fall through to the reader: an S Pen press does not
+        // fall through the overlay to the reader the way a finger press does.
+        if (!hitPopup && event.actionMasked == MotionEvent.ACTION_DOWN) {
+            onTapOutsidePopup()
+        }
         val shouldDispatch = touchStreamTracker.shouldDispatch(event.actionMasked, hitPopup)
         if (!shouldDispatch) return false
         val handled = super.dispatchTouchEvent(event)
