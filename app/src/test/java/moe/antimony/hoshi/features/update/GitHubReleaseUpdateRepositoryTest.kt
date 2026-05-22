@@ -152,6 +152,45 @@ class GitHubReleaseUpdateRepositoryTest {
     }
 
     @Test
+    fun selectsArm64ReleaseAssetForArm64Devices() {
+        val release = splitAbiRelease()
+
+        val update = release.availableUpdateOrNull(
+            currentVersionName = "0.3.4",
+            supportedAbis = listOf("arm64-v8a", "armeabi-v7a"),
+        )
+
+        requireNotNull(update)
+        assertEquals("Hoshi-Reader-v0.3.5-arm64-v8a.apk", update.assetName)
+        assertEquals("https://example.com/Hoshi-Reader-v0.3.5-arm64-v8a.apk", update.downloadUrl)
+    }
+
+    @Test
+    fun selectsV7aReleaseAssetForThirtyTwoBitArmDevices() {
+        val release = splitAbiRelease()
+
+        val update = release.availableUpdateOrNull(
+            currentVersionName = "0.3.4",
+            supportedAbis = listOf("armeabi-v7a"),
+        )
+
+        requireNotNull(update)
+        assertEquals("Hoshi-Reader-v0.3.5-armeabi-v7a.apk", update.assetName)
+    }
+
+    @Test
+    fun returnsNoUpdateWhenSplitAbiReleaseHasNoCompatibleAsset() {
+        val release = splitAbiRelease()
+
+        val update = release.availableUpdateOrNull(
+            currentVersionName = "0.3.4",
+            supportedAbis = listOf("x86_64"),
+        )
+
+        assertEquals(null, update)
+    }
+
+    @Test
     fun rejectsInvalidReleaseVersionAndAmbiguousApkAssets() {
         val invalidVersion = GitHubRelease(
             tagName = "latest",
@@ -177,6 +216,29 @@ class GitHubReleaseUpdateRepositoryTest {
         assertTrue(AppVersion.parse("0.3.4")!! == AppVersion.parse("v0.3.4")!!)
         assertTrue(AppVersion.parse("0.3.4")!! < AppVersion.parse("0.3.5")!!)
     }
+
+    private fun splitAbiRelease(): GitHubRelease =
+        GitHubRelease(
+            tagName = "v0.3.5",
+            htmlUrl = "https://example.com/releases/tag/v0.3.5",
+            assets = listOf(
+                GitHubReleaseAsset(
+                    name = "Hoshi-Reader-v0.3.5-arm64-v8a.apk",
+                    browserDownloadUrl = "https://example.com/Hoshi-Reader-v0.3.5-arm64-v8a.apk",
+                    digest = null,
+                ),
+                GitHubReleaseAsset(
+                    name = "Hoshi-Reader-v0.3.5-armeabi-v7a.apk",
+                    browserDownloadUrl = "https://example.com/Hoshi-Reader-v0.3.5-armeabi-v7a.apk",
+                    digest = null,
+                ),
+                GitHubReleaseAsset(
+                    name = "LICENSE",
+                    browserDownloadUrl = "https://example.com/LICENSE",
+                    digest = null,
+                ),
+            ),
+        )
 
     private class FakeGitHubHttpClient(
         private val responses: Map<String, String>,

@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.update
 
+import android.os.Build
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -63,7 +64,10 @@ internal fun AvailableUpdate.downloadUrlAfterFailed(failedDownloadUrl: String?):
         candidates.getOrNull(candidates.indexOf(failedDownloadUrl) + 1) ?: downloadUrl
     }
 
-internal fun GitHubRelease.availableUpdateOrNull(currentVersionName: String): AvailableUpdate? {
+internal fun GitHubRelease.availableUpdateOrNull(
+    currentVersionName: String,
+    supportedAbis: List<String> = AndroidSupportedAbis.current(),
+): AvailableUpdate? {
     val releaseVersion = AppVersion.parse(tagName) ?: return null
     val currentVersion = AppVersion.parse(currentVersionName) ?: return null
     if (releaseVersion <= currentVersion) return null
@@ -72,6 +76,7 @@ internal fun GitHubRelease.availableUpdateOrNull(currentVersionName: String): Av
     val apkAssets = assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
     val expectedName = "Hoshi-Reader-v$normalizedVersion.apk"
     val selectedAsset = apkAssets.firstOrNull { it.name == expectedName }
+        ?: apkAssets.selectCompatibleAbiAsset(normalizedVersion, supportedAbis)
         ?: apkAssets.singleOrNull()
         ?: return null
     return AvailableUpdate(
@@ -82,6 +87,30 @@ internal fun GitHubRelease.availableUpdateOrNull(currentVersionName: String): Av
         fallbackDownloadUrls = selectedAsset.fallbackDownloadUrls,
         sha256 = selectedAsset.normalizedSha256(),
     )
+}
+
+private fun List<GitHubReleaseAsset>.selectCompatibleAbiAsset(
+    normalizedVersion: String,
+    supportedAbis: List<String>,
+): GitHubReleaseAsset? {
+    val expectedPrefix = "Hoshi-Reader-v$normalizedVersion-"
+    val expectedSuffix = ".apk"
+    val assetsByAbi = mapNotNull { asset ->
+        val abi = asset.name
+            .takeIf { it.startsWith(expectedPrefix) && it.endsWith(expectedSuffix) }
+            ?.removePrefix(expectedPrefix)
+            ?.removeSuffix(expectedSuffix)
+            ?: return@mapNotNull null
+        abi to asset
+    }
+    return supportedAbis.firstNotNullOfOrNull { abi ->
+        assetsByAbi.singleOrNull { (assetAbi, _) -> assetAbi == abi }?.second
+    }
+}
+
+private object AndroidSupportedAbis {
+    fun current(): List<String> =
+        runCatching { Build.SUPPORTED_ABIS.toList() }.getOrDefault(emptyList())
 }
 
 private fun GitHubReleaseAsset.normalizedSha256(): String? =

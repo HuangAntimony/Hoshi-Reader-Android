@@ -109,7 +109,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Restore Cargo cache
         uses: Swatinem/rust-cache@v2
@@ -158,23 +158,83 @@ jobs:
             echo "::warning::app/build.gradle.kts versionCode=${actual_code}, expected ${version_code}"
           fi
 
-      - name: Build and check release APK
-        shell: bash
-        run: |
-          ./gradlew --no-daemon lintVitalRelease assembleRelease \
-            -PreleaseVersionName=${{ needs.resolve-release.outputs.version_name }} \
-            -PreleaseVersionCode=${{ needs.resolve-release.outputs.version_code }}
-
-      - name: Verify APK metadata matches tag
+      - name: Prepare split ABI release build
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/build.gradle.kts")
+          text = path.read_text()
+          text = text.replace(
+              'val releaseVersionCode = providers.gradleProperty("releaseVersionCode").orNull?.toIntOrNull()\n',
+              'val releaseVersionCode = providers.gradleProperty("releaseVersionCode").orNull?.toIntOrNull()\n'
+              'val releaseAbi = providers.gradleProperty("releaseAbi").orNull\n',
+          )
+          text = text.replace(
+              '            ndk {\n'
+              '                abiFilters += listOf("arm64-v8a")\n'
+              '            }\n',
+              '            ndk {\n'
+              '                abiFilters += listOf(releaseAbi ?: "arm64-v8a")\n'
+              '            }\n',
+          )
+          text = text.replace(
+              '    outputs.file(rustReleaseJniLibsDir.resolve("arm64-v8a/libhoshiepub.so"))\n',
+              '    outputs.file(rustReleaseJniLibsDir.resolve("${releaseAbi ?: "arm64-v8a"}/libhoshiepub.so"))\n',
+          )
+          text = text.replace(
+              '        "-t",\n'
+              '        "arm64-v8a",\n'
+              '        "-o",\n'
+              '        rustReleaseJniLibsDir.absolutePath,\n'
+              '        "build",\n'
+              '        "--lib",\n'
+              '        "--release",\n'
+              '    )\n'
+              '}\n'
+              '\n'
+              'tasks.named("preBuild")',
+              '        "-t",\n'
+              '        releaseAbi ?: "arm64-v8a",\n'
+              '        "-o",\n'
+              '        rustReleaseJniLibsDir.absolutePath,\n'
+              '        "build",\n'
+              '        "--lib",\n'
+              '        "--release",\n'
+              '    )\n'
+              '}\n'
+              '\n'
+              'tasks.named("preBuild")',
+          )
+          path.write_text(text)
+          PY
+
+      - name: Build and check split release APKs
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve-release.outputs.tag }}"
+          version_name="${{ needs.resolve-release.outputs.version_name }}"
+          version_code="${{ needs.resolve-release.outputs.version_code }}"
+          build_tools="${ANDROID_HOME}/build-tools/36.0.0"
+          apk_assets=()
+
+          for abi in arm64-v8a armeabi-v7a; do
+            rm -rf app/build/jniLibs/release app/build/outputs/apk/release
+            ./gradlew --no-daemon clean lintVitalRelease assembleRelease \
+              -PreleaseAbi="${abi}" \
+              -PreleaseVersionName="${version_name}" \
+              -PreleaseVersionCode="${version_code}"
+
+            python3 - <<PY
           import json
           from pathlib import Path
 
-          expected_name = "${{ needs.resolve-release.outputs.version_name }}"
-          expected_code = int("${{ needs.resolve-release.outputs.version_code }}")
+          expected_name = "${version_name}"
+          expected_code = int("${version_code}")
           metadata_path = Path("app/build/outputs/apk/release/output-metadata.json")
           metadata = json.loads(metadata_path.read_text())
           element = metadata["elements"][0]
@@ -183,32 +243,37 @@ jobs:
 
           if actual_name != expected_name or actual_code != expected_code:
               raise SystemExit(
-                  f"Release APK metadata mismatch: "
+                  f"Release APK metadata mismatch for ${abi}: "
                   f"versionName={actual_name}, versionCode={actual_code}; "
                   f"expected versionName={expected_name}, versionCode={expected_code}"
               )
           PY
 
-      - name: Prepare release assets
-        id: assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="${{ needs.resolve-release.outputs.tag }}"
-          apk_source="app/build/outputs/apk/release/app-release.apk"
-          apk_asset="Hoshi-Reader-${tag}.apk"
+            apk_source="app/build/outputs/apk/release/app-release.apk"
+            apk_asset="Hoshi-Reader-${tag}-${abi}.apk"
 
-          if [[ ! -f "${apk_source}" ]]; then
-            echo "Expected signed APK was not found at ${apk_source}" >&2
-            find app/build/outputs/apk -type f -name '*.apk' -print >&2 || true
-            exit 1
-          fi
+            if [[ ! -f "${apk_source}" ]]; then
+              echo "Expected signed APK was not found at ${apk_source}" >&2
+              find app/build/outputs/apk -type f -name '*.apk' -print >&2 || true
+              exit 1
+            fi
 
-          build_tools="${ANDROID_HOME}/build-tools/36.0.0"
-          "${build_tools}/apksigner" verify --print-certs "${apk_source}"
-          cp "${apk_source}" "${apk_asset}"
+            mapfile -t packaged_abis < <(zipinfo -1 "${apk_source}" \
+              | sed -n 's#^lib/\([^/]*\)/.*\.so$#\1#p' \
+              | sort -u)
+            if [[ "${#packaged_abis[@]}" -ne 1 || "${packaged_abis[0]}" != "${abi}" ]]; then
+              echo "Expected only ${abi} native libraries, found: ${packaged_abis[*]:-none}" >&2
+              zipinfo -1 "${apk_source}" | grep '^lib/' >&2 || true
+              exit 1
+            fi
+            zipinfo -1 "${apk_source}" | grep -qx "lib/${abi}/libhoshiepub.so"
 
-          echo "apk_asset=${apk_asset}" >> "${GITHUB_OUTPUT}"
+            "${build_tools}/apksigner" verify --print-certs "${apk_source}"
+            cp "${apk_source}" "${apk_asset}"
+            apk_assets+=("${apk_asset}")
+          done
+
+          echo "apk_assets=${apk_assets[*]}" >> "${GITHUB_OUTPUT}"
 
       - name: Generate release notes from CHANGELOG
         shell: bash
@@ -248,7 +313,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ needs.resolve-release.outputs.tag }}"
-          apk_asset="${{ steps.assets.outputs.apk_asset }}"
+          apk_assets="${{ steps.assets.outputs.apk_assets }}"
           prerelease_flag=()
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" \
@@ -268,4 +333,4 @@ jobs:
               "${prerelease_flag[@]}"
           fi
 
-          gh release upload "${tag}" "${apk_asset}" LICENSE --clobber
+          gh release upload "${tag}" ${apk_assets} LICENSE --clobber
