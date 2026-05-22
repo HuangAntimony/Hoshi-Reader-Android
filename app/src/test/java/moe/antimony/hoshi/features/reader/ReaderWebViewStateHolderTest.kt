@@ -122,6 +122,19 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun readerNavigationInputIsIgnoredWhileWebViewIsRestoring() {
+        val holder = stateHolder(initialIndex = 2)
+
+        assertFalse(holder.canAcceptReaderNavigationInput())
+
+        holder.markWebViewRestored()
+        assertTrue(holder.canAcceptReaderNavigationInput())
+
+        holder.goToNextChapter(lastIndex = 3)
+        assertFalse(holder.canAcceptReaderNavigationInput())
+    }
+
+    @Test
     fun staleContinuousScrollProgressFromPreviousRestoreEpochIsIgnored() {
         val holder = stateHolder(initialIndex = 2)
         holder.markWebViewRestored()
@@ -130,6 +143,20 @@ class ReaderWebViewStateHolderTest {
         holder.goToNextChapter(lastIndex = 3)
         holder.markWebViewRestored()
         val staleProgress = holder.recordContinuousScrollProgress(0.72, oldEpoch)
+
+        assertNull(staleProgress)
+        assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), holder.readerPosition.displayedPosition)
+    }
+
+    @Test
+    fun staleContinuousScrollDisplayProgressFromPreviousRestoreEpochIsIgnored() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.markWebViewRestored()
+        val oldEpoch = holder.webViewRestoreEpoch
+
+        holder.goToNextChapter(lastIndex = 3)
+        holder.markWebViewRestored()
+        val staleProgress = holder.recordContinuousScrollDisplayProgress(1.0, oldEpoch)
 
         assertNull(staleProgress)
         assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), holder.readerPosition.displayedPosition)

@@ -626,6 +626,7 @@ fun ReaderWebView(
         sasayakiPlayer?.readerSkipButtonAction = settings.readerSkipButtonAction
     }
     fun goToNextChapter(): Boolean {
+        if (!stateHolder.canAcceptReaderNavigationInput()) return false
         startStatisticsForProgressChangeIfNeeded()
         val next = stateHolder.goToNextChapter(book.chapters.lastIndex)
         if (next != null) {
@@ -637,6 +638,7 @@ fun ReaderWebView(
         return false
     }
     fun goToPreviousChapter(): Boolean {
+        if (!stateHolder.canAcceptReaderNavigationInput()) return false
         startStatisticsForProgressChangeIfNeeded()
         val previous = stateHolder.goToPreviousChapter()
         if (previous != null) {
@@ -660,6 +662,12 @@ fun ReaderWebView(
         stateHolder.clearForwardHistoryAfterManualMovement()
         recordStatisticsAtDisplayedPosition()
     }
+    fun displayContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        startStatisticsForProgressChangeIfNeeded()
+        stateHolder.recordContinuousScrollDisplayProgress(progress, restoreEpoch) ?: return
+        stateHolder.clearForwardHistoryAfterManualMovement()
+        recordStatisticsAtDisplayedPosition()
+    }
     fun saveContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordContinuousScrollProgress(progress, restoreEpoch) ?: return
@@ -668,6 +676,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition)
     }
     fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean {
+        if (!stateHolder.canAcceptReaderNavigationInput()) return false
         val currentWebView = webView ?: return false
         closeLookupPopupsAndSelection()
         val onLimit = when (direction) {
@@ -989,6 +998,9 @@ fun ReaderWebView(
                         },
                         onDisplayProgress = { progress ->
                             displayPagedTurnProgress(progress)
+                        },
+                        onContinuousScrollDisplayProgress = { progress, restoreEpoch ->
+                            displayContinuousScrollProgress(progress, restoreEpoch)
                         },
                         onContinuousScrollProgress = { progress, restoreEpoch ->
                             saveContinuousScrollProgress(progress, restoreEpoch)
@@ -1744,6 +1756,7 @@ private fun ChapterWebView(
     onPreviousChapter: () -> Boolean,
     onSaveBookmark: (progress: Double) -> Unit,
     onDisplayProgress: (progress: Double) -> Unit,
+    onContinuousScrollDisplayProgress: (progress: Double, restoreEpoch: Int) -> Unit,
     onContinuousScrollProgress: (progress: Double, restoreEpoch: Int) -> Unit,
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     scanNonJapaneseText: Boolean,
@@ -1761,6 +1774,7 @@ private fun ChapterWebView(
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
     val currentOnSaveBookmark = rememberUpdatedState(onSaveBookmark)
     val currentOnDisplayProgress = rememberUpdatedState(onDisplayProgress)
+    val currentOnContinuousScrollDisplayProgress = rememberUpdatedState(onContinuousScrollDisplayProgress)
     val currentOnContinuousScrollProgress = rememberUpdatedState(onContinuousScrollProgress)
     val currentOnClearLookupPopup = rememberUpdatedState(onClearLookupPopup)
     val currentOnHighlightCreated = rememberUpdatedState(onHighlightCreated)
@@ -1866,7 +1880,9 @@ private fun ChapterWebView(
                 webView.setOnTouchListener(
                     ContinuousScrollTouchListener(
                         settings = readerSettings,
-                        shouldIgnoreReaderGesture = webView::isNativeSelectionActionModeActive,
+                        shouldIgnoreReaderGesture = {
+                            currentIsWebViewRestoring.value || webView.isNativeSelectionActionModeActive()
+                        },
                         onTap = ::selectAt,
                         onNextChapter = {
                             currentOnClearLookupPopup.value()
@@ -1896,7 +1912,9 @@ private fun ChapterWebView(
                         if (continuousScrollSaveRequestId != requestId) return@evaluateJavascript
                         ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
                             when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
-                                ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                ReaderProgressPersistenceAction.DisplayOnly -> {
+                                    currentOnContinuousScrollDisplayProgress.value(progress, restoreEpoch)
+                                }
                                 ReaderProgressPersistenceAction.SaveBookmark -> {
                                     currentOnContinuousScrollProgress.value(progress, restoreEpoch)
                                 }
@@ -1924,7 +1942,7 @@ private fun ChapterWebView(
                 webView.setOnScrollChangeListener(null)
                 webView.setOnTouchListener(object : SwipePageTouchListener() {
                     override fun shouldIgnoreReaderGesture(): Boolean =
-                        webView.isNativeSelectionActionModeActive()
+                        currentIsWebViewRestoring.value || webView.isNativeSelectionActionModeActive()
 
                     override fun onTap(x: Float, y: Float) {
                         selectAt(x, y)

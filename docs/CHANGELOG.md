@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep the light reader bottom menu outline visible against the white reader background.
 - Prevent Books from crashing when the Reading Shelf is enabled while a user-created shelf is also named Reading.
+- Prevent rapid reader page turns during chapter restore from skipping over the newly loading chapter or briefly showing boundary progress from a stale scroll callback.
 
 ## [v1.0.1] - 2026-05-22
 

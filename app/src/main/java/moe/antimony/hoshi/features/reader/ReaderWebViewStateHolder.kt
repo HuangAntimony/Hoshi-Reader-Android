@@ -178,6 +178,12 @@ internal class ReaderWebViewStateHolder(
         return recordDisplayedProgress(progress)
     }
 
+    fun recordContinuousScrollDisplayProgress(progress: Double, restoreEpoch: Int): ReaderChapterPosition? =
+        recordContinuousScrollProgress(progress, restoreEpoch)
+
+    fun canAcceptReaderNavigationInput(): Boolean =
+        !isWebViewRestoring
+
     fun prepareReloadAtDisplayedPosition() {
         readerPosition = readerPosition.prepareReloadAtDisplayedPosition()
         markWebViewRestoring()
