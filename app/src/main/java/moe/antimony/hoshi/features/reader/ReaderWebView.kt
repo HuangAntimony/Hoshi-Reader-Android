@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -69,6 +70,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,6 +121,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -158,6 +161,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private data class PendingRootSelectionHighlight(
     val popupId: String,
@@ -970,7 +974,6 @@ fun ReaderWebView(
         }
         val previousBehavior = controller?.systemBarsBehavior
         controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
             if (previousBehavior != null) {
                 controller.systemBarsBehavior = previousBehavior
@@ -978,8 +981,26 @@ fun ReaderWebView(
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
+    LaunchedEffect(context, view, focusMode) {
+        val activity = context.findActivity()
+        val controller = activity?.window?.let { window ->
+            WindowCompat.getInsetsController(window, view)
+        } ?: return@LaunchedEffect
+        val visibility = readerSystemBarVisibility(focusMode)
+        if (visibility.showStatusBar) {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        }
+        if (visibility.showNavigationBar) {
+            controller.show(WindowInsetsCompat.Type.navigationBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.navigationBars())
+        }
+    }
 
     val bottomChromeMetrics = readerBottomChromeMetrics()
+    val stableStatusBarPadding = rememberStableStatusBarPadding()
     val sasayakiBottomSkipButtons = readerSasayakiBottomSkipButtons(
         settings = sasayakiSettings,
         hasAudio = sasayakiPlayer?.hasAudio == true,
@@ -1002,6 +1023,16 @@ fun ReaderWebView(
     val reserveSasayakiTopToggle = remember(bookRoot, sasayakiSettings) {
         readerShouldReserveSasayakiTopToggle(bookRoot, sasayakiSettings)
     }
+    val contentChromeInsets = readerContentChromeInsets(
+        state = chromeState,
+        settings = effectiveSettings,
+        showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
+        showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
+        focusMode = focusMode,
+        topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
+    )
+    val nonFocusTopInfoPadding = maxOf(stableStatusBarPadding, 25.dp)
+    val topInfoPadding = if (focusMode) 8.dp else nonFocusTopInfoPadding
     val onSasayakiTopToggle = sasayakiPlayer
         ?.takeIf { showSasayakiTopToggle && it.hasAudio }
         ?.let { player ->
@@ -1034,7 +1065,8 @@ fun ReaderWebView(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .padding(top = contentChromeInsets.topDp.dp),
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val viewportHorizontalPadding = maxWidth * effectiveSettings.continuousViewportHorizontalPaddingRatio.toFloat()
@@ -1157,6 +1189,7 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             modifier = Modifier
                 .align(Alignment.TopCenter)
+                .padding(top = topInfoPadding)
                 .padding(horizontal = 15.dp),
         )
         ReaderFocusModeToggleArea(
@@ -1582,29 +1615,46 @@ private fun ReaderTopInfo(
             titlePadding.endDp.dp,
             dynamicTitlePadding,
         )
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            if (visibility.showTitleAndProgress && settings.showTitle) {
-                Text(
-                    text = state.title,
-                    color = Color(colors.infoText),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
+        val showCenterInfo = visibility.showTitleAndProgress &&
+            (settings.showTitle || (settings.showProgressTop && progress.isNotBlank()))
+        if (showCenterInfo) {
+            val bubbleMetrics = readerInfoBubbleMetrics()
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter),
+                shape = RoundedCornerShape(bubbleMetrics.cornerRadiusDp.dp),
+                color = Color(colors.menuContainer),
+                border = BorderStroke(1.dp, Color(colors.menuBorder)),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
+                Column(
                     modifier = Modifier.padding(
-                        start = resolvedTitlePadding,
-                        end = resolvedTitlePadding,
+                        horizontal = bubbleMetrics.horizontalPaddingDp.dp,
+                        vertical = bubbleMetrics.verticalPaddingDp.dp,
                     ),
-                )
-            }
-            if (visibility.showTitleAndProgress && settings.showProgressTop && progress.isNotBlank()) {
-                Text(
-                    text = progress,
-                    color = Color(colors.infoText),
-                    style = MaterialTheme.typography.labelMedium,
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    if (settings.showTitle) {
+                        Text(
+                            text = state.title,
+                            color = Color(colors.infoText),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            modifier = Modifier.padding(
+                                start = resolvedTitlePadding,
+                                end = resolvedTitlePadding,
+                            ),
+                        )
+                    }
+                    if (settings.showProgressTop && progress.isNotBlank()) {
+                        Text(
+                            text = progress,
+                            color = Color(colors.infoText),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
             }
         }
         if (showStartControls) {
@@ -1749,6 +1799,7 @@ private fun ReaderFocusModeToggleArea(
         sasayakiSkipButtons = sasayakiSkipButtons,
         focusMode = focusMode,
     )
+    if (!toggleArea.visible) return
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1756,6 +1807,19 @@ private fun ReaderFocusModeToggleArea(
             .height((metrics.buttonSizeDp + metrics.bottomPaddingDp + 8).dp)
             .clickable(onClick = onToggleFocusMode),
     )
+}
+
+@Composable
+private fun rememberStableStatusBarPadding(): Dp {
+    val density = LocalDensity.current
+    val currentTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    var stableTop by remember { mutableStateOf(0.dp) }
+    LaunchedEffect(currentTop) {
+        if (currentTop > 0.dp) {
+            stableTop = currentTop
+        }
+    }
+    return if (currentTop > 0.dp) currentTop else stableTop
 }
 
 @Composable
@@ -1810,28 +1874,41 @@ private fun BoxScope.ReaderBottomChrome(
             ),
     ) {
         if (layout.bottomCenterLineCount > 0) {
-            Column(
+            val bubbleMetrics = readerInfoBubbleMetrics()
+            Surface(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .heightIn(max = layout.bottomCenterMaxHeightDp.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                shape = RoundedCornerShape(bubbleMetrics.cornerRadiusDp.dp),
+                color = Color(colors.menuContainer),
+                border = BorderStroke(1.dp, Color(colors.menuBorder)),
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
             ) {
-                if (layout.showStatisticsInBottomBar) {
-                    Text(
-                        text = state.statisticsText(settings),
-                        color = Color(colors.infoText),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-                if (layout.showProgressInBottomBar) {
-                    Text(
-                        text = state.progressText(settings),
-                        color = Color(colors.infoText),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
+                Column(
+                    modifier = Modifier.padding(
+                        horizontal = bubbleMetrics.horizontalPaddingDp.dp,
+                        vertical = bubbleMetrics.verticalPaddingDp.dp,
+                    ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    if (layout.showStatisticsInBottomBar) {
+                        Text(
+                            text = state.statisticsText(settings),
+                            color = Color(colors.infoText),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                    if (layout.showProgressInBottomBar) {
+                        Text(
+                            text = state.progressText(settings),
+                            color = Color(colors.infoText),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

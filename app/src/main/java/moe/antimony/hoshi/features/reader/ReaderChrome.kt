@@ -73,6 +73,12 @@ data class ReaderContentChromeInsets(
     val bottomDp: Int,
 )
 
+data class ReaderInfoBubbleMetrics(
+    val horizontalPaddingDp: Int,
+    val verticalPaddingDp: Int,
+    val cornerRadiusDp: Int,
+)
+
 data class ReaderChromeVisibility(
     val showTitleAndProgress: Boolean,
     val showBottomChrome: Boolean,
@@ -100,7 +106,13 @@ data class ReaderSasayakiBottomSkipButtonActions(
 )
 
 data class ReaderFocusModeToggleArea(
+    val visible: Boolean,
     val horizontalPaddingDp: Int,
+)
+
+data class ReaderSystemBarVisibility(
+    val showStatusBar: Boolean,
+    val showNavigationBar: Boolean,
 )
 
 data class ReaderTopTitlePaddingDp(
@@ -155,8 +167,25 @@ fun readerContentChromeInsets(
     showSasayakiToggle: Boolean = false,
     showStatisticsToggle: Boolean = false,
     focusMode: Boolean = false,
+    topSystemInsetDp: Int = 0,
 ): ReaderContentChromeInsets =
-    ReaderContentChromeInsets(topDp = 0, bottomDp = 0)
+    ReaderContentChromeInsets(
+        topDp = maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp) + ReaderWebViewTopPaddingDp,
+        bottomDp = 0,
+    )
+
+fun readerInfoBubbleMetrics(): ReaderInfoBubbleMetrics =
+    ReaderInfoBubbleMetrics(
+        horizontalPaddingDp = 12,
+        verticalPaddingDp = 6,
+        cornerRadiusDp = 24,
+    )
+
+fun readerSystemBarVisibility(focusMode: Boolean): ReaderSystemBarVisibility =
+    ReaderSystemBarVisibility(
+        showStatusBar = !focusMode,
+        showNavigationBar = false,
+    )
 
 fun readerChromeVisibility(
     focusMode: Boolean,
@@ -228,7 +257,7 @@ fun readerFocusModeToggleArea(
     focusMode: Boolean,
 ): ReaderFocusModeToggleArea {
     if (focusMode) {
-        return ReaderFocusModeToggleArea(horizontalPaddingDp = 0)
+        return ReaderFocusModeToggleArea(visible = false, horizontalPaddingDp = 0)
     }
     val sideClusterWidth = if (sasayakiSkipButtons.visible) {
         metrics.buttonSizeDp + sasayakiSkipButtons.adjacentSpacingDp + sasayakiSkipButtons.buttonSizeDp
@@ -236,6 +265,7 @@ fun readerFocusModeToggleArea(
         metrics.buttonSizeDp
     }
     return ReaderFocusModeToggleArea(
+        visible = true,
         horizontalPaddingDp = metrics.horizontalPaddingDp + sideClusterWidth,
     )
 }
@@ -305,6 +335,8 @@ private fun ReaderStatisticsChromeState.readingTimeText(): String {
 }
 
 private const val ReaderBottomChromeButtonSizeDp = 44
+private const val ReaderTopReservedSpaceDp = 52
+private const val ReaderWebViewTopPaddingDp = 4
 private const val ReaderTopButtonSizeDp = 36
 private const val ReaderTopButtonIconSizeDp = 20
 private const val ReaderTopTitleControlPaddingDp = 42

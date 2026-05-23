@@ -58,25 +58,29 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun readerContentDoesNotReserveSpaceForTopChromeRows() {
+    fun readerContentReservesOnlyTheTopSafetyArea() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
             totalCharacters = 169325,
         )
 
-        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), readerContentChromeInsets())
+        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), readerContentChromeInsets())
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showCharacters = false, showPercentage = false),
             ),
         )
+        assertEquals(
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            readerContentChromeInsets(topSystemInsetDp = 52),
+        )
     }
 
     @Test
-    fun jumpHistoryControlsOverlayReaderContentInsteadOfReservingTheTopRow() {
+    fun jumpHistoryControlsDoNotAddMoreThanTheTopSafetyArea() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
@@ -85,7 +89,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -94,7 +98,7 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun topQuickControlsOverlayReaderContentInsteadOfReservingTheTopRow() {
+    fun topQuickControlsDoNotAddMoreThanTheTopSafetyArea() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
@@ -102,7 +106,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -110,7 +114,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -118,7 +122,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -126,7 +130,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = true, showProgressTop = false),
@@ -134,7 +138,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = true, showProgressTop = true),
@@ -214,6 +218,14 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun centerInfoUsesBubbleChromeLikeIos() {
+        assertEquals(
+            ReaderInfoBubbleMetrics(horizontalPaddingDp = 12, verticalPaddingDp = 6, cornerRadiusDp = 24),
+            readerInfoBubbleMetrics(),
+        )
+    }
+
+    @Test
     fun topSasayakiToggleUsesSmallerCircleWithoutShrinkingTheIcon() {
         val metrics = readerBottomChromeMetrics()
 
@@ -262,8 +274,20 @@ class ReaderChromeTest {
             focusMode = true,
         )
 
-        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), normalInsets)
+        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), normalInsets)
         assertEquals(normalInsets, focusInsets)
+    }
+
+    @Test
+    fun readerSystemBarsShowStatusOutsideFocusAndHideAllInFocus() {
+        assertEquals(
+            ReaderSystemBarVisibility(showStatusBar = true, showNavigationBar = false),
+            readerSystemBarVisibility(focusMode = false),
+        )
+        assertEquals(
+            ReaderSystemBarVisibility(showStatusBar = false, showNavigationBar = false),
+            readerSystemBarVisibility(focusMode = true),
+        )
     }
 
     @Test
@@ -328,13 +352,12 @@ class ReaderChromeTest {
                 focusMode = false,
             ).horizontalPaddingDp,
         )
-        assertEquals(
-            0,
+        assertFalse(
             readerFocusModeToggleArea(
                 metrics = metrics,
                 sasayakiSkipButtons = skipButtons,
                 focusMode = true,
-            ).horizontalPaddingDp,
+            ).visible,
         )
     }
 
@@ -347,7 +370,7 @@ class ReaderChromeTest {
         assertEquals(28, metrics.secondaryIconSizeDp)
         assertEquals(8, metrics.trailingButtonSpacingDp)
         assertEquals(46, metrics.menuBottomOffsetDp)
-        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), readerContentChromeInsets())
+        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), readerContentChromeInsets())
     }
 
     @Test
