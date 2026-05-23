@@ -79,7 +79,7 @@ Validation:
 
 ### 3. Reader advanced paragraph spacing
 
-Status: pending Android sync.
+Status: completed on Android.
 
 Commits:
 
@@ -96,18 +96,16 @@ iOS behavior to mirror:
 - In horizontal writing, paragraph spacing applies to top/bottom paragraph margins.
 - Changing the value rebuilds the reader WebView through the same state key path as line height and character spacing.
 
-Android current gap:
+Android result:
 
-- Android has line height and character spacing, but no paragraph spacing field, localized labels, persistence key, or CSS generation.
-
-Suggested slice:
-
-- Add the setting across `ReaderSettings`, legacy SharedPreferences, DataStore, `ReaderWebViewState`, `ReaderAppearanceView`, strings, and `ReaderContentStyles`.
-- Add focused unit coverage for settings persistence and CSS output.
+- Reader settings now include paragraph spacing with default `0`, legacy SharedPreferences and DataStore persistence, and reader content reload-key participation.
+- Appearance -> Layout -> Advanced now shows a localized Paragraph Spacing slider from `0...3` in `0.1em` steps.
+- Generated reader CSS applies paragraph spacing to left/right paragraph margins in vertical writing and top/bottom margins in horizontal writing, only when Advanced layout is enabled.
+- Covered by focused JVM tests for defaults, migration/persistence, reload-key changes, localized resources, and CSS output.
 
 Validation:
 
-- `./gradlew :app:testDebugUnitTest --tests moe.antimony.hoshi.LocalizationResourceTest`
+- `./gradlew :app:testDebugUnitTest --tests moe.antimony.hoshi.features.reader.ReaderSettingsTest --tests moe.antimony.hoshi.features.reader.ReaderSettingsRepositoryTest --tests moe.antimony.hoshi.features.reader.ReaderWebViewStateHolderTest --tests moe.antimony.hoshi.LocalizationResourceTest`
 - Device-validate visible spacing changes in both paginated/continuous and vertical/horizontal writing.
 
 ### 4. Reader chrome redesign and focus-mode interaction

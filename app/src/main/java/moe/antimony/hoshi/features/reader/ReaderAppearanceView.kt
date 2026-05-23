@@ -389,6 +389,17 @@ private fun ReaderAppearanceContent(
                                 onSettingsChange(settings.copy(characterSpacing = round(value).toDouble()))
                             },
                         )
+                        AppearanceDivider(palette)
+                        SliderRow(
+                            label = stringResource(R.string.reader_appearance_paragraph_spacing),
+                            value = String.format(Locale.US, "%.1fem", settings.paragraphSpacing),
+                            sliderValue = settings.paragraphSpacing.toFloat(),
+                            valueRange = 0f..3f,
+                            steps = 29,
+                            onValueChange = { value ->
+                                onSettingsChange(settings.copy(paragraphSpacing = round(value * 10) / 10.0))
+                            },
+                        )
                     }
                 }
                 AppearanceSection(title = stringResource(R.string.reader_appearance_display), palette = palette) {

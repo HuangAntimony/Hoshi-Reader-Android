@@ -33,9 +33,10 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
-- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; checked through `9b3e135`, with popup, Dictionary pull-to-clear, and dictionary auto-update sync work pending; defer EPUB storage-format migration until upstream iOS/TTU book data sync stabilizes.
+- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; checked through `9b3e135`, with reader chrome, popup, Dictionary pull-to-clear, and dictionary auto-update sync work pending; defer EPUB storage-format migration until upstream iOS/TTU book data sync stabilizes.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 1: continuous reader padding now belongs to the visible viewport, vertical paginated columns resolve from page height, and chapter HTML receives an early XHTML-safe viewport while retaining the fast `loadUrl` chapter path.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 2: large reader images and SVG image media now use iOS-style tap handling, Blur Images first-tap reveal, fullscreen zoom, and copy/save/share controls.
+- Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 3: Advanced reader Layout now includes iOS-style paragraph spacing with persistence, WebView reload-key participation, and vertical/horizontal CSS margin mapping.
 - Device-validate the shared native Android popup overlay rewrite across reader lookup, Dictionary tab, and Process Text, covering warmed reader root lookup reuse, duplicate state, audio error/autoplay, popup scale levels, redirect history, redirected child popup placement, edge-crossing popup gestures, Sasayaki popup controls, collapsed dictionary toggles on slow E-ink devices, E-ink line highlights, lower-screen recursive popup placement, and slow horizontal drags/long presses on controls.
 - Device-validate vertical lookup selection on ruby text, confirming E-ink underlines, regular highlights, and popup placement share one furigana-aware selection area.
 - Device-validate continuous-mode lookup popup placement with nonzero reader padding in both vertical and horizontal writing.

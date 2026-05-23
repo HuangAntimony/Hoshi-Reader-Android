@@ -47,6 +47,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.layoutAdvanced)
             assertEquals(1.65, settings.lineHeight, 0.000001)
             assertEquals(0.0, settings.characterSpacing, 0.0)
+            assertEquals(0.0, settings.paragraphSpacing, 0.0)
             assertTrue(settings.showTitle)
             assertTrue(settings.showCharacters)
             assertTrue(settings.showPercentage)
@@ -76,6 +77,7 @@ class ReaderSettingsRepositoryTest {
                 continuousMode = true,
                 chapterSwipeDistance = 120,
                 lineHeight = 1.9,
+                paragraphSpacing = 2.2,
                 popupSwipeThreshold = 120,
                 volumeKeysTurnPages = true,
                 volumeKeysSeekSasayaki = true,
@@ -93,6 +95,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(migrated.continuousMode)
             assertEquals(60, migrated.chapterSwipeDistance)
             assertEquals(1.9, migrated.lineHeight, 0.000001)
+            assertEquals(2.2, migrated.paragraphSpacing, 0.000001)
             assertEquals(60, migrated.popupSwipeThreshold)
             assertTrue(migrated.volumeKeysTurnPages)
             assertTrue(migrated.volumeKeysSeekSasayaki)
@@ -131,6 +134,7 @@ class ReaderSettingsRepositoryTest {
                     layoutAdvanced = true,
                     lineHeight = 1.8,
                     characterSpacing = 0.03,
+                    paragraphSpacing = 1.7,
                     showTitle = false,
                     showCharacters = false,
                     showPercentage = false,
@@ -173,6 +177,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.layoutAdvanced)
             assertEquals(1.8, saved.lineHeight, 0.000001)
             assertEquals(0.03, saved.characterSpacing, 0.000001)
+            assertEquals(1.7, saved.paragraphSpacing, 0.000001)
             assertFalse(saved.showTitle)
             assertFalse(saved.showCharacters)
             assertFalse(saved.showPercentage)

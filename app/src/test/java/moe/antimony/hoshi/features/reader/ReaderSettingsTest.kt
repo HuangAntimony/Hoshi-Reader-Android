@@ -18,6 +18,7 @@ class ReaderSettingsTest {
         assertEquals(5, settings.horizontalPadding)
         assertEquals(0, settings.verticalPadding)
         assertEquals(1.65, settings.lineHeight, 0.0)
+        assertEquals(0.0, settings.paragraphSpacing, 0.0)
         assertEquals("Noto Serif CJK JP", settings.selectedFont)
         assertFalse(settings.systemLightSepia)
         assertFalse(settings.sepiaInvertInDark)
@@ -85,6 +86,7 @@ class ReaderSettingsTest {
             layoutAdvanced = true,
             lineHeight = 1.85,
             characterSpacing = 2.0,
+            paragraphSpacing = 1.4,
         )
 
         val css = ReaderContentStyles.styleTag(
@@ -100,9 +102,44 @@ class ReaderSettingsTest {
         assertTrue(css.contains("font-size: 28px !important;"))
         assertTrue(css.contains("line-height: 1.85 !important;"))
         assertTrue(css.contains("letter-spacing: 0.02em !important;"))
+        assertTrue(css.contains("margin-right: 1.4em !important;"))
+        assertTrue(css.contains("margin-left: 1.4em !important;"))
+        assertFalse(css.contains("margin-top: 1.4em !important;"))
+        assertFalse(css.contains("margin-bottom: 1.4em !important;"))
         assertTrue(css.contains("column-gap: calc(var(--hoshi-vertical-padding-gap, 8vh) + 28px);"))
         assertTrue(css.contains("padding: var(--hoshi-vertical-padding-block, 4.0vh) 6.0vw !important;"))
         assertTrue(css.contains("padding-bottom: calc(var(--hoshi-vertical-padding-block, 4.0vh) + 28px) !important;"))
+    }
+
+    @Test
+    fun horizontalReaderCssAppliesAdvancedParagraphSpacingToBlockMargins() {
+        val css = ReaderContentStyles.styleTag(
+            ReaderSettings(
+                verticalWriting = false,
+                layoutAdvanced = true,
+                paragraphSpacing = 2.3,
+            ),
+        )
+
+        assertTrue(css.contains("margin-top: 2.3em !important;"))
+        assertTrue(css.contains("margin-bottom: 2.3em !important;"))
+        assertFalse(css.contains("margin-right: 2.3em !important;"))
+        assertFalse(css.contains("margin-left: 2.3em !important;"))
+    }
+
+    @Test
+    fun readerCssOmitsParagraphSpacingWhenAdvancedLayoutIsOff() {
+        val css = ReaderContentStyles.styleTag(
+            ReaderSettings(
+                layoutAdvanced = false,
+                paragraphSpacing = 2.3,
+            ),
+        )
+
+        assertFalse(css.contains("margin-right: 2.3em !important;"))
+        assertFalse(css.contains("margin-left: 2.3em !important;"))
+        assertFalse(css.contains("margin-top: 2.3em !important;"))
+        assertFalse(css.contains("margin-bottom: 2.3em !important;"))
     }
 
     @Test

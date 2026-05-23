@@ -44,6 +44,7 @@ data class ReaderSettings(
     val layoutAdvanced: Boolean = false,
     val lineHeight: Double = 1.65,
     val characterSpacing: Double = 0.0,
+    val paragraphSpacing: Double = 0.0,
     val showTitle: Boolean = true,
     val showCharacters: Boolean = true,
     val showPercentage: Boolean = true,
@@ -223,6 +224,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         layoutAdvanced = preferences.getBoolean("layoutAdvanced", false),
         lineHeight = preferences.getFloat("lineHeight", 1.65f).toDouble(),
         characterSpacing = preferences.getFloat("characterSpacing", 0f).toDouble(),
+        paragraphSpacing = preferences.getFloat("paragraphSpacing", 0f).toDouble(),
         showTitle = preferences.getBoolean("readerShowTitle", true),
         showCharacters = preferences.getBoolean("readerShowCharacters", true),
         showPercentage = preferences.getBoolean("readerShowPercentage", true),
@@ -270,6 +272,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("layoutAdvanced", settings.layoutAdvanced)
             .putFloat("lineHeight", settings.lineHeight.toFloat())
             .putFloat("characterSpacing", settings.characterSpacing.toFloat())
+            .putFloat("paragraphSpacing", settings.paragraphSpacing.toFloat())
             .putBoolean("readerShowTitle", settings.showTitle)
             .putBoolean("readerShowCharacters", settings.showCharacters)
             .putBoolean("readerShowPercentage", settings.showPercentage)
@@ -356,6 +359,7 @@ class ReaderSettingsRepository(
             layoutAdvanced = this[KEY_LAYOUT_ADVANCED] ?: false,
             lineHeight = (this[KEY_LINE_HEIGHT] ?: 1.65f).toDouble(),
             characterSpacing = (this[KEY_CHARACTER_SPACING] ?: 0f).toDouble(),
+            paragraphSpacing = (this[KEY_PARAGRAPH_SPACING] ?: 0f).toDouble(),
             showTitle = this[KEY_SHOW_TITLE] ?: true,
             showCharacters = this[KEY_SHOW_CHARACTERS] ?: true,
             showPercentage = this[KEY_SHOW_PERCENTAGE] ?: true,
@@ -402,6 +406,7 @@ class ReaderSettingsRepository(
         this[KEY_LAYOUT_ADVANCED] = settings.layoutAdvanced
         this[KEY_LINE_HEIGHT] = settings.lineHeight.toFloat()
         this[KEY_CHARACTER_SPACING] = settings.characterSpacing.toFloat()
+        this[KEY_PARAGRAPH_SPACING] = settings.paragraphSpacing.toFloat()
         this[KEY_SHOW_TITLE] = settings.showTitle
         this[KEY_SHOW_CHARACTERS] = settings.showCharacters
         this[KEY_SHOW_PERCENTAGE] = settings.showPercentage
@@ -452,6 +457,7 @@ class ReaderSettingsRepository(
         private val KEY_LAYOUT_ADVANCED = booleanPreferencesKey("layoutAdvanced")
         private val KEY_LINE_HEIGHT = floatPreferencesKey("lineHeight")
         private val KEY_CHARACTER_SPACING = floatPreferencesKey("characterSpacing")
+        private val KEY_PARAGRAPH_SPACING = floatPreferencesKey("paragraphSpacing")
         private val KEY_SHOW_TITLE = booleanPreferencesKey("readerShowTitle")
         private val KEY_SHOW_CHARACTERS = booleanPreferencesKey("readerShowCharacters")
         private val KEY_SHOW_PERCENTAGE = booleanPreferencesKey("readerShowPercentage")

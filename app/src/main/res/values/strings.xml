@@ -226,6 +226,7 @@
     <string name="reader_appearance_blur_images">Blur Images</string>
     <string name="reader_appearance_line_height">Line Height</string>
     <string name="reader_appearance_character_spacing">Character Spacing</string>
+    <string name="reader_appearance_paragraph_spacing">Paragraph Spacing</string>
     <string name="reader_appearance_show_title">Show Title</string>
     <string name="reader_appearance_show_character_count">Show Character Count</string>
     <string name="reader_appearance_show_percentage">Show Percentage</string>

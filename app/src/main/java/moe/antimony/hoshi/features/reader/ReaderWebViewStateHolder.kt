@@ -266,6 +266,7 @@ internal data class ReaderContentReloadKey(
     val layoutAdvanced: Boolean,
     val lineHeight: Double,
     val characterSpacing: Double,
+    val paragraphSpacing: Double,
 )
 
 internal fun ReaderSettings.readerContentReloadKey(): ReaderContentReloadKey =
@@ -282,4 +283,5 @@ internal fun ReaderSettings.readerContentReloadKey(): ReaderContentReloadKey =
         layoutAdvanced = layoutAdvanced,
         lineHeight = lineHeight,
         characterSpacing = characterSpacing,
+        paragraphSpacing = paragraphSpacing,
     )

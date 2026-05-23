@@ -226,6 +226,7 @@
     <string name="reader_appearance_blur_images">模糊图片</string>
     <string name="reader_appearance_line_height">行高</string>
     <string name="reader_appearance_character_spacing">字距</string>
+    <string name="reader_appearance_paragraph_spacing">段落间距</string>
     <string name="reader_appearance_show_title">显示标题</string>
     <string name="reader_appearance_show_character_count">显示字符数</string>
     <string name="reader_appearance_show_percentage">显示百分比</string>

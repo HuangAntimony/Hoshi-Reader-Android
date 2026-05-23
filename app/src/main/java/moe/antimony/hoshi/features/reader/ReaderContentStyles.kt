@@ -118,6 +118,25 @@ internal object ReaderContentStyles {
         } else {
             ""
         }
+        val paragraphSpacingCss = if (settings.layoutAdvanced) {
+            if (settings.verticalWriting) {
+                """
+                p {
+                    margin-right: ${settings.paragraphSpacing}em !important;
+                    margin-left: ${settings.paragraphSpacing}em !important;
+                }
+                """.trimIndent()
+            } else {
+                """
+                p {
+                    margin-top: ${settings.paragraphSpacing}em !important;
+                    margin-bottom: ${settings.paragraphSpacing}em !important;
+                }
+                """.trimIndent()
+            }
+        } else {
+            ""
+        }
         val furiganaCss = if (settings.hideFurigana) {
             """
             rt {
@@ -194,6 +213,7 @@ internal object ReaderContentStyles {
         return """
         $fontFaceCss
         $pageBreakCss
+        $paragraphSpacingCss
         @media (prefers-color-scheme: light) { :root { --hoshi-system-text-color: #000; } }
         @media (prefers-color-scheme: dark) { :root { --hoshi-system-text-color: #fff; } }
         :root {
