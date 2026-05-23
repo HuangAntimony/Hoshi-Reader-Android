@@ -170,7 +170,7 @@ fun readerContentChromeInsets(
     topSystemInsetDp: Int = 0,
 ): ReaderContentChromeInsets =
     ReaderContentChromeInsets(
-        topDp = maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp) + ReaderWebViewTopPaddingDp,
+        topDp = ReaderContentTopReservedSpaceDp + ReaderWebViewTopPaddingDp,
         bottomDp = 0,
     )
 
@@ -181,7 +181,7 @@ fun readerTopInfoOverlayPaddingDp(
     if (focusMode) {
         ReaderFocusTopOverlayPaddingDp
     } else {
-        maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp)
+        maxOf(topSystemInsetDp, ReaderTopInfoReservedSpaceDp)
     }
 
 fun readerInfoBubbleMetrics(): ReaderInfoBubbleMetrics =
@@ -334,9 +334,10 @@ private fun ReaderStatisticsChromeState.readingTimeText(): String {
 }
 
 private const val ReaderBottomChromeButtonSizeDp = 44
-private const val ReaderTopReservedSpaceDp = 52
+private const val ReaderContentTopReservedSpaceDp = 44
+private const val ReaderTopInfoReservedSpaceDp = 52
 private const val ReaderWebViewTopPaddingDp = 4
-private const val ReaderFocusTopOverlayPaddingDp = 14
+private const val ReaderFocusTopOverlayPaddingDp = 0
 private const val ReaderTopButtonSizeDp = 36
 private const val ReaderTopButtonIconSizeDp = 20
 private const val ReaderTopTitleControlPaddingDp = 42

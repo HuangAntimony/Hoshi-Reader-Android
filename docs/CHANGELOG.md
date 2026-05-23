@@ -9,7 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add fullscreen reader image viewing with zoom, copy, save, and share controls for large images and SVG illustrations, while keeping Blur Images taps from opening lookup until the image is revealed.
 - Add an Advanced reader Layout setting for paragraph spacing, matching iOS vertical and horizontal text spacing behavior.
-- Add immersive reader chrome focus-mode behavior: reader status/navigation bars and floating controls now follow iOS focus behavior, with reader text using the screen area behind floating controls while preserving the top camera/control safety space, focus toggles avoiding reader content reloads, and popup taps keeping their expected priority.
+- Add immersive reader chrome focus-mode behavior: reader status/navigation bars and floating controls now follow iOS focus behavior, with reader text using the screen area behind floating controls while preserving the top camera/text safety space, keeping focus quick controls at the screen edge, avoiding reader content reloads on focus toggles, and keeping popup taps at their expected priority.
 
 ### Fixed
 

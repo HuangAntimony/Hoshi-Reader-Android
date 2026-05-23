@@ -65,20 +65,20 @@ class ReaderChromeTest {
             totalCharacters = 169325,
         )
 
-        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), readerContentChromeInsets())
+        assertEquals(ReaderContentChromeInsets(topDp = 48, bottomDp = 0), readerContentChromeInsets())
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showCharacters = false, showPercentage = false),
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(topSystemInsetDp = 52),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(focusMode = true),
         )
     }
@@ -87,7 +87,7 @@ class ReaderChromeTest {
     fun topTitleBubbleUsesStableStatusAreaPaddingBeforeInsetsAnimateIn() {
         assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 0, focusMode = false))
         assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = false))
-        assertEquals(14, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = true))
+        assertEquals(0, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = true))
     }
 
     @Test
@@ -100,7 +100,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -117,7 +117,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -125,7 +125,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -133,7 +133,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = false, showProgressTop = false),
@@ -141,7 +141,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = true, showProgressTop = false),
@@ -149,7 +149,7 @@ class ReaderChromeTest {
             ),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 48, bottomDp = 0),
             readerContentChromeInsets(
                 state = state,
                 settings = ReaderSettings(showTitle = true, showProgressTop = true),
@@ -285,7 +285,7 @@ class ReaderChromeTest {
             focusMode = true,
         )
 
-        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), normalInsets)
+        assertEquals(ReaderContentChromeInsets(topDp = 48, bottomDp = 0), normalInsets)
         assertEquals(normalInsets, focusInsets)
     }
 
@@ -372,7 +372,7 @@ class ReaderChromeTest {
         assertEquals(28, metrics.secondaryIconSizeDp)
         assertEquals(8, metrics.trailingButtonSpacingDp)
         assertEquals(46, metrics.menuBottomOffsetDp)
-        assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), readerContentChromeInsets())
+        assertEquals(ReaderContentChromeInsets(topDp = 48, bottomDp = 0), readerContentChromeInsets())
     }
 
     @Test
