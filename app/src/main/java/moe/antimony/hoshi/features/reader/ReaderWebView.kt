@@ -1029,11 +1029,7 @@ fun ReaderWebView(
         showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
         showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
-        topSystemInsetDp = if (focusMode) {
-            0
-        } else {
-            stableStatusBarPadding.value.roundToInt().coerceAtLeast(0)
-        },
+        topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
     )
     val topInfoPadding = readerTopInfoOverlayPaddingDp(
         topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),

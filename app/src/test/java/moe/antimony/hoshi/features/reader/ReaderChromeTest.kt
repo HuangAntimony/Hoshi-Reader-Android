@@ -78,7 +78,7 @@ class ReaderChromeTest {
             readerContentChromeInsets(topSystemInsetDp = 52),
         )
         assertEquals(
-            ReaderContentChromeInsets(topDp = 52, bottomDp = 0),
+            ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(focusMode = true),
         )
     }
@@ -87,7 +87,7 @@ class ReaderChromeTest {
     fun topTitleBubbleUsesStableStatusAreaPaddingBeforeInsetsAnimateIn() {
         assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 0, focusMode = false))
         assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = false))
-        assertEquals(8, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = true))
+        assertEquals(14, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = true))
     }
 
     @Test
@@ -286,7 +286,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), normalInsets)
-        assertEquals(ReaderContentChromeInsets(topDp = 52, bottomDp = 0), focusInsets)
+        assertEquals(normalInsets, focusInsets)
     }
 
     @Test
