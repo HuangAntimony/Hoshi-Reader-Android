@@ -62,11 +62,15 @@ data class ReaderChromeColors(
 )
 
 data class ReaderChromeLayout(
-    val topWebViewPaddingDp: Int,
     val showProgressInBottomBar: Boolean,
     val showStatisticsInBottomBar: Boolean,
     val bottomCenterLineCount: Int,
     val bottomCenterMaxHeightDp: Int,
+)
+
+data class ReaderContentChromeInsets(
+    val topDp: Int,
+    val bottomDp: Int,
 )
 
 data class ReaderChromeVisibility(
@@ -122,8 +126,7 @@ data class ReaderBottomChromeMetrics(
     val menuItemIconBoxSizeDp: Int,
     val menuItemSpacingDp: Int,
 ) {
-    val webViewBottomPaddingDp: Int = buttonSizeDp + bottomPaddingDp
-    val menuBottomPaddingDp: Int = webViewBottomPaddingDp
+    val menuBottomOffsetDp: Int = buttonSizeDp + bottomPaddingDp
 }
 
 fun readerChromeLayout(
@@ -138,18 +141,22 @@ fun readerChromeLayout(
     val showProgressInBottomBar = !settings.showProgressTop && progress.isNotBlank()
     val showStatisticsInBottomBar = statistics.isNotBlank()
     return ReaderChromeLayout(
-        topWebViewPaddingDp = readerWebViewTopPaddingDp(
-            state = state,
-            settings = settings,
-            showSasayakiToggle = showSasayakiToggle,
-            showStatisticsToggle = showStatisticsToggle,
-        ),
         showProgressInBottomBar = showProgressInBottomBar,
         showStatisticsInBottomBar = showStatisticsInBottomBar,
         bottomCenterLineCount = listOf(showStatisticsInBottomBar, showProgressInBottomBar).count { it },
         bottomCenterMaxHeightDp = ReaderBottomChromeButtonSizeDp,
     )
 }
+
+@Suppress("UNUSED_PARAMETER")
+fun readerContentChromeInsets(
+    state: ReaderChromeState? = null,
+    settings: ReaderSettings? = null,
+    showSasayakiToggle: Boolean = false,
+    showStatisticsToggle: Boolean = false,
+    focusMode: Boolean = false,
+): ReaderContentChromeInsets =
+    ReaderContentChromeInsets(topDp = 0, bottomDp = 0)
 
 fun readerChromeVisibility(
     focusMode: Boolean,
@@ -166,27 +173,6 @@ fun readerChromeVisibility(
         showBackJump = focusMode && hasBackJump,
         showForwardJump = focusMode && hasForwardJump,
     )
-
-fun readerWebViewTopPaddingDp(
-    state: ReaderChromeState,
-    settings: ReaderSettings,
-    showSasayakiToggle: Boolean = false,
-    showStatisticsToggle: Boolean = false,
-): Int {
-    val progress = state.progressText(settings)
-    val textRows = listOf(
-        settings.showTitle,
-        settings.showProgressTop && progress.isNotBlank(),
-    ).count { it }
-    val textHeight = textRows * ReaderChromeLineHeightDp
-    val hasJumpHistoryControl = state.backTargetCharacter != null || state.forwardTargetCharacter != null
-    val buttonHeight = if (showSasayakiToggle || showStatisticsToggle || hasJumpHistoryControl) {
-        ReaderTopButtonSizeDp
-    } else {
-        0
-    }
-    return ReaderWebViewTopBasePaddingDp + maxOf(textHeight, buttonHeight)
-}
 
 fun readerBottomChromeMetrics(): ReaderBottomChromeMetrics =
     ReaderBottomChromeMetrics(
@@ -318,8 +304,6 @@ private fun ReaderStatisticsChromeState.readingTimeText(): String {
     return "$hours:${minutes.toString().padStart(2, '0')}"
 }
 
-private const val ReaderWebViewTopBasePaddingDp = 4
-private const val ReaderChromeLineHeightDp = 20
 private const val ReaderBottomChromeButtonSizeDp = 44
 private const val ReaderTopButtonSizeDp = 36
 private const val ReaderTopButtonIconSizeDp = 20

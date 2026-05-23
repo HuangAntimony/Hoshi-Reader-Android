@@ -62,14 +62,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -122,7 +119,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -984,8 +980,6 @@ fun ReaderWebView(
     }
 
     val bottomChromeMetrics = readerBottomChromeMetrics()
-    val stableStatusBarPadding = rememberStableStatusBarPadding()
-    val stableNavigationBarPadding = rememberStableNavigationBarPadding()
     val sasayakiBottomSkipButtons = readerSasayakiBottomSkipButtons(
         settings = sasayakiSettings,
         hasAudio = sasayakiPlayer?.hasAudio == true,
@@ -1040,13 +1034,7 @@ fun ReaderWebView(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(top = stableStatusBarPadding)
-                .padding(bottom = stableNavigationBarPadding)
-                .padding(
-                    top = chromeLayout.topWebViewPaddingDp.dp,
-                    bottom = bottomChromeMetrics.webViewBottomPaddingDp.dp,
-                ),
+                .fillMaxSize(),
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val viewportHorizontalPadding = maxWidth * effectiveSettings.continuousViewportHorizontalPaddingRatio.toFloat()
@@ -1169,7 +1157,6 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = stableStatusBarPadding)
                 .padding(horizontal = 15.dp),
         )
         ReaderFocusModeToggleArea(
@@ -1177,7 +1164,6 @@ fun ReaderWebView(
             sasayakiSkipButtons = sasayakiBottomSkipButtons,
             focusMode = focusMode,
             onToggleFocusMode = ::handleReaderTapOutside,
-            bottomSystemPadding = stableNavigationBarPadding,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         if (chromeVisibility.showBottomChrome) ReaderBottomChrome(
@@ -1206,7 +1192,6 @@ fun ReaderWebView(
             onSasayakiSkipBackward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
             onSasayakiSkipForward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
             metrics = bottomChromeMetrics,
-            bottomSystemPadding = stableNavigationBarPadding,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         if (showAppearance) {
@@ -1757,7 +1742,6 @@ private fun ReaderFocusModeToggleArea(
     sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     focusMode: Boolean,
     onToggleFocusMode: () -> Unit,
-    bottomSystemPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val toggleArea = readerFocusModeToggleArea(
@@ -1768,37 +1752,10 @@ private fun ReaderFocusModeToggleArea(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = bottomSystemPadding)
             .padding(horizontal = toggleArea.horizontalPaddingDp.dp)
             .height((metrics.buttonSizeDp + metrics.bottomPaddingDp + 8).dp)
             .clickable(onClick = onToggleFocusMode),
     )
-}
-
-@Composable
-private fun rememberStableStatusBarPadding(): Dp {
-    val density = LocalDensity.current
-    val currentTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-    var stableTop by remember { mutableStateOf(0.dp) }
-    LaunchedEffect(currentTop) {
-        if (currentTop > 0.dp) {
-            stableTop = currentTop
-        }
-    }
-    return if (currentTop > 0.dp) currentTop else stableTop
-}
-
-@Composable
-private fun rememberStableNavigationBarPadding(): Dp {
-    val density = LocalDensity.current
-    val currentBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
-    var stableBottom by remember { mutableStateOf(0.dp) }
-    LaunchedEffect(currentBottom) {
-        if (currentBottom > 0.dp) {
-            stableBottom = currentBottom
-        }
-    }
-    return if (currentBottom > 0.dp) currentBottom else stableBottom
 }
 
 @Composable
@@ -1820,7 +1777,6 @@ private fun BoxScope.ReaderBottomChrome(
     onSasayakiSkipBackward: () -> Unit,
     onSasayakiSkipForward: () -> Unit,
     metrics: ReaderBottomChromeMetrics,
-    bottomSystemPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     if (menuExpanded) {
@@ -1840,14 +1796,12 @@ private fun BoxScope.ReaderBottomChrome(
             onSasayaki = onSasayaki,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = bottomSystemPadding)
-                .padding(end = metrics.horizontalPaddingDp.dp, bottom = metrics.menuBottomPaddingDp.dp),
+                .padding(end = metrics.horizontalPaddingDp.dp, bottom = metrics.menuBottomOffsetDp.dp),
         )
     }
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = bottomSystemPadding)
             .padding(
                 start = metrics.horizontalPaddingDp.dp,
                 end = metrics.horizontalPaddingDp.dp,

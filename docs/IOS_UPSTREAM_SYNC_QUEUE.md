@@ -135,8 +135,8 @@ Android result:
 
 - ReaderView now owns Android system-bar behavior for the whole reader route. Both status and navigation bars are hidden through `WindowInsetsCompat.Type.systemBars()` and use transient edge-swipe reveal, while reader exit restores the normal bars.
 - Focus mode now follows the iOS interaction flow: text selection, paginated page turns, and continuous scrolling force focus mode on; empty reader taps toggle focus mode; taps while popups are visible dismiss popups before any focus toggle.
-- Top title/progress and bottom Back/Menu/progress/statistics chrome hide in focus mode, while statistics, Sasayaki, and jump-return quick controls stay available from the top safe area in focus mode.
-- Android-specific reader affordances remain: E-ink opaque chrome colors, compact Android hit targets, bottom Sasayaki skip buttons, and stable top/bottom inset spacing for Android status/navigation behavior.
+- Top title/progress and bottom Back/Menu/progress/statistics chrome float above reader text and hide in focus mode, while statistics, Sasayaki, and jump-return quick controls stay available as top overlays in focus mode.
+- Android-specific reader affordances remain: E-ink opaque chrome colors, compact Android hit targets, and bottom Sasayaki skip buttons. Reader content no longer reserves space for chrome or Android system bars; transient status/navigation bars and reader chrome may overlay text to maximize the reading area.
 
 Validation:
 

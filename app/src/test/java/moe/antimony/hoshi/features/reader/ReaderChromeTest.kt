@@ -58,28 +58,25 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun topReaderPaddingFollowsVisibleTopChromeRows() {
+    fun readerContentDoesNotReserveSpaceForTopChromeRows() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
             totalCharacters = 169325,
         )
 
-        assertEquals(44, readerWebViewTopPaddingDp(state, ReaderSettings()))
-        assertEquals(24, readerWebViewTopPaddingDp(state, ReaderSettings(showProgressTop = false)))
-        assertEquals(24, readerWebViewTopPaddingDp(state, ReaderSettings(showTitle = false)))
-        assertEquals(4, readerWebViewTopPaddingDp(state, ReaderSettings(showTitle = false, showProgressTop = false)))
+        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), readerContentChromeInsets())
         assertEquals(
-            4,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = false, showCharacters = false, showPercentage = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = false, showCharacters = false, showPercentage = false),
             ),
         )
     }
 
     @Test
-    fun jumpHistoryControlsReserveTheTopChromeRowLikeIos() {
+    fun jumpHistoryControlsOverlayReaderContentInsteadOfReservingTheTopRow() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
@@ -88,16 +85,16 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            40,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = false, showProgressTop = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = false, showProgressTop = false),
             ),
         )
     }
 
     @Test
-    fun sasayakiTopToggleReservesTheTopChromeRowLikeIos() {
+    fun topQuickControlsOverlayReaderContentInsteadOfReservingTheTopRow() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
@@ -105,42 +102,42 @@ class ReaderChromeTest {
         )
 
         assertEquals(
-            40,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = false, showProgressTop = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = false, showProgressTop = false),
                 showSasayakiToggle = true,
             ),
         )
         assertEquals(
-            40,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = false, showProgressTop = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = false, showProgressTop = false),
                 showStatisticsToggle = true,
             ),
         )
         assertEquals(
-            4,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = false, showProgressTop = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = false, showProgressTop = false),
                 showSasayakiToggle = false,
             ),
         )
         assertEquals(
-            40,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = true, showProgressTop = false),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = true, showProgressTop = false),
                 showSasayakiToggle = true,
             ),
         )
         assertEquals(
-            44,
-            readerWebViewTopPaddingDp(
-                state,
-                ReaderSettings(showTitle = true, showProgressTop = true),
+            ReaderContentChromeInsets(topDp = 0, bottomDp = 0),
+            readerContentChromeInsets(
+                state = state,
+                settings = ReaderSettings(showTitle = true, showProgressTop = true),
                 showSasayakiToggle = true,
             ),
         )
@@ -246,27 +243,27 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun focusModeKeepsTheReaderContentPaddingStable() {
+    fun focusModeDoesNotChangeReaderContentChromeInsets() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
             totalCharacters = 169325,
         )
-        val normalLayout = readerChromeLayout(
+        val normalInsets = readerContentChromeInsets(
             state = state,
             settings = ReaderSettings(),
             showSasayakiToggle = true,
             focusMode = false,
         )
-        val focusLayout = readerChromeLayout(
+        val focusInsets = readerContentChromeInsets(
             state = state,
             settings = ReaderSettings(),
             showSasayakiToggle = true,
             focusMode = true,
         )
 
-        assertEquals(normalLayout.topWebViewPaddingDp, focusLayout.topWebViewPaddingDp)
-        assertEquals(normalLayout.showProgressInBottomBar, focusLayout.showProgressInBottomBar)
+        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), normalInsets)
+        assertEquals(normalInsets, focusInsets)
     }
 
     @Test
@@ -342,16 +339,15 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun bottomChromeUsesCompactControlsAndKeepsReaderContentFlushToButtonTop() {
+    fun bottomChromeUsesCompactOverlayControlsWithoutContentInset() {
         val metrics = readerBottomChromeMetrics()
 
         assertEquals(44, metrics.buttonSizeDp)
         assertEquals(28, metrics.primaryIconSizeDp)
         assertEquals(28, metrics.secondaryIconSizeDp)
         assertEquals(8, metrics.trailingButtonSpacingDp)
-        assertEquals(46, metrics.webViewBottomPaddingDp)
-        assertEquals(metrics.webViewBottomPaddingDp, metrics.menuBottomPaddingDp)
-        assertEquals(metrics.buttonSizeDp + metrics.bottomPaddingDp, metrics.webViewBottomPaddingDp)
+        assertEquals(46, metrics.menuBottomOffsetDp)
+        assertEquals(ReaderContentChromeInsets(topDp = 0, bottomDp = 0), readerContentChromeInsets())
     }
 
     @Test
