@@ -1029,10 +1029,16 @@ fun ReaderWebView(
         showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
         showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
-        topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
+        topSystemInsetDp = if (focusMode) {
+            0
+        } else {
+            stableStatusBarPadding.value.roundToInt().coerceAtLeast(0)
+        },
     )
-    val nonFocusTopInfoPadding = maxOf(stableStatusBarPadding, 25.dp)
-    val topInfoPadding = if (focusMode) 8.dp else nonFocusTopInfoPadding
+    val topInfoPadding = readerTopInfoOverlayPaddingDp(
+        topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
+        focusMode = focusMode,
+    ).dp
     val onSasayakiTopToggle = sasayakiPlayer
         ?.takeIf { showSasayakiTopToggle && it.hasAudio }
         ?.let { player ->

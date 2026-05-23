@@ -77,6 +77,17 @@ class ReaderChromeTest {
             ReaderContentChromeInsets(topDp = 56, bottomDp = 0),
             readerContentChromeInsets(topSystemInsetDp = 52),
         )
+        assertEquals(
+            ReaderContentChromeInsets(topDp = 52, bottomDp = 0),
+            readerContentChromeInsets(focusMode = true),
+        )
+    }
+
+    @Test
+    fun topTitleBubbleUsesStableStatusAreaPaddingBeforeInsetsAnimateIn() {
+        assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 0, focusMode = false))
+        assertEquals(52, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = false))
+        assertEquals(8, readerTopInfoOverlayPaddingDp(topSystemInsetDp = 52, focusMode = true))
     }
 
     @Test
@@ -275,7 +286,7 @@ class ReaderChromeTest {
         )
 
         assertEquals(ReaderContentChromeInsets(topDp = 56, bottomDp = 0), normalInsets)
-        assertEquals(normalInsets, focusInsets)
+        assertEquals(ReaderContentChromeInsets(topDp = 52, bottomDp = 0), focusInsets)
     }
 
     @Test
@@ -327,7 +338,7 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun focusModeEntryTapAreaStaysBetweenBottomButtonClusters() {
+    fun bottomFocusModeTapAreaDoesNotInterceptReaderText() {
         val metrics = readerBottomChromeMetrics()
         val skipButtons = ReaderSasayakiBottomSkipButtons(
             visible = true,
@@ -336,27 +347,18 @@ class ReaderChromeTest {
             adjacentSpacingDp = metrics.trailingButtonSpacingDp,
         )
 
-        assertEquals(
-            metrics.horizontalPaddingDp + metrics.buttonSizeDp,
+        assertFalse(
             readerFocusModeToggleArea(
                 metrics = metrics,
                 sasayakiSkipButtons = skipButtons.copy(visible = false),
                 focusMode = false,
-            ).horizontalPaddingDp,
-        )
-        assertEquals(
-            metrics.horizontalPaddingDp + metrics.buttonSizeDp + metrics.trailingButtonSpacingDp + metrics.buttonSizeDp,
-            readerFocusModeToggleArea(
-                metrics = metrics,
-                sasayakiSkipButtons = skipButtons,
-                focusMode = false,
-            ).horizontalPaddingDp,
+            ).visible,
         )
         assertFalse(
             readerFocusModeToggleArea(
                 metrics = metrics,
                 sasayakiSkipButtons = skipButtons,
-                focusMode = true,
+                focusMode = false,
             ).visible,
         )
     }

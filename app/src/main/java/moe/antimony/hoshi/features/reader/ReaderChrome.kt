@@ -170,9 +170,23 @@ fun readerContentChromeInsets(
     topSystemInsetDp: Int = 0,
 ): ReaderContentChromeInsets =
     ReaderContentChromeInsets(
-        topDp = maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp) + ReaderWebViewTopPaddingDp,
+        topDp = maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp) + if (focusMode) {
+            0
+        } else {
+            ReaderWebViewTopPaddingDp
+        },
         bottomDp = 0,
     )
+
+fun readerTopInfoOverlayPaddingDp(
+    topSystemInsetDp: Int,
+    focusMode: Boolean,
+): Int =
+    if (focusMode) {
+        ReaderFocusTopOverlayPaddingDp
+    } else {
+        maxOf(topSystemInsetDp, ReaderTopReservedSpaceDp)
+    }
 
 fun readerInfoBubbleMetrics(): ReaderInfoBubbleMetrics =
     ReaderInfoBubbleMetrics(
@@ -256,18 +270,7 @@ fun readerFocusModeToggleArea(
     sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     focusMode: Boolean,
 ): ReaderFocusModeToggleArea {
-    if (focusMode) {
-        return ReaderFocusModeToggleArea(visible = false, horizontalPaddingDp = 0)
-    }
-    val sideClusterWidth = if (sasayakiSkipButtons.visible) {
-        metrics.buttonSizeDp + sasayakiSkipButtons.adjacentSpacingDp + sasayakiSkipButtons.buttonSizeDp
-    } else {
-        metrics.buttonSizeDp
-    }
-    return ReaderFocusModeToggleArea(
-        visible = true,
-        horizontalPaddingDp = metrics.horizontalPaddingDp + sideClusterWidth,
-    )
+    return ReaderFocusModeToggleArea(visible = false, horizontalPaddingDp = 0)
 }
 
 fun readerTopTitlePaddingDp(
@@ -337,6 +340,7 @@ private fun ReaderStatisticsChromeState.readingTimeText(): String {
 private const val ReaderBottomChromeButtonSizeDp = 44
 private const val ReaderTopReservedSpaceDp = 52
 private const val ReaderWebViewTopPaddingDp = 4
+private const val ReaderFocusTopOverlayPaddingDp = 8
 private const val ReaderTopButtonSizeDp = 36
 private const val ReaderTopButtonIconSizeDp = 20
 private const val ReaderTopTitleControlPaddingDp = 42
