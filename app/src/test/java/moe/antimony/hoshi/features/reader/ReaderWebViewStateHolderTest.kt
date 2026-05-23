@@ -356,6 +356,53 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun readerInteractionsEnterFocusModeWithoutReloadingTheReaderContent() {
+        val holder = stateHolder(initialIndex = 1)
+        holder.markWebViewRestored()
+        val previousEpoch = holder.webViewRestoreEpoch
+
+        holder.enterFocusModeForReaderInteraction()
+
+        assertTrue(holder.focusMode)
+        assertFalse(holder.isWebViewRestoring)
+        assertEquals(previousEpoch, holder.webViewRestoreEpoch)
+
+        holder.enterFocusModeForReaderInteraction()
+
+        assertTrue(holder.focusMode)
+        assertEquals(previousEpoch, holder.webViewRestoreEpoch)
+    }
+
+    @Test
+    fun readerTapTogglesFocusModeOnlyWhenNoPopupIsVisible() {
+        val holder = stateHolder(initialIndex = 1)
+        holder.markWebViewRestored()
+        val previousEpoch = holder.webViewRestoreEpoch
+
+        assertTrue(holder.toggleFocusModeFromReaderTap(hasVisiblePopups = false))
+        assertTrue(holder.focusMode)
+
+        assertFalse(holder.toggleFocusModeFromReaderTap(hasVisiblePopups = true))
+        assertTrue(holder.focusMode)
+
+        assertTrue(holder.toggleFocusModeFromReaderTap(hasVisiblePopups = false))
+        assertFalse(holder.focusMode)
+        assertEquals(previousEpoch, holder.webViewRestoreEpoch)
+    }
+
+    @Test
+    fun enteringFocusModeClosesTheReaderMenu() {
+        val holder = stateHolder()
+        holder.showReaderMenu()
+        assertTrue(holder.showReaderMenu)
+
+        holder.enterFocusModeForReaderInteraction()
+
+        assertTrue(holder.focusMode)
+        assertFalse(holder.showReaderMenu)
+    }
+
+    @Test
     fun emptyLookupStackConsumesSasayakiResumeRequest() {
         val holder = stateHolder()
         holder.markSasayakiPausedByLookup()

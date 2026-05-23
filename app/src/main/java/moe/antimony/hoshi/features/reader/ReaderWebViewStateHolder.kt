@@ -89,6 +89,17 @@ internal class ReaderWebViewStateHolder(
         }
     }
 
+    fun enterFocusModeForReaderInteraction() {
+        focusMode = true
+        showReaderMenu = false
+    }
+
+    fun toggleFocusModeFromReaderTap(hasVisiblePopups: Boolean): Boolean {
+        if (hasVisiblePopups) return false
+        toggleFocusMode()
+        return true
+    }
+
     fun openChaptersFromMenu() {
         showReaderMenu = false
         showChapters = true

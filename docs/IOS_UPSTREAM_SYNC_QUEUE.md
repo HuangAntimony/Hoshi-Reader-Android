@@ -110,7 +110,7 @@ Validation:
 
 ### 4. Reader chrome redesign and focus-mode interaction
 
-Status: pending Android design comparison.
+Status: completed on Android in `codex/reader-chrome-focus-sync`.
 
 Commits:
 
@@ -131,14 +131,12 @@ iOS behavior to assess:
 - Taps outside popups toggle focus mode; selection, scroll, and page turns force focus mode on.
 - ReaderView owns status-bar behavior instead of fullscreen image view special-casing.
 
-Android current gap:
+Android result:
 
-- Android reader chrome already has custom top/bottom controls, E-ink constraints, Sasayaki controls, progress placement, jump-return controls, and focus mode behavior. The correct action is design comparison, not a direct SwiftUI port.
-
-Suggested slice:
-
-- Compare iOS current reader chrome against Android's `ReaderChrome`/`ReaderWebView` behavior and list concrete Android-visible mismatches before editing UI.
-- Implement only mismatches that improve parity without regressing E-ink density, hit targets, or existing bottom-button settings.
+- ReaderView now owns Android system-bar behavior for the whole reader route. Both status and navigation bars are hidden through `WindowInsetsCompat.Type.systemBars()` and use transient edge-swipe reveal, while reader exit restores the normal bars.
+- Focus mode now follows the iOS interaction flow: text selection, paginated page turns, and continuous scrolling force focus mode on; empty reader taps toggle focus mode; taps while popups are visible dismiss popups before any focus toggle.
+- Top title/progress and bottom Back/Menu/progress/statistics chrome hide in focus mode, while statistics, Sasayaki, and jump-return quick controls stay available from the top safe area in focus mode.
+- Android-specific reader affordances remain: E-ink opaque chrome colors, compact Android hit targets, bottom Sasayaki skip buttons, and stable top/bottom inset spacing for Android status/navigation behavior.
 
 Validation:
 

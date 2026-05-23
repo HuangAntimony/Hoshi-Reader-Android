@@ -270,6 +270,42 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun focusModeKeepsTopQuickControlsAvailableAndHidesBottomChrome() {
+        val visibility = readerChromeVisibility(
+            focusMode = true,
+            hasStatisticsToggle = true,
+            hasSasayakiToggle = true,
+            hasBackJump = true,
+            hasForwardJump = true,
+        )
+
+        assertFalse(visibility.showTitleAndProgress)
+        assertFalse(visibility.showBottomChrome)
+        assertEquals(true, visibility.showStatisticsToggle)
+        assertEquals(true, visibility.showSasayakiToggle)
+        assertEquals(true, visibility.showBackJump)
+        assertEquals(true, visibility.showForwardJump)
+    }
+
+    @Test
+    fun nonFocusModeShowsTitleProgressBottomChromeAndHidesTopQuickControls() {
+        val visibility = readerChromeVisibility(
+            focusMode = false,
+            hasStatisticsToggle = true,
+            hasSasayakiToggle = true,
+            hasBackJump = true,
+            hasForwardJump = true,
+        )
+
+        assertEquals(true, visibility.showTitleAndProgress)
+        assertEquals(true, visibility.showBottomChrome)
+        assertFalse(visibility.showStatisticsToggle)
+        assertFalse(visibility.showSasayakiToggle)
+        assertFalse(visibility.showBackJump)
+        assertFalse(visibility.showForwardJump)
+    }
+
+    @Test
     fun focusModeEntryTapAreaStaysBetweenBottomButtonClusters() {
         val metrics = readerBottomChromeMetrics()
         val skipButtons = ReaderSasayakiBottomSkipButtons(

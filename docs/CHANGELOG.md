@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add fullscreen reader image viewing with zoom, copy, save, and share controls for large images and SVG illustrations, while keeping Blur Images taps from opening lookup until the image is revealed.
 - Add an Advanced reader Layout setting for paragraph spacing, matching iOS vertical and horizontal text spacing behavior.
+- Add immersive reader chrome focus-mode behavior: reader system bars now hide during reading and can be revealed transiently with an edge swipe, while reader controls stay stable and popup taps keep their expected priority.
 
 ### Fixed
 

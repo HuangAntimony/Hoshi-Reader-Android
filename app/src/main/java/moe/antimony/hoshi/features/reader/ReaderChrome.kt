@@ -69,6 +69,15 @@ data class ReaderChromeLayout(
     val bottomCenterMaxHeightDp: Int,
 )
 
+data class ReaderChromeVisibility(
+    val showTitleAndProgress: Boolean,
+    val showBottomChrome: Boolean,
+    val showStatisticsToggle: Boolean,
+    val showSasayakiToggle: Boolean,
+    val showBackJump: Boolean,
+    val showForwardJump: Boolean,
+)
+
 data class ReaderSasayakiBottomSkipButtons(
     val visible: Boolean,
     val buttonSizeDp: Int,
@@ -141,6 +150,22 @@ fun readerChromeLayout(
         bottomCenterMaxHeightDp = ReaderBottomChromeButtonSizeDp,
     )
 }
+
+fun readerChromeVisibility(
+    focusMode: Boolean,
+    hasStatisticsToggle: Boolean,
+    hasSasayakiToggle: Boolean,
+    hasBackJump: Boolean,
+    hasForwardJump: Boolean,
+): ReaderChromeVisibility =
+    ReaderChromeVisibility(
+        showTitleAndProgress = !focusMode,
+        showBottomChrome = !focusMode,
+        showStatisticsToggle = focusMode && hasStatisticsToggle,
+        showSasayakiToggle = focusMode && hasSasayakiToggle,
+        showBackJump = focusMode && hasBackJump,
+        showForwardJump = focusMode && hasForwardJump,
+    )
 
 fun readerWebViewTopPaddingDp(
     state: ReaderChromeState,

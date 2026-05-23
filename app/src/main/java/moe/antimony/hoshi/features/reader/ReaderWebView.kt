@@ -67,8 +67,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -129,6 +130,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -705,6 +707,7 @@ fun ReaderWebView(
         return false
     }
     fun saveDisplayedProgress(progress: Double) {
+        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordDisplayedProgress(progress)
         stateHolder.clearForwardHistoryAfterManualMovement()
@@ -712,18 +715,21 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition)
     }
     fun displayPagedTurnProgress(progress: Double) {
+        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordDisplayedProgress(progress)
         stateHolder.clearForwardHistoryAfterManualMovement()
         recordStatisticsAtDisplayedPosition()
     }
     fun displayContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordContinuousScrollDisplayProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
         recordStatisticsAtDisplayedPosition()
     }
     fun saveContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordContinuousScrollProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
@@ -753,6 +759,7 @@ fun ReaderWebView(
         }
     }
     val handleTextSelected: (ReaderSelectionData, (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit = { selection, selectionRects ->
+        stateHolder.enterFocusModeForReaderInteraction()
         pendingRootSelectionHighlight = null
         visibleLookupPopupIds = emptySet()
         rootSelectionHighlightRects = emptyList()
@@ -772,6 +779,11 @@ fun ReaderWebView(
         } else {
             pendingRootSelectionHighlight = null
             onTextSelected(selection)?.let { selectionRects(it) { rootSelectionHighlightRects = it } }
+        }
+    }
+    fun handleReaderTapOutside() {
+        if (!stateHolder.toggleFocusModeFromReaderTap(hasVisiblePopups = stateHolder.lookupPopups.isNotEmpty())) {
+            closeLookupPopupsAndSelection()
         }
     }
     val chromeState = remember(
@@ -955,23 +967,25 @@ fun ReaderWebView(
             controller?.isAppearanceLightNavigationBars = !systemDarkTheme
         }
     }
-    DisposableEffect(context, view, focusMode) {
+    DisposableEffect(context, view) {
         val activity = context.findActivity()
         val controller = activity?.window?.let { window ->
             WindowCompat.getInsetsController(window, view)
         }
-        if (focusMode) {
-            controller?.hide(WindowInsetsCompat.Type.statusBars())
-        } else {
-            controller?.show(WindowInsetsCompat.Type.statusBars())
-        }
+        val previousBehavior = controller?.systemBarsBehavior
+        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller?.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.statusBars())
+            if (previousBehavior != null) {
+                controller.systemBarsBehavior = previousBehavior
+            }
+            controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
     val bottomChromeMetrics = readerBottomChromeMetrics()
     val stableStatusBarPadding = rememberStableStatusBarPadding()
+    val stableNavigationBarPadding = rememberStableNavigationBarPadding()
     val sasayakiBottomSkipButtons = readerSasayakiBottomSkipButtons(
         settings = sasayakiSettings,
         hasAudio = sasayakiPlayer?.hasAudio == true,
@@ -1012,6 +1026,13 @@ fun ReaderWebView(
         showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
     )
+    val chromeVisibility = readerChromeVisibility(
+        focusMode = focusMode,
+        hasStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
+        hasSasayakiToggle = onSasayakiTopToggle != null,
+        hasBackJump = stateHolder.backTargetPosition != null,
+        hasForwardJump = stateHolder.forwardTargetPosition != null,
+    )
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1021,7 +1042,7 @@ fun ReaderWebView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = stableStatusBarPadding)
-                .navigationBarsPadding()
+                .padding(bottom = stableNavigationBarPadding)
                 .padding(
                     top = chromeLayout.topWebViewPaddingDp.dp,
                     bottom = bottomChromeMetrics.webViewBottomPaddingDp.dp,
@@ -1075,6 +1096,8 @@ fun ReaderWebView(
                         sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
                         onTextSelected = handleTextSelected,
                         onClearLookupPopup = ::closeLookupPopupsAndSelection,
+                        onReaderTapOutside = ::handleReaderTapOutside,
+                        onReaderInteraction = stateHolder::enterFocusModeForReaderInteraction,
                         onImageTapped = ::openFullscreenImage,
                         onHighlightCreated = ::addHighlight,
                         fontManager = fontManager,
@@ -1142,7 +1165,7 @@ fun ReaderWebView(
             },
             onSasayakiToggle = onSasayakiTopToggle,
             sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
-            focusMode = focusMode,
+            visibility = chromeVisibility,
             metrics = bottomChromeMetrics,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -1153,10 +1176,11 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             sasayakiSkipButtons = sasayakiBottomSkipButtons,
             focusMode = focusMode,
-            onToggleFocusMode = stateHolder::toggleFocusMode,
+            onToggleFocusMode = ::handleReaderTapOutside,
+            bottomSystemPadding = stableNavigationBarPadding,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-        if (!focusMode) ReaderBottomChrome(
+        if (chromeVisibility.showBottomChrome) ReaderBottomChrome(
             state = chromeState,
             settings = effectiveSettings,
             layout = chromeLayout,
@@ -1182,6 +1206,7 @@ fun ReaderWebView(
             onSasayakiSkipBackward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
             onSasayakiSkipForward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
             metrics = bottomChromeMetrics,
+            bottomSystemPadding = stableNavigationBarPadding,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         if (showAppearance) {
@@ -1534,23 +1559,25 @@ private fun ReaderTopInfo(
     onJumpForward: (() -> Unit)?,
     onSasayakiToggle: (() -> Unit)?,
     sasayakiPlaying: Boolean,
-    focusMode: Boolean,
+    visibility: ReaderChromeVisibility,
     metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
     val progress = state.progressText(settings)
-    val showBackJump = !focusMode && state.backTargetCharacter != null && onJumpBack != null
-    val showForwardJump = !focusMode && state.forwardTargetCharacter != null && onJumpForward != null
-    if ((focusMode || !settings.showTitle) &&
-        onStatisticsToggle == null &&
+    val showBackJump = visibility.showBackJump && state.backTargetCharacter != null && onJumpBack != null
+    val showForwardJump = visibility.showForwardJump && state.forwardTargetCharacter != null && onJumpForward != null
+    val showStatisticsToggle = visibility.showStatisticsToggle && onStatisticsToggle != null
+    val showSasayakiToggle = visibility.showSasayakiToggle && onSasayakiToggle != null
+    if ((!visibility.showTitleAndProgress || !settings.showTitle) &&
+        !showStatisticsToggle &&
         !showBackJump &&
         !showForwardJump &&
-        onSasayakiToggle == null &&
-        (focusMode || progress.isBlank() || !settings.showProgressTop)
+        !showSasayakiToggle &&
+        (!visibility.showTitleAndProgress || progress.isBlank() || !settings.showProgressTop)
     ) return
     Box(modifier = modifier.fillMaxWidth()) {
-        val showStartControls = onStatisticsToggle != null || showBackJump
-        val showEndControls = onSasayakiToggle != null || showForwardJump
+        val showStartControls = showStatisticsToggle || showBackJump
+        val showEndControls = showSasayakiToggle || showForwardJump
         var startControlWidth by remember { mutableStateOf(0) }
         var endControlWidth by remember { mutableStateOf(0) }
         val density = LocalDensity.current
@@ -1575,7 +1602,7 @@ private fun ReaderTopInfo(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            if (!focusMode && settings.showTitle) {
+            if (visibility.showTitleAndProgress && settings.showTitle) {
                 Text(
                     text = state.title,
                     color = Color(colors.infoText),
@@ -1587,7 +1614,7 @@ private fun ReaderTopInfo(
                     ),
                 )
             }
-            if (!focusMode && settings.showProgressTop && progress.isNotBlank()) {
+            if (visibility.showTitleAndProgress && settings.showProgressTop && progress.isNotBlank()) {
                 Text(
                     text = progress,
                     color = Color(colors.infoText),
@@ -1603,11 +1630,11 @@ private fun ReaderTopInfo(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (onStatisticsToggle != null) {
+                if (showStatisticsToggle) {
                     ReaderRoundButton(
                         colors = colors,
                         sizeDp = metrics.topStatisticsButtonSizeDp,
-                        onClick = onStatisticsToggle,
+                        onClick = requireNotNull(onStatisticsToggle),
                     ) {
                         Icon(
                             imageVector = readerStatisticsTopToggleIcon(statisticsTracking),
@@ -1653,11 +1680,11 @@ private fun ReaderTopInfo(
                         onClick = requireNotNull(onJumpForward),
                     )
                 }
-                if (onSasayakiToggle != null) {
+                if (showSasayakiToggle) {
                     ReaderRoundButton(
                         colors = colors,
                         sizeDp = metrics.topSasayakiButtonSizeDp,
-                        onClick = onSasayakiToggle,
+                        onClick = requireNotNull(onSasayakiToggle),
                     ) {
                         Icon(
                             imageVector = readerSasayakiTopToggleIcon(sasayakiPlaying),
@@ -1730,6 +1757,7 @@ private fun ReaderFocusModeToggleArea(
     sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     focusMode: Boolean,
     onToggleFocusMode: () -> Unit,
+    bottomSystemPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val toggleArea = readerFocusModeToggleArea(
@@ -1740,7 +1768,7 @@ private fun ReaderFocusModeToggleArea(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
+            .padding(bottom = bottomSystemPadding)
             .padding(horizontal = toggleArea.horizontalPaddingDp.dp)
             .height((metrics.buttonSizeDp + metrics.bottomPaddingDp + 8).dp)
             .clickable(onClick = onToggleFocusMode),
@@ -1758,6 +1786,19 @@ private fun rememberStableStatusBarPadding(): Dp {
         }
     }
     return if (currentTop > 0.dp) currentTop else stableTop
+}
+
+@Composable
+private fun rememberStableNavigationBarPadding(): Dp {
+    val density = LocalDensity.current
+    val currentBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+    var stableBottom by remember { mutableStateOf(0.dp) }
+    LaunchedEffect(currentBottom) {
+        if (currentBottom > 0.dp) {
+            stableBottom = currentBottom
+        }
+    }
+    return if (currentBottom > 0.dp) currentBottom else stableBottom
 }
 
 @Composable
@@ -1779,6 +1820,7 @@ private fun BoxScope.ReaderBottomChrome(
     onSasayakiSkipBackward: () -> Unit,
     onSasayakiSkipForward: () -> Unit,
     metrics: ReaderBottomChromeMetrics,
+    bottomSystemPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     if (menuExpanded) {
@@ -1798,14 +1840,14 @@ private fun BoxScope.ReaderBottomChrome(
             onSasayaki = onSasayaki,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
+                .padding(bottom = bottomSystemPadding)
                 .padding(end = metrics.horizontalPaddingDp.dp, bottom = metrics.menuBottomPaddingDp.dp),
         )
     }
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
+            .padding(bottom = bottomSystemPadding)
             .padding(
                 start = metrics.horizontalPaddingDp.dp,
                 end = metrics.horizontalPaddingDp.dp,
@@ -2099,6 +2141,8 @@ private fun ChapterWebView(
     sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData, selectionRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit,
     onClearLookupPopup: () -> Unit,
+    onReaderTapOutside: () -> Unit,
+    onReaderInteraction: () -> Unit,
     onImageTapped: (String) -> Unit,
     onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit,
     fontManager: ReaderFontManager,
@@ -2111,6 +2155,8 @@ private fun ChapterWebView(
     val currentOnContinuousScrollDisplayProgress = rememberUpdatedState(onContinuousScrollDisplayProgress)
     val currentOnContinuousScrollProgress = rememberUpdatedState(onContinuousScrollProgress)
     val currentOnClearLookupPopup = rememberUpdatedState(onClearLookupPopup)
+    val currentOnReaderTapOutside = rememberUpdatedState(onReaderTapOutside)
+    val currentOnReaderInteraction = rememberUpdatedState(onReaderInteraction)
     val currentOnImageTapped = rememberUpdatedState(onImageTapped)
     val currentOnHighlightCreated = rememberUpdatedState(onHighlightCreated)
     val currentOnNextChapter = rememberUpdatedState(onNextChapter)
@@ -2224,7 +2270,7 @@ private fun ChapterWebView(
                     val selectionResult = ReaderSelectionResult.fromWebViewResult(result)
                     when {
                         selectionResult.isImageTap || selectionResult.isLinkTap -> Unit
-                        selectionResult.selectedNothing -> currentOnClearLookupPopup.value()
+                        selectionResult.selectedNothing -> currentOnReaderTapOutside.value()
                     }
                 }
             }
@@ -2237,12 +2283,14 @@ private fun ChapterWebView(
                         },
                         onTap = ::selectAt,
                         onNextChapter = {
+                            currentOnReaderInteraction.value()
                             currentOnClearLookupPopup.value()
                             val changed = currentOnNextChapter.value()
                             if (changed) webView.hideForReaderRestore()
                             changed
                         },
                         onPreviousChapter = {
+                            currentOnReaderInteraction.value()
                             currentOnClearLookupPopup.value()
                             val changed = currentOnPreviousChapter.value()
                             if (changed) webView.hideForReaderRestore()
@@ -2255,6 +2303,7 @@ private fun ChapterWebView(
                     if (now - lastContinuousProgressUpdate < CONTINUOUS_PROGRESS_THROTTLE_MS) return@setOnScrollChangeListener
                     lastContinuousProgressUpdate = now
                     if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
+                    currentOnReaderInteraction.value()
                     val restoreEpoch = currentWebViewRestoreEpoch.value
                     continuousScrollSaveRequestId += 1L
                     val requestId = continuousScrollSaveRequestId
@@ -2301,6 +2350,7 @@ private fun ChapterWebView(
                     }
 
                     override fun onLeftSwipe() {
+                        currentOnReaderInteraction.value()
                         currentOnClearLookupPopup.value()
                         val direction = readerNavigationDirectionForSwipe(
                             isVerticalWriting = readerSettings.verticalWriting,
@@ -2316,6 +2366,7 @@ private fun ChapterWebView(
                     }
 
                     override fun onRightSwipe() {
+                        currentOnReaderInteraction.value()
                         currentOnClearLookupPopup.value()
                         val direction = readerNavigationDirectionForSwipe(
                             isVerticalWriting = readerSettings.verticalWriting,
