@@ -180,6 +180,9 @@ fun ReaderSettings.usesDarkInterface(systemDark: Boolean): Boolean = when (theme
     ReaderTheme.Sepia -> sepiaInvertInDark && systemDark
 }
 
+fun ReaderSettings.usesDarkSystemBarIcons(systemDark: Boolean): Boolean =
+    !usesDarkInterface(systemDark)
+
 fun ReaderSettings.usesSepiaLightContent(systemDark: Boolean): Boolean =
     !eInkMode && (
         theme == ReaderTheme.Sepia && !(sepiaInvertInDark && systemDark) ||

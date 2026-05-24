@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
+import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
 import moe.antimony.hoshi.features.update.DownloadedUpdatePrompt
 import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
@@ -47,10 +48,13 @@ class MainActivity : ComponentActivity() {
             }
             val systemDark = isSystemInDarkTheme()
             val loadedReaderSettings = readerSettings
+            val darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark
+            val useDarkSystemBarIcons = loadedReaderSettings?.usesDarkSystemBarIcons(systemDark) ?: !systemDark
             CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
                 HoshiReaderTheme(
-                    darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark,
+                    darkTheme = darkTheme,
                     eInkMode = loadedReaderSettings?.eInkMode ?: false,
+                    useDarkSystemBarIcons = useDarkSystemBarIcons,
                 ) {
                     val loadedReaderSettings = readerSettings ?: return@HoshiReaderTheme
                     AppShell(

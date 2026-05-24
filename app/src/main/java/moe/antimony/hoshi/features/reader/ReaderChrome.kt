@@ -357,14 +357,14 @@ fun readerChromeColors(settings: ReaderSettings, systemDark: Boolean): ReaderChr
         infoText = 0xFF000000,
     )
     settings.theme == ReaderTheme.Sepia && settings.sepiaInvertInDark && systemDark -> ReaderChromeColors(
-        buttonContainer = 0xFA191713,
+        buttonContainer = 0xE6191713,
         buttonBorder = 0xFF4A4438,
         buttonOutline = 0x00000000,
         buttonShadowElevationDp = 1,
         buttonShadowColor = 0x25000000,
         buttonInnerShadowColor = 0x00000000,
         buttonContent = 0xFFF2E2C9,
-        menuContainer = 0xFA191713,
+        menuContainer = 0xE6191713,
         menuContent = 0xFFF2E2C9,
         menuBorder = 0xFF4A4438,
         bubbleOutline = 0x00000000,

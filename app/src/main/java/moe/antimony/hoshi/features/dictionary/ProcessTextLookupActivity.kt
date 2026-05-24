@@ -36,6 +36,7 @@ import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
+import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import kotlin.math.min
 
@@ -60,12 +61,12 @@ class ProcessTextLookupActivity : ComponentActivity() {
                 }
             }
             val loadedReaderSettings = readerSettings ?: return@setContent
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
                 HoshiReaderTheme(
-                    darkTheme = loadedReaderSettings.usesDarkInterface(
-                        androidx.compose.foundation.isSystemInDarkTheme(),
-                    ),
+                    darkTheme = loadedReaderSettings.usesDarkInterface(systemDark),
                     eInkMode = loadedReaderSettings.eInkMode,
+                    useDarkSystemBarIcons = loadedReaderSettings.usesDarkSystemBarIcons(systemDark),
                 ) {
                     ProcessTextLookupOverlay(
                         query = request.query,

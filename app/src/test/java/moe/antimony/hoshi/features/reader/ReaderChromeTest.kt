@@ -568,7 +568,10 @@ class ReaderChromeTest {
             systemDark = true,
         )
 
-        assertEquals(0xFA191713L, colors.buttonContainer)
+        assertEquals(0xE6191713L, colors.buttonContainer)
+        assertEquals(0xE6191713L, colors.menuContainer)
+        assertEquals(0xE6, colors.buttonContainer ushr 24)
+        assertEquals(readerChromeColors(ReaderSettings(theme = ReaderTheme.Dark), systemDark = false).buttonContainer ushr 24, colors.buttonContainer ushr 24)
         assertEquals(0xFF4A4438L, colors.buttonBorder)
         assertEquals(0xFFF2E2C9L, colors.buttonContent)
     }

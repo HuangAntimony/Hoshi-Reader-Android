@@ -957,21 +957,17 @@ fun ReaderWebView(
     }
 
     BackHandler(onBack = ::closeReader)
-    val useLightSystemBars = when (effectiveSettings.theme) {
-        ReaderTheme.Dark -> false
-        ReaderTheme.System -> !systemDarkTheme
-        ReaderTheme.Light, ReaderTheme.Sepia -> true
-    }
-    DisposableEffect(context, view, useLightSystemBars, systemDarkTheme) {
+    val useDarkSystemBarIcons = effectiveSettings.usesDarkSystemBarIcons(systemDarkTheme)
+    DisposableEffect(context, view, useDarkSystemBarIcons) {
         val activity = context.findActivity()
         val controller = activity?.window?.let { window ->
             WindowCompat.getInsetsController(window, view)
         }
-        controller?.isAppearanceLightStatusBars = useLightSystemBars
-        controller?.isAppearanceLightNavigationBars = useLightSystemBars
+        controller?.isAppearanceLightStatusBars = useDarkSystemBarIcons
+        controller?.isAppearanceLightNavigationBars = useDarkSystemBarIcons
         onDispose {
-            controller?.isAppearanceLightStatusBars = !systemDarkTheme
-            controller?.isAppearanceLightNavigationBars = !systemDarkTheme
+            controller?.isAppearanceLightStatusBars = useDarkSystemBarIcons
+            controller?.isAppearanceLightNavigationBars = useDarkSystemBarIcons
         }
     }
     DisposableEffect(context, view) {

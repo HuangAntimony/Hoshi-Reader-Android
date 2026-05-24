@@ -333,6 +333,21 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun systemBarIconAppearanceFollowsResolvedReaderInterfaceTheme() {
+        assertTrue(ReaderSettings(theme = ReaderTheme.Light).usesDarkSystemBarIcons(systemDark = true))
+        assertTrue(ReaderSettings(theme = ReaderTheme.Sepia).usesDarkSystemBarIcons(systemDark = true))
+        assertFalse(
+            ReaderSettings(
+                theme = ReaderTheme.Sepia,
+                sepiaInvertInDark = true,
+            ).usesDarkSystemBarIcons(systemDark = true),
+        )
+        assertFalse(ReaderSettings(theme = ReaderTheme.Dark).usesDarkSystemBarIcons(systemDark = false))
+        assertFalse(ReaderSettings(theme = ReaderTheme.System).usesDarkSystemBarIcons(systemDark = true))
+        assertTrue(ReaderSettings(theme = ReaderTheme.System).usesDarkSystemBarIcons(systemDark = false))
+    }
+
+    @Test
     fun systemReaderThemeResolvesContentColorsFromSystemDarkMode() {
         val settings = ReaderSettings(theme = ReaderTheme.System)
 
