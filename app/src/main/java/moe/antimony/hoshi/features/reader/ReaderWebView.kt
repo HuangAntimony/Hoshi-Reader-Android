@@ -2416,8 +2416,15 @@ private fun ChapterWebView(
         readerSettings.systemLightSepia,
         readerSettings.sepiaInvertInDark,
         systemDark,
+        sasayakiTextColor,
+        sasayakiBackgroundColor,
     ) {
-        readerAppearanceScript(readerSettings, systemDark)
+        readerAppearanceScript(
+            settings = readerSettings,
+            systemDark = systemDark,
+            sasayakiTextColor = sasayakiTextColor,
+            sasayakiBackgroundColor = sasayakiBackgroundColor,
+        )
     }
     val readerSetupScript = remember(
         chapter,
@@ -2440,6 +2447,19 @@ private fun ChapterWebView(
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
             highlightsJson = chapterHighlightsJson,
+        )
+    }
+    val readerSetupReloadKey = remember(
+        chapterPosition.progress,
+        chapterFragment,
+        scanNonJapaneseText,
+        fontFaceUrl,
+    ) {
+        ReaderWebViewSetupReloadKey(
+            initialProgress = chapterPosition.progress,
+            initialFragment = chapterFragment,
+            scanNonJapaneseText = scanNonJapaneseText,
+            fontFaceUrl = fontFaceUrl,
         )
     }
     AndroidView(
@@ -2611,7 +2631,7 @@ private fun ChapterWebView(
             val loadKey = readerWebViewLoadKey(
                 baseUrl = baseUrl,
                 readerContentReloadKey = readerContentReloadKey,
-                readerSetupScript = readerSetupScript,
+                readerSetupReloadKey = readerSetupReloadKey,
                 webViewViewportSize = webViewViewportSize,
             )
             if (webView.tag != loadKey) {
@@ -2630,13 +2650,20 @@ private fun ChapterWebView(
 internal fun readerWebViewReadyToLoad(webViewViewportSize: IntSize): Boolean =
     webViewViewportSize != IntSize.Zero
 
+internal data class ReaderWebViewSetupReloadKey(
+    val initialProgress: Double,
+    val initialFragment: String?,
+    val scanNonJapaneseText: Boolean,
+    val fontFaceUrl: String?,
+)
+
 internal fun readerWebViewLoadKey(
     baseUrl: String,
     readerContentReloadKey: ReaderContentReloadKey,
-    readerSetupScript: String,
+    readerSetupReloadKey: ReaderWebViewSetupReloadKey,
     webViewViewportSize: IntSize,
 ): String =
-    "$baseUrl#${readerContentReloadKey.hashCode()}#${readerSetupScript.hashCode()}#$webViewViewportSize"
+    "$baseUrl#${readerContentReloadKey.hashCode()}#${readerSetupReloadKey.hashCode()}#$webViewViewportSize"
 
 internal fun readerHtmlWithEarlyViewport(html: String): String {
     val withoutViewport = readerViewportMetaRegex.replace(html, "")
@@ -2941,13 +2968,19 @@ private fun readerSetupScript(
 private fun readerAppearanceScript(
     settings: ReaderSettings,
     systemDark: Boolean,
+    sasayakiTextColor: Long,
+    sasayakiBackgroundColor: Long,
 ): String {
     val backgroundColor = settings.backgroundColor(systemDark).toReaderCssColor().javaScriptStringLiteral()
     val textColor = settings.textColorCss(systemDark).javaScriptStringLiteral()
+    val sasayakiText = sasayakiTextColor.toReaderCssColor().javaScriptStringLiteral()
+    val sasayakiBackground = sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true).javaScriptStringLiteral()
     return """
         (function() {
           document.documentElement.style.setProperty('--hoshi-background-color', $backgroundColor);
           document.documentElement.style.setProperty('--hoshi-text-color', $textColor);
+          document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', $sasayakiText);
+          document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', $sasayakiBackground);
         })();
     """.trimIndent()
 }

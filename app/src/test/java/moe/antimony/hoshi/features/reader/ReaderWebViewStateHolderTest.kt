@@ -184,23 +184,87 @@ class ReaderWebViewStateHolderTest {
     fun readerWebViewLoadKeyTracksContentReloadKey() {
         val baseSettings = ReaderSettings()
         val changedSettings = baseSettings.copy(fontSize = 28)
-        val setupScript = "same rendered setup script"
+        val setupReloadKey = ReaderWebViewSetupReloadKey(
+            initialProgress = 0.2,
+            initialFragment = null,
+            scanNonJapaneseText = false,
+            fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+        )
         val viewportSize = IntSize(800, 1200)
 
         val baseLoadKey = readerWebViewLoadKey(
             baseUrl = "https://hoshi.local/epub/chapter.xhtml",
             readerContentReloadKey = baseSettings.readerContentReloadKey(),
-            readerSetupScript = setupScript,
+            readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,
         )
         val changedLoadKey = readerWebViewLoadKey(
             baseUrl = "https://hoshi.local/epub/chapter.xhtml",
             readerContentReloadKey = changedSettings.readerContentReloadKey(),
-            readerSetupScript = setupScript,
+            readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,
         )
 
         assertFalse(baseLoadKey == changedLoadKey)
+    }
+
+    @Test
+    fun readerWebViewLoadKeyTracksChapterRestoreTarget() {
+        val settings = ReaderSettings()
+        val viewportSize = IntSize(800, 1200)
+
+        val baseLoadKey = readerWebViewLoadKey(
+            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            readerContentReloadKey = settings.readerContentReloadKey(),
+            readerSetupReloadKey = ReaderWebViewSetupReloadKey(
+                initialProgress = 0.2,
+                initialFragment = null,
+                scanNonJapaneseText = false,
+                fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+            ),
+            webViewViewportSize = viewportSize,
+        )
+        val changedLoadKey = readerWebViewLoadKey(
+            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            readerContentReloadKey = settings.readerContentReloadKey(),
+            readerSetupReloadKey = ReaderWebViewSetupReloadKey(
+                initialProgress = 0.6,
+                initialFragment = null,
+                scanNonJapaneseText = false,
+                fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+            ),
+            webViewViewportSize = viewportSize,
+        )
+
+        assertFalse(baseLoadKey == changedLoadKey)
+    }
+
+    @Test
+    fun readerWebViewLoadKeyIgnoresThemeOnlySettings() {
+        val baseSettings = ReaderSettings(theme = ReaderTheme.Light)
+        val changedSettings = baseSettings.copy(theme = ReaderTheme.Dark)
+        val setupReloadKey = ReaderWebViewSetupReloadKey(
+            initialProgress = 0.2,
+            initialFragment = null,
+            scanNonJapaneseText = false,
+            fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+        )
+        val viewportSize = IntSize(800, 1200)
+
+        val baseLoadKey = readerWebViewLoadKey(
+            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            readerContentReloadKey = baseSettings.readerContentReloadKey(),
+            readerSetupReloadKey = setupReloadKey,
+            webViewViewportSize = viewportSize,
+        )
+        val changedLoadKey = readerWebViewLoadKey(
+            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            readerContentReloadKey = changedSettings.readerContentReloadKey(),
+            readerSetupReloadKey = setupReloadKey,
+            webViewViewportSize = viewportSize,
+        )
+
+        assertEquals(baseLoadKey, changedLoadKey)
     }
 
     @Test
