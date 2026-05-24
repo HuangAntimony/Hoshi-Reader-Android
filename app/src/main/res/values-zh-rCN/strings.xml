@@ -230,6 +230,7 @@
     <string name="reader_appearance_show_title">显示标题</string>
     <string name="reader_appearance_show_character_count">显示字符数</string>
     <string name="reader_appearance_show_percentage">显示百分比</string>
+    <string name="reader_appearance_always_show_progress">始终显示进度</string>
     <string name="reader_appearance_progress_position">进度位置</string>
     <string name="reader_appearance_progress_top">顶部</string>
     <string name="reader_appearance_progress_bottom">底部</string>

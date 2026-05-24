@@ -264,7 +264,7 @@ class ReaderWebViewStateHolderTest {
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
 
-        holder.syncSettings(ReaderSettings(showTitle = false, showProgressTop = false))
+        holder.syncSettings(ReaderSettings(showTitle = false, alwaysShowProgress = false, showProgressTop = false))
 
         assertFalse(holder.isWebViewRestoring)
         assertEquals(previousEpoch, holder.webViewRestoreEpoch)

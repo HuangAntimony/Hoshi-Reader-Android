@@ -208,6 +208,10 @@ internal object ReaderContentStyles {
                 $gridCss
                 text-orientation: mixed;
             }
+            body, body * {
+                orphans: 1 !important;
+                widows: 1 !important;
+            }
             """.trimIndent()
         }
         return """

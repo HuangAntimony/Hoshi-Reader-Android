@@ -25,6 +25,22 @@ class ReaderAppearanceSasayakiTest {
     }
 
     @Test
+    fun appearanceHidesProgressPositionWhenProgressIsAlwaysShown() {
+        assertTrue(readerAppearanceShowsAlwaysShowProgress(ReaderSettings()))
+        assertTrue(!readerAppearanceShowsProgressPosition(ReaderSettings()))
+        assertTrue(
+            readerAppearanceShowsProgressPosition(
+                ReaderSettings(alwaysShowProgress = false),
+            ),
+        )
+        assertTrue(
+            !readerAppearanceShowsAlwaysShowProgress(
+                ReaderSettings(showCharacters = false, showPercentage = false),
+            ),
+        )
+    }
+
+    @Test
     fun appearanceShowsSasayakiToggleWhenSasayakiIsEnabled() {
         assertEquals(
             listOf(R.string.reader_appearance_show_sasayaki_toggle),

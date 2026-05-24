@@ -48,6 +48,7 @@ data class ReaderSettings(
     val showTitle: Boolean = true,
     val showCharacters: Boolean = true,
     val showPercentage: Boolean = true,
+    val alwaysShowProgress: Boolean = true,
     val showProgressTop: Boolean = true,
     val popupWidth: Int = 320,
     val popupHeight: Int = 250,
@@ -124,7 +125,7 @@ data class ReaderSettings(
         return when (theme) {
             ReaderTheme.System -> if (systemDark) 0xFF000000 else if (systemLightSepia) 0xFFF2E2C9 else 0xFFFFFFFF
             ReaderTheme.Dark -> 0xFF000000
-            ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) 0xFF18150C else 0xFFF2E2C9
+            ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) 0xFF17150F else 0xFFF2E2C9
             ReaderTheme.Light -> 0xFFFFFFFF
         }
     }
@@ -228,6 +229,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         showTitle = preferences.getBoolean("readerShowTitle", true),
         showCharacters = preferences.getBoolean("readerShowCharacters", true),
         showPercentage = preferences.getBoolean("readerShowPercentage", true),
+        alwaysShowProgress = preferences.getBoolean("readerAlwaysShowProgress", true),
         showProgressTop = preferences.getBoolean("readerShowProgressTop", true),
         popupWidth = preferences.getInt("popupWidth", 320),
         popupHeight = preferences.getInt("popupHeight", 250),
@@ -276,6 +278,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("readerShowTitle", settings.showTitle)
             .putBoolean("readerShowCharacters", settings.showCharacters)
             .putBoolean("readerShowPercentage", settings.showPercentage)
+            .putBoolean("readerAlwaysShowProgress", settings.alwaysShowProgress)
             .putBoolean("readerShowProgressTop", settings.showProgressTop)
             .putInt("popupWidth", settings.popupWidth)
             .putInt("popupHeight", settings.popupHeight)
@@ -363,6 +366,7 @@ class ReaderSettingsRepository(
             showTitle = this[KEY_SHOW_TITLE] ?: true,
             showCharacters = this[KEY_SHOW_CHARACTERS] ?: true,
             showPercentage = this[KEY_SHOW_PERCENTAGE] ?: true,
+            alwaysShowProgress = this[KEY_ALWAYS_SHOW_PROGRESS] ?: true,
             showProgressTop = this[KEY_SHOW_PROGRESS_TOP] ?: true,
             popupWidth = this[KEY_POPUP_WIDTH] ?: 320,
             popupHeight = this[KEY_POPUP_HEIGHT] ?: 250,
@@ -410,6 +414,7 @@ class ReaderSettingsRepository(
         this[KEY_SHOW_TITLE] = settings.showTitle
         this[KEY_SHOW_CHARACTERS] = settings.showCharacters
         this[KEY_SHOW_PERCENTAGE] = settings.showPercentage
+        this[KEY_ALWAYS_SHOW_PROGRESS] = settings.alwaysShowProgress
         this[KEY_SHOW_PROGRESS_TOP] = settings.showProgressTop
         this[KEY_POPUP_WIDTH] = settings.popupWidth
         this[KEY_POPUP_HEIGHT] = settings.popupHeight
@@ -461,6 +466,7 @@ class ReaderSettingsRepository(
         private val KEY_SHOW_TITLE = booleanPreferencesKey("readerShowTitle")
         private val KEY_SHOW_CHARACTERS = booleanPreferencesKey("readerShowCharacters")
         private val KEY_SHOW_PERCENTAGE = booleanPreferencesKey("readerShowPercentage")
+        private val KEY_ALWAYS_SHOW_PROGRESS = booleanPreferencesKey("readerAlwaysShowProgress")
         private val KEY_SHOW_PROGRESS_TOP = booleanPreferencesKey("readerShowProgressTop")
         private val KEY_POPUP_WIDTH = intPreferencesKey("popupWidth")
         private val KEY_POPUP_HEIGHT = intPreferencesKey("popupHeight")

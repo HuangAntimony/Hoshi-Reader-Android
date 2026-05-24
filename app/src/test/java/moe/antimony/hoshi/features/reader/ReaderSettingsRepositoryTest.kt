@@ -51,6 +51,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(settings.showTitle)
             assertTrue(settings.showCharacters)
             assertTrue(settings.showPercentage)
+            assertTrue(settings.alwaysShowProgress)
             assertTrue(settings.showProgressTop)
             assertEquals(320, settings.popupWidth)
             assertEquals(250, settings.popupHeight)
@@ -138,6 +139,7 @@ class ReaderSettingsRepositoryTest {
                     showTitle = false,
                     showCharacters = false,
                     showPercentage = false,
+                    alwaysShowProgress = false,
                     showProgressTop = false,
                     popupWidth = 420,
                     popupHeight = 300,
@@ -181,6 +183,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(saved.showTitle)
             assertFalse(saved.showCharacters)
             assertFalse(saved.showPercentage)
+            assertFalse(saved.alwaysShowProgress)
             assertFalse(saved.showProgressTop)
             assertEquals(420, saved.popupWidth)
             assertEquals(300, saved.popupHeight)

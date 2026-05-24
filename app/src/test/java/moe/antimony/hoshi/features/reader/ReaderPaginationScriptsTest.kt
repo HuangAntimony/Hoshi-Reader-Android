@@ -114,10 +114,20 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun verticalPageHeightIncludesIosBottomOverlap() {
+    fun verticalPageHeightExtendsPastViewportByBottomOverlap() {
         val script = ReaderPaginationScripts.shellScript()
 
         assertTrue(script.contains("var pageHeight = window.innerHeight + 22;"))
+    }
+
+    @Test
+    fun horizontalPageHeightMatchesMeasuredViewportWithoutBottomOverlap() {
+        val script = ReaderPaginationScripts.shellScript(
+            settings = ReaderSettings(verticalWriting = false),
+        )
+
+        assertTrue(script.contains("var pageHeight = window.innerHeight + 0;"))
+        assertFalse(script.contains("var pageHeight = window.innerHeight + 22;"))
     }
 
     @Test

@@ -230,6 +230,7 @@
     <string name="reader_appearance_show_title">Show Title</string>
     <string name="reader_appearance_show_character_count">Show Character Count</string>
     <string name="reader_appearance_show_percentage">Show Percentage</string>
+    <string name="reader_appearance_always_show_progress">Always Show Progress</string>
     <string name="reader_appearance_progress_position">Progress Position</string>
     <string name="reader_appearance_progress_top">Top</string>
     <string name="reader_appearance_progress_bottom">Bottom</string>

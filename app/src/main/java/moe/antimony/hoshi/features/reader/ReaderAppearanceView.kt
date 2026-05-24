@@ -420,7 +420,15 @@ private fun ReaderAppearanceContent(
                         checked = settings.showPercentage,
                         onCheckedChange = { onSettingsChange(settings.copy(showPercentage = it)) },
                     )
-                    if (settings.showCharacters || settings.showPercentage) {
+                    if (readerAppearanceShowsAlwaysShowProgress(settings)) {
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_appearance_always_show_progress),
+                            checked = settings.alwaysShowProgress,
+                            onCheckedChange = { onSettingsChange(settings.copy(alwaysShowProgress = it)) },
+                        )
+                    }
+                    if (readerAppearanceShowsProgressPosition(settings)) {
                         AppearanceDivider(palette)
                         val topLabel = stringResource(R.string.reader_appearance_progress_top)
                         val bottomLabel = stringResource(R.string.reader_appearance_progress_bottom)
@@ -593,6 +601,12 @@ private fun ReaderAppearanceContent(
 
 internal fun readerAppearanceSasayakiRows(settings: SasayakiSettings): List<Int> =
     if (settings.enabled) listOf(R.string.reader_appearance_show_sasayaki_toggle) else emptyList()
+
+internal fun readerAppearanceShowsAlwaysShowProgress(settings: ReaderSettings): Boolean =
+    settings.showCharacters || settings.showPercentage
+
+internal fun readerAppearanceShowsProgressPosition(settings: ReaderSettings): Boolean =
+    readerAppearanceShowsAlwaysShowProgress(settings) && !settings.alwaysShowProgress
 
 internal fun readerAppearanceStatisticsRows(settings: ReaderSettings): List<ReaderAppearanceStatisticsRow> =
     if (settings.enableStatistics) {
