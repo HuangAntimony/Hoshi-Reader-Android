@@ -438,6 +438,31 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun acceptedReaderNavigationInputEntersFocusModeWithoutReloadingTheReaderContent() {
+        val holder = stateHolder(initialIndex = 1)
+        holder.markWebViewRestored()
+        holder.showReaderMenu()
+        val previousEpoch = holder.webViewRestoreEpoch
+
+        assertTrue(holder.beginReaderNavigationInput())
+
+        assertTrue(holder.focusMode)
+        assertFalse(holder.showReaderMenu)
+        assertFalse(holder.isWebViewRestoring)
+        assertEquals(previousEpoch, holder.webViewRestoreEpoch)
+    }
+
+    @Test
+    fun readerNavigationInputIsRejectedWhileWebViewIsRestoringWithoutChangingFocus() {
+        val holder = stateHolder(initialIndex = 1)
+
+        assertFalse(holder.beginReaderNavigationInput())
+
+        assertFalse(holder.focusMode)
+        assertTrue(holder.isWebViewRestoring)
+    }
+
+    @Test
     fun readerTapTogglesFocusModeOnlyWhenNoPopupIsVisible() {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()

@@ -742,8 +742,8 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition)
     }
     fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean {
-        if (!stateHolder.canAcceptReaderNavigationInput()) return false
         val currentWebView = webView ?: return false
+        if (!stateHolder.beginReaderNavigationInput()) return false
         closeLookupPopupsAndSelection()
         val onLimit = when (direction) {
             ReaderNavigationDirection.Forward -> ::goToNextChapter

@@ -207,6 +207,12 @@ internal class ReaderWebViewStateHolder(
     fun canAcceptReaderNavigationInput(): Boolean =
         !isWebViewRestoring
 
+    fun beginReaderNavigationInput(): Boolean {
+        if (!canAcceptReaderNavigationInput()) return false
+        enterFocusModeForReaderInteraction()
+        return true
+    }
+
     fun prepareReloadAtDisplayedPosition() {
         readerPosition = readerPosition.prepareReloadAtDisplayedPosition()
         markWebViewRestoring()
