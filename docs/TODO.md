@@ -118,7 +118,7 @@ For reader process-restore regressions, verify returning directly to an open boo
 
 For Dictionary tab input regressions, verify opening the tab focuses the search field, shows the soft keyboard, and hints Japanese input when a Japanese-capable keyboard is installed.
 
-For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, compact bottom buttons, Sasayaki top-right toggle spacing, top title centering with asymmetric top buttons, bottom reader-menu spacing and light-mode menu outline visibility, focus mode status-bar hiding without text reflow, and all progress indicators hidden against the paginated reader text area.
+For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, compact bottom buttons, Sasayaki top-right toggle spacing, top title centering with asymmetric top buttons, bottom reader-menu spacing and light-mode menu outline visibility, focus mode status-bar hiding without text reflow, Android Back revealing chrome before closing the reader, and all progress indicators hidden against the paginated reader text area.
 
 For reader appearance controls, verify Layout Mode shows both Paginated and Continuous labels without truncation in the settings page and reader sheet.
 
@@ -136,7 +136,7 @@ For reader keep-screen-on regressions, verify Behavior -> Keep Screen On default
 
 For reader text layout regressions, verify Appearance -> Layout changes such as Vertical Padding reload the current chapter at the displayed position and visibly affect text spacing.
 
-For continuous reader layout regressions, verify vertical-writing Horizontal Padding and horizontal-writing Vertical Padding inset the current visible viewport rather than only the chapter ends.
+For continuous reader layout regressions, verify vertical-writing Horizontal Padding and horizontal-writing Vertical Padding inset the current visible viewport rather than only the chapter ends, and continuous reader chrome only re-enters focus mode from a new drag gesture after tapping to reveal controls.
 
 For reader popup settings regressions, verify changing every Popup section control while a continuous reader is open does not rebuild the WebView and does not stop scroll progress updates.
 

@@ -15,6 +15,8 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep status bar icons readable when Android is in system dark mode but the reader uses Light, Sepia Light, or Sepia Dark themes. #73
 - Keep the reader WebView from reloading when switching between light and dark reader theme families.
+- Keep Android Back in reader focus mode from immediately leaving the book; the first Back now reveals reader chrome, and the next Back exits the reader.
+- Keep continuous reader chrome visible when tapping to leave focus mode during inertial scrolling.
 - Improve reader pagination and continuous layout so vertical text uses page-height columns, and continuous padding restores and displays against the padded viewport.
 
 ## [v1.0.2] - 2026-05-24

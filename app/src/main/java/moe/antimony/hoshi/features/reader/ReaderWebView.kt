@@ -729,14 +729,12 @@ fun ReaderWebView(
         recordStatisticsAtDisplayedPosition()
     }
     fun displayContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
-        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordContinuousScrollDisplayProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
         recordStatisticsAtDisplayedPosition()
     }
     fun saveContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
-        stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordContinuousScrollProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
@@ -956,7 +954,11 @@ fun ReaderWebView(
         }
     }
 
-    BackHandler(onBack = ::closeReader)
+    BackHandler {
+        if (stateHolder.handleBackNavigation()) {
+            closeReader()
+        }
+    }
     val useDarkSystemBarIcons = effectiveSettings.usesDarkSystemBarIcons(systemDarkTheme)
     DisposableEffect(context, view, useDarkSystemBarIcons) {
         val activity = context.findActivity()
@@ -2526,6 +2528,7 @@ private fun ChapterWebView(
                             currentIsWebViewRestoring.value || webView.isNativeSelectionActionModeActive()
                         },
                         onTap = ::selectAt,
+                        onScrollGesture = currentOnReaderInteraction.value,
                         onNextChapter = {
                             currentOnReaderInteraction.value()
                             currentOnClearLookupPopup.value()
@@ -2547,7 +2550,6 @@ private fun ChapterWebView(
                     if (now - lastContinuousProgressUpdate < CONTINUOUS_PROGRESS_THROTTLE_MS) return@setOnScrollChangeListener
                     lastContinuousProgressUpdate = now
                     if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
-                    currentOnReaderInteraction.value()
                     val restoreEpoch = currentWebViewRestoreEpoch.value
                     continuousScrollSaveRequestId += 1L
                     val requestId = continuousScrollSaveRequestId
@@ -3079,6 +3081,7 @@ private class ContinuousScrollTouchListener(
     private val settings: ReaderSettings,
     private val shouldIgnoreReaderGesture: () -> Boolean,
     private val onTap: (Float, Float) -> Unit,
+    private val onScrollGesture: () -> Unit,
     private val onNextChapter: () -> Boolean,
     private val onPreviousChapter: () -> Boolean,
 ) : View.OnTouchListener {
@@ -3086,6 +3089,7 @@ private class ContinuousScrollTouchListener(
     private var downY = 0f
     private var downTime = 0L
     private var currentGestureIgnored = false
+    private val focusTracker = ReaderContinuousScrollFocusTracker()
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         val webView = view as? WebView ?: return false
@@ -3099,23 +3103,36 @@ private class ContinuousScrollTouchListener(
                 downY = event.y
                 downTime = event.eventTime
                 currentGestureIgnored = false
+                focusTracker.onDown()
             }
             MotionEvent.ACTION_CANCEL -> {
                 currentGestureIgnored = false
+                focusTracker.onCancel()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (focusTracker.onMove(event.x - downX, event.y - downY)) {
+                    onScrollGesture()
+                }
             }
             MotionEvent.ACTION_UP -> {
                 if (currentGestureIgnored) {
                     currentGestureIgnored = false
+                    focusTracker.onCancel()
                     return false
                 }
                 val dx = event.x - downX
                 val dy = event.y - downY
                 val elapsedMs = event.eventTime - downTime
-                if (elapsedMs <= MAX_TAP_DURATION_MS && abs(dx) < TAP_SLOP && abs(dy) < TAP_SLOP) {
+                if (
+                    elapsedMs <= CONTINUOUS_READER_MAX_TAP_DURATION_MS &&
+                    abs(dx) < CONTINUOUS_READER_TAP_SLOP &&
+                    abs(dy) < CONTINUOUS_READER_TAP_SLOP
+                ) {
                     onTap(event.x, event.y)
                     return false
                 }
                 handleBoundarySwipe(webView, dx, dy)
+                focusTracker.onCancel()
             }
         }
         return false
@@ -3138,9 +3155,27 @@ private class ContinuousScrollTouchListener(
         }
     }
 
-    private companion object {
-        const val TAP_SLOP = 12f
-        const val MAX_TAP_DURATION_MS = 500L
+}
+
+private const val CONTINUOUS_READER_TAP_SLOP = 12f
+private const val CONTINUOUS_READER_MAX_TAP_DURATION_MS = 500L
+
+internal class ReaderContinuousScrollFocusTracker {
+    private var scrollGestureStarted = false
+
+    fun onDown() {
+        scrollGestureStarted = false
+    }
+
+    fun onCancel() {
+        scrollGestureStarted = false
+    }
+
+    fun onMove(dx: Float, dy: Float): Boolean {
+        if (scrollGestureStarted) return false
+        if (abs(dx) < CONTINUOUS_READER_TAP_SLOP && abs(dy) < CONTINUOUS_READER_TAP_SLOP) return false
+        scrollGestureStarted = true
+        return true
     }
 }
 

@@ -94,6 +94,18 @@ internal class ReaderWebViewStateHolder(
         showReaderMenu = false
     }
 
+    fun exitFocusMode() {
+        focusMode = false
+    }
+
+    fun handleBackNavigation(): Boolean {
+        if (focusMode) {
+            exitFocusMode()
+            return false
+        }
+        return true
+    }
+
     fun toggleFocusModeFromReaderTap(hasVisiblePopups: Boolean): Boolean {
         if (hasVisiblePopups) return false
         toggleFocusMode()
