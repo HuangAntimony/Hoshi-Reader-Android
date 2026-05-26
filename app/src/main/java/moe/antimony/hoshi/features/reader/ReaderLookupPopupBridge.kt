@@ -134,6 +134,11 @@ internal data class ReaderLookupPopupFramePayload(
             val top = frame.centerY - frame.height / 2
             val actionBarVisible = state.popupActionBar || backCount > 0 || forwardCount > 0
             val hasSasayakiCue = popup.sasayakiCue != null
+            val initialEntryJson = if (includeInitialEntryJson && entriesCount > 0) {
+                state.results.firstOrNull()?.let(LookupPopupHtml::entryJsonString)
+            } else {
+                null
+            }
             return ReaderLookupPopupFramePayload(
                 id = popup.id,
                 frame = ReaderLookupPopupFrameRect(
@@ -143,9 +148,7 @@ internal data class ReaderLookupPopupFramePayload(
                     height = frame.height,
                 ),
                 entriesCount = entriesCount,
-                initialEntryJson = popup.state.results.firstOrNull()
-                    ?.takeIf { includeInitialEntryJson && entriesCount > 0 }
-                    ?.let(LookupPopupHtml::entryJsonString),
+                initialEntryJson = initialEntryJson,
                 popupActionBar = state.popupActionBar,
                 actionBarVisible = actionBarVisible,
                 backCount = backCount,

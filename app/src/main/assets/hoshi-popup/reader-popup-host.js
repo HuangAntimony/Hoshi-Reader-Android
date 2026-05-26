@@ -65,7 +65,7 @@
         return item;
     }
 
-    function buildBar(payload, className, buttons) {
+    function buildBar(className, buttons) {
         const bar = document.createElement('div');
         bar.className = className;
         buttons.forEach(item => bar.appendChild(item));
@@ -76,7 +76,7 @@
         shell.querySelectorAll('.hoshi-reader-popup-bar').forEach(node => node.remove());
         if (payload.actionBarVisible) {
             shell.insertBefore(
-                buildBar(payload, 'hoshi-reader-popup-bar hoshi-reader-popup-action-bar', [
+                buildBar('hoshi-reader-popup-bar hoshi-reader-popup-action-bar', [
                     button('arrow_back', payload.backCount > 0, () => {
                         iframe.contentWindow?.postMessage({ type: 'navigateBack' }, ORIGIN);
                         postNative({ name: 'navigateBack', popupId: payload.id });
@@ -92,7 +92,7 @@
         }
         if (payload.sasayakiVisible) {
             shell.insertBefore(
-                buildBar(payload, 'hoshi-reader-popup-bar hoshi-reader-popup-sasayaki-bar', [
+                buildBar('hoshi-reader-popup-bar hoshi-reader-popup-sasayaki-bar', [
                     button('replay', true, () => postNative({ name: 'sasayakiReplayCue', popupId: payload.id }), 'Replay cue'),
                     button((payload.sasayakiIsPlaying || payload.sasayakiWasPaused) ? 'pause' : 'play_arrow', true, () => postNative({ name: 'sasayakiTogglePlayback', popupId: payload.id }), 'Play or pause'),
                     button('start', true, () => postNative({ name: 'sasayakiPlayForward', popupId: payload.id }), 'Play from cue')
@@ -161,7 +161,7 @@
         return record;
     }
 
-    function preloadRoot(iframeUrl) {
+    function preloadIdleRootFrame(iframeUrl) {
         window.__hoshiReaderPopupIframeUrl = iframeUrl;
         if (!iframeUrl || frames.size > 0) return;
         const layer = ensureLayer();
@@ -500,10 +500,10 @@
         renderStack,
         resolveMessage,
         highlightSelection,
-        preloadRoot
+        preloadIdleRootFrame
     };
     if (window.__hoshiReaderPopupIframeUrl) {
-        preloadRoot(window.__hoshiReaderPopupIframeUrl);
+        preloadIdleRootFrame(window.__hoshiReaderPopupIframeUrl);
     }
     if (window.__hoshiPendingReaderPopupStack) {
         renderStack(window.__hoshiPendingReaderPopupStack);

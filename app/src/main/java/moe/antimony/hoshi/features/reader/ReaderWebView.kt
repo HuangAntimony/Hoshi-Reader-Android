@@ -360,7 +360,7 @@ fun ReaderWebView(
                   var iframeUrl = ${readerPopupIframeUrl.javaScriptStringLiteral()};
                   window.__hoshiReaderPopupIframeUrl = iframeUrl;
                   if (window.hoshiReaderPopupHost) {
-                    window.hoshiReaderPopupHost.preloadRoot(iframeUrl);
+                    window.hoshiReaderPopupHost.preloadIdleRootFrame(iframeUrl);
                   }
                 })();
             """.trimIndent(),
@@ -1313,23 +1313,15 @@ fun ReaderWebView(
                     if (!readerIframePopupSupported) {
                         emptyList()
                     } else {
-                        themedLookupPopups.mapIndexed { index, popup ->
-                            val history = readerPopupHistories[popup.id] ?: ReaderPopupHistoryCounts()
-                            val isRootFrameOnlyUpdate = index == 0 &&
-                                rootSelectionHighlight?.popupId == popup.id &&
-                                rootSelectionHighlight?.rects != null
-                            ReaderLookupPopupFramePayload.fromPopup(
-                                popup = popup,
-                                popupIndex = index,
-                                viewport = readerLookupPopupViewport,
-                                backCount = history.backCount,
-                                forwardCount = history.forwardCount,
-                                sasayakiWasPaused = sasayakiWasPausedByLookup,
-                                sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
-                                iframeUrl = readerPopupIframeUrl,
-                                includeInitialEntryJson = !isRootFrameOnlyUpdate,
-                            )
-                        }
+                        readerLookupPopupFramePayloads(
+                            popups = themedLookupPopups,
+                            histories = readerPopupHistories,
+                            viewport = readerLookupPopupViewport,
+                            sasayakiWasPaused = sasayakiWasPausedByLookup,
+                            sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                            iframeUrl = readerPopupIframeUrl,
+                            rootSelectionHighlight = rootSelectionHighlight,
+                        )
                     }
                 }
                 highlights?.let { loadedHighlights ->
@@ -1670,6 +1662,43 @@ private fun ReaderFullscreenRasterImage(
         }
     }
 }
+
+private fun readerLookupPopupFramePayloads(
+    popups: List<LookupPopupItem>,
+    histories: Map<String, ReaderPopupHistoryCounts>,
+    viewport: ReaderLookupPopupViewport,
+    sasayakiWasPaused: Boolean,
+    sasayakiIsPlaying: Boolean,
+    iframeUrl: String,
+    rootSelectionHighlight: ReaderRootSelectionHighlight?,
+): List<ReaderLookupPopupFramePayload> =
+    popups.mapIndexed { index, popup ->
+        val history = histories[popup.id] ?: ReaderPopupHistoryCounts()
+        ReaderLookupPopupFramePayload.fromPopup(
+            popup = popup,
+            popupIndex = index,
+            viewport = viewport,
+            backCount = history.backCount,
+            forwardCount = history.forwardCount,
+            sasayakiWasPaused = sasayakiWasPaused,
+            sasayakiIsPlaying = sasayakiIsPlaying,
+            iframeUrl = iframeUrl,
+            includeInitialEntryJson = shouldSendInitialEntryJson(
+                popup = popup,
+                popupIndex = index,
+                rootSelectionHighlight = rootSelectionHighlight,
+            ),
+        )
+    }
+
+private fun shouldSendInitialEntryJson(
+    popup: LookupPopupItem,
+    popupIndex: Int,
+    rootSelectionHighlight: ReaderRootSelectionHighlight?,
+): Boolean =
+    popupIndex != 0 ||
+        rootSelectionHighlight?.popupId != popup.id ||
+        rootSelectionHighlight.rects == null
 
 @Composable
 private fun ReaderLookupPopupIframeSync(
