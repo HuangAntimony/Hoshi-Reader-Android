@@ -60,6 +60,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Fixed
 
 - Keep lookup popup audio and Anki buttons aligned after toggling harmonic frequency rows, and prefer the fitting right side for vertical-text lookup popups.
+- Prewarm lookup popup custom fonts so user CSS with imported fonts does not leave popup text blank while the font loads.
 
 ## [v0.7.4] - 2026-05-20
 

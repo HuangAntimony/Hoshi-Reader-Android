@@ -1533,6 +1533,7 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
             }
         `.trim()
     }));
+    window.hoshiPopupPrewarmFonts?.();
 
     const termTags = [...new Set(parseTags(contents[0]?.termTags))];
     const renderContent = (parent, content) => {
@@ -1828,7 +1829,8 @@ window.renderPopup = function() {
         const customStyle = document.createElement('style');
         customStyle.id = 'popup-custom-css';
         customStyle.textContent = window.customCSS;
-        document.body.appendChild(customStyle);
+        document.head.appendChild(customStyle);
+        window.hoshiPopupPrewarmFonts?.();
     }
 
     if (container.clickAttached) {

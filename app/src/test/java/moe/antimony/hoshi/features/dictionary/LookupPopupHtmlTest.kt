@@ -127,6 +127,56 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun popupHtmlInstallsCustomCssInHeadBeforeRenderingAndPrewarmsFonts() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".entry-header {}",
+                selectionJs = "window.hoshiSelection = { selectText: function() {} };",
+            ),
+            settings = DictionarySettings(
+                customCSS = """
+                    @font-face {
+                        font-family: "Slow Popup Font";
+                        src: url("https://hoshi.local/fonts/SlowPopupFont.ttf");
+                    }
+                    .glossary-content { font-family: "Slow Popup Font"; }
+                """.trimIndent(),
+            ),
+        )
+
+        val customCssIndex = html.indexOf("""<style id="popup-custom-css">""")
+        assertTrue(customCssIndex >= 0)
+        assertTrue(customCssIndex < html.indexOf("window.renderPopup();"))
+        assertTrue(html.contains("""font-family: "Slow Popup Font";"""))
+        assertTrue(html.contains("window.hoshiPopupPrewarmFonts = function()"))
+        assertTrue(html.contains("window.hoshiPopupPrewarmFonts();"))
+    }
+
+    @Test
+    fun iframePopupShellInstallsCustomCssInHeadAndPrewarmsFontsDuringIdleLoad() {
+        val html = LookupPopupHtml.renderIframeDocument(
+            settings = DictionarySettings(
+                customCSS = """
+                    @font-face {
+                        font-family: "Slow Iframe Font";
+                        src: url("https://hoshi.local/fonts/SlowIframeFont.ttf");
+                    }
+                    .entry { font-family: "Slow Iframe Font"; }
+                """.trimIndent(),
+            ),
+        )
+
+        val customCssIndex = html.indexOf("""<style id="popup-custom-css">""")
+        assertTrue(customCssIndex >= 0)
+        assertTrue(customCssIndex < html.indexOf("""<script src="https://hoshi.local/popup/popup.js"></script>"""))
+        assertTrue(html.contains("""font-family: "Slow Iframe Font";"""))
+        assertTrue(html.contains("window.hoshiPopupPrewarmFonts = function()"))
+        assertTrue(html.contains("window.hoshiPopupPrewarmFonts();"))
+    }
+
+    @Test
     fun popupHtmlExposesConfiguredScanLengthToRecursiveSelectionJavascript() {
         val html = LookupPopupHtml.render(
             listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),

@@ -74,6 +74,7 @@ class ReaderFontManager(private val filesDir: File) {
                 @font-face {
                     font-family: $family;
                     src: url($source);
+                    font-display: swap;
                 }
             """.trimIndent()
         }

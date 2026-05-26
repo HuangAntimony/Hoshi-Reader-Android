@@ -84,6 +84,8 @@ internal object LookupPopupHtml {
                 html { zoom: ${popupCssNumber(popupScale.coerceIn(0.8, 1.5))}; }
             </style>
         """.trimIndent()
+        val customCss = customCssStyle(normalizedSettings.customCSS)
+        val fontPrewarmScript = """<script>${popupFontPrewarmScript()}</script>"""
         val eInkCss = if (eInkMode) """<style>$eInkPopupCss</style>""" else ""
         val selectionJs = assets?.let { """<script>${it.selectionJs}</script>""" }
             ?: """<script src="$PopupAssetBaseUrl/selection.js"></script>"""
@@ -107,6 +109,8 @@ internal object LookupPopupHtml {
                 $popupCss
                 <style>$androidColorSchemeCss</style>
                 $popupTypographyCss
+                $customCss
+                $fontPrewarmScript
                 $eInkCss
                 $selectionJs
                 $popupJs
@@ -292,6 +296,8 @@ internal object LookupPopupHtml {
                 html { zoom: ${popupCssNumber(popupScale.coerceIn(0.8, 1.5))}; }
             </style>
         """.trimIndent()
+        val customCss = customCssStyle(normalizedSettings.customCSS)
+        val fontPrewarmScript = """<script>${popupFontPrewarmScript()}</script>"""
         val eInkCss = if (eInkMode) """<style>$eInkPopupCss</style>""" else ""
         val selectionJs = assets?.let { """<script>${it.selectionJs}</script>""" }
             ?: """<script src="$PopupAssetBaseUrl/selection.js"></script>"""
@@ -305,6 +311,8 @@ internal object LookupPopupHtml {
                 $popupCss
                 <style>$androidColorSchemeCss</style>
                 $popupTypographyCss
+                $customCss
+                $fontPrewarmScript
                 $eInkCss
                 <style>
                     html,
@@ -530,6 +538,55 @@ internal object LookupPopupHtml {
         val formatted = String.format(Locale.US, "%.2f", value).trimEnd('0')
         return if (formatted.endsWith('.')) "${formatted}0" else formatted
     }
+
+    private fun customCssStyle(css: String): String {
+        val content = css.trim()
+        if (content.isEmpty()) return ""
+        return """<style id="popup-custom-css">${content.styleElementContentEscaped()}</style>"""
+    }
+
+    private fun String.styleElementContentEscaped(): String =
+        replace(Regex("</style", RegexOption.IGNORE_CASE), "<\\/style")
+
+    private fun popupFontPrewarmScript(): String = """
+        (function() {
+            var prewarmedFaces = typeof WeakSet === 'function' ? new WeakSet() : null;
+            function rememberFace(face) {
+                if (!face) return false;
+                if (prewarmedFaces) {
+                    if (prewarmedFaces.has(face)) return false;
+                    prewarmedFaces.add(face);
+                }
+                return true;
+            }
+            function syncAfterFontLoad() {
+                if (typeof scheduleButtonFrameSyncAtVisualState === 'function') {
+                    scheduleButtonFrameSyncAtVisualState();
+                } else if (typeof scheduleButtonFrameSync === 'function') {
+                    scheduleButtonFrameSync();
+                }
+            }
+            window.hoshiPopupPrewarmFonts = function() {
+                if (!document.fonts) return;
+                var loads = [];
+                try {
+                    document.fonts.forEach(function(face) {
+                        if (!rememberFace(face) || face.status !== 'unloaded' || typeof face.load !== 'function') {
+                            return;
+                        }
+                        try {
+                            loads.push(face.load().catch(function() {}));
+                        } catch (e) {}
+                    });
+                } catch (e) {}
+                if (!loads.length) return;
+                Promise.all(loads).then(syncAfterFontLoad, syncAfterFontLoad);
+            };
+            window.hoshiPopupPrewarmFonts();
+            setTimeout(window.hoshiPopupPrewarmFonts, 0);
+            setTimeout(window.hoshiPopupPrewarmFonts, 100);
+        })();
+    """.trimIndent()
 
     private fun popupGestureScript(): String = """
         (function() {

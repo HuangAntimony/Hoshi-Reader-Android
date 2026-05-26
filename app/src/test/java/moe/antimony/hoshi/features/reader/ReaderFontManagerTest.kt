@@ -53,6 +53,7 @@ class ReaderFontManagerTest {
         assertTrue(css.contains("@font-face"))
         assertTrue(css.contains("""font-family: "Klee One";"""))
         assertTrue(css.contains("""src: url("https://hoshi.local/fonts/Klee%20One.ttf");"""))
+        assertTrue(css.contains("font-display: swap;"))
     }
 
     @Test
