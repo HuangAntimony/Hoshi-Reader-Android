@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
@@ -59,23 +60,20 @@ internal fun ReaderRouteDestination(
         bookId,
         stateHolder,
         reloadKey,
-        autoSyncState.isReadyToLoad,
     ) {
-        if (!autoSyncState.isReadyToLoad) {
-            value = ReaderRouteLoadState.Loading
-            return@produceState
-        }
-        val shouldSyncOnOpen = autoSyncState.shouldSyncOnOpen
-        val shouldSyncAudioBook = autoSyncState.shouldSyncAudioBook
         value = stateHolder.load(bookId) { entry ->
-            if (shouldSyncOnOpen) {
+            val initialAutoSyncState = ReaderRouteAutoSyncState(
+                syncSettings = syncSettings ?: appContainer.syncSettingsRepository.settings.first(),
+                sasayakiSettings = sasayakiSettings ?: appContainer.sasayakiSettingsRepository.settings.first(),
+            )
+            if (initialAutoSyncState.shouldSyncOnOpen) {
                 runCatching {
                     appContainer.syncManager.syncBook(
                         entry = entry,
                         direction = null,
                         syncStats = readerSettings.statisticsSyncEnabled,
                         statsSyncMode = readerSettings.statisticsSyncMode,
-                        syncAudioBook = shouldSyncAudioBook,
+                        syncAudioBook = initialAutoSyncState.shouldSyncAudioBook,
                         importOnly = true,
                     )
                 }

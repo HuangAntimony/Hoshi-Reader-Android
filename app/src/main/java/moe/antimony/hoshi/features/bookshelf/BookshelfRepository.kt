@@ -69,9 +69,11 @@ internal class AndroidBookshelfRepository(
     }
 
     override suspend fun openBook(entry: BookEntry): String = withContext(ioDispatcher) {
-        val parsedBook = bookParser.parse(entry.root)
-        saveMetadata(entry.root, parsedBook, bookRepository.loadMetadata(entry.root))
-        saveBookInfo(entry.root, parsedBook)
+        val metadata = bookRepository.loadMetadata(entry.root) ?: entry.metadata
+        bookRepository.saveMetadata(
+            entry.root,
+            metadata.copy(lastAccess = bookRepository.currentAppleReferenceDateSeconds()),
+        )
         readerBookId(entry.root)
     }
 

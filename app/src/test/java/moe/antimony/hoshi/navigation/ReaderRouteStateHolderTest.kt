@@ -69,6 +69,33 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
+    fun loadReusesCachedBookInfoWhenPresent() = runBlocking {
+        val root = File("book-a")
+        val cachedBookInfo = BookInfo(
+            characterCount = 10,
+            chapterInfo = mapOf(
+                "chapter-1.xhtml" to BookInfo.ChapterInfo(
+                    spineIndex = 0,
+                    currentTotal = 0,
+                    chapterCount = 10,
+                ),
+            ),
+        )
+        val parser = FakeReaderRouteEpubParser(readerBook(html = "ignored"))
+        val repository = FakeReaderRouteBookRepository(
+            entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
+            bookInfo = cachedBookInfo,
+        )
+        val stateHolder = ReaderRouteStateHolder(repository, parser)
+
+        val state = stateHolder.load("book-a")
+
+        assertTrue(state is ReaderRouteLoadState.Ready)
+        assertEquals(cachedBookInfo, parser.cachedBookInfo)
+        assertEquals(null, repository.savedBookInfo)
+    }
+
+    @Test
     fun saveBookmarkCalculatesCharacterCountAndNotifiesRefresh() = runBlocking {
         val root = File("book-a")
         val book = readerBook(html = "1234567890")
@@ -127,6 +154,7 @@ class ReaderRouteStateHolderTest {
     private class FakeReaderRouteBookRepository(
         private val entry: BookEntry?,
         private val bookmark: Bookmark? = null,
+        private val bookInfo: BookInfo? = null,
         private val now: Double = 1.0,
     ) : ReaderRouteBookRepository {
         var savedMetadata: BookMetadata? = null
@@ -159,6 +187,8 @@ class ReaderRouteStateHolderTest {
             savedStatistics = statistics
         }
 
+        override suspend fun loadReaderBookInfo(bookRoot: File): BookInfo? = bookInfo
+
         override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
             savedBookInfo = bookInfo
         }
@@ -169,7 +199,13 @@ class ReaderRouteStateHolderTest {
     private class FakeReaderRouteEpubParser(
         private val book: EpubBook,
     ) : ReaderRouteEpubParser {
-        override fun parse(root: File): EpubBook = book
+        var cachedBookInfo: BookInfo? = null
+            private set
+
+        override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook {
+            this.cachedBookInfo = cachedBookInfo
+            return cachedBookInfo?.let { book.copy(bookInfo = it) } ?: book
+        }
     }
 
     private fun readerBook(

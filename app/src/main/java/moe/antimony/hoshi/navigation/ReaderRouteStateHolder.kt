@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.ReadingStatistics
@@ -22,7 +23,8 @@ internal class ReaderRouteStateHolder(
         runCatching {
             val entry = repository.loadBookEntry(bookId)
                 ?: error("Book not found.")
-            val parsedBook = parser.parse(entry.root)
+            val cachedBookInfo = repository.loadReaderBookInfo(entry.root)
+            val parsedBook = parser.parse(entry.root, cachedBookInfo)
             val metadata = entry.metadata.copy(
                 title = parsedBook.title,
                 cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref),
@@ -35,13 +37,16 @@ internal class ReaderRouteStateHolder(
             )
             val displayEntry = entry.copy(metadata = metadata)
             val displayBook = parsedBook.copy(title = displayEntry.displayTitle)
-            repository.saveBookInfo(entry.root, displayBook.bookInfo)
+            if (cachedBookInfo != displayBook.bookInfo) {
+                repository.saveBookInfo(entry.root, displayBook.bookInfo)
+            }
             beforeBookmarkLoad(displayEntry)
+            val bookmark = repository.loadBookmark(entry.root)
             ReaderRouteLoadState.Ready(
                 entry = displayEntry,
                 bookRoot = entry.root,
                 book = displayBook,
-                bookmark = repository.loadBookmark(entry.root),
+                bookmark = bookmark,
             )
         }.getOrElse { error ->
             ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
@@ -72,12 +77,12 @@ internal class ReaderRouteStateHolder(
 }
 
 internal interface ReaderRouteEpubParser {
-    fun parse(root: File): EpubBook
+    fun parse(root: File, cachedBookInfo: BookInfo? = null): EpubBook
 }
 
 private object DefaultReaderRouteEpubParser : ReaderRouteEpubParser {
-    override fun parse(root: File): EpubBook =
-        EpubBookParser().parse(root)
+    override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook =
+        EpubBookParser().parse(root, cachedBookInfo = cachedBookInfo)
 }
 
 internal sealed interface ReaderRouteLoadState {

@@ -105,6 +105,7 @@ internal object ReaderPaginationScripts {
             if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
               window.HoshiReaderRestore.postMessage('restoreCompleted');
             }
+            this.warmPaginationMetrics();
           },
           createWalker: function(rootNode) {
             var root = rootNode || document.body;
@@ -457,6 +458,18 @@ internal object ReaderPaginationScripts {
             var metrics = this.paginationMetrics || this.buildPaginationMetrics();
             return metrics.minScroll;
           },
+          warmPaginationMetrics: function() {
+            if (this.paginationMetrics) return;
+            var run = () => {
+              if (this.paginationMetrics) return;
+              this.buildPaginationMetrics();
+            };
+            if (window.requestIdleCallback) {
+              window.requestIdleCallback(run, { timeout: 1000 });
+            } else {
+              setTimeout(run, 200);
+            }
+          },
           buildPaginationMetrics: function() {
             var context = this.getScrollContext();
             var currentScroll = this.getPagePosition(context);
@@ -668,17 +681,18 @@ internal object ReaderPaginationScripts {
           window.hoshiReader.pageHeight = pageHeight;
           window.hoshiReader.pageWidth = pageWidth;
           ${readerImageTapScript(settings)}
-          Array.from(document.querySelectorAll('svg')).forEach(function(svg) {
-            if (svg.querySelector('image') && svg.getAttribute('preserveAspectRatio') === 'none') {
+          var svgImages = Array.from(document.querySelectorAll('svg image'));
+          svgImages.forEach(function(svgImage) {
+            var svg = svgImage.closest('svg');
+            if (!svg) return;
+            if (svg.getAttribute('preserveAspectRatio') === 'none') {
               svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             }
-            var svgImage = svg.querySelector('image');
-            if (svgImage) {
-              var svgImageSrc = svgImage.href && svgImage.href.baseVal ? svgImage.href.baseVal : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
-              setupReaderImage(svgImage, svgImageSrc, false, svg);
-            }
+            var svgImageSrc = svgImage.href && svgImage.href.baseVal ? svgImage.href.baseVal : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
+            setupReaderImage(svgImage, svgImageSrc, false, svg);
           });
-          var imagePromises = Array.from(document.querySelectorAll('img')).map(function(img) {
+          var images = Array.from(document.querySelectorAll('img'));
+          var imagePromises = images.map(function(img) {
             return new Promise(function(resolve) {
               var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
               var mark = function() {
@@ -703,6 +717,7 @@ internal object ReaderPaginationScripts {
           spacer.style.breakInside = 'avoid';
           document.body.appendChild(spacer);
           Promise.all(imagePromises).then(function() {
+            if (!images.length) return;
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
@@ -1146,17 +1161,18 @@ internal object ReaderPaginationScripts {
           document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(window.innerWidth * ${generatedLayout.imageWidthViewportRatio})) + 'px');
           document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, window.innerHeight - ${settings.bottomOverlapPx}) + 'px');
           ${readerImageTapScript(settings)}
-          Array.from(document.querySelectorAll('svg')).forEach(function(svg) {
-            if (svg.querySelector('image') && svg.getAttribute('preserveAspectRatio') === 'none') {
+          var svgImages = Array.from(document.querySelectorAll('svg image'));
+          svgImages.forEach(function(svgImage) {
+            var svg = svgImage.closest('svg');
+            if (!svg) return;
+            if (svg.getAttribute('preserveAspectRatio') === 'none') {
               svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             }
-            var svgImage = svg.querySelector('image');
-            if (svgImage) {
-              var svgImageSrc = svgImage.href && svgImage.href.baseVal ? svgImage.href.baseVal : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
-              setupReaderImage(svgImage, svgImageSrc, false, svg);
-            }
+            var svgImageSrc = svgImage.href && svgImage.href.baseVal ? svgImage.href.baseVal : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
+            setupReaderImage(svgImage, svgImageSrc, false, svg);
           });
-          var imagePromises = Array.from(document.querySelectorAll('img')).map(function(img) {
+          var images = Array.from(document.querySelectorAll('img'));
+          var imagePromises = images.map(function(img) {
             return new Promise(function(resolve) {
               var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
               var mark = function() {
@@ -1175,6 +1191,7 @@ internal object ReaderPaginationScripts {
             });
           });
           Promise.all(imagePromises).then(function() {
+            if (!images.length) return;
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
