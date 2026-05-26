@@ -50,10 +50,10 @@
         return (payload.actionBarVisible ? ACTION_BAR_HEIGHT : 0) + (payload.sasayakiVisible ? SASAYAKI_BAR_HEIGHT : 0);
     }
 
-    function button(iconName, enabled, action, label) {
+    function button(iconName, enabled, action, label, className = '') {
         const item = document.createElement('button');
         item.type = 'button';
-        item.className = 'hoshi-reader-popup-control';
+        item.className = ['hoshi-reader-popup-control', className].filter(Boolean).join(' ');
         item.disabled = !enabled;
         item.setAttribute('aria-label', label);
         item.style.setProperty('--icon-url', `url("${icon(iconName)}")`);
@@ -62,6 +62,13 @@
             event.stopPropagation();
             if (!item.disabled) action();
         });
+        return item;
+    }
+
+    function spacer() {
+        const item = document.createElement('span');
+        item.className = 'hoshi-reader-popup-flex-spacer';
+        item.setAttribute('aria-hidden', 'true');
         return item;
     }
 
@@ -85,6 +92,7 @@
                         iframe.contentWindow?.postMessage({ type: 'navigateForward' }, ORIGIN);
                         postNative({ name: 'navigateForward', popupId: payload.id });
                     }, 'Forward'),
+                    spacer(),
                     button('close', true, () => postNative({ name: 'swipeDismiss', popupId: payload.id }), 'Close')
                 ]),
                 iframe,
@@ -93,9 +101,9 @@
         if (payload.sasayakiVisible) {
             shell.insertBefore(
                 buildBar('hoshi-reader-popup-bar hoshi-reader-popup-sasayaki-bar', [
-                    button('replay', true, () => postNative({ name: 'sasayakiReplayCue', popupId: payload.id }), 'Replay cue'),
-                    button((payload.sasayakiIsPlaying || payload.sasayakiWasPaused) ? 'pause' : 'play_arrow', true, () => postNative({ name: 'sasayakiTogglePlayback', popupId: payload.id }), 'Play or pause'),
-                    button('start', true, () => postNative({ name: 'sasayakiPlayForward', popupId: payload.id }), 'Play from cue')
+                    button('replay', true, () => postNative({ name: 'sasayakiReplayCue', popupId: payload.id }), 'Replay cue', 'hoshi-reader-popup-sasayaki-control'),
+                    button((payload.sasayakiIsPlaying || payload.sasayakiWasPaused) ? 'pause' : 'play_arrow', true, () => postNative({ name: 'sasayakiTogglePlayback', popupId: payload.id }), 'Play or pause', 'hoshi-reader-popup-sasayaki-control'),
+                    button('start', true, () => postNative({ name: 'sasayakiPlayForward', popupId: payload.id }), 'Play from cue', 'hoshi-reader-popup-sasayaki-control')
                 ]),
                 iframe,
             );
@@ -445,17 +453,20 @@
             height: ${ACTION_BAR_HEIGHT}px;
             display: flex;
             align-items: center;
-            padding: 0 4px;
+            padding: 0 8px;
             border-bottom: 1px solid rgba(120, 120, 128, 0.36);
             color: rgba(60, 60, 67, 0.86);
             background: inherit;
         }
         #${LAYER_ID} .hoshi-reader-popup-sasayaki-bar {
             justify-content: center;
-            gap: 18px;
+            gap: 12px;
         }
         #${LAYER_ID} .hoshi-reader-popup-action-bar {
-            justify-content: space-between;
+            gap: 12px;
+        }
+        #${LAYER_ID} .hoshi-reader-popup-flex-spacer {
+            flex: 1 1 auto;
         }
         #${LAYER_ID} .hoshi-reader-popup-shell[data-dark-mode="true"] .hoshi-reader-popup-bar {
             color: rgba(255, 255, 255, 0.92);
@@ -471,6 +482,9 @@
             color: inherit;
             padding: 7px;
             -webkit-tap-highlight-color: transparent;
+        }
+        #${LAYER_ID} .hoshi-reader-popup-sasayaki-control {
+            padding: 5px;
         }
         #${LAYER_ID} .hoshi-reader-popup-control:active {
             background: rgba(128, 128, 128, 0.18);
