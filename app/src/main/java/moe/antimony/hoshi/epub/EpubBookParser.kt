@@ -100,7 +100,7 @@ class EpubBookParser {
         }
 
         require(chapterShells.isNotEmpty()) { "EPUB spine contains no readable chapters" }
-        val reusableBookInfo = cachedBookInfo?.takeIf { it.matches(chapterShells) }
+        val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesChapterShells(chapterShells) }
         val chapters = if (reusableBookInfo != null) {
             chapterShells
         } else {
@@ -130,12 +130,12 @@ class EpubBookParser {
     }
 }
 
-private fun BookInfo.matches(chapters: List<EpubChapter>): Boolean {
+internal fun BookInfo.matchesChapterShells(chapters: List<EpubChapter>): Boolean {
     if (characterCount < 0) return false
     var total = 0
-    for (chapter in chapters) {
+    for ((chapterIndex, chapter) in chapters.withIndex()) {
         val info = chapterInfo[chapter.href] ?: return false
-        if (info.spineIndex != chapter.spineIndex || info.chapterCount < 0 || info.currentTotal != total) {
+        if (info.spineIndex != chapterIndex || info.chapterCount < 0 || info.currentTotal != total) {
             return false
         }
         total += info.chapterCount

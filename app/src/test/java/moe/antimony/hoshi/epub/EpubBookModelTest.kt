@@ -3,6 +3,7 @@ package moe.antimony.hoshi.epub
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EpubBookModelTest {
@@ -59,5 +60,34 @@ class EpubBookModelTest {
             book.bookInfo.chapterInfo.getValue("item/xhtml/b.xhtml"),
         )
         assertEquals(4, book.characterCountAt(chapterIndex = 1, progress = 0.5))
+    }
+
+    @Test
+    fun bookInfoMatchesFilteredChapterOrderWhenRawSpineSkipsEntries() {
+        val bookInfo = BookInfo(
+            characterCount = 6,
+            chapterInfo = mapOf(
+                "item/xhtml/a.xhtml" to BookInfo.ChapterInfo(spineIndex = 0, currentTotal = 0, chapterCount = 3),
+                "item/xhtml/b.xhtml" to BookInfo.ChapterInfo(spineIndex = 1, currentTotal = 3, chapterCount = 3),
+            ),
+        )
+        val chapterShells = listOf(
+            EpubChapter(
+                id = "a",
+                href = "item/xhtml/a.xhtml",
+                mediaType = "application/xhtml+xml",
+                html = "",
+                spineIndex = 1,
+            ),
+            EpubChapter(
+                id = "b",
+                href = "item/xhtml/b.xhtml",
+                mediaType = "application/xhtml+xml",
+                html = "",
+                spineIndex = 3,
+            ),
+        )
+
+        assertTrue(bookInfo.matchesChapterShells(chapterShells))
     }
 }
