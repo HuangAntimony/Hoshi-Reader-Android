@@ -13,9 +13,8 @@ data class EpubBook(
     val coverHref: String? = null,
     private val resources: Map<String, EpubResource> = emptyMap(),
     private val rootDirectory: File? = null,
+    val bookInfo: BookInfo = chapters.toBookInfo(),
 ) {
-    val bookInfo: BookInfo = chapters.toBookInfo()
-
     fun readResource(path: String): ByteArray? {
         val normalized = path.normalizeResourceHref()
         return resources[normalized]?.readBytes()
@@ -67,33 +66,31 @@ data class EpubResource(
 }
 
 class EpubBookParser {
-    fun parse(root: File, fallbackTitle: String? = null): EpubBook {
+    fun parse(root: File, fallbackTitle: String? = null, cachedBookInfo: BookInfo? = null): EpubBook {
         require(root.isDirectory) { "Extracted EPUB directory does not exist: ${root.absolutePath}" }
 
         val nativeBook = parseExtractedEpub(root.absolutePath)
         return try {
-            nativeBook.toReaderBook(root, fallbackTitle)
+            nativeBook.toReaderBook(root, fallbackTitle, cachedBookInfo)
         } finally {
             nativeBook.destroy()
         }
     }
 
-    private fun NativeEpubBook.toReaderBook(root: File, fallbackTitle: String?): EpubBook {
+    private fun NativeEpubBook.toReaderBook(root: File, fallbackTitle: String?, cachedBookInfo: BookInfo?): EpubBook {
         val manifest = manifest().associateBy { it.id }
         val contentDirectory = File(contentDir())
+        val contentDirectoryPrefix = contentDirectory.relativeDirectoryHref(root)
         val guideTocHrefs = root.readGuideTocHrefs()
-        val chapters = spine().mapIndexedNotNull { index, spineItem ->
+        val chapterShells = spine().mapIndexedNotNull { index, spineItem ->
             val manifestItem = manifest[spineItem.idref] ?: return@mapIndexedNotNull null
             if (!manifestItem.mediaType.isHtmlMediaType()) return@mapIndexedNotNull null
-            val href = chapterAbsolutePath(index.toUInt())
-                ?.let(::File)
-                ?.relativeHref(root)
-                ?: return@mapIndexedNotNull null
+            val href = contentDirectoryPrefix.resolveManifestHref(manifestItem.href)
             EpubChapter(
                 id = manifestItem.id,
                 href = href,
                 mediaType = manifestItem.mediaType,
-                html = readSpineItemText(index.toUInt()),
+                html = "",
                 spineIndex = index,
                 linear = spineItem.linear,
                 properties = manifestItem.properties,
@@ -102,25 +99,48 @@ class EpubBookParser {
             )
         }
 
-        require(chapters.isNotEmpty()) { "EPUB spine contains no readable chapters" }
+        require(chapterShells.isNotEmpty()) { "EPUB spine contains no readable chapters" }
+        val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesChapterShells(chapterShells) }
+        val chapters = if (reusableBookInfo != null) {
+            chapterShells
+        } else {
+            chapterShells.map { chapter ->
+                val spineIndex = chapter.spineIndex ?: return@map chapter
+                chapter.copy(html = readSpineItemText(spineIndex.toUInt()))
+            }
+        }
 
         val resources = manifest.values.mapNotNull { manifestItem ->
-            val file = contentDirectory.resolve(manifestItem.href)
-            val href = file.relativeHref(root) ?: return@mapNotNull null
+            val href = contentDirectoryPrefix.resolveManifestHref(manifestItem.href)
+            val file = root.resolve(href)
             href to EpubResource.file(manifestItem.mediaType, file)
         }.toMap()
 
         return EpubBook(
             title = title()?.ifBlank { null } ?: fallbackTitle?.takeIf { it.isNotBlank() } ?: root.nameWithoutExtension,
             coverHref = coverHref()
-                ?.let { contentDirectory.resolve(it).relativeHref(root) }
+                ?.let { contentDirectoryPrefix.resolveManifestHref(it) }
                 ?: resources.entries.firstOrNull { (_, resource) -> resource.mediaType.startsWith("image/") }?.key,
             toc = toc().children.map { it.toReaderTocItem(root, contentDirectory) },
             chapters = chapters,
             resources = resources,
             rootDirectory = root,
+            bookInfo = reusableBookInfo ?: chapters.toBookInfo(),
         )
     }
+}
+
+internal fun BookInfo.matchesChapterShells(chapters: List<EpubChapter>): Boolean {
+    if (characterCount < 0) return false
+    var total = 0
+    for ((chapterIndex, chapter) in chapters.withIndex()) {
+        val info = chapterInfo[chapter.href] ?: return false
+        if (info.spineIndex != chapterIndex || info.chapterCount < 0 || info.currentTotal != total) {
+            return false
+        }
+        total += info.chapterCount
+    }
+    return total == characterCount
 }
 
 private fun NativeTocNode.toReaderTocItem(root: File, contentDirectory: File): EpubTocItem =
@@ -146,6 +166,22 @@ private fun File.relativeHref(root: File): String? {
     return runCatching {
         normalizedFile.relativeTo(normalizedRoot).invariantSeparatorsPath.normalizeResourceHref()
     }.getOrNull()
+}
+
+private fun File.relativeDirectoryHref(root: File): String =
+    relativeHref(root)
+        ?.takeIf { it.isNotBlank() }
+        ?.trimEnd('/')
+        .orEmpty()
+
+private fun String.resolveManifestHref(href: String): String {
+    val normalizedHref = href.normalizeResourceHref()
+    val joined = if (isBlank()) {
+        normalizedHref
+    } else {
+        "$this/$normalizedHref"
+    }
+    return File(joined).normalize().invariantSeparatorsPath.normalizeResourceHref()
 }
 
 private fun File.readGuideTocHrefs(): Set<String> =

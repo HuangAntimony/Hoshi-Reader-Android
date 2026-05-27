@@ -85,7 +85,8 @@ class ReaderPaginationScriptsTest {
     fun normalizesCalibreCoverSvgAspectRatio() {
         val script = ReaderPaginationScripts.shellScript()
 
-        assertTrue(script.contains("svg.querySelector('image')"))
+        assertTrue(script.contains("document.querySelectorAll('svg image')"))
+        assertTrue(script.contains("var svg = svgImage.closest('svg');"))
         assertTrue(script.contains("svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')"))
     }
 
@@ -105,7 +106,8 @@ class ReaderPaginationScriptsTest {
             assertTrue(script.contains("blurElement.classList.remove('blurred');"))
             assertTrue(script.contains("HoshiReaderImage.postMessage(new URL(src, document.baseURI).href);"))
             assertTrue(script.contains("if (true) {"))
-            assertTrue(script.contains("var svgImage = svg.querySelector('image');"))
+            assertTrue(script.contains("var svgImages = Array.from(document.querySelectorAll('svg image'));"))
+            assertTrue(script.contains("svgImages.forEach(function(svgImage)"))
             assertTrue(script.contains("svgImage.href && svgImage.href.baseVal"))
             assertTrue(script.contains("setupReaderImage(svgImage, svgImageSrc, false, svg);"))
             assertTrue(script.contains("img.classList.add('block-img');"))
