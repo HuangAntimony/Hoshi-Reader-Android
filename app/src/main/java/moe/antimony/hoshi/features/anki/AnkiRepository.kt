@@ -146,19 +146,22 @@ class AnkiRepository(
         val fieldMappings = settings.fieldMappings
         val payload = runCatching { AnkiMiningPayload.fromJson(rawPayload) }.getOrNull()
             ?: return@withContext false
+        val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")
+        val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
+        val needsAudio = fieldMappings.referencesAnkiHandlebar("{audio}")
         val mediaContext = AnkiMiningContext(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
-            coverPath = context.coverPath?.let {
+            coverPath = context.coverPath?.takeIf { needsCover }?.let {
                 addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it), activeBackend, settings.backendKind)
             },
-            sasayakiAudioPath = context.sasayakiAudioPath?.let {
+            sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
                 addMediaFile(it, File(it).name, mimeTypeForPath(it), activeBackend, settings.backendKind)
             },
             sentenceOffset = context.sentenceOffset,
         )
         val mediaPayload = payload.copy(
-            audio = payload.audio.takeIf { it.isNotBlank() }
+            audio = payload.audio.takeIf { needsAudio && it.isNotBlank() }
                 ?.let { addRemoteAudio(it, activeBackend, settings.backendKind) }
                 .orEmpty(),
         )

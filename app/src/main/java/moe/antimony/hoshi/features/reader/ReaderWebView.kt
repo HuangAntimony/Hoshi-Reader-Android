@@ -804,7 +804,7 @@ fun ReaderWebView(
             }
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val popup = popupById(message.popupId) ?: return
-                val ankiContext = popup.sasayakiCue?.let { cue ->
+                val ankiContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
                     popup.state.ankiContext.copy(
                         sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
                     )

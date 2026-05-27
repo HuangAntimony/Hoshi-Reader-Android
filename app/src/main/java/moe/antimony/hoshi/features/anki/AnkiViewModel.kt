@@ -39,7 +39,8 @@ data class AnkiUiState(
         get() = AnkiPopupSettings(
             isConfigured = isConfigured,
             useAnkiConnect = settings.backendKind == AnkiBackendKind.AnkiConnect,
-            needsAudio = settings.fieldMappings.values.contains("{audio}"),
+            needsAudio = settings.fieldMappings.referencesAnkiHandlebar("{audio}"),
+            needsSasayakiAudio = settings.fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}"),
             allowDupes = settings.allowDupes,
             compactGlossaries = settings.compactGlossaries,
         )

@@ -11,6 +11,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Support ABI-specific GitHub update APKs while retaining compatibility with the existing arm64 update package during the transition.
 - Speed up opening books from the bookshelf by avoiding duplicate EPUB parsing and reusing saved reader character-count sidecars when they still match the EPUB spine.
 
+### Fixed
+
+- Prevent Anki mining from adding book covers or audio media when their corresponding field placeholders are not used.
+
 ## [v1.1.0] - 2026-05-24
 
 ### Added

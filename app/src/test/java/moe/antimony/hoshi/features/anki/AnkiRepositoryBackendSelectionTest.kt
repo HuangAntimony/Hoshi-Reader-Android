@@ -183,18 +183,105 @@ class AnkiRepositoryBackendSelectionTest {
         assertEquals("<img src=\"hoshi_cover_${cover.fileName}\">", ankiConnect.lastFields["Cover"])
     }
 
+    @Test
+    fun mineEntryDoesNotStoreUnreferencedHandlebarMedia() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Expression"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val cover = Files.createTempFile("hoshi-cover", ".png").also { Files.write(it, byteArrayOf(1)) }
+        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".m4a").also { Files.write(it, byteArrayOf(2)) }
+        val wordAudio = Files.createTempFile("hoshi-word", ".mp3").also { Files.write(it, byteArrayOf(3)) }
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    fieldMappings = mapOf("Expression" to "{expression}"),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる","audio":"${wordAudio.toUri()}"}""",
+                context = AnkiMiningContext(
+                    sentence = "パンを食べる。",
+                    coverPath = cover.toString(),
+                    sasayakiAudioPath = sasayaki.toString(),
+                ),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        assertEquals(0, ankiConnect.addMediaFromBytesCalls)
+        assertEquals(mapOf("Expression" to "食べる"), ankiConnect.lastFields)
+    }
+
+    @Test
+    fun mineEntryStoresAudioMediaReferencedInsideFieldTemplates() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Media"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".m4a").also { Files.write(it, byteArrayOf(2)) }
+        val wordAudio = Files.createTempFile("hoshi-word", ".mp3").also { Files.write(it, byteArrayOf(3)) }
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    fieldMappings = mapOf("Media" to "{audio} {sasayaki-audio}"),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる","audio":"${wordAudio.toUri()}"}""",
+                context = AnkiMiningContext(
+                    sentence = "パンを食べる。",
+                    sasayakiAudioPath = sasayaki.toString(),
+                ),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        assertEquals(2, ankiConnect.addMediaFromBytesCalls)
+        assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_audio_"))
+        assertTrue(ankiConnect.lastFields.getValue("Media").contains(sasayaki.fileName.toString()))
+    }
+
     private fun repository(
         backend: AnkiBackend = RecordingBackend(),
         settingsRepository: InMemoryAnkiSettingsRepository = InMemoryAnkiSettingsRepository(),
         ankiConnectBackendFactory: (String) -> AnkiBackend = { RecordingBackend() },
-    ): AnkiRepository =
-        AnkiRepository(
-            context = ContextWrapper(null),
+    ): AnkiRepository {
+        val cacheDir = Files.createTempDirectory("hoshi-anki-cache").toFile()
+        return AnkiRepository(
+            context = object : ContextWrapper(null) {
+                override fun getCacheDir() = cacheDir
+            },
             backend = backend,
             settingsRepository = settingsRepository,
             localAudioRepository = LocalAudioRepository(Files.createTempDirectory("hoshi-anki-test").toFile()),
             ankiConnectBackendFactory = ankiConnectBackendFactory,
         )
+    }
 
     private class InMemoryAnkiSettingsRepository(
         initial: AnkiSettings = AnkiSettings(),

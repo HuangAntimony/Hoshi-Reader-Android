@@ -44,4 +44,29 @@ class AnkiUiStateTest {
         assertEquals("", settings.ankiConnectUrl)
         assertFalse(settings.ankiConnectForceSync)
     }
+
+    @Test
+    fun popupMediaNeedsFollowHandlebarsReferencedInsideTemplates() {
+        val state = AnkiUiState(
+            settings = AnkiSettings(
+                fieldMappings = mapOf(
+                    "Audio" to "<div>{audio}</div>",
+                    "SentenceAudio" to "clip: {sasayaki-audio}",
+                ),
+            ),
+        )
+
+        assertTrue(state.popupSettings.needsAudio)
+        assertTrue(state.popupSettings.needsSasayakiAudio)
+    }
+
+    @Test
+    fun popupMediaNeedsAreOffWhenMediaHandlebarsAreAbsent() {
+        val state = AnkiUiState(
+            settings = AnkiSettings(fieldMappings = mapOf("Expression" to "{expression}")),
+        )
+
+        assertFalse(state.popupSettings.needsAudio)
+        assertFalse(state.popupSettings.needsSasayakiAudio)
+    }
 }

@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-26
+Last updated: 2026-05-27
 
 This file is the short operational handoff for future agents.
 
@@ -77,7 +77,7 @@ This file is the short operational handoff for future agents.
 
 ### Anki
 
-- Device-validate Android AnkiConnect against both an HTTPS internet host and a private HTTP host: connect, fetch, duplicate check, media storage, add-note, and optional force-sync behavior.
+- Device-validate Android AnkiConnect against both an HTTPS internet host and a private HTTP host: connect, fetch, duplicate check, referenced-only media storage (including no unused cover/audio uploads), add-note, and optional force-sync behavior.
 - Keep backend coverage for duplicate checks, AnkiDroid fetch failures, and AnkiConnect request shaping.
 - Keep popup mining decoupled from direct HTTP calls; route backend differences through the Anki backend boundary.
 
