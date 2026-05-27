@@ -8,6 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Changed
 
 - Rework reader lookup popups to render inside the reader WebView through an iframe layer, improving popup dismissal, touch stability, large-result first paint, and selection-highlight reveal timing while preserving E-ink underline marks, recursive lookup, audio, Anki, redirect history, and native-aligned action and Sasayaki controls.
+- Support ABI-specific GitHub update APKs while retaining compatibility with the existing arm64 update package during the transition.
 
 ## [v1.1.0] - 2026-05-24
 

@@ -90,7 +90,7 @@ This file is the short operational handoff for future agents.
 
 - Before F-Droid distribution, split update behavior by distribution channel so F-Droid builds do not bypass F-Droid update checks.
 - Device-validate GitHub update prompts after the check/download split, covering skip-version, manual checks, completed-download prompts, user-triggered install, and same-version APK cleanup.
-- Device-validate split GitHub release APK updates on arm64-v8a and armeabi-v7a targets after the first split-asset release.
+- Device-validate split GitHub release APK updates on arm64-v8a and armeabi-v7a targets, including the transitional arm64 legacy-name APK alias.
 
 ## Required Validation
 

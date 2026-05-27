@@ -179,6 +179,27 @@ class GitHubReleaseUpdateRepositoryTest {
     }
 
     @Test
+    fun prefersMatchingAbiAssetOverLegacyArm64AliasDuringTransition() {
+        val release = splitAbiRelease().copy(
+            assets = listOf(
+                GitHubReleaseAsset(
+                    name = "Hoshi-Reader-v0.3.5.apk",
+                    browserDownloadUrl = "https://example.com/Hoshi-Reader-v0.3.5.apk",
+                    digest = null,
+                ),
+            ) + splitAbiRelease().assets,
+        )
+
+        val update = release.availableUpdateOrNull(
+            currentVersionName = "0.3.4",
+            supportedAbis = listOf("armeabi-v7a"),
+        )
+
+        requireNotNull(update)
+        assertEquals("Hoshi-Reader-v0.3.5-armeabi-v7a.apk", update.assetName)
+    }
+
+    @Test
     fun returnsNoUpdateWhenSplitAbiReleaseHasNoCompatibleAsset() {
         val release = splitAbiRelease()
 

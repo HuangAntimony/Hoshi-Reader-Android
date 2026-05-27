@@ -75,8 +75,8 @@ internal fun GitHubRelease.availableUpdateOrNull(
     val normalizedVersion = releaseVersion.toString()
     val apkAssets = assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
     val expectedName = "Hoshi-Reader-v$normalizedVersion.apk"
-    val selectedAsset = apkAssets.firstOrNull { it.name == expectedName }
-        ?: apkAssets.selectCompatibleAbiAsset(normalizedVersion, supportedAbis)
+    val selectedAsset = apkAssets.selectCompatibleAbiAsset(normalizedVersion, supportedAbis)
+        ?: apkAssets.firstOrNull { it.name == expectedName }
         ?: apkAssets.singleOrNull()
         ?: return null
     return AvailableUpdate(
