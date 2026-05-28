@@ -97,11 +97,12 @@ data class ReaderChromeVisibility(
     val showForwardJump: Boolean,
 )
 
-data class ReaderSasayakiBottomSkipButtons(
+data class ReaderSasayakiBottomPlaybackControls(
     val visible: Boolean,
-    val buttonSizeDp: Int,
+    val rowHeightDp: Int,
+    val buttonWidthDp: Int,
     val iconSizeDp: Int,
-    val adjacentSpacingDp: Int,
+    val horizontalPaddingDp: Int,
 )
 
 enum class ReaderSasayakiBottomSkipButtonAction {
@@ -271,16 +272,17 @@ fun readerBottomChromeMetrics(): ReaderBottomChromeMetrics =
         menuItemSpacingDp = 12,
     )
 
-fun readerSasayakiBottomSkipButtons(
+fun readerSasayakiBottomPlaybackControls(
     settings: moe.antimony.hoshi.features.sasayaki.SasayakiSettings,
     hasAudio: Boolean,
     metrics: ReaderBottomChromeMetrics,
-): ReaderSasayakiBottomSkipButtons =
-    ReaderSasayakiBottomSkipButtons(
-        visible = settings.enabled && settings.showReaderSkipButtons && hasAudio,
-        buttonSizeDp = metrics.buttonSizeDp,
-        iconSizeDp = metrics.secondaryIconSizeDp,
-        adjacentSpacingDp = metrics.trailingButtonSpacingDp,
+): ReaderSasayakiBottomPlaybackControls =
+    ReaderSasayakiBottomPlaybackControls(
+        visible = settings.enabled && settings.showReaderBottomPlaybackControls && hasAudio,
+        rowHeightDp = metrics.bottomSafeAreaDp,
+        buttonWidthDp = 40,
+        iconSizeDp = 14,
+        horizontalPaddingDp = 18,
     )
 
 fun readerSasayakiBottomSkipButtonActions(
@@ -301,7 +303,6 @@ fun readerSasayakiBottomSkipButtonActions(
 
 fun readerFocusModeToggleArea(
     metrics: ReaderBottomChromeMetrics,
-    sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     focusMode: Boolean,
 ): ReaderFocusModeToggleArea {
     return ReaderFocusModeToggleArea(visible = false, horizontalPaddingDp = 0)

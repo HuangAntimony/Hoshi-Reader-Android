@@ -231,6 +231,7 @@
     <string name="reader_appearance_show_character_count">Show Character Count</string>
     <string name="reader_appearance_show_percentage">Show Percentage</string>
     <string name="reader_appearance_always_show_progress">Always Show Progress</string>
+    <string name="reader_appearance_show_back_button">Show Back Button</string>
     <string name="reader_appearance_progress_position">Progress Position</string>
     <string name="reader_appearance_progress_top">Top</string>
     <string name="reader_appearance_progress_bottom">Bottom</string>
@@ -431,8 +432,8 @@
     <string name="sasayaki_delay">Delay</string>
     <string name="sasayaki_speed">Speed</string>
     <string name="sasayaki_reader_controls">Reader Controls</string>
-    <string name="sasayaki_show_skip_buttons">Show Bottom Skip Buttons</string>
-    <string name="sasayaki_show_skip_buttons_help">Add rewind and fast-forward buttons to the bottom of the reader.</string>
+    <string name="sasayaki_show_bottom_playback_controls">Pin Playback Controls to Safe Area</string>
+    <string name="sasayaki_show_bottom_playback_controls_help">Show rewind, play or pause, and fast-forward controls in the bottom safe area.</string>
     <string name="sasayaki_skip_action">Skip Action</string>
     <string name="sasayaki_reverse_vertical_skip_buttons">Reverse in Vertical</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">In vertical writing, swap only the bottom reader skip button actions.</string>

@@ -440,6 +440,12 @@ private fun ReaderAppearanceContent(
                             palette = palette,
                         )
                     }
+                    AppearanceDivider(palette)
+                    SwitchRow(
+                        label = stringResource(R.string.reader_appearance_show_back_button),
+                        checked = settings.showReaderBackButton,
+                        onCheckedChange = { onSettingsChange(settings.copy(showReaderBackButton = it)) },
+                    )
                     readerAppearanceStatisticsRows(settings).forEach { row ->
                         AppearanceDivider(palette)
                         SwitchRow(

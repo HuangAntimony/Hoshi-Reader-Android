@@ -429,24 +429,10 @@ class ReaderChromeTest {
     @Test
     fun bottomFocusModeTapAreaDoesNotInterceptReaderText() {
         val metrics = readerBottomChromeMetrics()
-        val skipButtons = ReaderSasayakiBottomSkipButtons(
-            visible = true,
-            buttonSizeDp = metrics.buttonSizeDp,
-            iconSizeDp = metrics.secondaryIconSizeDp,
-            adjacentSpacingDp = metrics.trailingButtonSpacingDp,
-        )
 
         assertFalse(
             readerFocusModeToggleArea(
                 metrics = metrics,
-                sasayakiSkipButtons = skipButtons.copy(visible = false),
-                focusMode = false,
-            ).visible,
-        )
-        assertFalse(
-            readerFocusModeToggleArea(
-                metrics = metrics,
-                sasayakiSkipButtons = skipButtons,
                 focusMode = false,
             ).visible,
         )
@@ -467,36 +453,42 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun sasayakiBottomSkipButtonsMatchBottomChromeButtonsWhenEnabled() {
+    fun sasayakiBottomPlaybackControlsStayInsideBottomSafeAreaWhenEnabled() {
         val metrics = readerBottomChromeMetrics()
 
         assertEquals(
-            ReaderSasayakiBottomSkipButtons(
+            ReaderSasayakiBottomPlaybackControls(
                 visible = true,
-                buttonSizeDp = metrics.buttonSizeDp,
-                iconSizeDp = metrics.secondaryIconSizeDp,
-                adjacentSpacingDp = metrics.trailingButtonSpacingDp,
+                rowHeightDp = metrics.bottomSafeAreaDp,
+                buttonWidthDp = 40,
+                iconSizeDp = 14,
+                horizontalPaddingDp = 18,
             ),
-            readerSasayakiBottomSkipButtons(
-                settings = SasayakiSettings(showReaderSkipButtons = true),
+            readerSasayakiBottomPlaybackControls(
+                settings = SasayakiSettings(showReaderBottomPlaybackControls = true),
                 hasAudio = true,
                 metrics = metrics,
             ),
         )
         assertFalse(
-            readerSasayakiBottomSkipButtons(
-                settings = SasayakiSettings(showReaderSkipButtons = false),
+            readerSasayakiBottomPlaybackControls(
+                settings = SasayakiSettings(showReaderBottomPlaybackControls = false),
                 hasAudio = true,
                 metrics = metrics,
             ).visible,
         )
         assertFalse(
-            readerSasayakiBottomSkipButtons(
-                settings = SasayakiSettings(showReaderSkipButtons = true),
+            readerSasayakiBottomPlaybackControls(
+                settings = SasayakiSettings(showReaderBottomPlaybackControls = true),
                 hasAudio = false,
                 metrics = metrics,
             ).visible,
         )
+        assertTrue(readerSasayakiBottomPlaybackControls(
+            settings = SasayakiSettings(showReaderBottomPlaybackControls = true),
+            hasAudio = true,
+            metrics = metrics,
+        ).rowHeightDp <= metrics.bottomSafeAreaDp)
     }
 
     @Test

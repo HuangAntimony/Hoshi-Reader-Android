@@ -220,11 +220,11 @@ fun SasayakiSheet(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 )
                 SasayakiSettingsSwitchRow(
-                    label = stringResource(R.string.sasayaki_show_skip_buttons),
-                    checked = settings.showReaderSkipButtons,
-                    onCheckedChange = { onSettingsChange(settings.copy(showReaderSkipButtons = it)) },
+                    label = stringResource(R.string.sasayaki_show_bottom_playback_controls),
+                    checked = settings.showReaderBottomPlaybackControls,
+                    onCheckedChange = { onSettingsChange(settings.copy(showReaderBottomPlaybackControls = it)) },
                 )
-                if (settings.showReaderSkipButtons) {
+                if (settings.showReaderBottomPlaybackControls) {
                     SasayakiSettingsSwitchRow(
                         label = stringResource(R.string.sasayaki_reverse_vertical_skip_buttons),
                         checked = settings.reverseVerticalReaderSkipButtons,

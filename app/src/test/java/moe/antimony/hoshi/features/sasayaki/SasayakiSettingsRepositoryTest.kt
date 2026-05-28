@@ -26,7 +26,7 @@ class SasayakiSettingsRepositoryTest {
                 SasayakiSettings(
                     enabled = true,
                     showReaderToggle = true,
-                    showReaderSkipButtons = true,
+                    showReaderBottomPlaybackControls = true,
                     readerSkipButtonAction = SasayakiReaderSkipButtonAction.Cue,
                     reverseVerticalReaderSkipButtons = false,
                     autoScroll = true,
@@ -42,7 +42,7 @@ class SasayakiSettingsRepositoryTest {
         val legacySettings = SasayakiSettings(
             enabled = true,
             showReaderToggle = true,
-            showReaderSkipButtons = false,
+            showReaderBottomPlaybackControls = false,
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds15,
             reverseVerticalReaderSkipButtons = true,
             copyAudiobookToPrivateStorage = true,
@@ -72,7 +72,7 @@ class SasayakiSettingsRepositoryTest {
         val next = SasayakiSettings(
             enabled = true,
             showReaderToggle = true,
-            showReaderSkipButtons = false,
+            showReaderBottomPlaybackControls = true,
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds30,
             reverseVerticalReaderSkipButtons = true,
             copyAudiobookToPrivateStorage = true,

@@ -231,6 +231,7 @@
     <string name="reader_appearance_show_character_count">显示字符数</string>
     <string name="reader_appearance_show_percentage">显示百分比</string>
     <string name="reader_appearance_always_show_progress">始终显示进度</string>
+    <string name="reader_appearance_show_back_button">显示返回按钮</string>
     <string name="reader_appearance_progress_position">进度位置</string>
     <string name="reader_appearance_progress_top">顶部</string>
     <string name="reader_appearance_progress_bottom">底部</string>
@@ -431,8 +432,8 @@
     <string name="sasayaki_delay">延迟</string>
     <string name="sasayaki_speed">速度</string>
     <string name="sasayaki_reader_controls">阅读器控制</string>
-    <string name="sasayaki_show_skip_buttons">显示底部跳转按钮</string>
-    <string name="sasayaki_show_skip_buttons_help">在阅读器底部添加后退和快进按钮。</string>
+    <string name="sasayaki_show_bottom_playback_controls">固定播放控制到底部安全区</string>
+    <string name="sasayaki_show_bottom_playback_controls_help">在底部安全区显示后退、播放或暂停和快进控制。</string>
     <string name="sasayaki_skip_action">跳转操作</string>
     <string name="sasayaki_reverse_vertical_skip_buttons">纵排时反转</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">纵排阅读时，仅交换阅读器底部跳转按钮的实际操作。</string>

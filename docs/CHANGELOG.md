@@ -5,6 +5,14 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add a Reader Appearance switch to hide the reader's bottom back button while keeping Android system back gestures available.
+
+### Changed
+
+- Replace Sasayaki's old bottom skip buttons with safe-area pinned rewind, play or pause, and fast-forward controls, preserving the old bottom-controls setting value and keeping bottom progress text on the right when both are shown.
+
 ## [v1.1.1] - 2026-05-27
 
 ### Changed

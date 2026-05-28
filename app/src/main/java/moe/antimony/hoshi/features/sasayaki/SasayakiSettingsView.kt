@@ -133,16 +133,18 @@ fun SasayakiSettingsView(
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.sasayaki_show_skip_buttons)) },
-                            supportingContent = { Text(stringResource(R.string.sasayaki_show_skip_buttons_help)) },
+                            headlineContent = { Text(stringResource(R.string.sasayaki_show_bottom_playback_controls)) },
+                            supportingContent = { Text(stringResource(R.string.sasayaki_show_bottom_playback_controls_help)) },
                             trailingContent = {
                                 Switch(
-                                    checked = loadedSettings.showReaderSkipButtons,
-                                    onCheckedChange = { save(loadedSettings.copy(showReaderSkipButtons = it)) },
+                                    checked = loadedSettings.showReaderBottomPlaybackControls,
+                                    onCheckedChange = {
+                                        save(loadedSettings.copy(showReaderBottomPlaybackControls = it))
+                                    },
                                 )
                             },
                         )
-                        if (loadedSettings.showReaderSkipButtons) {
+                        if (loadedSettings.showReaderBottomPlaybackControls) {
                             SettingsDivider()
                             ListItem(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),

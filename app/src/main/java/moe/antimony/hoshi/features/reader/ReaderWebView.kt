@@ -129,6 +129,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
@@ -1199,7 +1200,7 @@ fun ReaderWebView(
     val stableNavigationBarPadding = rememberStableNavigationBarPadding()
     val currentStatusBarPaddingDp = currentStatusBarPadding.value.roundToInt().coerceAtLeast(0)
     val stableStatusBarPaddingDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0)
-    val sasayakiBottomSkipButtons = readerSasayakiBottomSkipButtons(
+    val sasayakiBottomPlaybackControls = readerSasayakiBottomPlaybackControls(
         settings = sasayakiSettings,
         hasAudio = sasayakiPlayer?.hasAudio == true,
         metrics = bottomChromeMetrics,
@@ -1442,7 +1443,6 @@ fun ReaderWebView(
         )
         ReaderFocusModeToggleArea(
             metrics = bottomChromeMetrics,
-            sasayakiSkipButtons = sasayakiBottomSkipButtons,
             focusMode = focusMode,
             onToggleFocusMode = ::handleReaderTapOutside,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -1453,6 +1453,11 @@ fun ReaderWebView(
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
             metrics = bottomChromeMetrics,
             focusMode = focusMode,
+            sasayakiPlaybackControls = sasayakiBottomPlaybackControls,
+            sasayakiPlaying = sasayakiPlayer?.isPlaying == true,
+            onSasayakiSkipBackward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
+            onSasayakiTogglePlayback = { sasayakiPlayer?.togglePlayback() },
+            onSasayakiSkipForward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         if (chromeVisibility.showBottomChrome) ReaderBottomChrome(
@@ -1477,9 +1482,6 @@ fun ReaderWebView(
             } else {
                 null
             },
-            sasayakiSkipButtons = sasayakiBottomSkipButtons,
-            onSasayakiSkipBackward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
-            onSasayakiSkipForward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -2174,14 +2176,12 @@ internal fun readerSasayakiTopToggleIcon(isPlaying: Boolean): ImageVector =
 @Composable
 private fun ReaderFocusModeToggleArea(
     metrics: ReaderBottomChromeMetrics,
-    sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
     focusMode: Boolean,
     onToggleFocusMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val toggleArea = readerFocusModeToggleArea(
         metrics = metrics,
-        sasayakiSkipButtons = sasayakiSkipButtons,
         focusMode = focusMode,
     )
     if (!toggleArea.visible) return
@@ -2240,9 +2240,6 @@ private fun BoxScope.ReaderBottomChrome(
     onAppearance: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
-    sasayakiSkipButtons: ReaderSasayakiBottomSkipButtons,
-    onSasayakiSkipBackward: () -> Unit,
-    onSasayakiSkipForward: () -> Unit,
     metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
@@ -2342,37 +2339,17 @@ private fun BoxScope.ReaderBottomChrome(
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ReaderGlassButton(colors = colors, metrics = metrics, onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = stringResource(R.string.action_back),
-                        modifier = Modifier.size(metrics.primaryIconSizeDp.dp),
-                        tint = Color(colors.buttonContent),
-                    )
-                }
-                if (sasayakiSkipButtons.visible) {
-                    Spacer(Modifier.width(sasayakiSkipButtons.adjacentSpacingDp.dp))
-                    ReaderGlassButton(colors = colors, metrics = metrics, onClick = onSasayakiSkipBackward) {
+                if (settings.showReaderBackButton) {
+                    ReaderGlassButton(colors = colors, metrics = metrics, onClick = onClose) {
                         Icon(
-                            imageVector = Icons.Rounded.FastRewind,
-                            contentDescription = stringResource(R.string.sasayaki_rewind),
-                            modifier = Modifier.size(sasayakiSkipButtons.iconSizeDp.dp),
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(metrics.primaryIconSizeDp.dp),
                             tint = Color(colors.buttonContent),
                         )
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                if (sasayakiSkipButtons.visible) {
-                    ReaderGlassButton(colors = colors, metrics = metrics, onClick = onSasayakiSkipForward) {
-                        Icon(
-                            imageVector = Icons.Rounded.FastForward,
-                            contentDescription = stringResource(R.string.sasayaki_fast_forward),
-                            modifier = Modifier.size(sasayakiSkipButtons.iconSizeDp.dp),
-                            tint = Color(colors.buttonContent),
-                        )
-                    }
-                    Spacer(Modifier.width(sasayakiSkipButtons.adjacentSpacingDp.dp))
-                }
                 ReaderGlassButton(colors = colors, metrics = metrics, onClick = onMenu) {
                     Icon(
                         imageVector = Icons.Rounded.Tune,
@@ -2393,21 +2370,101 @@ private fun ReaderBottomSafeProgress(
     colors: ReaderChromeColors,
     metrics: ReaderBottomChromeMetrics,
     focusMode: Boolean,
+    sasayakiPlaybackControls: ReaderSasayakiBottomPlaybackControls,
+    sasayakiPlaying: Boolean,
+    onSasayakiSkipBackward: () -> Unit,
+    onSasayakiTogglePlayback: () -> Unit,
+    onSasayakiSkipForward: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val progress = readerBottomSafeProgressText(state, settings, focusMode)
-    if (progress.isBlank()) return
+    if (progress.isBlank() && !sasayakiPlaybackControls.visible) return
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(metrics.bottomSafeAreaDp.dp),
+    ) {
+        if (sasayakiPlaybackControls.visible) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = sasayakiPlaybackControls.horizontalPaddingDp.dp)
+                    .height(sasayakiPlaybackControls.rowHeightDp.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ReaderBottomSafePlaybackButton(
+                    controls = sasayakiPlaybackControls,
+                    colors = colors,
+                    icon = Icons.Rounded.FastRewind,
+                    contentDescription = stringResource(R.string.sasayaki_rewind),
+                    onClick = onSasayakiSkipBackward,
+                )
+                ReaderBottomSafePlaybackButton(
+                    controls = sasayakiPlaybackControls,
+                    colors = colors,
+                    icon = if (sasayakiPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = if (sasayakiPlaying) {
+                        stringResource(R.string.sasayaki_pause)
+                    } else {
+                        stringResource(R.string.sasayaki_play)
+                    },
+                    onClick = onSasayakiTogglePlayback,
+                )
+                ReaderBottomSafePlaybackButton(
+                    controls = sasayakiPlaybackControls,
+                    colors = colors,
+                    icon = Icons.Rounded.FastForward,
+                    contentDescription = stringResource(R.string.sasayaki_fast_forward),
+                    onClick = onSasayakiSkipForward,
+                )
+            }
+        }
+        if (progress.isNotBlank()) {
+            Text(
+                text = progress,
+                color = Color(colors.infoText),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                textAlign = if (sasayakiPlaybackControls.visible) TextAlign.End else TextAlign.Center,
+                modifier = if (sasayakiPlaybackControls.visible) {
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxWidth()
+                        .padding(
+                            start = (
+                                sasayakiPlaybackControls.buttonWidthDp * 3 +
+                                    sasayakiPlaybackControls.horizontalPaddingDp
+                                ).dp,
+                            end = sasayakiPlaybackControls.horizontalPaddingDp.dp,
+                        )
+                } else {
+                    Modifier.align(Alignment.Center)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderBottomSafePlaybackButton(
+    controls: ReaderSasayakiBottomPlaybackControls,
+    colors: ReaderChromeColors,
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .width(controls.buttonWidthDp.dp)
+            .height(controls.rowHeightDp.dp)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = progress,
-            color = Color(colors.infoText),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color(colors.infoText),
+            modifier = Modifier.size(controls.iconSizeDp.dp),
         )
     }
 }
@@ -2449,6 +2506,23 @@ private fun ReaderMenuCard(
             modifier = Modifier.padding(vertical = metrics.menuVerticalPaddingDp.dp),
         ) {
             ReaderMenuItem(
+                text = stringResource(R.string.settings_appearance),
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Palette,
+                        contentDescription = null,
+                        tint = Color(colors.menuContent),
+                    )
+                },
+                colors = colors,
+                metrics = metrics,
+                onClick = onAppearance,
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),
+                color = Color(colors.menuBorder),
+            )
+            ReaderMenuItem(
                 text = stringResource(R.string.reader_chapters),
                 icon = {
                     Icon(
@@ -2477,23 +2551,6 @@ private fun ReaderMenuCard(
                 colors = colors,
                 metrics = metrics,
                 onClick = onHighlights,
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = metrics.menuItemHorizontalPaddingDp.dp),
-                color = Color(colors.menuBorder),
-            )
-            ReaderMenuItem(
-                text = stringResource(R.string.settings_appearance),
-                icon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Palette,
-                        contentDescription = null,
-                        tint = Color(colors.menuContent),
-                    )
-                },
-                colors = colors,
-                metrics = metrics,
-                onClick = onAppearance,
             )
             if (onStatistics != null) {
                 HorizontalDivider(

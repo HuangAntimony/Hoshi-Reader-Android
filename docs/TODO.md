@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-27
+Last updated: 2026-05-28
 
 This file is the short operational handoff for future agents.
 
@@ -122,7 +122,7 @@ For reader process-restore regressions, verify returning directly to an open boo
 
 For Dictionary tab input regressions, verify opening the tab focuses the search field, shows the soft keyboard, and hints Japanese input when a Japanese-capable keyboard is installed.
 
-For reader appearance chrome regressions, verify Show Title off, Progress Position Bottom, compact bottom buttons, Sasayaki top-right toggle spacing, top title centering with asymmetric top buttons, bottom reader-menu spacing and light-mode menu outline visibility, focus mode status-bar hiding without text reflow, Android Back revealing chrome before closing the reader, and all progress indicators hidden against the paginated reader text area.
+For reader appearance chrome regressions, verify Show Title off, Show Back Button on/off, Progress Position Bottom, compact bottom buttons, Sasayaki top-right toggle spacing, top title centering with asymmetric top buttons, bottom reader-menu spacing and light-mode menu outline visibility, focus mode status-bar hiding without text reflow, Android Back revealing chrome before closing the reader, and all progress indicators hidden against the paginated reader text area.
 
 For reader appearance controls, verify Layout Mode shows both Paginated and Continuous labels without truncation in the settings page and reader sheet.
 
@@ -132,7 +132,9 @@ For Sasayaki settings regressions, verify fresh installs default Sasayaki, Show 
 
 For Sasayaki matching regressions, verify short low-confidence `＊` subtitle cues are skipped while longer `＊` cues still match and advance playback alignment.
 
-For Sasayaki skip-control regressions, verify the reader bottom skip buttons flank the existing Back/Menu buttons, the same cue/5s/10s/15s/30s action applies from reader chrome, Sasayaki sheet controls, and Android system media controls, and Reverse Vertical Bottom Buttons only swaps the visible bottom reader buttons in vertical writing.
+For Sasayaki skip-control regressions, verify the same cue/5s/10s/15s/30s action applies from reader safe-area playback controls, Sasayaki sheet controls, and Android system media controls.
+
+Blocked: device-validate Sasayaki bottom safe-area playback controls once an Android target is available, covering the inherited/default-on Pin Playback Controls to Safe Area toggle in the Sasayaki menu, left-aligned rewind/play-or-pause/fast-forward controls with corner padding, vertical-writing reverse action behavior, right-aligned bottom progress when both are enabled, centered progress when only progress is fixed, and absence of the old Back/Menu-flanking skip buttons.
 
 For Sasayaki volume-key regressions, verify volume-key seek with loaded audiobook audio, fallback without loaded audio, priority over Volume Keys Turn Pages, and Reverse Volume Key Direction affecting both seek and page-turn controls.
 
