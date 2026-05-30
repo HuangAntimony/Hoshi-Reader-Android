@@ -51,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -192,6 +193,7 @@ fun AudioSettingsView(
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
     var importedSize by remember { mutableStateOf(repository.databaseSizeBytes()) }
+    var localAudioSourceConfig by remember { mutableStateOf<LocalAudioSourceConfig?>(null) }
     var importProgress by remember { mutableStateOf<LocalAudioImportProgress?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var isImporting by remember { mutableStateOf(false) }
@@ -210,6 +212,29 @@ fun AudioSettingsView(
         val source = sources.removeAt(from)
         sources.add(to, source)
         save(settings.copy(audioSources = sources))
+    }
+
+    fun moveLocalAudioSource(from: Int, to: Int) {
+        val current = localAudioSourceConfig ?: return
+        val sources = current.sourceOrder.toMutableList()
+        if (from !in sources.indices || to !in sources.indices) return
+        val source = sources.removeAt(from)
+        sources.add(to, source)
+        scope.launch {
+            localAudioSourceConfig = withContext(Dispatchers.IO) {
+                repository.updateSourceOrder(sources)
+            }
+        }
+    }
+
+    LaunchedEffect(hasImportedDatabase, isImporting) {
+        localAudioSourceConfig = if (hasImportedDatabase && !isImporting) {
+            withContext(Dispatchers.IO) {
+                repository.ensureSourceConfig()
+            }
+        } else {
+            null
+        }
     }
 
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
@@ -233,6 +258,9 @@ fun AudioSettingsView(
                 }
             }.onSuccess { size ->
                 importedSize = size
+                localAudioSourceConfig = withContext(Dispatchers.IO) {
+                    repository.ensureSourceConfig()
+                }
             }.onFailure { error ->
                 importError = error.localizedImportMessage(context, importFailedMessage)
             }
@@ -446,11 +474,32 @@ fun AudioSettingsView(
                                             onClick = {
                                                 repository.deleteDatabase()
                                                 importedSize = null
+                                                localAudioSourceConfig = null
                                                 importError = null
                                                 importProgress = null
                                             },
                                         ) {
                                             Text(stringResource(R.string.action_delete))
+                                        }
+                                    },
+                                )
+                            }
+                            localAudioSourceConfig?.sourceOrder?.takeIf { it.isNotEmpty() }?.let { sources ->
+                                GroupDivider()
+                                ListItem(
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    headlineContent = { Text(stringResource(R.string.audio_local_source_order)) },
+                                    supportingContent = {
+                                        Column {
+                                            sources.forEachIndexed { index, source ->
+                                                LocalAudioSourceOrderRow(
+                                                    source = source,
+                                                    canMoveUp = index > 0,
+                                                    canMoveDown = index < sources.lastIndex,
+                                                    onMoveUp = { moveLocalAudioSource(index, index - 1) },
+                                                    onMoveDown = { moveLocalAudioSource(index, index + 1) },
+                                                )
+                                            }
                                         }
                                     },
                                 )
@@ -513,6 +562,34 @@ private fun AudioSourceRow(
             }
         },
     )
+}
+
+@Composable
+private fun LocalAudioSourceOrderRow(
+    source: String,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = source,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(Icons.Rounded.ArrowUpward, contentDescription = stringResource(R.string.audio_move_local_source_up))
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(Icons.Rounded.ArrowDownward, contentDescription = stringResource(R.string.audio_move_local_source_down))
+        }
+    }
 }
 
 @Composable

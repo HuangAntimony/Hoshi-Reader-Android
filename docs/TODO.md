@@ -65,6 +65,7 @@ This file is the short operational handoff for future agents.
 - Device-validate recommended dictionary downloads from the Dictionaries screen, covering JMdict, JMnedict, Jiten, and Jitendex individual downloads and confirming each imported dictionary remains updatable.
 - Device-validate Low Memory Usage Mode with a large Yomitan archive, confirming the setting defaults off, persists, reduces peak memory when enabled, and keeps imported term/frequency/pitch dictionaries usable.
 - Device-validate settings segmented controls in Dictionaries, Dictionary Settings, and Advanced Audio, confirming selected labels no longer shift.
+- Device-validate local audio database source ordering with imported MP3 and Opus `android.db` files, confirming default order generation, up/down moves, lookup playback, and Anki audio export.
 - For deinflection regressions, verify conjugated lookup results such as `食べた` show iOS-style explanation overlays when tapping deinflection tags.
 - Keep frequency and pitch dictionaries type-specific; do not treat metadata dictionaries as term fallback dictionaries.
 - Do not reimplement Yomitan import, lookup, media, or style extraction outside `third_party/hoshidicts-kotlin-bridge` unless the bridge gap is documented first.

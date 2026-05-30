@@ -329,6 +329,9 @@
     <string name="audio_move_source_up">上移来源</string>
     <string name="audio_move_source_down">下移来源</string>
     <string name="audio_delete_source">删除来源</string>
+    <string name="audio_local_source_order">本地数据库来源顺序</string>
+    <string name="audio_move_local_source_up">上移本地音频来源</string>
+    <string name="audio_move_local_source_down">下移本地音频来源</string>
     <string name="anki_fetch_decks_ankiconnect">从 AnkiConnect 获取牌组和笔记类型。</string>
     <string name="anki_fetch_decks_ankidroid">从 AnkiDroid 获取牌组和笔记类型。</string>
     <string name="anki_open_app_settings">打开应用设置</string>

@@ -25,21 +25,15 @@ object AudioSourceResolver {
 
 object LocalAudioResolver {
     private val supportedAudioExtensions = setOf("mp3", "opus", "ogg")
-    private val defaultSources = listOf(
-        "nhk16",
-        "daijisen",
-        "shinmeikai8",
-        "jpod",
-        "jpod_alternate",
-        "taas",
-        "ozk5",
-        "forvo",
-        "forvo_ext",
-        "forvo_ext2",
-    )
 
-    fun resolve(term: String, reading: String, rows: List<LocalAudioEntry>): LocalAudioEntry? {
+    fun resolve(
+        term: String,
+        reading: String,
+        rows: List<LocalAudioEntry>,
+        sourceOrder: List<String> = LocalAudioSourceOrder.defaultOrder(rows.map { it.source }),
+    ): LocalAudioEntry? {
         val normalizedReading = katakanaToHiragana(reading)
+        val sourceRank = sourceOrder.withIndex().associate { it.value to it.index }
         return rows
             .asSequence()
             .filter { it.expression == term || (!it.reading.isNullOrBlank() && it.reading == normalizedReading) }
@@ -48,8 +42,9 @@ object LocalAudioResolver {
                 compareBy<LocalAudioEntry> {
                     if (normalizedReading.isNotBlank() && it.reading == normalizedReading) 0 else 1
                 }.thenBy {
-                    val index = defaultSources.indexOf(it.source)
-                    if (index >= 0) index else Int.MAX_VALUE
+                    sourceRank[it.source] ?: Int.MAX_VALUE
+                }.thenBy {
+                    it.source
                 },
             )
             .firstOrNull()

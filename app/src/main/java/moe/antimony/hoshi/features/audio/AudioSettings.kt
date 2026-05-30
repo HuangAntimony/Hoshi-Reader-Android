@@ -59,6 +59,7 @@ data class AudioSettings(
 
     companion object {
         const val LocalAudioPath = "Audio/android.db"
+        const val LocalAudioSourceConfigPath = "Audio/android_sources.json"
         const val LocalAudioUrl = "http://localhost:8765/localaudio/get/?term={term}&reading={reading}"
         const val InternalLocalAudioUrl = "hoshi-local-audio-source://get/?term={term}&reading={reading}"
 

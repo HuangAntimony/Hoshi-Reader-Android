@@ -329,6 +329,9 @@
     <string name="audio_move_source_up">Move source up</string>
     <string name="audio_move_source_down">Move source down</string>
     <string name="audio_delete_source">Delete source</string>
+    <string name="audio_local_source_order">Local database source order</string>
+    <string name="audio_move_local_source_up">Move local audio source up</string>
+    <string name="audio_move_local_source_down">Move local audio source down</string>
     <string name="anki_fetch_decks_ankiconnect">Fetch decks and note types from AnkiConnect.</string>
     <string name="anki_fetch_decks_ankidroid">Fetch decks and note types from AnkiDroid.</string>
     <string name="anki_open_app_settings">Open App Settings</string>

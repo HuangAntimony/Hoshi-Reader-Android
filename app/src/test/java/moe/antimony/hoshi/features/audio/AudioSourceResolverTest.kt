@@ -48,6 +48,21 @@ class AudioSourceResolverTest {
     }
 
     @Test
+    fun localAudioUsesCustomSourceOrderWithinSameReadingPriority() {
+        val match = LocalAudioResolver.resolve(
+            term = "食べる",
+            reading = "たべる",
+            sourceOrder = listOf("forvo", "nhk16"),
+            rows = listOf(
+                LocalAudioEntry(source = "nhk16", expression = "食べる", reading = "たべる", file = "audio/nhk.mp3"),
+                LocalAudioEntry(source = "forvo", expression = "食べる", reading = "たべる", file = "audio/forvo.mp3"),
+            ),
+        )
+
+        assertEquals(LocalAudioEntry(source = "forvo", expression = "食べる", reading = "たべる", file = "audio/forvo.mp3"), match)
+    }
+
+    @Test
     fun localAudioUrlRoundTripsSourceAndFile() {
         val url = LocalAudioResolver.audioUrl(source = "nhk16", file = "audio/20180222111121.opus")
 

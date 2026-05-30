@@ -54,6 +54,33 @@ class AudioRequestHandlerTest {
         )
     }
 
+    @Test
+    fun builtInLocalAudioResponseUsesConfiguredSourceOrderFromRepository() {
+        val filesDir = Files.createTempDirectory("hoshi-audio-request").toFile()
+        val handler = AudioRequestHandler(
+            localAudioRepository = LocalAudioRepository(filesDir),
+            findLocalAudio = { _, _ ->
+                LocalAudioResolver.resolve(
+                    term = "食べる",
+                    reading = "たべる",
+                    sourceOrder = listOf("forvo", "nhk16"),
+                    rows = listOf(
+                        LocalAudioEntry(source = "nhk16", expression = "食べる", reading = "たべる", file = "audio/nhk.mp3"),
+                        LocalAudioEntry(source = "forvo", expression = "食べる", reading = "たべる", file = "audio/forvo.mp3"),
+                    ),
+                )
+            },
+        )
+        val target = "hoshi-local-audio-source://get/?term=%E9%A3%9F%E3%81%B9%E3%82%8B&reading=%E3%81%9F%E3%81%B9%E3%82%8B"
+
+        val body = handler.handleAudioRequestBody("https://hoshi.local/audio?url=${target.urlEncodeForQuery()}")
+
+        assertEquals(
+            """{"type":"audioSourceList","audioSources":[{"name":"forvo","url":"hoshi-local-audio://forvo/audio%2Fforvo.mp3"}]}""",
+            body?.toString(Charsets.UTF_8),
+        )
+    }
+
     private fun String.urlEncodeForQuery(): String =
         URLEncoder.encode(this, Charsets.UTF_8.name())
 }

@@ -1744,9 +1744,7 @@ window.renderPopup = function() {
             entryDiv.appendChild(createEntryHeader(entry, idx));
 
             if (window.audioEnableAutoplay && window.audioSources?.length && idx === 0) {
-                setTimeout(() => {
-                    playEntryAudio(idx);
-                }, 70);
+                playEntryAudio(idx);
             }
 
             const tags = createTags(entry);

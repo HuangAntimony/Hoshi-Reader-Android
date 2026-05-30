@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add a Reader Appearance switch to hide the reader's bottom back button while keeping Android system back gestures available.
 - Add an Anki setting to sync AnkiDroid automatically after a card is added. #86
+- Add local audio database source ordering, including automatic default order generation on import and simple up/down controls for lookup playback and Anki audio export.
 
 ### Changed
 
