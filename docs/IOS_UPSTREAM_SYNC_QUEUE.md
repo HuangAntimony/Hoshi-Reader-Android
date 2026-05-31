@@ -257,40 +257,6 @@ Validation:
 - Disable network/mobile data during autosync and confirm it fails or defers without hanging.
 - Regression-test existing manual sync, reader auto import/export, close/background export flush, statistics Merge/Replace, and Sasayaki last-position sync.
 
-### 7. EPUB CSS sanitization for Calibre-generated books
-
-Status: pending Android comparison.
-
-Commit:
-
-- `32aa342` - add sanitization for some css in calibre generated epubs.
-
-Why this is reader/storage adjacent:
-
-- Android already has an EPUB resource sanitizer for private `-epub-*` CSS declarations, but iOS now mutates Calibre CSS files before reader load to remove layout-breaking rules. The two behaviors overlap but are not equivalent.
-
-iOS behavior to mirror:
-
-- On reader load, every CSS file in the extracted EPUB content directory is scanned.
-- Rules for Calibre-like selectors strip writing-mode properties and line-height.
-- If a rule with writing-mode also has height, height is stripped.
-- Positive `text-indent` is reset to `0`; negative text indentation is preserved.
-- If any line-height was stripped, `body { line-height: 1.65; }` is appended.
-
-Android current gap:
-
-- Android `ReaderResourceSanitizer` removes EPUB-private declarations when serving CSS, but it does not target Calibre selector rules, line-height, height, or positive text-indent in the same way.
-
-Suggested slice:
-
-- Add behavior-level sanitizer tests using Calibre-like CSS fixtures.
-- Implement non-destructive CSS sanitization in the reader resource bridge or import pipeline, keeping the parser/resource model unchanged.
-
-Validation:
-
-- Open Calibre-generated vertical and horizontal EPUB fixtures with problematic line-height, writing-mode, height, and text-indent rules.
-- Confirm reader layout, line height, indentation, and CSS resource serving remain stable across chapter reloads.
-
 ## Covered Or No Android Action
 
 - `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands.
@@ -303,6 +269,7 @@ Validation:
 - `3405d69`: iOS settings UI cleanup and documentation links. No direct Android sync beyond keeping future settings copy localized and Android-specific.
 - `147e3b9`: Android already ships default English and Simplified Chinese resources with localization tests. Future queue items that add user-visible strings still need the normal paired `values` / `values-zh-rCN` updates.
 - `61306c7`: formatting and whitespace cleanup only.
+- `32aa342`: Android now sanitizes Calibre-like EPUB CSS rules in `ReaderResourceSanitizer`, with behavior coverage for writing mode, line height, height, positive text indentation, negative text indentation, non-Calibre rules, and appended default body line height.
 
 ## Open Commit Inventory
 
@@ -322,7 +289,6 @@ Validation:
 | `cce1693` | 2026-05-27 | Vertical reader popup anchor correction | Pending |
 | `c2e1c09` | 2026-05-28 | TTU book sync, remote Drive bookshelf, backup import/export | Pending |
 | `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
-| `32aa342` | 2026-05-29 | Calibre CSS sanitization | Pending |
 | `32d76d2` | 2026-05-29 | TTU bookdata edge cases | Pending with TTU slice |
 
 ## Suggested Implementation Order
@@ -333,4 +299,3 @@ Validation:
 4. Dictionary automatic updates.
 5. Dictionary IPA display and Anki glossary handlebars.
 6. TTU/Google Drive bookdata sync, EPUB export, and backup import/export in smaller sub-slices.
-7. Calibre CSS sanitization.

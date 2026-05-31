@@ -51,4 +51,43 @@ class ReaderResourceSanitizerTest {
 
         assertEquals(bytes.toList(), sanitizeReaderResource("application/xhtml+xml", bytes).toList())
     }
+
+    @Test
+    fun cssSanitizerRemovesCalibreLayoutDeclarationsThatOverrideReaderLayout() {
+        val css = """
+            .calibre {
+              display: block;
+              writing-mode: vertical-rl;
+              -webkit-writing-mode: vertical-rl;
+              -epub-writing-mode: vertical-rl;
+              line-height: 1.2;
+              height: 100%;
+              text-indent: 1.5em;
+            }
+            .p12 {
+              margin: 0;
+              text-indent: -1em;
+            }
+            .chapter {
+              line-height: 2;
+              height: 40px;
+              text-indent: 2em;
+            }
+        """.trimIndent()
+
+        val sanitized = sanitizeReaderCss(css)
+
+        assertFalse(sanitized, sanitized.contains("writing-mode: vertical-rl"))
+        assertFalse(sanitized, sanitized.contains("-webkit-writing-mode: vertical-rl"))
+        assertFalse(sanitized, sanitized.contains("-epub-writing-mode: vertical-rl"))
+        assertFalse(sanitized, sanitized.contains("line-height: 1.2"))
+        assertFalse(sanitized, sanitized.contains("height: 100%"))
+        assertTrue(sanitized.contains(" text-indent: 0"))
+        assertTrue(sanitized.contains("text-indent: -1em"))
+        assertTrue(sanitized.contains(".chapter"))
+        assertTrue(sanitized.contains("line-height: 2"))
+        assertTrue(sanitized.contains("height: 40px"))
+        assertTrue(sanitized.contains("text-indent: 2em"))
+        assertTrue(sanitized.endsWith("\nbody { line-height: 1.65; }\n"))
+    }
 }

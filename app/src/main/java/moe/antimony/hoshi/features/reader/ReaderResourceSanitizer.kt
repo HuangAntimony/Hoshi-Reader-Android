@@ -8,6 +8,30 @@ internal fun sanitizeReaderResource(mediaType: String, bytes: ByteArray): ByteAr
 }
 
 internal fun sanitizeReaderCss(css: String): String =
+    sanitizeEpubPrivateCss(sanitizeCalibreCss(css))
+
+private fun sanitizeCalibreCss(css: String): String {
+    var didStripLineHeight = false
+    val result = calibreRuleRegex.replace(css) { match ->
+        val selector = match.groupValues[1]
+        val declarations = match.groupValues[2].split(';')
+        if (declarations.any { it.propertyName() == "line-height" }) {
+            didStripLineHeight = true
+        }
+        val stripHeight = declarations.any { it.propertyName() in writingModeProperties }
+        val cleaned = declarations
+            .mapNotNull { it.sanitizeCalibreDeclaration(stripHeight) }
+            .joinToString(separator = ";")
+        "$selector{$cleaned}"
+    }
+    return if (didStripLineHeight) {
+        result + "\nbody { line-height: 1.65; }\n"
+    } else {
+        result
+    }
+}
+
+private fun sanitizeEpubPrivateCss(css: String): String =
     epubPrivateDeclarationRegex.replace(css) { match ->
         val indent = match.groups["indent"]?.value.orEmpty()
         val property = match.groups["property"]?.value.orEmpty().lowercase()
@@ -15,8 +39,38 @@ internal fun sanitizeReaderCss(css: String): String =
         replacementDeclarations(indent, property, value)
     }
 
+private val calibreRuleRegex =
+    Regex(
+        """^(\s*\.(?:calibre\d*|body|c\d*|p\d+)\s*)\{(.*?)\}""",
+        setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL),
+    )
+
+private val writingModeProperties = setOf(
+    "writing-mode",
+    "-webkit-writing-mode",
+    "-epub-writing-mode",
+)
+
 private val epubPrivateDeclarationRegex =
     Regex("""(?im)^(?<indent>[ \t]*)-epub-(?<property>[^:;{}\r\n]+)[ \t]*:[ \t]*(?<value>[^;{}\r\n]*)[ \t]*;[ \t]*(?:\r?\n)?""")
+
+private fun String.sanitizeCalibreDeclaration(stripHeight: Boolean): String? =
+    when (propertyName()) {
+        in writingModeProperties -> null
+        "line-height" -> null
+        "height" -> if (stripHeight) null else this
+        "text-indent" -> {
+            val value = substringAfter(':', missingDelimiterValue = "")
+                .trim()
+            if (value.startsWith("-")) this else " text-indent: 0"
+        }
+        else -> this
+    }
+
+private fun String.propertyName(): String =
+    substringBefore(':')
+        .trim()
+        .lowercase()
 
 private fun replacementDeclarations(indent: String, property: String, value: String): String =
     when (property) {

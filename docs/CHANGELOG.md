@@ -9,6 +9,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add a long-press entry point for revealing dictionary deletion from the Dictionaries screen while keeping the reorder handle dedicated to dragging.
 
+### Fixed
+
+- Keep Calibre-generated EPUB CSS from overriding reader layout with embedded writing mode, line height, height, or positive indentation rules. #78
+
 ## [v1.1.2] - 2026-05-31
 
 ### Added
