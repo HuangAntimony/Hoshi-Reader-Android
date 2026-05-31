@@ -119,6 +119,27 @@ class DictionarySearchContentTest {
     }
 
     @Test
+    fun deinflectionExplanationOverlayDefinesThemeContrast() {
+        val light = LookupPopupHtml.render(
+            results = listOf(lookupResult()),
+            assets = LookupPopupAssets(popupJs = "window.renderPopup = function() {};", popupCss = ""),
+            darkMode = false,
+        )
+        val dark = LookupPopupHtml.render(
+            results = listOf(lookupResult()),
+            assets = LookupPopupAssets(popupJs = "window.renderPopup = function() {};", popupCss = ""),
+            darkMode = true,
+        )
+
+        assertTrue(light.contains("""html[data-hoshi-color-scheme="light"] .overlay"""))
+        assertTrue(light.contains("background: #eee;"))
+        assertTrue(light.contains("color: #000;"))
+        assertTrue(dark.contains("""html[data-hoshi-color-scheme="dark"] .overlay"""))
+        assertTrue(dark.contains("background: #000;"))
+        assertTrue(dark.contains("color: #fff;"))
+    }
+
+    @Test
     fun dictionaryPopupOptionsUseAppearancePopupSettingsLikeIos() {
         val options = dictionarySearchPopupOptions(
             readerSettings = ReaderSettings(

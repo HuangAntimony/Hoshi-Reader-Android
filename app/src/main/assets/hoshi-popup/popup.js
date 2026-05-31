@@ -1703,6 +1703,7 @@ function restore(snapshot) {
     window.entryCount = snapshot.entryCount;
     audioUrls = {};
     selectedDictionaries = {};
+    applyHoshiPopupThemeOverrides(container);
     scheduleButtonFrameSync();
     requestAnimationFrame(() => {
         document.scrollingElement.scrollTop = snapshot.scrollTop;
@@ -1719,6 +1720,23 @@ function navigate(origin, destination) {
 
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
+
+function applyHoshiPopupThemeOverrides(root = document) {
+    const colorScheme = document.documentElement.dataset.hoshiColorScheme;
+    const buttonColor = colorScheme === 'dark' ? 'rgba(235, 235, 245, 0.92)' : 'rgba(60, 60, 67, 0.86)';
+    const tableHeaderBackgroundColor = colorScheme === 'dark' ? '#333333' : '#eeeeee';
+    const tableHeaderTextColor = colorScheme === 'dark' ? '#ffffff' : '#000000';
+    root.querySelectorAll('button.button-slot').forEach(button => {
+        button.style.setProperty('color', buttonColor, 'important');
+    });
+    root.querySelectorAll('table[data-sc-content="formsTable"] th, table[data-sc-content="formsTable"] .gloss-sc-th').forEach(header => {
+        header.style.setProperty('background-color', tableHeaderBackgroundColor, 'important');
+        header.style.setProperty('color', tableHeaderTextColor, 'important');
+        header.querySelectorAll('*').forEach(child => {
+            child.style.setProperty('color', 'inherit', 'important');
+        });
+    });
+}
 
 window.renderPopup = function() {
     const container = document.getElementById('entries-container');
@@ -1768,6 +1786,7 @@ window.renderPopup = function() {
             const dictNames = Object.keys(grouped);
             for (let dictIdx = 0; dictIdx < dictNames.length; dictIdx++) {
                 entryDiv.appendChild(createGlossarySection(dictNames[dictIdx], grouped[dictNames[dictIdx]], dictIdx === 0, idx));
+                applyHoshiPopupThemeOverrides(entryDiv);
                 await new Promise(r => requestAnimationFrame(r));
                 if (generation !== renderGeneration) return;
             }
@@ -1783,6 +1802,7 @@ window.renderPopup = function() {
                 }
             });
         });
+        applyHoshiPopupThemeOverrides(container);
     })();
 
     if (window.compactGlossaries && !document.getElementById('popup-compact-glossaries')) {

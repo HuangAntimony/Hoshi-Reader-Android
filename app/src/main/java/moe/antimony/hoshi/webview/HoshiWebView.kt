@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.webview
 
+import android.os.Build
 import android.view.View
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -9,6 +10,8 @@ internal interface HoshiWebViewSettings {
     var domStorageEnabled: Boolean
     var allowFileAccess: Boolean
     var allowContentAccess: Boolean
+    var forceDarkAllowed: Boolean
+    var algorithmicDarkeningAllowed: Boolean
 }
 
 internal fun HoshiWebViewSettings.applyHoshiWebViewSecurityDefaults() {
@@ -16,10 +19,12 @@ internal fun HoshiWebViewSettings.applyHoshiWebViewSecurityDefaults() {
     domStorageEnabled = false
     allowFileAccess = false
     allowContentAccess = false
+    forceDarkAllowed = false
+    algorithmicDarkeningAllowed = false
 }
 
 fun WebView.applyHoshiWebViewSecurityDefaults() {
-    AndroidHoshiWebViewSettings(settings).applyHoshiWebViewSecurityDefaults()
+    AndroidHoshiWebViewSettings(this).applyHoshiWebViewSecurityDefaults()
     disableNativeOverscrollStretch()
 }
 
@@ -28,8 +33,11 @@ fun WebView.disableNativeOverscrollStretch() {
 }
 
 private class AndroidHoshiWebViewSettings(
-    private val settings: WebSettings,
+    private val webView: WebView,
 ) : HoshiWebViewSettings {
+    private val settings: WebSettings
+        get() = webView.settings
+
     override var javaScriptEnabled: Boolean
         get() = settings.javaScriptEnabled
         set(value) {
@@ -52,5 +60,21 @@ private class AndroidHoshiWebViewSettings(
         get() = settings.allowContentAccess
         set(value) {
             settings.allowContentAccess = value
+        }
+
+    override var forceDarkAllowed: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && webView.isForceDarkAllowed
+        set(value) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                webView.isForceDarkAllowed = value
+            }
+        }
+
+    override var algorithmicDarkeningAllowed: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && settings.isAlgorithmicDarkeningAllowed
+        set(value) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                settings.isAlgorithmicDarkeningAllowed = value
+            }
         }
 }
