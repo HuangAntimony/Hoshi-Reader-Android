@@ -8,7 +8,7 @@ internal fun sanitizeReaderResource(mediaType: String, bytes: ByteArray): ByteAr
 }
 
 internal fun sanitizeReaderCss(css: String): String =
-    sanitizeEpubPrivateCss(sanitizeCalibreCss(css))
+    stripPublisherWritingModeCss(sanitizeEpubPrivateCss(sanitizeCalibreCss(css)))
 
 private fun sanitizeCalibreCss(css: String): String {
     var didStripLineHeight = false
@@ -53,6 +53,12 @@ private val writingModeProperties = setOf(
 
 private val epubPrivateDeclarationRegex =
     Regex("""(?im)^(?<indent>[ \t]*)-epub-(?<property>[^:;{}\r\n]+)[ \t]*:[ \t]*(?<value>[^;{}\r\n]*)[ \t]*;[ \t]*(?:\r?\n)?""")
+
+private val publisherWritingModeDeclarationRegex =
+    Regex("""(?i)(^|[;{])\s*(?:-webkit-)?writing-mode\s*:\s*[^;{}]+;?""")
+
+private fun stripPublisherWritingModeCss(css: String): String =
+    publisherWritingModeDeclarationRegex.replace(css) { match -> match.groupValues[1] }
 
 private fun String.sanitizeCalibreDeclaration(stripHeight: Boolean): String? =
     when (propertyName()) {

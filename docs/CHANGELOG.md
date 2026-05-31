@@ -11,7 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
-- Keep Calibre-generated EPUB CSS from overriding reader layout with embedded writing mode, line height, height, or positive indentation rules. #78
+- Keep EPUB publisher CSS from overriding reader layout with embedded writing mode, line height, height, or positive indentation rules, including image-page vertical writing rules that could crash Android WebView. #78
 
 ## [v1.1.2] - 2026-05-31
 

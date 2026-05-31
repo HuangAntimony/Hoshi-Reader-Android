@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 This file is the short operational handoff for future agents.
 
@@ -41,7 +41,7 @@ This file is the short operational handoff for future agents.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 3: Advanced reader Layout now includes iOS-style paragraph spacing with persistence, WebView reload-key participation, and vertical/horizontal CSS margin mapping.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 4: reader chrome now uses Android immersive system bars with transient edge-swipe reveal, iOS-aligned focus-mode entry on selection/page/scroll, floating center info bubbles, top text safety spacing, screen-edge focus quick controls, a small bottom gesture-safe progress band, and bottom chrome overlays without reserving button space in reader content.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 5: recursive lookup popup selection now uses the configured scan length; zoom-coordinate handling was aligned with iOS but the pre-fix drift was not reproduced on Android WebView.
-- Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 7: Calibre-like EPUB CSS rules are sanitized before Android WebView rendering, preserving negative indentation while removing layout-breaking writing mode, line height, height, and positive indentation declarations.
+- Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 7: EPUB publisher CSS rules are sanitized before Android WebView rendering, preserving negative indentation while removing layout-breaking writing mode, line height, height, and positive indentation declarations.
 - Device-validate the reader lookup iframe popup path across paged and continuous mode, vertical and horizontal writing, recursive child lookup, parent-scroll child dismissal, duplicate state, audio error/autoplay, popup scale levels, redirect history, Sasayaki popup controls, dark-mode action button contrast, E-ink selection marks, swipe dismiss, outside tap/stylus dismiss, dictionary media images, and absence of invisible touch blockers after dismissal.
 - Reader lookup iframe now preloads/reuses the root iframe, gates visibility on first renderable content plus root selection highlight readiness, restores E-ink underline-style root marks, keeps action/Sasayaki controls aligned with the native popup layout, and lazy-loads popup dictionary media; it has real-device smoke coverage for vertical lookup, Sasayaki control-bar layout, popup bottom overscroll isolation, and swipe dismiss, while the full validation matrix above remains open.
 - Smoke-test Dictionary tab and Process Text lookup popups after reader iframe work, confirming their cold native overlay path still supports recursive lookup, audio/Anki buttons, redirects, selection marks, and touch passthrough.

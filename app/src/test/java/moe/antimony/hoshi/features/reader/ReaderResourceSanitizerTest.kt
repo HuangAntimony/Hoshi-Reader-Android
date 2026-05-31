@@ -31,7 +31,7 @@ class ReaderResourceSanitizerTest {
 
         assertFalse(sanitized, sanitized.contains("-epub-"))
         assertTrue(sanitized.contains("display: inline-block;"))
-        assertTrue(sanitized.contains("-webkit-writing-mode: vertical-rl;"))
+        assertFalse(sanitized, sanitized.contains("-webkit-writing-mode: vertical-rl;"))
         assertFalse(sanitized.contains("writing-mode: horizontal-tb;"))
         assertTrue(sanitized.contains("line-break: strict;"))
         assertTrue(sanitized.contains("word-break: keep-all;"))
