@@ -35,7 +35,7 @@ This file is the short operational handoff for future agents.
 
 ### Reader And Lookup
 
-- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; checked through `9b3e135`, with Dictionary pull-to-clear and dictionary auto-update sync work pending; defer EPUB storage-format migration until upstream iOS/TTU book data sync stabilizes.
+- Use `docs/IOS_UPSTREAM_SYNC_QUEUE.md` as the current iOS upstream sync queue; checked through `61306c7`, with popup scaling/vertical anchors, reader image/selection follow-up fixes, Dictionary pull-to-clear/auto-update, Anki/IPA glossary behavior, TTU/Google Drive bookdata sync, and Calibre CSS sanitization pending.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 1: continuous reader padding now belongs to the visible viewport, vertical paginated columns resolve from page height, and chapter HTML receives an early XHTML-safe viewport while retaining the fast `loadUrl` chapter path.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 2: large reader images and SVG image media now use iOS-style tap handling, Blur Images first-tap reveal, fullscreen zoom with anchored raster-image gestures, safe-area-aware controls and bounded panning, and copy/save/share controls.
 - Completed `docs/IOS_UPSTREAM_SYNC_QUEUE.md` slice 3: Advanced reader Layout now includes iOS-style paragraph spacing with persistence, WebView reload-key participation, and vertical/horizontal CSS margin mapping.

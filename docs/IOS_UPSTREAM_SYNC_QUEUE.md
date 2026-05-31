@@ -1,176 +1,93 @@
 # iOS Upstream Sync Queue
 
-This document was rewritten from scratch after checking every iOS upstream commit after `1e2aa8d11d5cd1687e11c6b8735a999e7a8ed16f`.
+This document tracks open Android work after checking iOS upstream `develop`.
 
 - Source: `reference/Hoshi-Reader-iOS`
-- Baseline: `1e2aa8d11d5cd1687e11c6b8735a999e7a8ed16f`
-- Latest checked: `origin/develop` at `9b3e135d18a49492bb6bffb9ce9cfaf2329c58c7`
-- Checked on: 2026-05-23
+- Baseline for this refresh: `9b3e135d18a49492bb6bffb9ce9cfaf2329c58c7`
+- Latest checked: `origin/develop` at `61306c70570c911c288d217d5a111d45204b345b`
+- Checked on: 2026-05-31
 
 ## Current Queue
 
-### 1. Reader pagination and continuous-layout correctness
+### 1. Popup scale, selection coordinates, and vertical reader anchors
 
-Status: completed on Android in `codex/reader-pagination-layout-sync`.
+Status: pending Android sync.
 
 Commits:
 
-- `7057771` - apply padding in reading direction to viewport in continuous mode.
-- `f07d8ea` - prevent restoring to unpadded position in continuous reading mode.
-- `8705f86` - use page height for column width in vertical-rl.
-- `9b3e135` - prevent continuous WebView crash by injecting viewport earlier, reverting the `f07d8ea` wait-for-viewport workaround.
-- `b84bb79` - prevent layout shifts on 13 inch iPads.
+- `7d49301` - scale popup units directly instead of relying on CSS zoom.
+- `cce1693` - align popups to selection in paginated/continuous vertical.
 
-Why this comes before reader UI polish:
+Why this comes first:
 
-- These changes affect scroll/page coordinates and restore targets. They should be stable before adding fullscreen image behavior, paragraph spacing, or reader chrome redesign work that also changes WebView dimensions.
+- Popup coordinates are shared by Dictionary tab lookup, reader lookup, recursive popup lookup, Anki buttons, and native action overlays. Android currently still uses WebView/CSS zoom plus coordinate scale helpers, so this is a small but foundational correctness slice before adding more popup/template behavior.
 
 iOS behavior to mirror:
 
-- Continuous mode frames the scroll WebView inside the padded viewport: vertical writing applies horizontal padding to the viewport, horizontal writing applies vertical padding to the viewport.
-- Continuous reader now injects a fixed-width viewport as a `WKUserScript` at document end, before the main setup script, to avoid WebView crashes and innerWidth/viewport desync during restore.
-- The earlier restore/jump workaround that waited three animation frames was reverted upstream by `9b3e135`.
-- Paginated vertical-rl uses page height for CSS column width, avoiding width/height mismatch in vertical writing.
-- iPad-specific reader geometry avoids first-load safe-area layout shifts.
+- Popup HTML no longer applies `html { zoom: ... }`. Instead, CSS lengths that need to scale use `calc(... * var(--popup-scale))`, and custom CSS `px` values are converted to scale-aware `calc()` expressions.
+- Button frame reporting returns raw `getBoundingClientRect()` coordinates; native overlay buttons use the popup scale only for icon sizing.
+- Recursive popup selection no longer passes separate zoom-adjusted rect points.
+- In reader vertical writing, selection rectangles are offset by the WebView scroll origin so lookup popups align with the selected text in paginated and continuous modes.
 
-Android result:
+Android current gap:
 
-- Continuous layout now splits padding by writing direction so the Compose viewport owns the padding along the reading axis, while body CSS keeps only cross-axis padding.
-- Paginated vertical writing resolves CSS `column-width` from `--page-height`; horizontal writing keeps `--page-width`.
-- Chapter XHTML/HTML resources get a single early viewport meta before reader setup runs, while chapter navigation keeps the existing `loadUrl` path instead of the slower `loadDataWithBaseURL` main-document load.
-- The reverted three-animation-frame restore wait was not copied. `b84bb79` remains tablet validation context only.
-- Covered by focused JVM tests plus emulator WebView inspection on `emulator-5554`: continuous vertical restore and paginated vertical both loaded text with one viewport meta and zero XHTML parser errors; paginated vertical reported `columnWidth` equal to `--page-height`.
+- `LookupPopupHtml`, `LookupPopupAndroidOverlay`, Dictionary tab popup rendering, and `hoshi-popup` assets still use `html { zoom: ... }`, `getButtonRectScale()`, and separate rect coordinates.
+- Android has prior zoom-coordinate work from the earlier `79fef08` slice, but this upstream commit supersedes that implementation model.
+- Android popup alignment needs a focused re-check in paginated and continuous vertical writing after removing zoom-based coordinate compensation.
+
+Suggested slice:
+
+- Move popup scaling to CSS variables and scale-aware lengths in shared popup assets and generated popup HTML.
+- Convert custom dictionary CSS pixel lengths to scale-aware expressions before injection.
+- Remove zoom-based button-frame and selection-rect compensation, then keep native overlay icons sized from the setting value.
+- Re-run reader vertical selection anchor tests in paginated and continuous modes.
 
 Validation:
 
-- Cover pages, multi-image pages, long text page turns, forward/backward chapter boundaries, continuous restore with nonzero padding in both writing modes, internal-link jumps, and rapid boundary flips.
+- Popup-to-popup lookup from reader and Dictionary tab at popup scales `0.8`, `1.0`, and `1.5`.
+- Reader vertical lookup in paginated and continuous modes, including lower-screen child popup placement and action-button alignment.
+- E-ink popup controls, deinflection overlays, dictionary media images, and outside-tap dismissal after scaling changes.
 
-### 2. Reader image tap, SVG media targeting, and fullscreen zoom
+### 2. Reader image hit testing, bottom safe-area taps, and selection highlight follow-up
 
-Status: completed on Android in `codex/reader-image-fullscreen-sync`.
+Status: pending Android sync.
 
 Commits:
 
-- `a0989ac` - fullscreen and zoomable images.
-- `027ea05` - apply click event to inner image element for SVG containers.
+- `b1509d9` - allow reader UI to be toggled on SVG image pages.
+- `a7a8380` - allow bottom safe area to toggle focus mode and dismiss popups.
+- `55a32cd` - prevent images with blur from being hidden with 0 horizontal padding in vertical.
+- `2b8a599` - prevent random margins from being highlighted and not cleared.
 
-Why this follows layout:
+Why this follows popup geometry:
 
-- Image sizing and click targets rely on the reader CSS/page metrics from the layout slice, especially for cover pages and vertical writing.
+- Most of these fixes touch hit testing, selection clearing, or reader chrome tap behavior. Popup coordinate cleanup should land first so reader tap/selection regressions are isolated.
 
 iOS behavior to mirror:
 
-- Large block images and SVG containers with embedded image elements become tappable.
-- If Blur Images is enabled, the first tap only removes blur and consumes the tap.
-- A later tap opens a fullscreen image viewer with zoom, double-tap zoom, close, and share controls.
-- SVG containers forward image handling through the inner `<image>` href so the fullscreen viewer opens the actual media URL.
+- Taps on SVG image pages can still toggle reader UI; SVG `<image>` media taps remain image taps, but the SVG container itself is no longer treated as a blocked image hit target.
+- The bottom safe area is tappable: it clears selection, closes popups if present, or toggles focus mode if no popup is open.
+- Blurred images in vertical writing use a one-pixel width reduction so zero horizontal padding does not hide them.
+- Text selection highlights each scanned character range separately, avoiding accidental margin highlight blocks that are not cleared.
 
-Android result:
+Android current gap:
 
-- Reader JS now uses one image setup path for large bitmap images and SVG containers. Bitmap images are wrapped with `.blur-wrapper` when Blur Images is enabled, while SVG click handling is attached to the inner `<image>` and forwards its resolved media URL.
-- Reader selection distinguishes text, links, and image taps so native Android tap handling no longer opens lookup or clears popups for image/link taps.
-- Tapped reader images open a fullscreen overlay. Raster images use native Compose zoom/pan/double-tap handling; SVG media renders in a contained zoomable WebView backed by the same EPUB resource bridge.
-- The fullscreen viewer exposes close, copy, save, and Android share controls. Copy/share use temporary FileProvider-backed cache files, while save writes through MediaStore.
-- Covered by focused JVM tests for reader image JS, selection result parsing, localized share strings, and local EPUB image resource targeting.
+- Android already exposes an Always Show Progress setting, persists `readerAlwaysShowProgress`, suppresses the normal top/bottom progress bubbles, and renders progress in the bottom safe-area band.
+- Android `ReaderSelectionScripts` still treats `svg` containers as image taps; upstream now treats only `img`, SVG inner `image`, and `.blur-wrapper` as image taps.
+- Android bottom safe-area tap behavior and popup/selection dismissal order need a focused comparison against `a7a8380`.
+- Android reader image sizing and selection highlight range generation need comparison against the one-pixel blurred-image width fix and per-character highlight fix.
 
-Validation:
+Suggested slice:
 
-- In paginated and continuous modes, verify cover image pages, multi-image illustration pages, SVG image containers, blurred images, inline/gaiji images, double-tap zoom, close/share controls if implemented, and no accidental reader chrome/page-turn/lookup on image taps.
-
-### 3. Reader advanced paragraph spacing
-
-Status: completed on Android.
-
-Commits:
-
-- `ebf5423` - paragraph spacing.
-
-Why this is a small high-value slice:
-
-- It is an independent user-facing setting with low architectural risk, but it touches strings, DataStore/legacy settings, WebView state keys, and generated reader CSS.
-
-iOS behavior to mirror:
-
-- Appearance -> Layout -> Advanced includes a `Paragraph Spacing` slider from `0...3` in `0.1em` steps, default `0`.
-- In vertical writing, paragraph spacing applies to left/right paragraph margins.
-- In horizontal writing, paragraph spacing applies to top/bottom paragraph margins.
-- Changing the value rebuilds the reader WebView through the same state key path as line height and character spacing.
-
-Android result:
-
-- Reader settings now include paragraph spacing with default `0`, legacy SharedPreferences and DataStore persistence, and reader content reload-key participation.
-- Appearance -> Layout -> Advanced now shows a localized Paragraph Spacing slider from `0...3` in `0.1em` steps.
-- Generated reader CSS applies paragraph spacing to left/right paragraph margins in vertical writing and top/bottom margins in horizontal writing, only when Advanced layout is enabled.
-- Covered by focused JVM tests for defaults, migration/persistence, reload-key changes, localized resources, and CSS output.
+- Audit Android reader chrome and reader JS against the four commits, then implement only confirmed mismatches.
+- Keep Android-specific immersive navigation behavior, but align tappable safe-area semantics and popup/selection dismissal order.
 
 Validation:
 
-- `./gradlew :app:testDebugUnitTest --tests moe.antimony.hoshi.features.reader.ReaderSettingsTest --tests moe.antimony.hoshi.features.reader.ReaderSettingsRepositoryTest --tests moe.antimony.hoshi.features.reader.ReaderWebViewStateHolderTest --tests moe.antimony.hoshi.LocalizationResourceTest`
-- Device-validate visible spacing changes in both paginated/continuous and vertical/horizontal writing.
+- SVG-only image pages, SVG containers with inner `<image>` media, blurred vertical image pages with zero horizontal padding, and blank margin taps.
+- Focus-mode toggling from the bottom safe-area band with no popup, with a root popup, and with recursive child popups.
 
-### 4. Reader chrome redesign and focus-mode interaction
-
-Status: completed on Android in `codex/reader-chrome-focus-sync`.
-
-Commits:
-
-- `3c0de23` - redesign reader UI.
-- `76409c9` - let ReaderView control status bar.
-- `4438de8` - minor reader UI adjustments.
-- `b84bb79` - prevent layout shifts on 13 inch iPads.
-
-Why this is lower than layout and image work:
-
-- This is high user-visible value, but Android already has substantial native reader chrome. Syncing it before the geometry fixes risks conflating visual redesign with page-position regressions.
-
-iOS behavior to assess:
-
-- Reader top title/progress moved into compact glass-styled overlays that hide in focus mode.
-- Bottom Back/Menu controls and optional bottom progress/statistics moved into compact glass-styled controls.
-- Statistics/Sasayaki quick toggles and jump-return controls are shown from the top safe area when focus mode is active.
-- Taps outside popups toggle focus mode; selection, scroll, and page turns force focus mode on.
-- ReaderView owns status-bar behavior instead of fullscreen image view special-casing.
-
-Android result:
-
-- ReaderView now owns Android system-bar behavior for the whole reader route. The top status bar remains visible outside focus mode, focus mode hides the status bar, the bottom navigation bar stays hidden with transient edge-swipe reveal, and reader exit restores the normal bars.
-- Focus mode now follows the iOS interaction flow: text selection, paginated page turns, and continuous scrolling force focus mode on; empty reader taps toggle focus mode; taps while popups are visible dismiss popups before any focus toggle.
-- Top title/progress and bottom Back/Menu/progress/statistics chrome float above reader text in glass-like center bubbles and hide in focus mode, while statistics, Sasayaki, and jump-return quick controls stay available as top overlays in focus mode.
-- Android-specific reader affordances remain: E-ink opaque chrome colors, compact Android hit targets, and bottom Sasayaki skip buttons. Reader content keeps only the iOS-style top camera/control safety space; bottom chrome and transient navigation bars may overlay text to maximize the reading area.
-
-Validation:
-
-- Reader appearance chrome regression matrix from `docs/TODO.md`, plus tablet width, E-ink mode, focus mode status-bar hiding, jump-return controls, statistics/Sasayaki toggles, and popup coexistence.
-
-### 5. Popup recursive selection scan length and zoom coordinates
-
-Status: completed on Android.
-
-Commits:
-
-- `79fef08` - correct recursive selection coordinates on zoomed popups and pass scanLength instead of hardcoding.
-
-Why this is independent:
-
-- It is scoped to popup lookup recursion and dictionary scan length, not reader layout or storage. It can be fixed before or after reader UI slices.
-
-iOS behavior to mirror:
-
-- Popup WebViews receive the configured `scanLength` and pass it to `window.hoshiSelection.selectText()` instead of hardcoding `16`.
-- On older iOS WebKit versions, recursive popup selection uses the touch point for hit testing and the popup-relative rect point for selection-rect calculation, fixing coordinate drift under popup zoom.
-
-Android result:
-
-- Popup HTML now exposes the normalized `DictionarySettings.scanLength` to popup JavaScript, so popup-in-popup text selection no longer hardcodes `16`.
-- Popup recursive selection now mirrors iOS by accepting a separate rect point for selection rects and child popup anchors. On current Android WebView this is expected to be a no-op when `getBoundingClientRect()` already reports zoom-adjusted coordinates, so the pre-fix coordinate drift was not reproduced on Android.
-- Popup action-button frame reporting uses the same coordinate helper so native overlay buttons and selection anchors share one coordinate model across WebView zoom implementations.
-- Covered by a focused JVM regression test for scan length injection plus popup JavaScript syntax checks.
-
-Validation:
-
-- Popup-to-popup lookup from reader and Dictionary tab at popup scales `0.8`, `1.0`, and `1.5`, including lower-screen child popup placement and scan length values above/below `16`.
-
-### 6. Dictionary pull-to-clear search reset
+### 3. Dictionary search pull-to-clear reset
 
 Status: pending Android sync.
 
@@ -178,28 +95,34 @@ Commit:
 
 - `73a9e62` - pull to refresh.
 
+Why this is independent:
+
+- It is scoped to the Dictionary tab search/results surface and can be implemented without waiting for storage or sync work.
+
 iOS behavior to mirror:
 
-- Dictionary search results now allow vertical bounce even inside the popup-backed results WebView.
-- Pulling down past an 80-point threshold clears the current query when text is present.
-- Pulling down with an empty query focuses the search field and shows the keyboard.
-- While dragging, a small inset appears below the search bar with an arrow and text that changes from pull guidance to release guidance after the threshold.
-- Releasing after the threshold clears text and focuses the search field; the reset indicator hides after deceleration.
-- Dragging the results dismisses the keyboard.
+- Dictionary search results allow a downward pull gesture even inside the popup-backed results WebView.
+- Pulling past an 80-point threshold clears the current query when text is present.
+- Pulling with an empty query focuses the search field and shows the keyboard.
+- While dragging, a small inset below the search bar shows pull/release guidance.
+- Dragging results dismisses the keyboard.
 
-Android notes:
+Android current gap:
 
-- Android Dictionary tab currently has an explicit clear button in the search field but no pull-to-clear/show-keyboard gesture.
-- Implement with Compose scroll state or nested scroll around the Dictionary results surface rather than adding iOS-specific WebView bounce semantics.
-- New visible labels must be added to default English and Simplified Chinese string resources.
+- Android has an explicit clear button in the search field but no pull-to-clear/show-keyboard gesture.
+
+Suggested slice:
+
+- Implement with Compose nested scroll or scroll state around the Dictionary results surface rather than iOS WebView bounce semantics.
+- Add localized pull/release labels to English and Simplified Chinese resources.
 
 Validation:
 
-- Search for a term in the Dictionary tab, pull the results down below threshold, and confirm the query clears, results reset, and keyboard focus returns.
-- With an empty query, pull down below threshold and confirm the keyboard appears without changing results.
-- Confirm ordinary vertical result scrolling and nested lookup popup interaction still work.
+- Search for a term, pull below threshold, confirm query clears, results reset, and keyboard focus returns.
+- With an empty query, pull below threshold and confirm keyboard appears.
+- Confirm normal result scrolling and nested popup lookup still work.
 
-### 7. Dictionary automatic updates
+### 4. Dictionary automatic updates
 
 Status: pending Android sync.
 
@@ -207,81 +130,179 @@ Commit:
 
 - `94d0c41` - dictionary auto updates.
 
+Why this is broader:
+
+- It crosses settings, dictionary repository import/update code, app foreground lifecycle, network constraints, partial-failure behavior, and update-result persistence.
+
 iOS behavior to mirror:
 
-- Dictionary settings show an Updates section when at least one installed dictionary is updatable.
-- Updates include an `Update Automatically` toggle, default enabled.
-- When automatic updates are enabled, users can choose Daily, Weekly, or Monthly; default is Weekly.
-- Settings show the last successful dictionary update time, or Never when none has succeeded.
-- On app activation, iOS checks whether automatic updates are enabled, whether updatable dictionaries exist, and whether the selected interval has elapsed.
+- Dictionary settings show an Updates section when installed dictionaries are updatable.
+- Users can enable automatic updates, choose Daily/Weekly/Monthly, and see the last successful update time or Never.
+- On app activation, iOS checks elapsed interval and installed updatable dictionaries before starting updates.
 - Automatic update sessions disallow expensive and constrained network access.
-- Failed dictionaries do not cancel the whole update batch.
-- Last update is recorded after at least one dictionary update check/import succeeds.
-- Manual update still reports failures to the user.
-- Updated dictionaries are imported into a temporary directory first, then moved into place so failed imports do not corrupt the installed copy.
-
-Android notes:
-
-- Android already supports manual update checks for installed updatable dictionaries, preserving enabled state, order, and collapsed-title migration on rename.
-- Android currently lacks automatic update settings, last-update display, activation-triggered background checks, non-expensive network restriction, partial-failure behavior, and temp-then-move update import.
-- Use Android platform/network APIs for network constraints rather than mechanically copying iOS `URLSessionConfiguration`.
-- New visible settings labels and interval values must be localized in English and Simplified Chinese.
-
-Validation:
-
-- Install an updatable dictionary, open Dictionaries, and confirm the Updates section shows automatic update controls, interval choices, last update, and manual Update.
-- With automatic updates enabled and an elapsed interval, foreground the app on an unmetered network and confirm updates run without blocking normal dictionary use.
-- Simulate one dictionary update failure and one success; confirm the success is applied, failure is surfaced only for manual update, and last update advances only after a successful check/import.
-- Confirm a failed import leaves the previous installed dictionary intact.
-
-## Deferred Until iOS Book Sync Stabilizes
-
-### Book storage EPUB-file compatibility
-
-Status: deferred until upstream iOS finishes book data sync with ッツ/TTU.
-
-Commits:
-
-- `ab6722e` - store books as epubs instead of unzipped folders.
-
-Why this is deferred:
-
-- This is the only new upstream change that can affect the filesystem contract shared by bookshelf import, reader open, backup/restore, sync, Sasayaki matching, cover export, and Anki book-cover mining.
-- The iOS author is still working toward ッツ/TTU book data sync, and that work may change the book folder/metadata shape again.
-- Android should avoid migrating its internal storage format until the upstream iOS book data sync contract settles. For now, keep Android's extracted-root model and only preserve enough knowledge to restore/read future iOS archives safely when implementation resumes.
-
-iOS behavior to mirror:
-
-- On launch, iOS repacks each legacy extracted book folder into `<folder>/<folder>.epub`, records that filename in `metadata.json` as `epub`, and removes extracted EPUB content except sidecars and the cover image.
-- New reader and Sasayaki loads resolve the EPUB filename from metadata and unzip it to an app `Temp` directory before parsing.
-- Backup/export now preserves a book folder containing sidecars, cover, and the packed EPUB file instead of the full extracted EPUB tree.
+- Failed dictionaries do not cancel the whole batch; last-update time advances after at least one successful check/import.
+- Manual update still reports failures.
+- Updated dictionaries import into a temporary directory first, then replace the installed copy.
 
 Android current gap:
 
-- Android `BookRepository.importBook()` still extracts the selected EPUB into a book root, and `EpubBookParser.parse(root)` expects an extracted EPUB directory.
-- Android `BookMetadata` has no `epub` field; current iOS-compatible backup tests cover sidecars, IDs, shelves, and covers, not the new packed-EPUB folder shape.
-- Android backup/restore already zips `Books` safely with `java.util.zip`, so this is not a ZIP-library migration. The key decision is whether Android should adopt packed EPUB storage or support both shapes at restore/open time.
+- Android supports manual update checks for installed updatable dictionaries, preserving enabled state, order, and collapsed-title migration on rename.
+- Android lacks automatic update settings, last-update display, activation-triggered checks, non-expensive network gating, partial-failure batch behavior, and temp-then-move update import.
 
 Suggested slice:
 
-- Do not start Android's storage migration yet.
-- Add metadata support for optional `epub`, restore/open compatibility for iOS packed-EPUB folders, and a migration strategy only after deciding whether Android keeps extracted roots or stores packed EPUBs.
-- If Android keeps extracted roots, import iOS backups by detecting `metadata.epub`, extracting that EPUB into the restored book root, and preserving sidecars/covers.
-- If Android adopts packed EPUB storage, update import, parser entry points, reader resource loading, cover resolution, Sasayaki matching, backup/restore, and sync together.
+- Add persisted auto-update settings and localized settings UI.
+- Use Android network APIs/WorkManager constraints after confirming the current recommended Jetpack behavior.
+- Make repository update import transactional per dictionary and record last successful update after at least one success.
 
 Validation:
 
-- Unit-test both legacy extracted roots and iOS packed-EPUB restored roots.
-- Device-validate import, reopen reader, cover display, backup/restore, Sasayaki matching, Anki book-cover export, and iOS-created `.hoshi` archive restore.
+- Install an updatable dictionary, open Dictionaries, and confirm automatic update controls, interval choices, last update, and manual Update.
+- Foreground the app on an allowed network after the interval elapses; confirm update runs without blocking dictionary use.
+- Simulate one failure and one success; confirm success is applied, manual failure is surfaced, and last-update advances only after success.
+- Confirm failed imports leave installed dictionaries intact.
+
+### 5. Dictionary IPA display and Anki glossary handlebars
+
+Status: pending Android sync; native frequency-sort dependency already present.
+
+Commits:
+
+- `8ef25f4` - glossary-brief, glossary-first-brief, selected-glossary-fallback, selected-glossary-brief, selected-glossary-brief-fallback handlebars.
+- `36be339` - support for IPA dicts.
+- `5cbdaa8` - glossary-no-dictionary, use regex to create alt glossary handlebars.
+
+Why this follows core popup rendering:
+
+- IPA pitch display and Anki glossary payloads are generated from popup/lookup data. Land popup scale/coordinate cleanup first, then adjust payload semantics.
+
+iOS behavior to mirror:
+
+- Pitch dictionaries can provide IPA/transcription strings alongside numeric pitch positions. Popup pitch groups render both, and duplicate pitch positions are still deduplicated across dictionaries.
+- Anki mining supports new glossary handlebar variants:
+  - brief variants strip glossary header labels.
+  - no-dictionary variants remove dictionary names from labels.
+  - selected-glossary fallback variants fall back to the first glossary when no selected dictionary value exists.
+  - per-dictionary `{single-glossary-<dict>-brief}` and `{single-glossary-<dict>-no-dictionary}` are supported even if not all variants are shown in the insertion picker.
+
+Android current gap:
+
+- The Android hoshidicts bridge submodule is already at the newer `497578824f...` native revision, matching the iOS package update context and covering the native frequency-sort change from `e70008d`.
+- Android JNI models currently expose `pitchPositions` but not transcription/IPA strings.
+- Android popup HTML and Anki renderer support core glossary and selected/single glossary handlebar values, but not the new brief/no-dictionary/fallback variants.
+
+Suggested slice:
+
+- Extend the bridge-facing pitch model only if `third_party/hoshidicts-kotlin-bridge` exposes transcription data; otherwise document the bridge gap first.
+- Render IPA/transcription rows in popup pitch groups without breaking compact pitch and pitch deduplication behavior.
+- Add Anki handlebar rendering and focused tests for brief, no-dictionary, fallback, and per-dictionary suffix forms.
+- Keep insertion UI aligned with iOS by hiding advanced variants that iOS does not surface directly.
+
+Validation:
+
+- Import an IPA-capable pitch dictionary and confirm lookup popups show transcription rows.
+- Mine Anki notes through AnkiDroid and AnkiConnect with each new handlebar variant, including dictionary media embedding and selected-dictionary fallback.
+
+### 6. TTU/Google Drive book data sync, backup import/export, and remote bookshelf
+
+Status: pending Android sync; replaces the earlier book-storage deferral with a concrete TTU bookdata queue.
+
+Commits:
+
+- `67bdbb9` - add option to export epubs.
+- `1aaee97` - prevent autosync being stuck when mobile data is disabled.
+- `c2e1c09` - ttu book sync (#63).
+- `32d76d2` - some edge cases in ttu bookdata.
+
+Why this is a large dependent slice:
+
+- This crosses bookshelf state, Drive listing and cache invalidation, remote cover thumbnails, EPUB export, TTU `bookdata_*.zip` conversion, backup import/export, reader-open import-only behavior, and existing progress/statistics/Sasayaki sync.
+
+iOS behavior to mirror:
+
+- Book context menus can share/export the stored EPUB when `metadata.epub` is available.
+- Sync settings include cache clearing, sign-out confirmation, and separate Data toggles for uploading book data, statistics, and audiobook progress.
+- Bookshelf shows remote Google Drive books that are not present locally, using Drive cover thumbnails and remote progress where available.
+- Tapping a remote book imports its TTU bookdata from Google Drive, then removes it from the remote-only section.
+- Remote Google Drive books can be deleted/trash-moved from the remote-only section.
+- Backup settings can export all local books as TTU-compatible bookdata zip folders and import TTU backup zips, merging new books and overwriting stats/progress for existing books.
+- Sync uploads bookdata only when enabled and missing remotely; existing progress/statistics/audio sync remains independent.
+- Drive requests detect no network before request execution so autosync does not hang behind disabled mobile data.
+- TTU conversion preserves/sanitizes XHTML wrappers, images, cover, CSS, table of contents, progress, statistics, and edge cases around `<br>`, `<hr>`, and wrapper divs.
+
+Android current gap:
+
+- Android has the first Google Drive progress/statistics/Sasayaki sync slice and uses Device Code auth, but it does not list/import/delete remote-only Drive books.
+- Android sync does not upload/download TTU bookdata zips or expose an Upload Books toggle.
+- Android Backup supports `.hoshi` Books/Dictionaries archives but not TTU backup import/export.
+- Android `BookMetadata`/repository still use extracted EPUB roots and do not retain a packed EPUB filename for direct EPUB export.
+- Network unavailability is handled in parts of authorization/sync, but the exact autosync no-network stuck case needs re-checking against Android's Drive client.
+
+Suggested slice:
+
+- Split into smaller Android work:
+  1. Drive data-source support for paginated folder listing, per-folder sync file listing, remote cover thumbnail caching, cache clear, and trash.
+  2. Remote-only bookshelf section and import/delete UI with localized strings.
+  3. EPUB retention/export strategy that is compatible with the deferred packed-EPUB storage decision.
+  4. TTU bookdata converter and Backup import/export flows.
+  5. Sync Upload Books setting and bookdata upload/import-only reader behavior.
+  6. Network-unavailable autosync guard.
+- Confirm Android Drive API, SAF, and background/network constraints against current Google/Jetpack docs before implementation.
+
+Validation:
+
+- On a user-configured Google Drive project, list remote-only ッツ books, show covers/progress, import one book, delete one remote book, and clear cached folder IDs/covers.
+- Export an Android book as EPUB and as TTU backup; import the TTU backup into iOS/ッツ where possible.
+- Import an iOS/ッツ TTU backup into Android; verify reader open, cover, progress, statistics, and Sasayaki progress.
+- Disable network/mobile data during autosync and confirm it fails or defers without hanging.
+- Regression-test existing manual sync, reader auto import/export, close/background export flush, statistics Merge/Replace, and Sasayaki last-position sync.
+
+### 7. EPUB CSS sanitization for Calibre-generated books
+
+Status: pending Android comparison.
+
+Commit:
+
+- `32aa342` - add sanitization for some css in calibre generated epubs.
+
+Why this is reader/storage adjacent:
+
+- Android already has an EPUB resource sanitizer for private `-epub-*` CSS declarations, but iOS now mutates Calibre CSS files before reader load to remove layout-breaking rules. The two behaviors overlap but are not equivalent.
+
+iOS behavior to mirror:
+
+- On reader load, every CSS file in the extracted EPUB content directory is scanned.
+- Rules for Calibre-like selectors strip writing-mode properties and line-height.
+- If a rule with writing-mode also has height, height is stripped.
+- Positive `text-indent` is reset to `0`; negative text indentation is preserved.
+- If any line-height was stripped, `body { line-height: 1.65; }` is appended.
+
+Android current gap:
+
+- Android `ReaderResourceSanitizer` removes EPUB-private declarations when serving CSS, but it does not target Calibre selector rules, line-height, height, or positive text-indent in the same way.
+
+Suggested slice:
+
+- Add behavior-level sanitizer tests using Calibre-like CSS fixtures.
+- Implement non-destructive CSS sanitization in the reader resource bridge or import pipeline, keeping the parser/resource model unchanged.
+
+Validation:
+
+- Open Calibre-generated vertical and horizontal EPUB fixtures with problematic line-height, writing-mode, height, and text-indent rules.
+- Confirm reader layout, line height, indentation, and CSS resource serving remain stable across chapter reloads.
 
 ## Covered Or No Android Action
 
-- `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled, while the visible skip controls replace them as media controls. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands while reader skip buttons are controlled separately. Re-test media controls when touching Sasayaki command behavior.
-- `09951b4`: iOS build-number bump only. No Android sync.
-- `51bd0f2`: iOS project compiler setting bump to C++23 and ZIPFoundation package update. Android already uses platform `java.util.zip`; no Android dependency migration is implied unless the shared dictionary bridge later changes toolchain requirements.
-- `612d350`: iOS build-number bump only. No Android sync.
-- `b84bb79`: iPad-specific safe-area/layout-shift mitigation. Keep as context for Android tablet validation, not a direct Android sync item unless a matching tablet issue appears.
-- `f07d8ea`: continuous restore wait-for-viewport workaround was reverted by `9b3e135`; keep only as context for why Android should not copy the wait-for-frames approach.
+- `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands.
+- `09951b4`, `612d350`, `ad71067`, `4b26d8a`: iOS version/build bumps only.
+- `51bd0f2`: iOS compiler setting and ZIPFoundation update. Android uses its own ZIP/Java/Kotlin stack; no direct action.
+- `b84bb79`, `adcbc96`, `7b98ec7`: iPad-specific safe-area/layout adjustments. Keep as Android tablet validation context rather than direct sync unless a matching tablet issue appears.
+- `f07d8ea`: continuous restore wait-for-viewport workaround was reverted by `9b3e135`; Android should not copy that approach.
+- `5518193`: Android already has `readerAlwaysShowProgress` persistence, the Appearance toggle, suppression of normal top/bottom progress bubbles while enabled, and bottom safe-area progress rendering.
+- `e70008d`: iOS hoshidicts package revision bump to `497578824f...`; Android's hoshidicts bridge submodule already points at the same native revision.
+- `3405d69`: iOS settings UI cleanup and documentation links. No direct Android sync beyond keeping future settings copy localized and Android-specific.
+- `147e3b9`: Android already ships default English and Simplified Chinese resources with localization tests. Future queue items that add user-visible strings still need the normal paired `values` / `values-zh-rCN` updates.
+- `61306c7`: formatting and whitespace cleanup only.
 
 ## Open Commit Inventory
 
@@ -289,24 +310,27 @@ Validation:
 | --- | --- | --- | --- |
 | `73a9e62` | 2026-05-18 | Dictionary pull-to-clear/show-keyboard gesture | Pending |
 | `94d0c41` | 2026-05-19 | Automatic dictionary updates | Pending |
-| `a0989ac` | 2026-05-21 | Fullscreen zoomable reader images | Pending image UX sync |
-| `ebf5423` | 2026-05-21 | Reader paragraph spacing setting | Pending setting/CSS sync |
-| `76409c9` | 2026-05-22 | Reader controls status bar ownership | Pending chrome comparison |
-| `3c0de23` | 2026-05-22 | Reader UI redesign | Pending chrome comparison |
-| `7057771` | 2026-05-22 | Continuous reader padding in reading direction | Synced in Android slice 1 |
-| `79fef08` | 2026-05-22 | Zoomed popup recursive selection coordinate fix | Pending popup audit |
-| `027ea05` | 2026-05-22 | SVG container image click targeting | Pending image UX sync |
-| `4438de8` | 2026-05-22 | Reader UI minor adjustments | Pending chrome comparison |
-| `8705f86` | 2026-05-23 | Vertical-rl column width uses page height | Synced in Android slice 1 |
-| `9b3e135` | 2026-05-23 | Continuous WebView early viewport injection crash fix | Synced in Android slice 1 |
+| `7d49301` | 2026-05-24 | Popup scale via CSS units, not WebView zoom | Pending |
+| `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
+| `b1509d9` | 2026-05-25 | Reader UI toggles on SVG image pages | Pending |
+| `a7a8380` | 2026-05-25 | Bottom safe area toggles focus/dismisses popups | Pending |
+| `55a32cd` | 2026-05-25 | Blurred vertical images remain visible with zero horizontal padding | Pending |
+| `2b8a599` | 2026-05-25 | Selection highlights scanned characters separately | Pending |
+| `67bdbb9` | 2026-05-25 | Export stored EPUB from book menu | Pending |
+| `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
+| `1aaee97` | 2026-05-27 | Autosync no-network guard | Pending |
+| `cce1693` | 2026-05-27 | Vertical reader popup anchor correction | Pending |
+| `c2e1c09` | 2026-05-28 | TTU book sync, remote Drive bookshelf, backup import/export | Pending |
+| `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
+| `32aa342` | 2026-05-29 | Calibre CSS sanitization | Pending |
+| `32d76d2` | 2026-05-29 | TTU bookdata edge cases | Pending with TTU slice |
 
 ## Suggested Implementation Order
 
-1. Reader pagination and continuous-layout correctness: stabilize WebView geometry, restore timing, and vertical-rl column sizing before UI work.
-2. Popup recursive selection scan length and zoom coordinates: small cross-surface correctness slice with focused popup validation.
-3. Reader image tap, SVG media targeting, and fullscreen zoom: depends on stable image/page metrics and shares blur/image event handling.
-4. Reader advanced paragraph spacing: independent setting/CSS slice with localization and persistence tests.
-5. Reader chrome redesign and focus-mode interaction: compare Android-specific chrome first, then sync concrete visible mismatches.
-6. Dictionary pull-to-clear: user-facing gesture/UI slice in the Dictionary tab.
-7. Dictionary automatic updates: broader settings, repository, networking, and lifecycle slice; implement after deciding Android's network constraint mechanism.
-8. After upstream iOS/TTU book data sync stabilizes, revisit Book storage EPUB-file compatibility and decide packed EPUB vs dual-shape restore/open support with backup and reader-open tests.
+1. Popup scale and vertical anchor correctness.
+2. Reader image hit testing, bottom safe-area taps, and selection highlight follow-up fixes.
+3. Dictionary pull-to-clear.
+4. Dictionary automatic updates.
+5. Dictionary IPA display and Anki glossary handlebars.
+6. TTU/Google Drive bookdata sync, EPUB export, and backup import/export in smaller sub-slices.
+7. Calibre CSS sanitization.
