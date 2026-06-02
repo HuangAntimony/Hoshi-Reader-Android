@@ -722,7 +722,7 @@ private fun readerAppearanceScript(
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
 ): String {
-    val backgroundColor = readerJavaScriptStringLiteral(settings.backgroundColor(systemDark).toReaderCssColor())
+    val backgroundColor = readerJavaScriptStringLiteral(settings.backgroundColorCss(systemDark))
     val textColor = readerJavaScriptStringLiteral(settings.textColorCss(systemDark))
     val sasayakiText = readerJavaScriptStringLiteral(sasayakiTextColor.toReaderCssColor())
     val sasayakiBackground = readerJavaScriptStringLiteral(sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true))

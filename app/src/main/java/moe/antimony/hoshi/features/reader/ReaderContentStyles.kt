@@ -79,7 +79,7 @@ internal object ReaderContentStyles {
         sasayakiBackgroundColor: Long = 0x6687CEEB,
     ): String {
         val textColor = settings.textColorCss(systemDark)
-        val backgroundColor = settings.backgroundColor(systemDark).toReaderCssColor()
+        val backgroundColor = settings.backgroundColorCss(systemDark)
         val normalizedFont = ReaderFontManager.normalizeDefaultFont(settings.selectedFont)
         val fontFaceFamily = normalizedFont.cssString()
         val bodyFontFamily = normalizedFont.readerCssFontFamily()

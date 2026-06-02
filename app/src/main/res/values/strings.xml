@@ -142,7 +142,7 @@
     <string name="dictionary_collapse_dictionaries">Collapse Dictionaries</string>
     <string name="dictionary_collapse_mode_expand_all">Expand All</string>
     <string name="dictionary_collapse_mode_collapse_all">Collapse All</string>
-    <string name="dictionary_collapse_mode_custom">Custom</string>
+    <string name="dictionary_collapse_mode_custom" comment="Dictionary collapse mode option, distinct from reader appearance custom theme.">Custom</string>
     <string name="dictionary_mode" comment="Dictionary setting label, intentionally matching reader appearance mode.">Mode</string>
     <string name="dictionary_expand_first">Expand First Dictionary</string>
     <string name="dictionary_settings_behaviour">Behaviour</string>
@@ -209,9 +209,20 @@
     <string name="reader_appearance_theme_light">Light</string>
     <string name="reader_appearance_theme_dark">Dark</string>
     <string name="reader_appearance_theme_sepia">Sepia</string>
+    <string name="reader_appearance_theme_custom" comment="Reader Appearance theme option, distinct from dictionary collapse custom mode.">Custom</string>
     <string name="reader_appearance_eink_mode">E-ink Mode</string>
     <string name="reader_appearance_use_sepia_light_theme">Use Sepia as Light Theme</string>
     <string name="reader_appearance_invert_sepia_dark">Invert in System Dark Theme</string>
+    <string name="reader_appearance_interface">Interface</string>
+    <string name="reader_appearance_background_color">Background Color</string>
+    <string name="reader_appearance_text_color">Text Color</string>
+    <string name="reader_appearance_info_color">Info Color</string>
+    <string name="reader_appearance_color_hex">Hex</string>
+    <string name="reader_appearance_color_invalid">Use #RRGGBB or #RRGGBBAA.</string>
+    <string name="reader_appearance_color_alpha">Alpha</string>
+    <string name="reader_appearance_color_red">Red</string>
+    <string name="reader_appearance_color_green">Green</string>
+    <string name="reader_appearance_color_blue">Blue</string>
     <string name="reader_appearance_text_orientation">Text Orientation</string>
     <string name="reader_appearance_vertical">Vertical</string>
     <string name="reader_appearance_horizontal">Horizontal</string>

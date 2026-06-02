@@ -22,6 +22,10 @@ class ReaderSettingsTest {
         assertEquals("Noto Serif CJK JP", settings.selectedFont)
         assertFalse(settings.systemLightSepia)
         assertFalse(settings.sepiaInvertInDark)
+        assertEquals(ReaderInterfaceTheme.System, settings.uiTheme)
+        assertEquals(0xFFFFFFFFL, settings.customBackgroundColor)
+        assertEquals(0xFF000000L, settings.customTextColor)
+        assertEquals(0xFF999999L, settings.customInfoColor)
         assertFalse(settings.continuousMode)
         assertFalse(settings.blurImages)
         assertFalse(settings.enableStatistics)
@@ -316,6 +320,30 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings(theme = ReaderTheme.Light).usesDarkInterface(systemDark = true))
         assertTrue(ReaderSettings(theme = ReaderTheme.Dark).usesDarkInterface(systemDark = false))
         assertFalse(ReaderSettings(theme = ReaderTheme.Sepia).usesDarkInterface(systemDark = true))
+        assertFalse(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.Light,
+            ).usesDarkInterface(systemDark = true),
+        )
+        assertTrue(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.Dark,
+            ).usesDarkInterface(systemDark = false),
+        )
+        assertTrue(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.System,
+            ).usesDarkInterface(systemDark = true),
+        )
+        assertFalse(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.System,
+            ).usesDarkInterface(systemDark = false),
+        )
         assertTrue(
             ReaderSettings(
                 theme = ReaderTheme.Sepia,
@@ -345,6 +373,18 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings(theme = ReaderTheme.Dark).usesDarkSystemBarIcons(systemDark = false))
         assertFalse(ReaderSettings(theme = ReaderTheme.System).usesDarkSystemBarIcons(systemDark = true))
         assertTrue(ReaderSettings(theme = ReaderTheme.System).usesDarkSystemBarIcons(systemDark = false))
+        assertFalse(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.Dark,
+            ).usesDarkSystemBarIcons(systemDark = false),
+        )
+        assertTrue(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.Light,
+            ).usesDarkSystemBarIcons(systemDark = true),
+        )
     }
 
     @Test
@@ -401,6 +441,50 @@ class ReaderSettingsTest {
         assertEquals("#F2E2C9", settings.textColorCss(systemDark = true))
         assertEquals(0xFFF2E2C9, settings.backgroundColor(systemDark = false))
         assertEquals("#332A1B", settings.textColorCss(systemDark = false))
+    }
+
+    @Test
+    fun customReaderThemeUsesConfiguredContentColorsAndSeparateInterfaceTheme() {
+        val settings = ReaderSettings(
+            theme = ReaderTheme.Custom,
+            uiTheme = ReaderInterfaceTheme.Dark,
+            customBackgroundColor = 0xFF112233,
+            customTextColor = 0xFF445566,
+        )
+
+        assertEquals(0xFF112233, settings.backgroundColor(systemDark = false))
+        assertEquals(0xFF112233, settings.backgroundColor(systemDark = true))
+        assertEquals("#445566", settings.textColorCss(systemDark = false))
+        assertEquals("#445566", settings.textColorCss(systemDark = true))
+        assertTrue(settings.usesDarkInterface(systemDark = false))
+    }
+
+    @Test
+    fun customReaderCssPreservesConfiguredColorAlpha() {
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(
+                theme = ReaderTheme.Custom,
+                customBackgroundColor = 0x44112233,
+                customTextColor = 0x88445566,
+            ),
+        )
+
+        assertTrue(css.contains("--hoshi-background-color: #11223344;"))
+        assertTrue(css.contains("--hoshi-text-color: #44556688;"))
+    }
+
+    @Test
+    fun eInkModeOverridesCustomThemeContentColors() {
+        val settings = ReaderSettings(
+            theme = ReaderTheme.Custom,
+            eInkMode = true,
+            uiTheme = ReaderInterfaceTheme.Dark,
+            customBackgroundColor = 0xFF112233,
+            customTextColor = 0xFF445566,
+        )
+
+        assertEquals(0xFF000000, settings.backgroundColor(systemDark = false))
+        assertEquals("#fff", settings.textColorCss(systemDark = false))
     }
 
     @Test
