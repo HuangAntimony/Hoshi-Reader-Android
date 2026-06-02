@@ -58,7 +58,7 @@ This file is the short operational handoff for future agents.
 - Device-validate bookshelf-to-reader open latency after the reader route stopped doing duplicate EPUB text parsing when valid `bookinfo.json` sidecars are present.
 - Device-validate iOS-style reader jump return controls after chapter, character, highlight, and internal-link jumps, confirming back/forward targets remain stable through paginated and continuous manual movement.
 - Re-check forward chapter-boundary landings at chapter start, restore-gated chapter jumps, and stable progress counters during rapid boundary flips after reader pagination changes.
-- Sasayaki reader highlighting now preloads chapter cue ranges with reader content and uses CSS Highlight where WebView supports it; when touching it again, validate reader open/restore remains fast and stable at positions with matched cues and that the span fallback still behaves on older WebViews.
+- Sasayaki reader highlighting now preloads chapter cue ranges with reader content and uses CSS Highlight where WebView supports it; when touching it again, validate reader open/restore remains fast, off-screen continuous-mode cues reveal at the page start, and the span fallback still behaves on older WebViews.
 - Re-run diagonal popup swipe validation once a Reader or nested Dictionary popup state is reliably reachable.
 - Future reader fixes must start from `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift` plus the matching JS/CSS, and must keep WebView-based reading and lookup.
 

@@ -13,7 +13,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep EPUB publisher CSS from overriding reader layout with embedded writing mode, line height, height, or positive indentation rules, including image-page vertical writing rules that could crash Android WebView. #78
 - Prevent reader chapter loading crashes from optional restore payload setup and avoid app freezes when mining Anki cards from lookup popups.
-- Prevent Sasayaki playback from reflowing the next highlighted reader sentence by using non-layout-changing range highlights where WebView supports them.
+- Prevent Sasayaki playback from reflowing the next highlighted reader sentence by using non-layout-changing range highlights where WebView supports them, while keeping off-screen continuous-mode cues aligned to the start of the page.
 
 ## [v1.1.2] - 2026-05-31
 

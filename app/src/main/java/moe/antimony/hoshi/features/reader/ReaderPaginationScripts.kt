@@ -965,9 +965,19 @@ internal object ReaderPaginationScripts {
             if (typeof target.scrollIntoView === 'function') {
               target.scrollIntoView({ block: 'start', inline: 'nearest' });
             } else if (this.isVertical()) {
-              window.scrollBy({ left: rect.left, behavior: 'instant' });
+              var root = document.scrollingElement || document.documentElement;
+              var currentLeft = window.scrollX;
+              if (currentLeft === 0 && root.scrollLeft !== 0) currentLeft = root.scrollLeft;
+              var targetLeft = currentLeft + rect.right - window.innerWidth;
+              window.scrollTo({ left: targetLeft, top: window.scrollY, behavior: 'instant' });
+              root.scrollLeft = targetLeft;
             } else {
-              window.scrollBy({ top: rect.top, behavior: 'instant' });
+              var root = document.scrollingElement || document.documentElement;
+              var currentTop = root.scrollTop;
+              if (currentTop === 0 && window.scrollY !== 0) currentTop = window.scrollY;
+              var targetTop = currentTop + rect.top;
+              window.scrollTo({ left: window.scrollX, top: targetTop, behavior: 'instant' });
+              root.scrollTop = targetTop;
             }
             return true;
           },
