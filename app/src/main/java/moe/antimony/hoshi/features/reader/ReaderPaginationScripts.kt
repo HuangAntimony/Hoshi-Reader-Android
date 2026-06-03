@@ -306,53 +306,7 @@ internal object ReaderPaginationScripts {
             }
             return wrapped;
           },
-          supportsSasayakiRangeHighlights: function() {
-            return !!(window.CSS && CSS.highlights && window.Highlight);
-          },
-          sasayakiInlineTargetsForCue: function(cueId) {
-            var ranges = this.cueRanges.get(cueId) || [];
-            if (ranges.length) return ranges;
-            return this.cueWrappers.get(cueId) || [];
-          },
-          prepareSasayakiInlineTargets: function(cueRanges, replace) {
-            if (this.supportsSasayakiRangeHighlights()) {
-              var targets = this.buildSasayakiHighlightRanges(cueRanges);
-              if (replace) {
-                this.cueRanges = targets.ranges;
-                this.cueRubyElements = targets.rubyElements;
-              } else {
-                targets.ranges.forEach(function(ranges, id) {
-                  this.cueRanges.set(id, ranges);
-                }, this);
-                targets.rubyElements.forEach(function(rubyElements, id) {
-                  this.cueRubyElements.set(id, rubyElements);
-                }, this);
-              }
-              if (targets.wrapperCueRanges.length) {
-                this.wrapSasayakiCueRanges(targets.wrapperCueRanges);
-              }
-              return;
-            }
-            if (!this.isEInkMode()) {
-              this.wrapSasayakiCueRanges(cueRanges);
-            }
-          },
-          textEmphasisElementForNode: function(node) {
-            var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-            while (el && el !== document.body) {
-              var style = window.getComputedStyle(el);
-              var emphasisStyle = style.webkitTextEmphasisStyle || style.textEmphasisStyle || 'none';
-              if (emphasisStyle && emphasisStyle !== 'none') return el;
-              el = el.parentElement;
-            }
-            return null;
-          },
-          cueRangeNeedsWrapper: function(cueRange) {
-            for (var i = 0; i < cueRange.ranges.length; i++) {
-              if (this.textEmphasisElementForNode(cueRange.ranges[i].node)) return true;
-            }
-            return false;
-          },
+          ${sasayakiInlineHighlightHelpersScript()}
           buildSasayakiGeometryRanges: function(cueRanges) {
             var geometryRanges = new Map();
             for (var i = 0; i < cueRanges.length; i++) {
@@ -444,41 +398,6 @@ internal object ReaderPaginationScripts {
               this.clearSasayakiOverlay();
               this.applyInlineSasayakiCue(this.activeCueId);
             }
-          },
-          buildSasayakiHighlightRanges: function(cueRanges) {
-            var highlightedRanges = new Map();
-            var highlightedRubyElements = new Map();
-            var wrapperCueRanges = [];
-            var rubyForNode = function(node) {
-              var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-              return el && el.closest ? el.closest('ruby') : null;
-            };
-            for (var i = 0; i < cueRanges.length; i++) {
-              var id = cueRanges[i].id;
-              var ranges = cueRanges[i].ranges;
-              if (!ranges.length) continue;
-              if (!this.isEInkMode() && this.cueRangeNeedsWrapper(cueRanges[i])) {
-                wrapperCueRanges.push(cueRanges[i]);
-                continue;
-              }
-              var highlightRanges = [];
-              var rubyElements = [];
-              for (var j = 0; j < ranges.length; j++) {
-                var segment = ranges[j];
-                var ruby = rubyForNode(segment.node);
-                if (ruby) {
-                  if (rubyElements.indexOf(ruby) < 0) rubyElements.push(ruby);
-                  continue;
-                }
-                var range = document.createRange();
-                range.setStart(segment.node, segment.start);
-                range.setEnd(segment.node, segment.end);
-                highlightRanges.push(range);
-              }
-              if (highlightRanges.length) highlightedRanges.set(id, highlightRanges);
-              if (rubyElements.length) highlightedRubyElements.set(id, rubyElements);
-            }
-            return { ranges: highlightedRanges, rubyElements: highlightedRubyElements, wrapperCueRanges: wrapperCueRanges };
           },
           highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
@@ -963,6 +882,91 @@ internal object ReaderPaginationScripts {
     """.trimIndent()
     }
 
+    private fun sasayakiInlineHighlightHelpersScript(): String = """
+          supportsSasayakiRangeHighlights: function() {
+            return !!(window.CSS && CSS.highlights && window.Highlight);
+          },
+          sasayakiInlineTargetsForCue: function(cueId) {
+            var ranges = this.cueRanges.get(cueId) || [];
+            if (ranges.length) return ranges;
+            return this.cueWrappers.get(cueId) || [];
+          },
+          prepareSasayakiInlineTargets: function(cueRanges, replace) {
+            if (this.supportsSasayakiRangeHighlights()) {
+              var targets = this.buildSasayakiHighlightRanges(cueRanges);
+              if (replace) {
+                this.cueRanges = targets.ranges;
+                this.cueRubyElements = targets.rubyElements;
+              } else {
+                targets.ranges.forEach(function(ranges, id) {
+                  this.cueRanges.set(id, ranges);
+                }, this);
+                targets.rubyElements.forEach(function(rubyElements, id) {
+                  this.cueRubyElements.set(id, rubyElements);
+                }, this);
+              }
+              if (targets.wrapperCueRanges.length) {
+                this.wrapSasayakiCueRanges(targets.wrapperCueRanges);
+              }
+              return;
+            }
+            if (!this.isEInkMode()) {
+              this.wrapSasayakiCueRanges(cueRanges);
+            }
+          },
+          textEmphasisElementForNode: function(node) {
+            var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            while (el && el !== document.body) {
+              var style = window.getComputedStyle(el);
+              var emphasisStyle = style.webkitTextEmphasisStyle || style.textEmphasisStyle || 'none';
+              if (emphasisStyle && emphasisStyle !== 'none') return el;
+              el = el.parentElement;
+            }
+            return null;
+          },
+          cueRangeNeedsWrapper: function(cueRange) {
+            for (var i = 0; i < cueRange.ranges.length; i++) {
+              if (this.textEmphasisElementForNode(cueRange.ranges[i].node)) return true;
+            }
+            return false;
+          },
+          buildSasayakiHighlightRanges: function(cueRanges) {
+            var highlightedRanges = new Map();
+            var highlightedRubyElements = new Map();
+            var wrapperCueRanges = [];
+            var rubyForNode = function(node) {
+              var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+              return el && el.closest ? el.closest('ruby') : null;
+            };
+            for (var i = 0; i < cueRanges.length; i++) {
+              var id = cueRanges[i].id;
+              var ranges = cueRanges[i].ranges;
+              if (!ranges.length) continue;
+              if (!this.isEInkMode() && this.cueRangeNeedsWrapper(cueRanges[i])) {
+                wrapperCueRanges.push(cueRanges[i]);
+                continue;
+              }
+              var highlightRanges = [];
+              var rubyElements = [];
+              for (var j = 0; j < ranges.length; j++) {
+                var segment = ranges[j];
+                var ruby = rubyForNode(segment.node);
+                if (ruby) {
+                  if (rubyElements.indexOf(ruby) < 0) rubyElements.push(ruby);
+                  continue;
+                }
+                var range = document.createRange();
+                range.setStart(segment.node, segment.start);
+                range.setEnd(segment.node, segment.end);
+                highlightRanges.push(range);
+              }
+              if (highlightRanges.length) highlightedRanges.set(id, highlightRanges);
+              if (rubyElements.length) highlightedRubyElements.set(id, rubyElements);
+            }
+            return { ranges: highlightedRanges, rubyElements: highlightedRubyElements, wrapperCueRanges: wrapperCueRanges };
+          },
+    """.trimIndent().prependIndent("          ")
+
     private fun continuousShellScript(
         initialProgress: Double,
         settings: ReaderSettings,
@@ -1262,53 +1266,7 @@ internal object ReaderPaginationScripts {
             }
             return wrapped;
           },
-          supportsSasayakiRangeHighlights: function() {
-            return !!(window.CSS && CSS.highlights && window.Highlight);
-          },
-          sasayakiInlineTargetsForCue: function(cueId) {
-            var ranges = this.cueRanges.get(cueId) || [];
-            if (ranges.length) return ranges;
-            return this.cueWrappers.get(cueId) || [];
-          },
-          prepareSasayakiInlineTargets: function(cueRanges, replace) {
-            if (this.supportsSasayakiRangeHighlights()) {
-              var targets = this.buildSasayakiHighlightRanges(cueRanges);
-              if (replace) {
-                this.cueRanges = targets.ranges;
-                this.cueRubyElements = targets.rubyElements;
-              } else {
-                targets.ranges.forEach(function(ranges, id) {
-                  this.cueRanges.set(id, ranges);
-                }, this);
-                targets.rubyElements.forEach(function(rubyElements, id) {
-                  this.cueRubyElements.set(id, rubyElements);
-                }, this);
-              }
-              if (targets.wrapperCueRanges.length) {
-                this.wrapSasayakiCueRanges(targets.wrapperCueRanges);
-              }
-              return;
-            }
-            if (!this.isEInkMode()) {
-              this.wrapSasayakiCueRanges(cueRanges);
-            }
-          },
-          textEmphasisElementForNode: function(node) {
-            var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-            while (el && el !== document.body) {
-              var style = window.getComputedStyle(el);
-              var emphasisStyle = style.webkitTextEmphasisStyle || style.textEmphasisStyle || 'none';
-              if (emphasisStyle && emphasisStyle !== 'none') return el;
-              el = el.parentElement;
-            }
-            return null;
-          },
-          cueRangeNeedsWrapper: function(cueRange) {
-            for (var i = 0; i < cueRange.ranges.length; i++) {
-              if (this.textEmphasisElementForNode(cueRange.ranges[i].node)) return true;
-            }
-            return false;
-          },
+          ${sasayakiInlineHighlightHelpersScript()}
           buildSasayakiGeometryRanges: function(cueRanges) {
             var geometryRanges = new Map();
             for (var i = 0; i < cueRanges.length; i++) {
@@ -1400,41 +1358,6 @@ internal object ReaderPaginationScripts {
               this.clearSasayakiOverlay();
               this.applyInlineSasayakiCue(this.activeCueId);
             }
-          },
-          buildSasayakiHighlightRanges: function(cueRanges) {
-            var highlightedRanges = new Map();
-            var highlightedRubyElements = new Map();
-            var wrapperCueRanges = [];
-            var rubyForNode = function(node) {
-              var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-              return el && el.closest ? el.closest('ruby') : null;
-            };
-            for (var i = 0; i < cueRanges.length; i++) {
-              var id = cueRanges[i].id;
-              var ranges = cueRanges[i].ranges;
-              if (!ranges.length) continue;
-              if (!this.isEInkMode() && this.cueRangeNeedsWrapper(cueRanges[i])) {
-                wrapperCueRanges.push(cueRanges[i]);
-                continue;
-              }
-              var highlightRanges = [];
-              var rubyElements = [];
-              for (var j = 0; j < ranges.length; j++) {
-                var segment = ranges[j];
-                var ruby = rubyForNode(segment.node);
-                if (ruby) {
-                  if (rubyElements.indexOf(ruby) < 0) rubyElements.push(ruby);
-                  continue;
-                }
-                var range = document.createRange();
-                range.setStart(segment.node, segment.start);
-                range.setEnd(segment.node, segment.end);
-                highlightRanges.push(range);
-              }
-              if (highlightRanges.length) highlightedRanges.set(id, highlightRanges);
-              if (rubyElements.length) highlightedRubyElements.set(id, rubyElements);
-            }
-            return { ranges: highlightedRanges, rubyElements: highlightedRubyElements, wrapperCueRanges: wrapperCueRanges };
           },
           highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
