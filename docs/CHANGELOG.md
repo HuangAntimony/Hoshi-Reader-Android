@@ -14,7 +14,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep EPUB publisher CSS from overriding reader layout with embedded writing mode, line height, height, positive indentation, or nested column-count rules, including image-page vertical writing rules that could crash Android WebView. #78 #90
 - Prevent reader chapter loading crashes from optional restore payload setup and avoid app freezes when mining Anki cards from lookup popups.
-- Prevent Sasayaki playback from reflowing the next highlighted reader sentence by using non-layout-changing range highlights where WebView supports them, while keeping emphasis marks visible on emphasized reader text, keeping off-screen continuous-mode cues aligned to the start of the page, rendering E-ink Sasayaki and reader lookup marks as matching-thickness ruby-aware overlay lines and boxes, and restoring colored Sasayaki highlights immediately after turning E-ink Mode off in an open reader.
+- Prevent Sasayaki playback from reflowing the next highlighted reader sentence by using non-layout-changing range highlights where WebView supports them, while keeping emphasis marks visible on emphasized reader text, keeping off-screen continuous-mode cues aligned to the start of the page, rendering E-ink Sasayaki and reader lookup marks as matching-thickness ruby-aware overlay lines and boxes, restoring colored Sasayaki highlights immediately after turning E-ink Mode off in an open reader, and letting books open before Sasayaki match sidecars finish loading.
 
 ## [v1.1.2] - 2026-05-31
 

@@ -250,6 +250,16 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun sasayakiApplyCommandSkipsUntilReaderShellIsReady() {
+        val command = ReaderPaginationScripts.applySasayakiCuesInvocation("""[{"id":"cue1","start":1,"length":2}]""")
+
+        assertEquals(
+            """if (window.hoshiReader && typeof window.hoshiReader.applySasayakiCues === 'function') { window.hoshiReader.applySasayakiCues([{"id":"cue1","start":1,"length":2}]); }""",
+            command,
+        )
+    }
+
+    @Test
     fun sasayakiRevealScrollsToRangeCenterLikeIos() {
         val script = ReaderPaginationScripts.shellScript()
         val scrollToRange = script.substringAfter("scrollToRange: function(range)")

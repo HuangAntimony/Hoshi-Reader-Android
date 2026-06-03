@@ -28,6 +28,7 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -174,6 +175,19 @@ internal fun ChapterWebView(
             scanNonJapaneseText = scanNonJapaneseText,
             fontFaceUrl = fontFaceUrl,
         )
+    }
+    val loadKey = readerWebViewLoadKey(
+        baseUrl = baseUrl,
+        readerContentReloadKey = readerContentReloadKey,
+        readerSetupReloadKey = readerSetupReloadKey,
+        webViewViewportSize = webViewViewportSize,
+    )
+    LaunchedEffect(readerWebView, loadKey, chapterSasayakiCuesJson, isWebViewRestoring) {
+        val webView = readerWebView ?: return@LaunchedEffect
+        val cuesJson = chapterSasayakiCuesJson ?: return@LaunchedEffect
+        if (isWebViewRestoring) return@LaunchedEffect
+        if (webView.tag != loadKey) return@LaunchedEffect
+        webView.evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson), null)
     }
     AndroidView(
         modifier = modifier
@@ -358,12 +372,6 @@ internal fun ChapterWebView(
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
             if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
-            val loadKey = readerWebViewLoadKey(
-                baseUrl = baseUrl,
-                readerContentReloadKey = readerContentReloadKey,
-                readerSetupReloadKey = readerSetupReloadKey,
-                webViewViewportSize = webViewViewportSize,
-            )
             if (webView.tag != loadKey) {
                 webView.tag = loadKey
                 webView.hideForReaderRestore()

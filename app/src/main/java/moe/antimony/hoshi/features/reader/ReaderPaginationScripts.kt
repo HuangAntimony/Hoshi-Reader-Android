@@ -18,7 +18,7 @@ internal object ReaderPaginationScripts {
         "window.hoshiReader.calculateProgress()"
 
     fun applySasayakiCuesInvocation(cuesJson: String): String =
-        "window.hoshiReader.applySasayakiCues($cuesJson)"
+        "if (window.hoshiReader && typeof window.hoshiReader.applySasayakiCues === 'function') { window.hoshiReader.applySasayakiCues($cuesJson); }"
 
     fun highlightSasayakiCueInvocation(cue: SasayakiCueRange, reveal: Boolean): String =
         "window.hoshiReader.highlightSasayakiCue(${cue.toJavaScriptObjectLiteral()}, $reveal)"
@@ -1747,7 +1747,7 @@ private fun readerRestoreScripts(
     highlightsJson: String?,
     initialRestoreScript: String,
 ): String = listOfNotNull(
-    sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" },
+    sasayakiCuesJson?.let(ReaderPaginationScripts::applySasayakiCuesInvocation),
     highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" },
     initialRestoreScript,
 ).joinToString(separator = "\n")

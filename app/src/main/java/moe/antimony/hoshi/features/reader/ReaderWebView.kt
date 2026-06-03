@@ -112,11 +112,8 @@ fun ReaderWebView(
     val bookRepository = appContainer.bookRepository
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
     var sasayakiMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
-    var isSasayakiMatchLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
     LaunchedEffect(bookRoot, bookRepository) {
-        isSasayakiMatchLoaded = bookRoot == null
         sasayakiMatchData = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
-        isSasayakiMatchLoaded = true
     }
     var highlights by remember(bookRoot) {
         mutableStateOf<List<ReaderHighlight>?>(if (bookRoot == null) emptyList() else null)
@@ -1216,7 +1213,7 @@ fun ReaderWebView(
                         )
                     }
                 }
-                if (highlights != null && isSasayakiMatchLoaded) {
+                if (highlights != null) {
                     val loadChapter = currentLoadChapter()
                     ChapterWebView(
                         book = book,
