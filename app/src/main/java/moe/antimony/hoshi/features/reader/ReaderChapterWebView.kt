@@ -395,6 +395,9 @@ internal data class ReaderWebViewSetupReloadKey(
 internal data class ReaderAppearanceUpdateKey(
     val backgroundColorCss: String,
     val textColorCss: String,
+    val eInkLineColorCss: String,
+    val eInkModeCss: String,
+    val verticalWritingCss: String,
     val sasayakiTextColorCss: String,
     val sasayakiBackgroundColorCss: String,
 )
@@ -408,6 +411,9 @@ internal fun readerAppearanceUpdateKey(
     ReaderAppearanceUpdateKey(
         backgroundColorCss = settings.backgroundColorCss(systemDark),
         textColorCss = settings.textColorCss(systemDark),
+        eInkLineColorCss = if (settings.usesDarkInterface(systemDark)) "#fff" else "#000",
+        eInkModeCss = if (settings.eInkMode) "1" else "0",
+        verticalWritingCss = if (settings.verticalWriting) "1" else "0",
         sasayakiTextColorCss = sasayakiTextColor.toReaderCssColor(),
         sasayakiBackgroundColorCss = sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true),
     )
@@ -735,14 +741,21 @@ private fun readerAppearanceScript(
 ): String {
     val backgroundColor = readerJavaScriptStringLiteral(appearanceUpdateKey.backgroundColorCss)
     val textColor = readerJavaScriptStringLiteral(appearanceUpdateKey.textColorCss)
+    val eInkLineColor = readerJavaScriptStringLiteral(appearanceUpdateKey.eInkLineColorCss)
+    val eInkMode = readerJavaScriptStringLiteral(appearanceUpdateKey.eInkModeCss)
+    val verticalWriting = readerJavaScriptStringLiteral(appearanceUpdateKey.verticalWritingCss)
     val sasayakiText = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiTextColorCss)
     val sasayakiBackground = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiBackgroundColorCss)
     return """
         (function() {
           document.documentElement.style.setProperty('--hoshi-background-color', $backgroundColor);
           document.documentElement.style.setProperty('--hoshi-text-color', $textColor);
+          document.documentElement.style.setProperty('--hoshi-eink-line-color', $eInkLineColor);
+          document.documentElement.style.setProperty('--hoshi-reader-eink-mode', $eInkMode);
+          document.documentElement.style.setProperty('--hoshi-reader-vertical-writing', $verticalWriting);
           document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', $sasayakiText);
           document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', $sasayakiBackground);
+          window.hoshiReader?.refreshSasayakiCuePresentation?.();
         })();
     """.trimIndent()
 }

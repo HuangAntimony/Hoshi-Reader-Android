@@ -65,6 +65,7 @@ import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
 import moe.antimony.hoshi.features.dictionary.LookupPopupHtml
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
+import moe.antimony.hoshi.features.dictionary.PopupSelectionEInkStyle
 import moe.antimony.hoshi.features.dictionary.closeChildPopupsForScrolledParent
 import moe.antimony.hoshi.features.dictionary.clearPopupSelectionHighlights
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
@@ -795,12 +796,10 @@ fun ReaderWebView(
             val (popup, highlightCount) = lookup
             pauseSasayakiForLookupIfNeeded()
             val selectionCount = onTextSelected(selection) ?: highlightCount
-            if (readerIframePopupSupported) {
-                rootSelectionHighlight = ReaderRootSelectionHighlight(
-                    popupId = popup.id,
-                    rects = null,
-                )
-            }
+            rootSelectionHighlight = ReaderRootSelectionHighlight(
+                popupId = popup.id,
+                rects = null,
+            )
             setLookupPopups(listOf(popup))
             if (readerIframePopupSupported) {
                 selectionRects(selectionCount) { rects ->
@@ -829,7 +828,9 @@ fun ReaderWebView(
                 }
             } else {
                 selectionRects(selectionCount) { rects ->
-                    val anchor = rects.firstOrNull() ?: return@selectionRects
+                    if (stateHolder.lookupPopups.none { it.id == popup.id }) return@selectionRects
+                    val displayRects = rects.ifEmpty { listOf(popup.state.selection.rect) }
+                    val anchor = displayRects.firstOrNull() ?: return@selectionRects
                     setLookupPopups(
                         stateHolder.lookupPopups.map { existing ->
                             if (existing.id == popup.id) {
@@ -842,6 +843,10 @@ fun ReaderWebView(
                                 existing
                             }
                         },
+                    )
+                    rootSelectionHighlight = ReaderRootSelectionHighlight(
+                        popupId = popup.id,
+                        rects = displayRects,
                     )
                 }
             }
@@ -1294,6 +1299,11 @@ fun ReaderWebView(
                             dismissRootLookupPopup()
                             true
                         },
+                        rootHighlightRects = rootSelectionHighlight?.rects.orEmpty(),
+                        rootHighlightDarkMode = popupDarkMode,
+                        rootHighlightEInkMode = effectiveSettings.eInkMode,
+                        rootHighlightVerticalWriting = effectiveSettings.verticalWriting,
+                        rootHighlightEInkStyle = PopupSelectionEInkStyle.Box,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

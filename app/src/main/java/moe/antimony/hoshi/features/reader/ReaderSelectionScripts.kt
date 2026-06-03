@@ -66,6 +66,118 @@ internal object ReaderSelectionScripts {
           [0x3000, 0x303f],
           ...FULLWIDTH_CHARACTER_RANGES,
         ];
+        window.hoshiRubyGeometry = window.hoshiRubyGeometry || {
+          isVertical: function() {
+            return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+          },
+          rectObject: function(rect) {
+            var x = rect.x !== undefined ? rect.x : rect.left;
+            var y = rect.y !== undefined ? rect.y : rect.top;
+            var width = rect.width !== undefined ? rect.width : rect.right - rect.left;
+            var height = rect.height !== undefined ? rect.height : rect.bottom - rect.top;
+            return { x: x, y: y, width: width, height: height };
+          },
+          rectWithBounds: function(rect) {
+            var object = this.rectObject(rect);
+            return {
+              x: object.x,
+              y: object.y,
+              width: object.width,
+              height: object.height,
+              left: rect.left !== undefined ? rect.left : object.x,
+              top: rect.top !== undefined ? rect.top : object.y,
+              right: rect.right !== undefined ? rect.right : object.x + object.width,
+              bottom: rect.bottom !== undefined ? rect.bottom : object.y + object.height
+            };
+          },
+          unionRect: function(a, b) {
+            var left = Math.min(a.left, b.left);
+            var top = Math.min(a.top, b.top);
+            var right = Math.max(a.right, b.right);
+            var bottom = Math.max(a.bottom, b.bottom);
+            return { x: left, y: top, width: right - left, height: bottom - top, left: left, top: top, right: right, bottom: bottom };
+          },
+          rangesOverlap: function(aStart, aEnd, bStart, bEnd, tolerance) {
+            return bStart <= aEnd + tolerance && bEnd >= aStart - tolerance;
+          },
+          rubyForNode: function(node) {
+            var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            return el && el.closest ? el.closest('ruby') : null;
+          },
+          rubyTextRects: function(node) {
+            var ruby = this.rubyForNode(node);
+            if (!ruby) return [];
+            var rects = [];
+            ruby.querySelectorAll('rt').forEach(function(rt) {
+              Array.from(rt.getClientRects()).forEach(function(rect) {
+                rects.push(rect);
+              });
+            });
+            return rects;
+          },
+          rubyRectMatchesBase: function(baseRect, rubyRect) {
+            var ruby = this.rectWithBounds(rubyRect);
+            var tolerance = 1;
+            if (this.isVertical()) {
+              return this.rangesOverlap(baseRect.top, baseRect.bottom, ruby.top, ruby.bottom, tolerance);
+            }
+            return this.rangesOverlap(baseRect.left, baseRect.right, ruby.left, ruby.right, tolerance);
+          },
+          rubyAwareRect: function(rect, node) {
+            var rubyRects = this.rubyTextRects(node);
+            if (!rubyRects.length) {
+              return this.rectObject(rect);
+            }
+            var result = this.rectWithBounds(rect);
+            rubyRects.forEach(function(rubyRect) {
+              if (this.rubyRectMatchesBase(result, rubyRect)) {
+                result = this.unionRect(result, this.rectWithBounds(rubyRect));
+              }
+            }, this);
+            return this.rectObject(result);
+          },
+          rectsForRange: function(range) {
+            var rects = Array.from(range.getClientRects());
+            if (!rects.length) {
+              var fallback = range.getBoundingClientRect();
+              if (fallback && fallback.width > 0 && fallback.height > 0) rects = [fallback];
+            }
+            return rects
+              .map(function(rect) { return this.rubyAwareRect(rect, range.startContainer); }, this)
+              .filter(function(rect) { return rect.width > 0 && rect.height > 0; });
+          },
+          inlineRectsTouch: function(a, b) {
+            var tolerance = 0.5;
+            if (this.isVertical()) {
+              return this.rangesOverlap(a.x, a.x + a.width, b.x, b.x + b.width, tolerance) &&
+                b.y <= a.y + a.height + tolerance &&
+                b.y + b.height >= a.y - tolerance;
+            }
+            return this.rangesOverlap(a.y, a.y + a.height, b.y, b.y + b.height, tolerance) &&
+              b.x <= a.x + a.width + tolerance &&
+              b.x + b.width >= a.x - tolerance;
+          },
+          mergeInlineRects: function(rects) {
+            var merged = [];
+            rects.forEach(function(rect) {
+              var current = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+              var previous = merged[merged.length - 1];
+              if (previous && this.inlineRectsTouch(previous, current)) {
+                var left = Math.min(previous.x, current.x);
+                var top = Math.min(previous.y, current.y);
+                var right = Math.max(previous.x + previous.width, current.x + current.width);
+                var bottom = Math.max(previous.y + previous.height, current.y + current.height);
+                previous.x = left;
+                previous.y = top;
+                previous.width = right - left;
+                previous.height = bottom - top;
+              } else {
+                merged.push(current);
+              }
+            }, this);
+            return merged;
+          }
+        };
         window.hoshiSelection = {
           selection: null,
           scanDelimiters: '。、！？…‥「」『』（）()【】〈〉《》〔〕｛｝{}［］[]・：；:;，,.─\n\r',
@@ -85,71 +197,31 @@ internal object ReaderSelectionScripts {
             return !!(el && el.closest('rt, rp'));
           },
           isVertical: function() {
-            return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+            return window.hoshiRubyGeometry.isVertical();
           },
           rectObject: function(rect) {
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            return window.hoshiRubyGeometry.rectObject(rect);
           },
           rectWithBounds: function(rect) {
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+            return window.hoshiRubyGeometry.rectWithBounds(rect);
           },
           unionRect: function(a, b) {
-            var left = Math.min(a.left, b.left);
-            var top = Math.min(a.top, b.top);
-            var right = Math.max(a.right, b.right);
-            var bottom = Math.max(a.bottom, b.bottom);
-            return { x: left, y: top, width: right - left, height: bottom - top, left: left, top: top, right: right, bottom: bottom };
+            return window.hoshiRubyGeometry.unionRect(a, b);
           },
           rubyForNode: function(node) {
-            var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-            return el && el.closest('ruby');
+            return window.hoshiRubyGeometry.rubyForNode(node);
           },
           rubyTextRects: function(node) {
-            var ruby = this.rubyForNode(node);
-            if (!ruby || !this.isVertical()) return [];
-            var rects = [];
-            ruby.querySelectorAll('rt').forEach(function(rt) {
-              Array.from(rt.getClientRects()).forEach(function(rect) {
-                rects.push(rect);
-              });
-            });
-            return rects;
+            return window.hoshiRubyGeometry.rubyTextRects(node);
           },
           rubyAwareRect: function(rect, node) {
-            var rubyRects = this.rubyTextRects(node);
-            if (!rubyRects.length) {
-              return this.rectObject(rect);
-            }
-            var result = this.rectWithBounds(rect);
-            rubyRects.forEach(function(rubyRect) {
-              if (this.rubyRectMatchesLine(result, rubyRect)) {
-                result = this.unionRect(result, rubyRect);
-              }
-            }, this);
-            return this.rectObject(result);
+            return window.hoshiRubyGeometry.rubyAwareRect(rect, node);
           },
           rubyAwareSelectionRect: function(rect, node) {
-            if (!this.isVertical()) return this.rectObject(rect);
-            var rubyRects = this.rubyTextRects(node);
-            if (!rubyRects.length) {
-              return this.rectObject(rect);
-            }
-            var result = this.rectWithBounds(rect);
-            rubyRects.forEach(function(rubyRect) {
-              if (this.rubyRectMatchesLine(result, rubyRect)) {
-                var left = Math.min(result.left, rubyRect.left);
-                var right = Math.max(result.right, rubyRect.right);
-                result.x = left;
-                result.left = left;
-                result.width = right - left;
-                result.right = right;
-              }
-            }, this);
-            return this.rectObject(result);
+            return window.hoshiRubyGeometry.rubyAwareRect(rect, node);
           },
           rubyRectMatchesLine: function(lineRect, rubyRect) {
-            var rubyCenterX = (rubyRect.left + rubyRect.right) / 2;
-            return rubyCenterX >= lineRect.left && rubyCenterX <= lineRect.right + lineRect.width;
+            return window.hoshiRubyGeometry.rubyRectMatchesBase(lineRect, rubyRect);
           },
           unifyVerticalColumnRects: function(rects) {
             if (!this.isVertical() || !rects.length) return rects;
@@ -361,9 +433,11 @@ internal object ReaderSelectionScripts {
             var range = document.createRange();
             range.setStart(first.node, first.start);
             range.setEnd(first.node, first.start + 1);
-            var rects = Array.from(range.getClientRects());
-            var rect = rects.find(function(rect) { return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom; }) || range.getBoundingClientRect();
-            return this.rubyAwareRect(rect, first.node);
+            var rects = window.hoshiRubyGeometry.rectsForRange(range);
+            var rect = rects.find(function(rect) {
+              return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+            }) || rects[0];
+            return rect || null;
           },
           highlightSelection: function(charCount) {
             if (!this.selection || !this.selection.ranges.length || !CSS.highlights) return;
@@ -374,9 +448,9 @@ internal object ReaderSelectionScripts {
             if (!this.selection || !this.selection.ranges.length) return [];
             var rects = [];
             this.selectionCharacterRanges(charCount).forEach(function(range) {
-              Array.from(range.getClientRects()).forEach(function(rect) {
-                rects.push(this.rubyAwareSelectionRect(rect, range.startContainer));
-              }, this);
+              window.hoshiRubyGeometry.rectsForRange(range).forEach(function(rect) {
+                rects.push(rect);
+              });
             }, this);
             return this.unifyVerticalColumnRects(this.mergeSelectionRects(rects));
           },
@@ -423,17 +497,7 @@ internal object ReaderSelectionScripts {
             return merged;
           },
           selectionRectsTouch: function(a, b) {
-            var tolerance = 0.5;
-            if (this.isVertical()) {
-              return Math.abs(a.x - b.x) <= tolerance &&
-                Math.abs(a.width - b.width) <= tolerance &&
-                b.y <= a.y + a.height + tolerance &&
-                b.y + b.height >= a.y - tolerance;
-            }
-            return Math.abs(a.y - b.y) <= tolerance &&
-              Math.abs(a.height - b.height) <= tolerance &&
-              b.x <= a.x + a.width + tolerance &&
-              b.x + b.width >= a.x - tolerance;
+            return window.hoshiRubyGeometry.inlineRectsTouch(a, b);
           },
           getNormalizedOffset: function(targetNode, offset) {
             if (!window.hoshiReader || !window.hoshiReader.nodeStartOffsets) return null;

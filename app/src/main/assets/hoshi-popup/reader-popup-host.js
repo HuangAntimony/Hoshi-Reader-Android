@@ -3,10 +3,13 @@
     const LAYER_ID = 'hoshi-reader-popup-layer';
     const ACTION_BAR_HEIGHT = 37;
     const SASAYAKI_BAR_HEIGHT = 37;
+    const HIGHLIGHT_LINE_SIZE = 1.5;
+    const HIGHLIGHT_INLINE_MERGE_TOLERANCE = 1;
     const frames = new Map();
     const frameSources = new WeakMap();
     let idleRootRecord = null;
     let rootHighlight = null;
+    let sasayakiHighlight = null;
 
     function ensureLayer() {
         let layer = document.getElementById(LAYER_ID);
@@ -33,6 +36,16 @@
         if (highlightLayer) return highlightLayer;
         highlightLayer = document.createElement('div');
         highlightLayer.className = 'hoshi-reader-selection-highlight-layer';
+        layer.insertBefore(highlightLayer, layer.firstChild);
+        return highlightLayer;
+    }
+
+    function ensureSasayakiHighlightLayer() {
+        const layer = ensureLayer();
+        let highlightLayer = layer.querySelector('.hoshi-reader-sasayaki-highlight-layer');
+        if (highlightLayer) return highlightLayer;
+        highlightLayer = document.createElement('div');
+        highlightLayer.className = 'hoshi-reader-sasayaki-highlight-layer';
         layer.insertBefore(highlightLayer, layer.firstChild);
         return highlightLayer;
     }
@@ -268,10 +281,7 @@
                 record.shell.remove();
             }
         }
-        const layer = document.getElementById(LAYER_ID);
-        if (layer && frames.size === 0 && !idleRootRecord) {
-            layer.remove();
-        }
+        cleanupLayerIfIdle();
     }
 
     function activeRootRecord() {
@@ -286,6 +296,214 @@
         return !!rootHighlight && rootHighlight.popupId === record.payload.id && rootHighlight.pending === true;
     }
 
+    function fullBoxEdges() {
+        return { top: true, right: true, bottom: true, left: true };
+    }
+
+    function readerCssVariable(name) {
+        return window.getComputedStyle?.(document.documentElement)?.getPropertyValue(name)?.trim() ?? '';
+    }
+
+    function readerEInkMode() {
+        return readerCssVariable('--hoshi-reader-eink-mode') === '1';
+    }
+
+    function readerVerticalWriting() {
+        const bodyWritingMode = window.getComputedStyle?.(document.body)?.writingMode ?? '';
+        if (bodyWritingMode.startsWith('vertical')) return true;
+        if (bodyWritingMode.startsWith('horizontal')) return false;
+        const rootWritingMode = window.getComputedStyle?.(document.documentElement)?.writingMode ?? '';
+        if (rootWritingMode.startsWith('vertical')) return true;
+        if (rootWritingMode.startsWith('horizontal')) return false;
+        return readerCssVariable('--hoshi-reader-vertical-writing') === '1';
+    }
+
+    function readerEInkLineColor(darkMode = false) {
+        return readerCssVariable('--hoshi-eink-line-color') || (darkMode ? '#fff' : '#000');
+    }
+
+    function hasSasayakiHighlight() {
+        return !!sasayakiHighlight &&
+            sasayakiHighlight.eInkMode !== false &&
+            Array.isArray(sasayakiHighlight.rects) &&
+            sasayakiHighlight.rects.some(rect => rect && rect.width > 0 && rect.height > 0);
+    }
+
+    function cleanupLayerIfIdle() {
+        const layer = document.getElementById(LAYER_ID);
+        if (layer && frames.size === 0 && !idleRootRecord && !hasSasayakiHighlight()) {
+            layer.remove();
+        }
+    }
+
+    function appendAbsoluteLine(layer, className, left, top, width, height, color) {
+        if (width <= 0 || height <= 0) return;
+        const line = document.createElement('div');
+        line.className = className;
+        line.style.position = 'absolute';
+        line.style.background = color;
+        line.style.left = `${left}px`;
+        line.style.top = `${top}px`;
+        line.style.width = `${width}px`;
+        line.style.height = `${height}px`;
+        layer.appendChild(line);
+    }
+
+    function renderSasayakiHighlight(payload) {
+        sasayakiHighlight = payload || null;
+        const existingLayer = document.getElementById(LAYER_ID)?.querySelector('.hoshi-reader-sasayaki-highlight-layer');
+        if (!hasSasayakiHighlight() || !readerEInkMode()) {
+            existingLayer?.replaceChildren();
+            cleanupLayerIfIdle();
+            return;
+        }
+        const layer = ensureSasayakiHighlightLayer();
+        const verticalWriting = sasayakiHighlight.verticalWriting ?? readerVerticalWriting();
+        const color = readerEInkLineColor(!!sasayakiHighlight.darkMode);
+        const rects = highlightBoxRects(
+            sasayakiHighlight.rects.filter(rect => rect && rect.width > 0 && rect.height > 0),
+            verticalWriting,
+        );
+        layer.replaceChildren();
+        rects.forEach((rect) => {
+            if (verticalWriting) {
+                appendAbsoluteLine(
+                    layer,
+                    'hoshi-reader-sasayaki-highlight-line',
+                    rect.x + Math.max(0, rect.width - HIGHLIGHT_LINE_SIZE),
+                    rect.y,
+                    HIGHLIGHT_LINE_SIZE,
+                    rect.height,
+                    color,
+                );
+            } else {
+                appendAbsoluteLine(
+                    layer,
+                    'hoshi-reader-sasayaki-highlight-line',
+                    rect.x,
+                    rect.y + Math.max(0, rect.height - HIGHLIGHT_LINE_SIZE),
+                    rect.width,
+                    HIGHLIGHT_LINE_SIZE,
+                    color,
+                );
+            }
+        });
+    }
+
+    function clearSasayakiHighlight() {
+        sasayakiHighlight = null;
+        document.getElementById(LAYER_ID)
+            ?.querySelector('.hoshi-reader-sasayaki-highlight-layer')
+            ?.replaceChildren();
+        cleanupLayerIfIdle();
+    }
+
+    function rectRangesOverlap(aStart, aEnd, bStart, bEnd, tolerance) {
+        return bStart <= aEnd + tolerance && bEnd >= aStart - tolerance;
+    }
+
+    function highlightRectsInlineAdjacent(a, b, verticalWriting) {
+        const tolerance = HIGHLIGHT_INLINE_MERGE_TOLERANCE;
+        if (verticalWriting) {
+            const sameColumn = rectRangesOverlap(a.x, a.x + a.width, b.x, b.x + b.width, tolerance);
+            const touches = rectRangesOverlap(a.y, a.y + a.height, b.y, b.y + b.height, tolerance);
+            return sameColumn && touches;
+        }
+        const sameLine = rectRangesOverlap(a.y, a.y + a.height, b.y, b.y + b.height, tolerance);
+        const touches = rectRangesOverlap(a.x, a.x + a.width, b.x, b.x + b.width, tolerance);
+        return sameLine && touches;
+    }
+
+    function highlightUnionRect(a, b) {
+        const left = Math.min(a.x, b.x);
+        const top = Math.min(a.y, b.y);
+        const right = Math.max(a.x + a.width, b.x + b.width);
+        const bottom = Math.max(a.y + a.height, b.y + b.height);
+        return { x: left, y: top, width: right - left, height: bottom - top };
+    }
+
+    function highlightBoxRects(rects, verticalWriting) {
+        const merged = [];
+        for (const rect of rects) {
+            const previous = merged[merged.length - 1];
+            if (previous && highlightRectsInlineAdjacent(previous, rect, verticalWriting)) {
+                merged[merged.length - 1] = highlightUnionRect(previous, rect);
+            } else {
+                merged.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+            }
+        }
+        return merged;
+    }
+
+    function rootHighlightBoxRects(rects) {
+        if (!rootHighlight?.eInkMode) return rects;
+        return highlightBoxRects(rects, rootHighlight.verticalWriting);
+    }
+
+    function rootHighlightRectsSplit(first, second) {
+        const tolerance = 8;
+        if (rootHighlight.verticalWriting) {
+            const sameWidth = Math.abs(first.width - second.width) <= tolerance;
+            const wrapsToNextLine = first.y > second.y + tolerance;
+            const touchesPageEdge = first.y + first.height >= window.innerHeight - tolerance ||
+                second.y <= tolerance;
+            return sameWidth && (wrapsToNextLine || touchesPageEdge);
+        }
+        const sameHeight = Math.abs(first.height - second.height) <= tolerance;
+        const wrapsToNextLine = first.y + first.height <= second.y + tolerance &&
+            first.x > second.x + tolerance;
+        const touchesPageEdge = first.x + first.width >= window.innerWidth - tolerance ||
+            second.x <= tolerance;
+        return sameHeight && (wrapsToNextLine || touchesPageEdge);
+    }
+
+    function rootHighlightBoxEdges(rects) {
+        const edges = rects.map(fullBoxEdges);
+        for (let index = 0; index < rects.length - 1; index++) {
+            if (!rootHighlightRectsSplit(rects[index], rects[index + 1])) continue;
+            if (rootHighlight.verticalWriting) {
+                edges[index].bottom = false;
+                edges[index + 1].top = false;
+            } else {
+                edges[index].right = false;
+                edges[index + 1].left = false;
+            }
+        }
+        return edges;
+    }
+
+    function appendRootHighlightEdge(item, className, left, top, width, height, color) {
+        if (width <= 0 || height <= 0) return;
+        const edge = document.createElement('div');
+        edge.className = `hoshi-reader-selection-highlight-edge ${className}`;
+        edge.style.position = 'absolute';
+        edge.style.background = color;
+        edge.style.left = `${left}px`;
+        edge.style.top = `${top}px`;
+        edge.style.width = `${width}px`;
+        edge.style.height = `${height}px`;
+        item.appendChild(edge);
+    }
+
+    function applyRootHighlightBox(item, rect, color, edges) {
+        const lineSize = HIGHLIGHT_LINE_SIZE;
+        item.style.left = `${rect.x}px`;
+        item.style.top = `${rect.y}px`;
+        item.style.width = `${rect.width}px`;
+        item.style.height = `${rect.height}px`;
+        item.style.background = 'transparent';
+        const bottomLineTop = Math.max(0, rect.height - lineSize);
+        const bottomLineBottom = bottomLineTop + lineSize;
+        const rightLineLeft = Math.max(0, rect.width - lineSize);
+        const rightLineRight = rightLineLeft + lineSize;
+        const inlineEnd = rect.width;
+        const blockEnd = rect.height;
+        if (edges.top) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-top', 0, 0, inlineEnd, lineSize, color);
+        if (edges.right) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-right', rightLineLeft, 0, lineSize, blockEnd, color);
+        if (edges.bottom) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-bottom', 0, bottomLineTop, inlineEnd, lineSize, color);
+        if (edges.left) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-left', 0, 0, lineSize, blockEnd, color);
+    }
+
     function renderRootHighlight(visible) {
         if (!visible || !rootHighlight || rootHighlight.pending || !Array.isArray(rootHighlight.rects)) {
             document.getElementById(LAYER_ID)
@@ -298,26 +516,18 @@
         const color = rootHighlight.eInkMode
             ? (rootHighlight.darkMode ? '#fff' : '#000')
             : (rootHighlight.darkMode ? 'rgba(255, 255, 255, 0.32)' : 'rgba(160, 160, 160, 0.32)');
-        const lineSize = 1.5;
-        for (const rect of rootHighlight.rects) {
-            if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+        const rects = rootHighlightBoxRects(
+            rootHighlight.rects.filter(rect => rect && rect.width > 0 && rect.height > 0),
+        );
+        const boxEdges = rootHighlight.eInkMode ? rootHighlightBoxEdges(rects) : [];
+        for (let index = 0; index < rects.length; index++) {
+            const rect = rects[index];
             const item = document.createElement('div');
             item.className = 'hoshi-reader-selection-highlight-rect';
-            item.style.background = color;
             if (rootHighlight.eInkMode) {
-                if (rootHighlight.verticalWriting) {
-                    const left = Math.max(rect.x, rect.x + rect.width - 2 - lineSize);
-                    item.style.left = `${left}px`;
-                    item.style.top = `${rect.y}px`;
-                    item.style.width = `${lineSize}px`;
-                    item.style.height = `${rect.height}px`;
-                } else {
-                    item.style.left = `${rect.x}px`;
-                    item.style.top = `${rect.y + rect.height - 2}px`;
-                    item.style.width = `${rect.width}px`;
-                    item.style.height = `${lineSize}px`;
-                }
+                applyRootHighlightBox(item, rect, color, boxEdges[index]);
             } else {
+                item.style.background = color;
                 item.style.left = `${rect.x}px`;
                 item.style.top = `${rect.y}px`;
                 item.style.width = `${rect.width}px`;
@@ -328,6 +538,9 @@
     }
 
     function syncRootReveal() {
+        if (hasSasayakiHighlight()) {
+            renderSasayakiHighlight(sasayakiHighlight);
+        }
         const rootRecord = activeRootRecord();
         for (const record of frames.values()) {
             setRevealReady(record, !rootHighlightBlocksReveal(record));
@@ -414,6 +627,12 @@
             pointer-events: auto;
         }
         #${LAYER_ID} .hoshi-reader-selection-highlight-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            contain: layout style paint;
+        }
+        #${LAYER_ID} .hoshi-reader-sasayaki-highlight-layer {
             position: fixed;
             inset: 0;
             pointer-events: none;
@@ -514,6 +733,8 @@
         renderStack,
         resolveMessage,
         highlightSelection,
+        renderSasayakiHighlight,
+        clearSasayakiHighlight,
         preloadIdleRootFrame
     };
     if (window.__hoshiReaderPopupIframeUrl) {

@@ -434,6 +434,35 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun eInkReaderCssLeavesActiveSasayakiCueLineToPopupHost() {
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(eInkMode = true, verticalWriting = false),
+        )
+        val sasayakiRule = css.substringAfter(".hoshi-sasayaki-cue.hoshi-sasayaki-active")
+            .substringBefore("}")
+
+        assertTrue(sasayakiRule.contains("background-color: transparent !important;"))
+        assertTrue(sasayakiRule.contains("color: inherit !important;"))
+        assertFalse(sasayakiRule.contains("var(--hoshi-sasayaki-background-color)"))
+        assertTrue(css.contains("--hoshi-eink-line-color: #000;"))
+        assertTrue(css.contains("--hoshi-reader-eink-mode: 1;"))
+        assertTrue(css.contains("--hoshi-reader-vertical-writing: 0;"))
+    }
+
+    @Test
+    fun verticalEInkReaderCssExposesWritingModeForPopupHostSasayakiLine() {
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(eInkMode = true, verticalWriting = true),
+        )
+        val sasayakiRule = css.substringAfter(".hoshi-sasayaki-cue.hoshi-sasayaki-active")
+            .substringBefore("}")
+
+        assertTrue(sasayakiRule.contains("background-color: transparent !important;"))
+        assertTrue(css.contains("--hoshi-reader-eink-mode: 1;"))
+        assertTrue(css.contains("--hoshi-reader-vertical-writing: 1;"))
+    }
+
+    @Test
     fun sepiaCanInvertReaderColorsInSystemDarkModeLikeIos() {
         val settings = ReaderSettings(theme = ReaderTheme.Sepia, sepiaInvertInDark = true)
 

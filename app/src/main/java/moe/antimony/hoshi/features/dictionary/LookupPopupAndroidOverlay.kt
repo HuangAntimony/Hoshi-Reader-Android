@@ -40,6 +40,9 @@ import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 @Composable
@@ -53,6 +56,7 @@ internal fun LookupPopupAndroidStack(
     rootHighlightDarkMode: Boolean = false,
     rootHighlightEInkMode: Boolean = false,
     rootHighlightVerticalWriting: Boolean = false,
+    rootHighlightEInkStyle: PopupSelectionEInkStyle = PopupSelectionEInkStyle.Underline,
 ) {
     val context = LocalContext.current
     val appContainer = LocalHoshiAppContainer.current
@@ -84,6 +88,7 @@ internal fun LookupPopupAndroidStack(
                 rootHighlightDarkMode = rootHighlightDarkMode,
                 rootHighlightEInkMode = rootHighlightEInkMode,
                 rootHighlightVerticalWriting = rootHighlightVerticalWriting,
+                rootHighlightEInkStyle = rootHighlightEInkStyle,
                 ankiViewModel = ankiViewModel,
                 ankiSettings = ankiUiState.popupSettings,
                 onPopupsChange = onPopupsChange,
@@ -137,6 +142,7 @@ private class LookupPopupOverlayController(
         rootHighlightDarkMode: Boolean,
         rootHighlightEInkMode: Boolean,
         rootHighlightVerticalWriting: Boolean,
+        rootHighlightEInkStyle: PopupSelectionEInkStyle,
         ankiViewModel: AnkiViewModel,
         ankiSettings: AnkiPopupSettings,
         onPopupsChange: (List<LookupPopupItem>) -> Unit,
@@ -156,6 +162,7 @@ private class LookupPopupOverlayController(
             rootHighlightDarkMode = rootHighlightDarkMode,
             rootHighlightEInkMode = rootHighlightEInkMode,
             rootHighlightVerticalWriting = rootHighlightVerticalWriting,
+            rootHighlightEInkStyle = rootHighlightEInkStyle,
             ankiViewModel = ankiViewModel,
             ankiSettings = ankiSettings,
             onPopupsChange = onPopupsChange,
@@ -183,6 +190,7 @@ private class LookupPopupOverlayController(
             darkMode = update.rootHighlightDarkMode,
             eInkMode = update.rootHighlightEInkMode,
             verticalWriting = update.rootHighlightVerticalWriting,
+            eInkStyle = update.rootHighlightEInkStyle,
         )
 
         val childPopups = update.popups
@@ -229,6 +237,7 @@ private data class OverlayUpdate(
     val rootHighlightDarkMode: Boolean,
     val rootHighlightEInkMode: Boolean,
     val rootHighlightVerticalWriting: Boolean,
+    val rootHighlightEInkStyle: PopupSelectionEInkStyle,
     val ankiViewModel: AnkiViewModel,
     val ankiSettings: AnkiPopupSettings,
     val onPopupsChange: (List<LookupPopupItem>) -> Unit,
@@ -865,30 +874,184 @@ private class PopupControlBar(context: Context) : LinearLayout(context) {
     }
 }
 
+internal enum class PopupSelectionEInkStyle {
+    Underline,
+    Box,
+}
+
+internal data class PopupSelectionBoxEdges(
+    val top: Boolean = true,
+    val right: Boolean = true,
+    val bottom: Boolean = true,
+    val left: Boolean = true,
+)
+
+internal fun popupSelectionBoxRects(
+    rects: List<ReaderSelectionRect>,
+    verticalWriting: Boolean,
+): List<ReaderSelectionRect> {
+    val merged = mutableListOf<ReaderSelectionRect>()
+    rects.filter { it.width > 0.0 && it.height > 0.0 }.forEach { rect ->
+        val previous = merged.lastOrNull()
+        if (previous != null && popupSelectionRectsInlineAdjacent(previous, rect, verticalWriting)) {
+            merged[merged.lastIndex] = previous.union(rect)
+        } else {
+            merged += rect
+        }
+    }
+    return merged
+}
+
+internal fun popupSelectionBoxEdges(
+    rects: List<ReaderSelectionRect>,
+    verticalWriting: Boolean,
+    viewportWidth: Double,
+    viewportHeight: Double,
+): List<PopupSelectionBoxEdges> {
+    val edges = rects.map { PopupSelectionBoxEdges() }.toMutableList()
+    for (index in 0 until rects.lastIndex) {
+        if (!popupSelectionSplitAcrossPage(rects[index], rects[index + 1], verticalWriting, viewportWidth, viewportHeight)) {
+            continue
+        }
+        if (verticalWriting) {
+            edges[index] = edges[index].copy(bottom = false)
+            edges[index + 1] = edges[index + 1].copy(top = false)
+        } else {
+            edges[index] = edges[index].copy(right = false)
+            edges[index + 1] = edges[index + 1].copy(left = false)
+        }
+    }
+    return edges
+}
+
+private fun popupSelectionRectsInlineAdjacent(
+    first: ReaderSelectionRect,
+    second: ReaderSelectionRect,
+    verticalWriting: Boolean,
+): Boolean {
+    val tolerance = 1.0
+    return if (verticalWriting) {
+        val sameColumn = popupSelectionRangesOverlap(
+            first.x,
+            first.x + first.width,
+            second.x,
+            second.x + second.width,
+            tolerance,
+        )
+        val touches = popupSelectionRangesOverlap(
+            first.y,
+            first.y + first.height,
+            second.y,
+            second.y + second.height,
+            tolerance,
+        )
+        sameColumn && touches
+    } else {
+        val sameLine = popupSelectionRangesOverlap(
+            first.y,
+            first.y + first.height,
+            second.y,
+            second.y + second.height,
+            tolerance,
+        )
+        val touches = popupSelectionRangesOverlap(
+            first.x,
+            first.x + first.width,
+            second.x,
+            second.x + second.width,
+            tolerance,
+        )
+        sameLine && touches
+    }
+}
+
+private fun popupSelectionRangesOverlap(
+    firstStart: Double,
+    firstEnd: Double,
+    secondStart: Double,
+    secondEnd: Double,
+    tolerance: Double,
+): Boolean = secondStart <= firstEnd + tolerance && secondEnd >= firstStart - tolerance
+
+private fun ReaderSelectionRect.union(other: ReaderSelectionRect): ReaderSelectionRect {
+    val left = min(x, other.x)
+    val top = min(y, other.y)
+    val right = max(x + width, other.x + other.width)
+    val bottom = max(y + height, other.y + other.height)
+    return ReaderSelectionRect(
+        x = left,
+        y = top,
+        width = right - left,
+        height = bottom - top,
+    )
+}
+
+private fun popupSelectionSplitAcrossPage(
+    first: ReaderSelectionRect,
+    second: ReaderSelectionRect,
+    verticalWriting: Boolean,
+    viewportWidth: Double,
+    viewportHeight: Double,
+): Boolean {
+    val tolerance = 8.0
+    return if (verticalWriting) {
+        val sameWidth = abs(first.width - second.width) <= tolerance
+        val wrapsToNextLine = first.y > second.y + tolerance
+        val touchesPageEdge = first.y + first.height >= viewportHeight - tolerance ||
+            second.y <= tolerance
+        sameWidth && (wrapsToNextLine || touchesPageEdge)
+    } else {
+        val sameHeight = abs(first.height - second.height) <= tolerance
+        val wrapsToNextLine = first.y + first.height <= second.y + tolerance &&
+            first.x > second.x + tolerance
+        val touchesPageEdge = first.x + first.width >= viewportWidth - tolerance ||
+            second.x <= tolerance
+        sameHeight && (wrapsToNextLine || touchesPageEdge)
+    }
+}
+
 private class PopupSelectionHighlightView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var rects = emptyList<ReaderSelectionRect>()
     private var darkMode = false
     private var eInkMode = false
     private var verticalWriting = false
+    private var eInkStyle = PopupSelectionEInkStyle.Underline
 
     fun update(
         rects: List<ReaderSelectionRect>,
         darkMode: Boolean,
         eInkMode: Boolean,
         verticalWriting: Boolean = false,
+        eInkStyle: PopupSelectionEInkStyle = PopupSelectionEInkStyle.Underline,
     ) {
         this.rects = rects
         this.darkMode = darkMode
         this.eInkMode = eInkMode
         this.verticalWriting = verticalWriting
+        this.eInkStyle = eInkStyle
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         val density = resources.displayMetrics.density
-        rects.forEach { rect ->
-            if (rect.width <= 0.0 || rect.height <= 0.0) return@forEach
+        val drawRects = if (eInkMode && eInkStyle == PopupSelectionEInkStyle.Box) {
+            popupSelectionBoxRects(rects, verticalWriting)
+        } else {
+            rects
+        }
+        val boxEdges = if (eInkMode && eInkStyle == PopupSelectionEInkStyle.Box) {
+            popupSelectionBoxEdges(
+                rects = drawRects,
+                verticalWriting = verticalWriting,
+                viewportWidth = width / density.toDouble(),
+                viewportHeight = height / density.toDouble(),
+            )
+        } else {
+            emptyList()
+        }
+        drawRects.forEachIndexed { index, rect ->
+            if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
             val left = (rect.x * density).toFloat()
             val top = (rect.y * density).toFloat()
             val right = ((rect.x + rect.width) * density).toFloat()
@@ -898,7 +1061,10 @@ private class PopupSelectionHighlightView(context: Context) : View(context) {
                 paint.isAntiAlias = false
                 paint.color = if (darkMode) AndroidColor.WHITE else AndroidColor.BLACK
                 val lineHeight = (1.5f * density).roundToInt().coerceAtLeast(1).toFloat()
-                if (verticalWriting) {
+                if (eInkStyle == PopupSelectionEInkStyle.Box) {
+                    val edges = boxEdges.getOrElse(index) { PopupSelectionBoxEdges() }
+                    drawBoxEdges(canvas, left, top, right, bottom, lineHeight, edges)
+                } else if (verticalWriting) {
                     val lineLeft = (right - 2f * density - lineHeight).coerceAtLeast(left).roundToInt().toFloat()
                     canvas.drawRect(lineLeft, top, lineLeft + lineHeight, bottom, paint)
                 } else {
@@ -911,6 +1077,27 @@ private class PopupSelectionHighlightView(context: Context) : View(context) {
                 canvas.drawRect(RectF(left, top, right, bottom), paint)
             }
         }
+    }
+
+    private fun drawBoxEdges(
+        canvas: Canvas,
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float,
+        lineHeight: Float,
+        edges: PopupSelectionBoxEdges,
+    ) {
+        val rightLineLeft = (right - lineHeight).coerceAtLeast(left)
+        val rightLineRight = rightLineLeft + lineHeight
+        val bottomLineTop = (bottom - lineHeight).coerceAtLeast(top)
+        val bottomLineBottom = bottomLineTop + lineHeight
+        val inlineEnd = right
+        val blockEnd = bottom
+        if (edges.top) canvas.drawRect(left, top, inlineEnd, top + lineHeight, paint)
+        if (edges.right) canvas.drawRect(rightLineLeft, top, rightLineRight, blockEnd, paint)
+        if (edges.bottom) canvas.drawRect(left, bottomLineTop, inlineEnd, bottomLineBottom, paint)
+        if (edges.left) canvas.drawRect(left, top, left + lineHeight, blockEnd, paint)
     }
 }
 
