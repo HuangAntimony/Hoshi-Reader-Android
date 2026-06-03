@@ -255,8 +255,8 @@ test('e-ink root lookup highlight draws a transparent box using the theme line c
     assert.equal(highlights[0].style.top, '24px');
     assert.equal(highlightEdge(highlights[0], 'top').style.background, '#fff');
     assert.equal(highlightEdge(highlights[0], 'right').style.background, '#fff');
-    assert.equal(highlightEdge(highlights[0], 'bottom').style.top, '15px');
-    assert.equal(highlightEdge(highlights[0], 'bottom').style.height, '1px');
+    assert.equal(highlightEdge(highlights[0], 'bottom').style.top, '14.5px');
+    assert.equal(highlightEdge(highlights[0], 'bottom').style.height, '1.5px');
     assert.equal(highlightEdge(highlights[0], 'left').style.background, '#fff');
 });
 
@@ -286,8 +286,8 @@ test('e-ink root lookup box snaps fractional edges to matching physical pixel wi
     const rightEdge = highlightEdge(highlight, 'right');
     const ratio = scene.window.devicePixelRatio;
 
-    assert.equal(physicalPixels(leftEdge.style.width, ratio), 2);
-    assert.equal(physicalPixels(rightEdge.style.width, ratio), 2);
+    assert.equal(physicalPixels(leftEdge.style.width, ratio), 4);
+    assert.equal(physicalPixels(rightEdge.style.width, ratio), 4);
     assert.equal(physicalPixels(leftEdge.style.width, ratio), physicalPixels(rightEdge.style.width, ratio));
     assert.equal(
         physicalPixels(rightEdge.style.left, ratio) + physicalPixels(rightEdge.style.width, ratio),
@@ -333,7 +333,7 @@ test('vertical e-ink root lookup highlight opens the box at a page split', () =>
     assert.notEqual(highlightEdge(highlights[0], 'top'), undefined);
     assert.equal(highlightEdge(highlights[1], 'top'), undefined);
     assert.notEqual(highlightEdge(highlights[1], 'bottom'), undefined);
-    assert.equal(highlightEdge(highlights[0], 'right').style.left, '11px');
+    assert.equal(highlightEdge(highlights[0], 'right').style.left, '10.5px');
 });
 
 test('vertical e-ink root lookup highlight merges adjacent ruby text segments into one box', () => {
@@ -399,7 +399,7 @@ test('horizontal e-ink root lookup highlight expands adjacent segments to the ru
     assert.equal(highlights[0].style.top, '20px');
     assert.equal(highlights[0].style.width, '42px');
     assert.equal(highlights[0].style.height, '24px');
-    assert.equal(highlightEdge(highlights[0], 'bottom').style.top, '23px');
+    assert.equal(highlightEdge(highlights[0], 'bottom').style.top, '22.5px');
 });
 
 test('vertical e-ink sasayaki and root lookup highlight use matching line coordinates', () => {
@@ -427,10 +427,10 @@ test('vertical e-ink sasayaki and root lookup highlight use matching line coordi
 
     assert.equal(scene.selectionHighlights.length, 1);
     assert.equal(sasayakiHighlights.length, 1);
-    assert.equal(highlightEdge(scene.selectionHighlights[0], 'right').style.left, '11px');
-    assert.equal(sasayakiHighlights[0].style.left, '51px');
+    assert.equal(highlightEdge(scene.selectionHighlights[0], 'right').style.left, '10.5px');
+    assert.equal(sasayakiHighlights[0].style.left, '50.5px');
     assert.equal(sasayakiHighlights[0].style.top, '60px');
-    assert.equal(sasayakiHighlights[0].style.width, '1px');
+    assert.equal(sasayakiHighlights[0].style.width, '1.5px');
     assert.equal(sasayakiHighlights[0].style.height, '28px');
 });
 
@@ -452,9 +452,9 @@ test('vertical e-ink sasayaki line follows the outer ruby-aware edge for the who
     const layer = scene.document.getElementById('hoshi-reader-popup-layer');
     const sasayakiHighlights = layer.querySelector('.hoshi-reader-sasayaki-highlight-layer').children;
     assert.equal(sasayakiHighlights.length, 1);
-    assert.equal(sasayakiHighlights[0].style.left, '51px');
+    assert.equal(sasayakiHighlights[0].style.left, '50.5px');
     assert.equal(sasayakiHighlights[0].style.top, '60px');
-    assert.equal(sasayakiHighlights[0].style.width, '1px');
+    assert.equal(sasayakiHighlights[0].style.width, '1.5px');
     assert.equal(sasayakiHighlights[0].style.height, '30px');
 });
 
@@ -480,9 +480,9 @@ test('horizontal e-ink sasayaki draws below the ruby-aware rect and clears expli
     let sasayakiHighlights = scene.layer.querySelector('.hoshi-reader-sasayaki-highlight-layer').children;
     assert.equal(sasayakiHighlights.length, 1);
     assert.equal(sasayakiHighlights[0].style.left, '12px');
-    assert.equal(sasayakiHighlights[0].style.top, '37px');
+    assert.equal(sasayakiHighlights[0].style.top, '36.5px');
     assert.equal(sasayakiHighlights[0].style.width, '40px');
-    assert.equal(sasayakiHighlights[0].style.height, '1px');
+    assert.equal(sasayakiHighlights[0].style.height, '1.5px');
 
     scene.host.clearSasayakiHighlight();
     sasayakiHighlights = scene.layer.querySelector('.hoshi-reader-sasayaki-highlight-layer').children;
@@ -508,7 +508,7 @@ test('horizontal e-ink sasayaki line follows the ruby-aware height for the whole
     const sasayakiHighlights = layer.querySelector('.hoshi-reader-sasayaki-highlight-layer').children;
     assert.equal(sasayakiHighlights.length, 1);
     assert.equal(sasayakiHighlights[0].style.left, '12px');
-    assert.equal(sasayakiHighlights[0].style.top, '43px');
+    assert.equal(sasayakiHighlights[0].style.top, '42.5px');
     assert.equal(sasayakiHighlights[0].style.width, '32px');
-    assert.equal(sasayakiHighlights[0].style.height, '1px');
+    assert.equal(sasayakiHighlights[0].style.height, '1.5px');
 });

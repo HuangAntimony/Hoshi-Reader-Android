@@ -107,7 +107,7 @@ internal object ReaderContentStyles {
             color: inherit;
             text-decoration-line: underline;
             text-decoration-color: var(--hoshi-eink-line-color);
-            text-decoration-thickness: 1px;
+            text-decoration-thickness: 1.5px;
             text-underline-offset: 2px;
         }
             """.trimIndent()

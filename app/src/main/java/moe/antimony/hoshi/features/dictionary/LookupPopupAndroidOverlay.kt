@@ -45,7 +45,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private const val PopupSelectionEInkLineSizeCssPx = 1.0f
+private const val PopupSelectionEInkLineSizeCssPx = 1.5f
 
 @Composable
 internal fun LookupPopupAndroidStack(
@@ -1062,7 +1062,7 @@ private class PopupSelectionHighlightView(context: Context) : View(context) {
             if (eInkMode) {
                 paint.isAntiAlias = false
                 paint.color = if (darkMode) AndroidColor.WHITE else AndroidColor.BLACK
-                val lineHeight = (PopupSelectionEInkLineSizeCssPx * density).toInt().coerceAtLeast(1).toFloat()
+                val lineHeight = (PopupSelectionEInkLineSizeCssPx * density).roundToInt().coerceAtLeast(1).toFloat()
                 if (eInkStyle == PopupSelectionEInkStyle.Box) {
                     val edges = boxEdges.getOrElse(index) { PopupSelectionBoxEdges() }
                     drawBoxEdges(canvas, left, top, right, bottom, lineHeight, edges)

@@ -3,7 +3,7 @@
     const LAYER_ID = 'hoshi-reader-popup-layer';
     const ACTION_BAR_HEIGHT = 37;
     const SASAYAKI_BAR_HEIGHT = 37;
-    const HIGHLIGHT_LINE_SIZE = 1;
+    const HIGHLIGHT_LINE_SIZE = 1.5;
     const HIGHLIGHT_INLINE_MERGE_TOLERANCE = 1;
     const frames = new Map();
     const frameSources = new WeakMap();
@@ -359,8 +359,7 @@
     }
 
     function highlightLineSize() {
-        const ratio = devicePixelRatio();
-        return Math.max(1, Math.floor(HIGHLIGHT_LINE_SIZE * ratio)) / ratio;
+        return HIGHLIGHT_LINE_SIZE;
     }
 
     function snapHighlightRect(rect) {
