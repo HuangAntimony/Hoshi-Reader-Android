@@ -127,27 +127,21 @@ internal fun ChapterWebView(
     val readerContentReloadKey = remember(readerSettings) {
         readerSettings.readerContentReloadKey()
     }
-    val readerAppearanceScript = remember(
-        readerSettings.theme,
-        readerSettings.eInkMode,
-        readerSettings.systemLightSepia,
-        readerSettings.sepiaInvertInDark,
-        systemDark,
-        sasayakiTextColor,
-        sasayakiBackgroundColor,
-    ) {
-        readerAppearanceScript(
-            settings = readerSettings,
-            systemDark = systemDark,
-            sasayakiTextColor = sasayakiTextColor,
-            sasayakiBackgroundColor = sasayakiBackgroundColor,
-        )
+    val appearanceUpdateKey = readerAppearanceUpdateKey(
+        settings = readerSettings,
+        systemDark = systemDark,
+        sasayakiTextColor = sasayakiTextColor,
+        sasayakiBackgroundColor = sasayakiBackgroundColor,
+    )
+    val readerAppearanceScript = remember(appearanceUpdateKey) {
+        readerAppearanceScript(appearanceUpdateKey)
     }
     val readerSetupScript = remember(
         chapter,
         chapterPosition.progress,
         chapterFragment,
         readerContentReloadKey,
+        appearanceUpdateKey,
         fontFaceUrl,
         systemDark,
         scanNonJapaneseText,
@@ -397,6 +391,26 @@ internal data class ReaderWebViewSetupReloadKey(
     val scanNonJapaneseText: Boolean,
     val fontFaceUrl: String?,
 )
+
+internal data class ReaderAppearanceUpdateKey(
+    val backgroundColorCss: String,
+    val textColorCss: String,
+    val sasayakiTextColorCss: String,
+    val sasayakiBackgroundColorCss: String,
+)
+
+internal fun readerAppearanceUpdateKey(
+    settings: ReaderSettings,
+    systemDark: Boolean,
+    sasayakiTextColor: Long,
+    sasayakiBackgroundColor: Long,
+): ReaderAppearanceUpdateKey =
+    ReaderAppearanceUpdateKey(
+        backgroundColorCss = settings.backgroundColorCss(systemDark),
+        textColorCss = settings.textColorCss(systemDark),
+        sasayakiTextColorCss = sasayakiTextColor.toReaderCssColor(),
+        sasayakiBackgroundColorCss = sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true),
+    )
 
 internal fun readerWebViewLoadKey(
     baseUrl: String,
@@ -717,15 +731,12 @@ private fun readerSetupScript(
 }
 
 private fun readerAppearanceScript(
-    settings: ReaderSettings,
-    systemDark: Boolean,
-    sasayakiTextColor: Long,
-    sasayakiBackgroundColor: Long,
+    appearanceUpdateKey: ReaderAppearanceUpdateKey,
 ): String {
-    val backgroundColor = readerJavaScriptStringLiteral(settings.backgroundColorCss(systemDark))
-    val textColor = readerJavaScriptStringLiteral(settings.textColorCss(systemDark))
-    val sasayakiText = readerJavaScriptStringLiteral(sasayakiTextColor.toReaderCssColor())
-    val sasayakiBackground = readerJavaScriptStringLiteral(sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true))
+    val backgroundColor = readerJavaScriptStringLiteral(appearanceUpdateKey.backgroundColorCss)
+    val textColor = readerJavaScriptStringLiteral(appearanceUpdateKey.textColorCss)
+    val sasayakiText = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiTextColorCss)
+    val sasayakiBackground = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiBackgroundColorCss)
     return """
         (function() {
           document.documentElement.style.setProperty('--hoshi-background-color', $backgroundColor);

@@ -402,6 +402,28 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun readerAppearanceUpdateKeyTracksCustomContentColorsWithoutReloadingContent() {
+        val base = ReaderSettings(
+            theme = ReaderTheme.Custom,
+            customBackgroundColor = 0xFF112233,
+            customTextColor = 0xFF445566,
+        )
+        val backgroundChanged = base.copy(customBackgroundColor = 0xFF778899)
+        val textChanged = base.copy(customTextColor = 0xFFABCDEF)
+
+        assertEquals(base.readerContentReloadKey(), backgroundChanged.readerContentReloadKey())
+        assertEquals(base.readerContentReloadKey(), textChanged.readerContentReloadKey())
+        assertFalse(
+            readerAppearanceUpdateKey(base, systemDark = false, sasayakiTextColor = 0xFF111111, sasayakiBackgroundColor = 0xFFFFFFFF) ==
+                readerAppearanceUpdateKey(backgroundChanged, systemDark = false, sasayakiTextColor = 0xFF111111, sasayakiBackgroundColor = 0xFFFFFFFF),
+        )
+        assertFalse(
+            readerAppearanceUpdateKey(base, systemDark = false, sasayakiTextColor = 0xFF111111, sasayakiBackgroundColor = 0xFFFFFFFF) ==
+                readerAppearanceUpdateKey(textChanged, systemDark = false, sasayakiTextColor = 0xFF111111, sasayakiBackgroundColor = 0xFFFFFFFF),
+        )
+    }
+
+    @Test
     fun focusModeTogglesWithoutReloadingTheReaderContent() {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
