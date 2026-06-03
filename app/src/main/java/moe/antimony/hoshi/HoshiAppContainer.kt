@@ -32,6 +32,7 @@ import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
+import moe.antimony.hoshi.features.settings.AppLanguageRepository
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
 import moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer
 import moe.antimony.hoshi.features.sync.DriveAuthorizer
@@ -63,6 +64,7 @@ internal class HoshiAppContainer(context: Context) {
     val bookshelfSettingsRepository: BookshelfSettingsRepository = appContext.bookshelfSettingsRepository()
     val updateSettingsRepository: UpdateSettingsRepository = appContext.updateSettingsRepository()
     val updateDownloadStore: UpdateDownloadStore = appContext.updateDownloadStore()
+    val appLanguageRepository: AppLanguageRepository = AppLanguageRepository(appContext)
     val readerFontManager: ReaderFontManager = ReaderFontManager(appContext.filesDir)
     val localAudioRepository: LocalAudioRepository = LocalAudioRepository(appContext.filesDir)
     val backupRepository: HoshiBackupRepository = HoshiBackupRepository(appContext.filesDir)

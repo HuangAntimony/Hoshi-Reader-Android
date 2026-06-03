@@ -37,6 +37,7 @@ import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
+import moe.antimony.hoshi.features.settings.AppLanguageResources
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import kotlin.math.min
 
@@ -54,6 +55,7 @@ class ProcessTextLookupActivity : ComponentActivity() {
 
         setContent {
             val appContainer = remember { HoshiAppContainer(applicationContext) }
+            val appLanguage = remember { appContainer.appLanguageRepository.load() }
             var readerSettings by remember { mutableStateOf<ReaderSettings?>(null) }
             LaunchedEffect(appContainer) {
                 appContainer.readerSettingsRepository.settings.collect { settings ->
@@ -62,18 +64,20 @@ class ProcessTextLookupActivity : ComponentActivity() {
             }
             val loadedReaderSettings = readerSettings ?: return@setContent
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-            CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
-                HoshiReaderTheme(
-                    darkTheme = loadedReaderSettings.usesDarkInterface(systemDark),
-                    eInkMode = loadedReaderSettings.eInkMode,
-                    useDarkSystemBarIcons = loadedReaderSettings.usesDarkSystemBarIcons(systemDark),
-                ) {
-                    ProcessTextLookupOverlay(
-                        query = request.query,
-                        readerSettings = loadedReaderSettings,
-                        appContainer = appContainer,
-                        onClose = ::finish,
-                    )
+            AppLanguageResources(mode = appLanguage) {
+                CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
+                    HoshiReaderTheme(
+                        darkTheme = loadedReaderSettings.usesDarkInterface(systemDark),
+                        eInkMode = loadedReaderSettings.eInkMode,
+                        useDarkSystemBarIcons = loadedReaderSettings.usesDarkSystemBarIcons(systemDark),
+                    ) {
+                        ProcessTextLookupOverlay(
+                            query = request.query,
+                            readerSettings = loadedReaderSettings,
+                            appContainer = appContainer,
+                            onClose = ::finish,
+                        )
+                    }
                 }
             }
         }

@@ -1,6 +1,6 @@
 # Hoshi Android Agent TODO
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 This file is the short operational handoff for future agents.
 
@@ -155,3 +155,5 @@ For continuous reader layout regressions, verify vertical-writing Horizontal Pad
 For reader popup settings regressions, verify changing every Popup section control while a continuous reader is open does not rebuild the WebView and does not stop scroll progress updates.
 
 For localization changes, run `./gradlew :app:testDebugUnitTest --tests moe.antimony.hoshi.LocalizationResourceTest` and keep `docs/TRANSLATING.md` aligned with supported locale resource directories.
+
+For app-language regressions, verify Advanced ends with a standalone Language card, Follow system is localized, named language options use stable self-language labels, selection persists, and switching languages updates the current screen without recreating the app.

@@ -44,6 +44,7 @@ import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
+import moe.antimony.hoshi.features.settings.AppLanguageMode
 import moe.antimony.hoshi.features.update.AboutScreen
 import kotlinx.coroutines.launch
 
@@ -64,6 +65,8 @@ fun AppShell(
     onPendingImportConsumed: () -> Unit = {},
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
+    appLanguage: AppLanguageMode,
+    onAppLanguageChange: (AppLanguageMode) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -82,6 +85,8 @@ fun AppShell(
     val scope = rememberCoroutineScope()
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
+    val currentAppLanguage by rememberUpdatedState(appLanguage)
+    val currentOnAppLanguageChange by rememberUpdatedState(onAppLanguageChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
     val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }
@@ -210,6 +215,8 @@ fun AppShell(
                         sasayakiSettings = sasayakiSettings,
                         onSasayakiSettingsChange = ::updateSasayakiSettings,
                         readerFontManager = readerFontManager,
+                        appLanguage = currentAppLanguage,
+                        onAppLanguageChange = currentOnAppLanguageChange,
                         onClose = ::popRoute,
                         onBooksRestored = { bookshelfRefreshKey += 1 },
                         onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
@@ -327,6 +334,8 @@ private fun SettingsDetailDestination(
     sasayakiSettings: SasayakiSettings,
     onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
     readerFontManager: ReaderFontManager,
+    appLanguage: AppLanguageMode,
+    onAppLanguageChange: (AppLanguageMode) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit,
     onSelectedTabChange: (MainTab) -> Unit,
@@ -358,6 +367,8 @@ private fun SettingsDetailDestination(
         SettingsDetailSection.Advanced -> AdvancedSettingsView(
             readerSettings = readerSettings,
             onReaderSettingsChange = onReaderSettingsChange,
+            appLanguage = appLanguage,
+            onAppLanguageChange = onAppLanguageChange,
             onClose = onClose,
             onBooksRestored = onBooksRestored,
             modifier = Modifier.fillMaxSize(),

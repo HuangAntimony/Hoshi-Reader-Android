@@ -55,6 +55,8 @@
     <string name="settings_about">关于</string>
     <string name="settings_backup" comment="Advanced settings row label, intentionally matching the Backup action noun.">备份</string>
     <string name="settings_title" comment="Shared label for settings page titles distinct from the main tab key.">设置</string>
+    <string name="settings_language">语言</string>
+    <string name="language_follow_system">跟随系统</string>
     <string name="bookshelf_open_failed">无法打开 EPUB。</string>
     <string name="bookshelf_import_failed">无法导入 EPUB。</string>
     <string name="bookshelf_import_failed_list_format" comment="Bookshelf batch import failure summary; intentionally matches the dictionary batch import format.">导入失败：\n%1$s</string>

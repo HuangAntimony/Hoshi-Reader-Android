@@ -6,18 +6,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -30,16 +29,20 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -49,8 +52,10 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,23 +79,26 @@ import moe.antimony.hoshi.features.anki.AnkiConnectView
 import moe.antimony.hoshi.features.backup.BackupSettingsView
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderStatisticsSettingsView
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
+import moe.antimony.hoshi.features.settings.AppLanguageMode
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
+import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.localizedImportMessage
+import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
 import moe.antimony.hoshi.ui.hoshiTextFieldCursorBrush
 import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
-import moe.antimony.hoshi.features.sync.SyncSettingsView
-import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdvancedSettingsView(
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
+    appLanguage: AppLanguageMode,
+    onAppLanguageChange: (AppLanguageMode) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -162,9 +170,20 @@ fun AdvancedSettingsView(
                         section.rows.forEachIndexed { index, row ->
                             ListItem(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
+                                leadingContent = {
+                                    Icon(
+                                        row.icon.imageVector(),
+                                        contentDescription = null
+                                    )
+                                },
                                 headlineContent = { Text(stringResource(row.titleRes)) },
-                                supportingContent = row.subtitleRes?.let { subtitleRes -> { Text(stringResource(subtitleRes)) } },
+                                supportingContent = row.subtitleRes?.let { subtitleRes ->
+                                    {
+                                        Text(
+                                            stringResource(subtitleRes)
+                                        )
+                                    }
+                                },
                                 modifier = Modifier.clickable { destination = row.destination },
                             )
                             if (index != section.rows.lastIndex) {
@@ -174,7 +193,51 @@ fun AdvancedSettingsView(
                     }
                 }
             }
+            item {
+                AppLanguageCard(
+                    selected = appLanguage,
+                    onSelected = onAppLanguageChange,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun AppLanguageCard(
+    selected: AppLanguageMode,
+    onSelected: (AppLanguageMode) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    GroupCard {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            leadingContent = { Icon(Icons.Rounded.Language, contentDescription = null) },
+            headlineContent = { Text(stringResource(R.string.settings_language)) },
+            trailingContent = {
+                Box {
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                        TextButton(onClick = { expanded = true }) {
+                            Text(stringResource(selected.labelRes))
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            AppLanguageMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(mode.labelRes)) },
+                                    onClick = {
+                                        expanded = false
+                                        onSelected(mode)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -249,7 +312,7 @@ fun AudioSettingsView(
                     var lastProgressUpdate = 0L
                     repository.importDatabase(context.contentResolver, uri) { progress ->
                         val shouldUpdate = progress.totalBytes == progress.copiedBytes ||
-                            progress.copiedBytes - lastProgressUpdate >= ProgressUpdateBytes
+                                progress.copiedBytes - lastProgressUpdate >= ProgressUpdateBytes
                         if (shouldUpdate) {
                             lastProgressUpdate = progress.copiedBytes
                             scope.launch { importProgress = progress }
@@ -284,7 +347,12 @@ fun AudioSettingsView(
                     containerColor = colorScheme.background,
                     scrolledContainerColor = colorScheme.background,
                 ),
-                title = { Text(stringResource(R.string.advanced_audio), fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Text(
+                        stringResource(R.string.advanced_audio),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 navigationIcon = {
                     BackIconButton {
                         if (!isImporting) {
@@ -339,7 +407,10 @@ fun AudioSettingsView(
                     val loadedSettings = settings ?: return@item
                     SectionTitle(stringResource(R.string.audio_add_source))
                     GroupCard {
-                        TextInputRow(label = stringResource(R.string.audio_name), value = nameInput, onValueChange = { nameInput = it })
+                        TextInputRow(
+                            label = stringResource(R.string.audio_name),
+                            value = nameInput,
+                            onValueChange = { nameInput = it })
                         GroupDivider()
                         Row(
                             modifier = Modifier
@@ -356,13 +427,23 @@ fun AudioSettingsView(
                             }
                             IconButton(
                                 onClick = {
-                                    save(loadedSettings.addSource(AudioSource(name = nameInput.trim(), url = urlInput.trim())))
+                                    save(
+                                        loadedSettings.addSource(
+                                            AudioSource(
+                                                name = nameInput.trim(),
+                                                url = urlInput.trim()
+                                            )
+                                        )
+                                    )
                                     nameInput = ""
                                     urlInput = ""
                                 },
                                 enabled = nameInput.isNotBlank() && urlInput.isNotBlank(),
                             ) {
-                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.audio_add_source))
+                                Icon(
+                                    Icons.Rounded.Add,
+                                    contentDescription = stringResource(R.string.audio_add_source)
+                                )
                             }
                         }
                     }
@@ -403,7 +484,10 @@ fun AudioSettingsView(
                                                 .height(58.dp),
                                             selected = loadedSettings.playbackMode == mode,
                                             onClick = { save(loadedSettings.copy(playbackMode = mode)) },
-                                            shape = SegmentedButtonDefaults.itemShape(index, AudioPlaybackMode.entries.size),
+                                            shape = SegmentedButtonDefaults.itemShape(
+                                                index,
+                                                AudioPlaybackMode.entries.size
+                                            ),
                                             icon = {},
                                         ) {
                                             Text(stringResource(mode.labelRes))
@@ -466,7 +550,12 @@ fun AudioSettingsView(
                                 ListItem(
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                     headlineContent = {
-                                        Text(stringResource(R.string.audio_android_db_size_format, Formatter.formatFileSize(context, size)))
+                                        Text(
+                                            stringResource(
+                                                R.string.audio_android_db_size_format,
+                                                Formatter.formatFileSize(context, size)
+                                            )
+                                        )
                                     },
                                     trailingContent = {
                                         OutlinedButton(
@@ -484,26 +573,37 @@ fun AudioSettingsView(
                                     },
                                 )
                             }
-                            localAudioSourceConfig?.sourceOrder?.takeIf { it.isNotEmpty() }?.let { sources ->
-                                GroupDivider()
-                                ListItem(
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    headlineContent = { Text(stringResource(R.string.audio_local_source_order)) },
-                                    supportingContent = {
-                                        Column {
-                                            sources.forEachIndexed { index, source ->
-                                                LocalAudioSourceOrderRow(
-                                                    source = source,
-                                                    canMoveUp = index > 0,
-                                                    canMoveDown = index < sources.lastIndex,
-                                                    onMoveUp = { moveLocalAudioSource(index, index - 1) },
-                                                    onMoveDown = { moveLocalAudioSource(index, index + 1) },
-                                                )
+                            localAudioSourceConfig?.sourceOrder?.takeIf { it.isNotEmpty() }
+                                ?.let { sources ->
+                                    GroupDivider()
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = { Text(stringResource(R.string.audio_local_source_order)) },
+                                        supportingContent = {
+                                            Column {
+                                                sources.forEachIndexed { index, source ->
+                                                    LocalAudioSourceOrderRow(
+                                                        source = source,
+                                                        canMoveUp = index > 0,
+                                                        canMoveDown = index < sources.lastIndex,
+                                                        onMoveUp = {
+                                                            moveLocalAudioSource(
+                                                                index,
+                                                                index - 1
+                                                            )
+                                                        },
+                                                        onMoveDown = {
+                                                            moveLocalAudioSource(
+                                                                index,
+                                                                index + 1
+                                                            )
+                                                        },
+                                                    )
+                                                }
                                             }
-                                        }
-                                    },
-                                )
-                            }
+                                        },
+                                    )
+                                }
                         }
                     }
                     Text(
@@ -548,14 +648,23 @@ private fun AudioSourceRow(
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-                    Icon(Icons.Rounded.ArrowUpward, contentDescription = stringResource(R.string.audio_move_source_up))
+                    Icon(
+                        Icons.Rounded.ArrowUpward,
+                        contentDescription = stringResource(R.string.audio_move_source_up)
+                    )
                 }
                 IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-                    Icon(Icons.Rounded.ArrowDownward, contentDescription = stringResource(R.string.audio_move_source_down))
+                    Icon(
+                        Icons.Rounded.ArrowDownward,
+                        contentDescription = stringResource(R.string.audio_move_source_down)
+                    )
                 }
                 if (canDelete) {
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.audio_delete_source))
+                        Icon(
+                            Icons.Rounded.Delete,
+                            contentDescription = stringResource(R.string.audio_delete_source)
+                        )
                     }
                 }
                 Switch(checked = source.isEnabled, onCheckedChange = onEnabledChange)
@@ -584,10 +693,16 @@ private fun LocalAudioSourceOrderRow(
             maxLines = 1,
         )
         IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-            Icon(Icons.Rounded.ArrowUpward, contentDescription = stringResource(R.string.audio_move_local_source_up))
+            Icon(
+                Icons.Rounded.ArrowUpward,
+                contentDescription = stringResource(R.string.audio_move_local_source_up)
+            )
         }
         IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-            Icon(Icons.Rounded.ArrowDownward, contentDescription = stringResource(R.string.audio_move_local_source_down))
+            Icon(
+                Icons.Rounded.ArrowDownward,
+                contentDescription = stringResource(R.string.audio_move_local_source_down)
+            )
         }
     }
 }
@@ -659,7 +774,10 @@ private fun GroupDivider() {
 @Composable
 private fun BackIconButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.action_back))
+        Icon(
+            Icons.AutoMirrored.Rounded.ArrowBack,
+            contentDescription = stringResource(R.string.action_back)
+        )
     }
 }
 
@@ -760,11 +878,24 @@ private val AudioPlaybackMode.labelRes: Int
         AudioPlaybackMode.Mix -> R.string.audio_playback_mix
     }
 
+@get:StringRes
+private val AppLanguageMode.labelRes: Int
+    get() = when (this) {
+        AppLanguageMode.System -> R.string.language_follow_system
+        AppLanguageMode.English -> R.string.language_english
+        AppLanguageMode.SimplifiedChinese -> R.string.language_simplified_chinese
+    }
+
 private val LocalAudioImportProgress.fraction: Float
-    get() = totalBytes?.takeIf { it > 0 }?.let { (copiedBytes.toFloat() / it.toFloat()).coerceIn(0f, 1f) } ?: 0f
+    get() = totalBytes?.takeIf { it > 0 }
+        ?.let { (copiedBytes.toFloat() / it.toFloat()).coerceIn(0f, 1f) } ?: 0f
 
 private fun LocalAudioImportProgress.label(context: android.content.Context): String {
     val copied = Formatter.formatFileSize(context, copiedBytes)
     val total = totalBytes?.let { Formatter.formatFileSize(context, it) }
-    return if (total == null) copied else context.getString(R.string.audio_copied_size_format, copied, total)
+    return if (total == null) copied else context.getString(
+        R.string.audio_copied_size_format,
+        copied,
+        total
+    )
 }

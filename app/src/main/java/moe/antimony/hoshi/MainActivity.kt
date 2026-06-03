@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
+import moe.antimony.hoshi.features.settings.AppLanguageResources
 import moe.antimony.hoshi.features.update.DownloadedUpdatePrompt
 import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
@@ -38,6 +39,8 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appContainer = remember { HoshiAppContainer(applicationContext) }
+            val appLanguageRepository = appContainer.appLanguageRepository
+            var appLanguage by remember { mutableStateOf(appLanguageRepository.load()) }
             val readerSettingsRepository = appContainer.readerSettingsRepository
             val scope = rememberCoroutineScope()
             var readerSettings by remember { mutableStateOf<ReaderSettings?>(null) }
@@ -50,28 +53,35 @@ class MainActivity : ComponentActivity() {
             val loadedReaderSettings = readerSettings
             val darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark
             val useDarkSystemBarIcons = loadedReaderSettings?.usesDarkSystemBarIcons(systemDark) ?: !systemDark
-            CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
-                HoshiReaderTheme(
-                    darkTheme = darkTheme,
-                    eInkMode = loadedReaderSettings?.eInkMode ?: false,
-                    useDarkSystemBarIcons = useDarkSystemBarIcons,
-                ) {
-                    val loadedReaderSettings = readerSettings ?: return@HoshiReaderTheme
-                    AppShell(
-                        pendingImportUri = pendingImportUri,
-                        onPendingImportConsumed = { pendingImportUri = null },
-                        readerSettings = loadedReaderSettings,
-                        onReaderSettingsChange = { settings ->
-                            readerSettings = settings
-                            scope.launch {
-                                readerSettingsRepository.update { settings }
+            AppLanguageResources(mode = appLanguage) {
+                CompositionLocalProvider(LocalHoshiAppContainer provides appContainer) {
+                    HoshiReaderTheme(
+                        darkTheme = darkTheme,
+                        eInkMode = loadedReaderSettings?.eInkMode ?: false,
+                        useDarkSystemBarIcons = useDarkSystemBarIcons,
+                    ) {
+                        val loadedReaderSettings = readerSettings ?: return@HoshiReaderTheme
+                        AppShell(
+                            pendingImportUri = pendingImportUri,
+                            onPendingImportConsumed = { pendingImportUri = null },
+                            readerSettings = loadedReaderSettings,
+                            onReaderSettingsChange = { settings ->
+                                readerSettings = settings
+                                scope.launch {
+                                    readerSettingsRepository.update { settings }
+                                }
+                            },
+                            appLanguage = appLanguage,
+                            onAppLanguageChange = { language ->
+                                appLanguage = language
+                                appLanguageRepository.save(language)
+                            },
+                            onReaderKeyEventHandlerChange = { handler ->
+                                readerKeyEventHandler = handler
                             }
-                        },
-                        onReaderKeyEventHandlerChange = { handler ->
-                            readerKeyEventHandler = handler
-                        }
-                    )
-                    DownloadedUpdatePrompt()
+                        )
+                        DownloadedUpdatePrompt()
+                    }
                 }
             }
         }

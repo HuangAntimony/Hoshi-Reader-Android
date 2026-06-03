@@ -7,6 +7,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Added
 
+- Add a runtime language picker in Advanced settings for following the system language, English, or Simplified Chinese without reloading the app.
 - Add a long-press entry point for revealing dictionary deletion from the Dictionaries screen while keeping the reorder handle dedicated to dragging.
 
 ### Fixed

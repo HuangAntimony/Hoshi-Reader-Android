@@ -55,6 +55,10 @@
     <string name="settings_about">About</string>
     <string name="settings_backup" comment="Advanced settings row label, intentionally matching the Backup action noun.">Backup</string>
     <string name="settings_title" comment="Shared label for settings page titles distinct from the main tab key.">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_simplified_chinese" translatable="false">简体中文</string>
     <string name="bookshelf_open_failed">Failed to open EPUB.</string>
     <string name="bookshelf_import_failed">Failed to import EPUB.</string>
     <string name="bookshelf_import_failed_list_format" comment="Bookshelf batch import failure summary; intentionally matches the dictionary batch import format.">Failed to import:\n%1$s</string>
