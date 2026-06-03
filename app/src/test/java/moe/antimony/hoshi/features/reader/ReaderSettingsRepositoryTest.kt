@@ -28,6 +28,10 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.eInkMode)
             assertFalse(settings.systemLightSepia)
             assertFalse(settings.sepiaInvertInDark)
+            assertEquals(ReaderInterfaceTheme.System, settings.uiTheme)
+            assertEquals(0xFFFFFFFFL, settings.customBackgroundColor)
+            assertEquals(0xFF000000L, settings.customTextColor)
+            assertEquals(0xFF999999L, settings.customInfoColor)
             assertTrue(settings.verticalWriting)
             assertEquals(ReaderFontManager.defaultMinchoFont, settings.selectedFont)
             assertEquals(22, settings.fontSize)
@@ -74,6 +78,10 @@ class ReaderSettingsRepositoryTest {
             ReaderSettings(
                 theme = ReaderTheme.Dark,
                 eInkMode = true,
+                uiTheme = ReaderInterfaceTheme.Dark,
+                customBackgroundColor = 0xFF112233,
+                customTextColor = 0xFF445566,
+                customInfoColor = 0xFF778899,
                 selectedFont = "Hiragino Mincho ProN",
                 fontSize = 29,
                 continuousMode = true,
@@ -92,6 +100,10 @@ class ReaderSettingsRepositoryTest {
 
             assertEquals(ReaderTheme.Dark, migrated.theme)
             assertTrue(migrated.eInkMode)
+            assertEquals(ReaderInterfaceTheme.Dark, migrated.uiTheme)
+            assertEquals(0xFF112233, migrated.customBackgroundColor)
+            assertEquals(0xFF445566, migrated.customTextColor)
+            assertEquals(0xFF778899, migrated.customInfoColor)
             assertEquals(ReaderFontManager.defaultMinchoFont, migrated.selectedFont)
             assertEquals(29, migrated.fontSize)
             assertTrue(migrated.continuousMode)
@@ -115,8 +127,12 @@ class ReaderSettingsRepositoryTest {
             repository.update { current ->
                 current.copy(
                     theme = ReaderTheme.Sepia,
+                    uiTheme = ReaderInterfaceTheme.Dark,
                     systemLightSepia = true,
                     sepiaInvertInDark = true,
+                    customBackgroundColor = 0xFF102030,
+                    customTextColor = 0xFF405060,
+                    customInfoColor = 0xFF708090,
                     verticalWriting = false,
                     selectedFont = ReaderFontManager.defaultGothicFont,
                     fontSize = 24,
@@ -160,8 +176,12 @@ class ReaderSettingsRepositoryTest {
             val saved = repository.settings.first()
 
             assertEquals(ReaderTheme.Sepia, saved.theme)
+            assertEquals(ReaderInterfaceTheme.Dark, saved.uiTheme)
             assertTrue(saved.systemLightSepia)
             assertTrue(saved.sepiaInvertInDark)
+            assertEquals(0xFF102030, saved.customBackgroundColor)
+            assertEquals(0xFF405060, saved.customTextColor)
+            assertEquals(0xFF708090, saved.customInfoColor)
             assertFalse(saved.verticalWriting)
             assertEquals(ReaderFontManager.defaultGothicFont, saved.selectedFont)
             assertEquals(24, saved.fontSize)

@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
 
@@ -246,15 +245,19 @@ class AnkiViewModel(
         }
     }
 
-    fun mineEntry(rawPayload: String, context: AnkiMiningContext): Boolean =
-        runBlocking {
-            repository.mineEntry(
-                rawPayload = rawPayload,
-                context = context,
-                decks = _uiState.value.decks,
-                noteTypes = _uiState.value.noteTypes,
-            )
+    fun mineEntryAsync(rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val mined = runCatching {
+                repository.mineEntry(
+                    rawPayload = rawPayload,
+                    context = context,
+                    decks = _uiState.value.decks,
+                    noteTypes = _uiState.value.noteTypes,
+                )
+            }.getOrDefault(false)
+            onResult(mined)
         }
+    }
 
     fun duplicateCheckAsync(expression: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {

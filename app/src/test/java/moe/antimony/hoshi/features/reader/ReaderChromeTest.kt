@@ -619,6 +619,21 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun customReaderThemeUsesCustomInfoColorForReaderMetadata() {
+        val colors = readerChromeColors(
+            ReaderSettings(
+                theme = ReaderTheme.Custom,
+                uiTheme = ReaderInterfaceTheme.Light,
+                customInfoColor = 0xFF778899,
+            ),
+            systemDark = true,
+        )
+
+        assertEquals(0xFAFCFCFCL, colors.buttonContainer)
+        assertEquals(0xFF778899L, colors.infoText)
+    }
+
+    @Test
     fun nonEInkChromeUsesIosLikeGlassHighlightsAndShadows() {
         val light = readerChromeColors(ReaderSettings(theme = ReaderTheme.Light), systemDark = false)
         val sepia = readerChromeColors(ReaderSettings(theme = ReaderTheme.Sepia), systemDark = false)

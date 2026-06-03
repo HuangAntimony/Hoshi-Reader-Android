@@ -51,6 +51,11 @@ internal object ReaderPaginationScripts {
         val initialRestoreScript = initialFragment?.let { fragment ->
             "window.hoshiReader.jumpToFragment(${fragment.javaScriptStringLiteral()});"
         } ?: "window.hoshiReader.restoreProgress($initialProgress);"
+        val restoreScripts = readerRestoreScripts(
+            sasayakiCuesJson = sasayakiCuesJson,
+            highlightsJson = highlightsJson,
+            initialRestoreScript = initialRestoreScript,
+        )
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         return """
         <script>
@@ -60,6 +65,8 @@ internal object ReaderPaginationScripts {
           nativeSelectionActive: false,
           nativeSelectionScrollPosition: null,
           cueWrappers: new Map(),
+          cueRanges: new Map(),
+          cueRubyElements: new Map(),
           activeCueId: null,
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
@@ -250,10 +257,29 @@ internal object ReaderPaginationScripts {
           applySasayakiCues: function(cues) {
             this.resetSasayakiCues();
             var cueRanges = this.collectSasayakiCueRanges(cues);
+            if (this.supportsSasayakiRangeHighlights()) {
+              var highlights = this.buildSasayakiHighlightRanges(cueRanges);
+              this.cueRanges = highlights.ranges;
+              this.cueRubyElements = highlights.rubyElements;
+              this.buildNodeOffsets();
+              return;
+            }
             this.wrapSasayakiCueRanges(cueRanges);
             this.buildNodeOffsets();
           },
           wrapSasayakiCue: function(cue) {
+            if (this.supportsSasayakiRangeHighlights()) {
+              var existingRanges = this.cueRanges.get(cue.id);
+              if (existingRanges && existingRanges.length) return existingRanges;
+              var collectedRanges = this.collectSasayakiCueRanges([cue]);
+              var highlightRanges = this.buildSasayakiHighlightRanges(collectedRanges);
+              var ranges = highlightRanges.ranges.get(cue.id) || [];
+              var rubyElements = highlightRanges.rubyElements.get(cue.id) || [];
+              if (ranges.length) this.cueRanges.set(cue.id, ranges);
+              if (rubyElements.length) this.cueRubyElements.set(cue.id, rubyElements);
+              this.buildNodeOffsets();
+              return ranges;
+            }
             var existing = this.cueWrappers.get(cue.id);
             if (existing && existing.length) return existing;
             var cueRanges = this.collectSasayakiCueRanges([cue]);
@@ -285,20 +311,67 @@ internal object ReaderPaginationScripts {
             }
             return wrapped;
           },
+          supportsSasayakiRangeHighlights: function() {
+            return !!(window.CSS && CSS.highlights && window.Highlight);
+          },
+          buildSasayakiHighlightRanges: function(cueRanges) {
+            var highlightedRanges = new Map();
+            var highlightedRubyElements = new Map();
+            var rubyForNode = function(node) {
+              var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+              return el && el.closest ? el.closest('ruby') : null;
+            };
+            for (var i = 0; i < cueRanges.length; i++) {
+              var id = cueRanges[i].id;
+              var ranges = cueRanges[i].ranges;
+              if (!ranges.length) continue;
+              var highlightRanges = [];
+              var rubyElements = [];
+              for (var j = 0; j < ranges.length; j++) {
+                var segment = ranges[j];
+                var ruby = rubyForNode(segment.node);
+                if (ruby) {
+                  if (rubyElements.indexOf(ruby) < 0) rubyElements.push(ruby);
+                  continue;
+                }
+                var range = document.createRange();
+                range.setStart(segment.node, segment.start);
+                range.setEnd(segment.node, segment.end);
+                highlightRanges.push(range);
+              }
+              if (highlightRanges.length) highlightedRanges.set(id, highlightRanges);
+              if (rubyElements.length) highlightedRubyElements.set(id, rubyElements);
+            }
+            return { ranges: highlightedRanges, rubyElements: highlightedRubyElements };
+          },
           highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
             var cueId = typeof cue === 'string' ? cue : cue.id;
-            var wrappers = this.cueWrappers.get(cueId);
-            if ((!wrappers || !wrappers.length) && typeof cue !== 'string') {
-              wrappers = this.wrapSasayakiCue(cue);
+            var useRangeHighlights = this.supportsSasayakiRangeHighlights();
+            var targets = useRangeHighlights ? this.cueRanges.get(cueId) : this.cueWrappers.get(cueId);
+            var rubyElements = useRangeHighlights ? (this.cueRubyElements.get(cueId) || []) : [];
+            if ((!targets || !targets.length) && typeof cue !== 'string') {
+              targets = this.wrapSasayakiCue(cue);
+              rubyElements = useRangeHighlights ? (this.cueRubyElements.get(cueId) || []) : [];
             }
-            if (!wrappers || !wrappers.length) return null;
+            if ((!targets || !targets.length) && !rubyElements.length) return null;
             this.activeCueId = cueId;
-            wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
+            if (useRangeHighlights) {
+              if (targets && targets.length) {
+                CSS.highlights.set('hoshi-sasayaki', new Highlight(...targets));
+              }
+              rubyElements.forEach(function(ruby) { ruby.classList.add('hoshi-sasayaki-ruby-active'); });
+            } else {
+              targets.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
+            }
             if (reveal) {
               var range = document.createRange();
-              range.selectNodeContents(wrappers[0]);
-              if (this.scrollToRange(range)) {
+              var scrollRange = targets && targets.length ? targets[0] : rubyElements[0];
+              if (!useRangeHighlights) {
+                range.selectNodeContents(targets[0]);
+                scrollRange = range;
+              }
+              if (this.scrollToRange(scrollRange)) {
                 return this.calculateProgress();
               }
             }
@@ -306,11 +379,25 @@ internal object ReaderPaginationScripts {
           },
           clearSasayakiCue: function() {
             if (!this.activeCueId) return;
-            var wrappers = this.cueWrappers.get(this.activeCueId) || [];
-            wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
+            if (this.supportsSasayakiRangeHighlights()) {
+              CSS.highlights.delete('hoshi-sasayaki');
+              var rubyElements = this.cueRubyElements.get(this.activeCueId) || [];
+              rubyElements.forEach(function(ruby) { ruby.classList.remove('hoshi-sasayaki-ruby-active'); });
+            } else {
+              var wrappers = this.cueWrappers.get(this.activeCueId) || [];
+              wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
+            }
             this.activeCueId = null;
           },
           resetSasayakiCues: function() {
+            if (this.supportsSasayakiRangeHighlights()) {
+              CSS.highlights.delete('hoshi-sasayaki');
+            }
+            this.cueRubyElements.forEach(function(rubyElements) {
+              rubyElements.forEach(function(ruby) { ruby.classList.remove('hoshi-sasayaki-ruby-active'); });
+            });
+            this.cueRubyElements.clear();
+            this.cueRanges.clear();
             var self = this;
             this.cueWrappers.forEach(function(wrappers) { self.unwrap(wrappers); });
             this.cueWrappers.clear();
@@ -721,9 +808,7 @@ internal object ReaderPaginationScripts {
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
-            ${sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" }.orEmpty()}
-            ${highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" }.orEmpty()}
-            $initialRestoreScript
+            $restoreScripts
           });
         };
         window.addEventListener('load', function() {
@@ -746,11 +831,18 @@ internal object ReaderPaginationScripts {
         val initialRestoreScript = initialFragment?.let { fragment ->
             "window.hoshiReader.jumpToFragment(${fragment.javaScriptStringLiteral()});"
         } ?: "window.hoshiReader.restoreProgress($initialProgress);"
+        val restoreScripts = readerRestoreScripts(
+            sasayakiCuesJson = sasayakiCuesJson,
+            highlightsJson = highlightsJson,
+            initialRestoreScript = initialRestoreScript,
+        )
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         return """
         <script>
         window.hoshiReader = {
           cueWrappers: new Map(),
+          cueRanges: new Map(),
+          cueRubyElements: new Map(),
           activeCueId: null,
           ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
           ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
@@ -899,7 +991,23 @@ internal object ReaderPaginationScripts {
             } else if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
               return false;
             }
-            target.scrollIntoView({ block: 'start', inline: 'nearest' });
+            if (typeof target.scrollIntoView === 'function') {
+              target.scrollIntoView({ block: 'start', inline: 'nearest' });
+            } else if (this.isVertical()) {
+              var root = document.scrollingElement || document.documentElement;
+              var currentLeft = window.scrollX;
+              if (currentLeft === 0 && root.scrollLeft !== 0) currentLeft = root.scrollLeft;
+              var targetLeft = currentLeft + rect.right - window.innerWidth;
+              window.scrollTo({ left: targetLeft, top: window.scrollY, behavior: 'instant' });
+              root.scrollLeft = targetLeft;
+            } else {
+              var root = document.scrollingElement || document.documentElement;
+              var currentTop = root.scrollTop;
+              if (currentTop === 0 && window.scrollY !== 0) currentTop = window.scrollY;
+              var targetTop = currentTop + rect.top;
+              window.scrollTo({ left: window.scrollX, top: targetTop, behavior: 'instant' });
+              root.scrollTop = targetTop;
+            }
             return true;
           },
           collectSasayakiCueRanges: function(cues) {
@@ -963,10 +1071,29 @@ internal object ReaderPaginationScripts {
           applySasayakiCues: function(cues) {
             this.resetSasayakiCues();
             var cueRanges = this.collectSasayakiCueRanges(cues);
+            if (this.supportsSasayakiRangeHighlights()) {
+              var highlights = this.buildSasayakiHighlightRanges(cueRanges);
+              this.cueRanges = highlights.ranges;
+              this.cueRubyElements = highlights.rubyElements;
+              this.buildNodeOffsets();
+              return;
+            }
             this.wrapSasayakiCueRanges(cueRanges);
             this.buildNodeOffsets();
           },
           wrapSasayakiCue: function(cue) {
+            if (this.supportsSasayakiRangeHighlights()) {
+              var existingRanges = this.cueRanges.get(cue.id);
+              if (existingRanges && existingRanges.length) return existingRanges;
+              var collectedRanges = this.collectSasayakiCueRanges([cue]);
+              var highlightRanges = this.buildSasayakiHighlightRanges(collectedRanges);
+              var ranges = highlightRanges.ranges.get(cue.id) || [];
+              var rubyElements = highlightRanges.rubyElements.get(cue.id) || [];
+              if (ranges.length) this.cueRanges.set(cue.id, ranges);
+              if (rubyElements.length) this.cueRubyElements.set(cue.id, rubyElements);
+              this.buildNodeOffsets();
+              return ranges;
+            }
             var existing = this.cueWrappers.get(cue.id);
             if (existing && existing.length) return existing;
             var cueRanges = this.collectSasayakiCueRanges([cue]);
@@ -998,28 +1125,86 @@ internal object ReaderPaginationScripts {
             }
             return wrapped;
           },
+          supportsSasayakiRangeHighlights: function() {
+            return !!(window.CSS && CSS.highlights && window.Highlight);
+          },
+          buildSasayakiHighlightRanges: function(cueRanges) {
+            var highlightedRanges = new Map();
+            var highlightedRubyElements = new Map();
+            var rubyForNode = function(node) {
+              var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+              return el && el.closest ? el.closest('ruby') : null;
+            };
+            for (var i = 0; i < cueRanges.length; i++) {
+              var id = cueRanges[i].id;
+              var ranges = cueRanges[i].ranges;
+              if (!ranges.length) continue;
+              var highlightRanges = [];
+              var rubyElements = [];
+              for (var j = 0; j < ranges.length; j++) {
+                var segment = ranges[j];
+                var ruby = rubyForNode(segment.node);
+                if (ruby) {
+                  if (rubyElements.indexOf(ruby) < 0) rubyElements.push(ruby);
+                  continue;
+                }
+                var range = document.createRange();
+                range.setStart(segment.node, segment.start);
+                range.setEnd(segment.node, segment.end);
+                highlightRanges.push(range);
+              }
+              if (highlightRanges.length) highlightedRanges.set(id, highlightRanges);
+              if (rubyElements.length) highlightedRubyElements.set(id, rubyElements);
+            }
+            return { ranges: highlightedRanges, rubyElements: highlightedRubyElements };
+          },
           highlightSasayakiCue: function(cue, reveal) {
             this.clearSasayakiCue();
             var cueId = typeof cue === 'string' ? cue : cue.id;
-            var wrappers = this.cueWrappers.get(cueId);
-            if ((!wrappers || !wrappers.length) && typeof cue !== 'string') {
-              wrappers = this.wrapSasayakiCue(cue);
+            var useRangeHighlights = this.supportsSasayakiRangeHighlights();
+            var targets = useRangeHighlights ? this.cueRanges.get(cueId) : this.cueWrappers.get(cueId);
+            var rubyElements = useRangeHighlights ? (this.cueRubyElements.get(cueId) || []) : [];
+            if ((!targets || !targets.length) && typeof cue !== 'string') {
+              targets = this.wrapSasayakiCue(cue);
+              rubyElements = useRangeHighlights ? (this.cueRubyElements.get(cueId) || []) : [];
             }
-            if (!wrappers || !wrappers.length) return null;
+            if ((!targets || !targets.length) && !rubyElements.length) return null;
             this.activeCueId = cueId;
-            wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
-            if (reveal && this.scrollToTarget(wrappers[0])) {
+            if (useRangeHighlights) {
+              if (targets && targets.length) {
+                CSS.highlights.set('hoshi-sasayaki', new Highlight(...targets));
+              }
+              rubyElements.forEach(function(ruby) { ruby.classList.add('hoshi-sasayaki-ruby-active'); });
+            } else {
+              targets.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
+            }
+            var scrollTarget = targets && targets.length ? targets[0] : rubyElements[0];
+            if (reveal && scrollTarget && this.scrollToTarget(scrollTarget)) {
               return this.calculateProgress();
             }
             return null;
           },
           clearSasayakiCue: function() {
             if (!this.activeCueId) return;
-            var wrappers = this.cueWrappers.get(this.activeCueId) || [];
-            wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
+            if (this.supportsSasayakiRangeHighlights()) {
+              CSS.highlights.delete('hoshi-sasayaki');
+              var rubyElements = this.cueRubyElements.get(this.activeCueId) || [];
+              rubyElements.forEach(function(ruby) { ruby.classList.remove('hoshi-sasayaki-ruby-active'); });
+            } else {
+              var wrappers = this.cueWrappers.get(this.activeCueId) || [];
+              wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
+            }
             this.activeCueId = null;
           },
           resetSasayakiCues: function() {
+            if (this.supportsSasayakiRangeHighlights()) {
+              CSS.highlights.delete('hoshi-sasayaki');
+            }
+            this.cueRubyElements.forEach(function(rubyElements) {
+              rubyElements.forEach(function(ruby) { ruby.classList.remove('hoshi-sasayaki-ruby-active'); });
+            });
+            this.cueRubyElements.clear();
+            this.cueRanges.clear();
             var self = this;
             this.cueWrappers.forEach(function(wrappers) { self.unwrap(wrappers); });
             this.cueWrappers.clear();
@@ -1195,9 +1380,7 @@ internal object ReaderPaginationScripts {
             return new Promise(function(resolve) { setTimeout(resolve, 50); });
           }).then(function() {
             window.hoshiReader.buildNodeOffsets();
-            ${sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" }.orEmpty()}
-            ${highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" }.orEmpty()}
-            $initialRestoreScript
+            $restoreScripts
           });
         };
         window.addEventListener('load', function() {
@@ -1352,6 +1535,16 @@ private fun readerHighlightsScript(): String = """
       }
     };
 """.trimIndent()
+
+private fun readerRestoreScripts(
+    sasayakiCuesJson: String?,
+    highlightsJson: String?,
+    initialRestoreScript: String,
+): String = listOfNotNull(
+    sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" },
+    highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" },
+    initialRestoreScript,
+).joinToString(separator = "\n")
 
 private fun String.javaScriptStringLiteral(): String =
     buildString(length + 2) {

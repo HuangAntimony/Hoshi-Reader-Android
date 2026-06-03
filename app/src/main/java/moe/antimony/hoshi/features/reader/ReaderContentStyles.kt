@@ -79,7 +79,7 @@ internal object ReaderContentStyles {
         sasayakiBackgroundColor: Long = 0x6687CEEB,
     ): String {
         val textColor = settings.textColorCss(systemDark)
-        val backgroundColor = settings.backgroundColor(systemDark).toReaderCssColor()
+        val backgroundColor = settings.backgroundColorCss(systemDark)
         val normalizedFont = ReaderFontManager.normalizeDefaultFont(settings.selectedFont)
         val fontFaceFamily = normalizedFont.cssString()
         val bodyFontFamily = normalizedFont.readerCssFontFamily()
@@ -228,6 +228,10 @@ internal object ReaderContentStyles {
                 $gridCss
                 text-orientation: mixed;
             }
+            body * {
+                column-count: auto !important;
+                -webkit-column-count: auto !important;
+            }
             body, body * {
                 orphans: 1 !important;
                 widows: 1 !important;
@@ -288,6 +292,14 @@ internal object ReaderContentStyles {
             user-select: none;
         }
         $selectionHighlightCss
+        ::highlight(hoshi-sasayaki) {
+            color: var(--hoshi-sasayaki-text-color) !important;
+            background-color: var(--hoshi-sasayaki-background-color) !important;
+        }
+        ruby.hoshi-sasayaki-ruby-active {
+            color: var(--hoshi-sasayaki-text-color) !important;
+            background-color: var(--hoshi-sasayaki-background-color) !important;
+        }
         .hoshi-sasayaki-cue.hoshi-sasayaki-active {
             color: var(--hoshi-sasayaki-text-color) !important;
             background-color: var(--hoshi-sasayaki-background-color) !important;

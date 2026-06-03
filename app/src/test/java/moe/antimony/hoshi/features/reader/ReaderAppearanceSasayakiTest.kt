@@ -52,4 +52,19 @@ class ReaderAppearanceSasayakiTest {
     fun appearanceHidesSasayakiToggleWhenSasayakiIsDisabled() {
         assertTrue(readerAppearanceSasayakiRows(SasayakiSettings(enabled = false)).isEmpty())
     }
+
+    @Test
+    fun appearanceShowsCustomThemeControlsOnlyForCustomTheme() {
+        assertTrue(readerAppearanceShowsCustomInterfaceTheme(ReaderSettings(theme = ReaderTheme.Custom)))
+        assertTrue(!readerAppearanceShowsCustomInterfaceTheme(ReaderSettings(theme = ReaderTheme.Sepia)))
+        assertEquals(
+            listOf(
+                ReaderAppearanceCustomColorRow.Background,
+                ReaderAppearanceCustomColorRow.Text,
+                ReaderAppearanceCustomColorRow.Info,
+            ),
+            readerAppearanceCustomColorRows(ReaderSettings(theme = ReaderTheme.Custom)),
+        )
+        assertTrue(readerAppearanceCustomColorRows(ReaderSettings(theme = ReaderTheme.Light)).isEmpty())
+    }
 }

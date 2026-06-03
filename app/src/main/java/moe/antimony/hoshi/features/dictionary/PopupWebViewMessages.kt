@@ -41,7 +41,7 @@ internal class PopupWebViewCallbacks(
     val onPlayWordAudio: (String, AudioPlaybackMode) -> Unit = { _, _ -> },
     val onContentReady: () -> Unit = {},
     val onScroll: () -> Unit = {},
-    val onMineEntry: (String) -> Boolean = { false },
+    val onMineEntry: (String, (Boolean) -> Unit) -> Unit = { _, reply -> reply(false) },
     val onDuplicateCheck: (String, (Boolean) -> Unit) -> Unit = { _, reply -> reply(false) },
 )
 
@@ -253,10 +253,6 @@ internal class PopupWebViewBridge(
     }
 
     @JavascriptInterface
-    fun mineEntry(payloadJson: String): Boolean =
-        runCatching { callbackHolder.callbacks.onMineEntry(payloadJson) }.getOrDefault(false)
-
-    @JavascriptInterface
     fun postMessage(message: String) {
         val payload = runCatching { JSONObject(message) }.getOrNull() ?: return
         val callbacks = callbackHolder.callbacks
@@ -333,6 +329,20 @@ internal class PopupWebViewBridge(
                             "window.HoshiAndroidPopup && window.HoshiAndroidPopup.resolveMessage(${quote(messageId)}, $isDuplicate)",
                             null,
                         )
+                    }
+                }
+            }
+            "mineEntry" -> {
+                val messageId = payload.optString("id").takeIf { it.isNotBlank() } ?: return
+                val body = payload.opt("body").takeIf { it != null && it != JSONObject.NULL } ?: return
+                mainHandler.post {
+                    callbacks.onMineEntry(body.toString()) { mined ->
+                        mainHandler.post {
+                            webView.evaluateJavascript(
+                                "window.HoshiAndroidPopup && window.HoshiAndroidPopup.resolveMessage(${quote(messageId)}, $mined)",
+                                null,
+                            )
+                        }
                     }
                 }
             }

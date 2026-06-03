@@ -144,7 +144,7 @@
     <string name="dictionary_collapse_dictionaries">折叠辞典</string>
     <string name="dictionary_collapse_mode_expand_all">全部展开</string>
     <string name="dictionary_collapse_mode_collapse_all">全部折叠</string>
-    <string name="dictionary_collapse_mode_custom">自定义</string>
+    <string name="dictionary_collapse_mode_custom" comment="Dictionary collapse mode option, distinct from reader appearance custom theme.">自定义</string>
     <string name="dictionary_mode" comment="Dictionary setting label, intentionally matching reader appearance mode.">模式</string>
     <string name="dictionary_expand_first">展开第一个辞典</string>
     <string name="dictionary_settings_behaviour">行为</string>
@@ -211,9 +211,20 @@
     <string name="reader_appearance_theme_light">浅色</string>
     <string name="reader_appearance_theme_dark">深色</string>
     <string name="reader_appearance_theme_sepia">护眼色</string>
+    <string name="reader_appearance_theme_custom" comment="Reader Appearance theme option, distinct from dictionary collapse custom mode.">自定义</string>
     <string name="reader_appearance_eink_mode">墨水屏模式</string>
     <string name="reader_appearance_use_sepia_light_theme">浅色主题使用护眼色</string>
     <string name="reader_appearance_invert_sepia_dark">系统深色时反转护眼色</string>
+    <string name="reader_appearance_interface">界面</string>
+    <string name="reader_appearance_background_color">背景颜色</string>
+    <string name="reader_appearance_text_color">文字颜色</string>
+    <string name="reader_appearance_info_color">信息颜色</string>
+    <string name="reader_appearance_color_hex">十六进制</string>
+    <string name="reader_appearance_color_invalid">请使用 #RRGGBB 或 #RRGGBBAA。</string>
+    <string name="reader_appearance_color_alpha">透明度</string>
+    <string name="reader_appearance_color_red">红色</string>
+    <string name="reader_appearance_color_green">绿色</string>
+    <string name="reader_appearance_color_blue">蓝色</string>
     <string name="reader_appearance_text_orientation">文字方向</string>
     <string name="reader_appearance_vertical">竖排</string>
     <string name="reader_appearance_horizontal">横排</string>

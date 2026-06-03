@@ -519,15 +519,19 @@ private class LookupPopupHostView(
             onPlayWordAudio = { url, mode ->
                 WordAudioPlayer.get(context).play(url, mode)
             },
-            onMineEntry = { payload ->
-                runCatching {
-                    val ankiContext = popup.sasayakiCue?.let { cue ->
+            onMineEntry = { payload, reply ->
+                val miningContext = runCatching {
+                    popup.sasayakiCue?.let { cue ->
                         state.ankiContext.copy(
                             sasayakiAudioPath = onPrepareSasayakiAudio(cue, state.selection.sentence),
                         )
                     } ?: state.ankiContext
-                    ankiViewModel.mineEntry(payload, ankiContext)
-                }.getOrDefault(false)
+                }.getOrNull()
+                if (miningContext == null) {
+                    reply(false)
+                } else {
+                    ankiViewModel.mineEntryAsync(payload, miningContext, reply)
+                }
             },
             onDuplicateCheck = { expression, reply ->
                 ankiViewModel.duplicateCheckAsync(expression, reply)

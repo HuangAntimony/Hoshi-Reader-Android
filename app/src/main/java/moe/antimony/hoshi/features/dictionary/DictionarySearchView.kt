@@ -254,12 +254,13 @@ fun DictionarySearchView(
                     onPlayWordAudio = { url, mode ->
                         WordAudioPlayer.get(context).play(url, mode)
                     },
-                    onMineEntry = { payload ->
-                        ankiViewModel.mineEntry(
+                    onMineEntry = { payload, reply ->
+                        ankiViewModel.mineEntryAsync(
                             payload,
                             AnkiMiningContext(
                                 sentence = uiState.lastQuery.ifBlank { uiState.query },
                             ),
+                            reply,
                         )
                     },
                     onDuplicateCheck = ankiViewModel::duplicateCheckAsync,

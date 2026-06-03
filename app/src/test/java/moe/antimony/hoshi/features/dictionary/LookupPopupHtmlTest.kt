@@ -268,6 +268,21 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun popupHtmlMinesEntriesThroughAsyncRequestBridgeLikeIos() {
+        val html = LookupPopupHtml.render(
+            listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".button-slot {}",
+                selectionJs = "window.hoshiSelection = { selectText: function() {} };",
+            ),
+        )
+
+        assertTrue(html.contains("mineEntry: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('mineEntry', content); } }"))
+        assertFalse(html.contains("window.HoshiPopup.mineEntry(JSON.stringify(content))"))
+    }
+
+    @Test
     fun eInkPopupCssTargetsNativeButtonSlots() {
         val html = LookupPopupHtml.render(
             listOf(lookupResult(expression = "食べる", reading = "たべる", glossary = "to eat")),

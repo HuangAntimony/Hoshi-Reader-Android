@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -21,8 +22,12 @@ import java.util.Locale
 data class ReaderSettings(
     val theme: ReaderTheme = ReaderTheme.System,
     val eInkMode: Boolean = false,
+    val uiTheme: ReaderInterfaceTheme = ReaderInterfaceTheme.System,
     val systemLightSepia: Boolean = false,
     val sepiaInvertInDark: Boolean = false,
+    val customBackgroundColor: Long = 0xFFFFFFFF,
+    val customTextColor: Long = 0xFF000000,
+    val customInfoColor: Long = 0xFF999999,
     val verticalWriting: Boolean = true,
     val selectedFont: String = ReaderFontManager.defaultMinchoFont,
     val fontSize: Int = 22,
@@ -128,8 +133,12 @@ data class ReaderSettings(
             ReaderTheme.Dark -> 0xFF000000
             ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) 0xFF17150F else 0xFFF2E2C9
             ReaderTheme.Light -> 0xFFFFFFFF
+            ReaderTheme.Custom -> customBackgroundColor
         }
     }
+
+    fun backgroundColorCss(systemDark: Boolean): String =
+        backgroundColor(systemDark).toReaderCssColor(includeAlpha = !eInkMode && theme == ReaderTheme.Custom)
 
     fun textColorCss(systemDark: Boolean): String {
         if (eInkMode) {
@@ -140,6 +149,7 @@ data class ReaderSettings(
             ReaderTheme.Light -> "#000"
             ReaderTheme.Dark -> "#fff"
             ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) "#F2E2C9" else "#332A1B"
+            ReaderTheme.Custom -> customTextColor.toReaderCssColor(includeAlpha = true)
         }
     }
 
@@ -161,6 +171,24 @@ enum class ReaderTheme(val label: String) {
     Light("Light"),
     Dark("Dark"),
     Sepia("Sepia"),
+    Custom("Custom"),
+}
+
+enum class ReaderInterfaceTheme(val label: String) {
+    System("System"),
+    Light("Light"),
+    Dark("Dark");
+
+    fun usesDarkInterface(systemDark: Boolean): Boolean = when (this) {
+        System -> systemDark
+        Light -> false
+        Dark -> true
+    }
+
+    companion object {
+        fun fromStorage(value: String?): ReaderInterfaceTheme =
+            entries.firstOrNull { it.label == value || it.name == value } ?: System
+    }
 }
 
 enum class StatisticsAutostartMode(val rawValue: String, @get:StringRes val labelRes: Int) {
@@ -179,6 +207,7 @@ fun ReaderSettings.usesDarkInterface(systemDark: Boolean): Boolean = when (theme
     ReaderTheme.Light -> false
     ReaderTheme.Dark -> true
     ReaderTheme.Sepia -> sepiaInvertInDark && systemDark
+    ReaderTheme.Custom -> uiTheme.usesDarkInterface(systemDark)
 }
 
 fun ReaderSettings.usesDarkSystemBarIcons(systemDark: Boolean): Boolean =
@@ -202,8 +231,12 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
             ?: ReaderTheme.System,
         eInkMode = preferences.getBoolean("eInkMode", false),
+        uiTheme = ReaderInterfaceTheme.fromStorage(preferences.getString("uiTheme", null)),
         systemLightSepia = preferences.getBoolean("systemLightSepia", false),
         sepiaInvertInDark = preferences.getBoolean("sepiaInvertInDark", false),
+        customBackgroundColor = preferences.getLong("customBackgroundColor", 0xFFFFFFFF),
+        customTextColor = preferences.getLong("customTextColor", 0xFF000000),
+        customInfoColor = preferences.getLong("customInfoColor", 0xFF999999),
         verticalWriting = preferences.getBoolean("verticalWriting", true),
         selectedFont = ReaderFontManager.normalizeDefaultFont(
             preferences.getString("selectedFont", null) ?: ReaderFontManager.defaultMinchoFont,
@@ -256,8 +289,12 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         preferences.edit()
             .putString("theme", settings.theme.label)
             .putBoolean("eInkMode", settings.eInkMode)
+            .putString("uiTheme", settings.uiTheme.label)
             .putBoolean("systemLightSepia", settings.systemLightSepia)
             .putBoolean("sepiaInvertInDark", settings.sepiaInvertInDark)
+            .putLong("customBackgroundColor", settings.customBackgroundColor)
+            .putLong("customTextColor", settings.customTextColor)
+            .putLong("customInfoColor", settings.customInfoColor)
             .putBoolean("verticalWriting", settings.verticalWriting)
             .putString("selectedFont", settings.selectedFont)
             .putInt("fontSize", settings.fontSize)
@@ -343,8 +380,12 @@ class ReaderSettingsRepository(
                 ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
                 ?: ReaderTheme.System,
             eInkMode = this[KEY_E_INK_MODE] ?: false,
+            uiTheme = ReaderInterfaceTheme.fromStorage(this[KEY_UI_THEME]),
             systemLightSepia = this[KEY_SYSTEM_LIGHT_SEPIA] ?: false,
             sepiaInvertInDark = this[KEY_SEPIA_INVERT_IN_DARK] ?: false,
+            customBackgroundColor = this[KEY_CUSTOM_BACKGROUND_COLOR] ?: 0xFFFFFFFF,
+            customTextColor = this[KEY_CUSTOM_TEXT_COLOR] ?: 0xFF000000,
+            customInfoColor = this[KEY_CUSTOM_INFO_COLOR] ?: 0xFF999999,
             verticalWriting = this[KEY_VERTICAL_WRITING] ?: true,
             selectedFont = ReaderFontManager.normalizeDefaultFont(
                 this[KEY_SELECTED_FONT] ?: ReaderFontManager.defaultMinchoFont,
@@ -394,8 +435,12 @@ class ReaderSettingsRepository(
     private fun MutablePreferences.writeReaderSettings(settings: ReaderSettings) {
         this[KEY_THEME] = settings.theme.label
         this[KEY_E_INK_MODE] = settings.eInkMode
+        this[KEY_UI_THEME] = settings.uiTheme.label
         this[KEY_SYSTEM_LIGHT_SEPIA] = settings.systemLightSepia
         this[KEY_SEPIA_INVERT_IN_DARK] = settings.sepiaInvertInDark
+        this[KEY_CUSTOM_BACKGROUND_COLOR] = settings.customBackgroundColor
+        this[KEY_CUSTOM_TEXT_COLOR] = settings.customTextColor
+        this[KEY_CUSTOM_INFO_COLOR] = settings.customInfoColor
         this[KEY_VERTICAL_WRITING] = settings.verticalWriting
         this[KEY_SELECTED_FONT] = settings.selectedFont
         this[KEY_FONT_SIZE] = settings.fontSize
@@ -447,8 +492,12 @@ class ReaderSettingsRepository(
             booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")
         private val KEY_THEME = stringPreferencesKey("theme")
         private val KEY_E_INK_MODE = booleanPreferencesKey("eInkMode")
+        private val KEY_UI_THEME = stringPreferencesKey("uiTheme")
         private val KEY_SYSTEM_LIGHT_SEPIA = booleanPreferencesKey("systemLightSepia")
         private val KEY_SEPIA_INVERT_IN_DARK = booleanPreferencesKey("sepiaInvertInDark")
+        private val KEY_CUSTOM_BACKGROUND_COLOR = longPreferencesKey("customBackgroundColor")
+        private val KEY_CUSTOM_TEXT_COLOR = longPreferencesKey("customTextColor")
+        private val KEY_CUSTOM_INFO_COLOR = longPreferencesKey("customInfoColor")
         private val KEY_VERTICAL_WRITING = booleanPreferencesKey("verticalWriting")
         private val KEY_SELECTED_FONT = stringPreferencesKey("selectedFont")
         private val KEY_FONT_SIZE = intPreferencesKey("fontSize")

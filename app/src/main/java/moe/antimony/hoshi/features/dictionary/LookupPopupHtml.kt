@@ -161,7 +161,7 @@ internal object LookupPopupHtml {
                             shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
                             contentReady: { postMessage: function(frames) { window.HoshiAndroidPopup.postMessage('contentReady', frames); } },
                             popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
-                            mineEntry: { postMessage: async function(content) { return window.HoshiPopup.mineEntry(JSON.stringify(content)); } },
+                            mineEntry: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('mineEntry', content); } },
                             duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
                             getEntry: { postMessage: async function(index) {
                                 if (window.HoshiPopup && window.HoshiPopup.getEntry) {

@@ -143,6 +143,22 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun loadScriptOmitsAbsentOptionalPayloadScriptsBeforeRestore() {
+        val script = ReaderPaginationScripts.shellScript(
+            sasayakiCuesJson = null,
+            highlightsJson = null,
+        )
+        val restoreBlock = script.substringAfter("Promise.all(imagePromises).then(function()")
+            .substringAfter("window.hoshiReader.buildNodeOffsets();")
+            .substringBefore("});")
+
+        assertFalse(restoreBlock.contains("applySasayakiCues"))
+        assertFalse(restoreBlock.contains("applyHighlights"))
+        assertFalse(restoreBlock.contains("null"))
+        assertTrue(restoreBlock.contains("window.hoshiReader.restoreProgress(0.0)"))
+    }
+
+    @Test
     fun characterBasedProgressCountsEveryNodeBeforeViewportLikeIos() {
         val progress = readerProgressFromVisibleNodeLayouts(
             listOf(
