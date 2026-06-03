@@ -447,6 +447,7 @@ class ReaderSettingsTest {
         assertTrue(css.contains("--hoshi-eink-line-color: #000;"))
         assertTrue(css.contains("--hoshi-reader-eink-mode: 1;"))
         assertTrue(css.contains("--hoshi-reader-vertical-writing: 0;"))
+        assertTrue(css.contains("text-decoration-thickness: 1px;"))
     }
 
     @Test

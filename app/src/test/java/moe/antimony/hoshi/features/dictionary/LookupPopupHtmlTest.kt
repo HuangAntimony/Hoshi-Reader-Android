@@ -295,6 +295,7 @@ class LookupPopupHtmlTest {
         )
 
         assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .button-slot"""))
+        assertTrue(html.contains("text-decoration-thickness: 1px;"))
         assertFalse(html.contains("""html[data-hoshi-eink-mode="true"] .audio-button"""))
         assertFalse(html.contains("""html[data-hoshi-eink-mode="true"] .mine-button"""))
     }

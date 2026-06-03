@@ -45,6 +45,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+private const val PopupSelectionEInkLineSizeCssPx = 1.0f
+
 @Composable
 internal fun LookupPopupAndroidStack(
     popups: List<LookupPopupItem>,
@@ -1052,15 +1054,15 @@ private class PopupSelectionHighlightView(context: Context) : View(context) {
         }
         drawRects.forEachIndexed { index, rect ->
             if (rect.width <= 0.0 || rect.height <= 0.0) return@forEachIndexed
-            val left = (rect.x * density).toFloat()
-            val top = (rect.y * density).toFloat()
-            val right = ((rect.x + rect.width) * density).toFloat()
-            val bottom = ((rect.y + rect.height) * density).toFloat()
+            val left = (rect.x * density).roundToInt().toFloat()
+            val top = (rect.y * density).roundToInt().toFloat()
+            val right = ((rect.x + rect.width) * density).roundToInt().toFloat()
+            val bottom = ((rect.y + rect.height) * density).roundToInt().toFloat()
             paint.style = Paint.Style.FILL
             if (eInkMode) {
                 paint.isAntiAlias = false
                 paint.color = if (darkMode) AndroidColor.WHITE else AndroidColor.BLACK
-                val lineHeight = (1.5f * density).roundToInt().coerceAtLeast(1).toFloat()
+                val lineHeight = (PopupSelectionEInkLineSizeCssPx * density).toInt().coerceAtLeast(1).toFloat()
                 if (eInkStyle == PopupSelectionEInkStyle.Box) {
                     val edges = boxEdges.getOrElse(index) { PopupSelectionBoxEdges() }
                     drawBoxEdges(canvas, left, top, right, bottom, lineHeight, edges)

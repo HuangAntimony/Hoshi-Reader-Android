@@ -3,7 +3,7 @@
     const LAYER_ID = 'hoshi-reader-popup-layer';
     const ACTION_BAR_HEIGHT = 37;
     const SASAYAKI_BAR_HEIGHT = 37;
-    const HIGHLIGHT_LINE_SIZE = 1.5;
+    const HIGHLIGHT_LINE_SIZE = 1;
     const HIGHLIGHT_INLINE_MERGE_TOLERANCE = 1;
     const frames = new Map();
     const frameSources = new WeakMap();
@@ -349,6 +349,33 @@
         layer.appendChild(line);
     }
 
+    function devicePixelRatio() {
+        return Math.max(1, window.devicePixelRatio || 1);
+    }
+
+    function snapCssPixel(value) {
+        const ratio = devicePixelRatio();
+        return Math.round(value * ratio) / ratio;
+    }
+
+    function highlightLineSize() {
+        const ratio = devicePixelRatio();
+        return Math.max(1, Math.floor(HIGHLIGHT_LINE_SIZE * ratio)) / ratio;
+    }
+
+    function snapHighlightRect(rect) {
+        const left = snapCssPixel(rect.x);
+        const top = snapCssPixel(rect.y);
+        const right = snapCssPixel(rect.x + rect.width);
+        const bottom = snapCssPixel(rect.y + rect.height);
+        return {
+            x: left,
+            y: top,
+            width: Math.max(0, right - left),
+            height: Math.max(0, bottom - top),
+        };
+    }
+
     function renderSasayakiHighlight(payload) {
         sasayakiHighlight = payload || null;
         const existingLayer = document.getElementById(LAYER_ID)?.querySelector('.hoshi-reader-sasayaki-highlight-layer');
@@ -366,24 +393,26 @@
         );
         layer.replaceChildren();
         rects.forEach((rect) => {
+            const snapped = snapHighlightRect(rect);
+            const lineSize = highlightLineSize();
             if (verticalWriting) {
                 appendAbsoluteLine(
                     layer,
                     'hoshi-reader-sasayaki-highlight-line',
-                    rect.x + Math.max(0, rect.width - HIGHLIGHT_LINE_SIZE),
-                    rect.y,
-                    HIGHLIGHT_LINE_SIZE,
-                    rect.height,
+                    snapped.x + Math.max(0, snapped.width - lineSize),
+                    snapped.y,
+                    lineSize,
+                    snapped.height,
                     color,
                 );
             } else {
                 appendAbsoluteLine(
                     layer,
                     'hoshi-reader-sasayaki-highlight-line',
-                    rect.x,
-                    rect.y + Math.max(0, rect.height - HIGHLIGHT_LINE_SIZE),
-                    rect.width,
-                    HIGHLIGHT_LINE_SIZE,
+                    snapped.x,
+                    snapped.y + Math.max(0, snapped.height - lineSize),
+                    snapped.width,
+                    lineSize,
                     color,
                 );
             }
@@ -486,18 +515,19 @@
     }
 
     function applyRootHighlightBox(item, rect, color, edges) {
-        const lineSize = HIGHLIGHT_LINE_SIZE;
-        item.style.left = `${rect.x}px`;
-        item.style.top = `${rect.y}px`;
-        item.style.width = `${rect.width}px`;
-        item.style.height = `${rect.height}px`;
+        const snapped = snapHighlightRect(rect);
+        const lineSize = highlightLineSize();
+        item.style.left = `${snapped.x}px`;
+        item.style.top = `${snapped.y}px`;
+        item.style.width = `${snapped.width}px`;
+        item.style.height = `${snapped.height}px`;
         item.style.background = 'transparent';
-        const bottomLineTop = Math.max(0, rect.height - lineSize);
+        const bottomLineTop = Math.max(0, snapped.height - lineSize);
         const bottomLineBottom = bottomLineTop + lineSize;
-        const rightLineLeft = Math.max(0, rect.width - lineSize);
+        const rightLineLeft = Math.max(0, snapped.width - lineSize);
         const rightLineRight = rightLineLeft + lineSize;
-        const inlineEnd = rect.width;
-        const blockEnd = rect.height;
+        const inlineEnd = snapped.width;
+        const blockEnd = snapped.height;
         if (edges.top) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-top', 0, 0, inlineEnd, lineSize, color);
         if (edges.right) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-right', rightLineLeft, 0, lineSize, blockEnd, color);
         if (edges.bottom) appendRootHighlightEdge(item, 'hoshi-reader-selection-highlight-edge-bottom', 0, bottomLineTop, inlineEnd, lineSize, color);

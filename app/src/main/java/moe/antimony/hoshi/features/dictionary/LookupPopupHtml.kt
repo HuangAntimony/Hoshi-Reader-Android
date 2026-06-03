@@ -787,7 +787,7 @@ internal object LookupPopupHtml {
             color: inherit;
             text-decoration-line: underline;
             text-decoration-color: #000;
-            text-decoration-thickness: 1.5px;
+            text-decoration-thickness: 1px;
             text-underline-offset: 2px;
         }
 
