@@ -3,13 +3,13 @@ package moe.antimony.hoshi.features.reader
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-internal data class ReaderProgressNodeLayout(
+data class ReaderProgressNodeLayout(
     val characterCount: Int,
     val beforeViewport: Boolean = false,
     val charactersBeforeViewport: Int = if (beforeViewport) characterCount else 0,
 )
 
-internal fun readerProgressFromVisibleNodeLayouts(nodes: List<ReaderProgressNodeLayout>): Double {
+fun readerProgressFromVisibleNodeLayouts(nodes: List<ReaderProgressNodeLayout>): Double {
     val total = nodes.sumOf { it.characterCount }
     if (total <= 0) return 0.0
     val explored = nodes

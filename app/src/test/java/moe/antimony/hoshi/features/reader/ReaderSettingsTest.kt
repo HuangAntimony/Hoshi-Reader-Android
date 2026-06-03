@@ -455,6 +455,23 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun readerSelectionHighlightCssFollowsDynamicEInkModeAttribute() {
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(eInkMode = true),
+        )
+        val nonEInkSelectionRule = css.substringAfter("html:not([data-hoshi-reader-eink-mode=\"true\"]) ::highlight(hoshi-selection)")
+            .substringBefore("}")
+        val eInkSelectionRule = css.substringAfter("html[data-hoshi-reader-eink-mode=\"true\"] ::highlight(hoshi-selection)")
+            .substringBefore("}")
+
+        assertTrue(nonEInkSelectionRule.contains("background-color: rgba(160, 160, 160, 0.4) !important;"))
+        assertFalse(nonEInkSelectionRule.contains("text-decoration-line: underline;"))
+        assertTrue(eInkSelectionRule.contains("background-color: transparent !important;"))
+        assertTrue(eInkSelectionRule.contains("text-decoration-line: underline;"))
+        assertTrue(eInkSelectionRule.contains("text-decoration-thickness: 1.5px;"))
+    }
+
+    @Test
     fun verticalEInkReaderCssExposesWritingModeForPopupHostSasayakiLine() {
         val css = ReaderContentStyles.styleTag(
             settings = ReaderSettings(eInkMode = true, verticalWriting = true),

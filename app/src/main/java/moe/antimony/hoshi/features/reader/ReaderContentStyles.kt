@@ -100,9 +100,12 @@ internal object ReaderContentStyles {
             ""
         }
         val eInkLineColor = if (settings.usesDarkInterface(systemDark)) "#fff" else "#000"
-        val selectionHighlightCss = if (settings.eInkMode) {
-            """
-        ::highlight(hoshi-selection) {
+        val selectionHighlightCss = """
+        html:not([data-hoshi-reader-eink-mode="true"]) ::highlight(hoshi-selection) {
+            background-color: rgba(160, 160, 160, 0.4) !important;
+            color: inherit;
+        }
+        html[data-hoshi-reader-eink-mode="true"] ::highlight(hoshi-selection) {
             background-color: transparent !important;
             color: inherit;
             text-decoration-line: underline;
@@ -110,15 +113,7 @@ internal object ReaderContentStyles {
             text-decoration-thickness: 1.5px;
             text-underline-offset: 2px;
         }
-            """.trimIndent()
-        } else {
-            """
-        ::highlight(hoshi-selection) {
-            background-color: rgba(160, 160, 160, 0.4) !important;
-            color: inherit;
-        }
-            """.trimIndent()
-        }
+        """.trimIndent()
         val gridCss = if (!settings.justifyText) {
             """
             text-align: start !important;

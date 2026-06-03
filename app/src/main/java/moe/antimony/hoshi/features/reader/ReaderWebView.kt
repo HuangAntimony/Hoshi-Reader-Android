@@ -137,6 +137,7 @@ fun ReaderWebView(
         resolveBookCoverFile(bookRoot, book.coverHref)
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
@@ -888,6 +889,38 @@ fun ReaderWebView(
             },
         )
     }
+    fun dispatchSasayakiCueToReader(cue: SasayakiMatch, reveal: Boolean) {
+        val targetWebView = webView
+        if (targetWebView == null || stateHolder.isWebViewRestoring) {
+            pendingSasayakiCue = PendingSasayakiCue(cue = cue, reveal = reveal)
+            return
+        }
+        pendingSasayakiCue = null
+        targetWebView.evaluateJavascript(
+            ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
+        ) { progressResult ->
+            ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
+                startStatisticsForProgressChangeIfNeeded()
+                val savedPosition = stateHolder.recordDisplayedProgress(progress)
+                recordStatisticsAtDisplayedPosition()
+                saveReaderPosition(savedPosition)
+            }
+        }
+    }
+    LaunchedEffect(
+        webView,
+        stateHolder.isWebViewRestoring,
+        readerPosition.displayedPosition.index,
+        pendingSasayakiCue,
+    ) {
+        val pending = pendingSasayakiCue ?: return@LaunchedEffect
+        if (stateHolder.isWebViewRestoring || webView == null) return@LaunchedEffect
+        if (pending.cue.chapterIndex != readerPosition.displayedPosition.index) {
+            pendingSasayakiCue = null
+            return@LaunchedEffect
+        }
+        dispatchSasayakiCueToReader(pending.cue, pending.reveal)
+    }
     LaunchedEffect(bookRoot, sasayakiMatchData, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         sasayakiPlayer?.release()
         sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null && isSasayakiPlaybackLoaded) {
@@ -902,18 +935,10 @@ fun ReaderWebView(
                 persistenceScope = scope,
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
-                    webView?.evaluateJavascript(
-                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
-                    ) { progressResult ->
-                        ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
-                            startStatisticsForProgressChangeIfNeeded()
-                            val savedPosition = stateHolder.recordDisplayedProgress(progress)
-                            recordStatisticsAtDisplayedPosition()
-                            saveReaderPosition(savedPosition)
-                        }
-                    }
+                    dispatchSasayakiCueToReader(cue, reveal)
                 },
                 onClearCue = {
+                    pendingSasayakiCue = null
                     webView?.evaluateJavascript(ReaderPaginationScripts.clearSasayakiCueInvocation(), null)
                 },
                 onLoadChapter = { chapterIndex ->
@@ -1470,6 +1495,11 @@ private fun resolveBookCoverFile(bookRoot: File?, coverHref: String?): File? {
 
 private fun SasayakiMatch.toCueRange(): SasayakiCueRange =
     SasayakiCueRange(id = id, start = start, length = length)
+
+private data class PendingSasayakiCue(
+    val cue: SasayakiMatch,
+    val reveal: Boolean,
+)
 
 private fun SasayakiPlaybackData?.hasStoredAudioSource(): Boolean =
     this?.audioUri?.isNotBlank() == true || this?.audioFileName?.isNotBlank() == true

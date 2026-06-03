@@ -109,16 +109,6 @@ internal fun ChapterWebView(
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     var lastContinuousProgressUpdate by remember { mutableStateOf(0L) }
     var continuousScrollSaveRequestId by remember { mutableStateOf(0L) }
-    val currentOnFragmentRestored = rememberUpdatedState<(WebView) -> Unit> { restoredWebView ->
-        if (chapterFragment != null) {
-            restoredWebView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                ReaderPaginationScripts.doubleResult(progressResult)?.let(currentOnSaveBookmark.value)
-                currentOnRestoreCompleted.value()
-            }
-        } else {
-            currentOnRestoreCompleted.value()
-        }
-    }
     val chapter = book.chapters[chapterPosition.index]
     var readerWebView by remember { mutableStateOf<WebView?>(null) }
     val fontFaceUrl = remember(readerSettings.selectedFont) {
@@ -136,32 +126,6 @@ internal fun ChapterWebView(
     )
     val readerAppearanceScript = remember(appearanceUpdateKey) {
         readerAppearanceScript(appearanceUpdateKey)
-    }
-    val readerSetupScript = remember(
-        chapter,
-        chapterPosition.progress,
-        chapterFragment,
-        readerContentReloadKey,
-        appearanceUpdateKey,
-        fontFaceUrl,
-        systemDark,
-        scanNonJapaneseText,
-        sasayakiTextColor,
-        sasayakiBackgroundColor,
-        chapterSasayakiCuesJson,
-    ) {
-        readerSetupScript(
-            initialProgress = chapterPosition.progress,
-            initialFragment = chapterFragment,
-            settings = readerSettings,
-            fontFaceUrl = fontFaceUrl,
-            systemDark = systemDark,
-            scanNonJapaneseText = scanNonJapaneseText,
-            sasayakiTextColor = sasayakiTextColor,
-            sasayakiBackgroundColor = sasayakiBackgroundColor,
-            sasayakiCuesJson = chapterSasayakiCuesJson,
-            highlightsJson = chapterHighlightsJson,
-        )
     }
     val readerSetupReloadKey = remember(
         chapterPosition.progress,
@@ -182,6 +146,47 @@ internal fun ChapterWebView(
         readerSetupReloadKey = readerSetupReloadKey,
         webViewViewportSize = webViewViewportSize,
     )
+    val readerSetupScript = remember(
+        chapter,
+        chapterPosition.progress,
+        chapterFragment,
+        readerContentReloadKey,
+        appearanceUpdateKey,
+        fontFaceUrl,
+        systemDark,
+        scanNonJapaneseText,
+        sasayakiTextColor,
+        sasayakiBackgroundColor,
+        chapterSasayakiCuesJson,
+        chapterHighlightsJson,
+        loadKey,
+    ) {
+        readerSetupScript(
+            initialProgress = chapterPosition.progress,
+            initialFragment = chapterFragment,
+            settings = readerSettings,
+            fontFaceUrl = fontFaceUrl,
+            systemDark = systemDark,
+            scanNonJapaneseText = scanNonJapaneseText,
+            sasayakiTextColor = sasayakiTextColor,
+            sasayakiBackgroundColor = sasayakiBackgroundColor,
+            sasayakiCuesJson = chapterSasayakiCuesJson,
+            highlightsJson = chapterHighlightsJson,
+            restoreToken = loadKey,
+        )
+    }
+    val currentOnFragmentRestored = rememberUpdatedState<(WebView, String) -> Boolean> { restoredWebView, restoreToken ->
+        if (restoreToken != loadKey) return@rememberUpdatedState false
+        if (chapterFragment != null) {
+            restoredWebView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                ReaderPaginationScripts.doubleResult(progressResult)?.let(currentOnSaveBookmark.value)
+                currentOnRestoreCompleted.value()
+            }
+        } else {
+            currentOnRestoreCompleted.value()
+        }
+        true
+    }
     LaunchedEffect(readerWebView, loadKey, chapterSasayakiCuesJson, isWebViewRestoring) {
         val webView = readerWebView ?: return@LaunchedEffect
         val cuesJson = chapterSasayakiCuesJson ?: return@LaunchedEffect
@@ -210,8 +215,8 @@ internal fun ChapterWebView(
                     "HoshiTextSelection",
                 )
                 addJavascriptInterface(
-                    ReaderRestoreBridge(this) { restoredWebView ->
-                        currentOnFragmentRestored.value(restoredWebView)
+                    ReaderRestoreBridge(this) { restoredWebView, restoreToken ->
+                        currentOnFragmentRestored.value(restoredWebView, restoreToken)
                     },
                     "HoshiReaderRestore",
                 )
@@ -710,6 +715,7 @@ private fun readerSetupScript(
     sasayakiBackgroundColor: Long,
     sasayakiCuesJson: String?,
     highlightsJson: String?,
+    restoreToken: String,
 ): String {
     val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
     val css = ReaderContentStyles.css(
@@ -720,12 +726,13 @@ private fun readerSetupScript(
         sasayakiBackgroundColor = sasayakiBackgroundColor,
     ).let(::readerJavaScriptStringLiteral)
     val selectionScript = ReaderSelectionScripts.source()
-    val paginationScript = ReaderPaginationScripts.shellScript(
+    val paginationScript = ReaderPaginationScripts.shellScriptWithRestoreToken(
         initialProgress = initialProgress,
         initialFragment = initialFragment,
         settings = settings,
         sasayakiCuesJson = sasayakiCuesJson,
         highlightsJson = highlightsJson,
+        restoreToken = restoreToken,
     ).scriptTagBody()
     return """
         (function() {
@@ -965,13 +972,14 @@ internal class ReaderContinuousScrollFocusTracker {
 
 private class ReaderRestoreBridge(
     private val webView: WebView,
-    private val onRestoreCompleted: (WebView) -> Unit,
+    private val onRestoreCompleted: (WebView, String) -> Boolean,
 ) {
     @JavascriptInterface
-    fun postMessage(@Suppress("UNUSED_PARAMETER") message: String) {
+    fun postMessage(message: String) {
         webView.post {
-            onRestoreCompleted(webView)
-            webView.showAfterReaderRestore()
+            if (onRestoreCompleted(webView, message)) {
+                webView.showAfterReaderRestore()
+            }
         }
     }
 }
