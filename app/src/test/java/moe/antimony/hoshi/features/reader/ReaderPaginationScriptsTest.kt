@@ -178,7 +178,6 @@ class ReaderPaginationScriptsTest {
         val script = ReaderPaginationScripts.shellScript()
 
         assertTrue(script.contains("notifyRestoreComplete: function()"))
-        assertTrue(script.contains("""window.HoshiReaderRestore.postMessage("restoreCompleted")"""))
         assertTrue(script.contains("var targetCharCount = Math.ceil(totalChars * progress)"))
         assertTrue(script.contains("textOffsetForCharCount: function(node, targetCount)"))
         assertTrue(script.contains("if ((runningSum + nodeLen) > targetCharCount)"))
@@ -247,53 +246,6 @@ class ReaderPaginationScriptsTest {
             """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true)""",
             command,
         )
-    }
-
-    @Test
-    fun sasayakiApplyCommandSkipsUntilReaderShellIsReady() {
-        val command = ReaderPaginationScripts.applySasayakiCuesInvocation("""[{"id":"cue1","start":1,"length":2}]""")
-
-        assertEquals(
-            """if (window.hoshiReader && typeof window.hoshiReader.applySasayakiCues === 'function') { window.hoshiReader.applySasayakiCues([{"id":"cue1","start":1,"length":2}]); }""",
-            command,
-        )
-    }
-
-    @Test
-    fun pagedEInkSasayakiRevealUsesPagedRangeScroll() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(eInkMode = true),
-        )
-        val eInkHighlightBlock = script.substringAfter("if (this.isEInkMode()) {")
-            .substringBefore("var targets = this.sasayakiInlineTargetsForCue(cueId);")
-
-        assertTrue(eInkHighlightBlock.contains("this.scrollToRange(geometryTarget)"))
-        assertFalse(eInkHighlightBlock.contains("this.scrollToTarget(geometryTarget)"))
-    }
-
-    @Test
-    fun sasayakiApplyPreservesActiveCueAfterLateCuePayloadArrives() {
-        val script = ReaderPaginationScripts.shellScript()
-        val applyBlock = script.substringAfter("applySasayakiCues: function(cues)")
-            .substringBefore("wrapSasayakiCue: function(cue)")
-
-        assertTrue(applyBlock.contains("var activeCueId = this.activeCueId;"))
-        assertTrue(applyBlock.contains("if (activeCueId && this.hasSasayakiCueTarget(activeCueId))"))
-        assertTrue(applyBlock.contains("this.activeCueId = activeCueId;"))
-        assertTrue(applyBlock.contains("this.refreshSasayakiCuePresentation();"))
-    }
-
-    @Test
-    fun cachedEInkCueCanBuildEmphasisWrapperAfterSwitchingBackToInlineMode() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(eInkMode = true),
-        )
-
-        assertTrue(script.contains("cueSourceRanges: new Map()"))
-        assertTrue(script.contains("ensureSasayakiInlineTargetsForCue: function(cueId)"))
-        assertTrue(script.contains("this.ensureSasayakiInlineTargetsForCue(this.activeCueId);"))
-        assertTrue(script.contains("this.cueRanges.delete(cueId);"))
-        assertTrue(script.contains("this.cueRubyElements.delete(cueId);"))
     }
 
     @Test

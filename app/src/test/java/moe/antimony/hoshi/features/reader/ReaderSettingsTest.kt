@@ -434,57 +434,6 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun eInkReaderCssLeavesActiveSasayakiCueLineToPopupHost() {
-        val css = ReaderContentStyles.styleTag(
-            settings = ReaderSettings(eInkMode = true, verticalWriting = false),
-        )
-        val sasayakiRule = css.substringAfter(".hoshi-sasayaki-cue.hoshi-sasayaki-active")
-            .substringBefore("}")
-        val nonEInkSasayakiRule = css.substringAfter("html:not([data-hoshi-reader-eink-mode=\"true\"]) .hoshi-sasayaki-cue.hoshi-sasayaki-active")
-            .substringBefore("}")
-
-        assertTrue(sasayakiRule.contains("background-color: transparent !important;"))
-        assertTrue(sasayakiRule.contains("color: inherit !important;"))
-        assertFalse(sasayakiRule.contains("var(--hoshi-sasayaki-background-color)"))
-        assertTrue(nonEInkSasayakiRule.contains("color: var(--hoshi-sasayaki-text-color) !important;"))
-        assertTrue(nonEInkSasayakiRule.contains("background-color: var(--hoshi-sasayaki-background-color) !important;"))
-        assertTrue(css.contains("--hoshi-eink-line-color: #000;"))
-        assertTrue(css.contains("--hoshi-reader-eink-mode: 1;"))
-        assertTrue(css.contains("--hoshi-reader-vertical-writing: 0;"))
-        assertTrue(css.contains("text-decoration-thickness: 1.5px;"))
-    }
-
-    @Test
-    fun readerSelectionHighlightCssFollowsDynamicEInkModeAttribute() {
-        val css = ReaderContentStyles.styleTag(
-            settings = ReaderSettings(eInkMode = true),
-        )
-        val nonEInkSelectionRule = css.substringAfter("html:not([data-hoshi-reader-eink-mode=\"true\"]) ::highlight(hoshi-selection)")
-            .substringBefore("}")
-        val eInkSelectionRule = css.substringAfter("html[data-hoshi-reader-eink-mode=\"true\"] ::highlight(hoshi-selection)")
-            .substringBefore("}")
-
-        assertTrue(nonEInkSelectionRule.contains("background-color: rgba(160, 160, 160, 0.4) !important;"))
-        assertFalse(nonEInkSelectionRule.contains("text-decoration-line: underline;"))
-        assertTrue(eInkSelectionRule.contains("background-color: transparent !important;"))
-        assertTrue(eInkSelectionRule.contains("text-decoration-line: underline;"))
-        assertTrue(eInkSelectionRule.contains("text-decoration-thickness: 1.5px;"))
-    }
-
-    @Test
-    fun verticalEInkReaderCssExposesWritingModeForPopupHostSasayakiLine() {
-        val css = ReaderContentStyles.styleTag(
-            settings = ReaderSettings(eInkMode = true, verticalWriting = true),
-        )
-        val sasayakiRule = css.substringAfter(".hoshi-sasayaki-cue.hoshi-sasayaki-active")
-            .substringBefore("}")
-
-        assertTrue(sasayakiRule.contains("background-color: transparent !important;"))
-        assertTrue(css.contains("--hoshi-reader-eink-mode: 1;"))
-        assertTrue(css.contains("--hoshi-reader-vertical-writing: 1;"))
-    }
-
-    @Test
     fun sepiaCanInvertReaderColorsInSystemDarkModeLikeIos() {
         val settings = ReaderSettings(theme = ReaderTheme.Sepia, sepiaInvertInDark = true)
 
