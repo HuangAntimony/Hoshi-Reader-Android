@@ -157,37 +157,32 @@ internal object ReaderContentStyles {
         } else {
             ""
         }
-        val sasayakiHighlightCss = if (settings.eInkMode) {
-            """
-        ::highlight(hoshi-sasayaki) {
+        val sasayakiHighlightCss = """
+        html[data-hoshi-reader-eink-mode="true"] ::highlight(hoshi-sasayaki) {
             color: inherit !important;
             background-color: transparent !important;
         }
-        ruby.hoshi-sasayaki-ruby-active {
+        html[data-hoshi-reader-eink-mode="true"] ruby.hoshi-sasayaki-ruby-active {
             color: inherit !important;
             background-color: transparent !important;
         }
-        .hoshi-sasayaki-cue.hoshi-sasayaki-active {
+        html[data-hoshi-reader-eink-mode="true"] .hoshi-sasayaki-cue.hoshi-sasayaki-active {
             color: inherit !important;
             background-color: transparent !important;
         }
-            """.trimIndent()
-        } else {
-            """
-        ::highlight(hoshi-sasayaki) {
+        html:not([data-hoshi-reader-eink-mode="true"]) ::highlight(hoshi-sasayaki) {
             color: var(--hoshi-sasayaki-text-color) !important;
             background-color: var(--hoshi-sasayaki-background-color) !important;
         }
-        ruby.hoshi-sasayaki-ruby-active {
+        html:not([data-hoshi-reader-eink-mode="true"]) ruby.hoshi-sasayaki-ruby-active {
             color: var(--hoshi-sasayaki-text-color) !important;
             background-color: var(--hoshi-sasayaki-background-color) !important;
         }
-        .hoshi-sasayaki-cue.hoshi-sasayaki-active {
+        html:not([data-hoshi-reader-eink-mode="true"]) .hoshi-sasayaki-cue.hoshi-sasayaki-active {
             color: var(--hoshi-sasayaki-text-color) !important;
             background-color: var(--hoshi-sasayaki-background-color) !important;
         }
-            """.trimIndent()
-        }
+        """.trimIndent()
         val furiganaCss = if (settings.hideFurigana) {
             """
             rt {

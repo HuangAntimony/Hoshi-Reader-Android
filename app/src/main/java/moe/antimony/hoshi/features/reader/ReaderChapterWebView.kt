@@ -703,6 +703,7 @@ private fun readerSetupScript(
     sasayakiCuesJson: String?,
     highlightsJson: String?,
 ): String {
+    val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
     val css = ReaderContentStyles.css(
         settings = settings,
         fontFaceUrl = fontFaceUrl,
@@ -720,6 +721,7 @@ private fun readerSetupScript(
     ).scriptTagBody()
     return """
         (function() {
+          document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode;
           var style = document.createElement('style');
           style.textContent = $css;
           document.head.appendChild(style);
@@ -752,6 +754,7 @@ private fun readerAppearanceScript(
           document.documentElement.style.setProperty('--hoshi-text-color', $textColor);
           document.documentElement.style.setProperty('--hoshi-eink-line-color', $eInkLineColor);
           document.documentElement.style.setProperty('--hoshi-reader-eink-mode', $eInkMode);
+          document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode === '1' ? 'true' : 'false';
           document.documentElement.style.setProperty('--hoshi-reader-vertical-writing', $verticalWriting);
           document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', $sasayakiText);
           document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', $sasayakiBackground);
