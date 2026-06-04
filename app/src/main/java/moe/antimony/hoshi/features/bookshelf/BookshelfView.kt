@@ -56,6 +56,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.Settings
@@ -1763,6 +1764,7 @@ private fun BottomTabGlyph(tab: MainTab, modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsGlyph(destination: SettingsDestination, color: Color, modifier: Modifier = Modifier) {
     val icon = when (destination) {
+        SettingsDestination.Profiles -> Icons.Rounded.Person
         SettingsDestination.Dictionaries -> Icons.AutoMirrored.Rounded.MenuBook
         SettingsDestination.Anki -> Icons.Rounded.Inventory2
         SettingsDestination.Appearance -> Icons.Rounded.Palette

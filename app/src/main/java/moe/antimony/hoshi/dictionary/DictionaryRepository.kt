@@ -21,6 +21,14 @@ internal class DictionaryRepository(
     fun loadDictionaries(type: DictionaryType): List<DictionaryInfo> =
         storage.loadDictionaries(type)
 
+    fun currentConfig(): DictionaryConfig =
+        storage.currentConfig()
+
+    fun saveConfig(config: DictionaryConfig) {
+        storage.saveConfig(config)
+        rebuildLookupQuery()
+    }
+
     fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         storage.updatableDictionaries()
 

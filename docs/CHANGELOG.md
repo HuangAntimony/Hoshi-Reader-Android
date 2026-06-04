@@ -8,6 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Added
 
 - Add a dictionary lookup language setting with multilingual hoshidicts lookup support across reader popups, recursive lookups, Dictionary search, and Android Process Text.
+- Add Settings profiles so users can switch between multiple learning languages and keep each profile's lookup language and enabled dictionaries separate.
 
 ### Fixed
 

@@ -27,6 +27,8 @@ import moe.antimony.hoshi.features.dictionary.DictionarySettingsRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.DictionaryViewModelRepository
 import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
+import moe.antimony.hoshi.features.profiles.LearningProfilesRepository
+import moe.antimony.hoshi.features.profiles.learningProfilesRepository
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.reader.readerSettingsRepository
@@ -56,6 +58,7 @@ internal class HoshiAppContainer(context: Context) {
     val dictionaryRepository: DictionaryRepository = DictionaryRepository(appContext.filesDir)
     val readerSettingsRepository: ReaderSettingsRepository = appContext.readerSettingsRepository()
     val dictionarySettingsRepository: DictionarySettingsRepository = appContext.dictionarySettingsRepository()
+    val learningProfilesRepository: LearningProfilesRepository = appContext.learningProfilesRepository()
     val audioSettingsRepository: AudioSettingsRepository = appContext.audioSettingsRepository()
     val ankiSettingsRepository: AnkiSettingsRepository = appContext.ankiSettingsRepository()
     val sasayakiSettingsRepository: SasayakiSettingsRepository = appContext.sasayakiSettingsRepository()

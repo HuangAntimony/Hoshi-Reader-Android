@@ -45,6 +45,7 @@
     <string name="main_tab_books" comment="Main navigation tab label, intentionally matching the backup Books section.">Books</string>
     <string name="main_tab_dictionary">Dictionary</string>
     <string name="main_tab_settings" comment="Main navigation tab label, intentionally matching settings page titles.">Settings</string>
+    <string name="settings_profiles">Profiles</string>
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">Dictionaries</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_appearance">Appearance</string>
@@ -59,6 +60,14 @@
     <string name="language_follow_system">Follow system</string>
     <string name="language_english" translatable="false">English</string>
     <string name="language_simplified_chinese" translatable="false">简体中文</string>
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_add_profile">Add Profile</string>
+    <string name="profiles_edit_profile">Edit Profile</string>
+    <string name="profiles_name">Profile Name</string>
+    <string name="profiles_language">Learning Language</string>
+    <string name="profiles_active">Active</string>
+    <string name="profiles_new_name_format">Profile %1$d</string>
+    <string name="profiles_delete_title_format">Delete \"%1$s\"?</string>
     <string name="bookshelf_open_failed">Failed to open EPUB.</string>
     <string name="bookshelf_import_failed">Failed to import EPUB.</string>
     <string name="bookshelf_import_failed_list_format" comment="Bookshelf batch import failure summary; intentionally matches the dictionary batch import format.">Failed to import:\n%1$s</string>

@@ -138,6 +138,7 @@ internal const val CollapsedShelfCoverSpacingDp = 12
 private const val CompletedProgressThreshold = 0.999
 
 enum class SettingsDestination {
+    Profiles,
     Dictionaries,
     Anki,
     Appearance,
@@ -177,6 +178,7 @@ data class BookshelfSectionModel(
 
 fun settingsGroups(): List<List<SettingsRowModel>> = listOf(
     listOf(
+        SettingsRowModel(R.string.settings_profiles, SettingsDestination.Profiles),
         SettingsRowModel(R.string.settings_dictionaries, SettingsDestination.Dictionaries),
         SettingsRowModel(R.string.settings_anki, SettingsDestination.Anki),
         SettingsRowModel(R.string.settings_appearance, SettingsDestination.Appearance),

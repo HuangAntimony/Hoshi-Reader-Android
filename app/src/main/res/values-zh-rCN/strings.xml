@@ -47,6 +47,15 @@
     <string name="main_tab_settings" comment="Main navigation tab label, intentionally matching settings page titles.">设置</string>
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">辞典</string>
     <string name="settings_anki">Anki</string>
+    <string name="settings_profiles">Profiles</string>
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_add_profile">Add Profile</string>
+    <string name="profiles_edit_profile">Edit Profile</string>
+    <string name="profiles_name">Profile Name</string>
+    <string name="profiles_language">Learning Language</string>
+    <string name="profiles_active">Active</string>
+    <string name="profiles_new_name_format">Profile %1$d</string>
+    <string name="profiles_delete_title_format">Delete \"%1$s\"?</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_behavior">行为</string>
     <string name="settings_advanced">高级</string>

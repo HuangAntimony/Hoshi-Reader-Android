@@ -100,13 +100,16 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiAppContainer
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.RecommendedDictionaries
+import moe.antimony.hoshi.features.profiles.toProfileDictionarySelections
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.importing.ImportFileType
@@ -313,6 +316,12 @@ fun DictionaryView(
                 settings = uiState.settings,
                 termDictionaries = uiState.dictionaries[DictionaryType.Term].orEmpty(),
                 onSettingsChange = dictionaryViewModel::updateSettings,
+                onLookupLanguageChange = { language ->
+                    dictionaryViewModel.updateSettings { current -> current.copy(lookupLanguage = language) }
+                    coroutineScope.launch {
+                        appContainer.learningProfilesRepository.updateActiveLookupLanguage(language)
+                    }
+                },
                 onClose = { destination = null },
                 modifier = modifier,
             )
@@ -526,7 +535,16 @@ fun DictionaryView(
                         }
                         DictionaryRow(
                             dictionary = dictionary,
-                            onEnabledChange = { dictionaryViewModel.setDictionaryEnabled(dictionary, it) },
+                            onEnabledChange = { enabled ->
+                                dictionaryViewModel.setDictionaryEnabled(dictionary, enabled) {
+                                    val selections = withContext(Dispatchers.IO) {
+                                        appContainer.dictionaryRepository
+                                            .currentConfig()
+                                            .toProfileDictionarySelections()
+                                    }
+                                    appContainer.learningProfilesRepository.updateActiveDictionarySelections(selections)
+                                }
+                            },
                             onDelete = {
                                 revealedFileName = null
                                 dictionaryViewModel.deleteDictionary(dictionary)
@@ -916,6 +934,7 @@ private fun DictionarySettingsView(
     settings: DictionarySettings,
     termDictionaries: List<DictionaryInfo>,
     onSettingsChange: ((DictionarySettings) -> DictionarySettings) -> Unit,
+    onLookupLanguageChange: (DictionaryLanguage) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -989,7 +1008,7 @@ private fun DictionarySettingsView(
                                     text = { Text(stringResource(language.labelRes)) },
                                     onClick = {
                                         languageMenuExpanded = false
-                                        onSettingsChange { current -> current.copy(lookupLanguage = language) }
+                                        onLookupLanguageChange(language)
                                     },
                                 )
                             }

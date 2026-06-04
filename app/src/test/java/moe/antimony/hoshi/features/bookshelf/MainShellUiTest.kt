@@ -32,6 +32,7 @@ class MainShellUiTest {
 
         assertEquals(
             listOf(
+                R.string.settings_profiles,
                 R.string.settings_dictionaries,
                 R.string.settings_anki,
                 R.string.settings_appearance,

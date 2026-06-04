@@ -37,6 +37,7 @@ import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
 import moe.antimony.hoshi.features.dictionary.DictionaryView
+import moe.antimony.hoshi.features.profiles.LearningProfilesView
 import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
@@ -332,6 +333,10 @@ private fun SettingsDetailDestination(
     onSelectedTabChange: (MainTab) -> Unit,
 ) {
     when (route.section) {
+        SettingsDetailSection.Profiles -> LearningProfilesView(
+            onClose = onClose,
+            modifier = Modifier.fillMaxSize(),
+        )
         SettingsDetailSection.Dictionaries -> DictionaryView(
             onClose = onClose,
             modifier = Modifier.fillMaxSize(),
@@ -380,6 +385,7 @@ private fun MainTab.toRoute(): AppRoute = when (this) {
 }
 
 private fun SettingsDestination.toSection(): SettingsDetailSection = when (this) {
+    SettingsDestination.Profiles -> SettingsDetailSection.Profiles
     SettingsDestination.Dictionaries -> SettingsDetailSection.Dictionaries
     SettingsDestination.Anki -> SettingsDetailSection.Anki
     SettingsDestination.Appearance -> SettingsDetailSection.Appearance
