@@ -517,7 +517,12 @@ private class LookupPopupHostView(
                 selectionHighlightView.update(rects, state.darkMode, state.eInkMode)
             },
             onLookupRedirect = { query ->
-                LookupEngine.lookup(query, state.dictionarySettings.maxResults, state.dictionarySettings.scanLength)
+                LookupEngine.lookup(
+                    query,
+                    state.dictionarySettings.maxResults,
+                    state.dictionarySettings.scanLength,
+                    state.dictionarySettings.lookupLanguage.code,
+                )
             },
             onLookupRedirected = { count ->
                 if (count > 0) {

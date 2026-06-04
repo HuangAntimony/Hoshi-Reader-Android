@@ -4,5 +4,5 @@
 	branch = develop
 [submodule "third_party/hoshidicts-kotlin-bridge"]
 	path = third_party/hoshidicts-kotlin-bridge
-	url = https://github.com/Manhhao/hoshidicts-kotlin-bridge.git
+	url = https://github.com/kaihouguide/hoshidicts-kotlin-bridge.git
 	branch = main

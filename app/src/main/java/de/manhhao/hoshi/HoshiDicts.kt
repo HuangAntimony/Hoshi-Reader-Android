@@ -76,6 +76,7 @@ object HoshiDicts {
         pitchPaths: Array<String>,
     )
 
+    external fun setLookupLanguage(session: Long, language: String)
     external fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): Array<LookupResult>
     external fun getStyles(session: Long): Array<DictionaryStyle>
     external fun getMediaFile(session: Long, dictName: String, mediaPath: String): ByteArray?

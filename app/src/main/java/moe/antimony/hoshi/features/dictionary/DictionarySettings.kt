@@ -28,7 +28,45 @@ enum class DictionaryCollapseMode(val rawValue: String, @get:StringRes val label
     }
 }
 
+enum class DictionaryLanguage(
+    val code: String,
+    val keyboardLocaleTag: String,
+    @get:StringRes val labelRes: Int,
+) {
+    Arabic("ar", "ar", R.string.dictionary_language_arabic),
+    German("de", "de-DE", R.string.dictionary_language_german),
+    ModernGreek("el", "el-GR", R.string.dictionary_language_modern_greek),
+    English("en", "en-US", R.string.dictionary_language_english),
+    Esperanto("eo", "eo", R.string.dictionary_language_esperanto),
+    Spanish("es", "es-ES", R.string.dictionary_language_spanish),
+    Basque("eu", "eu-ES", R.string.dictionary_language_basque),
+    French("fr", "fr-FR", R.string.dictionary_language_french),
+    Irish("ga", "ga-IE", R.string.dictionary_language_irish),
+    AncientGreek("grc", "grc", R.string.dictionary_language_ancient_greek),
+    Japanese("ja", "ja-JP", R.string.dictionary_language_japanese),
+    Georgian("kat", "ka-GE", R.string.dictionary_language_georgian),
+    Korean("ko", "ko-KR", R.string.dictionary_language_korean),
+    Latin("la", "la", R.string.dictionary_language_latin),
+    OldIrish("sga", "sga", R.string.dictionary_language_old_irish),
+    Albanian("sq", "sq-AL", R.string.dictionary_language_albanian),
+    Tagalog("tl", "tl-PH", R.string.dictionary_language_tagalog),
+    Yiddish("yi", "yi", R.string.dictionary_language_yiddish),
+    ;
+
+    companion object {
+        val Default = Japanese
+
+        fun fromCode(code: String?): DictionaryLanguage? =
+            entries.firstOrNull { it.code == code } ?: when (code) {
+                "ka" -> Georgian
+                "arz" -> Arabic
+                else -> null
+            }
+    }
+}
+
 data class DictionarySettings(
+    val lookupLanguage: DictionaryLanguage = DictionaryLanguage.Default,
     val dictionaryTabDefault: Boolean = false,
     val scanNonJapaneseText: Boolean = true,
     val maxResults: Int = 16,
@@ -65,6 +103,8 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
     private val preferences = context.getSharedPreferences("dictionary-settings", Context.MODE_PRIVATE)
 
     override fun load(): DictionarySettings = DictionarySettings(
+        lookupLanguage = DictionaryLanguage.fromCode(preferences.getString(KEY_LOOKUP_LANGUAGE, null))
+            ?: DictionaryLanguage.Default,
         dictionaryTabDefault = preferences.getBoolean(KEY_DICTIONARY_TAB_DEFAULT, false),
         scanNonJapaneseText = preferences.getBoolean(KEY_SCAN_NON_JAPANESE_TEXT, true),
         maxResults = preferences.getInt(KEY_MAX_RESULTS, 16),
@@ -107,10 +147,12 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
             .putBoolean(KEY_COMPACT_PITCH_ACCENTS, normalized.compactPitchAccents)
             .putBoolean(KEY_LOW_RAM_DICTIONARY_IMPORT, normalized.lowRamDictionaryImport)
             .putString(KEY_CUSTOM_CSS, normalized.customCSS)
+            .putString(KEY_LOOKUP_LANGUAGE, normalized.lookupLanguage.code)
             .apply()
     }
 
     private companion object {
+        const val KEY_LOOKUP_LANGUAGE = "lookupLanguage"
         const val KEY_DICTIONARY_TAB_DEFAULT = "dictionaryTabDefault"
         const val KEY_SCAN_NON_JAPANESE_TEXT = "scanNonJapaneseText"
         const val KEY_MAX_RESULTS = "maxResults"
@@ -165,6 +207,7 @@ class DictionarySettingsRepository(
     private fun Preferences.toDictionarySettings(): DictionarySettings {
         val legacyCollapseDictionaries = this[KEY_COLLAPSE_DICTIONARIES]
         return DictionarySettings(
+            lookupLanguage = DictionaryLanguage.fromCode(this[KEY_LOOKUP_LANGUAGE]) ?: DictionaryLanguage.Default,
             dictionaryTabDefault = this[KEY_DICTIONARY_TAB_DEFAULT] ?: false,
             scanNonJapaneseText = this[KEY_SCAN_NON_JAPANESE_TEXT] ?: true,
             maxResults = this[KEY_MAX_RESULTS] ?: 16,
@@ -203,6 +246,7 @@ class DictionarySettingsRepository(
         this[KEY_COMPACT_PITCH_ACCENTS] = normalized.compactPitchAccents
         this[KEY_LOW_RAM_DICTIONARY_IMPORT] = normalized.lowRamDictionaryImport
         this[KEY_CUSTOM_CSS] = normalized.customCSS
+        this[KEY_LOOKUP_LANGUAGE] = normalized.lookupLanguage.code
     }
 
     companion object {
@@ -210,6 +254,7 @@ class DictionarySettingsRepository(
 
         private val KEY_MIGRATED_FROM_SHARED_PREFERENCES =
             booleanPreferencesKey("dictionarySettingsMigratedFromSharedPreferences")
+        private val KEY_LOOKUP_LANGUAGE = stringPreferencesKey("lookupLanguage")
         private val KEY_DICTIONARY_TAB_DEFAULT = booleanPreferencesKey("dictionaryTabDefault")
         private val KEY_SCAN_NON_JAPANESE_TEXT = booleanPreferencesKey("scanNonJapaneseText")
         private val KEY_MAX_RESULTS = intPreferencesKey("maxResults")

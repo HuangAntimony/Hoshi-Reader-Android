@@ -81,10 +81,12 @@ import kotlin.math.abs
 private const val DictionaryPopupTopInset = 118.0
 private const val DictionaryPopupBottomInset = 0.0
 
-internal fun dictionarySearchKeyboardOptions(): KeyboardOptions = KeyboardOptions(
+internal fun dictionarySearchKeyboardOptions(
+    language: DictionaryLanguage = DictionaryLanguage.Default,
+): KeyboardOptions = KeyboardOptions(
     imeAction = ImeAction.Search,
     showKeyboardOnFocus = true,
-    hintLocales = LocaleList(Locale("ja-JP")),
+    hintLocales = LocaleList(Locale(language.keyboardLocaleTag)),
 )
 
 internal fun dictionarySearchPopupOptions(
@@ -286,6 +288,7 @@ fun DictionarySearchView(
         DictionarySearchBar(
             query = uiState.query,
             isSearching = uiState.isSearching,
+            lookupLanguage = uiState.dictionarySettings.lookupLanguage,
             onQueryChange = searchViewModel::updateQuery,
             onSubmit = runLookup,
             modifier = Modifier
@@ -350,6 +353,7 @@ private fun Modifier.observeDictionaryHistorySwipe(
 private fun DictionarySearchBar(
     query: String,
     isSearching: Boolean,
+    lookupLanguage: DictionaryLanguage,
     onQueryChange: (String) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -412,7 +416,7 @@ private fun DictionarySearchBar(
                     scrollState = fieldScrollState,
                     textStyle = MaterialTheme.typography.titleLarge.copy(color = fieldForegroundColor),
                     cursorBrush = hoshiTextFieldCursorBrush(fieldForegroundColor),
-                    keyboardOptions = dictionarySearchKeyboardOptions(),
+                    keyboardOptions = dictionarySearchKeyboardOptions(lookupLanguage),
                     onKeyboardAction = { onSubmit() },
                 )
             }

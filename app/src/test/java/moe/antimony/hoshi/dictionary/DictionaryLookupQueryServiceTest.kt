@@ -9,16 +9,19 @@ class DictionaryLookupQueryServiceTest {
     fun rebuildForwardsEnabledPathsByDictionaryTypeToNativeBridge() {
         val bridge = RecordingDictionaryNativeBridge()
         val service = DictionaryLookupQueryService(bridge)
+        val termDictionary = File("/dicts/Term/JMdict")
+        val frequencyDictionary = File("/dicts/Frequency/Freq")
+        val pitchDictionary = File("/dicts/Pitch/Pitch")
 
         service.rebuild(
-            termDictionaries = listOf(File("/dicts/Term/JMdict")),
-            frequencyDictionaries = listOf(File("/dicts/Frequency/Freq")),
-            pitchDictionaries = listOf(File("/dicts/Pitch/Pitch")),
+            termDictionaries = listOf(termDictionary),
+            frequencyDictionaries = listOf(frequencyDictionary),
+            pitchDictionaries = listOf(pitchDictionary),
         )
 
-        assertArrayEquals(arrayOf("/dicts/Term/JMdict"), bridge.termPaths)
-        assertArrayEquals(arrayOf("/dicts/Frequency/Freq"), bridge.freqPaths)
-        assertArrayEquals(arrayOf("/dicts/Pitch/Pitch"), bridge.pitchPaths)
+        assertArrayEquals(arrayOf(termDictionary.absolutePath), bridge.termPaths)
+        assertArrayEquals(arrayOf(frequencyDictionary.absolutePath), bridge.freqPaths)
+        assertArrayEquals(arrayOf(pitchDictionary.absolutePath), bridge.pitchPaths)
     }
 
     private class RecordingDictionaryNativeBridge : DictionaryNativeBridge {

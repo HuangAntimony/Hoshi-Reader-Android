@@ -11,6 +11,7 @@ class DictionarySettingsTest {
     fun defaultsMatchIosUserConfig() {
         val settings = DictionarySettings()
 
+        assertEquals(DictionaryLanguage.Japanese, settings.lookupLanguage)
         assertFalse(settings.dictionaryTabDefault)
         assertTrue(settings.scanNonJapaneseText)
         assertEquals(16, settings.maxResults)

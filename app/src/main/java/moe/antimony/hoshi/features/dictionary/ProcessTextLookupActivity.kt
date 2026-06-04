@@ -113,6 +113,7 @@ private fun ProcessTextLookupOverlay(
                     query,
                     dictionarySettings.maxResults,
                     dictionarySettings.scanLength,
+                    dictionarySettings.lookupLanguage.code,
                 )
                 lookupPopupItem(
                     selection = selection,

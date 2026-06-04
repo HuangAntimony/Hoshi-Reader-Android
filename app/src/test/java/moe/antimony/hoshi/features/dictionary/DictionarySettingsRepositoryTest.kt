@@ -33,6 +33,7 @@ class DictionarySettingsRepositoryTest {
         val legacy = FakeLegacyDictionarySettingsSource(
             DictionarySettings(
                 dictionaryTabDefault = true,
+                lookupLanguage = DictionaryLanguage.French,
                 scanNonJapaneseText = false,
                 maxResults = 100,
                 scanLength = 0,
@@ -53,6 +54,7 @@ class DictionarySettingsRepositoryTest {
             val migrated = repository.settings.first()
 
             assertTrue(migrated.dictionaryTabDefault)
+            assertEquals(DictionaryLanguage.French, migrated.lookupLanguage)
             assertFalse(migrated.scanNonJapaneseText)
             assertEquals(50, migrated.maxResults)
             assertEquals(1, migrated.scanLength)
@@ -79,6 +81,7 @@ class DictionarySettingsRepositoryTest {
             repository.update {
                 it.copy(
                     dictionaryTabDefault = true,
+                    lookupLanguage = DictionaryLanguage.German,
                     scanNonJapaneseText = false,
                     maxResults = 0,
                     scanLength = 100,
@@ -98,6 +101,7 @@ class DictionarySettingsRepositoryTest {
             val saved = repository.settings.first()
 
             assertTrue(saved.dictionaryTabDefault)
+            assertEquals(DictionaryLanguage.German, saved.lookupLanguage)
             assertFalse(saved.scanNonJapaneseText)
             assertEquals(1, saved.maxResults)
             assertEquals(64, saved.scanLength)

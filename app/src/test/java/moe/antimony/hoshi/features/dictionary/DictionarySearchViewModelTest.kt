@@ -34,7 +34,11 @@ class DictionarySearchViewModelTest {
         val repository = FakeDictionarySearchRepository(
             lookupResults = listOf(lookupResult("猫")),
             dictionaryStyles = mapOf("JMdict" to ".entry {}"),
-            dictionarySettings = DictionarySettings(maxResults = 2, scanLength = 7),
+            dictionarySettings = DictionarySettings(
+                lookupLanguage = DictionaryLanguage.French,
+                maxResults = 2,
+                scanLength = 7,
+            ),
             audioSettings = AudioSettings(enableAutoplay = true),
         )
         val viewModel = viewModel(repository)
@@ -57,7 +61,7 @@ class DictionarySearchViewModelTest {
         assertTrue(state.hasSearched)
         assertFalse(state.isSearching)
         assertNull(state.errorMessage)
-        assertEquals(listOf("猫:2:7"), repository.lookupCalls)
+        assertEquals(listOf("猫:2:7:fr"), repository.lookupCalls)
         assertEquals(2, repository.rebuildCount)
         assertEquals(1, state.results.size)
         assertEquals("猫", state.results.single().matched)
@@ -128,7 +132,11 @@ class DictionarySearchViewModelTest {
         val repository = FakeDictionarySearchRepository(
             lookupResults = listOf(lookupResult("食べる")),
             dictionaryStyles = mapOf("Dict" to ".term {}"),
-            dictionarySettings = DictionarySettings(maxResults = 4, scanLength = 12),
+            dictionarySettings = DictionarySettings(
+                lookupLanguage = DictionaryLanguage.German,
+                maxResults = 4,
+                scanLength = 12,
+            ),
         )
         val viewModel = viewModel(repository)
         val highlightCount = viewModel.openRootPopup(
@@ -141,7 +149,7 @@ class DictionarySearchViewModelTest {
 
         assertEquals(3, highlightCount)
         assertEquals(1, viewModel.uiState.value.popups.size)
-        assertEquals(listOf("食べる:4:12"), repository.lookupCalls)
+        assertEquals(listOf("食べる:4:12:de"), repository.lookupCalls)
 
         viewModel.recordLookupRedirected(2)
         viewModel.navigateBack()
@@ -239,8 +247,8 @@ private class FakeDictionarySearchRepository(
         rebuildCount += 1
     }
 
-    override fun lookup(query: String, maxResults: Int, scanLength: Int): List<LookupResult> {
-        lookupCalls += "$query:$maxResults:$scanLength"
+    override fun lookup(query: String, maxResults: Int, scanLength: Int, language: String): List<LookupResult> {
+        lookupCalls += "$query:$maxResults:$scanLength:$language"
         error?.let { throw it }
         return lookupResults
     }

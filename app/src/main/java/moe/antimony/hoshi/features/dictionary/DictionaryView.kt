@@ -920,6 +920,7 @@ private fun DictionarySettingsView(
     modifier: Modifier = Modifier,
 ) {
     var showCollapsedDictionaries by remember { mutableStateOf(false) }
+    var languageMenuExpanded by remember { mutableStateOf(false) }
     if (showCollapsedDictionaries) {
         CollapsedDictionariesView(
             dictionaries = termDictionaries,
@@ -966,6 +967,35 @@ private fun DictionarySettingsView(
             item {
                 SectionLabel(stringResource(R.string.dictionary_settings_lookup))
                 SettingsGroup {
+                    Box {
+                        ListItem(
+                            modifier = Modifier.clickable { languageMenuExpanded = true },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.dictionary_lookup_language)) },
+                            supportingContent = { Text(stringResource(settings.lookupLanguage.labelRes)) },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                        DropdownMenu(
+                            expanded = languageMenuExpanded,
+                            onDismissRequest = { languageMenuExpanded = false },
+                        ) {
+                            DictionaryLanguage.entries.forEach { language ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(language.labelRes)) },
+                                    onClick = {
+                                        languageMenuExpanded = false
+                                        onSettingsChange { current -> current.copy(lookupLanguage = language) }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    GroupDivider()
                     ToggleRow(stringResource(R.string.dictionary_scan_non_japanese), settings.scanNonJapaneseText) {
                         onSettingsChange { current -> current.copy(scanNonJapaneseText = it) }
                     }

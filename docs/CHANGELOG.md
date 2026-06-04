@@ -5,6 +5,10 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add a dictionary lookup language setting with multilingual hoshidicts lookup support across reader popups, recursive lookups, Dictionary search, and Android Process Text.
+
 ### Fixed
 
 - Prevent vertical reader text from prematurely wrapping after furigana, leaving blank space in the current column.

@@ -708,6 +708,7 @@ fun ReaderWebView(
                     message.query,
                     popup.state.dictionarySettings.maxResults,
                     popup.state.dictionarySettings.scanLength,
+                    popup.state.dictionarySettings.lookupLanguage.code,
                 )
                 if (results.isNotEmpty()) {
                     setLookupPopups(

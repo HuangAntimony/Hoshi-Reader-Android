@@ -139,6 +139,25 @@
     <string name="dictionary_delete_action">Delete Dictionary</string>
     <string name="dictionary_reorder_action">Reorder Dictionary</string>
     <string name="dictionary_settings_lookup">Lookup</string>
+    <string name="dictionary_lookup_language">Lookup Language</string>
+    <string name="dictionary_language_arabic">Arabic</string>
+    <string name="dictionary_language_german">German</string>
+    <string name="dictionary_language_modern_greek">Modern Greek</string>
+    <string name="dictionary_language_english">English</string>
+    <string name="dictionary_language_esperanto">Esperanto</string>
+    <string name="dictionary_language_spanish">Spanish</string>
+    <string name="dictionary_language_basque">Basque</string>
+    <string name="dictionary_language_french">French</string>
+    <string name="dictionary_language_irish">Irish</string>
+    <string name="dictionary_language_ancient_greek">Ancient Greek</string>
+    <string name="dictionary_language_japanese">Japanese</string>
+    <string name="dictionary_language_georgian">Georgian</string>
+    <string name="dictionary_language_korean">Korean</string>
+    <string name="dictionary_language_latin">Latin</string>
+    <string name="dictionary_language_old_irish">Old Irish</string>
+    <string name="dictionary_language_albanian">Albanian</string>
+    <string name="dictionary_language_tagalog">Tagalog</string>
+    <string name="dictionary_language_yiddish">Yiddish</string>
     <string name="dictionary_settings_import" comment="Dictionary settings section label, intentionally matching the Import action noun.">Import</string>
     <string name="dictionary_scan_non_japanese">Scan Non-Japanese Text</string>
     <string name="dictionary_max_results">Max Results</string>
