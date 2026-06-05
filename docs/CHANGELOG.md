@@ -7,6 +7,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ### Fixed
 
+- Keep the Advanced Audio Local source switch synchronized with the Local Audio setting, preventing duplicate Local sources when turning it off from the source list.
 - Prevent vertical reader text from prematurely wrapping after furigana, leaving blank space in the current column.
 
 ## [v1.1.3] - 2026-06-04

@@ -37,6 +37,33 @@ class AudioSettingsTest {
     }
 
     @Test
+    fun disablingDisabledLocalAudioSourceDoesNotCreateDuplicateLocalSources() {
+        val settings = AudioSettings()
+            .withLocalAudioEnabled(true)
+            .copy(
+                audioSources = listOf(
+                    AudioSettings.LocalAudioSource.copy(isEnabled = false),
+                    AudioSettings.DefaultAudioSource,
+                ),
+            )
+            .withLocalAudioEnabled(false)
+
+        assertFalse(settings.enableLocalAudio)
+        assertFalse(settings.audioSources.any { it.name == AudioSettings.LocalAudioSource.name })
+        assertFalse(settings.audioSources.any { it.url == AudioSettings.LocalAudioSource.url })
+    }
+
+    @Test
+    fun changingLocalSourceEnabledStateUpdatesLocalAudioSetting() {
+        val settings = AudioSettings()
+            .withLocalAudioEnabled(true)
+            .withAudioSourceEnabled(AudioSettings.LocalAudioSource, false)
+
+        assertFalse(settings.enableLocalAudio)
+        assertFalse(settings.audioSources.any { it.url == AudioSettings.LocalAudioSource.url })
+    }
+
+    @Test
     fun addSourceIgnoresDuplicateUrlsLikeIos() {
         val settings = AudioSettings().addSource(
             AudioSource(
@@ -80,5 +107,4 @@ class AudioSettingsTest {
         assertFalse(settings.enableLocalAudio)
         assertEquals(listOf(AudioSettings.DefaultAudioSource, external), settings.audioSources)
     }
-
 }

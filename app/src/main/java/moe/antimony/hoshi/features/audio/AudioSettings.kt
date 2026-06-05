@@ -44,10 +44,19 @@ data class AudioSettings(
         get() = audioSources.filter { it.isEnabled }.map { it.url }
 
     fun withLocalAudioEnabled(enabled: Boolean): AudioSettings {
-        val withoutLocal = audioSources.filterNot { it == LocalAudioSource }
+        val withoutLocal = audioSources.filterNot { it.isBuiltInLocalAudioSource }
         return copy(
             enableLocalAudio = enabled,
             audioSources = if (enabled) listOf(LocalAudioSource) + withoutLocal else withoutLocal,
+        )
+    }
+
+    fun withAudioSourceEnabled(source: AudioSource, enabled: Boolean): AudioSettings {
+        if (source.isBuiltInLocalAudioSource) return withLocalAudioEnabled(enabled)
+        return copy(
+            audioSources = audioSources.map { item ->
+                if (item.url == source.url) item.copy(isEnabled = enabled) else item
+            },
         )
     }
 
@@ -78,8 +87,11 @@ data class AudioSettings(
     }
 }
 
+internal val AudioSource.isBuiltInLocalAudioSource: Boolean
+    get() = name == AudioSettings.LocalAudioSource.name && url == AudioSettings.LocalAudioSource.url
+
 private fun AudioSettings.normalizedAudioSettings(): AudioSettings {
-    val withoutLocal = audioSources.filterNot { it == AudioSettings.LocalAudioSource }
+    val withoutLocal = audioSources.filterNot { it.isBuiltInLocalAudioSource }
     return copy(
         audioSources = if (enableLocalAudio) {
             listOf(AudioSettings.LocalAudioSource) + withoutLocal
@@ -111,9 +123,9 @@ class AudioSettingsStore(context: Context) : AudioSettingsLegacySource {
             enableAutoplay = preferences.getBoolean(KEY_AUDIO_ENABLE_AUTOPLAY, false),
             playbackMode = AudioPlaybackMode.fromRawValue(preferences.getString(KEY_AUDIO_PLAYBACK_MODE, null)),
         ).let { settings ->
-            if (settings.enableLocalAudio && settings.audioSources.none { it == AudioSettings.LocalAudioSource }) {
+            if (settings.enableLocalAudio && settings.audioSources.none { it.isBuiltInLocalAudioSource }) {
                 settings.withLocalAudioEnabled(true)
-            } else if (!settings.enableLocalAudio && settings.audioSources.any { it == AudioSettings.LocalAudioSource }) {
+            } else if (!settings.enableLocalAudio && settings.audioSources.any { it.isBuiltInLocalAudioSource }) {
                 settings.withLocalAudioEnabled(false)
             } else {
                 settings
