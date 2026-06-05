@@ -522,6 +522,7 @@ window.hoshiReader = {
     this.clearSasayakiOverlay();
   },
   unwrap: function(wrappers) {
+    var didUnwrap = false;
     wrappers.forEach(function(wrapper) {
       var parent = wrapper.parentNode;
       if (!parent) return;
@@ -530,7 +531,9 @@ window.hoshiReader = {
       }
       parent.removeChild(wrapper);
       parent.normalize();
+      didUnwrap = true;
     });
+    if (didUnwrap) this.stabilizeRubyAdjacentTextNodes();
   },
   isJapaneseBreakCharacter: function(text) {
     var code = (text || '').codePointAt(0);

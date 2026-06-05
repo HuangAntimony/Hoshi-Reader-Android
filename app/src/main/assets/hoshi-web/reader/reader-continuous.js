@@ -549,6 +549,7 @@
     this.clearSasayakiOverlay();
   },
   unwrap: function(wrappers) {
+    var didUnwrap = false;
     wrappers.forEach(function(wrapper) {
       var parent = wrapper.parentNode;
       if (!parent) return;
@@ -557,6 +558,51 @@
       }
       parent.removeChild(wrapper);
       parent.normalize();
+      didUnwrap = true;
+    });
+    if (didUnwrap) this.stabilizeRubyAdjacentTextNodes();
+  },
+  isJapaneseBreakCharacter: function(text) {
+    var code = (text || '').codePointAt(0);
+    return (code >= 0x3000 && code <= 0x303f) ||
+      (code >= 0x3040 && code <= 0x30ff) ||
+      (code >= 0x3400 && code <= 0x9fff) ||
+      (code >= 0xf900 && code <= 0xfaff) ||
+      (code >= 0xff00 && code <= 0xffef);
+  },
+  stabilizeRubyAdjacentTextNodes: function() {
+    if (!this.isVertical()) return;
+    var self = this;
+    var splitLimit = 64;
+    document.querySelectorAll('ruby').forEach(function(ruby) {
+      if (ruby.closest('rt, rp')) return;
+      var node = ruby.nextSibling;
+      while (node && node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) {
+        node = node.nextSibling;
+      }
+      if (!node || node.nodeType !== Node.TEXT_NODE || !node.nodeValue) return;
+      var chars = Array.from(node.nodeValue);
+      if (chars.length <= 1) return;
+      var fragment = document.createDocumentFragment();
+      var pending = '';
+      var splitCount = 0;
+      var flush = function() {
+        if (!pending) return;
+        fragment.appendChild(document.createTextNode(pending));
+        pending = '';
+      };
+      chars.forEach(function(char) {
+        if (splitCount < splitLimit && self.isJapaneseBreakCharacter(char)) {
+          flush();
+          fragment.appendChild(document.createTextNode(char));
+          splitCount += 1;
+        } else {
+          pending += char;
+        }
+      });
+      if (splitCount === 0) return;
+      flush();
+      node.replaceWith(fragment);
     });
   },
   calculateProgress: function() {
@@ -634,7 +680,10 @@
       });
       var parent = marker.parentNode;
       marker.remove();
-      if (parent) parent.normalize();
+      if (parent) {
+        parent.normalize();
+        this.stabilizeRubyAdjacentTextNodes();
+      }
       }
     }
     requestAnimationFrame(() => {
@@ -740,6 +789,7 @@ window.hoshiReader.initialize = function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {
+    window.hoshiReader.stabilizeRubyAdjacentTextNodes();
     window.hoshiReader.buildNodeOffsets();
     __HOSHI_RESTORE_SCRIPTS__
   });

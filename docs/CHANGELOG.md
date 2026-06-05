@@ -9,7 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Keep the Advanced Audio Local source switch synchronized with the Local Audio setting, preventing duplicate Local sources when turning it off from the source list.
 - Import EPUB archives that use stored ZIP entries with data descriptors, matching iOS for books that previously failed during import.
-- Prevent vertical reader text from prematurely wrapping after furigana, leaving blank space in the current column.
+- Prevent vertical reader text in paginated and continuous modes from prematurely wrapping after furigana, leaving blank space in the current column.
 - Trim unmatched quotation brackets from reader lookup sentences before Anki mining, matching iOS for quoted multi-sentence passages. #98
 
 ## [v1.1.3] - 2026-06-04
