@@ -123,13 +123,16 @@ class EpubBookParserTest {
     @Test
     fun parsesKadokawaEpubWithSpineItemProperties() {
         val root = tempFolder.newFolder("kadokawa-test5")
-        EpubArchiveExtractor().extract(File("../testdata/test5.epub"), root)
+        val archive = tempFolder.newFile("kadokawa-test5.epub")
+        writeKadokawaLikeEpubArchive(archive)
+        EpubArchiveExtractor().extract(archive, root)
 
         val book = EpubBookParser().parse(root)
 
         assertEquals("他校の氷姫を助けたら、お友達から始める事になりました", book.title)
         assertEquals(16, book.chapters.size)
         assertEquals("item/xhtml/p-cover.xhtml", book.chapters.first().href)
+        assertEquals("rendition:layout-pre-paginated", book.chapters.first().properties)
         assertEquals("item/image/cover.jpg", book.coverHref)
     }
 
@@ -264,6 +267,71 @@ class EpubBookParserTest {
             </package>
             """.trimIndent(),
         )
+    }
+
+    private fun writeKadokawaLikeEpubArchive(archive: File) {
+        val chapterHrefs = listOf("p-cover.xhtml") +
+            (1..14).map { index -> "p-${index.toString().padStart(3, '0')}.xhtml" } +
+            listOf("p-colophon.xhtml")
+
+        ZipOutputStream(archive.outputStream()).use { zip ->
+            zip.writeTextEntry(
+                "META-INF/container.xml",
+                """
+                <?xml version="1.0"?>
+                <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                  <rootfiles>
+                    <rootfile full-path="item/standard.opf" media-type="application/oebps-package+xml"/>
+                  </rootfiles>
+                </container>
+                """.trimIndent(),
+            )
+            chapterHrefs.forEachIndexed { index, href ->
+                zip.writeTextEntry(
+                    "item/xhtml/$href",
+                    """
+                    <html xmlns="http://www.w3.org/1999/xhtml">
+                    <body><p>Kadokawa chapter ${index + 1}</p></body>
+                    </html>
+                    """.trimIndent(),
+                )
+            }
+            zip.writeTextEntry("item/image/cover.jpg", "cover")
+            zip.writeTextEntry(
+                "item/standard.opf",
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+                  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <dc:title>他校の氷姫を助けたら、お友達から始める事になりました</dc:title>
+                  </metadata>
+                  <manifest>
+                    ${chapterHrefs.joinToString("\n                    ") { href ->
+                        val id = href.substringBefore('.')
+                        val properties = if (href == "p-cover.xhtml") {
+                            " properties=\"rendition:layout-pre-paginated\""
+                        } else {
+                            ""
+                        }
+                        """<item id="$id" href="xhtml/$href" media-type="application/xhtml+xml"$properties/>"""
+                    }}
+                    <item id="cover-image" href="image/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+                  </manifest>
+                  <spine page-progression-direction="rtl">
+                    ${chapterHrefs.joinToString("\n                    ") { href ->
+                        """<itemref idref="${href.substringBefore('.')}"/>"""
+                    }}
+                  </spine>
+                </package>
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private fun ZipOutputStream.writeTextEntry(path: String, value: String) {
+        putNextEntry(ZipEntry(path))
+        write(value.toByteArray())
+        closeEntry()
     }
 
     private companion object {
