@@ -162,3 +162,42 @@ test('shared ruby geometry exposes merged inline rects for reader Sasayaki overl
     assert.equal(merged[0].width, 18);
     assert.equal(merged[0].height, 12);
 });
+
+test('shared ruby geometry does not cascade a vertical single-character base rect into adjacent ruby text', () => {
+    const { window } = loadSelection('花');
+    window.getComputedStyle = () => ({ writingMode: 'vertical-rl' });
+
+    const rect = (x, y, width, height) => ({
+        x,
+        y,
+        width,
+        height,
+        left: x,
+        top: y,
+        right: x + width,
+        bottom: y + height,
+    });
+    const previousRt = { getClientRects: () => [rect(171, 434, 14, 21)] };
+    const targetRt = { getClientRects: () => [rect(171, 455, 14, 21)] };
+    const nextRt = { getClientRects: () => [rect(171, 476, 14, 21)] };
+    const ruby = {
+        querySelectorAll(selector) {
+            return selector === 'rt' ? [previousRt, targetRt, nextRt] : [];
+        },
+    };
+    const baseNode = {
+        nodeType: 3,
+        parentElement: {
+            closest(selector) {
+                return selector === 'ruby' ? ruby : null;
+            },
+        },
+    };
+
+    const rubyAware = window.hoshiRubyGeometry.rubyAwareRect(rect(148, 455, 30, 21), baseNode);
+
+    assert.equal(rubyAware.x, 148);
+    assert.equal(rubyAware.y, 455);
+    assert.equal(rubyAware.width, 37);
+    assert.equal(rubyAware.height, 21);
+});

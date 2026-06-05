@@ -97,6 +97,10 @@ window.hoshiRubyGeometry = window.hoshiRubyGeometry || {
         return bStart <= aEnd + tolerance && bEnd >= aStart - tolerance;
     },
 
+    rangeOverlapAmount(aStart, aEnd, bStart, bEnd) {
+        return Math.min(aEnd, bEnd) - Math.max(aStart, bStart);
+    },
+
     rubyForNode(node) {
         const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
         return el?.closest ? el.closest('ruby') : null;
@@ -114,19 +118,20 @@ window.hoshiRubyGeometry = window.hoshiRubyGeometry || {
 
     rubyRectMatchesBase(baseRect, rubyRect) {
         const ruby = this.rectWithBounds(rubyRect);
-        const tolerance = 1;
+        const minimumOverlap = 1;
         if (this.isVertical()) {
-            return this.rangesOverlap(baseRect.top, baseRect.bottom, ruby.top, ruby.bottom, tolerance);
+            return this.rangeOverlapAmount(baseRect.top, baseRect.bottom, ruby.top, ruby.bottom) > minimumOverlap;
         }
-        return this.rangesOverlap(baseRect.left, baseRect.right, ruby.left, ruby.right, tolerance);
+        return this.rangeOverlapAmount(baseRect.left, baseRect.right, ruby.left, ruby.right) > minimumOverlap;
     },
 
     rubyAwareRect(rect, node) {
         const rubyRects = this.rubyTextRects(node);
         if (!rubyRects.length) return this.rectObject(rect);
-        let result = this.rectWithBounds(rect);
+        const base = this.rectWithBounds(rect);
+        let result = base;
         rubyRects.forEach((rubyRect) => {
-            if (this.rubyRectMatchesBase(result, rubyRect)) {
+            if (this.rubyRectMatchesBase(base, rubyRect)) {
                 result = this.unionRect(result, this.rectWithBounds(rubyRect));
             }
         });
