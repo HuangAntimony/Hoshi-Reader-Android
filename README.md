@@ -116,3 +116,15 @@ Hoshi Reader Android builds on this ecosystem:
 ## License
 
 Distributed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
+
+## Star History
+
+If Hoshi Reader Android helps your reading workflow, please consider giving the project a star.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&legend=top-left" />
+  </picture>
+</p>

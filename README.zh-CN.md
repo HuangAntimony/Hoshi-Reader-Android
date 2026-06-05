@@ -122,3 +122,15 @@ Hoshi Reader Android 基于以下生态：
 ## 许可证
 
 本项目基于 GNU General Public License v3.0 发布。详情见 [LICENSE](LICENSE)。
+
+## Star History
+
+如果 Hoshi Reader Android 对你的阅读有帮助，欢迎顺手点一个 Star。
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=HuangAntimony/Hoshi-Reader-Android&type=date&legend=top-left" />
+  </picture>
+</p>
