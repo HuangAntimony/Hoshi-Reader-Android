@@ -87,7 +87,7 @@ Manual reader validation should cover:
   inside large text nodes.
 - lookup popup open/dismiss, recursive lookup, parent-scroll child dismissal,
   duplicate state, redirect history, audio/autoplay errors, Anki actions,
-  Sasayaki controls, dictionary media images, outside tap/stylus dismissal, and
+  Sasayaki controls, dictionary media images, outside tap dismissal, and
   absence of invisible touch blockers after dismissal.
 - E-ink selection marks, horizontal and vertical lookup underlines, reduced
   motion popup scrolling, and slow-device first-visible-content behavior.
@@ -143,7 +143,8 @@ Validate relevant dictionary/audio changes with:
   files, lookup playback, and Anki audio export.
 - deinflection explanations for conjugated lookups such as `食べた`.
 - popup theme contrast for deinflection explanations and JMdict forms tables.
-- Dictionary tab and Process Text popup cold paths after reader popup changes.
+- Dictionary tab and Process Text iframe popup cold paths after reader popup
+  changes.
 - Android AnkiConnect and AnkiDroid flows when Anki behavior changes, including
   duplicate checks, media references, add-note, and sync behavior.
 

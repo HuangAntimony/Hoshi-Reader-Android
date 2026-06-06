@@ -1,12 +1,8 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.annotation.SuppressLint
-import android.net.Uri
 import android.view.MotionEvent
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -47,9 +43,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -75,16 +69,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
-import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.anki.AnkiViewModel
-import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
@@ -94,7 +85,6 @@ import moe.antimony.hoshi.features.reader.ReaderLookupPopupWebBridge
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupViewport
 import moe.antimony.hoshi.features.reader.ReaderPopupHistoryCounts
 import moe.antimony.hoshi.features.reader.ReaderSettings
-import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.reader.readerLookupPopupIframeUrl
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -156,27 +146,18 @@ fun DictionarySearchView(
     val ankiViewModel: AnkiViewModel = hiltViewModel()
     val uiState by searchViewModel.uiState.collectAsStateWithLifecycle()
     val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
-    var rootHighlightRects by remember { mutableStateOf<List<ReaderSelectionRect>>(emptyList()) }
     var rootIframeAtTop by remember { mutableStateOf(true) }
     var childHistories by remember { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var iframeHostWebView by remember { mutableStateOf<WebView?>(null) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    var searchBarBottomPx by remember { mutableIntStateOf(0) }
     var searchBarBottomDp by remember { mutableStateOf(0.0) }
     var pullDistancePx by remember { mutableFloatStateOf(0f) }
     var localFocusRequestKey by remember { mutableIntStateOf(0) }
     val localAudioRepository = appContainer.localAudioRepository
     val fontManager = appContainer.readerFontManager
     val fontFaceCss = fontManager.popupFontFaceCss()
-    val readerIframePopupSupported = remember { ReaderLookupPopupWebBridge.isSupported() }
     val readerPopupBridgeHolder = remember { ReaderLookupPopupBridgeCallbackHolder() }
     val popupDarkMode = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val actionButtonTintColor = when {
-        readerSettings.eInkMode && popupDarkMode -> Color.White
-        readerSettings.eInkMode -> Color.Black
-        popupDarkMode -> Color(0xFFEBEBF5)
-        else -> Color(0x993C3C43)
-    }
     val popupOptions = dictionarySearchPopupOptions(
         readerSettings = readerSettings,
         dictionarySettings = uiState.dictionarySettings,
@@ -189,34 +170,6 @@ fun DictionarySearchView(
             width = with(density) { viewportSize.width.toDp().value.toDouble() },
             height = with(density) { viewportSize.height.toDp().value.toDouble() },
         )
-    }
-    val resultHtml = remember(
-        uiState.lastQuery,
-        uiState.results,
-        uiState.dictionaryStyles,
-        uiState.dictionarySettings,
-        popupDarkMode,
-        readerSettings.eInkMode,
-        uiState.audioSettings,
-        ankiUiState.popupSettings,
-        assets,
-        fontFaceCss,
-        searchBarBottomPx,
-    ) {
-        DictionarySearchContent.renderExistingResults(
-            lastQuery = uiState.lastQuery,
-            results = uiState.results,
-            assets = assets,
-            dictionaryStyles = uiState.dictionaryStyles,
-            dictionarySettings = uiState.dictionarySettings,
-            darkMode = popupDarkMode,
-            eInkMode = readerSettings.eInkMode,
-            audioSettings = uiState.audioSettings,
-            ankiSettings = ankiUiState.popupSettings,
-            fontFaceCss = fontFaceCss,
-            popupScale = readerSettings.popupScale,
-            topSpacerPx = searchBarBottomPx,
-        ).html
     }
     val themedPopups = remember(
         uiState.popups,
@@ -305,17 +258,9 @@ fun DictionarySearchView(
         localFocusRequestKey += 1
     }
     val runLookup = {
-        rootHighlightRects = emptyList()
         childHistories = emptyMap()
         rootIframeAtTop = true
-        searchViewModel.runLookup(
-            assets = assets,
-            darkMode = popupDarkMode,
-            eInkMode = readerSettings.eInkMode,
-            ankiSettings = ankiUiState.popupSettings,
-            fontFaceCss = fontFaceCss,
-            popupScale = readerSettings.popupScale,
-        )
+        searchViewModel.runLookup()
     }
     val lookupPopup = { selection: moe.antimony.hoshi.features.reader.ReaderSelectionData ->
         searchViewModel.createPopup(
@@ -326,7 +271,6 @@ fun DictionarySearchView(
     fun setIframePopups(next: List<LookupPopupItem>) {
         val activeIds = next.mapTo(mutableSetOf()) { it.id }
         childHistories = childHistories.filterKeys(activeIds::contains)
-        if (next.isEmpty()) rootHighlightRects = emptyList()
         searchViewModel.setPopups(next)
     }
     fun popupIndex(popupId: String): Int =
@@ -370,7 +314,6 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
             is ReaderLookupPopupBridgeMessage.TapOutside -> {
                 if (message.popupId == DictionarySearchRootPopupId) {
-                    rootHighlightRects = emptyList()
                     searchViewModel.closePopups()
                 } else {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
@@ -379,7 +322,6 @@ fun DictionarySearchView(
             }
             is ReaderLookupPopupBridgeMessage.SwipeDismiss -> {
                 if (message.popupId == DictionarySearchRootPopupId) {
-                    rootHighlightRects = emptyList()
                     searchViewModel.dismissRootPopup()
                 } else {
                     val dismissal = dictionarySearchIframePopupsAfterSwipeDismiss(
@@ -387,7 +329,6 @@ fun DictionarySearchView(
                         popupId = message.popupId,
                     )
                     if (dismissal.clearRootSelection) {
-                        rootHighlightRects = emptyList()
                         childHistories = emptyMap()
                         searchViewModel.dismissRootPopup()
                     } else {
@@ -477,7 +418,6 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.ContentReady -> Unit
             is ReaderLookupPopupBridgeMessage.PopupScrolled -> {
                 if (message.popupId == DictionarySearchRootPopupId) {
-                    rootHighlightRects = emptyList()
                     if (uiState.popups.isNotEmpty()) {
                         childHistories = emptyMap()
                         searchViewModel.dismissRootPopup()
@@ -539,7 +479,7 @@ fun DictionarySearchView(
             .onSizeChanged { viewportSize = it },
     ) {
         when {
-            uiState.hasResults && readerIframePopupSupported -> {
+            uiState.hasResults -> {
                 DictionarySearchIframeHost(
                     callbackHolder = readerPopupBridgeHolder,
                     resourceHandler = readerPopupResourceHandler,
@@ -556,7 +496,6 @@ fun DictionarySearchView(
                             )
                         ) {
                             DictionaryPullResetAction.ResetAndFocus -> {
-                                rootHighlightRects = emptyList()
                                 childHistories = emptyMap()
                                 rootIframeAtTop = true
                                 searchViewModel.resetSearch()
@@ -582,59 +521,6 @@ fun DictionarySearchView(
                     rootHighlight = null,
                 )
             }
-            uiState.hasResults -> DictionaryResultWebView(
-                html = resultHtml,
-                results = uiState.results,
-                assets = assets,
-                fontManager = fontManager,
-                audioSettings = uiState.audioSettings,
-                popupScale = readerSettings.popupScale,
-                actionButtonTintColor = actionButtonTintColor,
-                localAudioRepository = localAudioRepository,
-                clearSelectionSignal = uiState.resultClearSelectionSignal,
-                backSignal = uiState.backSignal,
-                forwardSignal = uiState.forwardSignal,
-                callbacks = PopupWebViewCallbacks(
-                    onTapOutside = {
-                        rootHighlightRects = emptyList()
-                        searchViewModel.closePopups()
-                    },
-                    onSwipeDismiss = {
-                        rootHighlightRects = emptyList()
-                        searchViewModel.closePopups()
-                    },
-                    onOpenLink = context::openPopupExternalLink,
-                    onTextSelected = { selection ->
-                        searchViewModel.openRootPopup(selection, popupOptions)
-                    },
-                    onSelectionRectsLoaded = { rects ->
-                        rootHighlightRects = rects
-                    },
-                    onLookupRedirect = searchViewModel::lookupRedirect,
-                    onLookupRedirected = searchViewModel::recordLookupRedirected,
-                    onPlayWordAudio = { url, mode ->
-                        WordAudioPlayer.get(context).play(url, mode)
-                    },
-                    onMineEntry = { payload, reply ->
-                        ankiViewModel.mineEntryAsync(
-                            payload,
-                            AnkiMiningContext(
-                                sentence = uiState.lastQuery.ifBlank { uiState.query },
-                            ),
-                            reply,
-                        )
-                    },
-                    onDuplicateCheck = ankiViewModel::duplicateCheckAsync,
-                ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .observeDictionaryHistorySwipe(
-                        backCount = uiState.backCount,
-                        forwardCount = uiState.forwardCount,
-                        onBack = searchViewModel::navigateBack,
-                        onForward = searchViewModel::navigateForward,
-                    ),
-            )
             uiState.errorMessage != null -> DictionarySearchMessage(
                 text = requireNotNull(uiState.errorMessage).asString(),
                 modifier = Modifier.fillMaxSize(),
@@ -644,7 +530,7 @@ fun DictionarySearchView(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (uiState.hasResults && readerIframePopupSupported && pullDistancePx > 1f) {
+        if (uiState.hasResults && pullDistancePx > 1f) {
             DictionaryPullResetIndicator(
                 distancePx = pullDistancePx,
                 thresholdPx = with(density) { DictionaryPullResetThreshold.toPx() },
@@ -660,7 +546,6 @@ fun DictionarySearchView(
             onSubmit = runLookup,
             focusRequestKey = focusRequestKey to localFocusRequestKey,
             onBottomChanged = { bottomPx ->
-                searchBarBottomPx = bottomPx
                 searchBarBottomDp = with(density) { bottomPx.toDp().value.toDouble() }
             },
             modifier = Modifier
@@ -668,25 +553,6 @@ fun DictionarySearchView(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface),
         )
-        if (!readerIframePopupSupported) {
-            LookupPopupAndroidStack(
-                popups = themedPopups,
-                onPopupsChange = { next ->
-                    if (next.isEmpty()) rootHighlightRects = emptyList()
-                    searchViewModel.setPopups(next)
-                },
-                lookupChildPopup = lookupPopup,
-                onRootPopupDismissed = {
-                    rootHighlightRects = emptyList()
-                    searchViewModel.dismissRootPopup()
-                    true
-                },
-                rootHighlightRects = rootHighlightRects,
-                rootHighlightDarkMode = popupDarkMode,
-                rootHighlightEInkMode = readerSettings.eInkMode,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
     }
 }
 
@@ -715,7 +581,7 @@ private fun DictionarySearchIframeHost(
                 isHorizontalScrollBarEnabled = false
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 ReaderLookupPopupWebBridge.install(this, callbackHolder)
-                webViewClient = DictionarySearchIframeWebViewClient(resourceHandler)
+                webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
                 installDictionaryPullTouchObserver(
                     rootAtTop = { currentRootAtTop.value },
                     onPullStarted = { currentOnPullStarted.value() },
@@ -724,7 +590,7 @@ private fun DictionarySearchIframeHost(
                 )
                 loadDataWithBaseURL(
                     "https://hoshi.local/dictionary/iframe-host.html",
-                    dictionarySearchIframeHostHtml(),
+                    lookupPopupIframeHostHtml(),
                     "text/html",
                     "UTF-8",
                     null,
@@ -733,21 +599,10 @@ private fun DictionarySearchIframeHost(
             }
         },
         update = { webView ->
-            webView.webViewClient = DictionarySearchIframeWebViewClient(resourceHandler)
+            webView.webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
             onWebViewChanged(webView)
         },
     )
-}
-
-private class DictionarySearchIframeWebViewClient(
-    private val resourceHandler: ReaderLookupPopupResourceHandler,
-) : WebViewClient() {
-    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-        resourceHandler.handle(request.url)
-
-    @Suppress("OVERRIDE_DEPRECATION")
-    override fun shouldInterceptRequest(view: WebView, url: String): WebResourceResponse? =
-        resourceHandler.handle(Uri.parse(url))
 }
 
 @SuppressLint("ClickableViewAccessibility")
@@ -799,28 +654,6 @@ private fun WebView.installDictionaryPullTouchObserver(
         false
     }
 }
-
-private fun dictionarySearchIframeHostHtml(): String = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-            html,
-            body {
-                margin: 0;
-                width: 100%;
-                height: 100%;
-                background: transparent;
-                overflow: hidden;
-                overscroll-behavior: none;
-            }
-        </style>
-        <script src="https://hoshi.local/popup/reader-popup-host.js"></script>
-    </head>
-    <body></body>
-    </html>
-""".trimIndent()
 
 @Composable
 private fun DictionaryPullResetIndicator(
@@ -1044,102 +877,4 @@ private fun DictionarySearchMessage(text: String, modifier: Modifier = Modifier)
     ) {
         Text(text = text, color = MaterialTheme.colorScheme.error)
     }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun DictionaryResultWebView(
-    html: String,
-    results: List<LookupResult>,
-    assets: LookupPopupAssets,
-    fontManager: ReaderFontManager,
-    audioSettings: AudioSettings,
-    popupScale: Double,
-    actionButtonTintColor: Color,
-    localAudioRepository: LocalAudioRepository,
-    clearSelectionSignal: Int,
-    backSignal: Int,
-    forwardSignal: Int,
-    callbacks: PopupWebViewCallbacks,
-    modifier: Modifier = Modifier,
-) {
-    val callbackHolder = remember { PopupWebViewCallbackHolder(callbacks) }
-    callbackHolder.callbacks = callbacks
-    val lookupResultsHolder = remember { PopupLookupResultsHolder(results) }
-    var loadedHtml by remember { mutableStateOf<String?>(null) }
-    var appliedClearSelectionSignal by remember { mutableStateOf(clearSelectionSignal) }
-    var appliedBackSignal by remember { mutableStateOf(backSignal) }
-    var appliedForwardSignal by remember { mutableStateOf(forwardSignal) }
-    var appliedPopupScale by remember { mutableStateOf(popupScale) }
-    AndroidView(
-        modifier = modifier.fillMaxSize(),
-        factory = { context ->
-            val audioRequestHandler = AudioRequestHandler(
-                localAudioRepository,
-            )
-            PopupActionButtonWebView(context).apply {
-                applyHoshiWebViewSecurityDefaults()
-                isVerticalScrollBarEnabled = false
-                isHorizontalScrollBarEnabled = false
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                addJavascriptInterface(
-                    PopupWebViewBridge(
-                        webView = this,
-                        callbackHolder = callbackHolder,
-                        lookupResultsHolder = lookupResultsHolder,
-                    ),
-                    "HoshiPopup",
-                )
-                webViewClient = PopupMessageWebViewClient(
-                    callbackHolder = callbackHolder,
-                    audioRequestHandler = audioRequestHandler,
-                    assets = assets,
-                    fontManager = fontManager,
-                )
-            }
-        },
-        update = { webView ->
-            callbackHolder.callbacks = callbacks
-            webView.webViewClient = PopupMessageWebViewClient(
-                callbackHolder,
-                AudioRequestHandler(
-                    localAudioRepository,
-                ),
-                assets,
-                fontManager,
-            )
-            if (loadedHtml != html) {
-                lookupResultsHolder.results = results
-                loadedHtml = html
-                (webView as? PopupActionButtonWebView)?.clearActionButtons()
-                webView.loadDataWithBaseURL(
-                    "https://hoshi.local/dictionary/",
-                    html,
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-            (webView as? PopupActionButtonWebView)?.setActionButtonTint(actionButtonTintColor.toArgb())
-            if (appliedPopupScale != popupScale) {
-                appliedPopupScale = popupScale
-                webView.evaluateJavascript(
-                    "document.documentElement.style.zoom = '${popupScale.coerceIn(0.8, 1.5)}'; if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)",
-                    null,
-                )
-            }
-            if (appliedClearSelectionSignal != clearSelectionSignal) {
-                appliedClearSelectionSignal = clearSelectionSignal
-                webView.evaluateJavascript("window.hoshiSelection.clearSelection()", null)
-            }
-            if (appliedBackSignal != backSignal) {
-                appliedBackSignal = backSignal
-                webView.evaluateJavascript("window.navigateBack(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
-            }
-            if (appliedForwardSignal != forwardSignal) {
-                appliedForwardSignal = forwardSignal
-                webView.evaluateJavascript("window.navigateForward(); if (typeof syncButtonFrames === 'function') requestAnimationFrame(syncButtonFrames)", null)
-            }
-        },
-    )
 }

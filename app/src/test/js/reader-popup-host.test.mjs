@@ -81,13 +81,26 @@ class FakeElement {
         this.children.forEach(visit);
         return matches;
     }
+
+    closest(selector) {
+        const classNames = Array.from(selector.matchAll(/\.([A-Za-z0-9_-]+)/g), (match) => match[1]);
+        let element = this;
+        while (element) {
+            if (classNames.some((className) => element.className.split(' ').includes(className))) {
+                return element;
+            }
+            element = element.parentNode;
+        }
+        return null;
+    }
 }
 
-function popupHost() {
+function popupHost(options = {}) {
     const root = new FakeElement('html');
     const body = new FakeElement('body');
     root.appendChild(body);
     const messageListeners = [];
+    const windowListeners = new Map();
     const document = {
         documentElement: root,
         body,
@@ -106,8 +119,15 @@ function popupHost() {
             },
         }),
         addEventListener(type, listener) {
-            if (type === 'message') messageListeners.push(listener);
+            if (type === 'message') {
+                messageListeners.push(listener);
+                return;
+            }
+            const listeners = windowListeners.get(type) ?? [];
+            listeners.push(listener);
+            windowListeners.set(type, listeners);
         },
+        __hoshiReaderPopupHostDismissTopPopupOnOutsideTap: options.dismissTopPopupOnOutsideTap === true,
     };
     const script = fs.readFileSync(
         new URL('../../main/assets/hoshi-web/popup/reader-popup-host.js', import.meta.url),
@@ -124,6 +144,9 @@ function popupHost() {
                 data,
                 source: {},
             }));
+        },
+        dispatchWindowEvent: (type, event) => {
+            (windowListeners.get(type) ?? []).forEach((listener) => listener(event));
         },
     };
 }
@@ -259,6 +282,49 @@ test('public navigation helpers forward messages to the active iframe', () => {
     assert.deepEqual(nativeMessages, [
         { name: 'navigateBack', popupId: 'root' },
         { name: 'navigateForward', popupId: 'root' },
+    ]);
+});
+
+test('outside pointer dismissal is opt-in for process text iframe host', () => {
+    const scene = popupHost();
+    const nativeMessages = [];
+    scene.window.HoshiReaderPopup = {
+        postMessage(message) {
+            nativeMessages.push(JSON.parse(message));
+        },
+    };
+    scene.host.renderStack({
+        popups: [rootPopupPayload()],
+    });
+
+    scene.dispatchWindowEvent('pointerdown', { target: scene.document.body });
+
+    assert.deepEqual(nativeMessages, []);
+});
+
+test('process text iframe host outside pointer dismisses the top popup', () => {
+    const scene = popupHost({ dismissTopPopupOnOutsideTap: true });
+    const nativeMessages = [];
+    scene.window.HoshiReaderPopup = {
+        postMessage(message) {
+            nativeMessages.push(JSON.parse(message));
+        },
+    };
+    scene.host.renderStack({
+        popups: [
+            rootPopupPayload(),
+            {
+                ...rootPopupPayload(),
+                id: 'child',
+                frame: { left: 20, top: 20, width: 200, height: 180 },
+            },
+        ],
+    });
+
+    scene.dispatchWindowEvent('pointerdown', { target: scene.document.body });
+
+    assert.deepEqual(nativeMessages, [
+        { name: 'swipeDismiss', popupId: 'child' },
     ]);
 });
 

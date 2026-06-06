@@ -84,7 +84,6 @@ internal fun ChapterWebView(
     onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit,
     readerPopupBridgeHolder: ReaderLookupPopupBridgeCallbackHolder,
     readerPopupResourceHandler: ReaderLookupPopupResourceHandler,
-    readerIframePopupSupported: Boolean,
     readerPopupFrames: List<ReaderLookupPopupFramePayload>,
     fontManager: ReaderFontManager,
     systemDark: Boolean,
@@ -231,9 +230,7 @@ internal fun ChapterWebView(
                     },
                     "HoshiReaderImage",
                 )
-                if (readerIframePopupSupported) {
-                    ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder)
-                }
+                ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder)
                 webViewClient = EpubWebViewClient(
                     book = book,
                     fontManager = fontManager,

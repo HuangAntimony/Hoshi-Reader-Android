@@ -58,12 +58,10 @@ import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
-import moe.antimony.hoshi.features.dictionary.LookupPopupAndroidStack
 import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
 import moe.antimony.hoshi.features.dictionary.LookupPopupHtml
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
-import moe.antimony.hoshi.features.dictionary.PopupSelectionEInkStyle
 import moe.antimony.hoshi.features.dictionary.closeChildPopupsForScrolledParent
 import moe.antimony.hoshi.features.dictionary.clearPopupSelectionHighlights
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
@@ -180,7 +178,6 @@ fun ReaderWebView(
     val effectiveSettings = stateHolder.effectiveSettings
     val readerPosition = stateHolder.readerPosition
     val lookupPopups = stateHolder.lookupPopups
-    val readerIframePopupSupported = remember { ReaderLookupPopupWebBridge.isSupported() }
     var readerPopupHistories by remember { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var rootSelectionHighlight by remember { mutableStateOf<ReaderRootSelectionHighlight?>(null) }
     var fullscreenImage by remember { mutableStateOf<ReaderFullscreenImage?>(null) }
@@ -225,8 +222,7 @@ fun ReaderWebView(
     val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
         readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
     }
-    LaunchedEffect(webView, readerPopupIframeUrl, readerIframePopupSupported) {
-        if (!readerIframePopupSupported) return@LaunchedEffect
+    LaunchedEffect(webView, readerPopupIframeUrl) {
         webView?.evaluateJavascript(
             """
                 (function() {
@@ -790,36 +786,11 @@ fun ReaderWebView(
                 rects = null,
             )
             setLookupPopups(listOf(popup))
-            if (readerIframePopupSupported) {
-                selectionRects(selectionCount) { rects ->
-                    if (stateHolder.lookupPopups.none { it.id == popup.id }) return@selectionRects
-                    val displayRects = rects.ifEmpty { listOf(popup.state.selection.rect) }
-                    val anchor = displayRects.firstOrNull()
-                    if (anchor != null) {
-                        setLookupPopups(
-                            stateHolder.lookupPopups.map { existing ->
-                                if (existing.id == popup.id) {
-                                    existing.copy(
-                                        state = existing.state.copy(
-                                            selection = existing.state.selection.copy(rect = anchor),
-                                        ),
-                                    )
-                                } else {
-                                    existing
-                                }
-                            },
-                        )
-                    }
-                    rootSelectionHighlight = ReaderRootSelectionHighlight(
-                        popupId = popup.id,
-                        rects = displayRects,
-                    )
-                }
-            } else {
-                selectionRects(selectionCount) { rects ->
-                    if (stateHolder.lookupPopups.none { it.id == popup.id }) return@selectionRects
-                    val displayRects = rects.ifEmpty { listOf(popup.state.selection.rect) }
-                    val anchor = displayRects.firstOrNull() ?: return@selectionRects
+            selectionRects(selectionCount) { rects ->
+                if (stateHolder.lookupPopups.none { it.id == popup.id }) return@selectionRects
+                val displayRects = rects.ifEmpty { listOf(popup.state.selection.rect) }
+                val anchor = displayRects.firstOrNull()
+                if (anchor != null) {
                     setLookupPopups(
                         stateHolder.lookupPopups.map { existing ->
                             if (existing.id == popup.id) {
@@ -833,23 +804,19 @@ fun ReaderWebView(
                             }
                         },
                     )
-                    rootSelectionHighlight = ReaderRootSelectionHighlight(
-                        popupId = popup.id,
-                        rects = displayRects,
-                    )
                 }
+                rootSelectionHighlight = ReaderRootSelectionHighlight(
+                    popupId = popup.id,
+                    rects = displayRects,
+                )
             }
         } else {
             onTextSelected(selection)?.let { count ->
-                if (readerIframePopupSupported) {
-                    selectionRects(count) { rects ->
-                        rootSelectionHighlight = ReaderRootSelectionHighlight(
-                            popupId = null,
-                            rects = rects,
-                        )
-                    }
-                } else {
-                    selectionRects(count) {}
+                selectionRects(count) { rects ->
+                    rootSelectionHighlight = ReaderRootSelectionHighlight(
+                        popupId = null,
+                        rects = rects,
+                    )
                 }
             }
         }
@@ -1216,23 +1183,18 @@ fun ReaderWebView(
                     readerLookupPopupViewport,
                     sasayakiWasPausedByLookup,
                     sasayakiPlayer?.isPlaying == true,
-                    readerIframePopupSupported,
                     readerPopupIframeUrl,
                     rootSelectionHighlight,
                 ) {
-                    if (!readerIframePopupSupported) {
-                        emptyList()
-                    } else {
-                        readerLookupPopupFramePayloads(
-                            popups = themedLookupPopups,
-                            histories = readerPopupHistories,
-                            viewport = readerLookupPopupViewport,
-                            sasayakiWasPaused = sasayakiWasPausedByLookup,
-                            sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
-                            iframeUrl = readerPopupIframeUrl,
-                            rootSelectionHighlight = rootSelectionHighlight,
-                        )
-                    }
+                    readerLookupPopupFramePayloads(
+                        popups = themedLookupPopups,
+                        histories = readerPopupHistories,
+                        viewport = readerLookupPopupViewport,
+                        sasayakiWasPaused = sasayakiWasPausedByLookup,
+                        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                        iframeUrl = readerPopupIframeUrl,
+                        rootSelectionHighlight = rootSelectionHighlight,
+                    )
                 }
                 if (highlights != null) {
                     val loadChapter = currentLoadChapter()
@@ -1290,7 +1252,6 @@ fun ReaderWebView(
                         onHighlightCreated = ::addHighlight,
                         readerPopupBridgeHolder = readerPopupBridgeHolder,
                         readerPopupResourceHandler = readerPopupResourceHandler,
-                        readerIframePopupSupported = readerIframePopupSupported,
                         readerPopupFrames = readerLookupPopupPayloads,
                         fontManager = fontManager,
                         systemDark = systemDarkTheme,
@@ -1302,29 +1263,11 @@ fun ReaderWebView(
                             ),
                     )
                 }
-                if (readerIframePopupSupported) {
-                    ReaderLookupPopupIframeSync(
-                        webView = webView,
-                        payloads = readerLookupPopupPayloads,
-                        rootHighlight = readerRootSelectionHighlightPayload,
-                    )
-                } else {
-                    LookupPopupAndroidStack(
-                        popups = themedLookupPopups,
-                        onPopupsChange = ::setLookupPopups,
-                        lookupChildPopup = ::lookupChildPopup,
-                        onRootPopupDismissed = {
-                            dismissRootLookupPopup()
-                            true
-                        },
-                        rootHighlightRects = rootSelectionHighlight?.rects.orEmpty(),
-                        rootHighlightDarkMode = popupDarkMode,
-                        rootHighlightEInkMode = effectiveSettings.eInkMode,
-                        rootHighlightVerticalWriting = effectiveSettings.verticalWriting,
-                        rootHighlightEInkStyle = PopupSelectionEInkStyle.Box,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                ReaderLookupPopupIframeSync(
+                    webView = webView,
+                    payloads = readerLookupPopupPayloads,
+                    rootHighlight = readerRootSelectionHighlightPayload,
+                )
             }
         }
         ReaderTopInfo(

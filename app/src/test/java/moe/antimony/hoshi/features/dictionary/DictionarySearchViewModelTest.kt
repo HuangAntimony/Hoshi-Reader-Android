@@ -43,14 +43,7 @@ class DictionarySearchViewModelTest {
         viewModel.navigateBack()
 
         viewModel.updateQuery(" 猫 ")
-        viewModel.runLookup(
-            assets = LookupPopupAssets(
-                popupJs = "window.renderPopup = function() {};",
-                popupCss = ".entry {}",
-            ),
-            darkMode = true,
-            eInkMode = true,
-        )
+        viewModel.runLookup()
 
         val state = viewModel.uiState.value
         assertEquals("猫", state.lastQuery)
@@ -61,9 +54,6 @@ class DictionarySearchViewModelTest {
         assertEquals(2, repository.rebuildCount)
         assertEquals(1, state.results.size)
         assertEquals("猫", state.results.single().matched)
-        assertTrue(state.html.contains("window.lookupEntries = ["))
-        assertTrue(state.html.contains("""data-hoshi-color-scheme="dark""""))
-        assertTrue(state.html.contains("""data-hoshi-eink-mode="true""""))
         assertEquals(mapOf("JMdict" to ".entry {}"), state.dictionaryStyles)
         assertEquals(emptyList<LookupPopupItem>(), state.popups)
         assertEquals(0, state.resultClearSelectionSignal)
@@ -81,11 +71,10 @@ class DictionarySearchViewModelTest {
         val viewModel = viewModel(repository)
 
         viewModel.updateQuery("   ")
-        viewModel.runLookup(assets = LookupPopupAssets(popupJs = "", popupCss = ""))
+        viewModel.runLookup()
 
         val state = viewModel.uiState.value
         assertEquals("", state.lastQuery)
-        assertEquals("", state.html)
         assertEquals(emptyList<LookupResult>(), state.results)
         assertFalse(state.hasResults)
         assertTrue(state.hasSearched)
@@ -100,7 +89,7 @@ class DictionarySearchViewModelTest {
         )
         val viewModel = viewModel(repository)
         viewModel.updateQuery("猫")
-        viewModel.runLookup(assets = LookupPopupAssets(popupJs = "", popupCss = ""))
+        viewModel.runLookup()
         viewModel.setPopups(listOf(popup("old")))
         viewModel.recordLookupRedirected(1)
         viewModel.navigateBack()
@@ -110,7 +99,6 @@ class DictionarySearchViewModelTest {
         val state = viewModel.uiState.value
         assertEquals("", state.query)
         assertEquals("", state.lastQuery)
-        assertEquals("", state.html)
         assertEquals(emptyList<LookupResult>(), state.results)
         assertFalse(state.hasSearched)
         assertFalse(state.isSearching)
@@ -148,10 +136,9 @@ class DictionarySearchViewModelTest {
         val viewModel = viewModel(repository)
 
         viewModel.updateQuery("猫")
-        viewModel.runLookup(assets = LookupPopupAssets(popupJs = "", popupCss = ""))
+        viewModel.runLookup()
 
         val state = viewModel.uiState.value
-        assertEquals("", state.html)
         assertEquals(emptyList<LookupResult>(), state.results)
         assertEquals(emptyMap<String, String>(), state.dictionaryStyles)
         assertEquals(emptyList<LookupPopupItem>(), state.popups)

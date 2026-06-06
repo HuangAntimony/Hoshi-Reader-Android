@@ -605,6 +605,14 @@
         syncRootReveal();
     }
 
+    function topPopupId() {
+        let topId = null;
+        for (const id of frames.keys()) {
+            topId = id;
+        }
+        return topId;
+    }
+
     function resolveMessage(popupId, id, body) {
         const record = frames.get(popupId);
         record?.iframe.contentWindow?.postMessage({ type: 'reply', id, body }, ORIGIN);
@@ -659,6 +667,16 @@
             body: body === undefined ? null : body
         });
     });
+
+    if (window.__hoshiReaderPopupHostDismissTopPopupOnOutsideTap === true) {
+        window.addEventListener('pointerdown', function(event) {
+            if (frames.size === 0) return;
+            if (event.target?.closest?.(`#${LAYER_ID} .hoshi-reader-popup-shell`)) return;
+            const popupId = topPopupId();
+            if (!popupId) return;
+            postNative({ name: 'swipeDismiss', popupId });
+        }, true);
+    }
 
     const style = document.createElement('style');
     style.textContent = `

@@ -190,3 +190,28 @@ internal fun closeChildPopupsForScrolledParent(
             }
         }
     }
+
+internal fun popupSelectionOffsetY(
+    frameTopDp: Double,
+    popupActionBar: Boolean,
+    backCount: Int,
+    forwardCount: Int,
+    hasSasayakiCue: Boolean,
+): Double =
+    frameTopDp + popupSelectionControlsHeight(
+        popupActionBar = popupActionBar,
+        backCount = backCount,
+        forwardCount = forwardCount,
+        hasSasayakiCue = hasSasayakiCue,
+    )
+
+private fun popupSelectionControlsHeight(
+    popupActionBar: Boolean,
+    backCount: Int,
+    forwardCount: Int,
+    hasSasayakiCue: Boolean,
+): Double =
+    (if (popupActionBar || backCount > 0 || forwardCount > 0) PopupControlTotalHeightDp else 0.0) +
+        (if (hasSasayakiCue) PopupControlTotalHeightDp else 0.0)
+
+private const val PopupControlTotalHeightDp = 37.0

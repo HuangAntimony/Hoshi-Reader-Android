@@ -18,7 +18,6 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
-import moe.antimony.hoshi.features.anki.AnkiPopupSettings
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.IoDispatcher
@@ -129,17 +128,9 @@ internal class DictionarySearchViewModel : ViewModel {
         }
     }
 
-    fun runLookup(
-        assets: LookupPopupAssets? = null,
-        darkMode: Boolean = false,
-        eInkMode: Boolean = false,
-        ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
-        fontFaceCss: String = "",
-        popupScale: Double = 1.0,
-    ) {
+    fun runLookup() {
         val query = _uiState.value.query
         val dictionarySettings = _uiState.value.dictionarySettings.normalized()
-        val audioSettings = _uiState.value.audioSettings
         scope.launch {
             _uiState.update { it.copy(isSearching = true, errorMessage = null) }
             runCatching {
@@ -149,14 +140,6 @@ internal class DictionarySearchViewModel : ViewModel {
                         DictionarySearchContent.runLookup(
                             query = query,
                             lookup = { error("lookup should not run for blank query") },
-                            assets = assets,
-                            dictionarySettings = dictionarySettings,
-                            darkMode = darkMode,
-                            eInkMode = eInkMode,
-                            audioSettings = audioSettings,
-                            ankiSettings = ankiSettings,
-                            fontFaceCss = fontFaceCss,
-                            popupScale = popupScale,
                         )
                     } else {
                         repository.rebuildLookupQuery()
@@ -164,15 +147,7 @@ internal class DictionarySearchViewModel : ViewModel {
                         DictionarySearchContent.runLookup(
                             query = query,
                             lookup = { repository.lookup(it, dictionarySettings.maxResults, dictionarySettings.scanLength) },
-                            assets = assets,
                             dictionaryStyles = styles,
-                            dictionarySettings = dictionarySettings,
-                            darkMode = darkMode,
-                            eInkMode = eInkMode,
-                            audioSettings = audioSettings,
-                            ankiSettings = ankiSettings,
-                            fontFaceCss = fontFaceCss,
-                            popupScale = popupScale,
                         )
                     }
                 }
@@ -180,7 +155,6 @@ internal class DictionarySearchViewModel : ViewModel {
                 _uiState.update {
                     it.copy(
                         lastQuery = state.lastQuery,
-                        html = state.html,
                         results = state.results,
                         hasSearched = true,
                         isSearching = false,
@@ -198,7 +172,6 @@ internal class DictionarySearchViewModel : ViewModel {
                 _uiState.update {
                     it.copy(
                         lastQuery = query.trim(),
-                        html = "",
                         results = emptyList(),
                         hasSearched = true,
                         isSearching = false,

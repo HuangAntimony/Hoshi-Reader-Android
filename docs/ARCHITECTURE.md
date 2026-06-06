@@ -51,6 +51,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `app/src/main/assets/hoshi-web`; Kotlin owns typed commands, escaped
   parameters, asset loading, dynamic configuration fill-in, and WebView bridge
   invocation.
+- Reader, Dictionary search, and Process Text lookup popups render through the
+  shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
+  Kotlin owns popup payloads, resource handling, and native service bridges for
+  audio, dictionary media, Anki, and external links; do not reintroduce Android
+  native overlay popup fallback paths for these flows.
 - Lookup opens from a single tap on reader text. Long press is reserved for
   native selection/highlight flows.
 

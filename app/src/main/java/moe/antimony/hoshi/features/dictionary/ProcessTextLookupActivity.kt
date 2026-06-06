@@ -1,12 +1,13 @@
 package moe.antimony.hoshi.features.dictionary
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,11 +18,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.manhhao.hoshi.LookupResult
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -31,16 +37,31 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.ProcessTextLookupRequest
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.LookupEngine
+import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
+import moe.antimony.hoshi.features.audio.LocalAudioRepository
+import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupIframeSync
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupResourceHandler
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupViewport
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupWebBridge
+import moe.antimony.hoshi.features.reader.ReaderPopupHistoryCounts
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
+import moe.antimony.hoshi.features.reader.readerLookupPopupFramePayloads
+import moe.antimony.hoshi.features.reader.readerLookupPopupIframeUrl
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
+import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import kotlin.math.min
 
 internal class ProcessTextLookupDependencies @Inject constructor(
@@ -99,14 +120,68 @@ private fun ProcessTextLookupOverlay(
     onClose: () -> Unit,
 ) {
     var popups by remember(query) { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
+    var popupHistories by remember(query) { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var error by remember(query) { mutableStateOf<Throwable?>(null) }
+    var iframeHostWebView by remember { mutableStateOf<WebView?>(null) }
+    val context = LocalContext.current
     val darkMode = MaterialTheme.colorScheme.background.luminanceForPopup() < 0.5f
     val density = LocalDensity.current
     val topInset = with(density) {
         WindowInsets.statusBars.getTop(this).toDp().value
     }
+    val ankiViewModel: AnkiViewModel = hiltViewModel()
+    val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
+    val assets = remember(context) { LookupPopupAssets.load(context) }
+    val fontFaceCss = dependencies.readerFontManager.popupFontFaceCss()
+    val popupSettings = popups.firstOrNull()?.state
+    val readerPopupIframeDocument = remember(
+        popupSettings?.dictionaryStyles,
+        popupSettings?.dictionarySettings,
+        popupSettings?.audioSettings,
+        readerSettings.popupSwipeThreshold,
+        readerSettings.popupReducedMotionScrolling,
+        readerSettings.popupReducedMotionScrollPercent,
+        readerSettings.popupReducedMotionSwipeThreshold,
+        readerSettings.popupScale,
+        darkMode,
+        readerSettings.eInkMode,
+        ankiUiState.popupSettings,
+        fontFaceCss,
+    ) {
+        LookupPopupHtml.renderIframeDocument(
+            assets = null,
+            dictionaryStyles = popupSettings?.dictionaryStyles.orEmpty(),
+            settings = popupSettings?.dictionarySettings ?: DictionarySettings(),
+            swipeToDismiss = true,
+            swipeThreshold = readerSettings.popupSwipeThreshold,
+            reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
+            reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
+            reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
+            darkMode = darkMode,
+            eInkMode = readerSettings.eInkMode,
+            audioSettings = popupSettings?.audioSettings ?: AudioSettings(),
+            ankiSettings = ankiUiState.popupSettings,
+            fontFaceCss = fontFaceCss,
+            popupScale = readerSettings.popupScale,
+        )
+    }
+    val currentReaderPopupIframeDocument = rememberUpdatedState(readerPopupIframeDocument)
+    val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
+        readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
+    }
+    val readerPopupResourceHandler = remember(context, assets, dependencies.readerFontManager) {
+        ReaderLookupPopupResourceHandler(
+            context = context.applicationContext,
+            assets = assets,
+            fontManager = dependencies.readerFontManager,
+            audioRequestHandler = AudioRequestHandler(LocalAudioRepository.fromContext(context.applicationContext)),
+            imageRequestHandler = DictionaryImageRequestHandler(),
+            iframeDocument = { currentReaderPopupIframeDocument.value },
+        )
+    }
+    val readerPopupBridgeHolder = remember { ReaderLookupPopupBridgeCallbackHolder() }
 
-    LaunchedEffect(query, readerSettings) {
+    LaunchedEffect(query, readerSettings, darkMode) {
         runCatching {
             withContext(Dispatchers.IO) {
                 dependencies.dictionaryRepository.rebuildLookupQuery()
@@ -150,75 +225,281 @@ private fun ProcessTextLookupOverlay(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(ComposeColor.Transparent)
-            .clickable(
-                indication = null,
-                interactionSource = null,
-                onClick = onClose,
-            ),
+            .background(ComposeColor.Transparent),
     ) {
-        val displayedPopups = popups.mapIndexed { index, popup ->
-            if (index == 0) {
-                val centeredSelection = popup.state.selection.copy(
-                    rect = ProcessTextLookupOverlayLayout.rootSelectionRect(
-                        screenWidth = maxWidth.value.toDouble(),
-                        screenHeight = maxHeight.value.toDouble(),
-                        popupMaxWidth = popup.state.width.toDouble(),
-                        popupMaxHeight = popup.state.height.toDouble(),
-                        topInset = topInset.toDouble(),
-                        bottomInset = popup.state.bottomInset,
-                    ),
-                )
-                popup.copy(
-                    state = popup.state.copy(
-                        selection = centeredSelection,
-                        topInset = topInset.toDouble(),
-                    ),
-                )
+        val viewport = ReaderLookupPopupViewport(
+            width = maxWidth.value.toDouble(),
+            height = maxHeight.value.toDouble(),
+        )
+        val themedPopups = popups.withLookupPopupVisualOptions(
+            darkMode = darkMode,
+            eInkMode = readerSettings.eInkMode,
+            audioSettings = popupSettings?.audioSettings ?: AudioSettings(),
+            popupScale = readerSettings.popupScale,
+        )
+        val displayedPopups = processTextLookupDisplayedPopups(
+            popups = themedPopups,
+            viewport = viewport,
+            topInset = topInset.toDouble(),
+        )
+        val iframePayloads = readerLookupPopupFramePayloads(
+            popups = displayedPopups,
+            histories = popupHistories,
+            viewport = viewport,
+            sasayakiWasPaused = false,
+            sasayakiIsPlaying = false,
+            iframeUrl = readerPopupIframeUrl,
+            rootSelectionHighlight = null,
+        )
+        fun setIframePopups(next: List<LookupPopupItem>) {
+            val activeIds = next.mapTo(mutableSetOf()) { it.id }
+            popupHistories = popupHistories.filterKeys(activeIds::contains)
+            if (next.isEmpty()) {
+                onClose()
             } else {
-                popup
+                popups = next
             }
         }
-        if (error == null) {
-            LookupPopupAndroidStack(
-                popups = displayedPopups,
-                onPopupsChange = { next ->
-                    if (next.isEmpty()) onClose() else popups = next
-                },
-                lookupChildPopup = { selection ->
-                    createLookupPopupItem(
-                        selection = selection,
-                        options = LookupPopupOptions(
-                            isVertical = false,
-                            isFullWidth = false,
-                            width = readerSettings.popupWidth,
-                            height = readerSettings.popupHeight,
-                            swipeToDismiss = true,
-                            swipeThreshold = readerSettings.popupSwipeThreshold,
-                            reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
-                            reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
-                            reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
-                            popupScale = readerSettings.popupScale,
-                            dictionarySettings = displayedPopups.firstOrNull()?.state?.dictionarySettings
-                                ?: DictionarySettings(),
-                            topInset = topInset.toDouble(),
-                            darkMode = darkMode,
-                            eInkMode = readerSettings.eInkMode,
-                            audioSettings = displayedPopups.firstOrNull()?.state?.audioSettings
-                                ?: AudioSettings(),
-                            popupActionBar = false,
-                        ),
+        fun popupIndex(popupId: String): Int =
+            popups.indexOfFirst { it.id == popupId }
+
+        fun popupById(popupId: String): LookupPopupItem? =
+            popups.firstOrNull { it.id == popupId }
+
+        fun replyIframeMessage(popupId: String, messageId: String, bodyJson: String) {
+            iframeHostWebView?.evaluateJavascript(
+                """
+                    window.hoshiReaderPopupHost &&
+                    window.hoshiReaderPopupHost.resolveMessage(${org.json.JSONObject.quote(popupId)}, ${org.json.JSONObject.quote(messageId)}, $bodyJson)
+                """.trimIndent(),
+                null,
+            )
+        }
+        fun highlightIframeSelection(popupId: String, highlightCount: Int) {
+            iframeHostWebView?.evaluateJavascript(
+                """
+                    window.hoshiReaderPopupHost &&
+                    window.hoshiReaderPopupHost.highlightSelection(${org.json.JSONObject.quote(popupId)}, $highlightCount)
+                """.trimIndent(),
+                null,
+            )
+        }
+        fun lookupChildPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
+            createLookupPopupItem(
+                selection = selection,
+                options = LookupPopupOptions(
+                    isVertical = false,
+                    isFullWidth = false,
+                    width = readerSettings.popupWidth,
+                    height = readerSettings.popupHeight,
+                    swipeToDismiss = true,
+                    swipeThreshold = readerSettings.popupSwipeThreshold,
+                    reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
+                    reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
+                    reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
+                    popupScale = readerSettings.popupScale,
+                    dictionarySettings = popupSettings?.dictionarySettings ?: DictionarySettings(),
+                    topInset = topInset.toDouble(),
+                    darkMode = darkMode,
+                    eInkMode = readerSettings.eInkMode,
+                    audioSettings = popupSettings?.audioSettings ?: AudioSettings(),
+                    popupActionBar = false,
+                ),
+                dictionaryStyles = popupSettings?.dictionaryStyles,
+            )
+        fun handleReaderPopupBridgeMessage(message: ReaderLookupPopupBridgeMessage) {
+            when (message) {
+                is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
+                is ReaderLookupPopupBridgeMessage.TapOutside -> {
+                    val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
+                    setIframePopups(closeChildPopups(popups, index))
+                }
+                is ReaderLookupPopupBridgeMessage.SwipeDismiss -> {
+                    val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
+                    if (index == 0) {
+                        onClose()
+                    } else {
+                        setIframePopups(dismissPopupAt(popups, index))
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.TextSelected -> {
+                    val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
+                    val nextPopups = closeChildPopups(popups, index)
+                    val lookup = lookupChildPopup(message.selection)
+                    if (lookup == null) {
+                        highlightIframeSelection(message.popupId, 0)
+                    } else {
+                        val (childPopup, highlightCount) = lookup
+                        setIframePopups(nextPopups + childPopup)
+                        highlightIframeSelection(message.popupId, highlightCount)
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.PlayWordAudio -> {
+                    WordAudioPlayer.get(context).play(message.url, message.mode)
+                }
+                is ReaderLookupPopupBridgeMessage.MineEntry -> {
+                    val popup = popupById(message.popupId) ?: return
+                    val messageId = message.messageId ?: return
+                    ankiViewModel.mineEntryAsync(message.payloadJson, popup.state.ankiContext) { mined ->
+                        replyIframeMessage(message.popupId, messageId, mined.toString())
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
+                    val messageId = message.messageId ?: return
+                    ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
+                        replyIframeMessage(message.popupId, messageId, isDuplicate.toString())
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.LookupRedirect -> {
+                    val popup = popupById(message.popupId) ?: return
+                    val messageId = message.messageId ?: return
+                    val settings = popup.state.dictionarySettings.normalized()
+                    val results = dependencies.dictionaryRepository.lookup(
+                        message.query,
+                        settings.maxResults,
+                        settings.scanLength,
                     )
-                },
-                onRootPopupDismissed = {
-                    onClose()
-                    true
-                },
-                fontManager = dependencies.readerFontManager,
+                    if (results.isNotEmpty()) {
+                        setIframePopups(
+                            popups.map { existing ->
+                                if (existing.id == message.popupId) {
+                                    existing.copy(state = existing.state.copy(results = results))
+                                } else {
+                                    existing
+                                }
+                            },
+                        )
+                        val current = popupHistories[message.popupId] ?: ReaderPopupHistoryCounts()
+                        popupHistories = popupHistories + (
+                            message.popupId to current.copy(
+                                backCount = current.backCount + 1,
+                                forwardCount = 0,
+                            )
+                            )
+                    }
+                    replyIframeMessage(message.popupId, messageId, results.size.toString())
+                }
+                is ReaderLookupPopupBridgeMessage.GetEntry -> {
+                    val entry = popupById(message.popupId)?.state?.results?.getOrNull(message.index)
+                    replyIframeMessage(
+                        popupId = message.popupId,
+                        messageId = message.messageId ?: return,
+                        bodyJson = entry?.let(LookupPopupHtml::entryJsonString) ?: "null",
+                    )
+                }
+                is ReaderLookupPopupBridgeMessage.PopupScrolled -> {
+                    val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
+                    setIframePopups(closeChildPopupsForScrolledParent(popups, index))
+                }
+                is ReaderLookupPopupBridgeMessage.NavigateBack -> {
+                    val current = popupHistories[message.popupId] ?: return
+                    if (current.backCount > 0) {
+                        popupHistories = popupHistories + (
+                            message.popupId to current.copy(
+                                backCount = current.backCount - 1,
+                                forwardCount = current.forwardCount + 1,
+                            )
+                            )
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.NavigateForward -> {
+                    val current = popupHistories[message.popupId] ?: return
+                    if (current.forwardCount > 0) {
+                        popupHistories = popupHistories + (
+                            message.popupId to current.copy(
+                                backCount = current.backCount + 1,
+                                forwardCount = current.forwardCount - 1,
+                            )
+                            )
+                    }
+                }
+                is ReaderLookupPopupBridgeMessage.ContentReady,
+                is ReaderLookupPopupBridgeMessage.ScrollState,
+                is ReaderLookupPopupBridgeMessage.SasayakiReplayCue,
+                is ReaderLookupPopupBridgeMessage.SasayakiTogglePlayback,
+                is ReaderLookupPopupBridgeMessage.SasayakiPlayForward,
+                -> Unit
+            }
+        }
+        readerPopupBridgeHolder.callbacks = ReaderLookupPopupBridgeCallbacks(::handleReaderPopupBridgeMessage)
+        if (error == null) {
+            ProcessTextLookupIframeHost(
+                callbackHolder = readerPopupBridgeHolder,
+                resourceHandler = readerPopupResourceHandler,
+                onWebViewChanged = { iframeHostWebView = it },
                 modifier = Modifier.fillMaxSize(),
+            )
+            ReaderLookupPopupIframeSync(
+                webView = iframeHostWebView,
+                payloads = iframePayloads,
+                rootHighlight = null,
             )
         }
     }
+}
+
+internal fun processTextLookupDisplayedPopups(
+    popups: List<LookupPopupItem>,
+    viewport: ReaderLookupPopupViewport,
+    topInset: Double,
+): List<LookupPopupItem> =
+    popups.mapIndexed { index, popup ->
+        if (index != 0) {
+            popup
+        } else {
+            val centeredSelection = popup.state.selection.copy(
+                rect = ProcessTextLookupOverlayLayout.rootSelectionRect(
+                    screenWidth = viewport.width,
+                    screenHeight = viewport.height,
+                    popupMaxWidth = popup.state.width.toDouble(),
+                    popupMaxHeight = popup.state.height.toDouble(),
+                    topInset = topInset,
+                    bottomInset = popup.state.bottomInset,
+                ),
+            )
+            popup.copy(
+                state = popup.state.copy(
+                    selection = centeredSelection,
+                    topInset = topInset,
+                ),
+            )
+        }
+    }
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun ProcessTextLookupIframeHost(
+    callbackHolder: ReaderLookupPopupBridgeCallbackHolder,
+    resourceHandler: ReaderLookupPopupResourceHandler,
+    onWebViewChanged: (WebView) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentOnWebViewChanged = rememberUpdatedState(onWebViewChanged)
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { viewContext ->
+            WebView(viewContext).apply {
+                applyHoshiWebViewSecurityDefaults()
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                ReaderLookupPopupWebBridge.install(this, callbackHolder)
+                webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
+                loadDataWithBaseURL(
+                    "https://hoshi.local/process-text/iframe-host.html",
+                    lookupPopupIframeHostHtml(dismissTopPopupOnOutsideTap = true),
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
+                currentOnWebViewChanged.value(this)
+            }
+        },
+        update = { webView ->
+            webView.webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
+            currentOnWebViewChanged.value(webView)
+        },
+    )
 }
 
 private fun lookupPopupItem(

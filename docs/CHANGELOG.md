@@ -15,6 +15,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Trim unmatched quotation brackets from reader lookup sentences before Anki mining, matching iOS for quoted multi-sentence passages. #98
 - Keep Dictionary search results tight below a Material-style top search field, allow new searches to replace the current results, add a guarded pull-to-clear/show-keyboard gesture, and refocus with all search text selected when tapping the active Dictionary tab.
 - Keep iframe lookup popups ready for the next word tap immediately after closing a recursive popup.
+- Keep Dictionary search and Process Text lookup popups on the same iframe popup path as Reader, preserving recursive lookup, dismissal, audio, Anki, and dictionary media behavior without the legacy native popup overlay.
 
 ## [v1.1.3] - 2026-06-04
 

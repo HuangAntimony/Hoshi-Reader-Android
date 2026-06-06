@@ -419,11 +419,11 @@ internal class ReaderLookupPopupBridgeCallbackHolder(
 )
 
 internal object ReaderLookupPopupWebBridge {
-    fun isSupported(): Boolean =
+    private fun isSupported(): Boolean =
         WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
 
-    fun install(webView: WebView, callbackHolder: ReaderLookupPopupBridgeCallbackHolder): Boolean {
-        if (!isSupported()) return false
+    fun install(webView: WebView, callbackHolder: ReaderLookupPopupBridgeCallbackHolder) {
+        if (!isSupported()) return
         WebViewCompat.addWebMessageListener(
             webView,
             "HoshiReaderPopup",
@@ -435,7 +435,6 @@ internal object ReaderLookupPopupWebBridge {
                 callbackHolder.callbacks.onMessage(parsed)
             }
         }
-        return true
     }
 }
 
