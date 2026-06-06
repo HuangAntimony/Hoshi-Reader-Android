@@ -118,6 +118,22 @@ internal fun closeChildPopups(
     parentIndex: Int,
 ): List<LookupPopupItem> = popups.take(parentIndex + 1)
 
+internal fun closeChildPopupsAndClearSelection(
+    popups: List<LookupPopupItem>,
+    parentIndex: Int,
+): List<LookupPopupItem> =
+    if (parentIndex !in popups.indices) {
+        popups
+    } else {
+        closeChildPopups(popups, parentIndex).mapIndexed { index, popup ->
+            if (index == parentIndex) {
+                popup.copy(clearSelectionSignal = popup.clearSelectionSignal + 1)
+            } else {
+                popup
+            }
+        }
+    }
+
 internal fun dismissPopupAt(
     popups: List<LookupPopupItem>,
     index: Int,

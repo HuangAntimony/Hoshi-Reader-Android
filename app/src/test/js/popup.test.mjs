@@ -39,10 +39,9 @@ class FakeElement {
 
 function popupContext() {
     const documentElement = {};
-    const body = {
-        appendChild(element) {
-            return element;
-        },
+    const body = new FakeContainer();
+    body.appendChild = function(element) {
+        return element;
     };
     const document = {
         body,
@@ -90,6 +89,7 @@ function popupContext() {
     vm.runInNewContext(fs.readFileSync(popupSourceUrl, 'utf8'), context);
     return {
         context,
+        body,
         selectTextCalls,
         tapOutsideMessages,
     };
@@ -178,4 +178,13 @@ test('popup click still selects text when there was no touch fallback', () => {
     container.dispatch('click', clickEvent(target, 48, 148));
 
     assert.equal(selectTextCalls.length, 1);
+});
+
+test('popup body blank area click posts tapOutside', () => {
+    const { body, tapOutsideMessages } = popupContext();
+    const target = new FakeElement();
+
+    body.dispatch('click', clickEvent(target, 48, 480));
+
+    assert.deepEqual(tapOutsideMessages, [null]);
 });

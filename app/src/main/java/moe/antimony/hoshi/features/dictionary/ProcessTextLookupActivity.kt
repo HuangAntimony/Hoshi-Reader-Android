@@ -312,7 +312,7 @@ private fun ProcessTextLookupOverlay(
                 is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
                 is ReaderLookupPopupBridgeMessage.TapOutside -> {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
-                    setIframePopups(closeChildPopups(popups, index))
+                    setIframePopups(closeChildPopupsAndClearSelection(popups, index))
                 }
                 is ReaderLookupPopupBridgeMessage.SwipeDismiss -> {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return

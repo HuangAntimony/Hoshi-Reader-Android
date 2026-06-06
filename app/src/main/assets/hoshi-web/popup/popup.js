@@ -1743,7 +1743,7 @@ function popupEventTarget(event) {
 }
 
 function isPopupInteractiveTapTarget(target) {
-    if (target?.closest('summary, a, button, .button-slot, .deinflection-tag, .frequency-group, .pitch-group')) {
+    if (target?.closest('summary, a, button, .button-slot, .deinflection-tag, .frequency-group, .pitch-group, .overlay, .overlay-close, .overlay-content')) {
         return true;
     }
     const tagRow = target?.closest('.tag-row');
@@ -1835,6 +1835,18 @@ function installPopupTapHandlers(container) {
         }
         handlePopupTap(popupEventTarget(event), event.clientX, event.clientY);
     });
+}
+
+function installPopupBodyTapHandlers() {
+    if (document.body) {
+        installPopupTapHandlers(document.body);
+    }
+}
+
+if (document.body) {
+    installPopupBodyTapHandlers();
+} else {
+    document.addEventListener('DOMContentLoaded', installPopupBodyTapHandlers, { once: true });
 }
 
 window.renderPopup = function() {
@@ -1949,8 +1961,6 @@ window.renderPopup = function() {
         document.head.appendChild(customStyle);
         window.hoshiPopupPrewarmFonts?.();
     }
-
-    installPopupTapHandlers(container);
 };
 
 document.addEventListener('scroll', () => {

@@ -27,6 +27,18 @@ internal fun dictionarySearchPullGestureCanStart(
     popups: List<ReaderLookupPopupFramePayload>,
     x: Double,
     y: Double,
+): Boolean = dictionarySearchRootGestureCanStart(popups, x, y)
+
+internal fun dictionarySearchHistorySwipeGestureCanStart(
+    popups: List<ReaderLookupPopupFramePayload>,
+    x: Double,
+    y: Double,
+): Boolean = dictionarySearchRootGestureCanStart(popups, x, y)
+
+private fun dictionarySearchRootGestureCanStart(
+    popups: List<ReaderLookupPopupFramePayload>,
+    x: Double,
+    y: Double,
 ): Boolean {
     val rootIndex = popups.indexOfFirst { it.id == DictionarySearchRootPopupId }
     if (rootIndex < 0) return false

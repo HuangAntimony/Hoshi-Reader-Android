@@ -379,6 +379,33 @@ class LookupPopupTest {
     }
 
     @Test
+    fun tappingOutsidePopupContentClosesChildrenAndClearsCurrentSelection() {
+        val popups = listOf("root", "child", "grandchild").map { id ->
+            LookupPopupItem(
+                id = id,
+                state = LookupPopupState(
+                    selection = ReaderSelectionData(
+                        text = id,
+                        sentence = id,
+                        rect = ReaderSelectionRect(x = 0.0, y = 0.0, width = 1.0, height = 1.0),
+                        normalizedOffset = null,
+                    ),
+                    results = emptyList(),
+                ),
+            )
+        }
+
+        val afterRootTapOutside = closeChildPopupsAndClearSelection(popups, 0)
+        val afterChildTapOutside = closeChildPopupsAndClearSelection(popups, 1)
+
+        assertEquals(listOf("root"), afterRootTapOutside.map { it.id })
+        assertEquals(1, afterRootTapOutside.single().clearSelectionSignal)
+        assertEquals(listOf("root", "child"), afterChildTapOutside.map { it.id })
+        assertEquals(0, afterChildTapOutside.single { it.id == "root" }.clearSelectionSignal)
+        assertEquals(1, afterChildTapOutside.single { it.id == "child" }.clearSelectionSignal)
+    }
+
+    @Test
     fun scrollingRootOnlyPopupDoesNotRewritePopupState() {
         val popups = listOf("root").map { id ->
             LookupPopupItem(

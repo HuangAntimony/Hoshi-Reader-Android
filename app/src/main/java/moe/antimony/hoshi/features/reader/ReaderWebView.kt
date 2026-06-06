@@ -62,6 +62,7 @@ import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
 import moe.antimony.hoshi.features.dictionary.LookupPopupHtml
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupOptions
+import moe.antimony.hoshi.features.dictionary.closeChildPopupsAndClearSelection
 import moe.antimony.hoshi.features.dictionary.closeChildPopupsForScrolledParent
 import moe.antimony.hoshi.features.dictionary.clearPopupSelectionHighlights
 import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
@@ -646,7 +647,7 @@ fun ReaderWebView(
             is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
             is ReaderLookupPopupBridgeMessage.TapOutside -> {
                 val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
-                setLookupPopups(stateHolder.lookupPopups.take(index + 1))
+                setLookupPopups(closeChildPopupsAndClearSelection(stateHolder.lookupPopups, index))
             }
             is ReaderLookupPopupBridgeMessage.SwipeDismiss -> {
                 val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return

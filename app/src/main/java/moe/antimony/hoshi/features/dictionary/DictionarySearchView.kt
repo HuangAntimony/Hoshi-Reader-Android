@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.focus.FocusRequester
@@ -322,10 +323,11 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
             is ReaderLookupPopupBridgeMessage.TapOutside -> {
                 if (message.popupId == DictionarySearchRootPopupId) {
-                    searchViewModel.closePopups()
+                    childHistories = emptyMap()
+                    searchViewModel.dismissRootPopup()
                 } else {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
-                    setIframePopups(closeChildPopups(uiState.popups, index))
+                    setIframePopups(closeChildPopupsAndClearSelection(uiState.popups, index))
                 }
             }
             is ReaderLookupPopupBridgeMessage.SwipeDismiss -> {
@@ -516,6 +518,13 @@ fun DictionarySearchView(
                         .observeDictionaryHistorySwipe(
                             backCount = uiState.backCount,
                             forwardCount = uiState.forwardCount,
+                            canStart = { position ->
+                                dictionarySearchHistorySwipeGestureCanStart(
+                                    popups = iframePayloads,
+                                    x = with(density) { position.x.toDp().value.toDouble() },
+                                    y = with(density) { position.y.toDp().value.toDouble() },
+                                )
+                            },
                             onBack = ::navigateRootIframeBack,
                             onForward = ::navigateRootIframeForward,
                         ),
@@ -714,11 +723,18 @@ private fun DictionaryPullResetIndicator(
 private fun Modifier.observeDictionaryHistorySwipe(
     backCount: Int,
     forwardCount: Int,
+    canStart: (Offset) -> Boolean = { true },
     onBack: () -> Unit,
     onForward: () -> Unit,
-): Modifier = pointerInput(backCount, forwardCount) {
+): Modifier = pointerInput(backCount, forwardCount, canStart) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
+        if (!canStart(down.position)) {
+            do {
+                val event = awaitPointerEvent(pass = PointerEventPass.Final)
+            } while (event.changes.any { it.pressed })
+            return@awaitEachGesture
+        }
         var lastPosition = down.position
         var totalX = 0f
         var totalY = 0f

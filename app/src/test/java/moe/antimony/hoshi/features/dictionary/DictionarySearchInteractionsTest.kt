@@ -95,6 +95,30 @@ class DictionarySearchInteractionsTest {
         assertFalse(dictionarySearchPullGestureCanStart(emptyList(), x = 20.0, y = 140.0))
     }
 
+    @Test
+    fun historySwipeGestureCanStartOnlyFromUncoveredRootIframeArea() {
+        val root = framePayload(
+            id = DictionarySearchRootPopupId,
+            left = 0.0,
+            top = 100.0,
+            width = 390.0,
+            height = 600.0,
+        )
+        val child = framePayload(
+            id = "child",
+            left = 70.0,
+            top = 160.0,
+            width = 250.0,
+            height = 240.0,
+        )
+
+        assertTrue(dictionarySearchHistorySwipeGestureCanStart(listOf(root), x = 20.0, y = 140.0))
+        assertFalse(dictionarySearchHistorySwipeGestureCanStart(listOf(root), x = 20.0, y = 80.0))
+        assertFalse(dictionarySearchHistorySwipeGestureCanStart(listOf(root, child), x = 100.0, y = 180.0))
+        assertTrue(dictionarySearchHistorySwipeGestureCanStart(listOf(root, child), x = 20.0, y = 180.0))
+        assertFalse(dictionarySearchHistorySwipeGestureCanStart(emptyList(), x = 20.0, y = 140.0))
+    }
+
     private fun popup(id: String): LookupPopupItem = LookupPopupItem(
         id = id,
         state = LookupPopupState(
