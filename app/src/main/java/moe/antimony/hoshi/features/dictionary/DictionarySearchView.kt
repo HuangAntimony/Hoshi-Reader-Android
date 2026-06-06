@@ -23,12 +23,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -105,7 +107,7 @@ import kotlin.math.roundToInt
 
 private const val DictionaryPopupTopInset = 118.0
 private const val DictionaryPopupBottomInset = 0.0
-private val DictionaryPullResetThreshold = 80.dp
+private val DictionaryPullResetThreshold = DictionaryPullResetTriggerDistanceDp.dp
 
 internal fun dictionarySearchKeyboardOptions(): KeyboardOptions = KeyboardOptions(
     imeAction = ImeAction.Search,
@@ -380,8 +382,17 @@ fun DictionarySearchView(
                     rootHighlightRects = emptyList()
                     searchViewModel.dismissRootPopup()
                 } else {
-                    val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
-                    setIframePopups(dismissPopupAt(uiState.popups, index))
+                    val dismissal = dictionarySearchIframePopupsAfterSwipeDismiss(
+                        popups = uiState.popups,
+                        popupId = message.popupId,
+                    )
+                    if (dismissal.clearRootSelection) {
+                        rootHighlightRects = emptyList()
+                        childHistories = emptyMap()
+                        searchViewModel.dismissRootPopup()
+                    } else {
+                        setIframePopups(dismissal.popups)
+                    }
                 }
             }
             is ReaderLookupPopupBridgeMessage.TextSelected -> {
@@ -467,7 +478,12 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.PopupScrolled -> {
                 if (message.popupId == DictionarySearchRootPopupId) {
                     rootHighlightRects = emptyList()
-                    searchViewModel.closePopups()
+                    if (uiState.popups.isNotEmpty()) {
+                        childHistories = emptyMap()
+                        searchViewModel.dismissRootPopup()
+                    } else {
+                        searchViewModel.closePopups()
+                    }
                 } else {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
                     setIframePopups(closeChildPopupsForScrolledParent(uiState.popups, index))
@@ -532,14 +548,22 @@ fun DictionarySearchView(
                     onPullStarted = { keyboardController?.hide() },
                     onPullDistance = { distance -> pullDistancePx = distance },
                     onPullReleased = { distance ->
-                        if (distance >= with(density) { DictionaryPullResetThreshold.toPx() }) {
-                            if (uiState.query.isNotEmpty()) {
+                        when (
+                            dictionaryPullResetAction(
+                                distancePx = distance,
+                                thresholdPx = with(density) { DictionaryPullResetThreshold.toPx() },
+                                hasQuery = uiState.query.isNotEmpty(),
+                            )
+                        ) {
+                            DictionaryPullResetAction.ResetAndFocus -> {
                                 rootHighlightRects = emptyList()
                                 childHistories = emptyMap()
                                 rootIframeAtTop = true
                                 searchViewModel.resetSearch()
+                                requestSearchFocus()
                             }
-                            requestSearchFocus()
+                            DictionaryPullResetAction.FocusOnly -> requestSearchFocus()
+                            DictionaryPullResetAction.None -> Unit
                         }
                         pullDistancePx = 0f
                     },
@@ -629,21 +653,20 @@ fun DictionarySearchView(
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
-        DictionarySearchBar(
+        DictionarySearchTopBar(
             query = uiState.query,
             isSearching = uiState.isSearching,
             onQueryChange = searchViewModel::updateQuery,
             onSubmit = runLookup,
             focusRequestKey = focusRequestKey to localFocusRequestKey,
+            onBottomChanged = { bottomPx ->
+                searchBarBottomPx = bottomPx
+                searchBarBottomDp = with(density) { bottomPx.toDp().value.toDouble() }
+            },
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 10.dp)
-                .onGloballyPositioned { coordinates ->
-                    val bottomPx = (coordinates.positionInRoot().y + coordinates.size.height).roundToInt()
-                    searchBarBottomPx = bottomPx
-                    searchBarBottomDp = with(density) { bottomPx.toDp().value.toDouble() }
-                },
+                .background(MaterialTheme.colorScheme.surface),
         )
         if (!readerIframePopupSupported) {
             LookupPopupAndroidStack(
@@ -870,6 +893,41 @@ private fun Modifier.observeDictionaryHistorySwipe(
 }
 
 @Composable
+private fun DictionarySearchTopBar(
+    query: String,
+    isSearching: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    focusRequestKey: Any,
+    onBottomChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .statusBarsPadding()
+            .onGloballyPositioned { coordinates ->
+                onBottomChanged((coordinates.positionInRoot().y + coordinates.size.height).roundToInt())
+            },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            DictionarySearchBar(
+                query = query,
+                isSearching = isSearching,
+                onQueryChange = onQueryChange,
+                onSubmit = onSubmit,
+                focusRequestKey = focusRequestKey,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+    }
+}
+
+@Composable
 private fun DictionarySearchBar(
     query: String,
     isSearching: Boolean,
@@ -883,8 +941,8 @@ private fun DictionarySearchBar(
 
     Surface(
         modifier = modifier,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 0.dp,
@@ -892,7 +950,7 @@ private fun DictionarySearchBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(52.dp)
                 .padding(start = 16.dp, end = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -915,7 +973,7 @@ private fun DictionarySearchBar(
                     Text(
                         text = stringResource(R.string.dictionary_search_placeholder),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
                 BasicTextField(
@@ -934,7 +992,7 @@ private fun DictionarySearchBar(
                     enabled = !isSearching,
                     lineLimits = hoshiSingleLineTextFieldLineLimits(),
                     scrollState = fieldScrollState,
-                    textStyle = MaterialTheme.typography.titleLarge.copy(color = fieldForegroundColor),
+                    textStyle = MaterialTheme.typography.titleMedium.copy(color = fieldForegroundColor),
                     cursorBrush = hoshiTextFieldCursorBrush(fieldForegroundColor),
                     keyboardOptions = dictionarySearchKeyboardOptions(),
                     onKeyboardAction = { onSubmit() },
