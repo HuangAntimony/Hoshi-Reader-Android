@@ -69,6 +69,7 @@ internal class ProcessTextLookupDependencies @Inject constructor(
     val dictionaryRepository: DictionaryRepository,
     val dictionarySettingsRepository: DictionarySettingsRepository,
     val audioSettingsRepository: AudioSettingsRepository,
+    val localAudioRepository: LocalAudioRepository,
     val readerFontManager: ReaderFontManager,
 )
 
@@ -169,12 +170,17 @@ private fun ProcessTextLookupOverlay(
     val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
         readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
     }
-    val readerPopupResourceHandler = remember(context, assets, dependencies.readerFontManager) {
+    val readerPopupResourceHandler = remember(
+        context,
+        assets,
+        dependencies.readerFontManager,
+        dependencies.localAudioRepository,
+    ) {
         ReaderLookupPopupResourceHandler(
             context = context.applicationContext,
             assets = assets,
             fontManager = dependencies.readerFontManager,
-            audioRequestHandler = AudioRequestHandler(LocalAudioRepository.fromContext(context.applicationContext)),
+            audioRequestHandler = AudioRequestHandler(dependencies.localAudioRepository),
             imageRequestHandler = DictionaryImageRequestHandler(),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
