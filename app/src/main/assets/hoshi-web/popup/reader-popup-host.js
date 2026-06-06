@@ -141,6 +141,26 @@
         record.iframe.contentWindow?.postMessage(iframeRenderMessage(record.payload), ORIGIN);
     }
 
+    function historyCount(payload, name) {
+        return payload?.[name] || 0;
+    }
+
+    function shouldReplaceIframeContent(previous, next) {
+        if (!previous) return true;
+        if (previous.id !== next.id) return true;
+        const nextKeepsHistory =
+            historyCount(next, 'backCount') > 0 ||
+            historyCount(next, 'forwardCount') > 0;
+        if (nextKeepsHistory) return false;
+        const previousHadHistory =
+            historyCount(previous, 'backCount') > 0 ||
+            historyCount(previous, 'forwardCount') > 0;
+        const hasNextInitialEntry = (next.initialEntryJson || null) !== null;
+        return hasNextInitialEntry && (previousHadHistory ||
+            (previous.entriesCount || 0) !== (next.entriesCount || 0) ||
+            (previous.initialEntryJson || null) !== (next.initialEntryJson || null));
+    }
+
     function setContentReady(record, ready) {
         record.contentReady = ready;
         record.shell.dataset.contentReady = String(ready);
@@ -210,7 +230,7 @@
             }
             frames.set(payload.id, record);
         }
-        if (record.payload?.id !== payload.id) {
+        if (shouldReplaceIframeContent(record.payload, payload)) {
             needsRender = true;
         }
         record.root = isRoot;
