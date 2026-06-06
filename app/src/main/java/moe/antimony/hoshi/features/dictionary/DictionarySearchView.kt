@@ -79,12 +79,14 @@ import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupFramePayload
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupIframeSync
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupResourceHandler
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupWebBridge
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupViewport
 import moe.antimony.hoshi.features.reader.ReaderPopupHistoryCounts
 import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.reader.androidPixelsToCssPixels
 import moe.antimony.hoshi.features.reader.readerLookupPopupIframeUrl
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -484,6 +486,7 @@ fun DictionarySearchView(
                     callbackHolder = readerPopupBridgeHolder,
                     resourceHandler = readerPopupResourceHandler,
                     rootAtTop = rootIframeAtTop,
+                    popupFrames = iframePayloads,
                     onWebViewChanged = { iframeHostWebView = it },
                     onPullStarted = { keyboardController?.hide() },
                     onPullDistance = { distance -> pullDistancePx = distance },
@@ -562,6 +565,7 @@ private fun DictionarySearchIframeHost(
     callbackHolder: ReaderLookupPopupBridgeCallbackHolder,
     resourceHandler: ReaderLookupPopupResourceHandler,
     rootAtTop: Boolean,
+    popupFrames: List<ReaderLookupPopupFramePayload>,
     onWebViewChanged: (WebView) -> Unit,
     onPullStarted: () -> Unit,
     onPullDistance: (Float) -> Unit,
@@ -569,6 +573,7 @@ private fun DictionarySearchIframeHost(
     modifier: Modifier = Modifier,
 ) {
     val currentRootAtTop = rememberUpdatedState(rootAtTop)
+    val currentPopupFrames = rememberUpdatedState(popupFrames)
     val currentOnPullStarted = rememberUpdatedState(onPullStarted)
     val currentOnPullDistance = rememberUpdatedState(onPullDistance)
     val currentOnPullReleased = rememberUpdatedState(onPullReleased)
@@ -584,6 +589,14 @@ private fun DictionarySearchIframeHost(
                 webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
                 installDictionaryPullTouchObserver(
                     rootAtTop = { currentRootAtTop.value },
+                    pullGestureCanStart = { event ->
+                        val density = resources.displayMetrics.density
+                        dictionarySearchPullGestureCanStart(
+                            popups = currentPopupFrames.value,
+                            x = androidPixelsToCssPixels(event.x, density).toDouble(),
+                            y = androidPixelsToCssPixels(event.y, density).toDouble(),
+                        )
+                    },
                     onPullStarted = { currentOnPullStarted.value() },
                     onPullDistance = { currentOnPullDistance.value(it) },
                     onPullReleased = { currentOnPullReleased.value(it) },
@@ -608,23 +621,26 @@ private fun DictionarySearchIframeHost(
 @SuppressLint("ClickableViewAccessibility")
 private fun WebView.installDictionaryPullTouchObserver(
     rootAtTop: () -> Boolean,
+    pullGestureCanStart: (MotionEvent) -> Boolean,
     onPullStarted: () -> Unit,
     onPullDistance: (Float) -> Unit,
     onPullReleased: (Float) -> Unit,
 ) {
     var downY = 0f
+    var canStart = false
     var active = false
     var lastDistance = 0f
     setOnTouchListener { _, event ->
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downY = event.y
+                canStart = rootAtTop() && pullGestureCanStart(event)
                 active = false
                 lastDistance = 0f
             }
             MotionEvent.ACTION_MOVE -> {
                 val distance = event.y - downY
-                if (rootAtTop() && distance > 0f) {
+                if (canStart && rootAtTop() && distance > 0f) {
                     if (!active && distance > 8f) {
                         active = true
                         onPullStarted()
@@ -648,6 +664,7 @@ private fun WebView.installDictionaryPullTouchObserver(
                     onPullDistance(0f)
                 }
                 active = false
+                canStart = false
                 lastDistance = 0f
             }
         }

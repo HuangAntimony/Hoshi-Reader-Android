@@ -13,7 +13,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Prevent vertical reader text in paginated and continuous modes from prematurely wrapping after furigana, and keep ruby-aware lookup highlights from expanding into adjacent kanji.
 - Keep bottom safe-area reader taps dismissing lookup popups or toggling Focus Mode, prevent blurred vertical images from disappearing at zero horizontal padding, and keep ruby lookup stable when EPUB ruby markup contains whitespace.
 - Trim unmatched quotation brackets from reader lookup sentences before Anki mining, matching iOS for quoted multi-sentence passages. #98
-- Keep Dictionary search results tight below a Material-style top search field, allow new searches to replace the current results, add a guarded pull-to-clear/show-keyboard gesture, and refocus with all search text selected when tapping the active Dictionary tab.
+- Keep Dictionary search results tight below a Material-style top search field, allow new searches to replace the current results, add a guarded pull-to-clear/show-keyboard gesture that ignores recursive popup scrolling, and refocus with all search text selected when tapping the active Dictionary tab.
 - Keep iframe lookup popups ready for the next word tap immediately after closing a recursive popup.
 - Keep Dictionary search and Process Text lookup popups on the same iframe popup path as Reader, preserving recursive lookup, dismissal, audio, Anki, and dictionary media behavior without the legacy native popup overlay.
 

@@ -5,6 +5,8 @@ import de.manhhao.hoshi.GlossaryEntry
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.PitchEntry
 import de.manhhao.hoshi.TermResult
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupFramePayload
+import moe.antimony.hoshi.features.reader.ReaderLookupPopupFrameRect
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import org.junit.Assert.assertEquals
@@ -69,6 +71,30 @@ class DictionarySearchInteractionsTest {
         assertFalse(result.clearRootSelection)
     }
 
+    @Test
+    fun pullResetGestureCanStartOnlyFromUncoveredRootIframeArea() {
+        val root = framePayload(
+            id = DictionarySearchRootPopupId,
+            left = 0.0,
+            top = 100.0,
+            width = 390.0,
+            height = 600.0,
+        )
+        val child = framePayload(
+            id = "child",
+            left = 70.0,
+            top = 160.0,
+            width = 250.0,
+            height = 240.0,
+        )
+
+        assertTrue(dictionarySearchPullGestureCanStart(listOf(root), x = 20.0, y = 140.0))
+        assertFalse(dictionarySearchPullGestureCanStart(listOf(root), x = 20.0, y = 80.0))
+        assertFalse(dictionarySearchPullGestureCanStart(listOf(root, child), x = 100.0, y = 180.0))
+        assertTrue(dictionarySearchPullGestureCanStart(listOf(root, child), x = 20.0, y = 180.0))
+        assertFalse(dictionarySearchPullGestureCanStart(emptyList(), x = 20.0, y = 140.0))
+    }
+
     private fun popup(id: String): LookupPopupItem = LookupPopupItem(
         id = id,
         state = LookupPopupState(
@@ -80,6 +106,36 @@ class DictionarySearchInteractionsTest {
             ),
             results = listOf(lookupResult()),
         ),
+    )
+
+    private fun framePayload(
+        id: String,
+        left: Double,
+        top: Double,
+        width: Double,
+        height: Double,
+    ): ReaderLookupPopupFramePayload = ReaderLookupPopupFramePayload(
+        id = id,
+        frame = ReaderLookupPopupFrameRect(
+            left = left,
+            top = top,
+            width = width,
+            height = height,
+        ),
+        entriesCount = 1,
+        initialEntryJson = null,
+        popupActionBar = false,
+        actionBarVisible = false,
+        backCount = 0,
+        forwardCount = 0,
+        sasayakiVisible = false,
+        sasayakiWasPaused = false,
+        sasayakiIsPlaying = false,
+        darkMode = false,
+        eInkMode = false,
+        clearSelectionSignal = 0,
+        selectionOffsetY = top,
+        iframeUrl = "https://hoshi.local/popup/iframe.html",
     )
 
     private fun lookupResult(): LookupResult = LookupResult(
