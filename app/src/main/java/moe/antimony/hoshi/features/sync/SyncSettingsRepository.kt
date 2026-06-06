@@ -35,6 +35,7 @@ class SyncSettingsRepository(
             mode = SyncMode.fromRawValue(this[KEY_MODE]),
             autoSyncEnabled = this[KEY_AUTO_SYNC_ENABLED] ?: false,
             authProvider = SyncAuthProvider.DeviceCode,
+            uploadBooks = this[KEY_UPLOAD_BOOKS] ?: false,
         )
 
     private fun MutablePreferences.writeSyncSettings(settings: SyncSettings) {
@@ -42,6 +43,7 @@ class SyncSettingsRepository(
         this[KEY_MODE] = settings.mode.rawValue
         this[KEY_AUTO_SYNC_ENABLED] = settings.autoSyncEnabled
         this[KEY_AUTH_PROVIDER] = settings.authProvider.name
+        this[KEY_UPLOAD_BOOKS] = settings.uploadBooks
     }
 
     companion object {
@@ -51,5 +53,6 @@ class SyncSettingsRepository(
         private val KEY_MODE = stringPreferencesKey("syncMode")
         private val KEY_AUTO_SYNC_ENABLED = booleanPreferencesKey("autoSyncEnabled")
         private val KEY_AUTH_PROVIDER = stringPreferencesKey("syncAuthProvider")
+        private val KEY_UPLOAD_BOOKS = booleanPreferencesKey("uploadBooks")
     }
 }

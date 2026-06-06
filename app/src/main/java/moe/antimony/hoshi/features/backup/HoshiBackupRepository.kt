@@ -5,6 +5,8 @@ import android.net.Uri
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -23,12 +25,38 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
+import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.features.sync.TtuAudioBook
+import moe.antimony.hoshi.features.sync.TtuBookDataConverter
+import moe.antimony.hoshi.features.sync.TtuProgress
+import moe.antimony.hoshi.features.sync.TtuSyncRules
+import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
 
 @Singleton
 class HoshiBackupRepository @Inject constructor(
     @param:FilesDir private val filesDir: File,
-    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val bookRepository: BookRepository,
+    private val ttuConverter: TtuBookDataConverter,
 ) {
+    constructor(filesDir: File) : this(
+        filesDir = filesDir,
+        ioDispatcher = Dispatchers.IO,
+        bookRepository = BookRepository(filesDir),
+        ttuConverter = createStandaloneTtuConverter(filesDir, Dispatchers.IO),
+    )
+
+    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(
+        filesDir = filesDir,
+        ioDispatcher = ioDispatcher,
+        bookRepository = BookRepository(filesDir),
+        ttuConverter = createStandaloneTtuConverter(filesDir, ioDispatcher),
+    )
+
     suspend fun exportBooks(contentResolver: ContentResolver, uri: Uri) {
         exportFolder(contentResolver, uri, BackupTarget.Books)
     }
@@ -59,6 +87,125 @@ class HoshiBackupRepository @Inject constructor(
 
     suspend fun restoreDictionaries(input: InputStream) {
         restoreFolder(BackupTarget.Dictionaries, input)
+    }
+
+    suspend fun exportTtuBookData(contentResolver: ContentResolver, uri: Uri) {
+        withContext(ioDispatcher) {
+            contentResolver.openOutputStream(uri)?.use { output ->
+                exportTtuBookData(output)
+            } ?: error("Unable to open backup destination.")
+        }
+    }
+
+    suspend fun exportTtuBookData(output: OutputStream) {
+        withContext(ioDispatcher) {
+            val tempRoot = filesDir.resolve(".ttu-export-${UUID.randomUUID()}")
+            tempRoot.deleteRecursively()
+            tempRoot.mkdirs()
+            try {
+                ZipOutputStream(output.buffered()).use { zip ->
+                    bookRepository.loadBookEntries().forEach { entry ->
+                        if (bookRepository.epubFile(entry) == null) return@forEach
+                        val titleFolder = TtuSyncRules.sanitizeTtuFilename(entry.displayTitle)
+                        val bookTemp = tempRoot.resolve(entry.metadata.id).also { it.mkdirs() }
+                        val bookData = ttuConverter.exportBookData(entry, bookTemp)
+                        zip.writeFile("$titleFolder/${bookData.name}", bookData)
+                        bookRepository.coverFile(entry)?.takeIf(File::isFile)?.let { cover ->
+                            zip.writeFile("$titleFolder/cover_1_6.${cover.extension.ifBlank { "jpg" }}", cover)
+                        }
+                        val stats = bookRepository.loadStatistics(entry.root)
+                        if (stats.isNotEmpty()) {
+                            zip.writeText(
+                                "$titleFolder/${TtuSyncRules.statisticsFileName(stats)}",
+                                backupJson.encodeToString(ListSerializer(ReadingStatistics.serializer()), stats),
+                            )
+                        }
+                        val bookmark = bookRepository.loadBookmark(entry.root)
+                        val bookInfo = bookRepository.loadBookInfo(entry.root)
+                        if (bookmark != null && bookInfo != null) {
+                            val lastModified = bookmark.lastModified ?: entry.metadata.lastAccess
+                            val unixTimestamp = TtuSyncRules.appleReferenceSecondsToUnixMillis(lastModified)
+                            val progress = TtuProgress(
+                                dataId = 0,
+                                exploredCharCount = bookmark.characterCount,
+                                progress = if (bookInfo.characterCount > 0) {
+                                    bookmark.characterCount.toDouble() / bookInfo.characterCount.toDouble()
+                                } else {
+                                    0.0
+                                },
+                                lastBookmarkModified = unixTimestamp,
+                            )
+                            zip.writeText("$titleFolder/${TtuSyncRules.progressFileName(progress)}", backupJson.encodeToString(TtuProgress.serializer(), progress))
+                        }
+                        val playback = bookRepository.loadSasayakiPlayback(entry.root)
+                        if (playback != null) {
+                            val audioBook = TtuAudioBook(
+                                title = entry.displayTitle,
+                                playbackPosition = playback.lastPosition,
+                                lastAudioBookModified = System.currentTimeMillis(),
+                            )
+                            zip.writeText("$titleFolder/${TtuSyncRules.audioBookFileName(audioBook)}", backupJson.encodeToString(TtuAudioBook.serializer(), audioBook))
+                        }
+                    }
+                }
+            } finally {
+                tempRoot.deleteRecursively()
+            }
+        }
+    }
+
+    suspend fun restoreTtuBookData(contentResolver: ContentResolver, uri: Uri) {
+        withContext(ioDispatcher) {
+            contentResolver.openInputStream(uri)?.use { input ->
+                restoreTtuBookData(input)
+            } ?: error("Unable to open backup file.")
+        }
+    }
+
+    suspend fun restoreTtuBookData(input: InputStream) {
+        withContext(ioDispatcher) {
+            val archiveFile = filesDir.resolve(".ttu-restore-${UUID.randomUUID()}.zip")
+            val tempRoot = filesDir.resolve(".ttu-restore-${UUID.randomUUID()}")
+            archiveFile.delete()
+            tempRoot.deleteRecursively()
+            tempRoot.mkdirs()
+            try {
+                archiveFile.outputStream().use { output -> input.copyTo(output) }
+                unzipInto(archiveFile, tempRoot)
+                tempRoot.listFiles().orEmpty().filter(File::isDirectory).forEach { folder ->
+                    val files = folder.listFiles().orEmpty()
+                    val bookData = files.firstOrNull { it.isFile && it.name.startsWith("bookdata_") && it.extension == "zip" }
+                        ?: return@forEach
+                    val entry = ttuConverter.importBookData(bookData)
+                    files.firstOrNull { it.name.startsWith("statistics_") }?.let { statsFile ->
+                        val stats = backupJson.decodeFromString(ListSerializer(ReadingStatistics.serializer()), statsFile.readText())
+                        bookRepository.saveStatistics(entry.root, stats)
+                    }
+                    files.firstOrNull { it.name.startsWith("progress_") }?.let { progressFile ->
+                        val progress = backupJson.decodeFromString(TtuProgress.serializer(), progressFile.readText())
+                        val bookInfo = bookRepository.loadBookInfo(entry.root) ?: return@let
+                        val resolved = bookInfo.resolveTtuCharacterPosition(progress.exploredCharCount)
+                        bookRepository.saveBookmark(
+                            entry.root,
+                            Bookmark(
+                                chapterIndex = resolved?.spineIndex ?: 0,
+                                progress = resolved?.progress ?: 0.0,
+                                characterCount = progress.exploredCharCount,
+                                lastModified = TtuSyncRules.unixMillisToAppleReferenceSeconds(progress.lastBookmarkModified),
+                            ),
+                        )
+                    }
+                    files.firstOrNull { it.name.startsWith("audioBook_") }?.let { audioFile ->
+                        val audioBook = backupJson.decodeFromString(TtuAudioBook.serializer(), audioFile.readText())
+                        val existing = bookRepository.loadSasayakiPlayback(entry.root) ?: SasayakiPlaybackData(lastPosition = 0.0)
+                        bookRepository.saveSasayakiPlayback(entry.root, existing.copy(lastPosition = audioBook.playbackPosition))
+                    }
+                }
+            } finally {
+                archiveFile.delete()
+                tempRoot.deleteRecursively()
+            }
+        }
     }
 
     private suspend fun exportFolder(contentResolver: ContentResolver, uri: Uri, target: BackupTarget) {
@@ -202,10 +349,32 @@ class HoshiBackupRepository @Inject constructor(
         return crc.value
     }
 
+    private fun ZipOutputStream.writeFile(path: String, file: File) {
+        putNextEntry(file.toZipEntry(path))
+        file.inputStream().use { input -> input.copyTo(this) }
+        closeEntry()
+    }
+
+    private fun ZipOutputStream.writeText(path: String, value: String) {
+        val bytes = value.toByteArray()
+        val entry = ZipEntry(path)
+        entry.size = bytes.size.toLong()
+        val crc = CRC32().apply { update(bytes) }
+        entry.crc = crc.value
+        putNextEntry(entry)
+        write(bytes)
+        closeEntry()
+    }
+
     private enum class BackupTarget(val folderName: String) {
         Books("Books"),
         Dictionaries("Dictionaries"),
     }
+}
+
+private val backupJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
 }
 
 fun booksBackupFileName(
@@ -228,4 +397,23 @@ fun dictionariesBackupFileName(
         .withZone(zoneId)
         .format(now)
     return "Dictionaries_$timestamp.hoshi"
+}
+
+fun ttuBookDataBackupFileName(
+    now: Instant = Instant.now(),
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): String {
+    val timestamp = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd_HH-mm-ss")
+        .withZone(zoneId)
+        .format(now)
+    return "hoshi_ttu_export_$timestamp.zip"
+}
+
+private fun createStandaloneTtuConverter(
+    filesDir: File,
+    ioDispatcher: CoroutineDispatcher,
+): TtuBookDataConverter {
+    val repository = BookRepository(filesDir)
+    return TtuBookDataConverter(repository, EpubBookParser(), filesDir, ioDispatcher)
 }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
@@ -96,6 +97,7 @@ fun SyncSettingsView(
     var clientSecret by remember { mutableStateOf("") }
     var devicePrompt by remember { mutableStateOf<DeviceCodePrompt?>(null) }
     var pollIntervalSeconds by remember { mutableStateOf(5L) }
+    var showSignOutConfirmation by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
     val currentSettings = settings
     val currentAuthStatus = authStatus
@@ -220,6 +222,28 @@ fun SyncSettingsView(
     }
 
     BackHandler(onBack = onClose)
+    if (showSignOutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmation = false },
+            title = { Text(stringResource(R.string.sync_sign_out_title)) },
+            text = { Text(stringResource(R.string.sync_sign_out_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutConfirmation = false
+                        signOut()
+                    },
+                ) {
+                    Text(stringResource(R.string.action_sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirmation = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
     val colorScheme = MaterialTheme.colorScheme
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -296,6 +320,18 @@ fun SyncSettingsView(
                             Switch(
                                 checked = currentSettings.autoSyncEnabled,
                                 onCheckedChange = { save(currentSettings.copy(autoSyncEnabled = it)) },
+                            )
+                        },
+                    )
+                    SettingsDivider()
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(stringResource(R.string.sync_upload_books)) },
+                        supportingContent = { Text(stringResource(R.string.sync_upload_books_description)) },
+                        trailingContent = {
+                            Switch(
+                                checked = currentSettings.uploadBooks,
+                                onCheckedChange = { save(currentSettings.copy(uploadBooks = it)) },
                             )
                         },
                     )
@@ -416,12 +452,21 @@ fun SyncSettingsView(
                     }
                     if (connectionActions.showSignOut) {
                         OutlinedButton(
-                            onClick = ::signOut,
+                            onClick = { showSignOutConfirmation = true },
                             enabled = connectionActions.signOutEnabled,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.action_sign_out))
                         }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            appContainer.googleDriveClient.clearCache()
+                            message = resources.getString(R.string.sync_cache_cleared)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.sync_clear_cache))
                     }
                     GoogleCloudOAuthSetupCard()
                 }

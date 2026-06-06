@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.LruCache
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -172,6 +173,8 @@ fun BookshelfView(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var contextMenuTarget by remember { mutableStateOf<BookContextMenuTarget?>(null) }
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
+    var remoteDeleteCandidate by remember { mutableStateOf<RemoteBookEntry?>(null) }
+    var exportCandidate by remember { mutableStateOf<BookEntry?>(null) }
     var markReadCandidate by remember { mutableStateOf<BookEntry?>(null) }
     var renameCandidate by remember { mutableStateOf<BookEntry?>(null) }
     val folderScanner = remember(context) { SafImportDirectoryScanner(context.contentResolver) }
@@ -211,6 +214,13 @@ fun BookshelfView(
         }
     }
 
+    val epubExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/epub+zip")) { uri ->
+        val candidate = exportCandidate
+        exportCandidate = null
+        if (uri == null || candidate == null) return@rememberLauncherForActivityResult
+        booksViewModel.exportBook(candidate, uri)
+    }
+
     fun launchBookImporter() {
         importer.launch(ImportFileType.Epub.mimeTypes)
     }
@@ -247,9 +257,12 @@ fun BookshelfView(
         modifier = modifier,
         layoutSpec = layoutSpec,
         bookEntries = uiState.bookEntries,
+        remoteBookEntries = uiState.remoteBookEntries,
         sections = uiState.sections,
         bookProgressById = uiState.bookProgressById,
+        remoteProgressById = uiState.remoteProgressById,
         coverSourcesById = uiState.coverSourcesById,
+        remoteCoverSourcesById = uiState.remoteCoverSourcesById,
         sortOption = uiState.sortOption,
         hasLoadedBooks = uiState.hasLoadedBooks,
         isLoading = uiState.isLoading,
@@ -274,9 +287,15 @@ fun BookshelfView(
         onImportFiles = ::launchBookImporter,
         onImportFolder = ::launchBookFolderImporter,
         onOpenBook = booksViewModel::openBook,
+        onImportRemoteBook = booksViewModel::importRemoteBook,
+        onDeleteRemoteCandidate = { remoteDeleteCandidate = it },
         contextMenuTarget = contextMenuTarget,
         onContextMenuTargetChange = { contextMenuTarget = it },
         onDeleteCandidate = { deleteCandidate = it },
+        onExportCandidate = { entry ->
+            exportCandidate = entry
+            epubExporter.launch("${entry.displayTitle.sanitizeExportFileName()}.epub")
+        },
         onMarkReadCandidate = { markReadCandidate = it },
         onRenameCandidate = {
             renameCandidate = it
@@ -340,6 +359,29 @@ fun BookshelfView(
             },
             dismissButton = {
                 TextButton(onClick = { deleteCandidate = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    remoteDeleteCandidate?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { remoteDeleteCandidate = null },
+            title = { Text(stringResource(R.string.bookshelf_delete_remote_book_title_format, candidate.title)) },
+            text = { Text(stringResource(R.string.bookshelf_delete_remote_book_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        booksViewModel.deleteRemoteBook(candidate)
+                        remoteDeleteCandidate = null
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { remoteDeleteCandidate = null }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -608,9 +650,12 @@ internal fun isBookContextMenuExpanded(
 private fun BooksTab(
     layoutSpec: MainShellLayoutSpec,
     bookEntries: List<BookEntry>,
+    remoteBookEntries: List<RemoteBookEntry>,
     sections: List<BookshelfSectionModel>,
     bookProgressById: Map<String, Double>,
+    remoteProgressById: Map<String, Double>,
     coverSourcesById: Map<String, BookCoverSource>,
+    remoteCoverSourcesById: Map<String, BookCoverSource>,
     sortOption: BookSortOption,
     hasLoadedBooks: Boolean,
     isLoading: Boolean,
@@ -632,9 +677,12 @@ private fun BooksTab(
     onImportFiles: () -> Unit,
     onImportFolder: () -> Unit,
     onOpenBook: (BookEntry) -> Unit,
+    onImportRemoteBook: (RemoteBookEntry) -> Unit,
+    onDeleteRemoteCandidate: (RemoteBookEntry) -> Unit,
     contextMenuTarget: BookContextMenuTarget?,
     onContextMenuTargetChange: (BookContextMenuTarget?) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
+    onExportCandidate: (BookEntry) -> Unit,
     onMarkReadCandidate: (BookEntry) -> Unit,
     onRenameCandidate: (BookEntry) -> Unit,
     onMoveBook: (BookEntry, String?) -> Unit,
@@ -692,7 +740,7 @@ private fun BooksTab(
                     CircularProgressIndicator()
                 }
                 !hasLoadedBooks -> Box(Modifier.fillMaxSize())
-                hasLoadedBooks && bookEntries.isEmpty() -> EmptyBooksView(
+                hasLoadedBooks && bookEntries.isEmpty() && remoteBookEntries.isEmpty() -> EmptyBooksView(
                     enabled = !fileTaskBlocked,
                     onImport = onImportFiles,
                     modifier = Modifier
@@ -775,6 +823,7 @@ private fun BooksTab(
                                             onMarkReadCandidate = onMarkReadCandidate,
                                             onRenameCandidate = onRenameCandidate,
                                             onDeleteCandidate = onDeleteCandidate,
+                                            onExportCandidate = onExportCandidate,
                                             syncSettings = syncSettings,
                                             onSyncBook = onSyncBook,
                                         )
@@ -806,6 +855,37 @@ private fun BooksTab(
                                         }
                                     }
                                 }
+                            }
+                        }
+                        if (remoteBookEntries.isNotEmpty()) {
+                            item(
+                                key = "header:google-drive",
+                                contentType = "sectionHeader",
+                                span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+                            ) {
+                                BookshelfSectionHeader(
+                                    title = stringResource(R.string.bookshelf_section_google_drive),
+                                    count = remoteBookEntries.size,
+                                    layoutSpec = layoutSpec,
+                                    isCollapsible = false,
+                                    isExpanded = true,
+                                    onToggle = {},
+                                )
+                            }
+                            items(
+                                items = remoteBookEntries,
+                                key = { "google-drive:${it.id}" },
+                                contentType = { "remoteBook" },
+                            ) { entry ->
+                                RemoteBookGridCell(
+                                    entry = entry,
+                                    progress = remoteProgressById[entry.id] ?: 0.0,
+                                    coverSource = remoteCoverSourcesById[entry.id],
+                                    layoutSpec = layoutSpec,
+                                    enabled = !fileTaskBlocked && !isSelecting,
+                                    onImport = { onImportRemoteBook(entry) },
+                                    onDelete = { onDeleteRemoteCandidate(entry) },
+                                )
                             }
                         }
                     }
@@ -1129,6 +1209,38 @@ private fun BookGridCell(
     }
 }
 
+@Composable
+private fun RemoteBookGridCell(
+    entry: RemoteBookEntry,
+    progress: Double,
+    coverSource: BookCoverSource?,
+    layoutSpec: MainShellLayoutSpec,
+    enabled: Boolean,
+    onImport: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.combinedClickable(
+            enabled = enabled,
+            onClick = onImport,
+            onLongClick = onDelete,
+        ),
+    ) {
+        BookCoverCard(coverSource = coverSource)
+        Spacer(Modifier.height(6.dp))
+        ReadingProgressPill(progress = progress)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = entry.title,
+            style = layoutSpec.bookTitleTextStyle.toTextStyle(),
+            fontWeight = layoutSpec.bookTitleFontWeight.toFontWeight(),
+            color = if (enabled) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 internal suspend fun loadBookProgressById(
     entries: List<BookEntry>,
     bookRepository: BookRepository,
@@ -1319,6 +1431,7 @@ private fun BookContextMenu(
     onMarkReadCandidate: (BookEntry) -> Unit,
     onRenameCandidate: (BookEntry) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
+    onExportCandidate: (BookEntry) -> Unit,
     syncSettings: SyncSettings,
     onSyncBook: (BookEntry, SyncDirection?) -> Unit,
 ) {
@@ -1392,6 +1505,13 @@ private fun BookContextMenu(
             text = { Text(stringResource(R.string.bookshelf_mark_read)) },
             onClick = {
                 onMarkReadCandidate(entry)
+                onDismiss()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.bookshelf_export_epub)) },
+            onClick = {
+                onExportCandidate(entry)
                 onDismiss()
             },
         )
@@ -1781,3 +1901,9 @@ private fun ChevronRightGlyph(color: Color, modifier: Modifier = Modifier) {
         modifier = modifier,
     )
 }
+
+private fun String.sanitizeExportFileName(): String =
+    split(Regex("[\\\\/:*?\"<>|\\n\\r\\u0000-\\u001F]"))
+        .joinToString("_")
+        .trim()
+        .ifBlank { "book" }

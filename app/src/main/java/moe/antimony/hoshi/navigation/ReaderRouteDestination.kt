@@ -83,12 +83,14 @@ internal fun ReaderRouteDestination(
 
     suspend fun exportBook(entry: BookEntry) {
         runCatching {
+            val currentSyncSettings = syncSettings ?: appContainer.syncSettingsRepository.settings.first()
             appContainer.syncManager.syncBook(
                 entry = entry,
                 direction = SyncDirection.ExportToTtu,
                 syncStats = readerSettings.statisticsSyncEnabled,
                 statsSyncMode = readerSettings.statisticsSyncMode,
                 syncAudioBook = autoSyncState.shouldSyncAudioBook,
+                syncBookData = currentSyncSettings.uploadBooks,
             )
         }.onSuccess { result ->
             Log.d(ReaderAutoSyncLogTag, "Reader auto export finished: ${result::class.java.simpleName}")

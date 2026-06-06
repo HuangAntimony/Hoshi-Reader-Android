@@ -68,6 +68,13 @@ data class ImportFileType(
             unsupportedMessageRes = R.string.import_select_hoshi_backup,
         )
 
+        val TtuBookDataBackup = ImportFileType(
+            description = "TTU bookdata backup",
+            extensions = listOf("zip"),
+            mimeTypes = arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"),
+            unsupportedMessageRes = R.string.import_select_ttu_bookdata_backup,
+        )
+
         val ReaderFont = ImportFileType(
             description = "font",
             extensions = listOf("ttf", "otf", "woff", "woff2"),

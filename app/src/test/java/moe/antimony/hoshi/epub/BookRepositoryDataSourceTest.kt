@@ -106,4 +106,17 @@ class BookRepositoryDataSourceTest {
         assertEquals(listOf("content://media/external/audio/media/1"), released)
         assertFalse(remove.exists())
     }
+
+    @Test
+    fun metadataCoverPathCanCacheCoverResourceFromPackedEpubParserResult() = runBlocking {
+        val repository = BookRepository(Files.createTempDirectory("hoshi-packed-cover").toFile())
+        val root = repository.createBookDirectory("packed-cover")
+        writeMinimalEpubArchive(root.resolve("packed-cover.epub"), title = "Packed Cover")
+        val parsed = EpubBookParser().parse(root)
+
+        val coverPath = repository.metadataCoverPath(root, parsed)
+
+        assertEquals("Books/packed-cover/cover.jpg", coverPath)
+        assertEquals(listOf(1, 2, 3), root.resolve("cover.jpg").readBytes().map(Byte::toInt))
+    }
 }

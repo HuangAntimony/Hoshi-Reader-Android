@@ -9,6 +9,8 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.DriveFile
+import moe.antimony.hoshi.features.sync.DriveSyncFiles
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
 import moe.antimony.hoshi.ui.UiText
@@ -56,6 +58,37 @@ class BookshelfViewModelTest {
         assertTrue(viewModel.uiState.value.sasayakiEnabled)
         assertFalse(viewModel.uiState.value.isLoading)
         assertNull(viewModel.uiState.value.errorMessage.testString())
+    }
+
+    @Test
+    fun reloadBooksPublishesRemoteGoogleDriveBooksSeparatelyFromLocalEntries() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val repository = FakeBookshelfRepository(
+            entries = listOf(bookEntry("local-book")),
+            remoteEntries = listOf(remote),
+            remoteProgressById = mapOf("drive-folder" to 0.5),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(listOf("local-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+        assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+        assertEquals(mapOf("drive-folder" to 0.5), viewModel.uiState.value.remoteProgressById)
+    }
+
+    @Test
+    fun remoteImportAndDeleteCallRepositoryAndReloadShelf() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val repository = FakeBookshelfRepository(remoteEntries = listOf(remote))
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.importRemoteBook(remote)
+        viewModel.deleteRemoteBook(remote)
+
+        assertEquals(listOf(remote), repository.importedRemoteEntries)
+        assertEquals(listOf(remote), repository.deletedRemoteEntries)
+        assertEquals(listOf(BookSortOption.Recent, BookSortOption.Recent), repository.loadRequests)
     }
 
     @Test
@@ -492,6 +525,20 @@ class BookshelfViewModelTest {
             ),
         )
 
+    private fun remoteEntry(id: String, title: String): RemoteBookEntry =
+        RemoteBookEntry(
+            id = id,
+            folderId = id,
+            folderName = title,
+            title = title,
+            syncFiles = DriveSyncFiles(
+                bookData = DriveFile("bookdata-$id", "bookdata_1_6_10_1000_1000.zip"),
+                progress = null,
+                statistics = null,
+                audioBook = null,
+            ),
+        )
+
     private class FakeBookshelfRepository(
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
@@ -500,6 +547,8 @@ class BookshelfViewModelTest {
         var shelves: List<BookShelf> = emptyList(),
         var coverSourcesById: Map<String, BookCoverSource> = emptyMap(),
         var settings: BookshelfSettings = BookshelfSettings(),
+        var remoteEntries: List<RemoteBookEntry> = emptyList(),
+        var remoteProgressById: Map<String, Double> = emptyMap(),
     ) : BookshelfRepository {
         val loadRequests = mutableListOf<BookSortOption>()
         val deletedEntries = mutableListOf<BookEntry>()
@@ -508,20 +557,44 @@ class BookshelfViewModelTest {
         val deletedShelves = mutableListOf<String>()
         val movedShelves = mutableListOf<Pair<Int, Int>>()
         val markedReadEntries = mutableListOf<BookEntry>()
+        val importedRemoteEntries = mutableListOf<RemoteBookEntry>()
+        val deletedRemoteEntries = mutableListOf<RemoteBookEntry>()
+        val exportedBooks = mutableListOf<BookEntry>()
         val showReadingUpdates = mutableListOf<Boolean>()
         val renamedBooks = mutableListOf<Pair<BookEntry, String?>>()
 
         override suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult {
             loadRequests += sortOption
-            return BookshelfLoadResult(entries, progressById, coverSourcesById, shelves, settings)
+            return BookshelfLoadResult(
+                entries = entries,
+                progressById = progressById,
+                coverSourcesById = coverSourcesById,
+                shelves = shelves,
+                settings = settings,
+                remoteEntries = remoteEntries,
+                remoteProgressById = remoteProgressById,
+            )
         }
 
         override suspend fun openBook(entry: BookEntry): String = openBookId
 
         override suspend fun importBook(uri: android.net.Uri): String = importBookId
 
+        override suspend fun exportBook(entry: BookEntry, uri: android.net.Uri) {
+            exportedBooks += entry
+        }
+
+        override suspend fun importRemoteBook(entry: RemoteBookEntry): String {
+            importedRemoteEntries += entry
+            return importBookId
+        }
+
         override suspend fun deleteBook(entry: BookEntry) {
             deletedEntries += entry
+        }
+
+        override suspend fun deleteRemoteBook(entry: RemoteBookEntry) {
+            deletedRemoteEntries += entry
         }
 
         override suspend fun deleteBooks(entries: Collection<BookEntry>) {
@@ -584,6 +657,7 @@ private fun UiText?.testString(): String? =
             R.string.bookshelf_scanning_folder -> "Scanning folder..."
             R.string.bookshelf_no_epub_files_found -> "No EPUB files found."
             R.string.bookshelf_already_synced_format -> "${args[0]} is already synced"
+            R.string.bookshelf_exported_epub_format -> "Exported ${args[0]}."
             else -> "resource:$id:${args.joinToString()}"
         }
         is UiText.Plural -> "plural:$id:$quantity:${args.joinToString()}"

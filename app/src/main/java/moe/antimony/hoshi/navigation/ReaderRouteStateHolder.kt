@@ -27,7 +27,7 @@ internal class ReaderRouteStateHolder(
             val parsedBook = parser.parse(entry.root, cachedBookInfo)
             val metadata = entry.metadata.copy(
                 title = parsedBook.title,
-                cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref),
+                cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref) ?: entry.metadata.cover,
                 folder = entry.root.name,
                 lastAccess = repository.currentAppleReferenceDateSeconds(),
             )

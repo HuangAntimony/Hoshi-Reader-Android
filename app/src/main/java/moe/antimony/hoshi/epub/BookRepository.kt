@@ -4,8 +4,11 @@ import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
 import java.time.Instant
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
 import java.util.UUID
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,7 +25,7 @@ import moe.antimony.hoshi.importing.validateImportFile
 
 @Singleton
 class BookRepository private constructor(
-    filesDir: File,
+    private val filesDir: File,
     private val ioDispatcher: CoroutineDispatcher,
     private val fileDataSource: BookFileDataSource,
     private val sidecarDataSource: BookSidecarDataSource,
@@ -42,6 +45,7 @@ class BookRepository private constructor(
 
     constructor(filesDir: File) : this(filesDir, Dispatchers.IO)
 
+    private val archiveExtractor = EpubArchiveExtractor()
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
 
     val currentBookFile: File get() = fileDataSource.currentBookFile
@@ -95,8 +99,25 @@ class BookRepository private constructor(
 
     suspend fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
 
+    suspend fun epubFile(entry: BookEntry): File? = fileDataSource.epubFile(entry.root, entry.metadata)
+
+    suspend fun epubFile(bookRoot: File): File? =
+        epubFile(bookRoot, loadMetadata(bookRoot))
+
+    suspend fun epubFile(bookRoot: File, metadata: BookMetadata?): File? =
+        fileDataSource.epubFile(bookRoot, metadata)
+
+    suspend fun exportEpub(entry: BookEntry, output: java.io.OutputStream) = withContext(ioDispatcher) {
+        val epub = epubFile(entry) ?: error("Book does not have a packed EPUB.")
+        epub.inputStream().use { input -> input.copyTo(output) }
+    }
+
     override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
         fileDataSource.metadataCoverPath(bookRoot, coverHref)
+
+    suspend fun metadataCoverPath(bookRoot: File, parsedBook: EpubBook): String? =
+        metadataCoverPath(bookRoot, parsedBook.coverHref)
+            ?: fileDataSource.writeCoverResource(bookRoot, parsedBook)
 
     suspend fun deleteBook(
         bookRoot: File,
@@ -201,11 +222,12 @@ class BookRepository private constructor(
     ): LegacyBookMigration {
         val oldId = storedMetadata?.id ?: root.name
         val baseMetadata = storedMetadata ?: root.fallbackMetadata()
-        val metadata = baseMetadata.withIosBackupCompatibleFields(root)
-        if (metadata != storedMetadata) {
-            saveMetadata(root, metadata)
+        val iosMetadata = baseMetadata.withIosBackupCompatibleFields(root)
+        if (iosMetadata != storedMetadata) {
+            saveMetadata(root, iosMetadata)
         }
-        return LegacyBookMigration(oldId = oldId, metadata = metadata)
+        val packedMetadata = migrateLegacyExtractedBookToPackedEpub(root, iosMetadata)
+        return LegacyBookMigration(oldId = oldId, metadata = packedMetadata)
     }
 
     // Legacy migration for Android builds that predate iOS-compatible Books backup.
@@ -217,6 +239,85 @@ class BookRepository private constructor(
             folder = folder ?: root.name,
             cover = cover?.let { metadataCoverPath(root, it) ?: it },
         )
+
+    private suspend fun migrateLegacyExtractedBookToPackedEpub(root: File, metadata: BookMetadata): BookMetadata =
+        withContext(ioDispatcher) {
+            if (!metadata.epub.isNullOrBlank()) return@withContext metadata
+            if (!root.resolve("META-INF/container.xml").isFile) return@withContext metadata
+
+            val epubName = "${root.name}.epub"
+            val destination = root.resolve(epubName)
+            if (destination.isFile) {
+                if (!verifyPackedEpub(destination, metadata.title)) return@withContext metadata
+                val updated = metadata.copy(epub = epubName)
+                saveMetadata(root, updated)
+                deleteLegacyExtractedPayload(root, updated, epubName)
+                return@withContext updated
+            }
+
+            val tempArchive = root.resolve(".$epubName.tmp")
+            val verifyRoot = filesDir.resolve("ImportTemp/packed-migration-${UUID.randomUUID()}").canonicalFile
+            tempArchive.delete()
+            verifyRoot.deleteRecursively()
+            val parsed = runCatching {
+                archiveExtractor.createArchive(
+                    sourceRoot = root,
+                    destination = tempArchive,
+                    excludedRootNames = metadata.packedMigrationExcludedRootNames(root, epubName),
+                )
+                archiveExtractor.extract(tempArchive, verifyRoot)
+                EpubBookParser(File(filesDir, "EpubMigrationCache")).parse(verifyRoot)
+            }.getOrElse {
+                tempArchive.delete()
+                verifyRoot.deleteRecursively()
+                return@withContext metadata
+            }
+            verifyRoot.deleteRecursively()
+            tempArchive.renameTo(destination).also { moved ->
+                if (!moved) {
+                    tempArchive.copyTo(destination, overwrite = true)
+                    tempArchive.delete()
+                }
+            }
+
+            val updated = metadata.copy(
+                title = metadata.title ?: parsed.title,
+                cover = metadata.cover,
+                epub = epubName,
+            )
+            saveMetadata(root, updated)
+            deleteLegacyExtractedPayload(root, updated, epubName)
+            updated
+        }
+
+    private fun verifyPackedEpub(epubFile: File, fallbackTitle: String?): Boolean =
+        runCatching {
+            EpubBookParser(File(filesDir, "EpubMigrationCache")).parsePacked(
+                epubFile = epubFile,
+                fallbackTitle = fallbackTitle ?: epubFile.nameWithoutExtension,
+            )
+        }.isSuccess
+
+    private fun BookMetadata.packedMigrationExcludedRootNames(root: File, epubName: String): Set<String> =
+        buildSet {
+            add(epubName)
+            add(".$epubName.tmp")
+            addAll(bookSidecarFileNames)
+            cover
+                ?.takeIf { it.isNotBlank() }
+                ?.let { File(it).name }
+                ?.takeIf { root.resolve(it).isFile }
+                ?.let(::add)
+        }
+
+    private fun deleteLegacyExtractedPayload(root: File, metadata: BookMetadata, epubName: String) {
+        val preserved = metadata.packedMigrationExcludedRootNames(root, epubName) + epubName
+        root.listFiles().orEmpty().forEach { child ->
+            if (child.name !in preserved) {
+                child.deleteRecursively()
+            }
+        }
+    }
 
     private data class LegacyBookMigration(
         val oldId: String,
@@ -282,6 +383,17 @@ class BookFileDataSource(
         resolveCoverFile(entry.root, cover)
     }
 
+    suspend fun epubFile(bookRoot: File, metadata: BookMetadata?): File? = withContext(ioDispatcher) {
+        val epubName = metadata?.epub?.takeIf { it.isNotBlank() } ?: "${bookRoot.name}.epub"
+        val root = bookRoot.canonicalFile
+        val epub = root.resolve(epubName).canonicalFile
+        if ((epub.path == root.path || epub.path.startsWith(root.path + File.separator)) && epub.isFile) {
+            epub
+        } else {
+            null
+        }
+    }
+
     suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? = withContext(ioDispatcher) {
         val cover = coverHref?.takeIf { it.isNotBlank() } ?: return@withContext null
         val source = resolveCoverFile(bookRoot, cover) ?: return@withContext null
@@ -293,6 +405,21 @@ class BookFileDataSource(
         if (source.canonicalFile != destination) {
             source.copyTo(destination, overwrite = true)
         }
+        "Books/${root.name}/${destination.name}"
+    }
+
+    suspend fun writeCoverResource(bookRoot: File, parsedBook: EpubBook): String? = withContext(ioDispatcher) {
+        val coverHref = parsedBook.coverHref?.takeIf { it.isNotBlank() } ?: return@withContext null
+        val bytes = parsedBook.readResource(coverHref) ?: return@withContext null
+        val root = bookRoot.canonicalFile
+        val rawName = File(coverHref).name.takeIf { it.isNotBlank() } ?: "cover.${parsedBook.mediaType(coverHref).coverExtension()}"
+        val fileName = rawName.sanitizeRootFileName().ifBlank { "cover.${parsedBook.mediaType(coverHref).coverExtension()}" }
+        val destination = root.resolve(fileName).canonicalFile
+        if (destination.path != root.path && !destination.path.startsWith(root.path + File.separator)) {
+            return@withContext null
+        }
+        destination.parentFile?.mkdirs()
+        destination.writeBytes(bytes)
         "Books/${root.name}/${destination.name}"
     }
 
@@ -356,9 +483,10 @@ class BookImportDataSource(
             importRoot.deleteRecursively()
             targetRoot
         } else {
-            targetRoot.deleteRecursively()
             try {
-                check(extractedRoot.renameTo(targetRoot)) { "Unable to move imported EPUB into Books/${targetRoot.name}" }
+                targetRoot.mkdirs()
+                val packedEpub = targetRoot.resolve("${targetRoot.name}.epub")
+                archiveFile.copyTo(packedEpub, overwrite = true)
                 targetRoot
             } finally {
                 importRoot.deleteRecursively()
@@ -389,6 +517,47 @@ class EpubArchiveExtractor {
                 }
             }
         }
+    }
+
+    fun createArchive(
+        sourceRoot: File,
+        destination: File,
+        excludedRootNames: Set<String> = emptySet(),
+    ) {
+        val root = sourceRoot.canonicalFile
+        require(root.isDirectory) { "Extracted EPUB directory does not exist: ${sourceRoot.absolutePath}" }
+        destination.parentFile?.mkdirs()
+        ZipOutputStream(destination.outputStream()).use { zip ->
+            val mimetype = root.resolve("mimetype")
+                .takeIf(File::isFile)
+                ?.readBytes()
+                ?: "application/epub+zip".toByteArray()
+            zip.putStoredEntry("mimetype", mimetype)
+            root.walkTopDown()
+                .filter { it.isFile }
+                .sortedBy { it.relativeTo(root).invariantSeparatorsPath }
+                .forEach { file ->
+                    val relativePath = file.relativeTo(root).invariantSeparatorsPath
+                    if (relativePath == "mimetype") return@forEach
+                    if (!relativePath.contains("/") && relativePath in excludedRootNames) return@forEach
+                    zip.putNextEntry(ZipEntry(relativePath))
+                    file.inputStream().use { input -> input.copyTo(zip) }
+                    zip.closeEntry()
+                }
+        }
+    }
+
+    private fun ZipOutputStream.putStoredEntry(name: String, bytes: ByteArray) {
+        val crc = CRC32().apply { update(bytes) }
+        val entry = ZipEntry(name).apply {
+            method = ZipEntry.STORED
+            size = bytes.size.toLong()
+            compressedSize = bytes.size.toLong()
+            this.crc = crc.value
+        }
+        putNextEntry(entry)
+        write(bytes)
+        closeEntry()
     }
 }
 
@@ -497,10 +666,33 @@ private const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"
 private const val SASAYAKI_PLAYBACK_FILE_NAME = "sasayaki_playback.json"
 private const val APPLE_REFERENCE_EPOCH_SECONDS = 978_307_200.0
 
+private val bookSidecarFileNames = setOf(
+    METADATA_FILE_NAME,
+    BOOKMARK_FILE_NAME,
+    STATISTICS_FILE_NAME,
+    HIGHLIGHTS_FILE_NAME,
+    BOOKINFO_FILE_NAME,
+    SASAYAKI_MATCH_FILE_NAME,
+    SASAYAKI_PLAYBACK_FILE_NAME,
+)
+
 private fun String.sanitizeImportedBookTitle(): String =
     split(Regex("[\\\\/:*?\"<>|\\n\\r\\u0000-\\u001F]"))
         .joinToString("_")
         .trim()
+
+private fun String.sanitizeRootFileName(): String =
+    split(Regex("[\\\\/:*?\"<>|\\n\\r\\u0000-\\u001F]"))
+        .joinToString("_")
+        .trim()
+
+private fun String.coverExtension(): String = when (lowercase()) {
+    "image/png" -> "png"
+    "image/gif" -> "gif"
+    "image/svg+xml" -> "svg"
+    "image/webp" -> "webp"
+    else -> "jpg"
+}
 
 internal fun String.isUuidString(): Boolean =
     runCatching { UUID.fromString(this) }.isSuccess

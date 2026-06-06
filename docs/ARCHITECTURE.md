@@ -32,6 +32,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   iOS sidecar JSON layout.
 - EPUB import enters through Android Storage Access Framework and copies content
   into app-specific storage.
+- Current book folders store the packed EPUB as `<folder>/<folder>.epub` and
+  persist the filename in `BookMetadata.epub`. Sidecar JSON and cached covers
+  remain beside the EPUB; parser and reader paths extract packed EPUBs only into
+  controlled app cache/temp directories when they need the EPUB tree.
 - Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
   are persisted through book sidecar repositories and models.
 - Dictionary import, lookup, media, style extraction, and deinflection behavior
@@ -63,7 +67,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 - Anki work stays behind the Anki backend/repository boundary.
 - Google Drive sync uses Android/Google OAuth and Drive APIs through the
-  repository/sync boundary.
+  repository/sync boundary. The Drive data source owns paginated folder listing,
+  grouped sync-file discovery, bookdata upload/download, trash, cache clearing,
+  and network preflight; Books keeps remote-only Google Drive books as
+  `RemoteBookEntry` models rather than local `BookEntry` placeholders.
 - Audio and Sasayaki playback use Media3/ExoPlayer with controller/repository
   boundaries.
 - Update checks use WorkManager unique work, with worker dependencies supplied

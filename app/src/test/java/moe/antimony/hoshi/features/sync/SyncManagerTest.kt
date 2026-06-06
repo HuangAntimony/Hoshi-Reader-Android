@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 
 class SyncManagerTest {
     @get:Rule
@@ -113,6 +114,75 @@ class SyncManagerTest {
         assertEquals(2, drive.listSyncFilesCalls)
     }
 
+    @Test
+    fun syncBookUploadsBookDataWhenEnabledAndRemoteFolderDoesNotHaveBookData() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource()
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            nowUnixMillis = { 9_999 },
+            bookDataExporter = { exported },
+        )
+
+        val result = manager.syncBook(
+            entry = entry,
+            direction = null,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            syncBookData = true,
+        )
+
+        assertEquals(SyncResult.Synced("Title"), result)
+        assertEquals("book-folder", drive.uploadedBookDataFolderId)
+        assertEquals(exported, drive.uploadedBookDataFile)
+    }
+
+    @Test
+    fun syncBookDoesNotUploadBookDataWhenImportOnlyOrRemoteAlreadyHasBookData() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        val importOnlyDrive = FakeDriveSyncDataSource()
+        val importOnlyManager = SyncManager(
+            bookRepository = repository,
+            drive = importOnlyDrive,
+            bookDataExporter = { exported },
+        )
+
+        importOnlyManager.syncBook(
+            entry = entry,
+            direction = null,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            importOnly = true,
+            syncBookData = true,
+        )
+
+        val alreadyPresentDrive = FakeDriveSyncDataSource(bookData = DriveFile("bookdata", "bookdata_1_6_200_1000_1000.zip"))
+        val alreadyPresentManager = SyncManager(
+            bookRepository = repository,
+            drive = alreadyPresentDrive,
+            bookDataExporter = { exported },
+        )
+        alreadyPresentManager.syncBook(
+            entry = entry,
+            direction = null,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            syncBookData = true,
+        )
+
+        assertEquals(null, importOnlyDrive.uploadedBookDataFile)
+        assertEquals(null, alreadyPresentDrive.uploadedBookDataFile)
+    }
+
     private suspend fun BookRepository.createEntry(): BookEntry {
         val root = createBookDirectory("book")
         val metadata = BookMetadata(
@@ -141,6 +211,7 @@ private class FakeDriveSyncDataSource(
     progress: TtuProgress? = null,
     statistics: List<ReadingStatistics>? = null,
     audioBook: TtuAudioBook? = null,
+    private val bookData: DriveFile? = null,
     private val staleOnFirstList: Boolean = false,
 ) : DriveSyncDataSource {
     private val progressFile = progress?.let { DriveFile("progress", TtuSyncRules.progressFileName(it)) }
@@ -155,6 +226,8 @@ private class FakeDriveSyncDataSource(
     var updatedProgress: TtuProgress? = null
     var updatedStatistics: List<ReadingStatistics> = emptyList()
     var updatedAudioBook: TtuAudioBook? = null
+    var uploadedBookDataFolderId: String? = null
+    var uploadedBookDataFile: File? = null
 
     override suspend fun findRootFolder(): String = "root"
 
@@ -174,6 +247,7 @@ private class FakeDriveSyncDataSource(
             throw GoogleDriveApiException("Not found", statusCode = 404)
         }
         return DriveSyncFiles(
+            bookData = bookData,
             progress = progressFile,
             statistics = statisticsFile,
             audioBook = audioBookFile,
@@ -202,6 +276,11 @@ private class FakeDriveSyncDataSource(
         assertEquals("book-folder", folderId)
         assertTrue(fileId == null || fileId == audioBookFile?.id)
         updatedAudioBook = audioBook
+    }
+
+    override suspend fun uploadBookData(folderId: String, file: File) {
+        uploadedBookDataFolderId = folderId
+        uploadedBookDataFile = file
     }
 
     override fun clearCache() {

@@ -134,57 +134,45 @@ Validation:
 
 ### 4. TTU/Google Drive book data sync, backup import/export, and remote bookshelf
 
-Status: pending Android sync; replaces the earlier book-storage deferral with a concrete TTU bookdata queue.
+Status: implemented on Android.
 
-Commits:
+Covered iOS commits:
 
-- `67bdbb9` - add option to export epubs.
-- `1aaee97` - prevent autosync being stuck when mobile data is disabled.
-- `c2e1c09` - ttu book sync (#63).
-- `32d76d2` - some edge cases in ttu bookdata.
+- `ab6722e` - refactor storage to keep packed EPUBs in book folders.
+- `67bdbb9` - add option to export EPUBs.
+- `1aaee97` - prevent autosync from hanging when mobile data is disabled.
+- `c2e1c09` - TTU book sync (#63).
+- `32d76d2` - TTU bookdata edge cases.
 
-Why this is a large dependent slice:
+Android coverage:
 
-- This crosses bookshelf state, Drive listing and cache invalidation, remote cover thumbnails, EPUB export, TTU `bookdata_*.zip` conversion, backup import/export, reader-open import-only behavior, and existing progress/statistics/Sasayaki sync.
+- Book folders now retain `<folder>.epub` and `BookMetadata.epub`; legacy
+  extracted books are repacked only after parse verification and are left
+  untouched on failure.
+- Books can export their stored EPUB from the Books context menu.
+- TTU bookdata conversion supports `staticdata.json`, `blobs/`, cover files,
+  generated EPUB structure, XHTML wrapper stripping, image rewriting, and the
+  `<br>` / `<hr>` / `<img>` edge cases.
+- Backup settings expose TTU bookdata export/import separately from `.hoshi`
+  Books/Dictionaries backups.
+- Google Drive sync can list remote book folders, discover `bookdata_`,
+  `cover_`, progress/statistics/audio files, upload missing bookdata when
+  Upload Books is enabled, download bookdata for remote import, trash remote
+  folders, clear cached Drive IDs, and preflight validated connectivity before
+  Drive REST requests.
+- Books keeps remote-only Drive books as `RemoteBookEntry` models and shows a
+  separate Google Drive section for tap-to-import and delete-from-Drive flows.
 
-iOS behavior to mirror:
+Manual validation to keep in release QA:
 
-- Book context menus can share/export the stored EPUB when `metadata.epub` is available.
-- Sync settings include cache clearing, sign-out confirmation, and separate Data toggles for uploading book data, statistics, and audiobook progress.
-- Bookshelf shows remote Google Drive books that are not present locally, using Drive cover thumbnails and remote progress where available.
-- Tapping a remote book imports its TTU bookdata from Google Drive, then removes it from the remote-only section.
-- Remote Google Drive books can be deleted/trash-moved from the remote-only section.
-- Backup settings can export all local books as TTU-compatible bookdata zip folders and import TTU backup zips, merging new books and overwriting stats/progress for existing books.
-- Sync uploads bookdata only when enabled and missing remotely; existing progress/statistics/audio sync remains independent.
-- Drive requests detect no network before request execution so autosync does not hang behind disabled mobile data.
-- TTU conversion preserves/sanitizes XHTML wrappers, images, cover, CSS, table of contents, progress, statistics, and edge cases around `<br>`, `<hr>`, and wrapper divs.
-
-Android current gap:
-
-- Android has the first Google Drive progress/statistics/Sasayaki sync slice and uses Device Code auth, but it does not list/import/delete remote-only Drive books.
-- Android sync does not upload/download TTU bookdata zips or expose an Upload Books toggle.
-- Android Backup supports `.hoshi` Books/Dictionaries archives but not TTU backup import/export.
-- Android `BookMetadata`/repository still use extracted EPUB roots and do not retain a packed EPUB filename for direct EPUB export.
-- Network unavailability is handled in parts of authorization/sync, but the exact autosync no-network stuck case needs re-checking against Android's Drive client.
-
-Suggested slice:
-
-- Split into smaller Android work:
-  1. Drive data-source support for paginated folder listing, per-folder sync file listing, remote cover thumbnail caching, cache clear, and trash.
-  2. Remote-only bookshelf section and import/delete UI with localized strings.
-  3. EPUB retention/export strategy that is compatible with the deferred packed-EPUB storage decision.
-  4. TTU bookdata converter and Backup import/export flows.
-  5. Sync Upload Books setting and bookdata upload/import-only reader behavior.
-  6. Network-unavailable autosync guard.
-- Confirm Android Drive API, SAF, and background/network constraints against current Google/Jetpack docs before implementation.
-
-Validation:
-
-- On a user-configured Google Drive project, list remote-only ッツ books, show covers/progress, import one book, delete one remote book, and clear cached folder IDs/covers.
-- Export an Android book as EPUB and as TTU backup; import the TTU backup into iOS/ッツ where possible.
-- Import an iOS/ッツ TTU backup into Android; verify reader open, cover, progress, statistics, and Sasayaki progress.
-- Disable network/mobile data during autosync and confirm it fails or defers without hanging.
-- Regression-test existing manual sync, reader auto import/export, close/background export flush, statistics Merge/Replace, and Sasayaki last-position sync.
+- On a user-configured Google Drive project, list remote-only ッツ books, import
+  one book, delete one remote book, and clear cached Drive folder IDs.
+- Export an Android book as EPUB and as TTU backup; import the TTU backup into
+  iOS/ッツ where possible.
+- Import an iOS/ッツ TTU backup into Android; verify reader open, cover,
+  progress, statistics, and Sasayaki progress.
+- Disable network/mobile data during autosync and confirm it fails or defers
+  without hanging.
 
 ## Covered Or No Android Action
 
@@ -213,12 +201,12 @@ Validation:
 | --- | --- | --- | --- |
 | `94d0c41` | 2026-05-19 | Automatic dictionary updates | Pending |
 | `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
-| `67bdbb9` | 2026-05-25 | Export stored EPUB from book menu | Pending |
+| `67bdbb9` | 2026-05-25 | Export stored EPUB from book menu | Implemented |
 | `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
-| `1aaee97` | 2026-05-27 | Autosync no-network guard | Pending |
-| `c2e1c09` | 2026-05-28 | TTU book sync, remote Drive bookshelf, backup import/export | Pending |
+| `1aaee97` | 2026-05-27 | Autosync no-network guard | Implemented |
+| `c2e1c09` | 2026-05-28 | TTU book sync, remote Drive bookshelf, backup import/export | Implemented |
 | `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
-| `32d76d2` | 2026-05-29 | TTU bookdata edge cases | Pending with TTU slice |
+| `32d76d2` | 2026-05-29 | TTU bookdata edge cases | Implemented |
 | `8ffca61` | 2026-06-02 | Autofill Lapis, Kiku, and Senren Anki field mappings | Pending |
 | `0d6c072` | 2026-06-04 | hoshidicts normalization processor bump | Pending bridge/native sync |
 | `cfc1e50` | 2026-06-04 | Build lookup query off main thread | Pending |
@@ -228,4 +216,3 @@ Validation:
 1. Dictionary automatic updates.
 2. Dictionary lookup normalization and query rebuild threading.
 3. Anki field templates, dictionary IPA display, and glossary handlebars.
-4. TTU/Google Drive bookdata sync, EPUB export, and backup import/export in smaller sub-slices.

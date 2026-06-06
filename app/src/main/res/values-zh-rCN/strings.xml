@@ -41,6 +41,7 @@
     <string name="import_select_audio_database">请选择 .db 音频数据库文件。</string>
     <string name="import_select_dictionary_archive">请选择 .zip 辞典压缩包文件。</string>
     <string name="import_select_hoshi_backup">请选择 .hoshi Hoshi 备份文件。</string>
+    <string name="import_select_ttu_bookdata_backup">请选择 .zip TTU bookdata 备份文件。</string>
     <string name="import_select_font">请选择 .ttf、.otf、.woff 或 .woff2 字体文件。</string>
     <string name="main_tab_books" comment="Main navigation tab label, intentionally matching the backup Books section.">书库</string>
     <string name="main_tab_dictionary">查词</string>
@@ -65,6 +66,9 @@
     <string name="bookshelf_scanning_folder">正在扫描文件夹...</string>
     <string name="bookshelf_no_epub_files_found">未找到 EPUB 文件。</string>
     <string name="bookshelf_importing_epub">正在导入 EPUB...</string>
+    <string name="bookshelf_exporting_epub">正在导出 EPUB...</string>
+    <string name="bookshelf_export_failed">无法导出 EPUB。</string>
+    <string name="bookshelf_exported_epub_format">已导出 %1$s。</string>
     <string name="bookshelf_importing_named_format">正在导入 %1$s...</string>
     <string name="bookshelf_importing_progress_format">正在导入 %1$d / %2$d...</string>
     <string name="bookshelf_sync_failed">同步失败。</string>
@@ -73,10 +77,13 @@
     <string name="bookshelf_synced_from_ttu_format">已从 ッツ 同步 %1$s\n%2$d 个字符</string>
     <string name="bookshelf_already_synced_format">%1$s 已同步</string>
     <string name="bookshelf_delete_book_title_format" comment="Delete confirmation, intentionally matching the imported-font delete confirmation format.">删除“%1$s”？</string>
+    <string name="bookshelf_delete_remote_book_title_format">从 Google Drive 删除“%1$s”？</string>
+    <string name="bookshelf_delete_remote_book_confirmation">这会将远端 Google Drive 文件夹移入回收站。本地书籍不会被删除。</string>
     <string name="bookshelf_mark_read_title_format">将“%1$s”标记为已读？</string>
     <string name="bookshelf_title_label" comment="Text-field label for renaming a book, distinct from the sort option.">标题</string>
     <string name="bookshelf_section_reading">正在阅读</string>
     <string name="bookshelf_section_unshelved">未归类</string>
+    <string name="bookshelf_section_google_drive" comment="Bookshelf remote section label, intentionally matching the Google Drive sync provider name.">Google Drive</string>
     <string name="bookshelf_selected_count_format">已选择 %1$d 本</string>
     <string name="bookshelf_sort_books">排序书籍</string>
     <string name="bookshelf_sorting_by">排序方式...</string>
@@ -92,6 +99,7 @@
     <string name="bookshelf_move">移动</string>
     <string name="bookshelf_match_sasayaki">匹配有声书</string>
     <string name="bookshelf_mark_read">标记已读</string>
+    <string name="bookshelf_export_epub">导出 EPUB</string>
     <string name="bookshelf_reading_shelf">正在阅读书架</string>
     <string name="bookshelf_reading_shelf_description">显示已经开始但尚未读完的书籍。</string>
     <string name="bookshelf_shelves">书架</string>
@@ -278,9 +286,15 @@
     <string name="sync_title">同步</string>
     <string name="sync_direction">方向</string>
     <string name="sync_auto_sync">自动同步</string>
+    <string name="sync_upload_books">上传书籍</string>
+    <string name="sync_upload_books_description">当同步的 Google Drive 书籍文件夹缺少 bookdata 时，上传 TTU bookdata。</string>
+    <string name="sync_clear_cache">清除 Google Drive 缓存</string>
+    <string name="sync_cache_cleared">已清除 Google Drive 缓存。</string>
+    <string name="sync_sign_out_title">退出 Google Drive？</string>
+    <string name="sync_sign_out_confirmation">Hoshi 将断开 Google Drive 并清除已缓存的 Drive 文件夹。本地书籍不会被删除。</string>
     <string name="sync_mode_auto">自动</string>
     <string name="sync_mode_manual">手动</string>
-    <string name="sync_google_drive">Google Drive</string>
+    <string name="sync_google_drive" comment="Sync provider label, intentionally matching the bookshelf remote Google Drive section.">Google Drive</string>
     <string name="sync_device_client_id">设备客户端 ID</string>
     <string name="sync_device_client_secret">设备客户端密钥</string>
     <string name="sync_authorize_google_drive">授权 Google Drive</string>
@@ -312,14 +326,20 @@
     <string name="update_available_message_format">Hoshi Reader %1$s 已可用。</string>
     <string name="backup_books" comment="Backup section label, intentionally matching the Books tab label.">书籍</string>
     <string name="backup_dictionaries" comment="Backup section label, intentionally matching the Dictionaries settings label.">辞典</string>
+    <string name="backup_ttu_bookdata">TTU Bookdata</string>
+    <string name="backup_ttu_bookdata_description">导出和导入兼容 TTU 的 bookdata、进度、统计和封面文件，不会替换整个 Books 文件夹。</string>
     <string name="backup_books_saved">书籍备份已保存。</string>
     <string name="backup_books_save_failed">无法保存书籍备份。</string>
     <string name="backup_dictionaries_saved">辞典备份已保存。</string>
     <string name="backup_dictionaries_save_failed">无法保存辞典备份。</string>
+    <string name="backup_ttu_saved">TTU bookdata 备份已保存。</string>
+    <string name="backup_ttu_save_failed">无法保存 TTU bookdata 备份。</string>
     <string name="backup_books_restored">书籍已恢复。</string>
     <string name="backup_books_restore_failed">无法恢复书籍备份。</string>
     <string name="backup_dictionaries_restored">辞典已恢复。</string>
     <string name="backup_dictionaries_restore_failed">无法恢复辞典备份。</string>
+    <string name="backup_ttu_restored">TTU bookdata 已导入。</string>
+    <string name="backup_ttu_restore_failed">无法导入 TTU bookdata 备份。</string>
     <string name="backup_restore_overwrites">恢复会覆盖当前集合。</string>
     <string name="backup_action_backup" comment="Verb for creating a backup, intentionally matching the Backup settings noun.">备份</string>
     <string name="backup_action_restore">恢复</string>

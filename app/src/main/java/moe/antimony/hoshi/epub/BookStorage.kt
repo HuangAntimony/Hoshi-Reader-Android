@@ -36,6 +36,7 @@ data class BookMetadata(
     val folder: String?,
     val lastAccess: Double,
     val renamedTitle: String? = null,
+    val epub: String? = null,
 ) {
     val displayTitle: String
         get() = renamedTitle?.takeIf { it.isNotBlank() } ?: title.orEmpty()
@@ -85,6 +86,8 @@ class BookStorage(filesDir: File) {
     }
 
     suspend fun coverFile(entry: BookEntry): File? = repository.coverFile(entry)
+
+    suspend fun epubFile(entry: BookEntry): File? = repository.epubFile(entry)
 
     suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
         repository.metadataCoverPath(bookRoot, coverHref)

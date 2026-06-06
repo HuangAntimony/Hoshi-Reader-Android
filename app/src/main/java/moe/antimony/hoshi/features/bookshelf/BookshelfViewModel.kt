@@ -278,6 +278,39 @@ internal class BookshelfViewModel : ViewModel {
         }
     }
 
+    fun exportBook(entry: BookEntry, uri: Uri) {
+        runLoading(
+            errorPrefix = UiText.Resource(R.string.bookshelf_export_failed),
+            blockingProgressMessage = UiText.Resource(R.string.bookshelf_exporting_epub),
+            block = {
+                repository.exportBook(entry, uri)
+                _uiState.update { it.copy(statusMessage = UiText.Resource(R.string.bookshelf_exported_epub_format, entry.displayTitle)) }
+            },
+        )
+    }
+
+    fun importRemoteBook(entry: RemoteBookEntry) {
+        runLoading(
+            errorPrefix = UiText.Resource(R.string.bookshelf_import_failed),
+            blockingProgressMessage = UiText.Resource(R.string.bookshelf_importing_named_format, entry.title),
+            block = {
+                repository.importRemoteBook(entry)
+                reloadBookEntriesSync()
+            },
+        )
+    }
+
+    fun deleteRemoteBook(entry: RemoteBookEntry) {
+        runLoading(
+            errorPrefix = UiText.Resource(R.string.bookshelf_sync_failed),
+            blockingProgressMessage = UiText.Resource(R.string.bookshelf_syncing),
+            block = {
+                repository.deleteRemoteBook(entry)
+                reloadBookEntriesSync()
+            },
+        )
+    }
+
     fun deleteSelectedBooks() {
         val selectedEntries = _uiState.value.bookEntries.filter { it.metadata.id in _uiState.value.selectedBookIds }
         if (selectedEntries.isEmpty()) return
@@ -447,8 +480,11 @@ internal class BookshelfViewModel : ViewModel {
             val validSelectedIds = it.selectedBookIds.intersect(result.entries.mapTo(mutableSetOf()) { entry -> entry.metadata.id })
             it.copy(
                 bookEntries = result.entries,
+                remoteBookEntries = result.remoteEntries,
                 bookProgressById = result.progressById,
+                remoteProgressById = result.remoteProgressById,
                 coverSourcesById = result.coverSourcesById,
+                remoteCoverSourcesById = result.remoteCoverSourcesById,
                 shelves = result.shelves,
                 sections = bookshelfSections(
                     entries = result.entries,

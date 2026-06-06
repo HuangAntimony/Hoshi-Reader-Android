@@ -37,6 +37,7 @@ data class SyncSettings(
     val mode: SyncMode = SyncMode.Auto,
     val autoSyncEnabled: Boolean = false,
     val authProvider: SyncAuthProvider = SyncAuthProvider.DeviceCode,
+    val uploadBooks: Boolean = false,
 )
 
 sealed interface DriveAuthStatus {
@@ -83,9 +84,13 @@ data class TtuAudioBook(
 data class DriveFile(
     val id: String,
     val name: String,
+    val parents: List<String> = emptyList(),
+    val thumbnailLink: String? = null,
 )
 
 data class DriveSyncFiles(
+    val bookData: DriveFile? = null,
+    val cover: DriveFile? = null,
     val progress: DriveFile?,
     val statistics: DriveFile?,
     val audioBook: DriveFile?,

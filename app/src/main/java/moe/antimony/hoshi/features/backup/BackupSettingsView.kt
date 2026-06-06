@@ -69,6 +69,10 @@ fun BackupSettingsView(
     val booksRestoreFailed = stringResource(R.string.backup_books_restore_failed)
     val dictionariesRestored = stringResource(R.string.backup_dictionaries_restored)
     val dictionariesRestoreFailed = stringResource(R.string.backup_dictionaries_restore_failed)
+    val ttuExported = stringResource(R.string.backup_ttu_saved)
+    val ttuExportFailed = stringResource(R.string.backup_ttu_save_failed)
+    val ttuImported = stringResource(R.string.backup_ttu_restored)
+    val ttuImportFailed = stringResource(R.string.backup_ttu_restore_failed)
     val booksExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri == null || operation != null) return@rememberLauncherForActivityResult
         operation = BackupOperation.Exporting
@@ -99,6 +103,23 @@ fun BackupSettingsView(
                     dictionariesBackupSaved
                 } else {
                     result.exceptionOrNull()?.message ?: dictionariesBackupSaveFailed
+                },
+            )
+        }
+    }
+    val ttuExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri == null || operation != null) return@rememberLauncherForActivityResult
+        operation = BackupOperation.Exporting
+        scope.launch {
+            val result = runCatching {
+                repository.exportTtuBookData(context.contentResolver, uri)
+            }
+            operation = null
+            snackbarHostState.showSnackbar(
+                if (result.isSuccess) {
+                    ttuExported
+                } else {
+                    result.exceptionOrNull()?.message ?: ttuExportFailed
                 },
             )
         }
@@ -144,6 +165,27 @@ fun BackupSettingsView(
             )
         }
     }
+    val ttuImporter = rememberLauncherForActivityResult(FileImportContent()) { uri ->
+        if (uri == null || operation != null) return@rememberLauncherForActivityResult
+        operation = BackupOperation.Restoring
+        scope.launch {
+            val result = runCatching {
+                context.contentResolver.validateImportFile(uri, ImportFileType.TtuBookDataBackup)
+                repository.restoreTtuBookData(context.contentResolver, uri)
+            }
+            operation = null
+            if (result.isSuccess) {
+                onBooksRestored()
+            }
+            snackbarHostState.showSnackbar(
+                if (result.isSuccess) {
+                    ttuImported
+                } else {
+                    result.exceptionOrNull()?.localizedImportMessage(context, ttuImportFailed) ?: ttuImportFailed
+                },
+            )
+        }
+    }
 
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_backup),
@@ -180,6 +222,15 @@ fun BackupSettingsView(
                         footer = stringResource(R.string.backup_restore_overwrites),
                         onBackup = { dictionariesExporter.launch(dictionariesBackupFileName()) },
                         onRestore = { dictionariesImporter.launch(ImportFileType.HoshiBackup.mimeTypes) },
+                        enabled = operation == null,
+                    )
+                }
+                item {
+                    BackupSection(
+                        title = stringResource(R.string.backup_ttu_bookdata),
+                        footer = stringResource(R.string.backup_ttu_bookdata_description),
+                        onBackup = { ttuExporter.launch(ttuBookDataBackupFileName()) },
+                        onRestore = { ttuImporter.launch(ImportFileType.TtuBookDataBackup.mimeTypes) },
                         enabled = operation == null,
                     )
                 }

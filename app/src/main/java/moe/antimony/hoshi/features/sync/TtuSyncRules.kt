@@ -28,6 +28,20 @@ object TtuSyncRules {
         }
     }
 
+    fun desanitizeTtuFilename(name: String): String {
+        var result = name
+            .replace("~ttu-star~", "*")
+        if (result.endsWith("~ttu-spc~")) {
+            result = result.removeSuffix("~ttu-spc~") + " "
+        }
+        if (result.endsWith("~ttu-dend~")) {
+            result = result.removeSuffix("~ttu-dend~") + "."
+        }
+        return result.replace(Regex("%([0-9A-Fa-f]{2})")) { match ->
+            match.groupValues[1].toInt(16).toChar().toString()
+        }
+    }
+
     fun appleReferenceSecondsToUnixMillis(appleReferenceSeconds: Double): Long =
         (appleReferenceSeconds * 1_000.0 + AppleReferenceEpochMillis).toLong()
 
@@ -40,6 +54,12 @@ object TtuSyncRules {
         val parts = name.split("_")
         if (parts.size <= 4) return null
         return parts[3].toLongOrNull()
+    }
+
+    fun parseProgressValue(file: DriveFile?): Double? {
+        val name = file?.name ?: return null
+        if (!name.startsWith("progress_")) return null
+        return name.removeSuffix(".json").split("_").getOrNull(4)?.toDoubleOrNull()
     }
 
     fun determineDirection(local: Bookmark?, remoteProgressFile: DriveFile?): SyncDirection {

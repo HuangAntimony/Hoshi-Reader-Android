@@ -4,6 +4,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import moe.antimony.hoshi.epub.BookMetadata
+import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.EpubArchiveExtractor
+import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,6 +21,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneId
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -243,6 +251,45 @@ class HoshiBackupRepositoryTest {
         assertFalse(zipEntryNames(output.toByteArray()).any { it == "Dictionaries/" || it.startsWith("Dictionaries/") })
     }
 
+    @Test
+    fun exportAndRestoreTtuBookDataMergesBookdataProgressAndStatistics() = runBlocking {
+        val sourceDir = Files.createTempDirectory("hoshi-ttu-backup-source").toFile()
+        val sourceRepository = BookRepository(sourceDir)
+        val sourceEntry = sourceRepository.createPackedTestBook("TTU Book")
+        sourceRepository.saveBookmark(sourceEntry.root, Bookmark(0, 0.5, 5, 10.0))
+        sourceRepository.saveStatistics(
+            sourceEntry.root,
+            listOf(ReadingStatistics(title = "TTU Book", dateKey = "2026-06-06", charactersRead = 5, lastStatisticModified = 100)),
+        )
+        val output = ByteArrayOutputStream()
+
+        HoshiBackupRepository(sourceDir).exportTtuBookData(output)
+
+        val entries = zipEntryNames(output.toByteArray())
+        assertTrue(entries.any { it.startsWith("TTU Book/bookdata_") && it.endsWith(".zip") })
+        assertTrue(entries.any { it.startsWith("TTU Book/progress_") && it.endsWith(".json") })
+        assertTrue(entries.any { it.startsWith("TTU Book/statistics_") && it.endsWith(".json") })
+
+        val targetDir = Files.createTempDirectory("hoshi-ttu-backup-target").toFile()
+        val targetRepository = BookRepository(targetDir)
+        HoshiBackupRepository(targetDir).restoreTtuBookData(ByteArrayInputStream(output.toByteArray()))
+        val restored = targetRepository.loadBookEntries().single()
+
+        assertEquals("TTU Book", restored.metadata.title)
+        assertTrue(restored.root.resolve(restored.metadata.epub!!).isFile)
+        assertEquals(5, targetRepository.loadBookmark(restored.root)?.characterCount)
+        assertEquals(5, targetRepository.loadStatistics(restored.root).single().charactersRead)
+    }
+
+    @Test
+    fun ttuBookDataBackupFileNameMatchesIosTimestampShapeAndExtension() {
+        val instant = Instant.parse("2026-05-10T07:08:09Z")
+
+        val name = ttuBookDataBackupFileName(instant, ZoneId.of("UTC"))
+
+        assertEquals("hoshi_ttu_export_2026-05-10_07-08-09.zip", name)
+    }
+
     private fun zipEntryNames(bytes: ByteArray): List<String> {
         val names = mutableListOf<String>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
@@ -326,6 +373,27 @@ class HoshiBackupRepositoryTest {
         val centralDirectoryOffset = uint(eocdOffset + 16, patched)
         writeUInt(patched, eocdOffset + 16, centralDirectoryOffset + zip64Extra.size)
         return patched
+    }
+
+    private suspend fun BookRepository.createPackedTestBook(title: String): moe.antimony.hoshi.epub.BookEntry {
+        val root = createBookDirectory(title)
+        val extracted = root.parentFile!!.resolve(".${root.name}-extracted").also { it.deleteRecursively() }
+        writeMinimalExtractedEpub(extracted, title = title)
+        val epub = root.resolve("${root.name}.epub")
+        EpubArchiveExtractor().createArchive(extracted, epub)
+        extracted.deleteRecursively()
+        val parsed = EpubBookParser().parse(root)
+        val metadata = BookMetadata(
+            id = UUID.randomUUID().toString(),
+            title = title,
+            cover = null,
+            folder = root.name,
+            lastAccess = 0.0,
+            epub = epub.name,
+        )
+        saveMetadata(root, metadata)
+        saveBookInfo(root, parsed.bookInfo)
+        return moe.antimony.hoshi.epub.BookEntry(root, metadata)
     }
 
     private fun ushort(offset: Int, bytes: ByteArray): Int =

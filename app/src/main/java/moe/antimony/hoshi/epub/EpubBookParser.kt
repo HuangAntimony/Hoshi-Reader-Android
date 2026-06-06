@@ -6,14 +6,16 @@ import uniffi.hoshiepub.parseExtractedEpub
 import java.io.File
 import javax.inject.Inject
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.di.CacheDir
 
 data class EpubBook(
     val title: String,
     val chapters: List<EpubChapter>,
     val toc: List<EpubTocItem> = emptyList(),
     val coverHref: String? = null,
-    private val resources: Map<String, EpubResource> = emptyMap(),
-    private val rootDirectory: File? = null,
+    val resources: Map<String, EpubResource> = emptyMap(),
+    val rootDirectory: File? = null,
     val bookInfo: BookInfo = chapters.toBookInfo(),
 ) {
     fun readResource(path: String): ByteArray? {
@@ -66,8 +68,46 @@ data class EpubResource(
     }
 }
 
-class EpubBookParser @Inject constructor() {
+class EpubBookParser @Inject constructor(
+    @param:CacheDir private val cacheDir: File,
+) {
+    constructor() : this(File(System.getProperty("java.io.tmpdir"), "hoshi-epub-parser-cache"))
+
     fun parse(root: File, fallbackTitle: String? = null, cachedBookInfo: BookInfo? = null): EpubBook {
+        if (root.isFile && root.extension.equals("epub", ignoreCase = true)) {
+            return parsePacked(root, fallbackTitle = fallbackTitle ?: root.nameWithoutExtension, cachedBookInfo = cachedBookInfo)
+        }
+        root.packedEpubFileFromBookRoot()?.let { epubFile ->
+            return parsePacked(
+                epubFile = epubFile,
+                fallbackTitle = fallbackTitle ?: root.name,
+                cachedBookInfo = cachedBookInfo,
+            )
+        }
+        return parseExtracted(root, fallbackTitle, cachedBookInfo)
+    }
+
+    fun parsePacked(
+        epubFile: File,
+        cacheRoot: File = File(cacheDir, "epub-open"),
+        fallbackTitle: String? = null,
+        cachedBookInfo: BookInfo? = null,
+    ): EpubBook {
+        require(epubFile.isFile) { "Packed EPUB does not exist: ${epubFile.absolutePath}" }
+        cacheRoot.mkdirs()
+        val extractedRoot = cacheRoot.resolve(epubFile.stableExtractionDirectoryName()).canonicalFile
+        return runCatching {
+            if (!extractedRoot.resolve("META-INF/container.xml").isFile) {
+                extractedRoot.deleteRecursively()
+                EpubArchiveExtractor().extract(epubFile, extractedRoot)
+            }
+            parseExtracted(extractedRoot, fallbackTitle ?: epubFile.nameWithoutExtension, cachedBookInfo)
+        }.onFailure {
+            extractedRoot.deleteRecursively()
+        }.getOrThrow()
+    }
+
+    private fun parseExtracted(root: File, fallbackTitle: String? = null, cachedBookInfo: BookInfo? = null): EpubBook {
         require(root.isDirectory) { "Extracted EPUB directory does not exist: ${root.absolutePath}" }
 
         val nativeBook = parseExtractedEpub(root.absolutePath)
@@ -129,6 +169,44 @@ class EpubBookParser @Inject constructor() {
             bookInfo = reusableBookInfo ?: chapters.toBookInfo(),
         )
     }
+}
+
+private fun File.packedEpubFileFromBookRoot(): File? {
+    if (!isDirectory) return null
+    val root = canonicalFile
+    val metadataEpub = runCatching {
+        val metadataFile = resolve("metadata.json")
+        if (!metadataFile.isFile) return@runCatching null
+        epubParserJson.decodeFromString(BookMetadata.serializer(), metadataFile.readText()).epub
+    }.getOrNull()
+    metadataEpub
+        ?.takeIf { it.isNotBlank() }
+        ?.let { root.safeChildFile(it) }
+        ?.takeIf(File::isFile)
+        ?.let { return it }
+
+    val conventional = root.safeChildFile("$name.epub")?.takeIf(File::isFile) ?: return null
+    return if (resolve("META-INF/container.xml").isFile) null else conventional
+}
+
+private fun File.safeChildFile(relativePath: String): File? {
+    val candidate = resolve(relativePath).canonicalFile
+    return if (candidate.path == path || candidate.path.startsWith(path + File.separator)) {
+        candidate
+    } else {
+        null
+    }
+}
+
+private fun File.stableExtractionDirectoryName(): String {
+    val canonical = canonicalFile
+    val prefix = nameWithoutExtension.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "book" }
+    val pathHash = canonical.absolutePath.hashCode().toUInt().toString(16)
+    return "$prefix-$pathHash-${lastModified()}-${length()}"
+}
+
+private val epubParserJson = Json {
+    ignoreUnknownKeys = true
 }
 
 internal fun BookInfo.matchesChapterShells(chapters: List<EpubChapter>): Boolean {

@@ -8,6 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Added
 
 - Show the Android WebView implementation package and version at the top of Settings -> Diagnostics reports.
+- Add iOS-compatible packed EPUB book storage, EPUB export from Books, TTU bookdata backup import/export, Google Drive Upload Books sync, and a remote-only Google Drive bookshelf section for importing or trashing TTU books.
 
 ### Fixed
 
