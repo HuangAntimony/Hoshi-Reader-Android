@@ -38,15 +38,23 @@ class FakeElement {
 }
 
 function popupContext() {
-    const documentElement = {};
+    const documentElement = new FakeElement();
     const body = new FakeContainer();
     body.appendChild = function(element) {
         return element;
     };
+    const documentListeners = new Map();
     const document = {
         body,
         documentElement,
-        addEventListener() {},
+        addEventListener(type, listener) {
+            const listeners = documentListeners.get(type) ?? [];
+            listeners.push(listener);
+            documentListeners.set(type, listeners);
+        },
+        dispatch(type, event) {
+            (documentListeners.get(type) ?? []).forEach((listener) => listener(event));
+        },
         createElement() {
             return new FakeElement();
         },
@@ -90,6 +98,7 @@ function popupContext() {
     return {
         context,
         body,
+        document,
         selectTextCalls,
         tapOutsideMessages,
     };
@@ -180,11 +189,19 @@ test('popup click still selects text when there was no touch fallback', () => {
     assert.equal(selectTextCalls.length, 1);
 });
 
-test('popup body blank area click posts tapOutside', () => {
-    const { body, tapOutsideMessages } = popupContext();
+test('popup content blank area click posts tapOutside through the document handler', () => {
+    const { document, tapOutsideMessages } = popupContext();
     const target = new FakeElement();
 
-    body.dispatch('click', clickEvent(target, 48, 480));
+    document.dispatch('click', clickEvent(target, 48, 480));
+
+    assert.deepEqual(tapOutsideMessages, [null]);
+});
+
+test('popup viewport blank area click posts tapOutside when it misses body content', () => {
+    const { document, tapOutsideMessages } = popupContext();
+
+    document.dispatch('click', clickEvent(document.documentElement, 48, 640));
 
     assert.deepEqual(tapOutsideMessages, [null]);
 });

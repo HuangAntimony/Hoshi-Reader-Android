@@ -1837,17 +1837,11 @@ function installPopupTapHandlers(container) {
     });
 }
 
-function installPopupBodyTapHandlers() {
-    if (document.body) {
-        installPopupTapHandlers(document.body);
-    }
+function installPopupDocumentTapHandlers() {
+    installPopupTapHandlers(document);
 }
 
-if (document.body) {
-    installPopupBodyTapHandlers();
-} else {
-    document.addEventListener('DOMContentLoaded', installPopupBodyTapHandlers, { once: true });
-}
+installPopupDocumentTapHandlers();
 
 window.renderPopup = function() {
     const container = document.getElementById('entries-container');
