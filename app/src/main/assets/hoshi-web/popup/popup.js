@@ -1738,6 +1738,105 @@ function applyHoshiPopupThemeOverrides(root = document) {
     });
 }
 
+function popupEventTarget(event) {
+    return event.target?.nodeType === Node.TEXT_NODE ? event.target.parentElement : event.target;
+}
+
+function isPopupInteractiveTapTarget(target) {
+    if (target?.closest('summary, a, button, .button-slot, .deinflection-tag, .frequency-group, .pitch-group')) {
+        return true;
+    }
+    const tagRow = target?.closest('.tag-row');
+    return Boolean(tagRow && !tagRow.closest('.expr-tag-row'));
+}
+
+function handlePopupTap(target, clientX, clientY) {
+    if (isPopupInteractiveTapTarget(target)) {
+        return false;
+    }
+    if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
+        webkit.messageHandlers.tapOutside.postMessage(null);
+        return true;
+    }
+    const scale = getButtonRectScale();
+    const rectX = (clientX + window.scrollX) / scale - window.scrollX;
+    const rectY = (clientY + window.scrollY) / scale - window.scrollY;
+    const selected = window.hoshiSelection?.selectText(clientX, clientY, window.scanLength, rectX, rectY);
+    if (!selected) {
+        webkit.messageHandlers.tapOutside.postMessage(null);
+    }
+    return true;
+}
+
+function installPopupTapHandlers(container) {
+    if (container.clickAttached) {
+        return;
+    }
+    container.clickAttached = true;
+    let touchStart = null;
+    let handledTouchTap = null;
+    const tapSlop = 10;
+    const duplicateClickSlop = 6;
+    const duplicateClickWindowMs = 700;
+
+    container.addEventListener('touchstart', (event) => {
+        if (event.touches.length !== 1) {
+            touchStart = null;
+            return;
+        }
+        const touch = event.touches[0];
+        touchStart = {
+            x: touch.clientX,
+            y: touch.clientY,
+        };
+    }, { passive: true });
+
+    container.addEventListener('touchend', (event) => {
+        if (!touchStart || event.changedTouches.length !== 1) {
+            touchStart = null;
+            return;
+        }
+        const touch = event.changedTouches[0];
+        const dx = touch.clientX - touchStart.x;
+        const dy = touch.clientY - touchStart.y;
+        touchStart = null;
+        if (Math.abs(dx) > tapSlop || Math.abs(dy) > tapSlop) {
+            return;
+        }
+        const target = popupEventTarget(event);
+        const handled = handlePopupTap(target, touch.clientX, touch.clientY);
+        if (!handled) {
+            return;
+        }
+        handledTouchTap = {
+            x: touch.clientX,
+            y: touch.clientY,
+            time: Date.now(),
+        };
+        if (event.cancelable) {
+            event.preventDefault();
+        }
+    });
+
+    container.addEventListener('click', (event) => {
+        if (handledTouchTap) {
+            const dx = event.clientX - handledTouchTap.x;
+            const dy = event.clientY - handledTouchTap.y;
+            const ageMs = Date.now() - handledTouchTap.time;
+            if (
+                ageMs >= 0 &&
+                ageMs <= duplicateClickWindowMs &&
+                Math.abs(dx) <= duplicateClickSlop &&
+                Math.abs(dy) <= duplicateClickSlop
+            ) {
+                event.preventDefault();
+                return;
+            }
+        }
+        handlePopupTap(popupEventTarget(event), event.clientX, event.clientY);
+    });
+}
+
 window.renderPopup = function() {
     const container = document.getElementById('entries-container');
     if (!window.entryCount) {
@@ -1851,28 +1950,7 @@ window.renderPopup = function() {
         window.hoshiPopupPrewarmFonts?.();
     }
 
-    if (container.clickAttached) {
-        return;
-    }
-    container.clickAttached = true;
-    container.addEventListener('click', (e) => {
-        const target = e.target?.nodeType === Node.TEXT_NODE ? e.target.parentElement : e.target;
-        if (target?.closest('summary')) {
-            return;
-        }
-        if (!target?.closest('.glossary-content') && !target?.closest('.expr-tag')) {
-            webkit.messageHandlers.tapOutside.postMessage(null);
-            return;
-        }
-        const scale = getButtonRectScale();
-        const rectX = (e.clientX + window.scrollX) / scale - window.scrollX;
-        const rectY = (e.clientY + window.scrollY) / scale - window.scrollY;
-        const selected = window.hoshiSelection?.selectText(e.clientX, e.clientY, window.scanLength, rectX, rectY);
-        if (!selected) {
-            webkit.messageHandlers.tapOutside.postMessage(null);
-            return;
-        }
-    });
+    installPopupTapHandlers(container);
 };
 
 document.addEventListener('scroll', () => {
