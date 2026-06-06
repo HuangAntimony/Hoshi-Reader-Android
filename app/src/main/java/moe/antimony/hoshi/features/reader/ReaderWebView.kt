@@ -728,6 +728,7 @@ fun ReaderWebView(
                 val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return
                 setLookupPopups(closeChildPopupsForScrolledParent(stateHolder.lookupPopups, index))
             }
+            is ReaderLookupPopupBridgeMessage.ScrollState -> Unit
             is ReaderLookupPopupBridgeMessage.NavigateBack -> {
                 val current = readerPopupHistories[message.popupId] ?: return
                 if (current.backCount > 0) {

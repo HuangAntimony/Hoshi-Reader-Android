@@ -120,6 +120,15 @@ internal class DictionarySearchViewModel : ViewModel {
         _uiState.update { it.copy(query = query) }
     }
 
+    fun resetSearch() {
+        _uiState.update { current ->
+            DictionarySearchUiState(
+                dictionarySettings = current.dictionarySettings,
+                audioSettings = current.audioSettings,
+            )
+        }
+    }
+
     fun runLookup(
         assets: LookupPopupAssets? = null,
         darkMode: Boolean = false,
@@ -211,6 +220,29 @@ internal class DictionarySearchViewModel : ViewModel {
     fun lookupRedirect(query: String): List<LookupResult> {
         val settings = _uiState.value.dictionarySettings.normalized()
         return repository.lookup(query, settings.maxResults, settings.scanLength)
+    }
+
+    fun lookupRootRedirect(query: String): List<LookupResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val settings = _uiState.value.dictionarySettings.normalized()
+        val results = repository.lookup(trimmed, settings.maxResults, settings.scanLength)
+        if (results.isNotEmpty()) {
+            _uiState.update {
+                it.copy(
+                    lastQuery = trimmed,
+                    results = results,
+                    hasSearched = true,
+                    isSearching = false,
+                    errorMessage = null,
+                    dictionaryStyles = if (it.dictionaryStyles.isEmpty()) repository.dictionaryStyles() else it.dictionaryStyles,
+                    popups = emptyList(),
+                    backCount = it.backCount + 1,
+                    forwardCount = 0,
+                )
+            }
+        }
+        return results
     }
 
     fun recordLookupRedirected(count: Int) {

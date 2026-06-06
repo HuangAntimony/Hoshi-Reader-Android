@@ -113,6 +113,17 @@ class ReaderLookupPopupBridgeMessageTest {
                 """{"name":"mineEntry","id":"45","popupId":"child","body":{"expression":"猫"}}""",
             ),
         )
+        assertEquals(
+            ReaderLookupPopupBridgeMessage.ScrollState(
+                popupId = "root",
+                messageId = null,
+                atTop = true,
+                scrollTop = 0.0,
+            ),
+            ReaderLookupPopupBridgeMessage.fromJson(
+                """{"name":"scrollState","popupId":"root","body":{"atTop":true,"scrollTop":0.0}}""",
+            ),
+        )
     }
 
     @Test

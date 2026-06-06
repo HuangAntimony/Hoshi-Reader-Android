@@ -93,6 +93,56 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
+    fun resetSearchClearsQueryResultsPopupsAndHistoryWithoutRunningLookup() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("猫")),
+            dictionaryStyles = mapOf("JMdict" to ".entry {}"),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.updateQuery("猫")
+        viewModel.runLookup(assets = LookupPopupAssets(popupJs = "", popupCss = ""))
+        viewModel.setPopups(listOf(popup("old")))
+        viewModel.recordLookupRedirected(1)
+        viewModel.navigateBack()
+
+        viewModel.resetSearch()
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.query)
+        assertEquals("", state.lastQuery)
+        assertEquals("", state.html)
+        assertEquals(emptyList<LookupResult>(), state.results)
+        assertFalse(state.hasSearched)
+        assertFalse(state.isSearching)
+        assertNull(state.errorMessage)
+        assertEquals(emptyMap<String, String>(), state.dictionaryStyles)
+        assertEquals(emptyList<LookupPopupItem>(), state.popups)
+        assertEquals(0, state.backCount)
+        assertEquals(0, state.forwardCount)
+        assertEquals(0, state.backSignal)
+        assertEquals(0, state.forwardSignal)
+        assertEquals(listOf("猫:16:16"), repository.lookupCalls)
+    }
+
+    @Test
+    fun rootIframeRedirectReplacesResultsAndUpdatesHistory() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("犬")),
+            dictionarySettings = DictionarySettings(maxResults = 3, scanLength = 9),
+        )
+        val viewModel = viewModel(repository)
+
+        val redirected = viewModel.lookupRootRedirect("犬")
+
+        val state = viewModel.uiState.value
+        assertEquals(1, redirected.size)
+        assertEquals(listOf("犬:3:9"), repository.lookupCalls)
+        assertEquals("犬", state.results.single().matched)
+        assertEquals(1, state.backCount)
+        assertEquals(0, state.forwardCount)
+    }
+
+    @Test
     fun failedLookupClearsContentAndPublishesError() {
         val repository = FakeDictionarySearchRepository(error = IllegalStateException("native lookup failed"))
         val viewModel = viewModel(repository)

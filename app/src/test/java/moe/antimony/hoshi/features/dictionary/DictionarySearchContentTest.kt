@@ -64,8 +64,25 @@ class DictionarySearchContentTest {
         assertTrue(state.hasResults)
         assertTrue(state.html.contains("window.lookupEntries = ["))
         assertTrue(state.html.contains(""""expression":"猫""""))
-        assertTrue(state.html.contains("""<div style="height: 118px;"></div>"""))
+        assertFalse(state.html.contains("""<div style="height: 118px;"></div>"""))
         assertTrue(state.html.contains("window.renderPopup();"))
+    }
+
+    @Test
+    fun fallbackResultHtmlUsesMeasuredSearchBarSpacerWhenProvided() {
+        val state = DictionarySearchContent.runLookup(
+            query = " 猫 ",
+            lookup = { listOf(lookupResult()) },
+            assets = LookupPopupAssets(
+                popupJs = "window.renderPopup = function() {};",
+                popupCss = ".entry-header {}",
+            ),
+            topSpacerPx = 86,
+        )
+
+        assertTrue(state.hasResults)
+        assertTrue(state.html.contains("""<div style="height: 86px;"></div>"""))
+        assertFalse(state.html.contains("""<div style="height: 118px;"></div>"""))
     }
 
     @Test

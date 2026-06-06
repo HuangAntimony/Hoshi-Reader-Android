@@ -162,6 +162,10 @@
     <string name="dictionary_custom_css_selector">选择器</string>
     <string name="dictionary_search_placeholder">搜索</string>
     <string name="dictionary_lookup_failed">查词失败。</string>
+    <string name="dictionary_pull_clear">下拉清除</string>
+    <string name="dictionary_release_clear">松开清除</string>
+    <string name="dictionary_pull_show_keyboard">下拉显示键盘</string>
+    <string name="dictionary_release_show_keyboard">松开显示键盘</string>
     <string name="dictionary_play_audio">播放音频</string>
     <string name="dictionary_add_to_anki">添加到 Anki</string>
     <string name="reader_behavior_volume_keys_turn_pages">音量键翻页</string>

@@ -403,6 +403,17 @@ internal object LookupPopupHtml {
                     window.lookupEntries = [];
                     window.entryCount = 0;
                     window.popupId = null;
+                    window.hoshiPostPopupScrollState = function() {
+                        var scrollRoot = document.scrollingElement || document.documentElement || document.body;
+                        var scrollTop = scrollRoot ? (scrollRoot.scrollTop || window.scrollY || 0) : 0;
+                        window.HoshiAndroidPopup.postMessage('scrollState', {
+                            atTop: scrollTop <= 1,
+                            scrollTop: scrollTop
+                        });
+                    };
+                    window.addEventListener('scroll', function() {
+                        window.hoshiPostPopupScrollState();
+                    }, { passive: true });
                 </script>
                 $selectionJs
                 $popupJs
@@ -472,6 +483,7 @@ internal object LookupPopupHtml {
                                 closeOverlay();
                                 window.hoshiSelection?.clearSelection();
                                 window.resetPopupResults?.();
+                                requestAnimationFrame(window.hoshiPostPopupScrollState);
                                 return;
                             }
                             if (message.type === 'renderPopup') {
@@ -493,6 +505,7 @@ internal object LookupPopupHtml {
                                     window.hoshiPopupObserveContentReady?.();
                                     window.renderPopup();
                                 }
+                                requestAnimationFrame(window.hoshiPostPopupScrollState);
                                 return;
                             }
                             if (message.type === 'navigateBack') {
@@ -504,6 +517,7 @@ internal object LookupPopupHtml {
                             }
                         });
                         webkit.messageHandlers.shellReady.postMessage(null);
+                        requestAnimationFrame(window.hoshiPostPopupScrollState);
                     })();
                 </script>
             </body>

@@ -9,42 +9,7 @@ This document tracks open Android work after checking iOS upstream `develop`.
 
 ## Current Queue
 
-### 1. Dictionary search pull-to-clear reset
-
-Status: pending Android sync.
-
-Commit:
-
-- `73a9e62` - pull to refresh.
-
-Why this is independent:
-
-- It is scoped to the Dictionary tab search/results surface and can be implemented without waiting for storage or sync work.
-
-iOS behavior to mirror:
-
-- Dictionary search results allow a downward pull gesture even inside the popup-backed results WebView.
-- Pulling past an 80-point threshold clears the current query when text is present.
-- Pulling with an empty query focuses the search field and shows the keyboard.
-- While dragging, a small inset below the search bar shows pull/release guidance.
-- Dragging results dismisses the keyboard.
-
-Android current gap:
-
-- Android has an explicit clear button in the search field but no pull-to-clear/show-keyboard gesture.
-
-Suggested slice:
-
-- Implement with Compose nested scroll or scroll state around the Dictionary results surface rather than iOS WebView bounce semantics.
-- Add localized pull/release labels to English and Simplified Chinese resources.
-
-Validation:
-
-- Search for a term, pull below threshold, confirm query clears, results reset, and keyboard focus returns.
-- With an empty query, pull below threshold and confirm keyboard appears.
-- Confirm normal result scrolling and nested popup lookup still work.
-
-### 2. Dictionary automatic updates
+### 1. Dictionary automatic updates
 
 Status: pending Android sync.
 
@@ -84,7 +49,7 @@ Validation:
 - Simulate one failure and one success; confirm success is applied, manual failure is surfaced, and last-update advances only after success.
 - Confirm failed imports leave installed dictionaries intact.
 
-### 3. Dictionary lookup normalization and query rebuild threading
+### 2. Dictionary lookup normalization and query rebuild threading
 
 Status: pending Android sync.
 
@@ -121,7 +86,7 @@ Validation:
 - Import, enable/disable, reorder, delete, update, and backup-restore dictionaries while search/reader lookup is active; confirm the UI remains responsive and stale rebuilds do not replace newer dictionaries.
 - `./gradlew test` and `./gradlew assembleDebug` on a clean native build after submodule updates.
 
-### 4. Anki field templates, dictionary IPA display, and glossary handlebars
+### 3. Anki field templates, dictionary IPA display, and glossary handlebars
 
 Status: pending Android sync; native frequency-sort dependency already present, newer normalization dependency tracked separately above.
 
@@ -167,7 +132,7 @@ Validation:
 - Fetch/select Lapis, Kiku, and Senren models through AnkiDroid and AnkiConnect; confirm only empty model mappings are autofilled and custom mappings persist.
 - Mine Anki notes through AnkiDroid and AnkiConnect with each new handlebar variant, including dictionary media embedding and selected-dictionary fallback.
 
-### 5. TTU/Google Drive book data sync, backup import/export, and remote bookshelf
+### 4. TTU/Google Drive book data sync, backup import/export, and remote bookshelf
 
 Status: pending Android sync; replaces the earlier book-storage deferral with a concrete TTU bookdata queue.
 
@@ -223,6 +188,7 @@ Validation:
 
 ## Covered Or No Android Action
 
+- `73a9e62`: Android now mirrors the Dictionary pull-to-clear/show-keyboard slice with reader-style iframe search results, localized pull/release labels, active Dictionary tab refocus/select-all, and measured search-result placement below the search field.
 - `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands.
 - `09951b4`, `612d350`, `ad71067`, `4b26d8a`, `172577c`, `be42499`: iOS version/build bumps only.
 - `51bd0f2`: iOS compiler setting and ZIPFoundation update. Android uses its own ZIP/Java/Kotlin stack; no direct action.
@@ -245,7 +211,6 @@ Validation:
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
-| `73a9e62` | 2026-05-18 | Dictionary pull-to-clear/show-keyboard gesture | Pending |
 | `94d0c41` | 2026-05-19 | Automatic dictionary updates | Pending |
 | `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
 | `67bdbb9` | 2026-05-25 | Export stored EPUB from book menu | Pending |
@@ -260,8 +225,7 @@ Validation:
 
 ## Suggested Implementation Order
 
-1. Dictionary pull-to-clear.
-2. Dictionary automatic updates.
-3. Dictionary lookup normalization and query rebuild threading.
-4. Anki field templates, dictionary IPA display, and glossary handlebars.
-5. TTU/Google Drive bookdata sync, EPUB export, and backup import/export in smaller sub-slices.
+1. Dictionary automatic updates.
+2. Dictionary lookup normalization and query rebuild threading.
+3. Anki field templates, dictionary IPA display, and glossary handlebars.
+4. TTU/Google Drive bookdata sync, EPUB export, and backup import/export in smaller sub-slices.

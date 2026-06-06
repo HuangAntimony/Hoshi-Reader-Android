@@ -23,7 +23,7 @@ internal data class DictionarySearchUiState(
     val backSignal: Int = 0,
     val forwardSignal: Int = 0,
 ) {
-    val hasResults: Boolean get() = html.isNotBlank()
+    val hasResults: Boolean get() = results.isNotEmpty()
 }
 
 internal data class DictionarySearchRenderState(
@@ -47,6 +47,7 @@ internal object DictionarySearchContent {
         ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
         fontFaceCss: String = "",
         popupScale: Double = 1.0,
+        topSpacerPx: Int = 0,
     ): DictionarySearchRenderState {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
@@ -80,6 +81,7 @@ internal object DictionarySearchContent {
             ankiSettings = ankiSettings,
             fontFaceCss = fontFaceCss,
             popupScale = popupScale,
+            topSpacerPx = topSpacerPx,
         )
     }
 
@@ -95,6 +97,7 @@ internal object DictionarySearchContent {
         ankiSettings: AnkiPopupSettings = AnkiPopupSettings(),
         fontFaceCss: String = "",
         popupScale: Double = 1.0,
+        topSpacerPx: Int = 0,
     ): DictionarySearchRenderState {
         if (results.isEmpty()) {
             return DictionarySearchRenderState(
@@ -111,7 +114,7 @@ internal object DictionarySearchContent {
                 results = results,
                 assets = assets,
                 dictionaryStyles = dictionaryStyles,
-                topSpacerPx = DictionarySearchTopSpacerPx,
+                topSpacerPx = topSpacerPx,
                 settings = dictionarySettings,
                 darkMode = darkMode,
                 eInkMode = eInkMode,
@@ -126,5 +129,3 @@ internal object DictionarySearchContent {
         )
     }
 }
-
-internal const val DictionarySearchTopSpacerPx = 118

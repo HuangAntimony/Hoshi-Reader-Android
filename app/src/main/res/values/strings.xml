@@ -164,6 +164,10 @@
     <string name="dictionary_custom_css_selector">Selector</string>
     <string name="dictionary_search_placeholder">Search</string>
     <string name="dictionary_lookup_failed">Lookup failed.</string>
+    <string name="dictionary_pull_clear">Pull down to clear</string>
+    <string name="dictionary_release_clear">Release to clear</string>
+    <string name="dictionary_pull_show_keyboard">Pull down to show keyboard</string>
+    <string name="dictionary_release_show_keyboard">Release to show keyboard</string>
     <string name="dictionary_play_audio">Play Audio</string>
     <string name="dictionary_add_to_anki">Add to Anki</string>
     <string name="reader_behavior_volume_keys_turn_pages">Volume Keys Turn Pages</string>

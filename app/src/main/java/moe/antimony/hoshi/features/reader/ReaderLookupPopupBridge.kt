@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
@@ -260,6 +261,13 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         override val messageId: String?,
     ) : ReaderLookupPopupBridgeMessage()
 
+    data class ScrollState(
+        override val popupId: String,
+        override val messageId: String?,
+        val atTop: Boolean,
+        val scrollTop: Double,
+    ) : ReaderLookupPopupBridgeMessage()
+
     data class NavigateBack(
         override val popupId: String,
         override val messageId: String?,
@@ -335,6 +343,15 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                 )
                 "contentReady" -> ContentReady(popupId, messageId)
                 "popupScrolled" -> PopupScrolled(popupId, messageId)
+                "scrollState" -> {
+                    val body = payload.obj("body") ?: return null
+                    ScrollState(
+                        popupId = popupId,
+                        messageId = messageId,
+                        atTop = body.boolean("atTop") ?: return null,
+                        scrollTop = body.double("scrollTop") ?: return null,
+                    )
+                }
                 "navigateBack" -> NavigateBack(popupId, messageId)
                 "navigateForward" -> NavigateForward(popupId, messageId)
                 "sasayakiReplayCue" -> SasayakiReplayCue(popupId, messageId)
@@ -381,6 +398,10 @@ private fun JsonObject.double(name: String): Double? =
     (this[name] as? JsonPrimitive)
         ?.doubleOrNull
         ?.takeIf { it.isFinite() }
+
+private fun JsonObject.boolean(name: String): Boolean? =
+    (this[name] as? JsonPrimitive)
+        ?.booleanOrNull
 
 private val readerPopupJson = Json { encodeDefaults = true }
 

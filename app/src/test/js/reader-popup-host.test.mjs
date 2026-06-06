@@ -220,6 +220,39 @@ test('sasayaki controls receive the larger control icon treatment', () => {
     });
 });
 
+test('public navigation helpers forward messages to the active iframe', () => {
+    const scene = popupHost();
+    const iframeMessages = [];
+    const nativeMessages = [];
+    scene.window.HoshiReaderPopup = {
+        postMessage(message) {
+            nativeMessages.push(JSON.parse(message));
+        },
+    };
+    scene.host.renderStack({
+        popups: [{
+            ...rootPopupPayload(),
+            backCount: 1,
+            forwardCount: 1,
+        }],
+    });
+    const shell = scene.document.getElementById('hoshi-reader-popup-layer').children[0];
+    const iframe = shell.querySelector('.hoshi-reader-popup-iframe');
+    iframe.contentWindow.postMessage = (message) => iframeMessages.push(message);
+
+    scene.host.navigateBack('root');
+    scene.host.navigateForward('root');
+
+    assert.deepEqual(
+        iframeMessages.map((message) => JSON.parse(JSON.stringify(message))),
+        [{ type: 'navigateBack' }, { type: 'navigateForward' }],
+    );
+    assert.deepEqual(nativeMessages, [
+        { name: 'navigateBack', popupId: 'root' },
+        { name: 'navigateForward', popupId: 'root' },
+    ]);
+});
+
 test('non e-ink root lookup highlight keeps the filled selection rectangle', () => {
     const highlights = renderRootHighlight({
         popupId: 'root',

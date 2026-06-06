@@ -93,6 +93,7 @@ fun AppShell(
     val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
     val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
+    var dictionaryFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
 
     LaunchedEffect(sasayakiSettingsRepository) {
@@ -116,6 +117,15 @@ fun AppShell(
 
     fun selectTopLevelRoute(route: AppRoute) {
         selectedTab = route.toMainTab()
+    }
+
+    fun selectMainTab(tab: MainTab) {
+        dictionaryFocusRequestKey = nextDictionaryFocusRequestKey(
+            selectedTab = selectedTab,
+            requestedTab = tab,
+            currentKey = dictionaryFocusRequestKey,
+        )
+        selectedTab = tab
     }
 
     LaunchedEffect(dictionarySettingsRepository) {
@@ -180,7 +190,8 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
-                    onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
+                    dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    onSelectedTabChange = ::selectMainTab,
                 )
                 AppRoute.DictionaryRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Dictionary,
@@ -191,7 +202,8 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
-                    onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
+                    dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    onSelectedTabChange = ::selectMainTab,
                 )
                 AppRoute.SettingsRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Settings,
@@ -202,7 +214,8 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
-                    onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
+                    dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    onSelectedTabChange = ::selectMainTab,
                     onSettingsDestination = { destination ->
                         when (destination) {
                             SettingsDestination.Anki -> openSettingsDetail(destination.toSection())
@@ -225,7 +238,7 @@ fun AppShell(
                     readerFontManager = readerFontManager,
                     onClose = ::popRoute,
                     onBooksRestored = { bookshelfRefreshKey += 1 },
-                    onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
+                    onSelectedTabChange = ::selectMainTab,
                 )
                 is AppRoute.ReaderRoute -> {
                     ReaderRouteDestination(
@@ -264,7 +277,8 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
-                    onSelectedTabChange = { selectTopLevelRoute(it.toRoute()) },
+                    dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    onSelectedTabChange = ::selectMainTab,
                 )
             }
         }
@@ -337,6 +351,7 @@ private fun TopLevelRouteContent(
     onOpenReader: (String) -> Unit,
     onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     bookshelfRefreshKey: Int,
+    dictionaryFocusRequestKey: Int,
     onSelectedTabChange: (MainTab) -> Unit,
     onSettingsDestination: (SettingsDestination) -> Unit = {},
 ) {
@@ -356,6 +371,7 @@ private fun TopLevelRouteContent(
             )
             MainTab.Dictionary -> DictionarySearchView(
                 readerSettings = readerSettings,
+                focusRequestKey = dictionaryFocusRequestKey,
                 modifier = contentModifier.fillMaxSize(),
             )
             MainTab.Settings -> SettingsTab(
@@ -426,6 +442,17 @@ private fun MainTab.toRoute(): AppRoute = when (this) {
     MainTab.Dictionary -> AppRoute.DictionaryRoute
     MainTab.Settings -> AppRoute.SettingsRoute
 }
+
+internal fun nextDictionaryFocusRequestKey(
+    selectedTab: MainTab,
+    requestedTab: MainTab,
+    currentKey: Int,
+): Int =
+    if (selectedTab == MainTab.Dictionary && requestedTab == MainTab.Dictionary) {
+        currentKey + 1
+    } else {
+        currentKey
+    }
 
 private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.MainRoute, AppRoute.BooksRoute -> MainTab.Books
