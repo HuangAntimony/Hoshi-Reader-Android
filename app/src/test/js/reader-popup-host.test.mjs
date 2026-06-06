@@ -372,6 +372,52 @@ test('active iframe rerenders when same popup id receives new entry payload', ()
     );
 });
 
+test('active iframe rerenders when content key changes behind same first entry and count', () => {
+    const scene = popupHost();
+    scene.host.renderStack({
+        popups: [{
+            ...rootPopupPayload(),
+            entriesCount: 2,
+            initialEntryJson: '{"expression":"猫"}',
+            contentKey: '猫/犬',
+        }],
+    });
+    const shell = scene.document.getElementById('hoshi-reader-popup-layer').children[0];
+    const iframe = shell.querySelector('.hoshi-reader-popup-iframe');
+    const iframeMessages = [];
+    iframe.contentWindow.postMessage = (message) => iframeMessages.push(message);
+    iframe.dispatchEvent('load');
+
+    scene.host.renderStack({
+        popups: [{
+            ...rootPopupPayload(),
+            entriesCount: 2,
+            initialEntryJson: '{"expression":"猫"}',
+            contentKey: '猫/鳥',
+        }],
+    });
+
+    assert.deepEqual(
+        iframeMessages
+            .filter((message) => message.type === 'renderPopup')
+            .map((message) => JSON.parse(JSON.stringify(message))),
+        [
+            {
+                type: 'renderPopup',
+                popupId: 'root',
+                entriesCount: 2,
+                initialEntryJson: '{"expression":"猫"}',
+            },
+            {
+                type: 'renderPopup',
+                popupId: 'root',
+                entriesCount: 2,
+                initialEntryJson: '{"expression":"猫"}',
+            },
+        ],
+    );
+});
+
 test('history updates do not replace iframe content handled by popup redirect', () => {
     const scene = popupHost();
     scene.host.renderStack({

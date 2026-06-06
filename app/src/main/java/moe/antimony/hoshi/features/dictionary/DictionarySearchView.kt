@@ -243,11 +243,17 @@ fun DictionarySearchView(
         readerSettings.eInkMode,
         readerPopupIframeUrl,
         uiState.resultClearSelectionSignal,
+        uiState.backCount,
+        uiState.forwardCount,
     ) {
         dictionarySearchIframePayloads(
             rootResults = uiState.results,
             childPopups = themedPopups,
             childHistories = childHistories,
+            rootHistory = ReaderPopupHistoryCounts(
+                backCount = uiState.backCount,
+                forwardCount = uiState.forwardCount,
+            ),
             viewport = viewport,
             searchBarBottomDp = searchBarBottomDp,
             darkMode = popupDarkMode,
@@ -406,11 +412,7 @@ fun DictionarySearchView(
                 replyIframeMessage(message.popupId, messageId, results.size.toString())
             }
             is ReaderLookupPopupBridgeMessage.GetEntry -> {
-                val entry = if (message.popupId == DictionarySearchRootPopupId) {
-                    uiState.results.getOrNull(message.index)
-                } else {
-                    popupById(message.popupId)?.state?.results?.getOrNull(message.index)
-                }
+                val entry = searchViewModel.entryForPopup(message.popupId, message.index)
                 replyIframeMessage(
                     popupId = message.popupId,
                     messageId = message.messageId ?: return,

@@ -11,6 +11,7 @@ import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.features.reader.ReaderSelectionRect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class DictionarySearchIframeTest {
@@ -70,6 +71,49 @@ class DictionarySearchIframeTest {
         assertEquals(listOf(DictionarySearchRootPopupId, "child"), payloads.map { it.id })
         assertEquals(1, payloads[1].backCount)
         assertEquals(2, payloads[1].forwardCount)
+    }
+
+    @Test
+    fun payloadsPassRootHistoryCountsToRootSearchResults() {
+        val payloads = dictionarySearchIframePayloads(
+            rootResults = listOf(lookupResult("猫")),
+            childPopups = emptyList(),
+            childHistories = emptyMap(),
+            rootHistory = ReaderPopupHistoryCounts(backCount = 2, forwardCount = 1),
+            viewport = ReaderLookupPopupViewport(width = 390.0, height = 700.0),
+            searchBarBottomDp = 86.0,
+            darkMode = false,
+            eInkMode = false,
+            iframeUrl = "https://hoshi.local/popup/iframe.html",
+        )
+
+        assertEquals(2, payloads.single().backCount)
+        assertEquals(1, payloads.single().forwardCount)
+    }
+
+    @Test
+    fun rootPayloadContentKeyCoversEntriesBeyondTheFirstResult() {
+        val firstResults = listOf(lookupResult("猫"), lookupResult("犬"))
+        val secondResults = listOf(lookupResult("猫"), lookupResult("鳥"))
+
+        val firstPayload = dictionarySearchRootFramePayload(
+            results = firstResults,
+            viewport = ReaderLookupPopupViewport(width = 390.0, height = 700.0),
+            searchBarBottomDp = 86.0,
+            darkMode = false,
+            eInkMode = false,
+            iframeUrl = "https://hoshi.local/popup/iframe.html",
+        )
+        val secondPayload = dictionarySearchRootFramePayload(
+            results = secondResults,
+            viewport = ReaderLookupPopupViewport(width = 390.0, height = 700.0),
+            searchBarBottomDp = 86.0,
+            darkMode = false,
+            eInkMode = false,
+            iframeUrl = "https://hoshi.local/popup/iframe.html",
+        )
+
+        assertNotEquals(firstPayload.contentKey, secondPayload.contentKey)
     }
 
     private fun lookupResult(matched: String): LookupResult = LookupResult(

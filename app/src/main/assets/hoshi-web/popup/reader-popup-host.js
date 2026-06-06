@@ -156,9 +156,15 @@
             historyCount(previous, 'backCount') > 0 ||
             historyCount(previous, 'forwardCount') > 0;
         const hasNextInitialEntry = (next.initialEntryJson || null) !== null;
-        return hasNextInitialEntry && (previousHadHistory ||
-            (previous.entriesCount || 0) !== (next.entriesCount || 0) ||
-            (previous.initialEntryJson || null) !== (next.initialEntryJson || null));
+        if (!hasNextInitialEntry) return false;
+        if (previousHadHistory) return true;
+        const previousContentKey = previous.contentKey || null;
+        const nextContentKey = next.contentKey || null;
+        if (previousContentKey !== null || nextContentKey !== null) {
+            return previousContentKey !== nextContentKey;
+        }
+        return (previous.entriesCount || 0) !== (next.entriesCount || 0) ||
+            (previous.initialEntryJson || null) !== (next.initialEntryJson || null);
     }
 
     function setContentReady(record, ready) {

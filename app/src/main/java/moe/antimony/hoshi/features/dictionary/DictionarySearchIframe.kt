@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
 import de.manhhao.hoshi.LookupResult
+import java.security.MessageDigest
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupFramePayload
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupFrameRect
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupViewport
@@ -16,6 +17,7 @@ internal fun dictionarySearchRootFramePayload(
     eInkMode: Boolean,
     iframeUrl: String,
     clearSelectionSignal: Int = 0,
+    rootHistory: ReaderPopupHistoryCounts = ReaderPopupHistoryCounts(),
 ): ReaderLookupPopupFramePayload {
     val top = searchBarBottomDp.coerceIn(0.0, viewport.height)
     return ReaderLookupPopupFramePayload(
@@ -30,8 +32,8 @@ internal fun dictionarySearchRootFramePayload(
         initialEntryJson = results.firstOrNull()?.let(LookupPopupHtml::entryJsonString),
         popupActionBar = false,
         actionBarVisible = false,
-        backCount = 0,
-        forwardCount = 0,
+        backCount = rootHistory.backCount,
+        forwardCount = rootHistory.forwardCount,
         sasayakiVisible = false,
         sasayakiWasPaused = false,
         sasayakiIsPlaying = false,
@@ -40,13 +42,30 @@ internal fun dictionarySearchRootFramePayload(
         clearSelectionSignal = clearSelectionSignal,
         selectionOffsetY = top,
         iframeUrl = iframeUrl,
+        contentKey = dictionarySearchResultsContentKey(results),
     )
+}
+
+internal fun dictionarySearchResultsContentKey(results: List<LookupResult>): String? {
+    if (results.isEmpty()) return null
+    val digest = MessageDigest.getInstance("SHA-256")
+    results.forEach { result ->
+        val entry = LookupPopupHtml.entryJsonString(result).toByteArray(Charsets.UTF_8)
+        digest.update(entry.size.toString().toByteArray(Charsets.UTF_8))
+        digest.update(0)
+        digest.update(entry)
+        digest.update(0)
+    }
+    return digest.digest().joinToString(separator = "") { byte ->
+        (byte.toInt() and 0xff).toString(16).padStart(2, '0')
+    }
 }
 
 internal fun dictionarySearchIframePayloads(
     rootResults: List<LookupResult>,
     childPopups: List<LookupPopupItem>,
     childHistories: Map<String, ReaderPopupHistoryCounts>,
+    rootHistory: ReaderPopupHistoryCounts = ReaderPopupHistoryCounts(),
     viewport: ReaderLookupPopupViewport,
     searchBarBottomDp: Double,
     darkMode: Boolean,
@@ -64,6 +83,7 @@ internal fun dictionarySearchIframePayloads(
             eInkMode = eInkMode,
             iframeUrl = iframeUrl,
             clearSelectionSignal = rootClearSelectionSignal,
+            rootHistory = rootHistory,
         ),
     ) + childPopups.mapIndexed { index, popup ->
         val history = childHistories[popup.id] ?: ReaderPopupHistoryCounts()

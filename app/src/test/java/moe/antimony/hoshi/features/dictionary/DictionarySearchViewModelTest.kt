@@ -131,6 +131,35 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
+    fun popupEntryReadsLatestStateAfterRedirectWithoutWaitingForRecomposition() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("猫")),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.updateQuery("猫")
+        viewModel.runLookup()
+
+        repository.lookupResults = listOf(lookupResult("犬"), lookupResult("飲む"))
+        viewModel.lookupRootRedirect("犬")
+
+        assertEquals("犬", viewModel.entryForPopup(DictionarySearchRootPopupId, 0)?.matched)
+        assertEquals("飲む", viewModel.entryForPopup(DictionarySearchRootPopupId, 1)?.matched)
+        assertNull(viewModel.entryForPopup(DictionarySearchRootPopupId, 2))
+
+        viewModel.setPopups(
+            listOf(
+                popup("child").copy(
+                    state = popup("child").state.copy(results = listOf(lookupResult("固形"), lookupResult("食物"))),
+                ),
+            ),
+        )
+
+        assertEquals("固形", viewModel.entryForPopup("child", 0)?.matched)
+        assertEquals("食物", viewModel.entryForPopup("child", 1)?.matched)
+        assertNull(viewModel.entryForPopup("missing", 0))
+    }
+
+    @Test
     fun failedLookupClearsContentAndPublishesError() {
         val repository = FakeDictionarySearchRepository(error = IllegalStateException("native lookup failed"))
         val viewModel = viewModel(repository)
@@ -267,7 +296,7 @@ private class FakeDictionarySearchRepository(
     val audioSettingsFlow = MutableStateFlow(audioSettings)
     val lookupCalls = mutableListOf<String>()
     var rebuildCount = 0
-    private var lookupResults = lookupResults
+    var lookupResults = lookupResults
 
     override val dictionarySettings: StateFlow<DictionarySettings> = dictionarySettingsFlow
     override val audioSettings: StateFlow<AudioSettings> = audioSettingsFlow

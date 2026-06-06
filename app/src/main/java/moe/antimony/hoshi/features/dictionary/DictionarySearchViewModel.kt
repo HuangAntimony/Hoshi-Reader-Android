@@ -195,6 +195,16 @@ internal class DictionarySearchViewModel : ViewModel {
         return repository.lookup(query, settings.maxResults, settings.scanLength)
     }
 
+    fun entryForPopup(popupId: String, index: Int): LookupResult? {
+        if (index < 0) return null
+        val state = _uiState.value
+        return if (popupId == DictionarySearchRootPopupId) {
+            state.results.getOrNull(index)
+        } else {
+            state.popups.firstOrNull { it.id == popupId }?.state?.results?.getOrNull(index)
+        }
+    }
+
     fun lookupRootRedirect(query: String): List<LookupResult> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return emptyList()

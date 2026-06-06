@@ -105,6 +105,7 @@ internal data class ReaderLookupPopupFramePayload(
     val clearSelectionSignal: Int,
     val selectionOffsetY: Double,
     val iframeUrl: String,
+    val contentKey: String? = null,
 ) {
     companion object {
         fun fromPopup(
