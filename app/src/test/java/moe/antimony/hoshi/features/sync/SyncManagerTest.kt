@@ -9,7 +9,9 @@ import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -173,7 +175,7 @@ class SyncManagerTest {
     }
 
     @Test
-    fun syncBookDataUploadFailureDoesNotBlockProgressStatisticsOrAudioSync() = runBlocking {
+    fun syncBookDataUploadFailurePropagatesBeforeSidecarSyncLikeIos() = runBlocking {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
         repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
@@ -195,19 +197,53 @@ class SyncManagerTest {
             bookDataExporter = { exported },
         )
 
+        try {
+            manager.syncBook(
+                entry = entry,
+                direction = SyncDirection.ExportToTtu,
+                syncStats = true,
+                statsSyncMode = StatisticsSyncMode.Merge,
+                syncAudioBook = true,
+                syncBookData = true,
+            )
+            fail("Expected bookdata upload failure to fail sync")
+        } catch (expected: RuntimeException) {
+            assertEquals("bookdata upload failed", expected.message)
+        }
+
+        assertNull(drive.updatedProgress)
+        assertEquals(emptyList<ReadingStatistics>(), drive.updatedStatistics)
+        assertNull(drive.updatedAudioBook)
+    }
+
+    @Test
+    fun staleDriveCacheDuringBookDataUploadIsClearedAndRetried() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource(
+            bookDataUploadErrors = mutableListOf(GoogleDriveApiException("Not found", statusCode = 404)),
+        )
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            bookDataExporter = { exported },
+        )
+
         val result = manager.syncBook(
             entry = entry,
-            direction = SyncDirection.ExportToTtu,
-            syncStats = true,
+            direction = null,
+            syncStats = false,
             statsSyncMode = StatisticsSyncMode.Merge,
-            syncAudioBook = true,
+            syncAudioBook = false,
             syncBookData = true,
         )
 
-        assertEquals(SyncResult.Exported("Title", 100), result)
-        assertEquals(TtuProgress(0, 100, 0.5, 4_321), drive.updatedProgress)
-        assertEquals(220, drive.updatedStatistics.single().charactersRead)
-        assertEquals(TtuAudioBook("Title", 45.0, 9_999), drive.updatedAudioBook)
+        assertEquals(SyncResult.Synced("Title"), result)
+        assertEquals(1, drive.clearCacheCalls)
+        assertEquals(2, drive.uploadBookDataCalls)
+        assertEquals(exported, drive.uploadedBookDataFile)
     }
 
     @Test
@@ -282,6 +318,7 @@ private class FakeDriveSyncDataSource(
     private val bookData: DriveFile? = null,
     private val staleOnFirstList: Boolean = false,
     private val bookDataUploadError: Throwable? = null,
+    private val bookDataUploadErrors: MutableList<Throwable> = mutableListOf(),
 ) : DriveSyncDataSource {
     private val progressFile = progress?.let { DriveFile("progress", TtuSyncRules.progressFileName(it)) }
     private val statisticsFile = statistics?.let { DriveFile("statistics", TtuSyncRules.statisticsFileName(it)) }
@@ -297,6 +334,7 @@ private class FakeDriveSyncDataSource(
     var updatedAudioBook: TtuAudioBook? = null
     var uploadedBookDataFolderId: String? = null
     var uploadedBookDataFile: File? = null
+    var uploadBookDataCalls = 0
 
     override suspend fun findRootFolder(): String = "root"
 
@@ -348,6 +386,10 @@ private class FakeDriveSyncDataSource(
     }
 
     override suspend fun uploadBookData(folderId: String, file: File) {
+        uploadBookDataCalls += 1
+        if (bookDataUploadErrors.isNotEmpty()) {
+            throw bookDataUploadErrors.removeAt(0)
+        }
         bookDataUploadError?.let { throw it }
         uploadedBookDataFolderId = folderId
         uploadedBookDataFile = file

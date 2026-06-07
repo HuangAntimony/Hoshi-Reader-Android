@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.sync
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -116,11 +115,7 @@ class SyncManager private constructor(
         val syncFiles = drive.listSyncFiles(driveFolderId)
 
         if (syncBookData && !importOnly && direction != SyncDirection.ImportFromTtu && syncFiles.bookData == null) {
-            try {
-                drive.uploadBookData(driveFolderId, bookDataExporter(entry))
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-            }
+            drive.uploadBookData(driveFolderId, bookDataExporter(entry))
         }
 
         val syncDirection = direction ?: TtuSyncRules.determineDirection(localBookmark, syncFiles.progress)

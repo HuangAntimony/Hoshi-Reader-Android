@@ -101,6 +101,51 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun reloadBooksKeepsExistingRemoteSectionWhileRefreshingRemoteBooks() {
+        val oldRemote = remoteEntry("old-drive-folder", "Old Remote Book")
+        val newRemote = remoteEntry("new-drive-folder", "New Remote Book")
+        val continueRemoteLoad = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(bookEntry("local-book")),
+            remoteEntries = listOf(oldRemote),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        repository.remoteEntries = listOf(newRemote)
+        repository.remoteLoadGate = continueRemoteLoad
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(listOf(oldRemote), viewModel.uiState.value.remoteBookEntries)
+
+        continueRemoteLoad.complete(Unit)
+
+        assertEquals(listOf(newRemote), viewModel.uiState.value.remoteBookEntries)
+    }
+
+    @Test
+    fun newerReloadResultIsNotOverwrittenWhenOlderReloadFinishesLater() {
+        val firstGate = CompletableDeferred<Unit>()
+        val secondGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            loadPlans = ArrayDeque(
+                listOf(
+                    FakeBookshelfRepository.LoadPlan(firstGate, listOf(bookEntry("older-local-book"))),
+                    FakeBookshelfRepository.LoadPlan(secondGate, listOf(bookEntry("newer-local-book"))),
+                ),
+            ),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+        viewModel.reloadBookEntries()
+        secondGate.complete(Unit)
+        firstGate.complete(Unit)
+
+        assertEquals(listOf("newer-local-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+    }
+
+    @Test
     fun remoteImportAndDeleteCallRepositoryAndReloadShelf() {
         val remote = remoteEntry("drive-folder", "Remote Book")
         val repository = FakeBookshelfRepository(remoteEntries = listOf(remote))
@@ -160,6 +205,24 @@ class BookshelfViewModelTest {
         continueDelete.complete(Unit)
 
         assertEquals(listOf(remote), repository.deletedRemoteEntries)
+    }
+
+    @Test
+    fun duplicateRemoteImportIsIgnoredWhileImportIsInFlight() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueImport = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            remoteEntries = listOf(remote),
+            remoteImportGate = continueImport,
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.importRemoteBook(remote)
+        viewModel.importRemoteBook(remote)
+
+        assertEquals(listOf(remote), repository.importedRemoteEntries)
+
+        continueImport.complete(Unit)
     }
 
     @Test
@@ -621,10 +684,16 @@ class BookshelfViewModelTest {
         var remoteEntries: List<RemoteBookEntry> = emptyList(),
         var remoteProgressById: Map<String, Double> = emptyMap(),
         var remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
-        private val remoteLoadGate: CompletableDeferred<Unit>? = null,
+        var remoteLoadGate: CompletableDeferred<Unit>? = null,
         private val remoteImportGate: CompletableDeferred<Unit>? = null,
         private val remoteDeleteGate: CompletableDeferred<Unit>? = null,
+        private val loadPlans: ArrayDeque<LoadPlan> = ArrayDeque(),
     ) : BookshelfRepository {
+        data class LoadPlan(
+            val gate: CompletableDeferred<Unit>?,
+            val entries: List<BookEntry>,
+        )
+
         val loadRequests = mutableListOf<BookSortOption>()
         val remoteLoadRequests = mutableListOf<List<String>>()
         val deletedEntries = mutableListOf<BookEntry>()
@@ -641,8 +710,10 @@ class BookshelfViewModelTest {
 
         override suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult {
             loadRequests += sortOption
+            val plan = loadPlans.removeFirstOrNull()
+            plan?.gate?.await()
             return BookshelfLoadResult(
-                entries = entries,
+                entries = plan?.entries ?: entries,
                 progressById = progressById,
                 coverSourcesById = coverSourcesById,
                 shelves = shelves,

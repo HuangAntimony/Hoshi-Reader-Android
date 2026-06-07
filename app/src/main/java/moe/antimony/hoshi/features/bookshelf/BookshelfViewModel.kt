@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -71,7 +72,10 @@ internal class BookshelfViewModel : ViewModel {
     private val _uiState = MutableStateFlow(BookshelfUiState())
     val uiState: StateFlow<BookshelfUiState> = _uiState
     private var openBookInFlight = false
-    private var remoteLoadGeneration = 0
+    private var reloadGeneration = 0
+    private var remoteLoadJob: Job? = null
+    private val remoteImportsInFlight = mutableSetOf<String>()
+    private val remoteDeletesInFlight = mutableSetOf<String>()
 
     fun reloadBookEntries() {
         reloadBookEntries(_uiState.value.sortOption)
@@ -292,10 +296,12 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     fun importRemoteBook(entry: RemoteBookEntry) {
+        if (!remoteImportsInFlight.add(entry.id)) return
         workScope.launch {
             _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
             try {
                 repository.importRemoteBook(entry)
+                removeRemoteBook(entry.id)
                 reloadBookEntriesSync()
             } catch (error: Throwable) {
                 _uiState.update {
@@ -304,15 +310,19 @@ internal class BookshelfViewModel : ViewModel {
                             ?: UiText.Resource(R.string.bookshelf_import_failed),
                     )
                 }
+            } finally {
+                remoteImportsInFlight -= entry.id
             }
         }
     }
 
     fun deleteRemoteBook(entry: RemoteBookEntry) {
+        if (!remoteDeletesInFlight.add(entry.id)) return
         workScope.launch {
             _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
             try {
                 repository.deleteRemoteBook(entry)
+                removeRemoteBook(entry.id)
                 reloadBookEntriesSync()
             } catch (error: Throwable) {
                 _uiState.update {
@@ -321,6 +331,8 @@ internal class BookshelfViewModel : ViewModel {
                             ?: UiText.Resource(R.string.bookshelf_sync_failed),
                     )
                 }
+            } finally {
+                remoteDeletesInFlight -= entry.id
             }
         }
     }
@@ -484,12 +496,15 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     private suspend fun reloadBookEntriesSync(sortOption: BookSortOption = _uiState.value.sortOption) {
+        val generation = ++reloadGeneration
+        remoteLoadJob?.cancel()
         val firstResult = loadBookEntries(sortOption)
         val result = if (firstResult.settings.sortOption != sortOption) {
             loadBookEntries(firstResult.settings.sortOption)
         } else {
             firstResult
         }
+        if (generation != reloadGeneration) return
         _uiState.update {
             val validSelectedIds = it.selectedBookIds.intersect(result.entries.mapTo(mutableSetOf()) { entry -> entry.metadata.id })
             it.copy(
@@ -508,24 +523,20 @@ internal class BookshelfViewModel : ViewModel {
                 showReading = result.settings.showReading,
                 selectedBookIds = validSelectedIds,
                 hasLoadedBooks = true,
-                remoteBookEntries = emptyList(),
-                remoteProgressById = emptyMap(),
-                remoteCoverSourcesById = emptyMap(),
                 errorMessage = null,
             )
         }
-        reloadRemoteBookEntries(result.entries)
+        reloadRemoteBookEntries(result.entries, generation)
     }
 
     private suspend fun loadBookEntries(sortOption: BookSortOption): BookshelfLoadResult =
         repository.loadBooks(sortOption)
 
-    private fun reloadRemoteBookEntries(localEntries: List<BookEntry>) {
-        val generation = ++remoteLoadGeneration
-        workScope.launch {
+    private fun reloadRemoteBookEntries(localEntries: List<BookEntry>, generation: Int) {
+        remoteLoadJob = workScope.launch {
             try {
                 val remoteResult = repository.loadRemoteBooks(localEntries)
-                if (generation != remoteLoadGeneration) return@launch
+                if (generation != reloadGeneration) return@launch
                 _uiState.update {
                     it.copy(
                         remoteBookEntries = remoteResult.remoteEntries,
@@ -536,6 +547,16 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
             }
+        }
+    }
+
+    private fun removeRemoteBook(remoteBookId: String) {
+        _uiState.update {
+            it.copy(
+                remoteBookEntries = it.remoteBookEntries.filterNot { remote -> remote.id == remoteBookId },
+                remoteProgressById = it.remoteProgressById - remoteBookId,
+                remoteCoverSourcesById = it.remoteCoverSourcesById - remoteBookId,
+            )
         }
     }
 
