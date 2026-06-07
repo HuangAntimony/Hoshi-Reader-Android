@@ -135,6 +135,27 @@ class TtuSyncRulesTest {
     }
 
     @Test
+    fun driveSyncFilesPreferLatestTimestampedTtuFiles() {
+        val syncFiles = listOf(
+            DriveFile(id = "old-bookdata", name = "bookdata_1_6_200_1000_500.zip"),
+            DriveFile(id = "new-bookdata", name = "bookdata_1_6_200_3000_500.zip"),
+            DriveFile(id = "old-progress", name = "progress_1_6_1000_0.2.json"),
+            DriveFile(id = "new-progress", name = "progress_1_6_4000_0.8.json"),
+            DriveFile(id = "old-statistics", name = "statistics_1_6_1000_10_10.0_0_0_0.0_0_0.0_0.0_0.0_0.0_0.0_0.0_na.json"),
+            DriveFile(id = "new-statistics", name = "statistics_1_6_5000_10_10.0_0_0_0.0_0_0.0_0.0_0.0_0.0_0.0_0.0_na.json"),
+            DriveFile(id = "old-audio", name = "audioBook_1_6_1000_4.0.json"),
+            DriveFile(id = "new-audio", name = "audioBook_1_6_6000_8.0.json"),
+            DriveFile(id = "cover", name = "cover_1_6.jpeg"),
+        ).toDriveSyncFiles()
+
+        assertEquals("new-bookdata", syncFiles.bookData?.id)
+        assertEquals("new-progress", syncFiles.progress?.id)
+        assertEquals("new-statistics", syncFiles.statistics?.id)
+        assertEquals("new-audio", syncFiles.audioBook?.id)
+        assertEquals("cover", syncFiles.cover?.id)
+    }
+
+    @Test
     fun statisticsMergeAndReplaceMatchIosSemantics() {
         val local = listOf(
             ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100),

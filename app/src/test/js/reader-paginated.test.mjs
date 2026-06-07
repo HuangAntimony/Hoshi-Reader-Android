@@ -461,6 +461,25 @@ test('paginated forward navigation reaches final partial page', () => {
     assert.equal(body.scrollTop, 3450);
 });
 
+test('paginated backward navigation leaves final partial page by one page', () => {
+    const body = new TestElement('body');
+    body.scrollTop = 3450;
+    const { reader } = loadReader(body);
+    reader.getScrollContext = () => ({
+        vertical: true,
+        scrollEl: body,
+        pageSize: 800,
+        maxScroll: 3450,
+    });
+    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, progressStops: [] };
+    reader.refreshSasayakiCuePresentation = () => {};
+
+    const result = reader.paginate('backward');
+
+    assert.equal(result, 'scrolled');
+    assert.equal(body.scrollTop, 3200);
+});
+
 test('continuous reader stabilizes vertical ruby-adjacent text like paginated reader', () => {
     const { paragraph, ruby } = rubyParagraph();
     paragraph.normalize();

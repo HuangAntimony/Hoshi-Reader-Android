@@ -152,7 +152,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
         onProgress: (Double) -> Unit,
     ): String = withContext(ioDispatcher) {
         val bookDataFile = entry.syncFiles.bookData ?: error("Remote bookdata is missing.")
-        val tempRoot = File.createTempFile("remote-bookdata-", ".zip", File(System.getProperty("java.io.tmpdir") ?: "."))
+        val tempRoot = File.createTempFile("remote-bookdata-", ".zip", cacheDir)
         try {
             drive.downloadFileTo(bookDataFile.id, tempRoot) { downloadedBytes, totalBytes ->
                 val total = totalBytes?.takeIf { it > 0L }

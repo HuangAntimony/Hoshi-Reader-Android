@@ -372,18 +372,19 @@ private fun generateNavigationDocuments(xhtmlFiles: List<TtuXhtmlFile>): String 
 }
 
 private fun generateOpf(imagePaths: List<String>, xhtmlFiles: List<TtuXhtmlFile>, title: String): String {
-    val imageManifest = imagePaths.joinToString(separator = "\n") { path ->
-        val name = File(path).nameWithoutExtension
-        val properties = if (name == "cover") """ properties="cover-image"""" else ""
-        """<item media-type="${imageMediaType(path)}" id="${if (name == "cover") "cover" else "i-$name"}" href="$path"$properties/>"""
-    }
-    val xhtmlManifest = xhtmlFiles.sortedBy { it.fileName }.joinToString(separator = "\n") {
-        val properties = if (it.html.contains("<svg")) """ properties="svg"""" else ""
-        """<item media-type="application/xhtml+xml" id="${it.fileName.removeSuffix(".xhtml")}" href="xhtml/${it.fileName}"$properties/>"""
-    }
-    val spine = xhtmlFiles.joinToString(separator = "\n") {
-        """<itemref linear="yes" idref="${it.fileName.removeSuffix(".xhtml")}"/>"""
-    }
+    val coverImageIndex = imagePaths.indexOfFirst { path -> File(path).nameWithoutExtension == "cover" }
+    val imageManifest = imagePaths.mapIndexed { index, path ->
+        val id = if (index == coverImageIndex) "cover" else "image-$index"
+        val properties = if (index == coverImageIndex) """ properties="cover-image"""" else ""
+        """<item media-type="${imageMediaType(path)}" id="$id" href="${escapeXml(path)}"$properties/>"""
+    }.joinToString(separator = "\n")
+    val xhtmlManifest = xhtmlFiles.mapIndexed { index, file ->
+        val properties = if (file.html.contains("<svg")) """ properties="svg"""" else ""
+        """<item media-type="application/xhtml+xml" id="xhtml-$index" href="xhtml/${escapeXml(file.fileName)}"$properties/>"""
+    }.joinToString(separator = "\n")
+    val spine = xhtmlFiles.mapIndexed { index, _ ->
+        """<itemref linear="yes" idref="xhtml-$index"/>"""
+    }.joinToString(separator = "\n")
     return """
         <?xml version="1.0" encoding="UTF-8"?>
         <package xmlns="http://www.idpf.org/2007/opf" version="3.0" xml:lang="ja" unique-identifier="book-uuid">

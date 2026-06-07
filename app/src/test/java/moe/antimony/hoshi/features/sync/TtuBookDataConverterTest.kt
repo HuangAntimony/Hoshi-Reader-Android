@@ -156,6 +156,27 @@ class TtuBookDataConverterTest {
     }
 
     @Test
+    fun importBookDataGeneratesSafeUniqueOpfIdsForUnsafeTtuNames() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val source = tempFolder.newFile("unsafe-opf-names-bookdata.zip")
+        writeTtuBookDataWithUnsafeOpfNames(source)
+        val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
+
+        val entry = converter.importBookData(source)
+
+        val unpacked = tempFolder.newFolder("unsafe-opf-unpacked")
+        moe.antimony.hoshi.epub.EpubArchiveExtractor().extract(entry.root.resolve("Manifest Id Book.epub"), unpacked)
+        val opf = unpacked.resolve("item/standard.opf").readText()
+        assertTrue(opf.contains("""id="image-0" href="image/a/pic 1.png""""))
+        assertTrue(opf.contains("""id="image-1" href="image/b/pic 1.png""""))
+        assertTrue(opf.contains("""id="xhtml-0" href="xhtml/1.xhtml""""))
+        assertTrue(opf.contains("""idref="xhtml-0""""))
+        assertFalse(opf.contains("""id="i-pic 1""""))
+        assertFalse(opf.contains("""id="1""""))
+        assertEquals("Manifest Id Book", EpubBookParser().parse(entry.root).title)
+    }
+
+    @Test
     fun tocLabelSkipsGroupingItemsWithoutHrefLikeIos() {
         val toc = listOf(
             EpubTocItem(
@@ -203,6 +224,26 @@ class TtuBookDataConverterTest {
             )
             zip.writeTextEntry("blobs/image/pic.png", "image")
             zip.writeTextEntry("cover.png", "cover")
+        }
+    }
+
+    private fun writeTtuBookDataWithUnsafeOpfNames(destination: File) {
+        ZipOutputStream(destination.outputStream()).use { zip ->
+            zip.writeTextEntry(
+                "staticdata.json",
+                """
+                {
+                  "title": "Manifest Id Book",
+                  "styleSheet": "",
+                  "elementHtml": "<div id=\"ttu-1\"><p><img src=\"../image/a/pic 1.png\"><img src=\"../image/b/pic 1.png\"></p></div>",
+                  "sections": [
+                    {"reference":"ttu-1","charactersWeight":1,"label":"1","startCharacter":0,"characters":1,"parentChapter":null}
+                  ]
+                }
+                """.trimIndent(),
+            )
+            zip.writeTextEntry("blobs/image/a/pic 1.png", "image-a")
+            zip.writeTextEntry("blobs/image/b/pic 1.png", "image-b")
         }
     }
 

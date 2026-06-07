@@ -540,14 +540,18 @@ private data class DriveIdResponse(
     val id: String,
 )
 
-private fun List<DriveFile>.toDriveSyncFiles(): DriveSyncFiles =
+internal fun List<DriveFile>.toDriveSyncFiles(): DriveSyncFiles =
     DriveSyncFiles(
-        bookData = firstOrNull { it.name.startsWith("bookdata_") },
+        bookData = latestTtuFile("bookdata_", TtuSyncRules::parseBookDataTimestampMillis),
         cover = firstOrNull { it.name.startsWith("cover_") },
-        progress = firstOrNull { it.name.startsWith("progress_") },
-        statistics = firstOrNull { it.name.startsWith("statistics_") },
-        audioBook = firstOrNull { it.name.startsWith("audioBook_") },
+        progress = latestTtuFile("progress_", TtuSyncRules::parseProgressTimestampMillis),
+        statistics = latestTtuFile("statistics_", TtuSyncRules::parseStatisticsTimestampMillis),
+        audioBook = latestTtuFile("audioBook_", TtuSyncRules::parseAudioBookTimestampMillis),
     )
+
+private fun List<DriveFile>.latestTtuFile(prefix: String, timestampMillis: (DriveFile) -> Long?): DriveFile? =
+    filter { it.name.startsWith(prefix) }
+        .maxByOrNull { timestampMillis(it) ?: Long.MIN_VALUE }
 
 private val json = Json {
     ignoreUnknownKeys = true

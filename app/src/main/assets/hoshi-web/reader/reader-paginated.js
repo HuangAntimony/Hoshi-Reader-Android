@@ -942,7 +942,7 @@ window.hoshiReader = {
       return "limit";
     } else {
       if (currentScroll > (minAlignedScroll + 1)) {
-        var targetBack = Math.round((currentScroll - context.pageSize) / context.pageSize) * context.pageSize;
+        var targetBack = Math.floor((currentScroll - 1) / context.pageSize) * context.pageSize;
         targetBack = Math.max(minAlignedScroll, targetBack);
         this.setPagePosition(context, targetBack);
         return "scrolled";
