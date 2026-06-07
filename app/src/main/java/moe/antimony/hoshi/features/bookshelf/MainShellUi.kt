@@ -135,6 +135,7 @@ private const val MediumWidthBreakpointDp = 600
 private const val ExpandedWidthBreakpointDp = 840
 internal const val CollapsedShelfCoverTargetWidthDp = 80
 internal const val CollapsedShelfCoverSpacingDp = 12
+internal const val GoogleDriveSectionCollapseKey = "__google_drive__"
 private const val CompletedProgressThreshold = 0.999
 
 enum class SettingsDestination {
@@ -247,6 +248,26 @@ fun bookshelfSections(
 internal fun googleDriveSectionInsertionIndex(sections: List<BookshelfSectionModel>): Int {
     val unshelvedIndex = sections.indexOfFirst { it.titleRes == R.string.bookshelf_section_unshelved }
     return if (unshelvedIndex >= 0) unshelvedIndex else sections.size
+}
+
+internal data class GoogleDriveSectionPresentation(
+    val isCollapsible: Boolean,
+    val isExpanded: Boolean,
+    val alpha: Float,
+    val allowsHitTesting: Boolean,
+)
+
+internal fun googleDriveSectionPresentation(
+    shelfExpansionState: Map<String, Boolean>,
+    isSelecting: Boolean,
+): GoogleDriveSectionPresentation {
+    val isExpanded = !isSelecting && (shelfExpansionState[GoogleDriveSectionCollapseKey] ?: false)
+    return GoogleDriveSectionPresentation(
+        isCollapsible = true,
+        isExpanded = isExpanded,
+        alpha = if (isSelecting) 0.4f else 1.0f,
+        allowsHitTesting = !isSelecting,
+    )
 }
 
 fun isBookCompleted(progress: Double): Boolean =

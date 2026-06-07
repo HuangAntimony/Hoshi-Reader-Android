@@ -11,21 +11,44 @@ import java.nio.file.Files
 
 class RemoteCoverSourceLoaderTest {
     @Test
-    fun remoteCoverSourcesDownloadConcurrentlyBeforePublishingRemoteSection() = runBlocking {
+    fun remoteCoverSourcesUseDriveThumbnailLinkResizedLikeIos() = runBlocking {
         val cacheDir = Files.createTempDirectory("hoshi-remote-covers").toFile()
+        val requestedLinks = mutableListOf<String>()
+        val entry = remoteEntry(
+            id = "first",
+            thumbnailLink = "https://drive.google.com/thumbnail?id=cover-first=s220",
+        )
+
+        val sources = withTimeout(1_000) {
+            loadRemoteCoverSources(
+                remoteEntries = listOf(entry),
+                cacheDir = cacheDir,
+            ) { cover, destination, _ ->
+                requestedLinks += cover.thumbnailLink.orEmpty()
+                destination.writeText(cover.id)
+            }
+        }
+
+        assertEquals(listOf("https://drive.google.com/thumbnail?id=cover-first=s768"), requestedLinks)
+        assertEquals(setOf("first"), sources.keys)
+    }
+
+    @Test
+    fun remoteCoverSourcesStillDownloadConcurrentlyWhenUsingThumbnails() = runBlocking {
+        val cacheDir = Files.createTempDirectory("hoshi-remote-covers-concurrent").toFile()
         val firstStarted = CompletableDeferred<Unit>()
         val secondStarted = CompletableDeferred<Unit>()
         val entries = listOf(
-            remoteEntry("first"),
-            remoteEntry("second"),
+            remoteEntry("first", "https://drive.google.com/thumbnail?id=first=s220"),
+            remoteEntry("second", "https://drive.google.com/thumbnail?id=second=s220"),
         )
 
         val sources = withTimeout(1_000) {
             loadRemoteCoverSources(
                 remoteEntries = entries,
                 cacheDir = cacheDir,
-            ) { fileId, destination, _ ->
-                when (fileId) {
+            ) { cover, destination, _ ->
+                when (cover.id) {
                     "cover-first" -> {
                         firstStarted.complete(Unit)
                         secondStarted.await()
@@ -35,14 +58,14 @@ class RemoteCoverSourceLoaderTest {
                         secondStarted.complete(Unit)
                     }
                 }
-                destination.writeText(fileId)
+                destination.writeText(cover.id)
             }
         }
 
         assertEquals(setOf("first", "second"), sources.keys)
     }
 
-    private fun remoteEntry(id: String): RemoteBookEntry =
+    private fun remoteEntry(id: String, thumbnailLink: String?): RemoteBookEntry =
         RemoteBookEntry(
             id = id,
             folderId = id,
@@ -50,7 +73,7 @@ class RemoteCoverSourceLoaderTest {
             title = id,
             syncFiles = DriveSyncFiles(
                 bookData = DriveFile("bookdata-$id", "bookdata_1_6_10_1000_1000.zip"),
-                cover = DriveFile("cover-$id", "cover_1_6.jpg"),
+                cover = DriveFile("cover-$id", "cover_1_6.jpg", thumbnailLink = thumbnailLink),
                 progress = null,
                 statistics = null,
                 audioBook = null,

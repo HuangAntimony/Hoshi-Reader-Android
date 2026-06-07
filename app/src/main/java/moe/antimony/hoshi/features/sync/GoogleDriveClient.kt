@@ -244,6 +244,14 @@ class GoogleDriveClient @Inject constructor(
         performDownload(url = url, destination = destination, progress = progress)
     }
 
+    override suspend fun downloadThumbnailTo(
+        thumbnailLink: String,
+        destination: File,
+        progress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+    ) {
+        performDownload(url = thumbnailLink, destination = destination, progress = progress)
+    }
+
     private suspend fun uploadJsonFile(folderId: String, fileId: String?, name: String, content: ByteArray) {
         uploadMultipartFile(
             folderId = folderId,
@@ -471,13 +479,13 @@ class GoogleDriveClient @Inject constructor(
 
     private fun checkValidatedInternet() {
         val network = connectivityManager?.activeNetwork
-            ?: throw GoogleDriveApiException("No validated internet connection.")
+            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
         val capabilities = connectivityManager.getNetworkCapabilities(network)
-            ?: throw GoogleDriveApiException("No validated internet connection.")
+            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
         if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
             !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         ) {
-            throw GoogleDriveApiException("No validated internet connection.")
+            throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
         }
     }
 

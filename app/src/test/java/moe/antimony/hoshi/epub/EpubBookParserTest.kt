@@ -127,6 +127,24 @@ class EpubBookParserTest {
     }
 
     @Test
+    fun parsesPackedEpubPruningOtherExtractionRootsLikeIosTempStorage() {
+        val firstArchive = tempFolder.newFile("first-packed.epub")
+        val secondArchive = tempFolder.newFile("second-packed.epub")
+        val cacheRoot = tempFolder.newFolder("single-working-cache")
+        writeMinimalEpubArchive(firstArchive, title = "First Packed Book")
+        writeMinimalEpubArchive(secondArchive, title = "Second Packed Book")
+
+        val first = EpubBookParser().parsePacked(firstArchive, cacheRoot)
+        val firstRoot = first.rootDirectory?.canonicalFile
+        val second = EpubBookParser().parsePacked(secondArchive, cacheRoot)
+        val secondRoot = second.rootDirectory?.canonicalFile
+
+        assertTrue(secondRoot?.isDirectory == true)
+        assertEquals(listOf(secondRoot), cacheRoot.listFiles().orEmpty().filter { it.isDirectory }.map { it.canonicalFile })
+        assertTrue(firstRoot?.exists() == false)
+    }
+
+    @Test
     fun metadataEpubPathOutsideBookRootIsIgnored() {
         val root = tempFolder.newFolder("book-root")
         writeMinimalExtractedEpub(root, title = "Inside Book")

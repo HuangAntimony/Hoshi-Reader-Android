@@ -11,6 +11,7 @@ import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.features.sync.DriveFile
 import moe.antimony.hoshi.features.sync.DriveSyncFiles
+import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
 import moe.antimony.hoshi.ui.UiText
@@ -280,6 +281,20 @@ class BookshelfViewModelTest {
             "Failed to fetch books from Google Drive: drive failed",
             viewModel.uiState.value.errorMessage.testString(),
         )
+    }
+
+    @Test
+    fun automaticRemoteOfflineFailureDoesNotInterruptLocalBooksLikeIos() {
+        val repository = FakeBookshelfRepository(
+            entries = listOf(bookEntry("local-book")),
+            remoteLoadError = GoogleDriveApiException("No validated internet connection."),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(listOf("local-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+        assertNull(viewModel.uiState.value.errorMessage.testString())
     }
 
     @Test

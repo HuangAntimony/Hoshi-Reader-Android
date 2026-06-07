@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.backup
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -109,7 +110,7 @@ fun BackupSettingsView(
     }
     val ttuExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri == null || operation != null) return@rememberLauncherForActivityResult
-        operation = BackupOperation.Exporting
+        operation = BackupOperation.ExportingTtu
         scope.launch {
             val result = runCatching {
                 repository.exportTtuBookData(context.contentResolver, uri)
@@ -167,7 +168,7 @@ fun BackupSettingsView(
     }
     val ttuImporter = rememberLauncherForActivityResult(FileImportContent()) { uri ->
         if (uri == null || operation != null) return@rememberLauncherForActivityResult
-        operation = BackupOperation.Restoring
+        operation = BackupOperation.ImportingTtu
         scope.launch {
             val result = runCatching {
                 context.contentResolver.validateImportFile(uri, ImportFileType.TtuBookDataBackup)
@@ -232,6 +233,8 @@ fun BackupSettingsView(
                         onBackup = { ttuExporter.launch(ttuBookDataBackupFileName()) },
                         onRestore = { ttuImporter.launch(ImportFileType.TtuBookDataBackup.mimeTypes) },
                         enabled = operation == null,
+                        backupLabelRes = R.string.action_export,
+                        restoreLabelRes = R.string.action_import,
                     )
                 }
             }
@@ -256,6 +259,8 @@ private fun BackupSection(
     onBackup: () -> Unit,
     onRestore: () -> Unit,
     enabled: Boolean,
+    @StringRes backupLabelRes: Int = R.string.backup_action_backup,
+    @StringRes restoreLabelRes: Int = R.string.backup_action_restore,
 ) {
     Text(
         text = title,
@@ -267,7 +272,7 @@ private fun BackupSection(
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = { Icon(Icons.Rounded.Upload, contentDescription = null) },
-            headlineContent = { Text(stringResource(R.string.backup_action_backup)) },
+            headlineContent = { Text(stringResource(backupLabelRes)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = enabled, onClick = onBackup),
@@ -279,7 +284,7 @@ private fun BackupSection(
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = { Icon(Icons.Rounded.Download, contentDescription = null) },
-            headlineContent = { Text(stringResource(R.string.backup_action_restore)) },
+            headlineContent = { Text(stringResource(restoreLabelRes)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = enabled, onClick = onRestore),
@@ -311,4 +316,6 @@ private fun BackupGroupCard(content: @Composable () -> Unit) {
 private enum class BackupOperation(val labelRes: Int) {
     Exporting(R.string.backup_archiving),
     Restoring(R.string.backup_restoring),
+    ExportingTtu(R.string.backup_exporting),
+    ImportingTtu(R.string.backup_importing),
 }

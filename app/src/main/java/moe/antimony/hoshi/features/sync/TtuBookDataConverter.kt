@@ -22,6 +22,7 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.epub.EpubTocItem
 
 @Singleton
 class TtuBookDataConverter @Inject constructor(
@@ -78,6 +79,22 @@ class TtuBookDataConverter @Inject constructor(
             val staticData = json.decodeFromString(TtuStaticData.serializer(), tempRoot.resolve("staticdata.json").readText())
             val folderName = staticData.title.sanitizeImportedBookFolderName()
             require(folderName.isNotBlank()) { "TTU book title is empty." }
+            val root = bookRepository.createBookDirectoryForImportedTitle(staticData.title)
+            val existingMetadata = bookRepository.loadMetadata(root)
+            if (root.listFiles()?.isNotEmpty() == true) {
+                return@withContext BookEntry(
+                    root = root,
+                    metadata = existingMetadata ?: BookMetadata(
+                        id = UUID.randomUUID().toString(),
+                        title = staticData.title,
+                        cover = null,
+                        folder = root.name,
+                        lastAccess = bookRepository.currentAppleReferenceDateSeconds(),
+                        epub = "${root.name}.epub",
+                    ),
+                )
+            }
+            root.deleteRecursively()
             val stagedBookRoot = stageRoot.resolve(folderName).canonicalFile
             stagedBookRoot.mkdirs()
             val epubName = "$folderName.epub"
@@ -116,12 +133,6 @@ class TtuBookDataConverter @Inject constructor(
             val parsed = parser.parse(stagedBookRoot, fallbackTitle = staticData.title)
             bookRepository.saveBookInfo(stagedBookRoot, parsed.bookInfo)
 
-            val root = bookRepository.createBookDirectoryForImportedTitle(staticData.title)
-            val existingMetadata = bookRepository.loadMetadata(root)
-            if (root.listFiles()?.isNotEmpty() == true) {
-                return@withContext BookEntry(root, existingMetadata ?: metadata.copy(folder = root.name))
-            }
-            root.deleteRecursively()
             if (!stagedBookRoot.renameTo(root)) {
                 stagedBookRoot.copyRecursively(root, overwrite = true)
                 stagedBookRoot.deleteRecursively()
@@ -200,18 +211,19 @@ class TtuBookDataConverter @Inject constructor(
     }
 
     private fun EpubBook.tocLabel(chapter: EpubChapter): String? {
-        fun search(items: List<moe.antimony.hoshi.epub.EpubTocItem>): String? =
-            items.firstNotNullOfOrNull { item ->
-                val href = item.href?.substringBefore('#')
-                if (href == chapter.href || href?.endsWith(chapter.href) == true || chapter.href.endsWith(href.orEmpty())) {
-                    item.label
-                } else {
-                    search(item.children)
-                }
-            }
-        return search(toc)
+        return ttuTocLabel(chapter.href, toc)
     }
 }
+
+internal fun ttuTocLabel(chapterHref: String, toc: List<EpubTocItem>): String? =
+    toc.firstNotNullOfOrNull { item ->
+        val href = item.href?.substringBefore('#')
+        if (!href.isNullOrBlank() && (href == chapterHref || href.endsWith(chapterHref) || chapterHref.endsWith(href))) {
+            item.label
+        } else {
+            ttuTocLabel(chapterHref, item.children)
+        }
+    }
 
 @Serializable
 private data class TtuStaticData(

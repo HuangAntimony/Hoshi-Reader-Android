@@ -13,7 +13,7 @@ import java.io.File
 
 internal class ReaderRouteStateHolder(
     private val repository: ReaderRouteBookRepository,
-    private val parser: ReaderRouteEpubParser = DefaultReaderRouteEpubParser,
+    private val parser: ReaderRouteEpubParser = DefaultReaderRouteEpubParser(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     suspend fun load(
@@ -82,9 +82,11 @@ internal interface ReaderRouteEpubParser {
     fun parse(root: File, cachedBookInfo: BookInfo? = null): EpubBook
 }
 
-private object DefaultReaderRouteEpubParser : ReaderRouteEpubParser {
+internal class DefaultReaderRouteEpubParser(
+    private val parser: EpubBookParser = EpubBookParser(),
+) : ReaderRouteEpubParser {
     override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook =
-        EpubBookParser().parse(root, cachedBookInfo = cachedBookInfo)
+        parser.parse(root, cachedBookInfo = cachedBookInfo)
 }
 
 internal sealed interface ReaderRouteLoadState {

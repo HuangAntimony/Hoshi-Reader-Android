@@ -24,6 +24,8 @@ import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.isUuidString
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.DriveAuthStatus
+import moe.antimony.hoshi.features.sync.DriveAuthorizer
 import moe.antimony.hoshi.features.sync.DriveSyncDataSource
 import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.SyncDirection
@@ -84,6 +86,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
     private val syncSettingsRepository: SyncSettingsRepository,
     private val syncManager: SyncManager,
     private val drive: DriveSyncDataSource,
+    private val driveAuthorizer: DriveAuthorizer,
     private val ttuBookDataConverter: TtuBookDataConverter,
     private val bookParser: EpubBookParser,
     @param:CacheDir private val cacheDir: File,
@@ -108,8 +111,13 @@ internal class AndroidBookshelfRepository @Inject constructor(
             remoteProgressById = remoteEntries.mapNotNull { remote ->
                 TtuSyncRules.parseProgressValue(remote.syncFiles.progress)?.let { remote.id to it }
             }.toMap(),
-            remoteCoverSourcesById = loadRemoteCoverSources(remoteEntries, cacheDir) { fileId, destination, progress ->
-                drive.downloadFileTo(fileId, destination, progress)
+            remoteCoverSourcesById = loadRemoteCoverSources(remoteEntries, cacheDir) { cover, destination, progress ->
+                val thumbnailLink = cover.thumbnailLink
+                if (thumbnailLink != null) {
+                    drive.downloadThumbnailTo(thumbnailLink, destination, progress)
+                } else {
+                    drive.downloadFileTo(cover.id, destination, progress)
+                }
             },
         )
     }
@@ -279,35 +287,18 @@ internal class AndroidBookshelfRepository @Inject constructor(
 
     private suspend fun loadRemoteBookEntries(localEntries: List<BookEntry>): List<RemoteBookEntry> {
         val syncSettings = syncSettingsRepository.settings.first()
-        if (!syncSettings.enabled) return emptyList()
+        val authStatus = driveAuthorizer.status()
+        if (!shouldLoadRemoteBooks(syncSettings, authStatus)) return emptyList()
         val localDriveNames = localEntries.mapTo(mutableSetOf()) { entry ->
             TtuSyncRules.sanitizeTtuFilename(entry.metadata.title ?: entry.displayTitle)
         }
-        return runCatching { loadRemoteBooksOnce(localDriveNames) }
+        return runCatching { loadRemoteBooksOnce(drive, localDriveNames) }
             .recoverCatching { error ->
                 if (error !is GoogleDriveApiException || !error.isStaleCacheError) throw error
                 drive.clearCache()
-                loadRemoteBooksOnce(localDriveNames)
+                loadRemoteBooksOnce(drive, localDriveNames)
             }
             .getOrThrow()
-    }
-
-    private suspend fun loadRemoteBooksOnce(localDriveNames: Set<String>): List<RemoteBookEntry> {
-        val rootFolderId = drive.findRootFolder()
-        val folders = drive.listBooks(rootFolderId)
-        val syncFilesByFolder = drive.listSyncFiles(folders.map { it.id })
-        return folders.mapNotNull { folder ->
-            if (folder.name in localDriveNames) return@mapNotNull null
-            val syncFiles = syncFilesByFolder[folder.id] ?: return@mapNotNull null
-            if (syncFiles.bookData == null) return@mapNotNull null
-            RemoteBookEntry(
-                id = folder.id,
-                folderId = folder.id,
-                folderName = folder.name,
-                title = TtuSyncRules.desanitizeTtuFilename(folder.name),
-                syncFiles = syncFiles,
-            )
-        }.sortedBy { it.title.lowercase() }
     }
 
     private suspend fun importRemoteSidecars(
@@ -361,11 +352,35 @@ private val remoteJson = Json {
     encodeDefaults = true
 }
 
+internal fun shouldLoadRemoteBooks(syncSettings: moe.antimony.hoshi.features.sync.SyncSettings, authStatus: DriveAuthStatus): Boolean =
+    syncSettings.enabled && authStatus is DriveAuthStatus.Connected
+
+internal suspend fun loadRemoteBooksOnce(
+    drive: DriveSyncDataSource,
+    localDriveNames: Set<String>,
+): List<RemoteBookEntry> {
+    val rootFolderId = drive.findRootFolder()
+    val folders = drive.listBooks(rootFolderId)
+        .filterNot { folder -> folder.name in localDriveNames }
+    val syncFilesByFolder = drive.listSyncFiles(folders.map { it.id })
+    return folders.mapNotNull { folder ->
+        val syncFiles = syncFilesByFolder[folder.id] ?: return@mapNotNull null
+        if (syncFiles.bookData == null) return@mapNotNull null
+        RemoteBookEntry(
+            id = folder.id,
+            folderId = folder.id,
+            folderName = folder.name,
+            title = TtuSyncRules.desanitizeTtuFilename(folder.name),
+            syncFiles = syncFiles,
+        )
+    }.sortedBy { it.title.lowercase() }
+}
+
 internal suspend fun loadRemoteCoverSources(
     remoteEntries: List<RemoteBookEntry>,
     cacheDir: File,
-    downloadFileTo: suspend (
-        fileId: String,
+    downloadCoverTo: suspend (
+        cover: moe.antimony.hoshi.features.sync.DriveFile,
         destination: File,
         progress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
     ) -> Unit,
@@ -380,7 +395,7 @@ internal suspend fun loadRemoteCoverSources(
                 if (!cached.isFile) {
                     val temp = coverCache.resolve(".${cover.id}-${UUID.randomUUID()}.tmp")
                     try {
-                        downloadFileTo(cover.id, temp) { _, _ -> }
+                        downloadCoverTo(cover.withIosThumbnailSize(), temp) { _, _ -> }
                         if (!temp.renameTo(cached)) {
                             temp.copyTo(cached, overwrite = true)
                             temp.delete()
@@ -396,6 +411,9 @@ internal suspend fun loadRemoteCoverSources(
         }
     }.awaitAll().filterNotNull().toMap()
 }
+
+private fun moe.antimony.hoshi.features.sync.DriveFile.withIosThumbnailSize(): moe.antimony.hoshi.features.sync.DriveFile =
+    copy(thumbnailLink = thumbnailLink?.replace(Regex("""=s\d+$"""), "=s768"))
 
 internal suspend fun loadBookCoverSourcesById(
     entries: List<BookEntry>,

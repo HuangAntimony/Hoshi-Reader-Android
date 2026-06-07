@@ -82,7 +82,10 @@ fun AppShell(
     val dictionaryBackStack = rememberNavBackStack(AppRoute.DictionaryRoute)
     val settingsBackStack = rememberNavBackStack(AppRoute.SettingsRoute)
     val bookRepository = appContainer.bookRepository
-    val readerRouteStateHolder = remember(bookRepository) { ReaderRouteStateHolder(bookRepository) }
+    val epubBookParser = appContainer.epubBookParser
+    val readerRouteStateHolder = remember(bookRepository, epubBookParser) {
+        ReaderRouteStateHolder(bookRepository, DefaultReaderRouteEpubParser(epubBookParser))
+    }
     val readerFontManager = appContainer.readerFontManager
     val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
     val scope = rememberCoroutineScope()
@@ -258,6 +261,7 @@ fun AppShell(
                         SasayakiMatchView(
                             bookEntry = request.bookEntry,
                             bookRepository = bookRepository,
+                            epubBookParser = epubBookParser,
                             onClose = ::popRoute,
                             modifier = Modifier.fillMaxSize(),
                         )

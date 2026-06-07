@@ -14,6 +14,7 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.EpubTocItem
 import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -128,6 +129,47 @@ class TtuBookDataConverterTest {
     }
 
     @Test
+    fun importBookDataReturnsExistingTitleFolderBeforeGeneratingEpubLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val existingRoot = repository.createBookDirectoryForImportedTitle("Existing Book")
+        val existingMetadata = BookMetadata(
+            id = "existing-book",
+            title = "Existing Book",
+            cover = null,
+            folder = existingRoot.name,
+            lastAccess = 1.0,
+            epub = "Existing Book.epub",
+        )
+        repository.saveMetadata(existingRoot, existingMetadata)
+        existingRoot.resolve("Existing Book.epub").writeText("existing epub")
+        val source = tempFolder.newFile("existing-invalid-bookdata.zip")
+        writeTtuBookDataWithNoReadableSections(source, title = "Existing Book")
+        val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
+
+        val entry = converter.importBookData(source)
+
+        assertEquals(existingRoot.canonicalFile, entry.root.canonicalFile)
+        assertEquals(existingMetadata, entry.metadata)
+        assertEquals("existing epub", existingRoot.resolve("Existing Book.epub").readText())
+    }
+
+    @Test
+    fun tocLabelSkipsGroupingItemsWithoutHrefLikeIos() {
+        val toc = listOf(
+            EpubTocItem(
+                label = "Part 1",
+                href = null,
+                children = listOf(
+                    EpubTocItem(label = "Chapter 1", href = "OPS/text/chapter-1.xhtml"),
+                ),
+            ),
+        )
+
+        assertEquals("Chapter 1", ttuTocLabel("OPS/text/chapter-1.xhtml", toc))
+        assertEquals(null, ttuTocLabel("OPS/text/chapter-2.xhtml", toc))
+    }
+
+    @Test
     fun importBookDataRejectsUnsafeSectionReferenceWithoutLeavingBookFolder() = runBlocking {
         val repository = BookRepository(tempFolder.root)
         val source = tempFolder.newFile("unsafe-bookdata.zip")
@@ -173,6 +215,24 @@ class TtuBookDataConverterTest {
                   "elementHtml": "<div id=\"ttu-../escape\"><p>Bad</p></div>",
                   "sections": [
                     {"reference":"ttu-../escape","charactersWeight":1,"label":"Bad","startCharacter":0,"characters":1,"parentChapter":null}
+                  ]
+                }
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private fun writeTtuBookDataWithNoReadableSections(destination: File, title: String) {
+        ZipOutputStream(destination.outputStream()).use { zip ->
+            zip.writeTextEntry(
+                "staticdata.json",
+                """
+                {
+                  "title": "$title",
+                  "styleSheet": "",
+                  "elementHtml": "<p>No TTU section wrapper</p>",
+                  "sections": [
+                    {"reference":"ttu-missing","charactersWeight":1,"label":"Missing","startCharacter":0,"characters":1,"parentChapter":null}
                   ]
                 }
                 """.trimIndent(),

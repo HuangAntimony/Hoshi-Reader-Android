@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
@@ -581,6 +582,7 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 if (generation != reloadGeneration) return@launch
+                if (error is GoogleDriveApiException && error.isNoValidatedInternetConnection) return@launch
                 _uiState.update {
                     it.copy(
                         errorMessage = UiText.Resource(

@@ -106,4 +106,10 @@ class GoogleDriveApiException(
     val statusCode: Int? = null,
 ) : Exception(message) {
     val isStaleCacheError: Boolean get() = statusCode == 404
+    val isNoValidatedInternetConnection: Boolean
+        get() = statusCode == null && message == NoValidatedInternetConnectionMessage
+
+    companion object {
+        const val NoValidatedInternetConnectionMessage = "No validated internet connection."
+    }
 }

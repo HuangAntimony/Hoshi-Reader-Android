@@ -98,6 +98,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -662,12 +663,16 @@ private fun LazyGridScope.googleDriveSection(
     remoteBusyBookIds: Set<String>,
     remoteCoverSourcesById: Map<String, BookCoverSource>,
     layoutSpec: MainShellLayoutSpec,
+    contentWidthDp: Int,
     fileTaskBlocked: Boolean,
     isSelecting: Boolean,
+    shelfExpansionState: Map<String, Boolean>,
+    onShelfExpandedChange: (String, Boolean) -> Unit,
     onImportRemoteBook: (RemoteBookEntry) -> Unit,
     onDeleteRemoteCandidate: (RemoteBookEntry) -> Unit,
 ) {
     if (remoteBookEntries.isEmpty()) return
+    val presentation = googleDriveSectionPresentation(shelfExpansionState, isSelecting)
     item(
         key = "header:google-drive",
         contentType = "sectionHeader",
@@ -677,26 +682,59 @@ private fun LazyGridScope.googleDriveSection(
             title = stringResource(R.string.bookshelf_section_google_drive),
             count = remoteBookEntries.size,
             layoutSpec = layoutSpec,
-            isCollapsible = false,
-            isExpanded = true,
-            onToggle = {},
+            isCollapsible = presentation.isCollapsible,
+            isExpanded = presentation.isExpanded,
+            enabled = presentation.allowsHitTesting && !fileTaskBlocked,
+            onToggle = {
+                onShelfExpandedChange(GoogleDriveSectionCollapseKey, !presentation.isExpanded)
+            },
+            modifier = Modifier.alpha(presentation.alpha),
         )
     }
-    items(
-        items = remoteBookEntries,
-        key = { "google-drive:${it.id}" },
-        contentType = { "remoteBook" },
-    ) { entry ->
-        RemoteBookGridCell(
-            entry = entry,
-            progress = remoteProgressById[entry.id] ?: 0.0,
-            downloadProgress = remoteImportProgressById[entry.id],
-            coverSource = remoteCoverSourcesById[entry.id],
-            layoutSpec = layoutSpec,
-            enabled = !fileTaskBlocked && !isSelecting && entry.id !in remoteBusyBookIds,
-            onImport = { onImportRemoteBook(entry) },
-            onDelete = { onDeleteRemoteCandidate(entry) },
-        )
+    if (presentation.isExpanded) {
+        items(
+            items = remoteBookEntries,
+            key = { "google-drive:${it.id}" },
+            contentType = { "remoteBook" },
+        ) { entry ->
+            RemoteBookGridCell(
+                entry = entry,
+                progress = remoteProgressById[entry.id] ?: 0.0,
+                downloadProgress = remoteImportProgressById[entry.id],
+                coverSource = remoteCoverSourcesById[entry.id],
+                layoutSpec = layoutSpec,
+                enabled = presentation.allowsHitTesting && !fileTaskBlocked && entry.id !in remoteBusyBookIds,
+                onImport = { onImportRemoteBook(entry) },
+                onDelete = { onDeleteRemoteCandidate(entry) },
+                modifier = Modifier.alpha(presentation.alpha),
+            )
+        }
+    } else {
+        item(
+            key = "preview:google-drive",
+            contentType = "collapsedPreview",
+            span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(presentation.alpha)
+                    .clickable(enabled = presentation.allowsHitTesting && !fileTaskBlocked) {
+                        onShelfExpandedChange(GoogleDriveSectionCollapseKey, true)
+                    },
+                horizontalArrangement = Arrangement.spacedBy(CollapsedShelfCoverSpacingDp.dp),
+            ) {
+                val collapsedCoverWidthDp = layoutSpec.collapsedShelfPreviewCoverWidthDp(contentWidthDp)
+                remoteBookEntries
+                    .take(layoutSpec.collapsedShelfPreviewColumns(contentWidthDp))
+                    .forEach { entry ->
+                        BookCoverCard(
+                            coverSource = remoteCoverSourcesById[entry.id],
+                            modifier = Modifier.width(collapsedCoverWidthDp.dp),
+                        )
+                    }
+            }
+        }
     }
 }
 
@@ -830,8 +868,11 @@ private fun BooksTab(
                                     remoteBusyBookIds = remoteBusyBookIds,
                                     remoteCoverSourcesById = remoteCoverSourcesById,
                                     layoutSpec = layoutSpec,
+                                    contentWidthDp = contentWidthDp,
                                     fileTaskBlocked = fileTaskBlocked,
                                     isSelecting = isSelecting,
+                                    shelfExpansionState = shelfExpansionState,
+                                    onShelfExpandedChange = onShelfExpandedChange,
                                     onImportRemoteBook = onImportRemoteBook,
                                     onDeleteRemoteCandidate = onDeleteRemoteCandidate,
                                 )
@@ -938,8 +979,11 @@ private fun BooksTab(
                                 remoteBusyBookIds = remoteBusyBookIds,
                                 remoteCoverSourcesById = remoteCoverSourcesById,
                                 layoutSpec = layoutSpec,
+                                contentWidthDp = contentWidthDp,
                                 fileTaskBlocked = fileTaskBlocked,
                                 isSelecting = isSelecting,
+                                shelfExpansionState = shelfExpansionState,
+                                onShelfExpandedChange = onShelfExpandedChange,
                                 onImportRemoteBook = onImportRemoteBook,
                                 onDeleteRemoteCandidate = onDeleteRemoteCandidate,
                             )
@@ -1156,12 +1200,14 @@ private fun BookshelfSectionHeader(
     layoutSpec: MainShellLayoutSpec,
     isCollapsible: Boolean = false,
     isExpanded: Boolean = true,
+    enabled: Boolean = true,
     onToggle: () -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = isCollapsible, onClick = onToggle)
+            .clickable(enabled = isCollapsible && enabled, onClick = onToggle)
             .padding(vertical = layoutSpec.shelfHeaderVerticalPaddingDp.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1275,9 +1321,10 @@ private fun RemoteBookGridCell(
     enabled: Boolean,
     onImport: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = modifier.combinedClickable(
             enabled = enabled,
             onClick = onImport,
             onLongClick = onDelete,

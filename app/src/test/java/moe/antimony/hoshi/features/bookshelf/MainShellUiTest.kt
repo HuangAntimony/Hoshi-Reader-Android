@@ -112,6 +112,31 @@ class MainShellUiTest {
     }
 
     @Test
+    fun googleDriveSectionPresentationMatchesIosCollapsedSelectionBehavior() {
+        val collapsed = googleDriveSectionPresentation(
+            shelfExpansionState = emptyMap(),
+            isSelecting = false,
+        )
+        val expanded = googleDriveSectionPresentation(
+            shelfExpansionState = mapOf(GoogleDriveSectionCollapseKey to true),
+            isSelecting = false,
+        )
+        val selecting = googleDriveSectionPresentation(
+            shelfExpansionState = mapOf(GoogleDriveSectionCollapseKey to true),
+            isSelecting = true,
+        )
+
+        assertTrue(collapsed.isCollapsible)
+        assertFalse(collapsed.isExpanded)
+        assertEquals(1.0f, collapsed.alpha)
+        assertTrue(collapsed.allowsHitTesting)
+        assertTrue(expanded.isExpanded)
+        assertFalse(selecting.isExpanded)
+        assertEquals(0.4f, selecting.alpha)
+        assertFalse(selecting.allowsHitTesting)
+    }
+
+    @Test
     fun virtualReadingShelfAndUserReadingShelfHaveDistinctLayoutKeys() {
         val reading = bookEntry(id = "reading", title = "Reading", lastAccess = 2.0)
         val shelved = bookEntry(id = "shelved", title = "Shelved", lastAccess = 1.0)

@@ -156,7 +156,7 @@
     <string name="dictionary_collapse_mode_custom" comment="Dictionary collapse mode option, distinct from reader appearance custom theme.">自定义</string>
     <string name="dictionary_mode" comment="Dictionary setting label, intentionally matching reader appearance mode.">模式</string>
     <string name="dictionary_expand_first">展开第一个辞典</string>
-    <string name="dictionary_settings_behaviour">行为</string>
+    <string name="dictionary_settings_behaviour" comment="Settings group label, intentionally shared with Sync settings.">行为</string>
     <string name="dictionary_compact_glossaries" comment="Dictionary setting label, intentionally matching Anki compact glossaries.">紧凑释义</string>
     <string name="dictionary_show_expression_tags">显示词形标签</string>
     <string name="dictionary_harmonic_frequency">调和词频</string>
@@ -244,7 +244,7 @@
     <string name="reader_appearance_font" comment="Reader font setting, intentionally matching dictionary custom CSS font.">字体</string>
     <string name="reader_appearance_font_file" comment="Fallback filename label, intentionally matching font setting labels.">字体</string>
     <string name="reader_appearance_import_font">导入字体</string>
-    <string name="reader_appearance_importing">正在导入...</string>
+    <string name="reader_appearance_importing" comment="Generic import progress label, intentionally shared with TTU backup import.">正在导入...</string>
     <string name="reader_appearance_font_size">字号</string>
     <string name="reader_appearance_hide_furigana">隐藏振假名</string>
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">模式</string>
@@ -285,10 +285,14 @@
     <string name="action_enable">启用</string>
     <string name="sync_ttu_sync">ッツ 同步</string>
     <string name="sync_title">同步</string>
+    <string name="sync_section_behaviour" comment="Sync settings group label, intentionally matching other settings group labels.">行为</string>
+    <string name="sync_section_data">数据</string>
     <string name="sync_direction">方向</string>
     <string name="sync_auto_sync">自动同步</string>
     <string name="sync_upload_books">上传书籍</string>
     <string name="sync_upload_books_description">当同步的 Google Drive 书籍文件夹缺少 bookdata 时，上传 TTU bookdata。</string>
+    <string name="sync_stats">同步统计</string>
+    <string name="sync_audiobook_progress">同步有声书进度</string>
     <string name="sync_clear_cache">清除 Google Drive 缓存</string>
     <string name="sync_cache_cleared">已清除 Google Drive 缓存。</string>
     <string name="sync_clear_cache_title">清除 Google Drive 缓存？</string>
@@ -329,8 +333,8 @@
     <string name="update_available_message_format">Hoshi Reader %1$s 已可用。</string>
     <string name="backup_books" comment="Backup section label, intentionally matching the Books tab label.">书籍</string>
     <string name="backup_dictionaries" comment="Backup section label, intentionally matching the Dictionaries settings label.">辞典</string>
-    <string name="backup_ttu_bookdata">TTU Bookdata</string>
-    <string name="backup_ttu_bookdata_description">导出和导入兼容 TTU 的 bookdata、进度、统计和封面文件，不会替换整个 Books 文件夹。</string>
+    <string name="backup_ttu_bookdata">ッツ 备份</string>
+    <string name="backup_ttu_bookdata_description">导入备份会添加新书，并覆盖已存在书籍的统计和阅读进度。</string>
     <string name="backup_books_saved">书籍备份已保存。</string>
     <string name="backup_books_save_failed">无法保存书籍备份。</string>
     <string name="backup_dictionaries_saved">辞典备份已保存。</string>
@@ -348,6 +352,8 @@
     <string name="backup_action_restore">恢复</string>
     <string name="backup_archiving">正在归档...</string>
     <string name="backup_restoring">正在恢复...</string>
+    <string name="backup_exporting">正在导出...</string>
+    <string name="backup_importing" comment="TTU backup import progress label, intentionally matching the generic importing progress text.">正在导入...</string>
     <string name="advanced_audio">音频</string>
     <string name="advanced_statistics" comment="Advanced settings row label, intentionally matching reader statistics label.">统计</string>
     <string name="advanced_statistics_subtitle">跟踪每本书的阅读时间、速度和已读字符数</string>

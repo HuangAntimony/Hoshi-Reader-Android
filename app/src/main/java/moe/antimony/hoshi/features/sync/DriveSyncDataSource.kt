@@ -32,6 +32,14 @@ interface DriveSyncDataSource {
         destination.writeBytes(downloadFile(fileId, progress))
     }
 
+    suspend fun downloadThumbnailTo(
+        thumbnailLink: String,
+        destination: File,
+        progress: (downloadedBytes: Long, totalBytes: Long?) -> Unit = { _, _ -> },
+    ) {
+        throw UnsupportedOperationException("downloadThumbnailTo is not implemented.")
+    }
+
     suspend fun getProgressFile(fileId: String): TtuProgress
 
     suspend fun getStatsFile(fileId: String): List<ReadingStatistics>

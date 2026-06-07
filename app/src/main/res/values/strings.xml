@@ -158,7 +158,7 @@
     <string name="dictionary_collapse_mode_custom" comment="Dictionary collapse mode option, distinct from reader appearance custom theme.">Custom</string>
     <string name="dictionary_mode" comment="Dictionary setting label, intentionally matching reader appearance mode.">Mode</string>
     <string name="dictionary_expand_first">Expand First Dictionary</string>
-    <string name="dictionary_settings_behaviour">Behaviour</string>
+    <string name="dictionary_settings_behaviour" comment="Settings group label, intentionally shared with Sync settings.">Behaviour</string>
     <string name="dictionary_compact_glossaries" comment="Dictionary setting label, intentionally matching Anki compact glossaries.">Compact Glossaries</string>
     <string name="dictionary_show_expression_tags">Show Expression Tags</string>
     <string name="dictionary_harmonic_frequency">Harmonic Frequency</string>
@@ -246,7 +246,7 @@
     <string name="reader_appearance_font" comment="Reader font setting, intentionally matching dictionary custom CSS font.">Font</string>
     <string name="reader_appearance_font_file" comment="Fallback filename label, intentionally matching font setting labels.">font</string>
     <string name="reader_appearance_import_font">Import Font</string>
-    <string name="reader_appearance_importing">Importing...</string>
+    <string name="reader_appearance_importing" comment="Generic import progress label, intentionally shared with TTU backup import.">Importing...</string>
     <string name="reader_appearance_font_size">Font Size</string>
     <string name="reader_appearance_hide_furigana">Hide Furigana</string>
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">Mode</string>
@@ -287,10 +287,14 @@
     <string name="action_enable">Enable</string>
     <string name="sync_ttu_sync">ッツ Sync</string>
     <string name="sync_title">Syncing</string>
+    <string name="sync_section_behaviour" comment="Sync settings group label, intentionally matching other settings group labels.">Behaviour</string>
+    <string name="sync_section_data">Data</string>
     <string name="sync_direction">Direction</string>
     <string name="sync_auto_sync">Auto Sync</string>
     <string name="sync_upload_books">Upload Books</string>
     <string name="sync_upload_books_description">Upload TTU bookdata to Google Drive when a synced book folder is missing bookdata.</string>
+    <string name="sync_stats">Sync Stats</string>
+    <string name="sync_audiobook_progress">Sync Audiobook Progress</string>
     <string name="sync_clear_cache">Clear Google Drive cache</string>
     <string name="sync_cache_cleared">Google Drive cache cleared.</string>
     <string name="sync_clear_cache_title">Clear Google Drive cache?</string>
@@ -331,8 +335,8 @@
     <string name="update_available_message_format">Hoshi Reader %1$s is available.</string>
     <string name="backup_books" comment="Backup section label, intentionally matching the Books tab label.">Books</string>
     <string name="backup_dictionaries" comment="Backup section label, intentionally matching the Dictionaries settings label.">Dictionaries</string>
-    <string name="backup_ttu_bookdata">TTU Bookdata</string>
-    <string name="backup_ttu_bookdata_description">Exports and imports TTU-compatible bookdata, progress, statistics, and cover files without replacing the whole Books folder.</string>
+    <string name="backup_ttu_bookdata">ッツ Backup</string>
+    <string name="backup_ttu_bookdata_description">Importing a backup adds new books and overwrites the statistics and reading progress of books already present.</string>
     <string name="backup_books_saved">Books backup saved.</string>
     <string name="backup_books_save_failed">Unable to save Books backup.</string>
     <string name="backup_dictionaries_saved">Dictionaries backup saved.</string>
@@ -350,6 +354,8 @@
     <string name="backup_action_restore">Restore</string>
     <string name="backup_archiving">Archiving...</string>
     <string name="backup_restoring">Restoring...</string>
+    <string name="backup_exporting">Exporting...</string>
+    <string name="backup_importing" comment="TTU backup import progress label, intentionally matching the generic importing progress text.">Importing...</string>
     <string name="advanced_audio">Audio</string>
     <string name="advanced_statistics" comment="Advanced settings row label, intentionally matching reader statistics label.">Statistics</string>
     <string name="advanced_statistics_subtitle">Track per-book reading time, speed, and characters read</string>

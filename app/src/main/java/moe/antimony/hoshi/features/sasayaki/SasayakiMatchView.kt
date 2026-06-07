@@ -65,6 +65,7 @@ import kotlin.math.roundToInt
 fun SasayakiMatchView(
     bookEntry: BookEntry,
     bookRepository: SasayakiSidecarRepository,
+    epubBookParser: EpubBookParser,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,7 +108,7 @@ fun SasayakiMatchView(
                     val srtBytes = context.contentResolver.openInputStream(uri).use { input ->
                         requireNotNull(input) { resources.getString(R.string.sasayaki_open_srt_failed) }.readBytes()
                     }
-                    val book = EpubBookParser().parse(bookEntry.root)
+                    val book = epubBookParser.parse(bookEntry.root)
                     val nextMatch = SasayakiMatcher.match(
                         book = book,
                         cues = SasayakiParser.parseCues(srtBytes),

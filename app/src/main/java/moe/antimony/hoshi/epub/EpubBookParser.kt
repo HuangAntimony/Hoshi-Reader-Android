@@ -97,6 +97,7 @@ class EpubBookParser @Inject constructor(
         cacheRoot.mkdirs()
         val extractedRoot = cacheRoot.resolve(epubFile.stableExtractionDirectoryName()).canonicalFile
         return runCatching {
+            cacheRoot.prunePackedEpubExtractionCache(keep = extractedRoot)
             if (!extractedRoot.resolve("META-INF/container.xml").isFile) {
                 extractedRoot.deleteRecursively()
                 EpubArchiveExtractor().extract(epubFile, extractedRoot)
@@ -203,6 +204,12 @@ private fun File.stableExtractionDirectoryName(): String {
     val prefix = nameWithoutExtension.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "book" }
     val pathHash = canonical.absolutePath.hashCode().toUInt().toString(16)
     return "$prefix-$pathHash-${lastModified()}-${length()}"
+}
+
+private fun File.prunePackedEpubExtractionCache(keep: File) {
+    listFiles().orEmpty()
+        .filterNot { it.canonicalFile == keep.canonicalFile }
+        .forEach { it.deleteRecursively() }
 }
 
 private val epubParserJson = Json {

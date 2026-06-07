@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.backup.HoshiBackupRepository
@@ -37,6 +38,7 @@ internal class HoshiUiDependencies @Inject constructor(
     private val syncSettingsRepositoryProvider: Lazy<SyncSettingsRepository>,
     private val updateSettingsRepositoryProvider: Lazy<UpdateSettingsRepository>,
     private val updateDownloadStoreProvider: Lazy<UpdateDownloadStore>,
+    private val epubBookParserProvider: Lazy<EpubBookParser>,
     private val readerFontManagerProvider: Lazy<ReaderFontManager>,
     private val localAudioRepositoryProvider: Lazy<LocalAudioRepository>,
     private val backupRepositoryProvider: Lazy<HoshiBackupRepository>,
@@ -59,6 +61,7 @@ internal class HoshiUiDependencies @Inject constructor(
     val syncSettingsRepository: SyncSettingsRepository get() = syncSettingsRepositoryProvider.get()
     val updateSettingsRepository: UpdateSettingsRepository get() = updateSettingsRepositoryProvider.get()
     val updateDownloadStore: UpdateDownloadStore get() = updateDownloadStoreProvider.get()
+    val epubBookParser: EpubBookParser get() = epubBookParserProvider.get()
     val readerFontManager: ReaderFontManager get() = readerFontManagerProvider.get()
     val localAudioRepository: LocalAudioRepository get() = localAudioRepositoryProvider.get()
     val backupRepository: HoshiBackupRepository get() = backupRepositoryProvider.get()
