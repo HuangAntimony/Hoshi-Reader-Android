@@ -79,6 +79,40 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun reloadBooksSuppressesAutomaticOfflineRemoteLoadErrorLikeIos() {
+        val local = bookEntry("local-book")
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteLoadError = GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+        assertTrue(viewModel.uiState.value.hasLoadedBooks)
+        assertNull(viewModel.uiState.value.errorMessage.testString())
+    }
+
+    @Test
+    fun refreshRemoteBooksReportsOfflineRemoteLoadErrorLikeIos() {
+        val local = bookEntry("local-book")
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteEntries = listOf(remote),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        repository.remoteLoadError = GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+
+        viewModel.refreshRemoteBooks()
+
+        assertEquals("Failed to fetch books from Google Drive.", viewModel.uiState.value.errorMessage.testString())
+        assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+    }
+
+    @Test
     fun reloadBooksPublishesLocalShelfBeforeRemoteGoogleDriveLoadCompletes() {
         val local = bookEntry("local-book")
         val remote = remoteEntry("drive-folder", "Remote Book")
@@ -298,23 +332,6 @@ class BookshelfViewModelTest {
 
         viewModel.reloadBookEntries()
 
-        assertEquals(
-            "Failed to fetch books from Google Drive.",
-            viewModel.uiState.value.errorMessage.testString(),
-        )
-    }
-
-    @Test
-    fun automaticRemoteNetworkFailureKeepsLocalBooksAndPublishesStableGoogleDriveError() {
-        val repository = FakeBookshelfRepository(
-            entries = listOf(bookEntry("local-book")),
-            remoteLoadError = GoogleDriveApiException("No internet connection."),
-        )
-        val viewModel = BookshelfViewModel(repository, testScope())
-
-        viewModel.reloadBookEntries()
-
-        assertEquals(listOf("local-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
         assertEquals(
             "Failed to fetch books from Google Drive.",
             viewModel.uiState.value.errorMessage.testString(),
@@ -815,7 +832,7 @@ class BookshelfViewModelTest {
         var remoteProgressById: Map<String, Double> = emptyMap(),
         var remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
         var remoteLoadGate: CompletableDeferred<Unit>? = null,
-        val remoteLoadError: Throwable? = null,
+        var remoteLoadError: Throwable? = null,
         val remoteImportError: Throwable? = null,
         val remoteDeleteError: Throwable? = null,
         val remoteImportGate: CompletableDeferred<Unit>? = null,

@@ -176,14 +176,15 @@ fun BackupSettingsView(
                 repository.restoreTtuBookData(context.contentResolver, uri)
             }
             operation = null
-            if (result.isSuccess) {
+            val restoredCount = result.getOrNull() ?: 0
+            if (restoredCount > 0) {
                 onBooksRestored()
             }
             snackbarHostState.showSnackbar(
-                if (result.isSuccess) {
-                    ttuImported
-                } else {
-                    result.exceptionOrNull().stableBackupFailureMessage(ttuImportFailed, ttuBackupUnsupported)
+                when {
+                    result.isSuccess && restoredCount > 0 -> ttuImported
+                    result.isSuccess -> ttuImportFailed
+                    else -> result.exceptionOrNull().stableBackupFailureMessage(ttuImportFailed, ttuBackupUnsupported)
                 },
             )
         }

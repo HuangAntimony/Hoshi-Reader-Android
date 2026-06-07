@@ -148,15 +148,14 @@ class HoshiBackupRepository @Inject constructor(
         }
     }
 
-    suspend fun restoreTtuBookData(contentResolver: ContentResolver, uri: Uri) {
+    suspend fun restoreTtuBookData(contentResolver: ContentResolver, uri: Uri): Int =
         withContext(ioDispatcher) {
             contentResolver.openInputStream(uri)?.use { input ->
                 restoreTtuBookData(input)
             } ?: error("Unable to open backup file.")
         }
-    }
 
-    suspend fun restoreTtuBookData(input: InputStream) {
+    suspend fun restoreTtuBookData(input: InputStream): Int =
         withContext(ioDispatcher) {
             val archiveFile = filesDir.resolve(".ttu-restore-${UUID.randomUUID()}.zip")
             val tempRoot = filesDir.resolve(".ttu-restore-${UUID.randomUUID()}")
@@ -166,11 +165,13 @@ class HoshiBackupRepository @Inject constructor(
             try {
                 archiveFile.outputStream().use { output -> input.copyTo(output) }
                 unzipInto(archiveFile, tempRoot)
+                var restoredCount = 0
                 tempRoot.listFiles().orEmpty().filter(File::isDirectory).forEach { folder ->
                     val files = folder.listFiles().orEmpty()
                     val bookData = files.firstOrNull { it.isFile && it.name.startsWith("bookdata_") && it.extension == "zip" }
                         ?: return@forEach
                     val entry = ttuConverter.importBookData(bookData)
+                    restoredCount += 1
                     files.firstOrNull { it.name.startsWith("statistics_") }?.let { statsFile ->
                         val stats = backupJson.decodeFromString(ListSerializer(ReadingStatistics.serializer()), statsFile.readText())
                         bookRepository.saveStatistics(entry.root, stats)
@@ -190,12 +191,12 @@ class HoshiBackupRepository @Inject constructor(
                         )
                     }
                 }
+                restoredCount
             } finally {
                 archiveFile.delete()
                 tempRoot.deleteRecursively()
             }
         }
-    }
 
     private suspend fun exportFolder(contentResolver: ContentResolver, uri: Uri, target: BackupTarget) {
         withContext(ioDispatcher) {

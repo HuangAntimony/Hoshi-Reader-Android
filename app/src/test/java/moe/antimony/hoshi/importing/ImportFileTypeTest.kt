@@ -20,6 +20,7 @@ class ImportFileTypeTest {
             ImportFileType.SasayakiSubtitle,
             ImportFileType.SasayakiAudiobook,
             ImportFileType.DictionaryArchive,
+            ImportFileType.TtuBookDataBackup,
             ImportFileType.ReaderFont,
         ).flatMap { it.mimeTypes.toList() }
         assertFalse(allPickerTypes.contains("*/*"))

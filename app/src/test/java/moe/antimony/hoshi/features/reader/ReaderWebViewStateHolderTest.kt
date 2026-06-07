@@ -310,6 +310,21 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun readerChapterHtmlDoesNotFabricateHeadForMalformedXhtmlLikeIos() {
+        val html = """
+            <html>
+            <body><p>Reader text</p></body>
+            </html>
+        """.trimIndent()
+
+        val prepared = readerHtmlWithEarlyViewport(html)
+
+        assertFalse(prepared.contains("<head>"))
+        assertFalse(prepared.contains("<meta name=\"viewport\""))
+        assertTrue(prepared.contains("<p>Reader text</p>"))
+    }
+
+    @Test
     fun sasayakiTopToggleSpaceIsReservedBeforeSidecarsAreParsed() {
         val root = createTempDirectory("hoshi-sasayaki-sidecar").toFile()
         try {

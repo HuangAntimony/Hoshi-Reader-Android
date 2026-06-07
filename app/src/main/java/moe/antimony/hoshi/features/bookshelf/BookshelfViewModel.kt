@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
@@ -87,7 +88,7 @@ internal class BookshelfViewModel : ViewModel {
         val generation = reloadGeneration
         val localEntries = _uiState.value.bookEntries
         _uiState.update { it.copy(errorMessage = null) }
-        reloadRemoteBookEntries(localEntries, generation)
+        reloadRemoteBookEntries(localEntries, generation, suppressOfflineErrors = false)
     }
 
     fun changeSort(sortOption: BookSortOption) {
@@ -567,13 +568,17 @@ internal class BookshelfViewModel : ViewModel {
                 errorMessage = null,
             )
         }
-        reloadRemoteBookEntries(result.entries, generation)
+        reloadRemoteBookEntries(result.entries, generation, suppressOfflineErrors = true)
     }
 
     private suspend fun loadBookEntries(sortOption: BookSortOption): BookshelfLoadResult =
         repository.loadBooks(sortOption)
 
-    private fun reloadRemoteBookEntries(localEntries: List<BookEntry>, generation: Int) {
+    private fun reloadRemoteBookEntries(
+        localEntries: List<BookEntry>,
+        generation: Int,
+        suppressOfflineErrors: Boolean,
+    ) {
         remoteLoadJob = workScope.launch {
             try {
                 val remoteResult = repository.loadRemoteBooks(localEntries)
@@ -588,6 +593,7 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 if (generation != reloadGeneration) return@launch
+                if (suppressOfflineErrors && error.isOfflineRemoteLoadError()) return@launch
                 _uiState.update {
                     it.copy(
                         errorMessage = UiText.Resource(R.string.bookshelf_remote_books_load_failed),
@@ -596,6 +602,9 @@ internal class BookshelfViewModel : ViewModel {
             }
         }
     }
+
+    private fun Throwable.isOfflineRemoteLoadError(): Boolean =
+        this is GoogleDriveApiException && message == GoogleDriveApiException.NoInternetConnectionMessage
 
     private fun removeRemoteBook(remoteBookId: String) {
         _uiState.update {

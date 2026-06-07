@@ -9,6 +9,7 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.DriveAuthStatus
 import moe.antimony.hoshi.features.sync.DriveFile
 import moe.antimony.hoshi.features.sync.DriveSyncFiles
 import moe.antimony.hoshi.features.sync.SyncSettings
@@ -144,6 +145,7 @@ class MainShellUiTest {
         assertTrue(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Connected,
                 hasLoadedBooks = true,
                 isSelecting = false,
                 fileTaskBlocked = false,
@@ -152,6 +154,7 @@ class MainShellUiTest {
         assertFalse(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = false),
+                authStatus = DriveAuthStatus.Connected,
                 hasLoadedBooks = true,
                 isSelecting = false,
                 fileTaskBlocked = false,
@@ -160,6 +163,16 @@ class MainShellUiTest {
         assertFalse(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.NotConnected,
+                hasLoadedBooks = true,
+                isSelecting = false,
+                fileTaskBlocked = false,
+            ),
+        )
+        assertFalse(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Connected,
                 hasLoadedBooks = false,
                 isSelecting = false,
                 fileTaskBlocked = false,
@@ -168,6 +181,7 @@ class MainShellUiTest {
         assertFalse(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Connected,
                 hasLoadedBooks = true,
                 isSelecting = true,
                 fileTaskBlocked = false,
@@ -176,6 +190,7 @@ class MainShellUiTest {
         assertFalse(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Connected,
                 hasLoadedBooks = true,
                 isSelecting = false,
                 fileTaskBlocked = true,

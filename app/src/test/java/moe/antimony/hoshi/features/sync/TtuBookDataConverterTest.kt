@@ -222,7 +222,7 @@ class TtuBookDataConverterTest {
     }
 
     @Test
-    fun importBookDataEncodesOnlyGeneratedFileNamesForDistinctTtuSectionReferences() = runBlocking {
+    fun importBookDataPreservesIosSectionFileNamesForDistinctTtuReferences() = runBlocking {
         val repository = BookRepository(tempFolder.root)
         val source = tempFolder.newFile("reversible-section-refs-bookdata.zip")
         writeTtuBookDataWithDistinctSectionReferences(source)
@@ -232,14 +232,14 @@ class TtuBookDataConverterTest {
 
         val unpacked = tempFolder.newFolder("reversible-section-refs-unpacked")
         moe.antimony.hoshi.epub.EpubArchiveExtractor().extract(entry.root.resolve("Reference Book.epub"), unpacked)
-        val colonFile = unpacked.resolve("item/xhtml/chap~3A1.xhtml")
+        val colonFile = unpacked.resolve("item/xhtml/chap:1.xhtml")
         val hyphenFile = unpacked.resolve("item/xhtml/chap-1.xhtml")
         assertTrue(colonFile.isFile)
         assertTrue(hyphenFile.isFile)
         assertTrue(colonFile.readText().contains("Colon reference"))
         assertTrue(hyphenFile.readText().contains("Hyphen reference"))
         val opf = unpacked.resolve("item/standard.opf").readText()
-        assertTrue(opf.contains("""href="xhtml/chap~3A1.xhtml""""))
+        assertTrue(opf.contains("""href="xhtml/chap:1.xhtml""""))
         assertTrue(opf.contains("""href="xhtml/chap-1.xhtml""""))
     }
 

@@ -307,27 +307,7 @@ private fun String.toSafeTtuFileStem(): String {
     require(!stem.contains('/') && !stem.contains('\\')) {
         "Unsafe TTU section reference: $this"
     }
-    return stem.toReversibleTtuFileStem()
-}
-
-private fun String.toReversibleTtuFileStem(): String = buildString {
-    this@toReversibleTtuFileStem.toByteArray(Charsets.UTF_8).forEach { byte ->
-        val value = byte.toInt() and 0xFF
-        val char = value.toChar()
-        if (
-            char in 'A'..'Z' ||
-            char in 'a'..'z' ||
-            char in '0'..'9' ||
-            char == '.' ||
-            char == '_' ||
-            char == '-'
-        ) {
-            append(char)
-        } else {
-            append('~')
-            append(value.toString(16).uppercase().padStart(2, '0'))
-        }
-    }
+    return stem
 }
 
 private fun generateXhtml(file: TtuXhtmlFile, title: String): String {

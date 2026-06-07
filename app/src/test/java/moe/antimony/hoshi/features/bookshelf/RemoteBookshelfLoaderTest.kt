@@ -39,6 +39,24 @@ class RemoteBookshelfLoaderTest {
         assertEquals(listOf("Remote Book"), entries.map { it.title })
     }
 
+    @Test
+    fun remoteBooksUseNaturalTitleOrderingLikeIosLocalizedStandardCompare() = runBlocking {
+        val drive = FakeRemoteBooksDrive(
+            folders = listOf(
+                DriveFile("book-10", "Book 10"),
+                DriveFile("book-2", "Book 2"),
+                DriveFile("book-1", "book 1"),
+            ),
+        )
+
+        val entries = loadRemoteBooksOnce(
+            drive = drive,
+            localDriveNames = emptySet(),
+        )
+
+        assertEquals(listOf("book 1", "Book 2", "Book 10"), entries.map { it.title })
+    }
+
     private class FakeRemoteBooksDrive(
         private val folders: List<DriveFile>,
     ) : DriveSyncDataSource {

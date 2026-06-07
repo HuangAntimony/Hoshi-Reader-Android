@@ -71,7 +71,7 @@ data class ImportFileType(
         val TtuBookDataBackup = ImportFileType(
             description = "TTU bookdata backup",
             extensions = listOf("zip"),
-            mimeTypes = arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*"),
+            mimeTypes = arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"),
             unsupportedMessageRes = R.string.import_select_ttu_bookdata_backup,
         )
 

@@ -305,6 +305,21 @@ class HoshiBackupRepositoryTest {
     }
 
     @Test
+    fun restoreTtuBookDataReturnsZeroWhenArchiveContainsNoBookdata() = runBlocking {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.writeTextEntry("Not TTU/readme.txt", "not bookdata")
+        }
+        val targetDir = Files.createTempDirectory("hoshi-empty-ttu-backup-target").toFile()
+        val targetRepository = BookRepository(targetDir)
+
+        val restored = HoshiBackupRepository(targetDir).restoreTtuBookData(ByteArrayInputStream(output.toByteArray()))
+
+        assertEquals(0, restored)
+        assertTrue(targetRepository.loadBookEntries().isEmpty())
+    }
+
+    @Test
     fun exportTtuBookDataDisambiguatesDuplicateVisibleTitles() = runBlocking {
         val sourceDir = Files.createTempDirectory("hoshi-ttu-backup-duplicate-title").toFile()
         val sourceRepository = BookRepository(sourceDir)
@@ -477,6 +492,12 @@ class HoshiBackupRepositoryTest {
         }
         fail("Missing zip signature: $signature")
         return -1
+    }
+
+    private fun ZipOutputStream.writeTextEntry(path: String, value: String) {
+        putNextEntry(ZipEntry(path))
+        write(value.toByteArray())
+        closeEntry()
     }
 
     private data class LocalFileHeader(

@@ -464,12 +464,7 @@ internal fun readerHtmlWithEarlyViewport(html: String): String {
         val insertAt = head.range.last + 1
         return withoutViewport.substring(0, insertAt) + "\n$viewport" + withoutViewport.substring(insertAt)
     }
-    val htmlTag = readerHtmlOpenTagRegex.find(withoutViewport)
-    if (htmlTag != null) {
-        val insertAt = htmlTag.range.last + 1
-        return withoutViewport.substring(0, insertAt) + "\n<head>$viewport</head>" + withoutViewport.substring(insertAt)
-    }
-    return "<head>$viewport</head>\n$withoutViewport"
+    return withoutViewport
 }
 
 private fun String.removeWhitespaceBeforeXmlDeclaration(): String {
@@ -483,8 +478,6 @@ private val readerViewportMetaRegex =
     Regex("""(?is)<meta\b(?=[^>]*\bname\s*=\s*(['"])viewport\1)[^>]*>""")
 
 private val readerHeadOpenTagRegex = Regex("""(?is)<head\b[^>]*>""")
-
-private val readerHtmlOpenTagRegex = Regex("""(?is)<html\b[^>]*>""")
 
 internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: SasayakiSettings): Boolean =
     settings.enabled &&
@@ -770,10 +763,9 @@ private fun readerSetupScript(
     return """
         (function() {
           document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode;
-          var hoshiHead = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
           var style = document.createElement('style');
           style.textContent = $css;
-          hoshiHead.appendChild(style);
+          document.head.appendChild(style);
           window.scanNonJapaneseText = $scanNonJapaneseText;
           $selectionScript
           window.hoshiSelection.configure({
@@ -787,7 +779,7 @@ private fun readerSetupScript(
             var popupHostScript = document.createElement('script');
             popupHostScript.id = 'hoshi-reader-popup-host-script';
             popupHostScript.src = 'https://appassets.androidplatform.net/popup/reader-popup-host.js';
-            hoshiHead.appendChild(popupHostScript);
+            document.head.appendChild(popupHostScript);
           }
           $paginationScript
         })();

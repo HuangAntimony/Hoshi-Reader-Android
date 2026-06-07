@@ -127,6 +127,7 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.sync.DriveAuthStatus
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncMode
 import moe.antimony.hoshi.features.sync.SyncSettings
@@ -168,6 +169,7 @@ fun BookshelfView(
     val syncSettings by appContainer.syncSettingsRepository.settings.collectAsStateWithLifecycle(
         initialValue = SyncSettings(),
     )
+    var driveAuthStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     val readerSettings by appContainer.readerSettingsRepository.settings.collectAsStateWithLifecycle(
         initialValue = ReaderSettings(),
     )
@@ -238,6 +240,14 @@ fun BookshelfView(
 
     LaunchedEffect(refreshKey) {
         booksViewModel.reloadBookEntries()
+    }
+
+    LaunchedEffect(syncSettings.enabled, refreshKey) {
+        driveAuthStatus = if (syncSettings.enabled) {
+            appContainer.deviceCodeDriveAuthorizer.status()
+        } else {
+            null
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -325,6 +335,7 @@ fun BookshelfView(
             onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))
         },
         syncSettings = syncSettings,
+        driveAuthStatus = driveAuthStatus,
         onSyncBook = { entry, direction ->
             booksViewModel.syncBook(
                 entry = entry,
@@ -678,11 +689,15 @@ internal fun isRemoteBookContextMenuExpanded(
 
 internal fun shouldEnableBookshelfPullRefresh(
     syncSettings: SyncSettings,
+    authStatus: DriveAuthStatus?,
     hasLoadedBooks: Boolean,
     isSelecting: Boolean,
     fileTaskBlocked: Boolean,
 ): Boolean =
-    syncSettings.enabled && hasLoadedBooks && !isSelecting && !fileTaskBlocked
+    shouldLoadRemoteBooks(syncSettings, authStatus ?: DriveAuthStatus.NotConnected) &&
+        hasLoadedBooks &&
+        !isSelecting &&
+        !fileTaskBlocked
 
 private fun LazyGridScope.googleDriveSection(
     remoteBookEntries: List<RemoteBookEntry>,
@@ -825,6 +840,7 @@ private fun BooksTab(
     sasayakiEnabled: Boolean,
     onMatchSasayaki: (BookEntry) -> Unit,
     syncSettings: SyncSettings,
+    driveAuthStatus: DriveAuthStatus?,
     onSyncBook: (BookEntry, SyncDirection?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -889,6 +905,7 @@ private fun BooksTab(
                     val pullRefreshState = rememberPullToRefreshState()
                     val pullRefreshEnabled = shouldEnableBookshelfPullRefresh(
                         syncSettings = syncSettings,
+                        authStatus = driveAuthStatus,
                         hasLoadedBooks = hasLoadedBooks,
                         isSelecting = isSelecting,
                         fileTaskBlocked = fileTaskBlocked,

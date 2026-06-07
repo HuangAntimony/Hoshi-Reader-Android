@@ -243,14 +243,15 @@ function queryRuby(root) {
     return result;
 }
 
-function loadReader(body, sourceUrl = readerPaginatedUrl) {
+function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     const head = new TestElement('head');
     const documentElement = new TestElement('html');
     documentElement.appendChild(head);
     documentElement.appendChild(body);
+    const documentHead = Object.hasOwn(options, 'documentHead') ? options.documentHead : head;
     const document = {
         body,
-        head: null,
+        head: documentHead,
         documentElement,
         fonts: { ready: Promise.resolve() },
         readyState: 'loading',
@@ -518,18 +519,13 @@ test('continuous reader re-stabilizes ruby-adjacent text after unwrap normalizes
     assert.deepEqual(textRunAfter(ruby).slice(0, 4), ['。', 'そ', 'れ', '追']);
 });
 
-test('reader initialization appends viewport when XHTML document.head is null', async () => {
+test('reader initialization requires XHTML document.head like iOS', () => {
     for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         const body = new TestElement('body');
-        const { reader, document, head } = loadReader(body, sourceUrl);
+        const { reader, document } = loadReader(body, sourceUrl, { documentHead: null });
 
         assert.equal(document.head, null);
 
-        reader.initialize();
-        await Promise.resolve();
-
-        const viewport = head.childNodes.find((node) => node.tagName === 'META' && node.name === 'viewport');
-        assert.ok(viewport);
-        assert.equal(viewport.content, 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+        assert.throws(() => reader.initialize(), /appendChild/);
     }
 });

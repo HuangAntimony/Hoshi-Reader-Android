@@ -41,6 +41,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
 import java.io.File
+import java.text.Collator
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 
@@ -373,7 +375,60 @@ internal suspend fun loadRemoteBooksOnce(
             title = TtuSyncRules.desanitizeTtuFilename(folder.name),
             syncFiles = syncFiles,
         )
-    }.sortedBy { it.title.lowercase() }
+    }.sortedWith(compareByIosLikeTitle { it.title })
+}
+
+private fun <T> compareByIosLikeTitle(selector: (T) -> String): Comparator<T> {
+    val collator = Collator.getInstance(Locale.getDefault()).apply {
+        strength = Collator.PRIMARY
+        decomposition = Collator.CANONICAL_DECOMPOSITION
+    }
+    return Comparator { left, right ->
+        val leftTitle = selector(left)
+        val rightTitle = selector(right)
+        compareIosLikeTitle(leftTitle, rightTitle, collator).takeIf { it != 0 }
+            ?: String.CASE_INSENSITIVE_ORDER.compare(leftTitle, rightTitle)
+    }
+}
+
+private fun compareIosLikeTitle(left: String, right: String, collator: Collator): Int {
+    var leftIndex = 0
+    var rightIndex = 0
+    while (leftIndex < left.length && rightIndex < right.length) {
+        val leftDigit = left[leftIndex].isDigit()
+        val rightDigit = right[rightIndex].isDigit()
+        if (leftDigit && rightDigit) {
+            val leftEnd = left.nextDigitRunEnd(leftIndex)
+            val rightEnd = right.nextDigitRunEnd(rightIndex)
+            val leftNumber = left.substring(leftIndex, leftEnd).trimStart('0').ifEmpty { "0" }
+            val rightNumber = right.substring(rightIndex, rightEnd).trimStart('0').ifEmpty { "0" }
+            leftNumber.length.compareTo(rightNumber.length).takeIf { it != 0 }?.let { return it }
+            leftNumber.compareTo(rightNumber).takeIf { it != 0 }?.let { return it }
+            leftIndex = leftEnd
+            rightIndex = rightEnd
+        } else {
+            val leftEnd = if (leftDigit) left.nextDigitRunEnd(leftIndex) else left.nextTextRunEnd(leftIndex)
+            val rightEnd = if (rightDigit) right.nextDigitRunEnd(rightIndex) else right.nextTextRunEnd(rightIndex)
+            collator.compare(left.substring(leftIndex, leftEnd), right.substring(rightIndex, rightEnd))
+                .takeIf { it != 0 }
+                ?.let { return it }
+            leftIndex = leftEnd
+            rightIndex = rightEnd
+        }
+    }
+    return (left.length - leftIndex).compareTo(right.length - rightIndex)
+}
+
+private fun String.nextDigitRunEnd(start: Int): Int {
+    var index = start
+    while (index < length && this[index].isDigit()) index += 1
+    return index
+}
+
+private fun String.nextTextRunEnd(start: Int): Int {
+    var index = start
+    while (index < length && !this[index].isDigit()) index += 1
+    return index
 }
 
 internal suspend fun loadRemoteCoverSources(
