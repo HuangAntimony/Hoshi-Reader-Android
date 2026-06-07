@@ -86,8 +86,10 @@ class ReaderPaginationScriptsTest {
             readerViewportCssLayout(ReaderSettings(verticalWriting = false), 480, 800).imageMaxWidthPx,
         )
         assertTrue(continuousVertical.contains("Math.max(1, Math.floor(window.innerWidth * 1.0) - 1)"))
-        assertTrue(paginatedVertical.contains("var viewportMetrics = window.hoshiReaderViewport || {};"))
-        assertTrue(paginatedHorizontal.contains("var viewportMetrics = window.hoshiReaderViewport || {};"))
+        assertTrue(paginatedVertical.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 1)"))
+        assertTrue(paginatedHorizontal.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 0)"))
+        assertFalse(paginatedVertical.contains("window.hoshiReaderViewport"))
+        assertFalse(paginatedHorizontal.contains("window.hoshiReaderViewport"))
         assertFalse(continuousVertical.contains("__HOSHI_IMAGE_WIDTH_REDUCTION_PX__"))
     }
 
@@ -151,7 +153,7 @@ class ReaderPaginationScriptsTest {
     fun verticalPageHeightExtendsPastViewportByBottomOverlap() {
         val script = ReaderPaginationScripts.shellScript()
 
-        assertTrue(script.contains("var pageHeight = Number(viewportMetrics.pageHeight) || (window.innerHeight + 22);"))
+        assertTrue(script.contains("var pageHeight = window.innerHeight + 22;"))
     }
 
     @Test
@@ -160,24 +162,25 @@ class ReaderPaginationScriptsTest {
             settings = ReaderSettings(verticalWriting = false),
         )
 
-        assertTrue(script.contains("var pageHeight = Number(viewportMetrics.pageHeight) || (window.innerHeight + 0);"))
+        assertTrue(script.contains("var pageHeight = window.innerHeight + 0;"))
         assertFalse(script.contains("window.innerHeight + 22"))
     }
 
     @Test
-    fun paginatedInitializeUsesPreseededViewportCssVariables() {
+    fun paginatedInitializeWritesRuntimeViewportCssVariables() {
         val script = ReaderPaginationScripts.shellScript()
         val initialize = script.substringAfter("window.hoshiReader.initialize = function()")
             .substringBefore("function setupReaderImage")
 
         assertTrue(initialize.contains("window.hoshiReader.pageHeight = pageHeight;"))
         assertTrue(initialize.contains("window.hoshiReader.pageWidth = pageWidth;"))
-        assertFalse(initialize.contains("style.setProperty('--page-height'"))
-        assertFalse(initialize.contains("style.setProperty('--page-width'"))
-        assertFalse(initialize.contains("style.setProperty('--hoshi-vertical-padding-block'"))
-        assertFalse(initialize.contains("style.setProperty('--hoshi-vertical-padding-gap'"))
-        assertFalse(initialize.contains("style.setProperty('--hoshi-image-max-width'"))
-        assertFalse(initialize.contains("style.setProperty('--hoshi-image-max-height'"))
+        assertTrue(initialize.contains("style.setProperty('--page-height'"))
+        assertTrue(initialize.contains("style.setProperty('--page-width'"))
+        assertTrue(initialize.contains("style.setProperty('--hoshi-vertical-padding-block'"))
+        assertTrue(initialize.contains("style.setProperty('--hoshi-vertical-padding-gap'"))
+        assertTrue(initialize.contains("style.setProperty('--hoshi-image-max-width'"))
+        assertTrue(initialize.contains("style.setProperty('--hoshi-image-max-height'"))
+        assertFalse(initialize.contains("window.hoshiReaderViewport"))
     }
 
     @Test
@@ -321,7 +324,8 @@ class ReaderPaginationScriptsTest {
         assertTrue(script.contains("var mediaStart = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll"))
         assertTrue(script.contains("var mediaEnd = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll"))
         assertTrue(script.contains("var minScroll = firstContentEdge === null ? 0"))
-        assertTrue(script.contains("var maxScroll = Math.min(maxAlignedScroll, lastContentScroll)"))
+        assertTrue(script.contains("var lastContentScroll = lastContentEdge <= 0 ? 0 : this.alignToPage(context, lastContentEdge - 1)"))
+        assertTrue(script.contains("var maxScroll = Math.min(context.maxScroll, lastContentScroll)"))
     }
 
     @Test

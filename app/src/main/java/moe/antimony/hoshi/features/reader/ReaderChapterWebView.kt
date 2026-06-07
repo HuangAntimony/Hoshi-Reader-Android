@@ -757,12 +757,6 @@ private fun readerSetupScript(
     ).let { css ->
         "${viewportLayout.cssVariables()}\n$css"
     }.let(::readerJavaScriptStringLiteral)
-    val viewportMetrics = """
-        window.hoshiReaderViewport = {
-          pageHeight: ${viewportLayout.pageHeightPx},
-          pageWidth: ${viewportLayout.pageWidthPx}
-        };
-    """.trimIndent()
     val selectionScript = assets.selectionJs
     val paginationScript = ReaderPaginationScripts.shellScriptWithRestoreToken(
         initialProgress = initialProgress,
@@ -780,7 +774,6 @@ private fun readerSetupScript(
           var style = document.createElement('style');
           style.textContent = $css;
           hoshiHead.appendChild(style);
-          $viewportMetrics
           window.scanNonJapaneseText = $scanNonJapaneseText;
           $selectionScript
           window.hoshiSelection.configure({

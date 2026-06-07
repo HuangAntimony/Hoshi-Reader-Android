@@ -807,8 +807,8 @@ window.hoshiReader = {
     }
 
     var minScroll = firstContentEdge === null ? 0 : Math.min(maxAlignedScroll, this.alignContentStartToPage(context, firstContentEdge));
-    var lastContentScroll = lastContentEdge <= 0 ? 0 : Math.floor(Math.max(0, lastContentEdge - 1) / context.pageSize) * context.pageSize;
-    var maxScroll = Math.min(maxAlignedScroll, lastContentScroll);
+    var lastContentScroll = lastContentEdge <= 0 ? 0 : this.alignToPage(context, lastContentEdge - 1);
+    var maxScroll = Math.min(context.maxScroll, lastContentScroll);
     progressStops.sort(function(a, b) { return a.scroll - b.scroll; });
     var metrics = {
       minScroll: minScroll,
@@ -930,10 +930,12 @@ window.hoshiReader = {
     var currentScroll = this.getPagePosition(context);
     var metrics = this.paginationMetrics || this.buildPaginationMetrics();
     var minAlignedScroll = metrics.minScroll;
-    var maxAlignedScroll = metrics.maxScroll;
+    var maxPageScroll = metrics.maxScroll;
     if (direction === "forward") {
-      if ((currentScroll + context.pageSize) <= (maxAlignedScroll + 1)) {
+      if (currentScroll < (maxPageScroll - 1)) {
         var targetForward = Math.round((currentScroll + context.pageSize) / context.pageSize) * context.pageSize;
+        targetForward = Math.min(targetForward, maxPageScroll);
+        if (targetForward <= (currentScroll + 1)) return "limit";
         this.setPagePosition(context, targetForward);
         return "scrolled";
       }
@@ -960,9 +962,14 @@ window.hoshiReader.initialize = function() {
   newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
   var hoshiHead = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
   hoshiHead.appendChild(newViewport);
-  var viewportMetrics = window.hoshiReaderViewport || {};
-  var pageHeight = Number(viewportMetrics.pageHeight) || (window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__);
-  var pageWidth = Number(viewportMetrics.pageWidth) || window.innerWidth;
+  var pageHeight = window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__;
+  var pageWidth = window.innerWidth;
+  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
+  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
+  document.documentElement.style.setProperty('--page-height', pageHeight + 'px');
+  document.documentElement.style.setProperty('--page-width', pageWidth + 'px');
+  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(pageWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
+  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, pageHeight - __HOSHI_BOTTOM_OVERLAP_PX__) + 'px');
   window.hoshiReader.pageHeight = pageHeight;
   window.hoshiReader.pageWidth = pageWidth;
   function setupReaderImage(element, src, wrap, blurElement) {

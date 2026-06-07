@@ -195,6 +195,44 @@ class TestFragment extends TestNode {
     }
 }
 
+class TestRange {
+    constructor() {
+        this.node = null;
+    }
+
+    selectNodeContents(node) {
+        this.node = node;
+    }
+
+    setStart(node) {
+        this.node = node;
+    }
+
+    setEnd() {}
+
+    getClientRects() {
+        return this.node?.rects ?? [];
+    }
+
+    getBoundingClientRect() {
+        const rects = this.getClientRects();
+        if (!rects.length) {
+            return { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+        }
+        const left = Math.min(...rects.map((rect) => rect.left));
+        const right = Math.max(...rects.map((rect) => rect.right));
+        const top = Math.min(...rects.map((rect) => rect.top));
+        const bottom = Math.max(...rects.map((rect) => rect.bottom));
+        return { left, right, top, bottom, width: right - left, height: bottom - top };
+    }
+
+    detach() {}
+}
+
+function testRect(top, bottom, left = 0, right = 20) {
+    return { left, right, top, bottom, width: right - left, height: bottom - top };
+}
+
 function queryRuby(root) {
     const result = [];
     const visit = (node) => {
@@ -224,6 +262,9 @@ function loadReader(body, sourceUrl = readerPaginatedUrl) {
         },
         createElement(tagName) {
             return new TestElement(tagName);
+        },
+        createRange() {
+            return new TestRange();
         },
         createTreeWalker(root) {
             const nodes = [];
@@ -380,6 +421,44 @@ test('paginated restoreProgress at chapter start avoids eager pagination metrics
     assert.deepEqual(scrolls, [0]);
     assert.equal(restored, 1);
     assert.equal(builtMetrics, 0);
+});
+
+test('paginated content metrics include final partial page when real text reaches it', () => {
+    const body = new TestElement('body');
+    body.scrollTop = 0;
+    body.scrollHeight = 4250;
+    const intro = new TestText('始');
+    intro.rects = [testRect(0, 40)];
+    const tail = new TestText('終');
+    tail.rects = [testRect(4000, 4100)];
+    body.appendChild(intro);
+    body.appendChild(tail);
+    const { reader } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.pageWidth = 480;
+
+    const metrics = reader.buildPaginationMetrics();
+
+    assert.equal(metrics.maxScroll, 3450);
+});
+
+test('paginated forward navigation reaches final partial page', () => {
+    const body = new TestElement('body');
+    body.scrollTop = 3200;
+    const { reader } = loadReader(body);
+    reader.getScrollContext = () => ({
+        vertical: true,
+        scrollEl: body,
+        pageSize: 800,
+        maxScroll: 3450,
+    });
+    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, progressStops: [] };
+    reader.refreshSasayakiCuePresentation = () => {};
+
+    const result = reader.paginate('forward');
+
+    assert.equal(result, 'scrolled');
+    assert.equal(body.scrollTop, 3450);
 });
 
 test('continuous reader stabilizes vertical ruby-adjacent text like paginated reader', () => {
