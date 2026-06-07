@@ -348,7 +348,7 @@ private fun generateXhtml(file: TtuXhtmlFile, title: String): String {
         $content
         </body>
         </html>
-    """.trimIndent()
+    """.trimIndent().trimStart()
 }
 
 private fun generateNavigationDocuments(xhtmlFiles: List<TtuXhtmlFile>): String {

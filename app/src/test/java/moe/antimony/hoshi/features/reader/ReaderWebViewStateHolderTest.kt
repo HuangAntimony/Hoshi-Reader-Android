@@ -291,6 +291,25 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun readerChapterHtmlKeepsXmlDeclarationAtDocumentStart() {
+        val html = """
+
+              <?xml version="1.0" encoding="UTF-8"?>
+              <html xmlns="http://www.w3.org/1999/xhtml">
+              <head><title>Reader</title></head>
+              <body><p>Reader text</p></body>
+              </html>
+        """.trimIndent()
+
+        val prepared = readerHtmlWithEarlyViewport(html)
+
+        assertTrue(prepared.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
+        assertFalse(prepared.startsWith("\n"))
+        assertFalse(prepared.startsWith(" "))
+        assertTrue(prepared.contains("<meta name=\"viewport\""))
+    }
+
+    @Test
     fun sasayakiTopToggleSpaceIsReservedBeforeSidecarsAreParsed() {
         val root = createTempDirectory("hoshi-sasayaki-sidecar").toFile()
         try {

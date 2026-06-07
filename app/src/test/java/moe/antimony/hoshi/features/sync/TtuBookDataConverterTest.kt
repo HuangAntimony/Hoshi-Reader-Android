@@ -91,6 +91,8 @@ class TtuBookDataConverterTest {
         moe.antimony.hoshi.epub.EpubArchiveExtractor().extract(entry.root.resolve("Imported Book.epub"), unpacked)
         val first = unpacked.resolve("item/xhtml/chapter-1.xhtml").readText()
         val second = unpacked.resolve("item/xhtml/chapter-2.xhtml").readText()
+        assertTrue(first.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
+        assertTrue(second.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
         assertTrue(first.contains("""<br class="clear"/>"""))
         assertTrue(first.contains("""<hr data-x="1"/>"""))
         assertTrue(first.contains("""<img src="../image/pic.png"/>"""))
@@ -191,7 +193,7 @@ class TtuBookDataConverterTest {
                 {
                   "title": "Imported Book",
                   "styleSheet": "body { color: black; }",
-                  "elementHtml": "<div id=\"ttu-chapter-1\"><div class=\"ttu-book-html-wrapper html-class\" data-extra=\"1\"><div class=\"ttu-book-body-wrapper body-class\" data-extra=\"2\"><p>First<br class=\"clear\"><hr data-x=\"1\"><img src=\"../image/pic.png\"></p></div></div></div><div id=\"ttu-chapter-2\"><p>No wrappers</p></div>",
+                  "elementHtml": "<div id=\"ttu-chapter-1\"><div class=\"ttu-book-html-wrapper html-class\" data-extra=\"1\"><div class=\"ttu-book-body-wrapper body-class\" data-extra=\"2\">\\n<div class=\"main\">\\n<p>First<br class=\"clear\"><hr data-x=\"1\"><img src=\"../image/pic.png\"></p>\\n</div>\\n</div></div></div><div id=\"ttu-chapter-2\"><p>No wrappers</p></div>",
                   "sections": [
                     {"reference":"ttu-chapter-1","charactersWeight":5,"label":"Chapter 1","startCharacter":0,"characters":5,"parentChapter":null},
                     {"reference":"ttu-chapter-2","charactersWeight":5,"label":"Chapter 2","startCharacter":5,"characters":5,"parentChapter":null}

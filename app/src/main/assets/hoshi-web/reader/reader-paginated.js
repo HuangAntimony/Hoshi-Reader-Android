@@ -954,7 +954,8 @@ window.hoshiReader.initialize = function() {
   var newViewport = document.createElement('meta');
   newViewport.name = 'viewport';
   newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-  document.head.appendChild(newViewport);
+  var hoshiHead = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
+  hoshiHead.appendChild(newViewport);
   var pageHeight = window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__;
   var pageWidth = window.innerWidth;
   document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');

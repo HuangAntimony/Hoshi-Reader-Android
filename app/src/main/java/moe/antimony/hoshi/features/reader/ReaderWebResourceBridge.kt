@@ -24,7 +24,7 @@ internal class ReaderWebResourceBridge(
     ) : this(book, fontManager::fontFileForRequest)
 
     fun resourceForUrl(url: String): ReaderWebResource? {
-        val uri = runCatching { URI(url) }.getOrNull() ?: return null
+        val uri = runCatching { URI(url).normalize() }.getOrNull() ?: return null
         if (uri.host != "hoshi.local") return null
         val path = uri.path.orEmpty()
         return when {
@@ -35,7 +35,7 @@ internal class ReaderWebResourceBridge(
     }
 
     fun imageResourceForUrl(url: String): ReaderWebResource? {
-        val uri = runCatching { URI(url) }.getOrNull() ?: return null
+        val uri = runCatching { URI(url).normalize() }.getOrNull() ?: return null
         if (uri.host != "hoshi.local") return null
         val path = uri.path.orEmpty().removePrefix("/epub/")
         if (path.isBlank() || path == uri.path.orEmpty()) return null

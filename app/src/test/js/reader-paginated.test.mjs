@@ -8,7 +8,29 @@ const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-c
 
 function readerSource(url) {
     return fs.readFileSync(url, 'utf8')
-        .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', '');
+        .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', '')
+        .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
+        .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', '0')
+        .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
+        .replaceAll('__HOSHI_VERTICAL_PADDING_GAP_RATIO__', '0')
+        .replaceAll('__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__', '1')
+        .replaceAll('__HOSHI_IMAGE_WIDTH_REDUCTION_PX__', '0')
+        .replaceAll('__HOSHI_BLUR_IMAGES__', 'false')
+        .replaceAll('__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__', JSON.stringify('0px'))
+        .replaceAll('__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__', JSON.stringify('0px'))
+        .replaceAll('__HOSHI_RESTORE_SCRIPTS__', '');
+}
+
+function testStyle() {
+    const values = new Map();
+    return {
+        setProperty(name, value) {
+            values.set(name, value);
+        },
+        getPropertyValue(name) {
+            return values.get(name) ?? '';
+        },
+    };
 }
 
 class TestNode {
@@ -75,6 +97,14 @@ class TestElement extends TestNode {
         super(1);
         this.tagName = tagName.toUpperCase();
         this.childNodes = [];
+        this.style = testStyle();
+        this.classList = {
+            add() {},
+            remove() {},
+            contains() {
+                return false;
+            },
+        };
     }
 
     appendChild(child) {
@@ -104,6 +134,18 @@ class TestElement extends TestNode {
         }
         return child;
     }
+
+    remove() {
+        this.parentNode?.removeChild(this);
+    }
+
+    addEventListener() {}
+
+    getAttribute() {
+        return null;
+    }
+
+    setAttribute() {}
 
     normalize() {
         const normalized = [];
@@ -164,8 +206,14 @@ function queryRuby(root) {
 }
 
 function loadReader(body, sourceUrl = readerPaginatedUrl) {
+    const head = new TestElement('head');
+    const documentElement = new TestElement('html');
+    documentElement.appendChild(head);
+    documentElement.appendChild(body);
     const document = {
         body,
+        head: null,
+        documentElement,
         readyState: 'loading',
         createDocumentFragment() {
             return new TestFragment();
@@ -176,13 +224,39 @@ function loadReader(body, sourceUrl = readerPaginatedUrl) {
         createElement(tagName) {
             return new TestElement(tagName);
         },
+        createTreeWalker(root) {
+            const nodes = [];
+            const visit = (node) => {
+                if (node.nodeType === 3) nodes.push(node);
+                node.childNodes?.forEach(visit);
+            };
+            visit(root);
+            let index = 0;
+            return {
+                nextNode() {
+                    return nodes[index++] ?? null;
+                },
+            };
+        },
+        querySelector(selector) {
+            if (selector !== 'meta[name="viewport"]') return null;
+            return head.childNodes.find((node) => node.tagName === 'META' && node.name === 'viewport') ?? null;
+        },
         querySelectorAll(selector) {
             return selector === 'ruby' ? queryRuby(body) : [];
+        },
+        getElementsByTagName(tagName) {
+            return tagName.toLowerCase() === 'head' ? [head] : [];
         },
         addEventListener() {},
     };
     const window = {
         addEventListener() {},
+        innerHeight: 800,
+        innerWidth: 480,
+        scrollX: 0,
+        scrollY: 0,
+        scrollTo() {},
         getComputedStyle() {
             return { writingMode: 'vertical-rl', getPropertyValue: () => '' };
         },
@@ -195,7 +269,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl) {
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
         window,
     });
-    return window.hoshiReader;
+    return { reader: window.hoshiReader, document, head };
 }
 
 function rubyParagraph() {
@@ -233,7 +307,7 @@ function textRunAfter(node) {
 
 function assertRubyTextNodesAreNormalized(sourceUrl) {
     const { paragraph, ruby } = rubyParagraphWithWhitespaceTextNodes();
-    const reader = loadReader(paragraph, sourceUrl);
+    const { reader } = loadReader(paragraph, sourceUrl);
 
     assert.equal(typeof reader.normalizeReaderText, 'function');
     reader.normalizeReaderText(paragraph);
@@ -251,7 +325,7 @@ test('paginated reader re-stabilizes ruby-adjacent text after unwrap normalizes 
     const wrapper = new TestElement('span');
     wrapper.appendChild(new TestText('追加'));
     paragraph.appendChild(wrapper);
-    const reader = loadReader(paragraph);
+    const { reader } = loadReader(paragraph);
 
     reader.unwrap([wrapper]);
 
@@ -261,7 +335,7 @@ test('paginated reader re-stabilizes ruby-adjacent text after unwrap normalizes 
 test('paginated reader-specific text normalization keeps ruby-adjacent text stable', () => {
     const { paragraph, ruby } = rubyParagraph();
     paragraph.normalize();
-    const reader = loadReader(paragraph);
+    const { reader } = loadReader(paragraph);
 
     assert.equal(typeof reader.normalizeReaderText, 'function');
     reader.normalizeReaderText(paragraph);
@@ -276,7 +350,7 @@ test('paginated reader removes ruby whitespace text nodes and wraps base text no
 test('continuous reader stabilizes vertical ruby-adjacent text like paginated reader', () => {
     const { paragraph, ruby } = rubyParagraph();
     paragraph.normalize();
-    const reader = loadReader(paragraph, readerContinuousUrl);
+    const { reader } = loadReader(paragraph, readerContinuousUrl);
 
     assert.equal(typeof reader.stabilizeRubyAdjacentTextNodes, 'function');
     reader.stabilizeRubyAdjacentTextNodes();
@@ -287,7 +361,7 @@ test('continuous reader stabilizes vertical ruby-adjacent text like paginated re
 test('continuous reader-specific text normalization keeps ruby-adjacent text stable', () => {
     const { paragraph, ruby } = rubyParagraph();
     paragraph.normalize();
-    const reader = loadReader(paragraph, readerContinuousUrl);
+    const { reader } = loadReader(paragraph, readerContinuousUrl);
 
     assert.equal(typeof reader.normalizeReaderText, 'function');
     reader.normalizeReaderText(paragraph);
@@ -304,9 +378,25 @@ test('continuous reader re-stabilizes ruby-adjacent text after unwrap normalizes
     const wrapper = new TestElement('span');
     wrapper.appendChild(new TestText('追加'));
     paragraph.appendChild(wrapper);
-    const reader = loadReader(paragraph, readerContinuousUrl);
+    const { reader } = loadReader(paragraph, readerContinuousUrl);
 
     reader.unwrap([wrapper]);
 
     assert.deepEqual(textRunAfter(ruby).slice(0, 4), ['。', 'そ', 'れ', '追']);
+});
+
+test('reader initialization appends viewport when XHTML document.head is null', async () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        const { reader, document, head } = loadReader(body, sourceUrl);
+
+        assert.equal(document.head, null);
+
+        reader.initialize();
+        await Promise.resolve();
+
+        const viewport = head.childNodes.find((node) => node.tagName === 'META' && node.name === 'viewport');
+        assert.ok(viewport);
+        assert.equal(viewport.content, 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    }
 });

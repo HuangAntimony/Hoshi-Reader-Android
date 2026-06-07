@@ -112,6 +112,30 @@ class ReaderWebResourceBridgeTest {
         assertNull(bridge.imageResourceForUrl("not a url"))
     }
 
+    @Test
+    fun normalizesRelativeSegmentsInEpubResourceRequests() {
+        val bridge = ReaderWebResourceBridge(
+            book = EpubBook(
+                title = "Book",
+                chapters = emptyList(),
+                resources = mapOf(
+                    "item/image/cover.jpg" to EpubResource("image/jpeg", byteArrayOf(4, 5, 6)),
+                    "item/stylesheet.css" to EpubResource("text/css", "body {}".toByteArray()),
+                ),
+            ),
+            fontFileForRequest = { null },
+        )
+
+        val image = bridge.resourceForUrl("https://hoshi.local/epub/item/xhtml/../image/cover.jpg")
+        val css = bridge.resourceForUrl("https://hoshi.local/epub/item/xhtml/../stylesheet.css")
+        val fullscreenImage = bridge.imageResourceForUrl("https://hoshi.local/epub/item/xhtml/../image/cover.jpg")
+
+        assertEquals("image/jpeg", image?.mediaType)
+        assertEquals(listOf(4.toByte(), 5.toByte(), 6.toByte()), image?.data?.toList())
+        assertEquals("text/css", css?.mediaType)
+        assertEquals("image/jpeg", fullscreenImage?.mediaType)
+    }
+
     private fun bookWithResource(
         path: String,
         mediaType: String,

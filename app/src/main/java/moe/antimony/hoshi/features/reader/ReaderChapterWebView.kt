@@ -442,7 +442,8 @@ internal fun readerWebViewLoadKey(
     "$baseUrl#${readerContentReloadKey.hashCode()}#${readerSetupReloadKey.hashCode()}#$webViewViewportSize"
 
 internal fun readerHtmlWithEarlyViewport(html: String): String {
-    val withoutViewport = readerViewportMetaRegex.replace(html, "")
+    val normalizedHtml = html.removeWhitespaceBeforeXmlDeclaration()
+    val withoutViewport = readerViewportMetaRegex.replace(normalizedHtml, "")
     val head = readerHeadOpenTagRegex.find(withoutViewport)
     val viewport = """<meta name="viewport" content="$ReaderViewportContent" />"""
     if (head != null) {
@@ -455,6 +456,11 @@ internal fun readerHtmlWithEarlyViewport(html: String): String {
         return withoutViewport.substring(0, insertAt) + "\n<head>$viewport</head>" + withoutViewport.substring(insertAt)
     }
     return "<head>$viewport</head>\n$withoutViewport"
+}
+
+private fun String.removeWhitespaceBeforeXmlDeclaration(): String {
+    val trimmed = trimStart()
+    return if (trimmed.startsWith("<?xml", ignoreCase = true)) trimmed else this
 }
 
 private const val ReaderViewportContent = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
@@ -742,9 +748,10 @@ private fun readerSetupScript(
     return """
         (function() {
           document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode;
+          var hoshiHead = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
           var style = document.createElement('style');
           style.textContent = $css;
-          document.head.appendChild(style);
+          hoshiHead.appendChild(style);
           window.scanNonJapaneseText = $scanNonJapaneseText;
           $selectionScript
           window.hoshiSelection.configure({
@@ -758,7 +765,7 @@ private fun readerSetupScript(
             var popupHostScript = document.createElement('script');
             popupHostScript.id = 'hoshi-reader-popup-host-script';
             popupHostScript.src = 'https://hoshi.local/popup/reader-popup-host.js';
-            document.head.appendChild(popupHostScript);
+            hoshiHead.appendChild(popupHostScript);
           }
           $paginationScript
         })();
