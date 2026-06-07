@@ -479,13 +479,16 @@ class GoogleDriveClient @Inject constructor(
 
     private fun checkValidatedInternet() {
         val network = connectivityManager?.activeNetwork
-            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
+            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
         val capabilities = connectivityManager.getNetworkCapabilities(network)
-            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
-        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
-            !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        if (!shouldAttemptDriveRequest(
+                hasActiveNetwork = true,
+                hasInternetCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+                hasValidatedCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
+            )
         ) {
-            throw GoogleDriveApiException(GoogleDriveApiException.NoValidatedInternetConnectionMessage)
+            throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
         }
     }
 

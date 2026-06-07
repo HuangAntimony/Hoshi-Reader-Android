@@ -88,6 +88,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -175,6 +178,7 @@ fun BookshelfView(
     val uiState by booksViewModel.uiState.collectAsStateWithLifecycle()
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var contextMenuTarget by remember { mutableStateOf<BookContextMenuTarget?>(null) }
+    var remoteContextMenuTarget by remember { mutableStateOf<RemoteBookContextMenuTarget?>(null) }
     var deleteCandidate by remember { mutableStateOf<BookEntry?>(null) }
     var remoteDeleteCandidate by remember { mutableStateOf<RemoteBookEntry?>(null) }
     var exportCandidate by remember { mutableStateOf<BookEntry?>(null) }
@@ -292,6 +296,7 @@ fun BookshelfView(
         onImportFiles = ::launchBookImporter,
         onImportFolder = ::launchBookFolderImporter,
         onOpenBook = booksViewModel::openBook,
+        onRefreshRemoteBooks = booksViewModel::refreshRemoteBooks,
         onImportRemoteBook = { entry ->
             booksViewModel.importRemoteBook(
                 entry = entry,
@@ -302,6 +307,8 @@ fun BookshelfView(
         onDeleteRemoteCandidate = { remoteDeleteCandidate = it },
         contextMenuTarget = contextMenuTarget,
         onContextMenuTargetChange = { contextMenuTarget = it },
+        remoteContextMenuTarget = remoteContextMenuTarget,
+        onRemoteContextMenuTargetChange = { remoteContextMenuTarget = it },
         onDeleteCandidate = { deleteCandidate = it },
         onExportCandidate = { entry ->
             exportCandidate = entry
@@ -640,6 +647,10 @@ internal data class BookContextMenuTarget(
     val bookId: String,
 )
 
+internal data class RemoteBookContextMenuTarget(
+    val remoteBookId: String,
+)
+
 internal fun bookContextMenuTarget(
     section: BookshelfSectionModel,
     entry: BookEntry,
@@ -656,6 +667,23 @@ internal fun isBookContextMenuExpanded(
 ): Boolean =
     activeTarget == bookContextMenuTarget(section, entry)
 
+internal fun remoteBookContextMenuTarget(entry: RemoteBookEntry): RemoteBookContextMenuTarget =
+    RemoteBookContextMenuTarget(remoteBookId = entry.id)
+
+internal fun isRemoteBookContextMenuExpanded(
+    activeTarget: RemoteBookContextMenuTarget?,
+    entry: RemoteBookEntry,
+): Boolean =
+    activeTarget == remoteBookContextMenuTarget(entry)
+
+internal fun shouldEnableBookshelfPullRefresh(
+    syncSettings: SyncSettings,
+    hasLoadedBooks: Boolean,
+    isSelecting: Boolean,
+    fileTaskBlocked: Boolean,
+): Boolean =
+    syncSettings.enabled && hasLoadedBooks && !isSelecting && !fileTaskBlocked
+
 private fun LazyGridScope.googleDriveSection(
     remoteBookEntries: List<RemoteBookEntry>,
     remoteProgressById: Map<String, Double>,
@@ -670,6 +698,8 @@ private fun LazyGridScope.googleDriveSection(
     onShelfExpandedChange: (String, Boolean) -> Unit,
     onImportRemoteBook: (RemoteBookEntry) -> Unit,
     onDeleteRemoteCandidate: (RemoteBookEntry) -> Unit,
+    remoteContextMenuTarget: RemoteBookContextMenuTarget?,
+    onRemoteContextMenuTargetChange: (RemoteBookContextMenuTarget?) -> Unit,
 ) {
     if (remoteBookEntries.isEmpty()) return
     val presentation = googleDriveSectionPresentation(shelfExpansionState, isSelecting)
@@ -697,17 +727,25 @@ private fun LazyGridScope.googleDriveSection(
             key = { "google-drive:${it.id}" },
             contentType = { "remoteBook" },
         ) { entry ->
-            RemoteBookGridCell(
-                entry = entry,
-                progress = remoteProgressById[entry.id] ?: 0.0,
-                downloadProgress = remoteImportProgressById[entry.id],
-                coverSource = remoteCoverSourcesById[entry.id],
-                layoutSpec = layoutSpec,
-                enabled = presentation.allowsHitTesting && !fileTaskBlocked && entry.id !in remoteBusyBookIds,
-                onImport = { onImportRemoteBook(entry) },
-                onDelete = { onDeleteRemoteCandidate(entry) },
-                modifier = Modifier.alpha(presentation.alpha),
-            )
+            Box {
+                RemoteBookGridCell(
+                    entry = entry,
+                    progress = remoteProgressById[entry.id] ?: 0.0,
+                    downloadProgress = remoteImportProgressById[entry.id],
+                    coverSource = remoteCoverSourcesById[entry.id],
+                    layoutSpec = layoutSpec,
+                    enabled = presentation.allowsHitTesting && !fileTaskBlocked && entry.id !in remoteBusyBookIds,
+                    onImport = { onImportRemoteBook(entry) },
+                    onOpenContextMenu = { onRemoteContextMenuTargetChange(remoteBookContextMenuTarget(entry)) },
+                    modifier = Modifier.alpha(presentation.alpha),
+                )
+                RemoteBookContextMenu(
+                    entry = entry,
+                    expanded = isRemoteBookContextMenuExpanded(remoteContextMenuTarget, entry),
+                    onDismiss = { onRemoteContextMenuTargetChange(null) },
+                    onDeleteCandidate = onDeleteRemoteCandidate,
+                )
+            }
         }
     } else {
         item(
@@ -772,10 +810,13 @@ private fun BooksTab(
     onImportFiles: () -> Unit,
     onImportFolder: () -> Unit,
     onOpenBook: (BookEntry) -> Unit,
+    onRefreshRemoteBooks: () -> Unit,
     onImportRemoteBook: (RemoteBookEntry) -> Unit,
     onDeleteRemoteCandidate: (RemoteBookEntry) -> Unit,
     contextMenuTarget: BookContextMenuTarget?,
     onContextMenuTargetChange: (BookContextMenuTarget?) -> Unit,
+    remoteContextMenuTarget: RemoteBookContextMenuTarget?,
+    onRemoteContextMenuTargetChange: (RemoteBookContextMenuTarget?) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
     onExportCandidate: (BookEntry) -> Unit,
     onMarkReadCandidate: (BookEntry) -> Unit,
@@ -845,9 +886,24 @@ private fun BooksTab(
                         .padding(horizontal = layoutSpec.pageHorizontalPaddingDp.dp),
                 )
                 else -> CompositionLocalProvider(LocalOverscrollFactory provides null) {
+                    val pullRefreshState = rememberPullToRefreshState()
+                    val pullRefreshEnabled = shouldEnableBookshelfPullRefresh(
+                        syncSettings = syncSettings,
+                        hasLoadedBooks = hasLoadedBooks,
+                        isSelecting = isSelecting,
+                        fileTaskBlocked = fileTaskBlocked,
+                    )
+                    Box(modifier = contentModifier.fillMaxHeight()) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(layoutSpec.bookGridColumns(contentWidthDp)),
-                        modifier = contentModifier.fillMaxHeight(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pullToRefresh(
+                                isRefreshing = false,
+                                state = pullRefreshState,
+                                enabled = pullRefreshEnabled,
+                                onRefresh = onRefreshRemoteBooks,
+                            ),
                         contentPadding = PaddingValues(
                             start = layoutSpec.pageHorizontalPaddingDp.dp,
                             end = layoutSpec.pageHorizontalPaddingDp.dp,
@@ -875,6 +931,8 @@ private fun BooksTab(
                                     onShelfExpandedChange = onShelfExpandedChange,
                                     onImportRemoteBook = onImportRemoteBook,
                                     onDeleteRemoteCandidate = onDeleteRemoteCandidate,
+                                    remoteContextMenuTarget = remoteContextMenuTarget,
+                                    onRemoteContextMenuTargetChange = onRemoteContextMenuTargetChange,
                                 )
                             }
                             val collapseKey = section.collapseKey
@@ -986,8 +1044,18 @@ private fun BooksTab(
                                 onShelfExpandedChange = onShelfExpandedChange,
                                 onImportRemoteBook = onImportRemoteBook,
                                 onDeleteRemoteCandidate = onDeleteRemoteCandidate,
+                                remoteContextMenuTarget = remoteContextMenuTarget,
+                                onRemoteContextMenuTargetChange = onRemoteContextMenuTargetChange,
                             )
                         }
+                    }
+                    if (pullRefreshEnabled) {
+                        PullToRefreshDefaults.Indicator(
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            isRefreshing = false,
+                            state = pullRefreshState,
+                        )
+                    }
                     }
                 }
             }
@@ -1320,14 +1388,14 @@ private fun RemoteBookGridCell(
     layoutSpec: MainShellLayoutSpec,
     enabled: Boolean,
     onImport: () -> Unit,
-    onDelete: () -> Unit,
+    onOpenContextMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.combinedClickable(
             enabled = enabled,
             onClick = onImport,
-            onLongClick = onDelete,
+            onLongClick = onOpenContextMenu,
         ),
     ) {
         BookCoverCard(coverSource = coverSource)
@@ -1648,6 +1716,27 @@ private fun BookContextMenu(
         onDismiss = onDismiss,
         onSyncBook = onSyncBook,
     )
+}
+
+@Composable
+private fun RemoteBookContextMenu(
+    entry: RemoteBookEntry,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onDeleteCandidate: (RemoteBookEntry) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.bookshelf_delete_remote_book)) },
+            onClick = {
+                onDeleteCandidate(entry)
+                onDismiss()
+            },
+        )
+    }
 }
 
 @Composable

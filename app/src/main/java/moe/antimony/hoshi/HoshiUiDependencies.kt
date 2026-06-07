@@ -17,7 +17,6 @@ import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
 import moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer
-import moe.antimony.hoshi.features.sync.GoogleDriveClient
 import moe.antimony.hoshi.features.sync.SyncManager
 import moe.antimony.hoshi.features.sync.SyncSettingsRepository
 import moe.antimony.hoshi.features.update.AndroidUpdateDownloadManager
@@ -44,7 +43,6 @@ internal class HoshiUiDependencies @Inject constructor(
     private val backupRepositoryProvider: Lazy<HoshiBackupRepository>,
     private val storageCleanupRepositoryProvider: Lazy<StorageCleanupRepository>,
     private val deviceCodeDriveAuthorizerProvider: Lazy<DeviceCodeDriveAuthorizer>,
-    private val googleDriveClientProvider: Lazy<GoogleDriveClient>,
     private val syncManagerProvider: Lazy<SyncManager>,
     private val updateDownloadManagerProvider: Lazy<AndroidUpdateDownloadManager>,
     private val updateCheckServiceProvider: Lazy<UpdateCheckService>,
@@ -67,7 +65,6 @@ internal class HoshiUiDependencies @Inject constructor(
     val backupRepository: HoshiBackupRepository get() = backupRepositoryProvider.get()
     val storageCleanupRepository: StorageCleanupRepository get() = storageCleanupRepositoryProvider.get()
     val deviceCodeDriveAuthorizer: DeviceCodeDriveAuthorizer get() = deviceCodeDriveAuthorizerProvider.get()
-    val googleDriveClient: GoogleDriveClient get() = googleDriveClientProvider.get()
     val syncManager: SyncManager get() = syncManagerProvider.get()
     val updateDownloadManager: AndroidUpdateDownloadManager get() = updateDownloadManagerProvider.get()
     val updateCheckService: UpdateCheckService get() = updateCheckServiceProvider.get()

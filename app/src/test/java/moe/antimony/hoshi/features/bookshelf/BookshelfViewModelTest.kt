@@ -125,6 +125,27 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun refreshRemoteBooksReloadsGoogleDriveSectionWithoutReloadingLocalShelfLikeIos() {
+        val local = bookEntry("local-book")
+        val oldRemote = remoteEntry("old-drive-folder", "Old Remote Book")
+        val newRemote = remoteEntry("new-drive-folder", "New Remote Book")
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteEntries = listOf(oldRemote),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        repository.remoteEntries = listOf(newRemote)
+
+        viewModel.refreshRemoteBooks()
+
+        assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+        assertEquals(listOf(newRemote), viewModel.uiState.value.remoteBookEntries)
+        assertEquals(listOf(BookSortOption.Recent), repository.loadRequests)
+        assertEquals(listOf(listOf("local-book"), listOf("local-book")), repository.remoteLoadRequests)
+    }
+
+    @Test
     fun newerReloadResultIsNotOverwrittenWhenOlderReloadFinishesLater() {
         val firstGate = CompletableDeferred<Unit>()
         val secondGate = CompletableDeferred<Unit>()
@@ -268,7 +289,7 @@ class BookshelfViewModelTest {
     }
 
     @Test
-    fun remoteLoadFailurePublishesErrorInsteadOfHidingDriveSection() {
+    fun remoteLoadFailurePublishesStableGoogleDriveError() {
         val repository = FakeBookshelfRepository(
             entries = listOf(bookEntry("local-book")),
             remoteLoadError = RuntimeException("drive failed"),
@@ -278,23 +299,54 @@ class BookshelfViewModelTest {
         viewModel.reloadBookEntries()
 
         assertEquals(
-            "Failed to fetch books from Google Drive: drive failed",
+            "Failed to fetch books from Google Drive.",
             viewModel.uiState.value.errorMessage.testString(),
         )
     }
 
     @Test
-    fun automaticRemoteOfflineFailureDoesNotInterruptLocalBooksLikeIos() {
+    fun automaticRemoteNetworkFailureKeepsLocalBooksAndPublishesStableGoogleDriveError() {
         val repository = FakeBookshelfRepository(
             entries = listOf(bookEntry("local-book")),
-            remoteLoadError = GoogleDriveApiException("No validated internet connection."),
+            remoteLoadError = GoogleDriveApiException("No internet connection."),
         )
         val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.reloadBookEntries()
 
         assertEquals(listOf("local-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
-        assertNull(viewModel.uiState.value.errorMessage.testString())
+        assertEquals(
+            "Failed to fetch books from Google Drive.",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
+    }
+
+    @Test
+    fun remoteImportFailurePublishesStableGoogleDriveError() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val repository = FakeBookshelfRepository(remoteImportError = RuntimeException("drive import failed"))
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.importRemoteBook(remote, syncStats = true, syncAudioBook = true)
+
+        assertEquals(
+            "Failed to import book from Google Drive.",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
+    }
+
+    @Test
+    fun remoteDeleteFailurePublishesStableGoogleDriveError() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val repository = FakeBookshelfRepository(remoteDeleteError = RuntimeException("drive delete failed"))
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.deleteRemoteBook(remote)
+
+        assertEquals(
+            "Failed to delete book from Google Drive.",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
     }
 
     @Test
@@ -764,6 +816,8 @@ class BookshelfViewModelTest {
         var remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
         var remoteLoadGate: CompletableDeferred<Unit>? = null,
         val remoteLoadError: Throwable? = null,
+        val remoteImportError: Throwable? = null,
+        val remoteDeleteError: Throwable? = null,
         val remoteImportGate: CompletableDeferred<Unit>? = null,
         val remoteDeleteGate: CompletableDeferred<Unit>? = null,
         val remoteImportProgress: List<Double> = emptyList(),
@@ -829,6 +883,7 @@ class BookshelfViewModelTest {
             importedRemoteEntries += ImportedRemoteBook(entry, syncStats, syncAudioBook)
             remoteImportProgress.forEach(onProgress)
             remoteImportGate?.await()
+            remoteImportError?.let { throw it }
             return importBookId
         }
 
@@ -839,6 +894,7 @@ class BookshelfViewModelTest {
         override suspend fun deleteRemoteBook(entry: RemoteBookEntry) {
             deletedRemoteEntries += entry
             remoteDeleteGate?.await()
+            remoteDeleteError?.let { throw it }
         }
 
         override suspend fun deleteBooks(entries: Collection<BookEntry>) {
@@ -902,7 +958,9 @@ private fun UiText?.testString(): String? =
             R.string.bookshelf_no_epub_files_found -> "No EPUB files found."
             R.string.bookshelf_already_synced_format -> "${args[0]} is already synced"
             R.string.bookshelf_exported_epub_format -> "Exported ${args[0]}."
-            R.string.bookshelf_remote_books_load_failed_format -> "Failed to fetch books from Google Drive: ${args[0]}"
+            R.string.bookshelf_remote_books_load_failed -> "Failed to fetch books from Google Drive."
+            R.string.bookshelf_remote_book_import_failed -> "Failed to import book from Google Drive."
+            R.string.bookshelf_remote_book_delete_failed -> "Failed to delete book from Google Drive."
             else -> "resource:$id:${args.joinToString()}"
         }
         is UiText.Plural -> "plural:$id:$quantity:${args.joinToString()}"

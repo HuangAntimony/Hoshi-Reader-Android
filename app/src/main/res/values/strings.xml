@@ -74,12 +74,15 @@
     <string name="bookshelf_importing_named_format">Importing %1$s...</string>
     <string name="bookshelf_importing_progress_format">Importing %1$d / %2$d...</string>
     <string name="bookshelf_sync_failed">Sync failed.</string>
-    <string name="bookshelf_remote_books_load_failed_format">Failed to fetch books from Google Drive: %1$s</string>
+    <string name="bookshelf_remote_books_load_failed">Failed to fetch books from Google Drive.</string>
+    <string name="bookshelf_remote_book_import_failed">Failed to import book from Google Drive.</string>
+    <string name="bookshelf_remote_book_delete_failed">Failed to delete book from Google Drive.</string>
     <string name="bookshelf_syncing">Syncing...</string>
     <string name="bookshelf_synced_to_ttu_format">Synced %1$s to ッツ\n%2$d characters</string>
     <string name="bookshelf_synced_from_ttu_format">Synced %1$s from ッツ\n%2$d characters</string>
     <string name="bookshelf_already_synced_format">%1$s is already synced</string>
     <string name="bookshelf_delete_book_title_format" comment="Delete confirmation, intentionally matching the imported-font delete confirmation format.">Delete \"%1$s\"?</string>
+    <string name="bookshelf_delete_remote_book">Delete from Google Drive</string>
     <string name="bookshelf_delete_remote_book_title_format">Delete \"%1$s\" from Google Drive?</string>
     <string name="bookshelf_delete_remote_book_confirmation">This moves the remote Google Drive folder to trash. Local books are not deleted.</string>
     <string name="bookshelf_mark_read_title_format">Mark \"%1$s\" as read?</string>

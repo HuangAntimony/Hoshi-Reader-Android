@@ -45,7 +45,7 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
-import moe.antimony.hoshi.importing.localizedImportMessage
+import moe.antimony.hoshi.importing.UnsupportedImportFileTypeException
 import moe.antimony.hoshi.importing.validateImportFile
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 
@@ -70,10 +70,12 @@ fun BackupSettingsView(
     val booksRestoreFailed = stringResource(R.string.backup_books_restore_failed)
     val dictionariesRestored = stringResource(R.string.backup_dictionaries_restored)
     val dictionariesRestoreFailed = stringResource(R.string.backup_dictionaries_restore_failed)
+    val hoshiBackupUnsupported = stringResource(R.string.import_select_hoshi_backup)
     val ttuExported = stringResource(R.string.backup_ttu_saved)
     val ttuExportFailed = stringResource(R.string.backup_ttu_save_failed)
     val ttuImported = stringResource(R.string.backup_ttu_restored)
     val ttuImportFailed = stringResource(R.string.backup_ttu_restore_failed)
+    val ttuBackupUnsupported = stringResource(R.string.import_select_ttu_bookdata_backup)
     val booksExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri == null || operation != null) return@rememberLauncherForActivityResult
         operation = BackupOperation.Exporting
@@ -120,7 +122,7 @@ fun BackupSettingsView(
                 if (result.isSuccess) {
                     ttuExported
                 } else {
-                    result.exceptionOrNull()?.message ?: ttuExportFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(ttuExportFailed)
                 },
             )
         }
@@ -141,7 +143,7 @@ fun BackupSettingsView(
                 if (result.isSuccess) {
                     booksRestored
                 } else {
-                    result.exceptionOrNull()?.localizedImportMessage(context, booksRestoreFailed) ?: booksRestoreFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(booksRestoreFailed, hoshiBackupUnsupported)
                 },
             )
         }
@@ -160,8 +162,7 @@ fun BackupSettingsView(
                 if (result.isSuccess) {
                     dictionariesRestored
                 } else {
-                    result.exceptionOrNull()?.localizedImportMessage(context, dictionariesRestoreFailed)
-                        ?: dictionariesRestoreFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(dictionariesRestoreFailed, hoshiBackupUnsupported)
                 },
             )
         }
@@ -182,7 +183,7 @@ fun BackupSettingsView(
                 if (result.isSuccess) {
                     ttuImported
                 } else {
-                    result.exceptionOrNull()?.localizedImportMessage(context, ttuImportFailed) ?: ttuImportFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(ttuImportFailed, ttuBackupUnsupported)
                 },
             )
         }
@@ -319,3 +320,13 @@ private enum class BackupOperation(val labelRes: Int) {
     ExportingTtu(R.string.backup_exporting),
     ImportingTtu(R.string.backup_importing),
 }
+
+internal fun Throwable?.stableBackupFailureMessage(
+    fallback: String,
+    unsupportedImportMessage: String? = null,
+): String =
+    if (this is UnsupportedImportFileTypeException && unsupportedImportMessage != null) {
+        unsupportedImportMessage
+    } else {
+        fallback
+    }

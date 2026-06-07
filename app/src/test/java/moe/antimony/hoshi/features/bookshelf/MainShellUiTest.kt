@@ -9,6 +9,9 @@ import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.features.sync.DriveFile
+import moe.antimony.hoshi.features.sync.DriveSyncFiles
+import moe.antimony.hoshi.features.sync.SyncSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -134,6 +137,59 @@ class MainShellUiTest {
         assertFalse(selecting.isExpanded)
         assertEquals(0.4f, selecting.alpha)
         assertFalse(selecting.allowsHitTesting)
+    }
+
+    @Test
+    fun bookshelfPullRefreshIsEnabledOnlyForLoadedSyncShelfLikeIos() {
+        assertTrue(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = true),
+                hasLoadedBooks = true,
+                isSelecting = false,
+                fileTaskBlocked = false,
+            ),
+        )
+        assertFalse(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = false),
+                hasLoadedBooks = true,
+                isSelecting = false,
+                fileTaskBlocked = false,
+            ),
+        )
+        assertFalse(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = true),
+                hasLoadedBooks = false,
+                isSelecting = false,
+                fileTaskBlocked = false,
+            ),
+        )
+        assertFalse(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = true),
+                hasLoadedBooks = true,
+                isSelecting = true,
+                fileTaskBlocked = false,
+            ),
+        )
+        assertFalse(
+            shouldEnableBookshelfPullRefresh(
+                syncSettings = SyncSettings(enabled = true),
+                hasLoadedBooks = true,
+                isSelecting = false,
+                fileTaskBlocked = true,
+            ),
+        )
+    }
+
+    @Test
+    fun remoteBookLongPressTargetsContextMenuBeforeDeleteLikeIos() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val target = remoteBookContextMenuTarget(remote)
+
+        assertTrue(isRemoteBookContextMenuExpanded(target, remote))
+        assertFalse(isRemoteBookContextMenuExpanded(target, remoteEntry("other-folder", "Other")))
     }
 
     @Test
@@ -315,6 +371,20 @@ class MainShellUiTest {
                 cover = null,
                 folder = id,
                 lastAccess = lastAccess,
+            ),
+        )
+
+    private fun remoteEntry(id: String, title: String): RemoteBookEntry =
+        RemoteBookEntry(
+            id = id,
+            folderId = id,
+            folderName = title,
+            title = title,
+            syncFiles = DriveSyncFiles(
+                bookData = DriveFile("bookdata-$id", "bookdata_1_6_10_1000_1000.zip"),
+                progress = null,
+                statistics = null,
+                audioBook = null,
             ),
         )
 }

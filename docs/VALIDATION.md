@@ -121,6 +121,10 @@ Validate relevant bookshelf/import changes with:
   scrolling for long values.
 - Android-created `Books` and `Dictionaries` `.hoshi` archives restored by iOS
   when backup compatibility changes.
+- Books context-menu EPUB export and Android-created TTU bookdata backup import
+  by iOS/ッツ where possible.
+- iOS/ッツ TTU bookdata backups imported into Android, confirming reader open,
+  cover, progress, and statistics.
 - bookshelf-to-reader open latency and loading frames when reader route or EPUB
   parsing behavior changes.
 - Reader open/close behavior from bookshelf, confirming close returns to the
@@ -191,10 +195,11 @@ Validate relevant settings/theme changes with:
 
 Validate relevant sync/update/Sasayaki changes with:
 
-- Google Drive Device Code connect/sign-out, transient network behavior,
-  manual import/export result dialogs, reader-open import-only behavior,
-  auto-export timing, close/background flush, statistics merge/replace, and
-  Sasayaki last-position sync.
+- Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
+  remote-only bookshelf list, pull-to-refresh, import, long-press delete,
+  transient network behavior, manual import/export result dialogs,
+  reader-open import-only behavior, auto-export timing, close/background flush,
+  statistics merge/replace, and Sasayaki last-position sync.
 - GitHub update prompts, skip-version, manual checks, completed-download
   prompts, user-triggered install, same-version APK cleanup, and split APK
   updates on arm64-v8a and armeabi-v7a targets.

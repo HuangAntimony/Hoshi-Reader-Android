@@ -66,10 +66,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderSettings
@@ -235,9 +233,7 @@ fun SyncSettingsView(
     fun signOut() {
         scope.launch {
             authorizer.revokeAccess()
-            withContext(Dispatchers.IO) {
-                appContainer.googleDriveClient.clearCache()
-            }
+            repository.clearGoogleDriveCache()
             authStatus = authorizer.status()
             message = null
             copyMessage = null
@@ -248,9 +244,7 @@ fun SyncSettingsView(
 
     fun clearCache() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                appContainer.googleDriveClient.clearCache()
-            }
+            repository.clearGoogleDriveCache()
             message = resources.getString(R.string.sync_cache_cleared)
         }
     }

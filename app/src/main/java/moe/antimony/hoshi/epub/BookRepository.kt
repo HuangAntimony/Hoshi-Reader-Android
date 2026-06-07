@@ -263,7 +263,7 @@ class BookRepository private constructor(
                 archiveExtractor.createArchive(
                     sourceRoot = root,
                     destination = tempArchive,
-                    excludedRootNames = metadata.packedMigrationExcludedRootNames(root, epubName),
+                    excludedRootNames = packedMigrationArchiveExcludedRootNames(epubName),
                 )
                 archiveExtractor.extract(tempArchive, verifyRoot)
                 EpubBookParser(File(filesDir, "EpubMigrationCache")).parse(verifyRoot)
@@ -298,12 +298,17 @@ class BookRepository private constructor(
             )
         }.isSuccess
 
-    private fun BookMetadata.packedMigrationExcludedRootNames(root: File, epubName: String): Set<String> =
+    private fun packedMigrationArchiveExcludedRootNames(epubName: String): Set<String> =
         buildSet {
             add(epubName)
             add(".$epubName.tmp")
             add(SASAYAKI_DIRECTORY_NAME)
             addAll(bookSidecarFileNames)
+        }
+
+    private fun BookMetadata.packedMigrationPreservedRootNames(root: File, epubName: String): Set<String> =
+        buildSet {
+            addAll(packedMigrationArchiveExcludedRootNames(epubName))
             cover
                 ?.takeIf { it.isNotBlank() }
                 ?.let { File(it).name }
@@ -312,7 +317,7 @@ class BookRepository private constructor(
         }
 
     private fun deleteLegacyExtractedPayload(root: File, metadata: BookMetadata, epubName: String) {
-        val preserved = metadata.packedMigrationExcludedRootNames(root, epubName) + epubName
+        val preserved = metadata.packedMigrationPreservedRootNames(root, epubName) + epubName
         root.listFiles().orEmpty().forEach { child ->
             if (child.name !in preserved) {
                 child.deleteRecursively()

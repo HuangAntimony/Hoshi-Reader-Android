@@ -72,12 +72,15 @@
     <string name="bookshelf_importing_named_format">正在导入 %1$s...</string>
     <string name="bookshelf_importing_progress_format">正在导入 %1$d / %2$d...</string>
     <string name="bookshelf_sync_failed">同步失败。</string>
-    <string name="bookshelf_remote_books_load_failed_format">无法从 Google Drive 获取书籍：%1$s</string>
+    <string name="bookshelf_remote_books_load_failed">无法从 Google Drive 获取书籍。</string>
+    <string name="bookshelf_remote_book_import_failed">无法从 Google Drive 导入书籍。</string>
+    <string name="bookshelf_remote_book_delete_failed">无法从 Google Drive 删除书籍。</string>
     <string name="bookshelf_syncing">正在同步...</string>
     <string name="bookshelf_synced_to_ttu_format">已将 %1$s 同步到 ッツ\n%2$d 个字符</string>
     <string name="bookshelf_synced_from_ttu_format">已从 ッツ 同步 %1$s\n%2$d 个字符</string>
     <string name="bookshelf_already_synced_format">%1$s 已同步</string>
     <string name="bookshelf_delete_book_title_format" comment="Delete confirmation, intentionally matching the imported-font delete confirmation format.">删除“%1$s”？</string>
+    <string name="bookshelf_delete_remote_book">从 Google Drive 删除</string>
     <string name="bookshelf_delete_remote_book_title_format">从 Google Drive 删除“%1$s”？</string>
     <string name="bookshelf_delete_remote_book_confirmation">这会将远端 Google Drive 文件夹移入回收站。本地书籍不会被删除。</string>
     <string name="bookshelf_mark_read_title_format">将“%1$s”标记为已读？</string>

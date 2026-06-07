@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
+import java.util.zip.ZipFile
 
 class BookRepositoryDataSourceTest {
     @Test
@@ -118,5 +119,36 @@ class BookRepositoryDataSourceTest {
 
         assertEquals("Books/packed-cover/cover.jpg", coverPath)
         assertEquals(listOf(1, 2, 3), root.resolve("cover.jpg").readBytes().map(Byte::toInt))
+    }
+
+    @Test
+    fun legacyExtractedMigrationWritesRootCoverIntoPackedEpubAndPreservesSidecarCopy() = runBlocking {
+        val repository = BookRepository(Files.createTempDirectory("hoshi-legacy-root-cover").toFile())
+        val root = repository.createBookDirectory("legacy-root-cover")
+        writeMinimalExtractedEpub(root, title = "Legacy Root Cover")
+        root.resolve("OPS/package.opf").writeText(
+            root.resolve("OPS/package.opf").readText().replace("images/cover.jpg", "../cover.jpg"),
+        )
+        root.resolve("OPS/images/cover.jpg").copyTo(root.resolve("cover.jpg"), overwrite = true)
+        root.resolve("OPS/images/cover.jpg").delete()
+        repository.saveMetadata(
+            root,
+            BookMetadata(
+                id = "legacy-root-cover",
+                title = "Legacy Root Cover",
+                cover = "cover.jpg",
+                folder = "legacy-root-cover",
+                lastAccess = 1.0,
+            ),
+        )
+
+        val entry = repository.loadBookEntries().single()
+
+        assertEquals("legacy-root-cover.epub", entry.metadata.epub)
+        assertTrue(root.resolve("cover.jpg").isFile)
+        assertFalse(root.resolve("OPS").exists())
+        ZipFile(root.resolve("legacy-root-cover.epub")).use { archive ->
+            assertTrue(archive.getEntry("cover.jpg") != null)
+        }
     }
 }

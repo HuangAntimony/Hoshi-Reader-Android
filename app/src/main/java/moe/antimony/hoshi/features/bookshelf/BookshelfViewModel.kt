@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookSortOption
-import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
@@ -80,6 +79,15 @@ internal class BookshelfViewModel : ViewModel {
 
     fun reloadBookEntries() {
         reloadBookEntries(_uiState.value.sortOption)
+    }
+
+    fun refreshRemoteBooks() {
+        if (!_uiState.value.hasLoadedBooks) return
+        remoteLoadJob?.cancel()
+        val generation = reloadGeneration
+        val localEntries = _uiState.value.bookEntries
+        _uiState.update { it.copy(errorMessage = null) }
+        reloadRemoteBookEntries(localEntries, generation)
     }
 
     fun changeSort(sortOption: BookSortOption) {
@@ -327,8 +335,7 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 _uiState.update {
                     it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.bookshelf_import_failed),
+                        errorMessage = UiText.Resource(R.string.bookshelf_remote_book_import_failed),
                     )
                 }
             } finally {
@@ -361,8 +368,7 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 _uiState.update {
                     it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.bookshelf_sync_failed),
+                        errorMessage = UiText.Resource(R.string.bookshelf_remote_book_delete_failed),
                     )
                 }
             } finally {
@@ -582,13 +588,9 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 if (generation != reloadGeneration) return@launch
-                if (error is GoogleDriveApiException && error.isNoValidatedInternetConnection) return@launch
                 _uiState.update {
                     it.copy(
-                        errorMessage = UiText.Resource(
-                            R.string.bookshelf_remote_books_load_failed_format,
-                            error.localizedMessage ?: error::class.java.simpleName,
-                        ),
+                        errorMessage = UiText.Resource(R.string.bookshelf_remote_books_load_failed),
                     )
                 }
             }

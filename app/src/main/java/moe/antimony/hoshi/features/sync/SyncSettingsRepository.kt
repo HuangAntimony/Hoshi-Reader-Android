@@ -8,16 +8,21 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 private val Context.syncSettingsDataStore by preferencesDataStore(name = SyncSettingsRepository.DataStoreName)
 
-fun Context.syncSettingsRepository(): SyncSettingsRepository =
-    SyncSettingsRepository(syncSettingsDataStore)
+fun Context.syncSettingsRepository(drive: DriveSyncDataSource): SyncSettingsRepository =
+    SyncSettingsRepository(syncSettingsDataStore, drive)
 
 class SyncSettingsRepository(
     private val dataStore: DataStore<Preferences>,
+    private val drive: DriveSyncDataSource,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     val settings: Flow<SyncSettings> = dataStore.data
         .map { preferences -> preferences.toSyncSettings() }
@@ -27,6 +32,10 @@ class SyncSettingsRepository(
             val current = preferences.toSyncSettings()
             preferences.writeSyncSettings(transform(current))
         }
+    }
+
+    suspend fun clearGoogleDriveCache() = withContext(ioDispatcher) {
+        drive.clearCache()
     }
 
     private fun Preferences.toSyncSettings(): SyncSettings =

@@ -28,6 +28,12 @@ class SyncSettingsScreenStateTest {
         )
         assertFalse(
             SyncSettingsScreenState(
+                settings = SyncSettings(enabled = false),
+                authStatus = DriveAuthStatus.Connected,
+            ).showClearCacheAction,
+        )
+        assertFalse(
+            SyncSettingsScreenState(
                 settings = SyncSettings(enabled = true),
                 authStatus = DriveAuthStatus.NotConnected,
             ).showClearCacheAction,

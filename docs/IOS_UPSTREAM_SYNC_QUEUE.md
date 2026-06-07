@@ -132,50 +132,9 @@ Validation:
 - Fetch/select Lapis, Kiku, and Senren models through AnkiDroid and AnkiConnect; confirm only empty model mappings are autofilled and custom mappings persist.
 - Mine Anki notes through AnkiDroid and AnkiConnect with each new handlebar variant, including dictionary media embedding and selected-dictionary fallback.
 
-### 4. TTU/Google Drive book data sync, backup import/export, and remote bookshelf
-
-Status: implemented on Android.
-
-Covered iOS commits:
-
-- `ab6722e` - refactor storage to keep packed EPUBs in book folders.
-- `67bdbb9` - add option to export EPUBs.
-- `1aaee97` - prevent autosync from hanging when mobile data is disabled.
-- `c2e1c09` - TTU book sync (#63).
-- `32d76d2` - TTU bookdata edge cases.
-
-Android coverage:
-
-- Book folders now retain `<folder>.epub` and `BookMetadata.epub`; legacy
-  extracted books are repacked only after parse verification and are left
-  untouched on failure.
-- Books can export their stored EPUB from the Books context menu.
-- TTU bookdata conversion supports `staticdata.json`, `blobs/`, cover files,
-  generated EPUB structure, XHTML wrapper stripping, image rewriting, and the
-  `<br>` / `<hr>` / `<img>` edge cases.
-- Backup settings expose TTU bookdata export/import separately from `.hoshi`
-  Books/Dictionaries backups.
-- Google Drive sync can list remote book folders, discover `bookdata_`,
-  `cover_`, progress/statistics/audio files, upload missing bookdata when
-  Upload Books is enabled, download bookdata for remote import, trash remote
-  folders, clear cached Drive IDs and remote cover thumbnails, and preflight
-  validated connectivity before Drive REST requests.
-- Books keeps remote-only Drive books as `RemoteBookEntry` models and shows a
-  separate Google Drive section for tap-to-import and delete-from-Drive flows.
-
-Manual validation to keep in release QA:
-
-- On a user-configured Google Drive project, list remote-only ッツ books, import
-  one book, delete one remote book, and clear cached Drive folders/covers.
-- Export an Android book as EPUB and as TTU backup; import the TTU backup into
-  iOS/ッツ where possible.
-- Import an iOS/ッツ TTU backup into Android; verify reader open, cover,
-  progress, and statistics.
-- Disable network/mobile data during autosync and confirm it fails or defers
-  without hanging.
-
 ## Covered Or No Android Action
 
+- `ab6722e`, `67bdbb9`, `1aaee97`, `c2e1c09`, `32d76d2`: Android now covers the TTU/Google Drive book-data slice. Book folders retain `<folder>.epub` and `BookMetadata.epub`; legacy extracted books are repacked only after parse verification; Books can export stored EPUBs; Backup settings expose TTU bookdata export/import; Google Drive sync lists remote book folders, discovers TTU sidecars, uploads missing bookdata when Upload Books is enabled, imports remote-only books, trashes remote folders, clears cached Drive IDs/covers, and only preflights for an active network with internet capability before Drive REST requests.
 - `73a9e62`: Android now mirrors the Dictionary pull-to-clear/show-keyboard slice with reader-style iframe search results, localized pull/release labels, active Dictionary tab refocus/select-all, and measured search-result placement below the search field.
 - `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands.
 - `09951b4`, `612d350`, `ad71067`, `4b26d8a`, `172577c`, `be42499`: iOS version/build bumps only.
@@ -189,7 +148,7 @@ Manual validation to keep in release QA:
 - `147e3b9`: Android already ships default English and Simplified Chinese resources with localization tests. Future queue items that add user-visible strings still need the normal paired `values` / `values-zh-rCN` updates.
 - `61306c7`: formatting and whitespace cleanup only.
 - `32aa342`: Android now sanitizes Calibre-like EPUB CSS rules in `ReaderResourceSanitizer`, with behavior coverage for writing mode, line height, height, positive text indentation, negative text indentation, non-Calibre rules, and appended default body line height.
-- `2ffde40`: iOS changed NWPathMonitor gating to block only explicitly unsatisfied paths. Android now preflights Drive REST, download, and upload requests with `ConnectivityManager` and requires `NET_CAPABILITY_INTERNET` plus `NET_CAPABILITY_VALIDATED`; device-code auth still treats transient network failures as retryable.
+- `2ffde40`: iOS changed NWPathMonitor gating to block only explicitly unsatisfied paths. Android Drive requests now only require an active network with `NET_CAPABILITY_INTERNET`; device-code auth still treats transient network failures as retryable.
 - `691baa2`, `323449c`: Android already localizes the Reading shelf title through `BookshelfSectionModel.titleRes = R.string.bookshelf_section_reading`, `BookshelfSectionHeader`, and paired English/Simplified Chinese resources.
 - `078d59f`: Android already overrides publisher column counts in paginated mode through `ReaderContentStyles` with `body * { column-count: auto !important; -webkit-column-count: auto !important; }`.
 - `1fcf287`: iOS SwiftUI file-importer placement fix. Android backup restore uses dedicated `rememberLauncherForActivityResult(FileImportContent())` launchers for `.hoshi` and TTU `.zip` imports.

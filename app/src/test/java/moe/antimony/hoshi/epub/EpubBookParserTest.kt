@@ -127,7 +127,7 @@ class EpubBookParserTest {
     }
 
     @Test
-    fun parsesPackedEpubPruningOtherExtractionRootsLikeIosTempStorage() {
+    fun parsesPackedEpubKeepsOtherExtractionRootsReadableLikeIosTempStorage() {
         val firstArchive = tempFolder.newFile("first-packed.epub")
         val secondArchive = tempFolder.newFile("second-packed.epub")
         val cacheRoot = tempFolder.newFolder("single-working-cache")
@@ -140,8 +140,12 @@ class EpubBookParserTest {
         val secondRoot = second.rootDirectory?.canonicalFile
 
         assertTrue(secondRoot?.isDirectory == true)
-        assertEquals(listOf(secondRoot), cacheRoot.listFiles().orEmpty().filter { it.isDirectory }.map { it.canonicalFile })
-        assertTrue(firstRoot?.exists() == false)
+        assertTrue(firstRoot?.isDirectory == true)
+        assertArrayEquals("body {}".toByteArray(), first.readResource("OPS/styles/book.css"))
+        assertEquals(
+            setOf(firstRoot, secondRoot),
+            cacheRoot.listFiles().orEmpty().filter { it.isDirectory }.map { it.canonicalFile }.toSet(),
+        )
     }
 
     @Test
