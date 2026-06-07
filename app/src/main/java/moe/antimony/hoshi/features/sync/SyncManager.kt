@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sync
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -113,12 +114,16 @@ class SyncManager private constructor(
         )
         val localBookmark = bookRepository.loadBookmark(entry.root)
         val syncFiles = drive.listSyncFiles(driveFolderId)
-        val syncDirection = direction ?: TtuSyncRules.determineDirection(localBookmark, syncFiles.progress)
 
-        if (syncBookData && !importOnly && syncDirection != SyncDirection.ImportFromTtu && syncFiles.bookData == null) {
-            drive.uploadBookData(driveFolderId, bookDataExporter(entry))
+        if (syncBookData && !importOnly && direction != SyncDirection.ImportFromTtu && syncFiles.bookData == null) {
+            try {
+                drive.uploadBookData(driveFolderId, bookDataExporter(entry))
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+            }
         }
 
+        val syncDirection = direction ?: TtuSyncRules.determineDirection(localBookmark, syncFiles.progress)
         if (syncDirection == SyncDirection.Synced) {
             return SyncResult.Synced(displayTitle)
         }

@@ -26,12 +26,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import dagger.hilt.android.qualifiers.ApplicationContext
 import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.di.CacheDir
 import moe.antimony.hoshi.di.IoDispatcher
 
 @Singleton
 class GoogleDriveClient @Inject constructor(
     @ApplicationContext context: Context,
     private val tokenProvider: DriveAccessTokenProvider,
+    @param:CacheDir private val cacheDir: File,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : DriveSyncDataSource {
     private val cachePreferences = context.applicationContext.getSharedPreferences(CacheName, Context.MODE_PRIVATE)
@@ -182,6 +184,7 @@ class GoogleDriveClient @Inject constructor(
     override fun clearCache() {
         rootFolderId = null
         titleToFolderId.clear()
+        clearGoogleDriveCoverCache(cacheDir)
         cachePreferences.edit()
             .remove(RootFolderIdKey)
             .remove(TitleFolderIdsKey)

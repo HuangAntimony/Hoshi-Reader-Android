@@ -302,6 +302,7 @@ class BookRepository private constructor(
         buildSet {
             add(epubName)
             add(".$epubName.tmp")
+            add(SASAYAKI_DIRECTORY_NAME)
             addAll(bookSidecarFileNames)
             cover
                 ?.takeIf { it.isNotBlank() }
@@ -539,7 +540,7 @@ class EpubArchiveExtractor {
                 .forEach { file ->
                     val relativePath = file.relativeTo(root).invariantSeparatorsPath
                     if (relativePath == "mimetype") return@forEach
-                    if (!relativePath.contains("/") && relativePath in excludedRootNames) return@forEach
+                    if (relativePath.substringBefore("/") in excludedRootNames) return@forEach
                     zip.putNextEntry(ZipEntry(relativePath))
                     file.inputStream().use { input -> input.copyTo(zip) }
                     zip.closeEntry()
@@ -664,6 +665,7 @@ private const val BOOKINFO_FILE_NAME = "bookinfo.json"
 private const val SHELVES_FILE_NAME = "shelves.json"
 private const val SASAYAKI_MATCH_FILE_NAME = "sasayaki_match.json"
 private const val SASAYAKI_PLAYBACK_FILE_NAME = "sasayaki_playback.json"
+private const val SASAYAKI_DIRECTORY_NAME = "Sasayaki"
 private const val APPLE_REFERENCE_EPOCH_SECONDS = 978_307_200.0
 
 private val bookSidecarFileNames = setOf(

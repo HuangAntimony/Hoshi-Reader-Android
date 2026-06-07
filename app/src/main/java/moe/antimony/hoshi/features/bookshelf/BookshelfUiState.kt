@@ -47,6 +47,9 @@ data class BookshelfLoadResult(
     val coverSourcesById: Map<String, BookCoverSource>,
     val shelves: List<BookShelf>,
     val settings: BookshelfSettings,
+)
+
+data class RemoteBookshelfLoadResult(
     val remoteEntries: List<RemoteBookEntry> = emptyList(),
     val remoteProgressById: Map<String, Double> = emptyMap(),
     val remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),

@@ -108,6 +108,36 @@ class BookMetadataStorageTest {
     }
 
     @Test
+    fun loadBookEntriesMigratesLegacyBookWithoutPackingOrDeletingSasayakiAudio() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-packed-migration-sasayaki").toFile())
+        val root = storage.createBookDirectory("legacy-book")
+        writeMinimalExtractedEpub(root, title = "Legacy Book")
+        root.resolve("Sasayaki").mkdirs()
+        root.resolve("Sasayaki/sasayaki_audio.m4b").writeBytes(byteArrayOf(1, 2, 3))
+        root.resolve("sasayaki_playback.json").writeText("""{"lastPosition":12.0,"audioFileName":"sasayaki_audio.m4b"}""")
+        storage.saveMetadata(
+            root,
+            BookMetadata(
+                id = UUID.randomUUID().toString(),
+                title = "Legacy Book",
+                cover = null,
+                folder = "legacy-book",
+                lastAccess = 1.0,
+            ),
+        )
+
+        storage.loadBookEntries().single()
+
+        assertTrue(root.resolve("legacy-book.epub").isFile)
+        assertTrue(root.resolve("Sasayaki/sasayaki_audio.m4b").isFile)
+        assertTrue(root.resolve("sasayaki_playback.json").isFile)
+        ZipFile(root.resolve("legacy-book.epub")).use { zip ->
+            assertFalse(zip.entries().asSequence().any { it.name.startsWith("Sasayaki/") })
+            assertFalse(zip.entries().asSequence().any { it.name == "sasayaki_playback.json" })
+        }
+    }
+
+    @Test
     fun loadBookEntriesLeavesLegacyBookUntouchedWhenPackedMigrationCannotParse() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-packed-migration-fail").toFile())
         val root = storage.createBookDirectory("broken-book")

@@ -143,6 +143,74 @@ class SyncManagerTest {
     }
 
     @Test
+    fun syncBookUploadsBookDataBeforeAutomaticImportDirectionLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        repository.saveBookmark(entry.root, Bookmark(0, 0.1, 10, TtuSyncRules.unixMillisToAppleReferenceSeconds(1_000)))
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource(
+            progress = TtuProgress(7, 150, 0.5, 2_000),
+        )
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            bookDataExporter = { exported },
+        )
+
+        val result = manager.syncBook(
+            entry = entry,
+            direction = null,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            syncBookData = true,
+        )
+
+        assertEquals(SyncResult.Imported("Title", 150), result)
+        assertEquals("book-folder", drive.uploadedBookDataFolderId)
+        assertEquals(exported, drive.uploadedBookDataFile)
+    }
+
+    @Test
+    fun syncBookDataUploadFailureDoesNotBlockProgressStatisticsOrAudioSync() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
+        repository.saveStatistics(
+            entry.root,
+            listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 220, lastStatisticModified = 200)),
+        )
+        repository.saveSasayakiPlayback(entry.root, SasayakiPlaybackData(lastPosition = 45.0))
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource(
+            statistics = emptyList(),
+            bookDataUploadError = RuntimeException("bookdata upload failed"),
+        )
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            nowUnixMillis = { 9_999 },
+            bookDataExporter = { exported },
+        )
+
+        val result = manager.syncBook(
+            entry = entry,
+            direction = SyncDirection.ExportToTtu,
+            syncStats = true,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = true,
+            syncBookData = true,
+        )
+
+        assertEquals(SyncResult.Exported("Title", 100), result)
+        assertEquals(TtuProgress(0, 100, 0.5, 4_321), drive.updatedProgress)
+        assertEquals(220, drive.updatedStatistics.single().charactersRead)
+        assertEquals(TtuAudioBook("Title", 45.0, 9_999), drive.updatedAudioBook)
+    }
+
+    @Test
     fun syncBookDoesNotUploadBookDataWhenImportOnlyOrRemoteAlreadyHasBookData() = runBlocking {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
@@ -213,6 +281,7 @@ private class FakeDriveSyncDataSource(
     audioBook: TtuAudioBook? = null,
     private val bookData: DriveFile? = null,
     private val staleOnFirstList: Boolean = false,
+    private val bookDataUploadError: Throwable? = null,
 ) : DriveSyncDataSource {
     private val progressFile = progress?.let { DriveFile("progress", TtuSyncRules.progressFileName(it)) }
     private val statisticsFile = statistics?.let { DriveFile("statistics", TtuSyncRules.statisticsFileName(it)) }
@@ -279,6 +348,7 @@ private class FakeDriveSyncDataSource(
     }
 
     override suspend fun uploadBookData(folderId: String, file: File) {
+        bookDataUploadError?.let { throw it }
         uploadedBookDataFolderId = folderId
         uploadedBookDataFile = file
     }

@@ -282,6 +282,37 @@ class HoshiBackupRepositoryTest {
     }
 
     @Test
+    fun exportTtuBookDataDisambiguatesDuplicateVisibleTitles() = runBlocking {
+        val sourceDir = Files.createTempDirectory("hoshi-ttu-backup-duplicate-title").toFile()
+        val sourceRepository = BookRepository(sourceDir)
+        val first = sourceRepository.createPackedTestBook("First Book")
+        val second = sourceRepository.createPackedTestBook("Second Book")
+        listOf(first, second).forEachIndexed { index, entry ->
+            val cover = entry.root.resolve("cover.jpg")
+            cover.writeBytes(byteArrayOf(index.toByte()))
+            sourceRepository.saveMetadata(
+                entry.root,
+                entry.metadata.copy(
+                    renamedTitle = "Same Title",
+                    cover = "Books/${entry.root.name}/cover.jpg",
+                ),
+            )
+        }
+        val output = ByteArrayOutputStream()
+
+        HoshiBackupRepository(sourceDir).exportTtuBookData(output)
+
+        val entries = zipEntryNames(output.toByteArray())
+        val bookFolders = entries
+            .filter { it.contains("/bookdata_") }
+            .map { it.substringBefore('/') }
+            .distinct()
+        assertEquals(2, bookFolders.size)
+        assertTrue("Same Title" in bookFolders)
+        assertEquals(2, entries.count { it.endsWith("/cover_1_6.jpg") })
+    }
+
+    @Test
     fun ttuBookDataBackupFileNameMatchesIosTimestampShapeAndExtension() {
         val instant = Instant.parse("2026-05-10T07:08:09Z")
 

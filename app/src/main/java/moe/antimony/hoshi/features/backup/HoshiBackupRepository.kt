@@ -104,9 +104,14 @@ class HoshiBackupRepository @Inject constructor(
             tempRoot.mkdirs()
             try {
                 ZipOutputStream(output.buffered()).use { zip ->
+                    val usedTitleFolders = mutableSetOf<String>()
                     bookRepository.loadBookEntries().forEach { entry ->
                         if (bookRepository.epubFile(entry) == null) return@forEach
-                        val titleFolder = TtuSyncRules.sanitizeTtuFilename(entry.displayTitle)
+                        val titleFolder = uniqueTtuBackupFolderName(
+                            baseName = TtuSyncRules.sanitizeTtuFilename(entry.displayTitle),
+                            bookId = entry.metadata.id,
+                            usedNames = usedTitleFolders,
+                        )
                         val bookTemp = tempRoot.resolve(entry.metadata.id).also { it.mkdirs() }
                         val bookData = ttuConverter.exportBookData(entry, bookTemp)
                         zip.writeFile("$titleFolder/${bookData.name}", bookData)
@@ -370,6 +375,25 @@ class HoshiBackupRepository @Inject constructor(
         Books("Books"),
         Dictionaries("Dictionaries"),
     }
+}
+
+private fun uniqueTtuBackupFolderName(
+    baseName: String,
+    bookId: String,
+    usedNames: MutableSet<String>,
+): String {
+    val normalizedBase = baseName.ifBlank { "Book" }
+    if (usedNames.add(normalizedBase)) return normalizedBase
+
+    val stableSuffix = bookId.take(8).ifBlank { UUID.randomUUID().toString().take(8) }
+    val suffixBase = "$normalizedBase-$stableSuffix"
+    var candidate = suffixBase
+    var index = 2
+    while (!usedNames.add(candidate)) {
+        candidate = "$suffixBase-$index"
+        index += 1
+    }
+    return candidate
 }
 
 private val backupJson = Json {

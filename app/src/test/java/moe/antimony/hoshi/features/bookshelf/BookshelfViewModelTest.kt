@@ -78,6 +78,29 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun reloadBooksPublishesLocalShelfBeforeRemoteGoogleDriveLoadCompletes() {
+        val local = bookEntry("local-book")
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueRemoteLoad = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteEntries = listOf(remote),
+            remoteLoadGate = continueRemoteLoad,
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+        assertTrue(viewModel.uiState.value.hasLoadedBooks)
+        assertEquals(emptyList<RemoteBookEntry>(), viewModel.uiState.value.remoteBookEntries)
+
+        continueRemoteLoad.complete(Unit)
+
+        assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+    }
+
+    @Test
     fun remoteImportAndDeleteCallRepositoryAndReloadShelf() {
         val remote = remoteEntry("drive-folder", "Remote Book")
         val repository = FakeBookshelfRepository(remoteEntries = listOf(remote))
@@ -89,6 +112,54 @@ class BookshelfViewModelTest {
         assertEquals(listOf(remote), repository.importedRemoteEntries)
         assertEquals(listOf(remote), repository.deletedRemoteEntries)
         assertEquals(listOf(BookSortOption.Recent, BookSortOption.Recent), repository.loadRequests)
+    }
+
+    @Test
+    fun remoteImportDoesNotReplaceLocalShelfWithBlockingLoading() {
+        val local = bookEntry("local-book")
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueImport = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteEntries = listOf(remote),
+            remoteImportGate = continueImport,
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+
+        viewModel.importRemoteBook(remote)
+
+        assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage.testString())
+
+        continueImport.complete(Unit)
+
+        assertEquals(listOf(remote), repository.importedRemoteEntries)
+    }
+
+    @Test
+    fun remoteDeleteDoesNotReplaceLocalShelfWithBlockingLoading() {
+        val local = bookEntry("local-book")
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueDelete = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(local),
+            remoteEntries = listOf(remote),
+            remoteDeleteGate = continueDelete,
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+
+        viewModel.deleteRemoteBook(remote)
+
+        assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage.testString())
+
+        continueDelete.complete(Unit)
+
+        assertEquals(listOf(remote), repository.deletedRemoteEntries)
     }
 
     @Test
@@ -549,8 +620,13 @@ class BookshelfViewModelTest {
         var settings: BookshelfSettings = BookshelfSettings(),
         var remoteEntries: List<RemoteBookEntry> = emptyList(),
         var remoteProgressById: Map<String, Double> = emptyMap(),
+        var remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
+        private val remoteLoadGate: CompletableDeferred<Unit>? = null,
+        private val remoteImportGate: CompletableDeferred<Unit>? = null,
+        private val remoteDeleteGate: CompletableDeferred<Unit>? = null,
     ) : BookshelfRepository {
         val loadRequests = mutableListOf<BookSortOption>()
+        val remoteLoadRequests = mutableListOf<List<String>>()
         val deletedEntries = mutableListOf<BookEntry>()
         val movedBooks = mutableListOf<Pair<Set<String>, String?>>()
         val createdShelves = mutableListOf<String>()
@@ -571,8 +647,16 @@ class BookshelfViewModelTest {
                 coverSourcesById = coverSourcesById,
                 shelves = shelves,
                 settings = settings,
+            )
+        }
+
+        override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult {
+            remoteLoadRequests += localEntries.map { it.metadata.id }
+            remoteLoadGate?.await()
+            return RemoteBookshelfLoadResult(
                 remoteEntries = remoteEntries,
                 remoteProgressById = remoteProgressById,
+                remoteCoverSourcesById = remoteCoverSourcesById,
             )
         }
 
@@ -586,6 +670,7 @@ class BookshelfViewModelTest {
 
         override suspend fun importRemoteBook(entry: RemoteBookEntry): String {
             importedRemoteEntries += entry
+            remoteImportGate?.await()
             return importBookId
         }
 
@@ -595,6 +680,7 @@ class BookshelfViewModelTest {
 
         override suspend fun deleteRemoteBook(entry: RemoteBookEntry) {
             deletedRemoteEntries += entry
+            remoteDeleteGate?.await()
         }
 
         override suspend fun deleteBooks(entries: Collection<BookEntry>) {

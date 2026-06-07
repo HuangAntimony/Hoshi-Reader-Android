@@ -31,6 +31,7 @@ import moe.antimony.hoshi.features.sync.TtuBookDataConverter
 import moe.antimony.hoshi.features.sync.TtuProgress
 import moe.antimony.hoshi.features.sync.TtuSyncRules
 import moe.antimony.hoshi.features.sync.TtuAudioBook
+import moe.antimony.hoshi.features.sync.googleDriveCoverCacheDirectory
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.first
 
 internal interface BookshelfRepository {
     suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult
+    suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult
     suspend fun openBook(entry: BookEntry): String
     suspend fun importBook(uri: Uri): String
     suspend fun exportBook(entry: BookEntry, uri: Uri)
@@ -82,13 +84,18 @@ internal class AndroidBookshelfRepository @Inject constructor(
     override suspend fun loadBooks(sortOption: BookSortOption): BookshelfLoadResult = withContext(ioDispatcher) {
         val entries = bookRepository.loadBookEntries(sortOption)
         val shelves = bookRepository.loadShelves()
-        val remoteEntries = loadRemoteBooks(entries)
         BookshelfLoadResult(
             entries = entries,
             progressById = loadBookProgressById(entries, bookRepository),
             coverSourcesById = loadBookCoverSourcesById(entries, bookRepository),
             shelves = shelves,
             settings = settingsRepository.settings.first(),
+        )
+    }
+
+    override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult = withContext(ioDispatcher) {
+        val remoteEntries = loadRemoteBookEntries(localEntries)
+        RemoteBookshelfLoadResult(
             remoteEntries = remoteEntries,
             remoteProgressById = remoteEntries.mapNotNull { remote ->
                 TtuSyncRules.parseProgressValue(remote.syncFiles.progress)?.let { remote.id to it }
@@ -250,7 +257,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
         bookRepository.saveBookInfo(root, parsedBook.bookInfo)
     }
 
-    private suspend fun loadRemoteBooks(localEntries: List<BookEntry>): List<RemoteBookEntry> {
+    private suspend fun loadRemoteBookEntries(localEntries: List<BookEntry>): List<RemoteBookEntry> {
         val syncSettings = syncSettingsRepository.settings.first()
         if (!syncSettings.enabled) return emptyList()
         val localDriveNames = localEntries.mapTo(mutableSetOf()) { entry ->
@@ -284,14 +291,25 @@ internal class AndroidBookshelfRepository @Inject constructor(
     }
 
     private suspend fun loadRemoteCoverSources(remoteEntries: List<RemoteBookEntry>): Map<String, BookCoverSource> {
-        val coverCache = cacheDir.resolve("gdrive-covers").also { it.mkdirs() }
+        val coverCache = googleDriveCoverCacheDirectory(cacheDir).also { it.mkdirs() }
         return remoteEntries.mapNotNull { entry ->
             val cover = entry.syncFiles.cover ?: return@mapNotNull null
             val extension = cover.name.substringAfterLast('.', "jpg").ifBlank { "jpg" }
             val cached = coverCache.resolve("${cover.id}.$extension")
             runCatching {
                 if (!cached.isFile) {
-                    drive.downloadFileTo(cover.id, cached)
+                    val temp = coverCache.resolve(".${cover.id}-${UUID.randomUUID()}.tmp")
+                    try {
+                        drive.downloadFileTo(cover.id, temp)
+                        if (!temp.renameTo(cached)) {
+                            temp.copyTo(cached, overwrite = true)
+                            temp.delete()
+                        }
+                    } catch (error: Throwable) {
+                        temp.delete()
+                        cached.delete()
+                        throw error
+                    }
                 }
                 entry.id to cached.toBookCoverSource()
             }.getOrNull()

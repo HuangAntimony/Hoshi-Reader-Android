@@ -158,15 +158,15 @@ Android coverage:
 - Google Drive sync can list remote book folders, discover `bookdata_`,
   `cover_`, progress/statistics/audio files, upload missing bookdata when
   Upload Books is enabled, download bookdata for remote import, trash remote
-  folders, clear cached Drive IDs, and preflight validated connectivity before
-  Drive REST requests.
+  folders, clear cached Drive IDs and remote cover thumbnails, and preflight
+  validated connectivity before Drive REST requests.
 - Books keeps remote-only Drive books as `RemoteBookEntry` models and shows a
   separate Google Drive section for tap-to-import and delete-from-Drive flows.
 
 Manual validation to keep in release QA:
 
 - On a user-configured Google Drive project, list remote-only ッツ books, import
-  one book, delete one remote book, and clear cached Drive folder IDs.
+  one book, delete one remote book, and clear cached Drive folders/covers.
 - Export an Android book as EPUB and as TTU backup; import the TTU backup into
   iOS/ッツ where possible.
 - Import an iOS/ッツ TTU backup into Android; verify reader open, cover,
@@ -192,7 +192,7 @@ Manual validation to keep in release QA:
 - `2ffde40`: iOS changed NWPathMonitor gating to block only explicitly unsatisfied paths. Android `GoogleDriveClient.performRequest()` does not pre-block by path status, and device-code auth already treats transient network failures as retryable; the broader autosync no-network behavior remains tracked by `1aaee97`.
 - `691baa2`, `323449c`: Android already localizes the Reading shelf title through `BookshelfSectionModel.titleRes = R.string.bookshelf_section_reading`, `BookshelfSectionHeader`, and paired English/Simplified Chinese resources.
 - `078d59f`: Android already overrides publisher column counts in paginated mode through `ReaderContentStyles` with `body * { column-count: auto !important; -webkit-column-count: auto !important; }`.
-- `1fcf287`: iOS SwiftUI file-importer placement fix. Android backup restore uses dedicated `rememberLauncherForActivityResult(FileImportContent())` launchers for `.hoshi` imports; TTU zip backup import/export remains part of the open TTU slice.
+- `1fcf287`: iOS SwiftUI file-importer placement fix. Android backup restore uses dedicated `rememberLauncherForActivityResult(FileImportContent())` launchers for `.hoshi` and TTU `.zip` imports.
 - `b1509d9`, `a7a8380`, `55a32cd`, `2b8a599`, `98b6534`: Android reader now matches this slice. `selection.js` keeps SVG containers outside image-hit blocking while preserving SVG `<image>` hits and emits per-character highlight ranges; `ReaderBottomSafeProgress` handles bottom safe-area taps for focus/popup dismissal; `ReaderGeneratedLayout` applies the vertical one-pixel image-width guard; paginated and continuous reader JS remove whitespace-only ruby text nodes and wrap ruby base text before lookup offsets are built.
 
 ## Open Commit Inventory
