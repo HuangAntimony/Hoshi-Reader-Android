@@ -113,7 +113,7 @@ internal object LookupPopupHtml {
                                     name: name,
                                     id: id || null,
                                     body: body === undefined ? null : body
-                                }, 'https://hoshi.local');
+                                }, 'https://appassets.androidplatform.net');
                             } catch (e) {
                                 console.warn('Hoshi reader popup bridge failed', e);
                             }
@@ -164,8 +164,8 @@ internal object LookupPopupHtml {
                     window.deduplicatePitchAccents = ${normalizedSettings.deduplicatePitchAccents};
                     window.compactPitchAccents = ${normalizedSettings.compactPitchAccents};
                     window.audioSources = ${audioSourcesJson(audioSettings)};
-                    window.audioRequestEndpoint = "https://hoshi.local/audio";
-                    window.dictionaryMediaRequestEndpoint = "https://hoshi.local/image";
+                    window.audioRequestEndpoint = "https://appassets.androidplatform.net/audio";
+                    window.dictionaryMediaRequestEndpoint = "https://appassets.androidplatform.net/image";
                     window.disablePopupImageViewportMaxHeight = true;
                     window.audioEnableAutoplay = ${audioSettings.enableAutoplay};
                     window.audioPlaybackMode = "${audioSettings.playbackMode.rawValue}";
@@ -244,7 +244,7 @@ internal object LookupPopupHtml {
                             }
                         };
                         window.addEventListener('message', function(event) {
-                            if (event.origin !== 'https://hoshi.local') return;
+                            if (event.origin !== 'https://appassets.androidplatform.net') return;
                             var message = event.data || {};
                             if (message.type === 'reply') {
                                 window.HoshiAndroidPopup.resolveMessage(message.id, message.body);
@@ -689,5 +689,5 @@ internal object LookupPopupHtml {
         }
     """
 
-    private const val PopupAssetBaseUrl = "https://hoshi.local/popup"
+    private const val PopupAssetBaseUrl = "https://appassets.androidplatform.net/popup"
 }

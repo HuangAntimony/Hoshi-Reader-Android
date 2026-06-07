@@ -64,7 +64,7 @@ class ReaderFontManager @Inject constructor(
         normalizeDefaultFont(name) in defaultFonts
 
     fun webViewFontUrl(name: String): String? =
-        storedFont(name)?.let { "https://hoshi.local/fonts/${it.fileName.pathSegmentEncoded()}" }
+        storedFont(name)?.let { "https://appassets.androidplatform.net/fonts/${it.fileName.pathSegmentEncoded()}" }
 
     fun allFontNames(): List<String> =
         (defaultFonts + storedFonts().map { it.name }).distinct()

@@ -613,7 +613,7 @@ private fun DictionarySearchIframeHost(
                     onPullReleased = { currentOnPullReleased.value(it) },
                 )
                 loadDataWithBaseURL(
-                    "https://hoshi.local/dictionary/iframe-host.html",
+                    "https://appassets.androidplatform.net/dictionary/iframe-host.html",
                     lookupPopupIframeHostHtml(),
                     "text/html",
                     "UTF-8",

@@ -252,7 +252,7 @@ private fun ReaderFullscreenSvgImage(
                 <body><img src="$escapedSource" /></body>
                 </html>
             """.trimIndent()
-            webView.loadDataWithBaseURL("https://hoshi.local/", html, "text/html", "UTF-8", null)
+            webView.loadDataWithBaseURL("https://appassets.androidplatform.net/", html, "text/html", "UTF-8", null)
         },
     )
 }

@@ -30,7 +30,7 @@ class ReaderInternalLinkTest {
     @Test
     fun resolvesHoshiEpubUrlToChapterAndFragment() {
         val target = book.resolveInternalReaderLink(
-            "https://hoshi.local/epub/OPS/chapter-1.xhtml#toc-001",
+            "https://appassets.androidplatform.net/epub/OPS/chapter-1.xhtml#toc-001",
         )
 
         assertEquals(ReaderChapterPosition(index = 1, progress = 0.0), target?.position)

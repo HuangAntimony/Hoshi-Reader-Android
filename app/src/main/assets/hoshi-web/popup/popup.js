@@ -1401,7 +1401,7 @@ function applyButtonSlotVisualState(slot) {
         ? (state === 'error' ? 'volume_off' : 'volume_up')
         : (state === 'duplicate' ? 'check_box' : 'add_box');
     slot.disabled = !enabled;
-    slot.style.setProperty('--button-icon-url', `url("https://hoshi.local/popup/icons/${iconName}.svg")`);
+    slot.style.setProperty('--button-icon-url', `url("https://appassets.androidplatform.net/popup/icons/${iconName}.svg")`);
 }
 
 async function playEntryAudio(entryIndex) {

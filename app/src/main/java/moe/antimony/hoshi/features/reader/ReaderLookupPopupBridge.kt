@@ -406,7 +406,7 @@ private fun JsonObject.boolean(name: String): Boolean? =
 
 private val readerPopupJson = Json { encodeDefaults = true }
 
-private const val PopupIframeUrl = "https://hoshi.local/popup/iframe.html"
+private const val PopupIframeUrl = "https://appassets.androidplatform.net/popup/iframe.html"
 
 internal fun readerLookupPopupIframeUrl(cacheKey: Int? = null): String =
     cacheKey?.let { "$PopupIframeUrl?v=$it" } ?: PopupIframeUrl
@@ -428,7 +428,7 @@ internal object ReaderLookupPopupWebBridge {
         WebViewCompat.addWebMessageListener(
             webView,
             "HoshiReaderPopup",
-            setOf("https://hoshi.local"),
+            setOf("https://appassets.androidplatform.net"),
         ) { _, message, _, _, _ ->
             val data = message.data ?: return@addWebMessageListener
             val parsed = ReaderLookupPopupBridgeMessage.fromJson(data) ?: return@addWebMessageListener
@@ -454,7 +454,7 @@ internal class ReaderLookupPopupResourceHandler(
             ?: audioRequestHandler.handleAudioRequest(uri.toString())
 
     private fun handlePopupAssetRequest(uri: Uri): WebResourceResponse? {
-        if (uri.scheme != "https" || uri.host != "hoshi.local" || !uri.path.orEmpty().startsWith("/popup/")) return null
+        if (uri.scheme != "https" || uri.host != "appassets.androidplatform.net" || !uri.path.orEmpty().startsWith("/popup/")) return null
         val path = uri.path.orEmpty()
         if (path == "/popup/iframe.html") {
             return textResponse("text/html", iframeDocument())
@@ -481,7 +481,7 @@ internal class ReaderLookupPopupResourceHandler(
     }
 
     private fun handleFontRequest(uri: Uri): WebResourceResponse? {
-        if (uri.scheme != "https" || uri.host != "hoshi.local") return null
+        if (uri.scheme != "https" || uri.host != "appassets.androidplatform.net") return null
         val fileName = uri.lastPathSegment?.takeIf { uri.path.orEmpty().startsWith("/fonts/") } ?: return null
         val fontFile = fontManager.fontFileForRequest(fileName) ?: return null
         return WebResourceResponse(

@@ -159,7 +159,7 @@ class DictionarySearchInteractionsTest {
         eInkMode = false,
         clearSelectionSignal = 0,
         selectionOffsetY = top,
-        iframeUrl = "https://hoshi.local/popup/iframe.html",
+        iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html",
     )
 
     private fun lookupResult(): LookupResult = LookupResult(

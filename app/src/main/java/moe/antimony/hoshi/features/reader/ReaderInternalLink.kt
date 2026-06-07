@@ -11,7 +11,7 @@ internal data class ReaderInternalLinkTarget(
 internal fun EpubBook.resolveInternalReaderLink(url: String): ReaderInternalLinkTarget? {
     val uri = runCatching { URI(url) }.getOrNull() ?: return null
     val scheme = uri.scheme?.lowercase() ?: return null
-    if ((scheme != "http" && scheme != "https") || uri.host != "hoshi.local") return null
+    if ((scheme != "http" && scheme != "https") || uri.host != "appassets.androidplatform.net") return null
 
     val path = uri.path.orEmpty()
     if (!path.startsWith("/epub/")) return null

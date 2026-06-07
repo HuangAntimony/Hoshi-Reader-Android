@@ -116,7 +116,7 @@ internal fun ChapterWebView(
     val fontFaceUrl = remember(readerSettings.selectedFont) {
         fontManager.webViewFontUrl(readerSettings.selectedFont)
     }
-    val baseUrl = remember(chapter) { "https://hoshi.local/epub/${chapter.href}" }
+    val baseUrl = remember(chapter) { "https://appassets.androidplatform.net/epub/${chapter.href}" }
     val readerContentReloadKey = remember(readerSettings) {
         readerSettings.readerContentReloadKey()
     }
@@ -695,7 +695,7 @@ private class EpubWebViewClient(
 
     override fun onPageFinished(view: WebView, url: String?) {
         super.onPageFinished(view, url)
-        if (Uri.parse(url ?: return).host == "hoshi.local") {
+        if (Uri.parse(url ?: return).host == "appassets.androidplatform.net") {
             onReaderPageFinished(view)
         }
     }
@@ -764,7 +764,7 @@ private fun readerSetupScript(
           if (!document.getElementById('hoshi-reader-popup-host-script')) {
             var popupHostScript = document.createElement('script');
             popupHostScript.id = 'hoshi-reader-popup-host-script';
-            popupHostScript.src = 'https://hoshi.local/popup/reader-popup-host.js';
+            popupHostScript.src = 'https://appassets.androidplatform.net/popup/reader-popup-host.js';
             hoshiHead.appendChild(popupHostScript);
           }
           $paginationScript

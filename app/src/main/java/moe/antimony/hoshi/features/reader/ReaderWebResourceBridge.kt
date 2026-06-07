@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.reader
 
 import android.webkit.WebResourceResponse
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URI
 import moe.antimony.hoshi.epub.EpubBook
 
@@ -9,9 +10,29 @@ internal data class ReaderWebResource(
     val mediaType: String,
     val encoding: String?,
     val data: ByteArray,
+    val statusCode: Int = HttpURLConnection.HTTP_OK,
+    val reasonPhrase: String = "OK",
 ) {
     fun toWebResourceResponse(): WebResourceResponse =
-        WebResourceResponse(mediaType, encoding, data.inputStream())
+        WebResourceResponse(
+            mediaType,
+            encoding,
+            statusCode,
+            reasonPhrase,
+            emptyMap(),
+            data.inputStream(),
+        )
+
+    companion object {
+        fun notFound(): ReaderWebResource =
+            ReaderWebResource(
+                mediaType = "text/plain",
+                encoding = "UTF-8",
+                data = ByteArray(0),
+                statusCode = HttpURLConnection.HTTP_NOT_FOUND,
+                reasonPhrase = "Not Found",
+            )
+    }
 }
 
 internal class ReaderWebResourceBridge(
@@ -25,18 +46,18 @@ internal class ReaderWebResourceBridge(
 
     fun resourceForUrl(url: String): ReaderWebResource? {
         val uri = runCatching { URI(url).normalize() }.getOrNull() ?: return null
-        if (uri.host != "hoshi.local") return null
+        if (uri.scheme != "https" || uri.host != "appassets.androidplatform.net") return null
         val path = uri.path.orEmpty()
         return when {
-            path.startsWith("/fonts/") -> fontResource(path.removePrefix("/fonts/"))
-            path.startsWith("/epub/") -> epubResource(path.removePrefix("/epub/"))
-            else -> null
+            path.startsWith("/fonts/") -> fontResource(path.removePrefix("/fonts/")) ?: ReaderWebResource.notFound()
+            path.startsWith("/epub/") -> epubResource(path.removePrefix("/epub/")) ?: ReaderWebResource.notFound()
+            else -> ReaderWebResource.notFound()
         }
     }
 
     fun imageResourceForUrl(url: String): ReaderWebResource? {
         val uri = runCatching { URI(url).normalize() }.getOrNull() ?: return null
-        if (uri.host != "hoshi.local") return null
+        if (uri.scheme != "https" || uri.host != "appassets.androidplatform.net") return null
         val path = uri.path.orEmpty().removePrefix("/epub/")
         if (path.isBlank() || path == uri.path.orEmpty()) return null
         val mediaType = book.mediaType(path).substringBefore(';').trim()

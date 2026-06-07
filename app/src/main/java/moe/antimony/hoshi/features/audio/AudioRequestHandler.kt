@@ -54,7 +54,7 @@ class AudioRequestHandler(
         val uri = runCatching { URI(url) }.getOrNull() ?: return null
         val isIosAudioScheme = uri.scheme == "audio"
         val isAndroidAudioEndpoint = uri.scheme == "https" &&
-            uri.host == "hoshi.local" &&
+            uri.host == "appassets.androidplatform.net" &&
             uri.path == "/audio"
         if (!isIosAudioScheme && !isAndroidAudioEndpoint) return null
         return uri

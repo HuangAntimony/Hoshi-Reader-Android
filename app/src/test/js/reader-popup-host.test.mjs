@@ -140,7 +140,7 @@ function popupHost(options = {}) {
         host: window.hoshiReaderPopupHost,
         dispatchMessage: (data) => {
             messageListeners.forEach((listener) => listener({
-                origin: 'https://hoshi.local',
+                origin: 'https://appassets.androidplatform.net',
                 data,
                 source: {},
             }));
@@ -173,7 +173,7 @@ function renderControls() {
             backCount: 1,
             forwardCount: 1,
             clearSelectionSignal: 0,
-            iframeUrl: 'https://hoshi.local/popup/iframe.html',
+            iframeUrl: 'https://appassets.androidplatform.net/popup/iframe.html',
         }],
     });
     const shell = document.getElementById('hoshi-reader-popup-layer').children[0];
@@ -194,7 +194,7 @@ function rootPopupPayload() {
         backCount: 0,
         forwardCount: 0,
         clearSelectionSignal: 0,
-        iframeUrl: 'https://hoshi.local/popup/iframe.html',
+        iframeUrl: 'https://appassets.androidplatform.net/popup/iframe.html',
     };
 }
 

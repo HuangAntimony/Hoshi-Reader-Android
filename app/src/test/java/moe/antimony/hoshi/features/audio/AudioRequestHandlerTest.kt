@@ -19,7 +19,7 @@ class AudioRequestHandlerTest {
         )
         val target = "http://localhost:8765/localaudio/get/?term=%E8%AA%AD%E3%82%80&reading=%E3%82%88%E3%82%80"
 
-        val body = handler.handleAudioRequestBody("https://hoshi.local/audio?url=${target.urlEncodeForQuery()}")
+        val body = handler.handleAudioRequestBody("https://appassets.androidplatform.net/audio?url=${target.urlEncodeForQuery()}")
 
         assertEquals(target, fetchedTarget)
         assertEquals(
@@ -46,7 +46,7 @@ class AudioRequestHandlerTest {
         )
         val target = "hoshi-local-audio-source://get/?term=%E9%A3%9F%E3%81%B9%E3%82%8B&reading=%E3%81%9F%E3%81%B9%E3%82%8B"
 
-        val body = handler.handleAudioRequestBody("https://hoshi.local/audio?url=${target.urlEncodeForQuery()}")
+        val body = handler.handleAudioRequestBody("https://appassets.androidplatform.net/audio?url=${target.urlEncodeForQuery()}")
 
         assertEquals(
             """{"type":"audioSourceList","audioSources":[{"name":"nhk16","url":"hoshi-local-audio://nhk16/audio%2F20170823122755.opus"}]}""",
@@ -73,7 +73,7 @@ class AudioRequestHandlerTest {
         )
         val target = "hoshi-local-audio-source://get/?term=%E9%A3%9F%E3%81%B9%E3%82%8B&reading=%E3%81%9F%E3%81%B9%E3%82%8B"
 
-        val body = handler.handleAudioRequestBody("https://hoshi.local/audio?url=${target.urlEncodeForQuery()}")
+        val body = handler.handleAudioRequestBody("https://appassets.androidplatform.net/audio?url=${target.urlEncodeForQuery()}")
 
         assertEquals(
             """{"type":"audioSourceList","audioSources":[{"name":"forvo","url":"hoshi-local-audio://forvo/audio%2Fforvo.mp3"}]}""",

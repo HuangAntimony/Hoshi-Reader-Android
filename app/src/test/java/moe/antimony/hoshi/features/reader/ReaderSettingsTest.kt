@@ -95,12 +95,12 @@ class ReaderSettingsTest {
 
         val css = ReaderContentStyles.styleTag(
             settings = settings,
-            fontFaceUrl = "https://hoshi.local/fonts/KleeOne-SemiBold.ttf",
+            fontFaceUrl = "https://appassets.androidplatform.net/fonts/KleeOne-SemiBold.ttf",
         )
 
         assertTrue(css.contains("@font-face"))
         assertTrue(css.contains("font-family: 'KleeOne-SemiBold';"))
-        assertTrue(css.contains("src: url('https://hoshi.local/fonts/KleeOne-SemiBold.ttf');"))
+        assertTrue(css.contains("src: url('https://appassets.androidplatform.net/fonts/KleeOne-SemiBold.ttf');"))
         assertTrue(css.contains("writing-mode: vertical-rl !important;"))
         assertTrue(css.contains("font-family: 'KleeOne-SemiBold', serif !important;"))
         assertTrue(css.contains("font-size: 28px !important;"))

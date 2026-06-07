@@ -41,7 +41,7 @@ internal fun lookupPopupIframeHostHtml(
             <script>
                 window.__hoshiReaderPopupHostDismissTopPopupOnOutsideTap = $outsideTapFlag;
             </script>
-            <script src="https://hoshi.local/popup/reader-popup-host.js"></script>
+            <script src="https://appassets.androidplatform.net/popup/reader-popup-host.js"></script>
         </head>
         <body></body>
         </html>

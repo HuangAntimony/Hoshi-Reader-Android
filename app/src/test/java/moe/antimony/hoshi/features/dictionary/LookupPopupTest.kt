@@ -185,8 +185,8 @@ class LookupPopupTest {
         assertEquals(171.0, payload.selectionOffsetY, 0.0)
         assertTrue(payload.popupActionBar)
         assertEquals(3, payload.entriesCount)
-        assertEquals("https://hoshi.local/popup/iframe.html", payload.iframeUrl)
-        assertEquals("https://hoshi.local/popup/iframe.html?v=123", readerLookupPopupIframeUrl(123))
+        assertEquals("https://appassets.androidplatform.net/popup/iframe.html", payload.iframeUrl)
+        assertEquals("https://appassets.androidplatform.net/popup/iframe.html?v=123", readerLookupPopupIframeUrl(123))
     }
 
     @Test

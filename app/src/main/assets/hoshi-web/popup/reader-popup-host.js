@@ -1,5 +1,5 @@
 (function() {
-    const ORIGIN = 'https://hoshi.local';
+    const ORIGIN = 'https://appassets.androidplatform.net';
     const LAYER_ID = 'hoshi-reader-popup-layer';
     const ACTION_BAR_HEIGHT = 37;
     const SASAYAKI_BAR_HEIGHT = 37;
@@ -56,7 +56,7 @@
     }
 
     function icon(name) {
-        return `https://hoshi.local/popup/icons/${name}.svg`;
+        return `https://appassets.androidplatform.net/popup/icons/${name}.svg`;
     }
 
     function frameContentTop(payload) {

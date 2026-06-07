@@ -492,7 +492,7 @@ private fun ProcessTextLookupIframeHost(
                 ReaderLookupPopupWebBridge.install(this, callbackHolder)
                 webViewClient = LookupPopupIframeWebViewClient(resourceHandler)
                 loadDataWithBaseURL(
-                    "https://hoshi.local/process-text/iframe-host.html",
+                    "https://appassets.androidplatform.net/process-text/iframe-host.html",
                     lookupPopupIframeHostHtml(dismissTopPopupOnOutsideTap = true),
                     "text/html",
                     "UTF-8",

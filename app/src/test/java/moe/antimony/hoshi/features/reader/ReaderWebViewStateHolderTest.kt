@@ -188,18 +188,18 @@ class ReaderWebViewStateHolderTest {
             initialProgress = 0.2,
             initialFragment = null,
             scanNonJapaneseText = false,
-            fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+            fontFaceUrl = "https://appassets.androidplatform.net/fonts/default.ttf",
         )
         val viewportSize = IntSize(800, 1200)
 
         val baseLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = baseSettings.readerContentReloadKey(),
             readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,
         )
         val changedLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = changedSettings.readerContentReloadKey(),
             readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,
@@ -214,24 +214,24 @@ class ReaderWebViewStateHolderTest {
         val viewportSize = IntSize(800, 1200)
 
         val baseLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = settings.readerContentReloadKey(),
             readerSetupReloadKey = ReaderWebViewSetupReloadKey(
                 initialProgress = 0.2,
                 initialFragment = null,
                 scanNonJapaneseText = false,
-                fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+                fontFaceUrl = "https://appassets.androidplatform.net/fonts/default.ttf",
             ),
             webViewViewportSize = viewportSize,
         )
         val changedLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = settings.readerContentReloadKey(),
             readerSetupReloadKey = ReaderWebViewSetupReloadKey(
                 initialProgress = 0.6,
                 initialFragment = null,
                 scanNonJapaneseText = false,
-                fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+                fontFaceUrl = "https://appassets.androidplatform.net/fonts/default.ttf",
             ),
             webViewViewportSize = viewportSize,
         )
@@ -247,18 +247,18 @@ class ReaderWebViewStateHolderTest {
             initialProgress = 0.2,
             initialFragment = null,
             scanNonJapaneseText = false,
-            fontFaceUrl = "https://hoshi.local/fonts/default.ttf",
+            fontFaceUrl = "https://appassets.androidplatform.net/fonts/default.ttf",
         )
         val viewportSize = IntSize(800, 1200)
 
         val baseLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = baseSettings.readerContentReloadKey(),
             readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,
         )
         val changedLoadKey = readerWebViewLoadKey(
-            baseUrl = "https://hoshi.local/epub/chapter.xhtml",
+            baseUrl = "https://appassets.androidplatform.net/epub/chapter.xhtml",
             readerContentReloadKey = changedSettings.readerContentReloadKey(),
             readerSetupReloadKey = setupReloadKey,
             webViewViewportSize = viewportSize,

@@ -24,9 +24,9 @@ class LookupPopupHtmlTest {
             popupScale = 1.15,
         )
 
-        assertTrue(html.contains("""<link rel="stylesheet" href="https://hoshi.local/popup/popup.css">"""))
-        assertTrue(html.contains("""<script src="https://hoshi.local/popup/selection.js"></script>"""))
-        assertTrue(html.contains("""<script src="https://hoshi.local/popup/popup.js"></script>"""))
+        assertTrue(html.contains("""<link rel="stylesheet" href="https://appassets.androidplatform.net/popup/popup.css">"""))
+        assertTrue(html.contains("""<script src="https://appassets.androidplatform.net/popup/selection.js"></script>"""))
+        assertTrue(html.contains("""<script src="https://appassets.androidplatform.net/popup/popup.js"></script>"""))
         assertTrue(html.contains("window.nativePopupButtons = false;"))
         assertTrue(html.contains("window.scanLength = 24;"))
         assertTrue(html.contains("html { zoom: 1.15; }"))
@@ -73,7 +73,7 @@ class LookupPopupHtmlTest {
                 customCSS = """
                     @font-face {
                         font-family: "Slow Iframe Font";
-                        src: url("https://hoshi.local/fonts/SlowIframeFont.ttf");
+                        src: url("https://appassets.androidplatform.net/fonts/SlowIframeFont.ttf");
                     }
                     .entry { font-family: "Slow Iframe Font"; }
                 """.trimIndent(),
@@ -81,7 +81,7 @@ class LookupPopupHtmlTest {
             fontFaceCss = """
                 @font-face {
                     font-family: "Klee One";
-                    src: url("https://hoshi.local/fonts/Klee%20One.ttf");
+                    src: url("https://appassets.androidplatform.net/fonts/Klee%20One.ttf");
                 }
             """.trimIndent(),
             popupScale = 1.25,
@@ -89,10 +89,10 @@ class LookupPopupHtmlTest {
 
         val customCssIndex = html.indexOf("""<style id="popup-custom-css">""")
         assertTrue(customCssIndex >= 0)
-        assertTrue(customCssIndex < html.indexOf("""<script src="https://hoshi.local/popup/popup.js"></script>"""))
+        assertTrue(customCssIndex < html.indexOf("""<script src="https://appassets.androidplatform.net/popup/popup.js"></script>"""))
         assertTrue(html.contains("""font-family: "Slow Iframe Font";"""))
         assertTrue(html.contains("""font-family: "Klee One";"""))
-        assertTrue(html.contains("""src: url("https://hoshi.local/fonts/Klee%20One.ttf");"""))
+        assertTrue(html.contains("""src: url("https://appassets.androidplatform.net/fonts/Klee%20One.ttf");"""))
         assertTrue(html.contains("html { zoom: 1.25; }"))
         assertTrue(html.contains("window.hoshiPopupPrewarmFonts = function()"))
         assertTrue(html.contains("window.hoshiPopupPrewarmFonts();"))

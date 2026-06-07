@@ -13,7 +13,7 @@ internal class DictionaryImageRequestHandler(
     fun handleImageRequest(uri: Uri): WebResourceResponse? {
         val isIosImageScheme = uri.scheme == "image"
         val isAndroidImageEndpoint = uri.scheme == "https" &&
-            uri.host == "hoshi.local" &&
+            uri.host == "appassets.androidplatform.net" &&
             uri.path == "/image"
         if (!isIosImageScheme && !isAndroidImageEndpoint) return null
         val dictionary = uri.getQueryParameter("dictionary").orEmpty()

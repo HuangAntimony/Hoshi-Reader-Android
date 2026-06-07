@@ -23,7 +23,7 @@ class DictionarySearchIframeTest {
             searchBarBottomDp = 86.0,
             darkMode = true,
             eInkMode = false,
-            iframeUrl = "https://hoshi.local/popup/iframe.html?v=5",
+            iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html?v=5",
         )
 
         assertEquals(DictionarySearchRootPopupId, payload.id)
@@ -36,7 +36,7 @@ class DictionarySearchIframeTest {
         assertFalse(payload.popupActionBar)
         assertFalse(payload.actionBarVisible)
         assertEquals(86.0, payload.selectionOffsetY, 0.0)
-        assertEquals("https://hoshi.local/popup/iframe.html?v=5", payload.iframeUrl)
+        assertEquals("https://appassets.androidplatform.net/popup/iframe.html?v=5", payload.iframeUrl)
     }
 
     @Test
@@ -65,7 +65,7 @@ class DictionarySearchIframeTest {
             searchBarBottomDp = 86.0,
             darkMode = false,
             eInkMode = false,
-            iframeUrl = "https://hoshi.local/popup/iframe.html",
+            iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html",
         )
 
         assertEquals(listOf(DictionarySearchRootPopupId, "child"), payloads.map { it.id })
@@ -84,7 +84,7 @@ class DictionarySearchIframeTest {
             searchBarBottomDp = 86.0,
             darkMode = false,
             eInkMode = false,
-            iframeUrl = "https://hoshi.local/popup/iframe.html",
+            iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html",
         )
 
         assertEquals(2, payloads.single().backCount)
@@ -102,7 +102,7 @@ class DictionarySearchIframeTest {
             searchBarBottomDp = 86.0,
             darkMode = false,
             eInkMode = false,
-            iframeUrl = "https://hoshi.local/popup/iframe.html",
+            iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html",
         )
         val secondPayload = dictionarySearchRootFramePayload(
             results = secondResults,
@@ -110,7 +110,7 @@ class DictionarySearchIframeTest {
             searchBarBottomDp = 86.0,
             darkMode = false,
             eInkMode = false,
-            iframeUrl = "https://hoshi.local/popup/iframe.html",
+            iframeUrl = "https://appassets.androidplatform.net/popup/iframe.html",
         )
 
         assertNotEquals(firstPayload.contentKey, secondPayload.contentKey)
