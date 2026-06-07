@@ -148,6 +148,7 @@ internal fun ReaderRouteDestination(
         is ReaderRouteLoadState.Ready -> ReaderWebView(
             book = state.book,
             bookRoot = state.bookRoot,
+            bookCoverFile = state.bookCoverFile,
             initialChapterIndex = state.bookmark?.chapterIndex ?: 0,
             initialProgress = state.bookmark?.progress ?: 0.0,
             readerSettings = readerSettings,

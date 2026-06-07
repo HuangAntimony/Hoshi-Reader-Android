@@ -119,11 +119,7 @@ class TtuBookDataConverter @Inject constructor(
             val root = bookRepository.createBookDirectoryForImportedTitle(staticData.title)
             val existingMetadata = bookRepository.loadMetadata(root)
             if (root.listFiles()?.isNotEmpty() == true) {
-                val existingInfo = bookRepository.loadBookInfo(root)
-                if (existingMetadata?.epub != null && existingInfo?.characterCount == parsed.bookInfo.characterCount) {
-                    return@withContext BookEntry(root, existingMetadata)
-                }
-                error("A different local book already uses the title ${staticData.title}.")
+                return@withContext BookEntry(root, existingMetadata ?: metadata.copy(folder = root.name))
             }
             root.deleteRecursively()
             if (!stagedBookRoot.renameTo(root)) {

@@ -98,6 +98,20 @@ class MainShellUiTest {
     }
 
     @Test
+    fun googleDriveSectionIsInsertedBeforeUnshelvedLikeIos() {
+        val unread = bookEntry(id = "unread", title = "Unread", lastAccess = 3.0)
+        val shelved = bookEntry(id = "shelved", title = "Shelved", lastAccess = 1.0)
+
+        val sections = bookshelfSections(
+            entries = listOf(unread, shelved),
+            shelves = listOf(BookShelf(name = "Manga", bookIds = listOf("shelved"))),
+        )
+
+        assertEquals(listOf("Manga", "Unshelved"), sections.map { it.title })
+        assertEquals(1, googleDriveSectionInsertionIndex(sections))
+    }
+
+    @Test
     fun virtualReadingShelfAndUserReadingShelfHaveDistinctLayoutKeys() {
         val reading = bookEntry(id = "reading", title = "Reading", lastAccess = 2.0)
         val shelved = bookEntry(id = "shelved", title = "Shelved", lastAccess = 1.0)

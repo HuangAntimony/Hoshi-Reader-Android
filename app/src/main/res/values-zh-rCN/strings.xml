@@ -72,6 +72,7 @@
     <string name="bookshelf_importing_named_format">正在导入 %1$s...</string>
     <string name="bookshelf_importing_progress_format">正在导入 %1$d / %2$d...</string>
     <string name="bookshelf_sync_failed">同步失败。</string>
+    <string name="bookshelf_remote_books_load_failed_format">无法从 Google Drive 获取书籍：%1$s</string>
     <string name="bookshelf_syncing">正在同步...</string>
     <string name="bookshelf_synced_to_ttu_format">已将 %1$s 同步到 ッツ\n%2$d 个字符</string>
     <string name="bookshelf_synced_from_ttu_format">已从 ッツ 同步 %1$s\n%2$d 个字符</string>
@@ -290,6 +291,8 @@
     <string name="sync_upload_books_description">当同步的 Google Drive 书籍文件夹缺少 bookdata 时，上传 TTU bookdata。</string>
     <string name="sync_clear_cache">清除 Google Drive 缓存</string>
     <string name="sync_cache_cleared">已清除 Google Drive 缓存。</string>
+    <string name="sync_clear_cache_title">清除 Google Drive 缓存？</string>
+    <string name="sync_clear_cache_confirmation">Hoshi 将清除已缓存的 Google Drive 文件夹 ID 和远程封面缩略图。本地书籍不会被删除。</string>
     <string name="sync_sign_out_title">退出 Google Drive？</string>
     <string name="sync_sign_out_confirmation">Hoshi 将断开 Google Drive 并清除已缓存的 Drive 文件夹。本地书籍不会被删除。</string>
     <string name="sync_mode_auto">自动</string>

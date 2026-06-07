@@ -295,12 +295,32 @@ internal class BookshelfViewModel : ViewModel {
         )
     }
 
-    fun importRemoteBook(entry: RemoteBookEntry) {
+    fun importRemoteBook(
+        entry: RemoteBookEntry,
+        syncStats: Boolean,
+        syncAudioBook: Boolean,
+    ) {
+        if (entry.id in remoteDeletesInFlight) return
         if (!remoteImportsInFlight.add(entry.id)) return
         workScope.launch {
-            _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    statusMessage = null,
+                    errorMessage = null,
+                    remoteImportProgressById = it.remoteImportProgressById + (entry.id to 0.0),
+                    remoteBusyBookIds = it.remoteBusyBookIds + entry.id,
+                )
+            }
             try {
-                repository.importRemoteBook(entry)
+                repository.importRemoteBook(
+                    entry = entry,
+                    syncStats = syncStats,
+                    syncAudioBook = syncAudioBook,
+                ) { progress ->
+                    _uiState.update {
+                        it.copy(remoteImportProgressById = it.remoteImportProgressById + (entry.id to progress))
+                    }
+                }
                 removeRemoteBook(entry.id)
                 reloadBookEntriesSync()
             } catch (error: Throwable) {
@@ -312,14 +332,27 @@ internal class BookshelfViewModel : ViewModel {
                 }
             } finally {
                 remoteImportsInFlight -= entry.id
+                _uiState.update {
+                    it.copy(
+                        remoteImportProgressById = it.remoteImportProgressById - entry.id,
+                        remoteBusyBookIds = it.remoteBusyBookIds - entry.id,
+                    )
+                }
             }
         }
     }
 
     fun deleteRemoteBook(entry: RemoteBookEntry) {
+        if (entry.id in remoteImportsInFlight) return
         if (!remoteDeletesInFlight.add(entry.id)) return
         workScope.launch {
-            _uiState.update { it.copy(statusMessage = null, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    statusMessage = null,
+                    errorMessage = null,
+                    remoteBusyBookIds = it.remoteBusyBookIds + entry.id,
+                )
+            }
             try {
                 repository.deleteRemoteBook(entry)
                 removeRemoteBook(entry.id)
@@ -333,6 +366,7 @@ internal class BookshelfViewModel : ViewModel {
                 }
             } finally {
                 remoteDeletesInFlight -= entry.id
+                _uiState.update { it.copy(remoteBusyBookIds = it.remoteBusyBookIds - entry.id) }
             }
         }
     }
@@ -546,6 +580,15 @@ internal class BookshelfViewModel : ViewModel {
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
+                if (generation != reloadGeneration) return@launch
+                _uiState.update {
+                    it.copy(
+                        errorMessage = UiText.Resource(
+                            R.string.bookshelf_remote_books_load_failed_format,
+                            error.localizedMessage ?: error::class.java.simpleName,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -555,6 +598,8 @@ internal class BookshelfViewModel : ViewModel {
             it.copy(
                 remoteBookEntries = it.remoteBookEntries.filterNot { remote -> remote.id == remoteBookId },
                 remoteProgressById = it.remoteProgressById - remoteBookId,
+                remoteImportProgressById = it.remoteImportProgressById - remoteBookId,
+                remoteBusyBookIds = it.remoteBusyBookIds - remoteBookId,
                 remoteCoverSourcesById = it.remoteCoverSourcesById - remoteBookId,
             )
         }

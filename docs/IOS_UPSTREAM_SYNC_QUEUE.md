@@ -170,7 +170,7 @@ Manual validation to keep in release QA:
 - Export an Android book as EPUB and as TTU backup; import the TTU backup into
   iOS/ッツ where possible.
 - Import an iOS/ッツ TTU backup into Android; verify reader open, cover,
-  progress, statistics, and Sasayaki progress.
+  progress, and statistics.
 - Disable network/mobile data during autosync and confirm it fails or defers
   without hanging.
 

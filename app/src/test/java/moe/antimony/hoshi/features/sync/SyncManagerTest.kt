@@ -9,6 +9,7 @@ import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -142,6 +143,61 @@ class SyncManagerTest {
         assertEquals(SyncResult.Synced("Title"), result)
         assertEquals("book-folder", drive.uploadedBookDataFolderId)
         assertEquals(exported, drive.uploadedBookDataFile)
+    }
+
+    @Test
+    fun syncBookDeletesTemporaryBookDataAfterSuccessfulUpload() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource()
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            bookDataExporter = { _: BookEntry -> exported },
+        )
+
+        manager.syncBook(
+            entry = entry,
+            direction = null,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            syncBookData = true,
+        )
+
+        assertFalse(exported.exists())
+    }
+
+    @Test
+    fun syncBookDeletesTemporaryBookDataAfterUploadFailure() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
+        exported.writeText("bookdata")
+        val drive = FakeDriveSyncDataSource(bookDataUploadError = RuntimeException("bookdata upload failed"))
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            bookDataExporter = { _: BookEntry -> exported },
+        )
+
+        try {
+            manager.syncBook(
+                entry = entry,
+                direction = null,
+                syncStats = false,
+                statsSyncMode = StatisticsSyncMode.Merge,
+                syncAudioBook = false,
+                syncBookData = true,
+            )
+            fail("Expected bookdata upload failure")
+        } catch (expected: RuntimeException) {
+            assertEquals("bookdata upload failed", expected.message)
+        }
+
+        assertFalse(exported.exists())
     }
 
     @Test

@@ -151,10 +151,10 @@ class BookshelfViewModelTest {
         val repository = FakeBookshelfRepository(remoteEntries = listOf(remote))
         val viewModel = BookshelfViewModel(repository, testScope())
 
-        viewModel.importRemoteBook(remote)
+        viewModel.importRemoteBook(remote, syncStats = true, syncAudioBook = false)
         viewModel.deleteRemoteBook(remote)
 
-        assertEquals(listOf(remote), repository.importedRemoteEntries)
+        assertEquals(listOf(ImportedRemoteBook(remote, syncStats = true, syncAudioBook = false)), repository.importedRemoteEntries)
         assertEquals(listOf(remote), repository.deletedRemoteEntries)
         assertEquals(listOf(BookSortOption.Recent, BookSortOption.Recent), repository.loadRequests)
     }
@@ -172,7 +172,7 @@ class BookshelfViewModelTest {
         val viewModel = BookshelfViewModel(repository, testScope())
         viewModel.reloadBookEntries()
 
-        viewModel.importRemoteBook(remote)
+        viewModel.importRemoteBook(remote, syncStats = false, syncAudioBook = false)
 
         assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
         assertFalse(viewModel.uiState.value.isLoading)
@@ -180,7 +180,7 @@ class BookshelfViewModelTest {
 
         continueImport.complete(Unit)
 
-        assertEquals(listOf(remote), repository.importedRemoteEntries)
+        assertEquals(listOf(ImportedRemoteBook(remote, syncStats = false, syncAudioBook = false)), repository.importedRemoteEntries)
     }
 
     @Test
@@ -217,12 +217,69 @@ class BookshelfViewModelTest {
         )
         val viewModel = BookshelfViewModel(repository, testScope())
 
-        viewModel.importRemoteBook(remote)
-        viewModel.importRemoteBook(remote)
+        viewModel.importRemoteBook(remote, syncStats = false, syncAudioBook = false)
+        viewModel.importRemoteBook(remote, syncStats = true, syncAudioBook = true)
 
-        assertEquals(listOf(remote), repository.importedRemoteEntries)
+        assertEquals(listOf(ImportedRemoteBook(remote, syncStats = false, syncAudioBook = false)), repository.importedRemoteEntries)
 
         continueImport.complete(Unit)
+    }
+
+    @Test
+    fun remoteImportPublishesDownloadProgressAndBlocksDeleteWhileInFlight() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueImport = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            remoteEntries = listOf(remote),
+            remoteImportGate = continueImport,
+            remoteImportProgress = listOf(0.25, 0.75),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.importRemoteBook(remote, syncStats = false, syncAudioBook = true)
+
+        assertEquals(mapOf(remote.id to 0.75), viewModel.uiState.value.remoteImportProgressById)
+        viewModel.deleteRemoteBook(remote)
+        assertEquals(emptyList<RemoteBookEntry>(), repository.deletedRemoteEntries)
+
+        continueImport.complete(Unit)
+
+        assertEquals(emptyMap<String, Double>(), viewModel.uiState.value.remoteImportProgressById)
+    }
+
+    @Test
+    fun remoteDeleteBlocksImportWhileInFlight() {
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val continueDelete = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            remoteEntries = listOf(remote),
+            remoteDeleteGate = continueDelete,
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.deleteRemoteBook(remote)
+        viewModel.importRemoteBook(remote, syncStats = true, syncAudioBook = true)
+
+        assertEquals(listOf(remote), repository.deletedRemoteEntries)
+        assertEquals(emptyList<ImportedRemoteBook>(), repository.importedRemoteEntries)
+
+        continueDelete.complete(Unit)
+    }
+
+    @Test
+    fun remoteLoadFailurePublishesErrorInsteadOfHidingDriveSection() {
+        val repository = FakeBookshelfRepository(
+            entries = listOf(bookEntry("local-book")),
+            remoteLoadError = RuntimeException("drive failed"),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.reloadBookEntries()
+
+        assertEquals(
+            "Failed to fetch books from Google Drive: drive failed",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
     }
 
     @Test
@@ -673,6 +730,12 @@ class BookshelfViewModelTest {
             ),
         )
 
+    private data class ImportedRemoteBook(
+        val entry: RemoteBookEntry,
+        val syncStats: Boolean,
+        val syncAudioBook: Boolean,
+    )
+
     private class FakeBookshelfRepository(
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
@@ -685,8 +748,10 @@ class BookshelfViewModelTest {
         var remoteProgressById: Map<String, Double> = emptyMap(),
         var remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
         var remoteLoadGate: CompletableDeferred<Unit>? = null,
-        private val remoteImportGate: CompletableDeferred<Unit>? = null,
-        private val remoteDeleteGate: CompletableDeferred<Unit>? = null,
+        val remoteLoadError: Throwable? = null,
+        val remoteImportGate: CompletableDeferred<Unit>? = null,
+        val remoteDeleteGate: CompletableDeferred<Unit>? = null,
+        val remoteImportProgress: List<Double> = emptyList(),
         private val loadPlans: ArrayDeque<LoadPlan> = ArrayDeque(),
     ) : BookshelfRepository {
         data class LoadPlan(
@@ -702,7 +767,7 @@ class BookshelfViewModelTest {
         val deletedShelves = mutableListOf<String>()
         val movedShelves = mutableListOf<Pair<Int, Int>>()
         val markedReadEntries = mutableListOf<BookEntry>()
-        val importedRemoteEntries = mutableListOf<RemoteBookEntry>()
+        val importedRemoteEntries = mutableListOf<ImportedRemoteBook>()
         val deletedRemoteEntries = mutableListOf<RemoteBookEntry>()
         val exportedBooks = mutableListOf<BookEntry>()
         val showReadingUpdates = mutableListOf<Boolean>()
@@ -724,6 +789,7 @@ class BookshelfViewModelTest {
         override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult {
             remoteLoadRequests += localEntries.map { it.metadata.id }
             remoteLoadGate?.await()
+            remoteLoadError?.let { throw it }
             return RemoteBookshelfLoadResult(
                 remoteEntries = remoteEntries,
                 remoteProgressById = remoteProgressById,
@@ -739,8 +805,14 @@ class BookshelfViewModelTest {
             exportedBooks += entry
         }
 
-        override suspend fun importRemoteBook(entry: RemoteBookEntry): String {
-            importedRemoteEntries += entry
+        override suspend fun importRemoteBook(
+            entry: RemoteBookEntry,
+            syncStats: Boolean,
+            syncAudioBook: Boolean,
+            onProgress: (Double) -> Unit,
+        ): String {
+            importedRemoteEntries += ImportedRemoteBook(entry, syncStats, syncAudioBook)
+            remoteImportProgress.forEach(onProgress)
             remoteImportGate?.await()
             return importBookId
         }
@@ -815,6 +887,7 @@ private fun UiText?.testString(): String? =
             R.string.bookshelf_no_epub_files_found -> "No EPUB files found."
             R.string.bookshelf_already_synced_format -> "${args[0]} is already synced"
             R.string.bookshelf_exported_epub_format -> "Exported ${args[0]}."
+            R.string.bookshelf_remote_books_load_failed_format -> "Failed to fetch books from Google Drive: ${args[0]}"
             else -> "resource:$id:${args.joinToString()}"
         }
         is UiText.Plural -> "plural:$id:$quantity:${args.joinToString()}"

@@ -10,6 +10,8 @@ data class BookshelfUiState(
     val remoteBookEntries: List<RemoteBookEntry> = emptyList(),
     val bookProgressById: Map<String, Double> = emptyMap(),
     val remoteProgressById: Map<String, Double> = emptyMap(),
+    val remoteImportProgressById: Map<String, Double> = emptyMap(),
+    val remoteBusyBookIds: Set<String> = emptySet(),
     val coverSourcesById: Map<String, BookCoverSource> = emptyMap(),
     val remoteCoverSourcesById: Map<String, BookCoverSource> = emptyMap(),
     val shelves: List<BookShelf> = emptyList(),

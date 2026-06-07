@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,7 +48,12 @@ internal interface BookshelfRepository {
     suspend fun openBook(entry: BookEntry): String
     suspend fun importBook(uri: Uri): String
     suspend fun exportBook(entry: BookEntry, uri: Uri)
-    suspend fun importRemoteBook(entry: RemoteBookEntry): String
+    suspend fun importRemoteBook(
+        entry: RemoteBookEntry,
+        syncStats: Boolean,
+        syncAudioBook: Boolean,
+        onProgress: (Double) -> Unit,
+    ): String
     suspend fun deleteRemoteBook(entry: RemoteBookEntry)
     suspend fun deleteBook(entry: BookEntry)
     suspend fun deleteBooks(entries: Collection<BookEntry>)
@@ -100,7 +108,9 @@ internal class AndroidBookshelfRepository @Inject constructor(
             remoteProgressById = remoteEntries.mapNotNull { remote ->
                 TtuSyncRules.parseProgressValue(remote.syncFiles.progress)?.let { remote.id to it }
             }.toMap(),
-            remoteCoverSourcesById = loadRemoteCoverSources(remoteEntries),
+            remoteCoverSourcesById = loadRemoteCoverSources(remoteEntries, cacheDir) { fileId, destination, progress ->
+                drive.downloadFileTo(fileId, destination, progress)
+            },
         )
     }
 
@@ -127,13 +137,23 @@ internal class AndroidBookshelfRepository @Inject constructor(
         } ?: error("Unable to open EPUB export destination.")
     }
 
-    override suspend fun importRemoteBook(entry: RemoteBookEntry): String = withContext(ioDispatcher) {
+    override suspend fun importRemoteBook(
+        entry: RemoteBookEntry,
+        syncStats: Boolean,
+        syncAudioBook: Boolean,
+        onProgress: (Double) -> Unit,
+    ): String = withContext(ioDispatcher) {
         val bookDataFile = entry.syncFiles.bookData ?: error("Remote bookdata is missing.")
         val tempRoot = File.createTempFile("remote-bookdata-", ".zip", File(System.getProperty("java.io.tmpdir") ?: "."))
         try {
-            drive.downloadFileTo(bookDataFile.id, tempRoot)
+            drive.downloadFileTo(bookDataFile.id, tempRoot) { downloadedBytes, totalBytes ->
+                val total = totalBytes?.takeIf { it > 0L }
+                if (total != null) {
+                    onProgress((downloadedBytes.toDouble() / total.toDouble()).coerceIn(0.0, 1.0))
+                }
+            }
             val imported = ttuBookDataConverter.importBookData(tempRoot)
-            importRemoteSidecars(imported, entry)
+            importRemoteSidecars(imported, entry, syncStats, syncAudioBook)
             readerBookId(imported.root)
         } finally {
             tempRoot.delete()
@@ -269,7 +289,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
                 drive.clearCache()
                 loadRemoteBooksOnce(localDriveNames)
             }
-            .getOrDefault(emptyList())
+            .getOrThrow()
     }
 
     private suspend fun loadRemoteBooksOnce(localDriveNames: Set<String>): List<RemoteBookEntry> {
@@ -290,33 +310,12 @@ internal class AndroidBookshelfRepository @Inject constructor(
         }.sortedBy { it.title.lowercase() }
     }
 
-    private suspend fun loadRemoteCoverSources(remoteEntries: List<RemoteBookEntry>): Map<String, BookCoverSource> {
-        val coverCache = googleDriveCoverCacheDirectory(cacheDir).also { it.mkdirs() }
-        return remoteEntries.mapNotNull { entry ->
-            val cover = entry.syncFiles.cover ?: return@mapNotNull null
-            val extension = cover.name.substringAfterLast('.', "jpg").ifBlank { "jpg" }
-            val cached = coverCache.resolve("${cover.id}.$extension")
-            runCatching {
-                if (!cached.isFile) {
-                    val temp = coverCache.resolve(".${cover.id}-${UUID.randomUUID()}.tmp")
-                    try {
-                        drive.downloadFileTo(cover.id, temp)
-                        if (!temp.renameTo(cached)) {
-                            temp.copyTo(cached, overwrite = true)
-                            temp.delete()
-                        }
-                    } catch (error: Throwable) {
-                        temp.delete()
-                        cached.delete()
-                        throw error
-                    }
-                }
-                entry.id to cached.toBookCoverSource()
-            }.getOrNull()
-        }.toMap()
-    }
-
-    private suspend fun importRemoteSidecars(entry: BookEntry, remote: RemoteBookEntry) {
+    private suspend fun importRemoteSidecars(
+        entry: BookEntry,
+        remote: RemoteBookEntry,
+        syncStats: Boolean,
+        syncAudioBook: Boolean,
+    ) {
         remote.syncFiles.progress?.let { file ->
             val progress = remoteJson.decodeFromString(TtuProgress.serializer(), drive.downloadFile(file.id).decodeToString())
             val bookInfo = bookRepository.loadBookInfo(entry.root) ?: return@let
@@ -331,14 +330,18 @@ internal class AndroidBookshelfRepository @Inject constructor(
                 ),
             )
         }
-        remote.syncFiles.statistics?.let { file ->
-            val stats = remoteJson.decodeFromString(ListSerializer(moe.antimony.hoshi.epub.ReadingStatistics.serializer()), drive.downloadFile(file.id).decodeToString())
-            bookRepository.saveStatistics(entry.root, stats)
+        if (syncStats) {
+            remote.syncFiles.statistics?.let { file ->
+                val stats = remoteJson.decodeFromString(ListSerializer(moe.antimony.hoshi.epub.ReadingStatistics.serializer()), drive.downloadFile(file.id).decodeToString())
+                bookRepository.saveStatistics(entry.root, stats)
+            }
         }
-        remote.syncFiles.audioBook?.let { file ->
-            val audioBook = remoteJson.decodeFromString(TtuAudioBook.serializer(), drive.downloadFile(file.id).decodeToString())
-            val existing = bookRepository.loadSasayakiPlayback(entry.root) ?: moe.antimony.hoshi.epub.SasayakiPlaybackData(lastPosition = 0.0)
-            bookRepository.saveSasayakiPlayback(entry.root, existing.copy(lastPosition = audioBook.playbackPosition))
+        if (syncAudioBook) {
+            remote.syncFiles.audioBook?.let { file ->
+                val audioBook = remoteJson.decodeFromString(TtuAudioBook.serializer(), drive.downloadFile(file.id).decodeToString())
+                val existing = bookRepository.loadSasayakiPlayback(entry.root) ?: moe.antimony.hoshi.epub.SasayakiPlaybackData(lastPosition = 0.0)
+                bookRepository.saveSasayakiPlayback(entry.root, existing.copy(lastPosition = audioBook.playbackPosition))
+            }
         }
     }
 
@@ -356,6 +359,42 @@ internal class AndroidBookshelfRepository @Inject constructor(
 private val remoteJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true
+}
+
+internal suspend fun loadRemoteCoverSources(
+    remoteEntries: List<RemoteBookEntry>,
+    cacheDir: File,
+    downloadFileTo: suspend (
+        fileId: String,
+        destination: File,
+        progress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+    ) -> Unit,
+): Map<String, BookCoverSource> = coroutineScope {
+    val coverCache = googleDriveCoverCacheDirectory(cacheDir).also { it.mkdirs() }
+    remoteEntries.map { entry ->
+        async {
+            val cover = entry.syncFiles.cover ?: return@async null
+            val extension = cover.name.substringAfterLast('.', "jpg").ifBlank { "jpg" }
+            val cached = coverCache.resolve("${cover.id}.$extension")
+            runCatching {
+                if (!cached.isFile) {
+                    val temp = coverCache.resolve(".${cover.id}-${UUID.randomUUID()}.tmp")
+                    try {
+                        downloadFileTo(cover.id, temp) { _, _ -> }
+                        if (!temp.renameTo(cached)) {
+                            temp.copyTo(cached, overwrite = true)
+                            temp.delete()
+                        }
+                    } catch (error: Throwable) {
+                        temp.delete()
+                        cached.delete()
+                        throw error
+                    }
+                }
+                entry.id to cached.toBookCoverSource()
+            }.getOrNull()
+        }
+    }.awaitAll().filterNotNull().toMap()
 }
 
 internal suspend fun loadBookCoverSourcesById(

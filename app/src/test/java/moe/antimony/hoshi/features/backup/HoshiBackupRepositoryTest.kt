@@ -10,6 +10,7 @@ import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubArchiveExtractor
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -279,6 +280,28 @@ class HoshiBackupRepositoryTest {
         assertTrue(restored.root.resolve(restored.metadata.epub!!).isFile)
         assertEquals(5, targetRepository.loadBookmark(restored.root)?.characterCount)
         assertEquals(5, targetRepository.loadStatistics(restored.root).single().charactersRead)
+    }
+
+    @Test
+    fun ttuBookDataBackupDoesNotExportOrRestoreSasayakiAudioBookSidecarsLikeIos() = runBlocking {
+        val sourceDir = Files.createTempDirectory("hoshi-ttu-backup-audio-source").toFile()
+        val sourceRepository = BookRepository(sourceDir)
+        val sourceEntry = sourceRepository.createPackedTestBook("TTU Audio Book")
+        sourceRepository.saveSasayakiPlayback(sourceEntry.root, SasayakiPlaybackData(lastPosition = 44.0))
+        val output = ByteArrayOutputStream()
+
+        HoshiBackupRepository(sourceDir).exportTtuBookData(output)
+
+        val entries = zipEntryNames(output.toByteArray())
+        assertFalse(entries.any { it.substringAfter('/').startsWith("audioBook_") })
+        val targetDir = Files.createTempDirectory("hoshi-ttu-backup-audio-target").toFile()
+        val targetRepository = BookRepository(targetDir)
+        val existing = targetRepository.createPackedTestBook("TTU Audio Book")
+        targetRepository.saveSasayakiPlayback(existing.root, SasayakiPlaybackData(lastPosition = 12.0))
+
+        HoshiBackupRepository(targetDir).restoreTtuBookData(ByteArrayInputStream(output.toByteArray()))
+
+        assertEquals(12.0, targetRepository.loadSasayakiPlayback(existing.root)?.lastPosition)
     }
 
     @Test

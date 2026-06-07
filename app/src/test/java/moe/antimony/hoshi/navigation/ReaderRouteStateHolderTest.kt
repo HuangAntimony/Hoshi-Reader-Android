@@ -13,11 +13,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 
 class ReaderRouteStateHolderTest {
     @Test
     fun loadReadyParsesBookUpdatesSidecarsAndRestoresBookmark() = runBlocking {
-        val root = File("book-a")
+        val root = Files.createTempDirectory("hoshi-reader-route-book").toFile()
+        root.resolve("cover.jpg").writeText("cover")
         val parsedBook = readerBook(title = "Parsed Title", coverHref = "cover.jpg")
         val bookmark = Bookmark(chapterIndex = 0, progress = 0.5, characterCount = 4, lastModified = 10.0)
         val repository = FakeReaderRouteBookRepository(
@@ -42,13 +44,14 @@ class ReaderRouteStateHolderTest {
         state as ReaderRouteLoadState.Ready
         assertEquals(root, state.bookRoot)
         assertEquals(parsedBook, state.book)
+        assertEquals(root.resolve("cover.jpg"), state.bookCoverFile)
         assertEquals(bookmark, state.bookmark)
         assertEquals(
             BookMetadata(
                 id = "book-a",
                 title = "Parsed Title",
-                cover = "Books/book-a/cover.jpg",
-                folder = "book-a",
+                cover = "Books/${root.name}/cover.jpg",
+                folder = root.name,
                 lastAccess = 42.0,
             ),
             repository.savedMetadata,
@@ -108,6 +111,7 @@ class ReaderRouteStateHolderTest {
                 entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
                 bookRoot = root,
                 book = book,
+                bookCoverFile = null,
                 bookmark = null,
             ),
             chapterIndex = 0,
@@ -140,6 +144,7 @@ class ReaderRouteStateHolderTest {
                 entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
                 bookRoot = root,
                 book = book,
+                bookCoverFile = null,
                 bookmark = null,
             ),
             chapterIndex = 0,

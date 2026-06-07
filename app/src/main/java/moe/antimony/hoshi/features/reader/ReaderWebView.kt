@@ -82,6 +82,7 @@ import kotlin.math.roundToInt
 fun ReaderWebView(
     book: EpubBook,
     bookRoot: File? = null,
+    bookCoverFile: File? = null,
     initialChapterIndex: Int = 0,
     initialProgress: Double = 0.0,
     readerSettings: ReaderSettings = ReaderSettings(),
@@ -130,8 +131,8 @@ fun ReaderWebView(
         isSasayakiPlaybackLoaded = true
     }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
-    val sasayakiCoverFile = remember(bookRoot, book.coverHref) {
-        resolveBookCoverFile(bookRoot, book.coverHref)
+    val sasayakiCoverFile = remember(bookCoverFile) {
+        bookCoverFile?.takeIf { it.isFile }
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
     var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
@@ -1424,14 +1425,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
-}
-
-private fun resolveBookCoverFile(bookRoot: File?, coverHref: String?): File? {
-    val root = bookRoot?.canonicalFile ?: return null
-    val cover = coverHref?.takeIf { it.isNotBlank() } ?: return null
-    val file = root.resolve(cover).canonicalFile
-    if (file.path != root.path && !file.path.startsWith(root.path + File.separator)) return null
-    return file.takeIf { it.isFile }
 }
 
 private fun SasayakiMatch.toCueRange(): SasayakiCueRange =

@@ -244,6 +244,11 @@ fun bookshelfSections(
     return sections
 }
 
+internal fun googleDriveSectionInsertionIndex(sections: List<BookshelfSectionModel>): Int {
+    val unshelvedIndex = sections.indexOfFirst { it.titleRes == R.string.bookshelf_section_unshelved }
+    return if (unshelvedIndex >= 0) unshelvedIndex else sections.size
+}
+
 fun isBookCompleted(progress: Double): Boolean =
     progress >= CompletedProgressThreshold
 

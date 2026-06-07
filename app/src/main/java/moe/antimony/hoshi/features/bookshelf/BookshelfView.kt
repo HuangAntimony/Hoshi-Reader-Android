@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -261,6 +263,8 @@ fun BookshelfView(
         sections = uiState.sections,
         bookProgressById = uiState.bookProgressById,
         remoteProgressById = uiState.remoteProgressById,
+        remoteImportProgressById = uiState.remoteImportProgressById,
+        remoteBusyBookIds = uiState.remoteBusyBookIds,
         coverSourcesById = uiState.coverSourcesById,
         remoteCoverSourcesById = uiState.remoteCoverSourcesById,
         sortOption = uiState.sortOption,
@@ -287,7 +291,13 @@ fun BookshelfView(
         onImportFiles = ::launchBookImporter,
         onImportFolder = ::launchBookFolderImporter,
         onOpenBook = booksViewModel::openBook,
-        onImportRemoteBook = booksViewModel::importRemoteBook,
+        onImportRemoteBook = { entry ->
+            booksViewModel.importRemoteBook(
+                entry = entry,
+                syncStats = syncSettings.enabled && readerSettings.statisticsSyncEnabled,
+                syncAudioBook = sasayakiSettings.enabled && sasayakiSettings.syncEnabled,
+            )
+        },
         onDeleteRemoteCandidate = { remoteDeleteCandidate = it },
         contextMenuTarget = contextMenuTarget,
         onContextMenuTargetChange = { contextMenuTarget = it },
@@ -645,6 +655,51 @@ internal fun isBookContextMenuExpanded(
 ): Boolean =
     activeTarget == bookContextMenuTarget(section, entry)
 
+private fun LazyGridScope.googleDriveSection(
+    remoteBookEntries: List<RemoteBookEntry>,
+    remoteProgressById: Map<String, Double>,
+    remoteImportProgressById: Map<String, Double>,
+    remoteBusyBookIds: Set<String>,
+    remoteCoverSourcesById: Map<String, BookCoverSource>,
+    layoutSpec: MainShellLayoutSpec,
+    fileTaskBlocked: Boolean,
+    isSelecting: Boolean,
+    onImportRemoteBook: (RemoteBookEntry) -> Unit,
+    onDeleteRemoteCandidate: (RemoteBookEntry) -> Unit,
+) {
+    if (remoteBookEntries.isEmpty()) return
+    item(
+        key = "header:google-drive",
+        contentType = "sectionHeader",
+        span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
+    ) {
+        BookshelfSectionHeader(
+            title = stringResource(R.string.bookshelf_section_google_drive),
+            count = remoteBookEntries.size,
+            layoutSpec = layoutSpec,
+            isCollapsible = false,
+            isExpanded = true,
+            onToggle = {},
+        )
+    }
+    items(
+        items = remoteBookEntries,
+        key = { "google-drive:${it.id}" },
+        contentType = { "remoteBook" },
+    ) { entry ->
+        RemoteBookGridCell(
+            entry = entry,
+            progress = remoteProgressById[entry.id] ?: 0.0,
+            downloadProgress = remoteImportProgressById[entry.id],
+            coverSource = remoteCoverSourcesById[entry.id],
+            layoutSpec = layoutSpec,
+            enabled = !fileTaskBlocked && !isSelecting && entry.id !in remoteBusyBookIds,
+            onImport = { onImportRemoteBook(entry) },
+            onDelete = { onDeleteRemoteCandidate(entry) },
+        )
+    }
+}
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun BooksTab(
@@ -654,6 +709,8 @@ private fun BooksTab(
     sections: List<BookshelfSectionModel>,
     bookProgressById: Map<String, Double>,
     remoteProgressById: Map<String, Double>,
+    remoteImportProgressById: Map<String, Double>,
+    remoteBusyBookIds: Set<String>,
     coverSourcesById: Map<String, BookCoverSource>,
     remoteCoverSourcesById: Map<String, BookCoverSource>,
     sortOption: BookSortOption,
@@ -762,7 +819,23 @@ private fun BooksTab(
                         horizontalArrangement = Arrangement.spacedBy(layoutSpec.bookGridSpacingDp.dp),
                         verticalArrangement = Arrangement.spacedBy(layoutSpec.bookGridVerticalSpacingDp.dp),
                     ) {
-                        sections.filter { it.books.isNotEmpty() }.forEach { section ->
+                        val visibleSections = sections.filter { it.books.isNotEmpty() }
+                        val googleDriveIndex = googleDriveSectionInsertionIndex(visibleSections)
+                        visibleSections.forEachIndexed { sectionIndex, section ->
+                            if (sectionIndex == googleDriveIndex) {
+                                googleDriveSection(
+                                    remoteBookEntries = remoteBookEntries,
+                                    remoteProgressById = remoteProgressById,
+                                    remoteImportProgressById = remoteImportProgressById,
+                                    remoteBusyBookIds = remoteBusyBookIds,
+                                    remoteCoverSourcesById = remoteCoverSourcesById,
+                                    layoutSpec = layoutSpec,
+                                    fileTaskBlocked = fileTaskBlocked,
+                                    isSelecting = isSelecting,
+                                    onImportRemoteBook = onImportRemoteBook,
+                                    onDeleteRemoteCandidate = onDeleteRemoteCandidate,
+                                )
+                            }
                             val collapseKey = section.collapseKey
                             val isExpanded = if (!section.isCollapsible) {
                                 true
@@ -857,36 +930,19 @@ private fun BooksTab(
                                 }
                             }
                         }
-                        if (remoteBookEntries.isNotEmpty()) {
-                            item(
-                                key = "header:google-drive",
-                                contentType = "sectionHeader",
-                                span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) },
-                            ) {
-                                BookshelfSectionHeader(
-                                    title = stringResource(R.string.bookshelf_section_google_drive),
-                                    count = remoteBookEntries.size,
-                                    layoutSpec = layoutSpec,
-                                    isCollapsible = false,
-                                    isExpanded = true,
-                                    onToggle = {},
-                                )
-                            }
-                            items(
-                                items = remoteBookEntries,
-                                key = { "google-drive:${it.id}" },
-                                contentType = { "remoteBook" },
-                            ) { entry ->
-                                RemoteBookGridCell(
-                                    entry = entry,
-                                    progress = remoteProgressById[entry.id] ?: 0.0,
-                                    coverSource = remoteCoverSourcesById[entry.id],
-                                    layoutSpec = layoutSpec,
-                                    enabled = !fileTaskBlocked && !isSelecting,
-                                    onImport = { onImportRemoteBook(entry) },
-                                    onDelete = { onDeleteRemoteCandidate(entry) },
-                                )
-                            }
+                        if (googleDriveIndex == visibleSections.size) {
+                            googleDriveSection(
+                                remoteBookEntries = remoteBookEntries,
+                                remoteProgressById = remoteProgressById,
+                                remoteImportProgressById = remoteImportProgressById,
+                                remoteBusyBookIds = remoteBusyBookIds,
+                                remoteCoverSourcesById = remoteCoverSourcesById,
+                                layoutSpec = layoutSpec,
+                                fileTaskBlocked = fileTaskBlocked,
+                                isSelecting = isSelecting,
+                                onImportRemoteBook = onImportRemoteBook,
+                                onDeleteRemoteCandidate = onDeleteRemoteCandidate,
+                            )
                         }
                     }
                 }
@@ -1213,6 +1269,7 @@ private fun BookGridCell(
 private fun RemoteBookGridCell(
     entry: RemoteBookEntry,
     progress: Double,
+    downloadProgress: Double?,
     coverSource: BookCoverSource?,
     layoutSpec: MainShellLayoutSpec,
     enabled: Boolean,
@@ -1238,6 +1295,13 @@ private fun RemoteBookGridCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        downloadProgress?.let { value ->
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { value.coerceIn(0.0, 1.0).toFloat() },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

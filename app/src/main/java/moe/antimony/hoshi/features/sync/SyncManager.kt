@@ -115,7 +115,12 @@ class SyncManager private constructor(
         val syncFiles = drive.listSyncFiles(driveFolderId)
 
         if (syncBookData && !importOnly && direction != SyncDirection.ImportFromTtu && syncFiles.bookData == null) {
-            drive.uploadBookData(driveFolderId, bookDataExporter(entry))
+            val bookData = bookDataExporter(entry)
+            try {
+                drive.uploadBookData(driveFolderId, bookData)
+            } finally {
+                bookData.delete()
+            }
         }
 
         val syncDirection = direction ?: TtuSyncRules.determineDirection(localBookmark, syncFiles.progress)

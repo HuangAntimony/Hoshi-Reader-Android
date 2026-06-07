@@ -28,9 +28,7 @@ import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.ReadingStatistics
-import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.epub.EpubBookParser
-import moe.antimony.hoshi.features.sync.TtuAudioBook
 import moe.antimony.hoshi.features.sync.TtuBookDataConverter
 import moe.antimony.hoshi.features.sync.TtuProgress
 import moe.antimony.hoshi.features.sync.TtuSyncRules
@@ -142,15 +140,6 @@ class HoshiBackupRepository @Inject constructor(
                             )
                             zip.writeText("$titleFolder/${TtuSyncRules.progressFileName(progress)}", backupJson.encodeToString(TtuProgress.serializer(), progress))
                         }
-                        val playback = bookRepository.loadSasayakiPlayback(entry.root)
-                        if (playback != null) {
-                            val audioBook = TtuAudioBook(
-                                title = entry.displayTitle,
-                                playbackPosition = playback.lastPosition,
-                                lastAudioBookModified = System.currentTimeMillis(),
-                            )
-                            zip.writeText("$titleFolder/${TtuSyncRules.audioBookFileName(audioBook)}", backupJson.encodeToString(TtuAudioBook.serializer(), audioBook))
-                        }
                     }
                 }
             } finally {
@@ -199,11 +188,6 @@ class HoshiBackupRepository @Inject constructor(
                                 lastModified = TtuSyncRules.unixMillisToAppleReferenceSeconds(progress.lastBookmarkModified),
                             ),
                         )
-                    }
-                    files.firstOrNull { it.name.startsWith("audioBook_") }?.let { audioFile ->
-                        val audioBook = backupJson.decodeFromString(TtuAudioBook.serializer(), audioFile.readText())
-                        val existing = bookRepository.loadSasayakiPlayback(entry.root) ?: SasayakiPlaybackData(lastPosition = 0.0)
-                        bookRepository.saveSasayakiPlayback(entry.root, existing.copy(lastPosition = audioBook.playbackPosition))
                     }
                 }
             } finally {

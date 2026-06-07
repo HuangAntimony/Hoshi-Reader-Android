@@ -40,12 +40,14 @@ internal class ReaderRouteStateHolder(
             if (cachedBookInfo != displayBook.bookInfo) {
                 repository.saveBookInfo(entry.root, displayBook.bookInfo)
             }
+            val bookCoverFile = resolveMetadataCoverFile(entry.root, metadata.cover)
             beforeBookmarkLoad(displayEntry)
             val bookmark = repository.loadBookmark(entry.root)
             ReaderRouteLoadState.Ready(
                 entry = displayEntry,
                 bookRoot = entry.root,
                 book = displayBook,
+                bookCoverFile = bookCoverFile,
                 bookmark = bookmark,
             )
         }.getOrElse { error ->
@@ -92,10 +94,16 @@ internal sealed interface ReaderRouteLoadState {
         val entry: moe.antimony.hoshi.epub.BookEntry,
         val bookRoot: File,
         val book: EpubBook,
+        val bookCoverFile: File?,
         val bookmark: Bookmark?,
     ) : ReaderRouteLoadState
 
     data class Error(
         val message: String,
     ) : ReaderRouteLoadState
+}
+
+internal fun resolveMetadataCoverFile(bookRoot: File, metadataCoverPath: String?): File? {
+    val fileName = metadataCoverPath?.takeIf { it.isNotBlank() }?.let { File(it).name } ?: return null
+    return bookRoot.resolve(fileName).takeIf { it.isFile }
 }

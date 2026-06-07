@@ -66,8 +66,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
@@ -98,6 +100,7 @@ fun SyncSettingsView(
     var devicePrompt by remember { mutableStateOf<DeviceCodePrompt?>(null) }
     var pollIntervalSeconds by remember { mutableStateOf(5L) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
+    var showClearCacheConfirmation by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
     val currentSettings = settings
     val currentAuthStatus = authStatus
@@ -212,12 +215,23 @@ fun SyncSettingsView(
     fun signOut() {
         scope.launch {
             authorizer.revokeAccess()
-            appContainer.googleDriveClient.clearCache()
+            withContext(Dispatchers.IO) {
+                appContainer.googleDriveClient.clearCache()
+            }
             authStatus = authorizer.status()
             message = null
             copyMessage = null
             devicePrompt = null
             isAuthorizing = false
+        }
+    }
+
+    fun clearCache() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                appContainer.googleDriveClient.clearCache()
+            }
+            message = resources.getString(R.string.sync_cache_cleared)
         }
     }
 
@@ -239,6 +253,28 @@ fun SyncSettingsView(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutConfirmation = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+    if (showClearCacheConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheConfirmation = false },
+            title = { Text(stringResource(R.string.sync_clear_cache_title)) },
+            text = { Text(stringResource(R.string.sync_clear_cache_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCacheConfirmation = false
+                        clearCache()
+                    },
+                ) {
+                    Text(stringResource(R.string.sync_clear_cache))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheConfirmation = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -460,10 +496,7 @@ fun SyncSettingsView(
                         }
                     }
                     OutlinedButton(
-                        onClick = {
-                            appContainer.googleDriveClient.clearCache()
-                            message = resources.getString(R.string.sync_cache_cleared)
-                        },
+                        onClick = { showClearCacheConfirmation = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.sync_clear_cache))

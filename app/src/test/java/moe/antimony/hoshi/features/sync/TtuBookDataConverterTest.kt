@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import moe.antimony.hoshi.epub.BookMetadata
+import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
@@ -97,6 +98,33 @@ class TtuBookDataConverterTest {
         assertTrue(first.contains("class=\"html-class\""))
         assertTrue(second.contains("<p>No wrappers</p>"))
         assertTrue((repository.loadBookInfo(entry.root)?.characterCount ?: 0) > 0)
+    }
+
+    @Test
+    fun importBookDataReturnsExistingTitleFolderBeforeComparingCharacterCountLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val existingRoot = repository.createBookDirectoryForImportedTitle("Imported Book")
+        val existingMetadata = BookMetadata(
+            id = "existing-book",
+            title = "Imported Book",
+            cover = null,
+            folder = existingRoot.name,
+            lastAccess = 1.0,
+            epub = "Imported Book.epub",
+        )
+        repository.saveMetadata(existingRoot, existingMetadata)
+        repository.saveBookInfo(existingRoot, BookInfo(characterCount = 999, chapterInfo = emptyMap()))
+        existingRoot.resolve("Imported Book.epub").writeText("existing epub")
+        val source = tempFolder.newFile("existing-bookdata.zip")
+        writeTtuBookDataFixture(source)
+        val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
+
+        val entry = converter.importBookData(source)
+
+        assertEquals(existingRoot.canonicalFile, entry.root.canonicalFile)
+        assertEquals(existingMetadata, entry.metadata)
+        assertEquals("existing epub", existingRoot.resolve("Imported Book.epub").readText())
+        assertFalse(tempFolder.root.resolve("Books/.ttu-import-Imported Book").exists())
     }
 
     @Test
