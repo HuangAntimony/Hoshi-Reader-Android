@@ -214,6 +214,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl) {
         body,
         head: null,
         documentElement,
+        fonts: { ready: Promise.resolve() },
         readyState: 'loading',
         createDocumentFragment() {
             return new TestFragment();
@@ -345,6 +346,40 @@ test('paginated reader-specific text normalization keeps ruby-adjacent text stab
 
 test('paginated reader removes ruby whitespace text nodes and wraps base text nodes', () => {
     assertRubyTextNodesAreNormalized(readerPaginatedUrl);
+});
+
+test('paginated restoreProgress at chapter start avoids eager pagination metrics', async () => {
+    const body = new TestElement('body');
+    const { reader } = loadReader(body);
+    const scrolls = [];
+    let builtMetrics = 0;
+    let restored = 0;
+
+    reader.getScrollContext = () => ({
+        vertical: true,
+        scrollEl: body,
+        pageSize: 800,
+        maxScroll: 4000,
+    });
+    reader.setPagePosition = (_context, position) => {
+        scrolls.push(position);
+        return position;
+    };
+    reader.registerSnapScroll = () => {};
+    reader.refreshSasayakiCuePresentation = () => {};
+    reader.notifyRestoreComplete = () => {
+        restored += 1;
+    };
+    reader.buildPaginationMetrics = () => {
+        builtMetrics += 1;
+        return { minScroll: 800, maxScroll: 3200, totalChars: 1, progressStops: [] };
+    };
+
+    await reader.restoreProgress(0);
+
+    assert.deepEqual(scrolls, [0]);
+    assert.equal(restored, 1);
+    assert.equal(builtMetrics, 0);
 });
 
 test('continuous reader stabilizes vertical ruby-adjacent text like paginated reader', () => {

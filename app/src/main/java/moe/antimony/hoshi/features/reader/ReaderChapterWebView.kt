@@ -44,6 +44,9 @@ import java.io.File
 import java.util.UUID
 import java.util.WeakHashMap
 import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.roundToInt
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.HighlightColor
@@ -109,6 +112,15 @@ internal fun ChapterWebView(
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     val context = LocalContext.current
     val readerWebAssets = remember(context) { ReaderWebAssets.load(context) }
+    val viewportDensity = context.resources.displayMetrics.density.coerceAtLeast(1f)
+    val webViewViewportCssSize = remember(webViewViewportSize, viewportDensity) {
+        IntSize(
+            width = androidPixelsToCssPixels(webViewViewportSize.width.toFloat(), viewportDensity).roundToInt()
+                .coerceAtLeast(1),
+            height = androidPixelsToCssPixels(webViewViewportSize.height.toFloat(), viewportDensity).roundToInt()
+                .coerceAtLeast(1),
+        )
+    }
     var lastContinuousProgressUpdate by remember { mutableStateOf(0L) }
     var continuousScrollSaveRequestId by remember { mutableStateOf(0L) }
     val chapter = book.chapters[chapterPosition.index]
@@ -157,6 +169,7 @@ internal fun ChapterWebView(
         fontFaceUrl,
         systemDark,
         scanNonJapaneseText,
+        webViewViewportCssSize,
         sasayakiTextColor,
         sasayakiBackgroundColor,
         chapterSasayakiCuesJson,
@@ -171,6 +184,7 @@ internal fun ChapterWebView(
             fontFaceUrl = fontFaceUrl,
             systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
+            webViewViewportCssSize = webViewViewportCssSize,
             sasayakiTextColor = sasayakiTextColor,
             sasayakiBackgroundColor = sasayakiBackgroundColor,
             sasayakiCuesJson = chapterSasayakiCuesJson,
@@ -719,6 +733,7 @@ private fun readerSetupScript(
     fontFaceUrl: String?,
     systemDark: Boolean,
     scanNonJapaneseText: Boolean,
+    webViewViewportCssSize: IntSize,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
     sasayakiCuesJson: String?,
@@ -727,6 +742,11 @@ private fun readerSetupScript(
     assets: ReaderWebAssets,
 ): String {
     val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
+    val viewportLayout = readerViewportCssLayout(
+        settings = settings,
+        viewportCssWidth = webViewViewportCssSize.width,
+        viewportCssHeight = webViewViewportCssSize.height,
+    )
     val css = ReaderContentStyles.css(
         settings = settings,
         fontFaceUrl = fontFaceUrl,
@@ -734,7 +754,15 @@ private fun readerSetupScript(
         sasayakiTextColor = sasayakiTextColor,
         sasayakiBackgroundColor = sasayakiBackgroundColor,
         readerCssTemplate = assets.readerCss,
-    ).let(::readerJavaScriptStringLiteral)
+    ).let { css ->
+        "${viewportLayout.cssVariables()}\n$css"
+    }.let(::readerJavaScriptStringLiteral)
+    val viewportMetrics = """
+        window.hoshiReaderViewport = {
+          pageHeight: ${viewportLayout.pageHeightPx},
+          pageWidth: ${viewportLayout.pageWidthPx}
+        };
+    """.trimIndent()
     val selectionScript = assets.selectionJs
     val paginationScript = ReaderPaginationScripts.shellScriptWithRestoreToken(
         initialProgress = initialProgress,
@@ -752,6 +780,7 @@ private fun readerSetupScript(
           var style = document.createElement('style');
           style.textContent = $css;
           hoshiHead.appendChild(style);
+          $viewportMetrics
           window.scanNonJapaneseText = $scanNonJapaneseText;
           $selectionScript
           window.hoshiSelection.configure({
@@ -770,6 +799,50 @@ private fun readerSetupScript(
           $paginationScript
         })();
     """.trimIndent()
+}
+
+internal data class ReaderViewportCssLayout(
+    val pageHeightPx: Int,
+    val pageWidthPx: Int,
+    val verticalPaddingBlockPx: Double,
+    val verticalPaddingGapPx: Double,
+    val imageMaxWidthPx: Int,
+    val imageMaxHeightPx: Int,
+) {
+    fun cssVariables(): String =
+        """
+        :root {
+            --page-height: ${pageHeightPx}px;
+            --page-width: ${pageWidthPx}px;
+            --hoshi-vertical-padding-block: ${verticalPaddingBlockPx.cssNumber()}px;
+            --hoshi-vertical-padding-gap: ${verticalPaddingGapPx.cssNumber()}px;
+            --hoshi-image-max-width: ${imageMaxWidthPx}px;
+            --hoshi-image-max-height: ${imageMaxHeightPx}px;
+        }
+        """.trimIndent()
+}
+
+internal fun readerViewportCssLayout(
+    settings: ReaderSettings,
+    viewportCssWidth: Int,
+    viewportCssHeight: Int,
+): ReaderViewportCssLayout {
+    val width = viewportCssWidth.coerceAtLeast(1)
+    val height = viewportCssHeight.coerceAtLeast(1)
+    val pageHeight = height + settings.bottomOverlapPx
+    val generatedLayout = ReaderGeneratedLayout.from(settings)
+    val imageMaxWidth = max(
+        1,
+        floor(width * generatedLayout.imageWidthViewportRatio).toInt() - generatedLayout.imageWidthReductionPx,
+    )
+    return ReaderViewportCssLayout(
+        pageHeightPx = pageHeight,
+        pageWidthPx = width,
+        verticalPaddingBlockPx = height * (settings.verticalPadding / 200.0),
+        verticalPaddingGapPx = height * (settings.verticalPadding / 100.0),
+        imageMaxWidthPx = imageMaxWidth,
+        imageMaxHeightPx = max(1, pageHeight - settings.bottomOverlapPx),
+    )
 }
 
 private fun readerAppearanceScript(

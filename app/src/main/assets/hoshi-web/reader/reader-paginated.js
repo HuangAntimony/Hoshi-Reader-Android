@@ -55,12 +55,12 @@ window.hoshiReader = {
     }
     return fallbackOffset;
   },
-   notifyRestoreComplete: function() {
-     if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
-       window.HoshiReaderRestore.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
-     }
-     this.warmPaginationMetrics();
-   },
+  notifyRestoreComplete: function() {
+    if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
+      window.HoshiReaderRestore.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
+    }
+    this.warmPaginationMetrics();
+  },
   createWalker: function(rootNode) {
     var root = rootNode || document.body;
     return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -835,10 +835,14 @@ window.hoshiReader = {
   restoreProgress: async function(progress) {
     await document.fonts.ready;
     var context = this.getScrollContext();
-    if (context.pageSize <= 0 || progress <= 0) {
-      var firstPage = this.contentFirstPageScroll(context);
-      this.setPagePosition(context, firstPage);
-      this.registerSnapScroll(firstPage);
+    if (context.pageSize <= 0) {
+      this.registerSnapScroll(0);
+      this.notifyRestoreComplete();
+      return;
+    }
+    if (progress <= 0) {
+      this.setPagePosition(context, 0);
+      this.registerSnapScroll(0);
       this.notifyRestoreComplete();
       return;
     }
@@ -956,14 +960,9 @@ window.hoshiReader.initialize = function() {
   newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
   var hoshiHead = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
   hoshiHead.appendChild(newViewport);
-  var pageHeight = window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__;
-  var pageWidth = window.innerWidth;
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--page-height', pageHeight + 'px');
-  document.documentElement.style.setProperty('--page-width', pageWidth + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(pageWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, pageHeight - __HOSHI_BOTTOM_OVERLAP_PX__) + 'px');
+  var viewportMetrics = window.hoshiReaderViewport || {};
+  var pageHeight = Number(viewportMetrics.pageHeight) || (window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__);
+  var pageWidth = Number(viewportMetrics.pageWidth) || window.innerWidth;
   window.hoshiReader.pageHeight = pageHeight;
   window.hoshiReader.pageWidth = pageWidth;
   function setupReaderImage(element, src, wrap, blurElement) {
