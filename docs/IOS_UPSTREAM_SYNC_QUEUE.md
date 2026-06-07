@@ -189,7 +189,7 @@ Manual validation to keep in release QA:
 - `147e3b9`: Android already ships default English and Simplified Chinese resources with localization tests. Future queue items that add user-visible strings still need the normal paired `values` / `values-zh-rCN` updates.
 - `61306c7`: formatting and whitespace cleanup only.
 - `32aa342`: Android now sanitizes Calibre-like EPUB CSS rules in `ReaderResourceSanitizer`, with behavior coverage for writing mode, line height, height, positive text indentation, negative text indentation, non-Calibre rules, and appended default body line height.
-- `2ffde40`: iOS changed NWPathMonitor gating to block only explicitly unsatisfied paths. Android `GoogleDriveClient.performRequest()` does not pre-block by path status, and device-code auth already treats transient network failures as retryable; the broader autosync no-network behavior remains tracked by `1aaee97`.
+- `2ffde40`: iOS changed NWPathMonitor gating to block only explicitly unsatisfied paths. Android now preflights Drive REST, download, and upload requests with `ConnectivityManager` and requires `NET_CAPABILITY_INTERNET` plus `NET_CAPABILITY_VALIDATED`; device-code auth still treats transient network failures as retryable.
 - `691baa2`, `323449c`: Android already localizes the Reading shelf title through `BookshelfSectionModel.titleRes = R.string.bookshelf_section_reading`, `BookshelfSectionHeader`, and paired English/Simplified Chinese resources.
 - `078d59f`: Android already overrides publisher column counts in paginated mode through `ReaderContentStyles` with `body * { column-count: auto !important; -webkit-column-count: auto !important; }`.
 - `1fcf287`: iOS SwiftUI file-importer placement fix. Android backup restore uses dedicated `rememberLauncherForActivityResult(FileImportContent())` launchers for `.hoshi` and TTU `.zip` imports.
@@ -201,12 +201,8 @@ Manual validation to keep in release QA:
 | --- | --- | --- | --- |
 | `94d0c41` | 2026-05-19 | Automatic dictionary updates | Pending |
 | `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
-| `67bdbb9` | 2026-05-25 | Export stored EPUB from book menu | Implemented |
 | `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
-| `1aaee97` | 2026-05-27 | Autosync no-network guard | Implemented |
-| `c2e1c09` | 2026-05-28 | TTU book sync, remote Drive bookshelf, backup import/export | Implemented |
 | `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
-| `32d76d2` | 2026-05-29 | TTU bookdata edge cases | Implemented |
 | `8ffca61` | 2026-06-02 | Autofill Lapis, Kiku, and Senren Anki field mappings | Pending |
 | `0d6c072` | 2026-06-04 | hoshidicts normalization processor bump | Pending bridge/native sync |
 | `cfc1e50` | 2026-06-04 | Build lookup query off main thread | Pending |

@@ -553,11 +553,13 @@ fun SyncSettingsView(
                             Text(stringResource(R.string.action_sign_out))
                         }
                     }
-                    OutlinedButton(
-                        onClick = { showClearCacheConfirmation = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.sync_clear_cache))
+                    if (screenState.showClearCacheAction) {
+                        OutlinedButton(
+                            onClick = { showClearCacheConfirmation = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.sync_clear_cache))
+                        }
                     }
                     GoogleCloudOAuthSetupCard()
                 }

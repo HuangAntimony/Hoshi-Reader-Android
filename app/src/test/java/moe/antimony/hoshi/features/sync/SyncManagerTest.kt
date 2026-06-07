@@ -65,6 +65,42 @@ class SyncManagerTest {
     }
 
     @Test
+    fun importFromTtuFetchesEnabledSidecarsBeforeSavingLocalStateLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val originalBookmark = Bookmark(0, 0.1, 10, TtuSyncRules.unixMillisToAppleReferenceSeconds(1_000))
+        val originalStats = listOf(
+            ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100),
+        )
+        repository.saveBookmark(entry.root, originalBookmark)
+        repository.saveStatistics(entry.root, originalStats)
+        val drive = FakeDriveSyncDataSource(
+            progress = TtuProgress(7, 150, 0.5, 2_000),
+            statistics = listOf(
+                ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 120, lastStatisticModified = 200),
+            ),
+            statisticsFetchError = RuntimeException("stats fetch failed"),
+        )
+        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+
+        try {
+            manager.syncBook(
+                entry = entry,
+                direction = SyncDirection.ImportFromTtu,
+                syncStats = true,
+                statsSyncMode = StatisticsSyncMode.Merge,
+                syncAudioBook = false,
+            )
+            fail("Expected remote stats fetch failure")
+        } catch (expected: RuntimeException) {
+            assertEquals("stats fetch failed", expected.message)
+        }
+
+        assertEquals(originalBookmark, repository.loadBookmark(entry.root))
+        assertEquals(originalStats, repository.loadStatistics(entry.root))
+    }
+
+    @Test
     fun exportToTtuUploadsIosCompatibleSidecarsAndRoundsLocalBookmarkTimestamp() = runBlocking {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
@@ -95,6 +131,44 @@ class SyncManagerTest {
         assertEquals(220, drive.updatedStatistics.single().charactersRead)
         assertEquals(TtuAudioBook("Title", 45.0, 9_999), drive.updatedAudioBook)
         assertEquals(4_321, TtuSyncRules.appleReferenceSecondsToUnixMillis(repository.loadBookmark(entry.root)!!.lastModified!!))
+    }
+
+    @Test
+    fun exportToTtuFetchesEnabledSidecarsBeforeUploadingProgressLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        val originalBookmark = Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321))
+        repository.saveBookmark(entry.root, originalBookmark)
+        repository.saveStatistics(
+            entry.root,
+            listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 220, lastStatisticModified = 200)),
+        )
+        val drive = FakeDriveSyncDataSource(
+            progress = TtuProgress(9, 80, 0.4, 3_000),
+            statistics = listOf(
+                ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100),
+            ),
+            statisticsFetchError = RuntimeException("stats fetch failed"),
+        )
+        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+
+        try {
+            manager.syncBook(
+                entry = entry,
+                direction = SyncDirection.ExportToTtu,
+                syncStats = true,
+                statsSyncMode = StatisticsSyncMode.Merge,
+                syncAudioBook = false,
+            )
+            fail("Expected remote stats fetch failure")
+        } catch (expected: RuntimeException) {
+            assertEquals("stats fetch failed", expected.message)
+        }
+
+        assertNull(drive.updatedProgress)
+        assertEquals(emptyList<ReadingStatistics>(), drive.updatedStatistics)
+        assertNull(drive.updatedAudioBook)
+        assertEquals(originalBookmark, repository.loadBookmark(entry.root))
     }
 
     @Test
@@ -143,6 +217,32 @@ class SyncManagerTest {
         assertEquals(SyncResult.Synced("Title"), result)
         assertEquals("book-folder", drive.uploadedBookDataFolderId)
         assertEquals(exported, drive.uploadedBookDataFile)
+    }
+
+    @Test
+    fun syncBookSkipsUnavailableBookDataExportAndContinuesSidecarSyncLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val entry = repository.createEntry()
+        repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
+        val drive = FakeDriveSyncDataSource()
+        val manager = SyncManager(
+            bookRepository = repository,
+            drive = drive,
+            bookDataExporter = { null },
+        )
+
+        val result = manager.syncBook(
+            entry = entry,
+            direction = SyncDirection.ExportToTtu,
+            syncStats = false,
+            statsSyncMode = StatisticsSyncMode.Merge,
+            syncAudioBook = false,
+            syncBookData = true,
+        )
+
+        assertEquals(SyncResult.Exported("Title", 100), result)
+        assertEquals(0, drive.uploadBookDataCalls)
+        assertEquals(TtuProgress(0, 100, 0.5, 4_321), drive.updatedProgress)
     }
 
     @Test
@@ -375,6 +475,8 @@ private class FakeDriveSyncDataSource(
     private val staleOnFirstList: Boolean = false,
     private val bookDataUploadError: Throwable? = null,
     private val bookDataUploadErrors: MutableList<Throwable> = mutableListOf(),
+    private val statisticsFetchError: Throwable? = null,
+    private val audioBookFetchError: Throwable? = null,
 ) : DriveSyncDataSource {
     private val progressFile = progress?.let { DriveFile("progress", TtuSyncRules.progressFileName(it)) }
     private val statisticsFile = statistics?.let { DriveFile("statistics", TtuSyncRules.statisticsFileName(it)) }
@@ -419,9 +521,15 @@ private class FakeDriveSyncDataSource(
 
     override suspend fun getProgressFile(fileId: String): TtuProgress = progressById.getValue(fileId)
 
-    override suspend fun getStatsFile(fileId: String): List<ReadingStatistics> = statisticsById.getValue(fileId)
+    override suspend fun getStatsFile(fileId: String): List<ReadingStatistics> {
+        statisticsFetchError?.let { throw it }
+        return statisticsById.getValue(fileId)
+    }
 
-    override suspend fun getAudioBookFile(fileId: String): TtuAudioBook = audioBookById.getValue(fileId)
+    override suspend fun getAudioBookFile(fileId: String): TtuAudioBook {
+        audioBookFetchError?.let { throw it }
+        return audioBookById.getValue(fileId)
+    }
 
     override suspend fun updateProgressFile(folderId: String, fileId: String?, progress: TtuProgress) {
         assertEquals("book-folder", folderId)

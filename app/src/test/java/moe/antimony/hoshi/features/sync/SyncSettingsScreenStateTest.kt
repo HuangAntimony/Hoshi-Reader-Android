@@ -17,4 +17,33 @@ class SyncSettingsScreenStateTest {
             ).isContentReady,
         )
     }
+
+    @Test
+    fun clearCacheActionIsShownOnlyWhenConnectedLikeIos() {
+        assertTrue(
+            SyncSettingsScreenState(
+                settings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Connected,
+            ).showClearCacheAction,
+        )
+        assertFalse(
+            SyncSettingsScreenState(
+                settings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.NotConnected,
+            ).showClearCacheAction,
+        )
+        assertFalse(
+            SyncSettingsScreenState(
+                settings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.MissingConfiguration,
+            ).showClearCacheAction,
+        )
+        assertFalse(
+            SyncSettingsScreenState(
+                settings = SyncSettings(enabled = true),
+                authStatus = DriveAuthStatus.Failed("failed"),
+            ).showClearCacheAction,
+        )
+        assertFalse(SyncSettingsScreenState(settings = null, authStatus = DriveAuthStatus.Connected).showClearCacheAction)
+    }
 }

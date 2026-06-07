@@ -37,13 +37,13 @@ class TtuBookDataConverter @Inject constructor(
         filesDir: File,
     ) : this(bookRepository, parser, filesDir, Dispatchers.IO)
 
-    suspend fun exportBookData(entry: BookEntry): File =
+    suspend fun exportBookData(entry: BookEntry): File? =
         exportBookData(entry, filesDir.resolve("ExportTemp/ttu-bookdata"))
 
-    suspend fun exportBookData(entry: BookEntry, outputDirectory: File): File = withContext(ioDispatcher) {
+    suspend fun exportBookData(entry: BookEntry, outputDirectory: File): File? = withContext(ioDispatcher) {
         val metadata = bookRepository.loadMetadata(entry.root) ?: entry.metadata
-        val bookInfo = bookRepository.loadBookInfo(entry.root) ?: return@withContext error("Book info is missing.")
-        if (bookRepository.epubFile(entry.root, metadata) == null) return@withContext error("Book does not have a packed EPUB.")
+        val bookInfo = bookRepository.loadBookInfo(entry.root) ?: return@withContext null
+        if (bookRepository.epubFile(entry.root, metadata) == null) return@withContext null
         val book = parser.parse(entry.root, fallbackTitle = metadata.title)
         outputDirectory.mkdirs()
         val nowMillis = System.currentTimeMillis()
@@ -152,7 +152,6 @@ class TtuBookDataConverter @Inject constructor(
             val chapterInfo = bookInfo.chapterInfo[chapter.href]
             val characters = chapterInfo?.chapterCount ?: 0
             val referenceId = chapter.id.ifBlank { chapter.href.substringAfterLast('/').substringBeforeLast('.') }
-                .replace(Regex("[^A-Za-z0-9._-]"), "-")
             val reference = "ttu-$referenceId"
             val ttuNoText = if (characters == 0) " ttu-no-text" else ""
             val htmlClass = classList("ttu-book-html-wrapper", chapter.html.extractTagClass("html"), ttuNoText)
@@ -305,10 +304,30 @@ private fun String.toSafeTtuFileStem(): String {
     require(startsWith("ttu-")) { "Unsafe TTU section reference: $this" }
     val stem = removePrefix("ttu-")
     require(stem.isNotBlank() && stem != "." && stem != "..") { "Unsafe TTU section reference: $this" }
-    require(stem.all { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }) {
+    require(!stem.contains('/') && !stem.contains('\\')) {
         "Unsafe TTU section reference: $this"
     }
-    return stem
+    return stem.toReversibleTtuFileStem()
+}
+
+private fun String.toReversibleTtuFileStem(): String = buildString {
+    this@toReversibleTtuFileStem.toByteArray(Charsets.UTF_8).forEach { byte ->
+        val value = byte.toInt() and 0xFF
+        val char = value.toChar()
+        if (
+            char in 'A'..'Z' ||
+            char in 'a'..'z' ||
+            char in '0'..'9' ||
+            char == '.' ||
+            char == '_' ||
+            char == '-'
+        ) {
+            append(char)
+        } else {
+            append('~')
+            append(value.toString(16).uppercase().padStart(2, '0'))
+        }
+    }
 }
 
 private fun generateXhtml(file: TtuXhtmlFile, title: String): String {

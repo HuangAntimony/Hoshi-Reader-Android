@@ -8,4 +8,7 @@ internal data class SyncSettingsScreenState(
 ) {
     val isContentReady: Boolean
         get() = settingsContentReady(settings, authStatus)
+
+    val showClearCacheAction: Boolean
+        get() = isContentReady && authStatus == DriveAuthStatus.Connected
 }

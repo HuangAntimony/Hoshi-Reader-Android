@@ -19,6 +19,7 @@ import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Rule
@@ -57,7 +58,9 @@ class TtuBookDataConverterTest {
         repository.saveBookInfo(root, parsed.bookInfo)
         val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
 
-        val bookData = converter.exportBookData(moe.antimony.hoshi.epub.BookEntry(root, metadata), tempFolder.newFolder("ttu-export"))
+        val bookData = requireNotNull(
+            converter.exportBookData(moe.antimony.hoshi.epub.BookEntry(root, metadata), tempFolder.newFolder("ttu-export")),
+        )
 
         ZipFile(bookData).use { zip ->
             assertNotNull(zip.getEntry("staticdata.json"))
@@ -72,6 +75,48 @@ class TtuBookDataConverterTest {
             assertEquals(2, staticData.getValue("sections").jsonArray.size)
             assertTrue(bookData.name.startsWith("bookdata_1_6_${parsed.bookInfo.characterCount}_"))
         }
+    }
+
+    @Test
+    fun exportBookDataReturnsNullWhenBookCannotBeConvertedLikeIos() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val missingBookInfoRoot = repository.createBookDirectory("missing-book-info")
+        val missingBookInfoMetadata = BookMetadata(
+            id = UUID.randomUUID().toString(),
+            title = "Missing Book Info",
+            cover = null,
+            folder = missingBookInfoRoot.name,
+            lastAccess = 1.0,
+            epub = "Missing Book Info.epub",
+        )
+        repository.saveMetadata(missingBookInfoRoot, missingBookInfoMetadata)
+
+        val missingEpubRoot = repository.createBookDirectory("missing-epub")
+        val missingEpubMetadata = BookMetadata(
+            id = UUID.randomUUID().toString(),
+            title = "Missing EPUB",
+            cover = null,
+            folder = missingEpubRoot.name,
+            lastAccess = 1.0,
+            epub = null,
+        )
+        repository.saveMetadata(missingEpubRoot, missingEpubMetadata)
+        repository.saveBookInfo(missingEpubRoot, BookInfo(characterCount = 1, chapterInfo = emptyMap()))
+
+        val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
+
+        assertNull(
+            converter.exportBookData(
+                moe.antimony.hoshi.epub.BookEntry(missingBookInfoRoot, missingBookInfoMetadata),
+                tempFolder.newFolder("missing-book-info-export"),
+            ),
+        )
+        assertNull(
+            converter.exportBookData(
+                moe.antimony.hoshi.epub.BookEntry(missingEpubRoot, missingEpubMetadata),
+                tempFolder.newFolder("missing-epub-export"),
+            ),
+        )
     }
 
     @Test
@@ -177,6 +222,28 @@ class TtuBookDataConverterTest {
     }
 
     @Test
+    fun importBookDataEncodesOnlyGeneratedFileNamesForDistinctTtuSectionReferences() = runBlocking {
+        val repository = BookRepository(tempFolder.root)
+        val source = tempFolder.newFile("reversible-section-refs-bookdata.zip")
+        writeTtuBookDataWithDistinctSectionReferences(source)
+        val converter = TtuBookDataConverter(repository, EpubBookParser(), tempFolder.root)
+
+        val entry = converter.importBookData(source)
+
+        val unpacked = tempFolder.newFolder("reversible-section-refs-unpacked")
+        moe.antimony.hoshi.epub.EpubArchiveExtractor().extract(entry.root.resolve("Reference Book.epub"), unpacked)
+        val colonFile = unpacked.resolve("item/xhtml/chap~3A1.xhtml")
+        val hyphenFile = unpacked.resolve("item/xhtml/chap-1.xhtml")
+        assertTrue(colonFile.isFile)
+        assertTrue(hyphenFile.isFile)
+        assertTrue(colonFile.readText().contains("Colon reference"))
+        assertTrue(hyphenFile.readText().contains("Hyphen reference"))
+        val opf = unpacked.resolve("item/standard.opf").readText()
+        assertTrue(opf.contains("""href="xhtml/chap~3A1.xhtml""""))
+        assertTrue(opf.contains("""href="xhtml/chap-1.xhtml""""))
+    }
+
+    @Test
     fun tocLabelSkipsGroupingItemsWithoutHrefLikeIos() {
         val toc = listOf(
             EpubTocItem(
@@ -244,6 +311,25 @@ class TtuBookDataConverterTest {
             )
             zip.writeTextEntry("blobs/image/a/pic 1.png", "image-a")
             zip.writeTextEntry("blobs/image/b/pic 1.png", "image-b")
+        }
+    }
+
+    private fun writeTtuBookDataWithDistinctSectionReferences(destination: File) {
+        ZipOutputStream(destination.outputStream()).use { zip ->
+            zip.writeTextEntry(
+                "staticdata.json",
+                """
+                {
+                  "title": "Reference Book",
+                  "styleSheet": "",
+                  "elementHtml": "<div id=\"ttu-chap:1\"><p>Colon reference</p></div><div id=\"ttu-chap-1\"><p>Hyphen reference</p></div>",
+                  "sections": [
+                    {"reference":"ttu-chap:1","charactersWeight":1,"label":"Colon","startCharacter":0,"characters":1,"parentChapter":null},
+                    {"reference":"ttu-chap-1","charactersWeight":1,"label":"Hyphen","startCharacter":1,"characters":1,"parentChapter":null}
+                  ]
+                }
+                """.trimIndent(),
+            )
         }
     }
 

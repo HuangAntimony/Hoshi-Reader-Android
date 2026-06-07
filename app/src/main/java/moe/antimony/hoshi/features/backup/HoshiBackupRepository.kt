@@ -111,7 +111,7 @@ class HoshiBackupRepository @Inject constructor(
                             usedNames = usedTitleFolders,
                         )
                         val bookTemp = tempRoot.resolve(entry.metadata.id).also { it.mkdirs() }
-                        val bookData = ttuConverter.exportBookData(entry, bookTemp)
+                        val bookData = ttuConverter.exportBookData(entry, bookTemp) ?: return@forEach
                         zip.writeFile("$titleFolder/${bookData.name}", bookData)
                         bookRepository.coverFile(entry)?.takeIf(File::isFile)?.let { cover ->
                             zip.writeFile("$titleFolder/cover_1_6.${cover.extension.ifBlank { "jpg" }}", cover)
