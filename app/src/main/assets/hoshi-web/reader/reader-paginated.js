@@ -768,10 +768,6 @@ window.hoshiReader = {
     });
     return true;
   },
-  fastLastPageScroll: function(context) {
-    if (context.pageSize <= 0) return 0;
-    return Math.max(0, Math.floor(context.maxScroll / context.pageSize) * context.pageSize);
-  },
   waitForImageLayout: function() {
     return new Promise(function(resolve) {
       requestAnimationFrame(function() {
@@ -821,15 +817,15 @@ window.hoshiReader = {
       }
       return found;
     };
-    var firstMeasuredIndex = -1;
-    for (var f = 0; f < textNodes.length; f++) {
-      if (measureNodeEdges(textNodes[f])) {
-        firstMeasuredIndex = f;
-        break;
-      }
+    var boundarySampleLimit = 64;
+    var leadingMeasured = 0;
+    var leadingEndIndex = -1;
+    for (var f = 0; f < textNodes.length && leadingMeasured < boundarySampleLimit; f++) {
+      if (measureNodeEdges(textNodes[f])) leadingMeasured += 1;
+      leadingEndIndex = f;
     }
-    for (var b = textNodes.length - 1; b > firstMeasuredIndex; b--) {
-      if (measureNodeEdges(textNodes[b])) break;
+    for (var b = textNodes.length - 1, trailingMeasured = 0; b > leadingEndIndex && trailingMeasured < boundarySampleLimit; b--) {
+      if (measureNodeEdges(textNodes[b])) trailingMeasured += 1;
     }
 
     var media = document.querySelectorAll('img, svg, image, video, canvas');
@@ -888,7 +884,7 @@ window.hoshiReader = {
     if (progress >= 0.99) {
       var lastStart = performance.now();
       var hadCachedMetrics = !!this.paginationMetrics;
-      var lastPage = hadCachedMetrics ? this.contentLastPageScroll(context) : this.fastLastPageScroll(context);
+      var lastPage = this.contentLastPageScroll(context);
       lastPage = Math.max(0, lastPage);
       window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress last page target', lastStart, 'lastPage=' + lastPage + ' cachedMetrics=' + hadCachedMetrics + ' maxScroll=' + context.maxScroll);
       this.setPagePosition(context, lastPage);

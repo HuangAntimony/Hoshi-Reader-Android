@@ -99,17 +99,11 @@ This avoids live `window.innerWidth/innerHeight` reads during initialization.
 - `reader WebView size changed`
 - `reader viewport state changed`
 
-### Fast Last Page Restore
+### Fast Last Page Restore (Reverted 2026-06-10)
 
-In `reader-paginated.js`, `progress >= 0.99` now uses `fastLastPageScroll(context)` when full pagination metrics are not already cached. This avoids an expensive full text-node + `getClientRects()` metrics pass during previous-chapter restore.
+In `reader-paginated.js`, `progress >= 0.99` briefly used `fastLastPageScroll(context)` (raw `floor(maxScroll / pageSize) * pageSize`) when full pagination metrics were not already cached, to avoid the then-expensive full text-node + `getClientRects()` metrics pass during previous-chapter restore.
 
-The relevant log changed from:
-
-- `restoreProgress last page metrics took ~829ms`
-
-to:
-
-- `restoreProgress last page target took 0ms ... cachedMetrics=false`
+**Reverted during PR review**: `context.maxScroll` includes the trailing spacer and bottom padding, so on some devices the fast path landed one blank page past the last content page. The restore path now always uses `contentLastPageScroll(context)` again. This is affordable because `buildPaginationMetrics` has since become bounds-only with a `trim()` filter (~10-30ms expected, vs the original ~829ms full scan that motivated the shortcut). `fastLastPageScroll` was deleted; the `cachedMetrics=` field stays in the `restoreProgress last page target` log.
 
 ### Removed Immediate Pagination Metrics Warm-Up
 
@@ -140,6 +134,8 @@ Rewrote `buildPaginationMetrics` in `reader-paginated.js` to:
 Expected: first-tap `buildPaginationMetrics` drops from 600-970ms to ~1-5ms. Log format changed to `minScroll=... maxScroll=...` (no more `totalChars=`/`stops=`).
 
 Known assumption: an interior node extending beyond both boundary text nodes in the scroll axis (weird absolute/table layouts) would shift bounds vs the old full scan. Media is still covered by the separate pass.
+
+**Hardened during PR review (2026-06-10)**: instead of measuring only the single first/last measurable text node, `buildPaginationMetrics` now measures up to 64 measurable nodes from each end (`boundarySampleLimit`). With ruby stabilization splitting boundary text into per-character nodes (~2 chars/node), 64 nodes covers roughly one full column at default font size, so short positioned lines near chapter edges (colophon pages etc.) no longer shift bounds. Deep-interior outliers remain covered only by the media pass; cost is ~128 cheap `getClientRects()` calls.
 
 Not yet addressed: `calculateProgress()` (full walker + `countCharsBeforeViewport` per node) still runs after every page turn for bookmark progress; its cost is not separately logged. If next trace shows taps still slow, instrument it.
 
