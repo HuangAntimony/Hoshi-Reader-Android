@@ -7,6 +7,7 @@ import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import moe.antimony.hoshi.di.FilesDir
 
 @Singleton
@@ -149,6 +150,7 @@ internal class DictionaryRepository private constructor(
                 successfulCount += 1
                 updatedCount += 1
             } catch (error: Exception) {
+                if (error is CancellationException) throw error
                 failures += DictionaryUpdateFailure(
                     title = installedIndex.title,
                     message = error.localizedMessage ?: error::class.java.simpleName,

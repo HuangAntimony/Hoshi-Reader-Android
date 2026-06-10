@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
 
 internal fun shouldEnqueueDictionaryAutoUpdate(
     settings: DictionarySettings,
@@ -40,10 +41,35 @@ internal fun shouldEnqueueDictionaryAutoUpdate(
 }
 
 @Singleton
-internal class DictionaryAutoUpdateScheduler @Inject constructor(
+internal class DictionaryAutoUpdateRunner @Inject constructor(
     private val dictionarySettingsRepository: DictionarySettingsRepository,
     private val dictionaryRepository: DictionaryRepository,
     private val dictionaryUpdateService: DictionaryUpdateService,
+) {
+    suspend fun isDue(
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean {
+        val settings = dictionarySettingsRepository.settings.first()
+        val hasUpdatableDictionaries = dictionaryRepository.updatableDictionaries().isNotEmpty()
+        return shouldEnqueueDictionaryAutoUpdate(
+            settings = settings,
+            nowEpochMillis = nowEpochMillis,
+            hasUpdatableDictionaries = hasUpdatableDictionaries,
+            isMutationInProgress = dictionaryUpdateService.isMutationInProgress,
+        )
+    }
+
+    suspend fun updateIfDue(
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): DictionaryUpdateSummary? {
+        if (!isDue(nowEpochMillis)) return null
+        return dictionaryUpdateService.updateDictionaries()
+    }
+}
+
+@Singleton
+internal class DictionaryAutoUpdateScheduler @Inject constructor(
+    private val dictionaryAutoUpdateRunner: DictionaryAutoUpdateRunner,
     private val workManager: Lazy<WorkManager>,
     @param:ApplicationScope private val appScope: CoroutineScope,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -69,17 +95,7 @@ internal class DictionaryAutoUpdateScheduler @Inject constructor(
     internal suspend fun enqueueIfDue(
         nowEpochMillis: Long = System.currentTimeMillis(),
     ) {
-        val settings = dictionarySettingsRepository.settings.first()
-        val hasUpdatableDictionaries = dictionaryRepository.updatableDictionaries().isNotEmpty()
-        if (!shouldEnqueueDictionaryAutoUpdate(
-                settings = settings,
-                nowEpochMillis = nowEpochMillis,
-                hasUpdatableDictionaries = hasUpdatableDictionaries,
-                isMutationInProgress = dictionaryUpdateService.isMutationInProgress,
-            )
-        ) {
-            return
-        }
+        if (!dictionaryAutoUpdateRunner.isDue(nowEpochMillis)) return
         val request = OneTimeWorkRequestBuilder<DictionaryAutoUpdateWorker>()
             .setConstraints(networkConstraints())
             .build()
@@ -104,11 +120,11 @@ internal class DictionaryAutoUpdateScheduler @Inject constructor(
 internal class DictionaryAutoUpdateWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val dictionaryUpdateService: DictionaryUpdateService,
+    private val dictionaryAutoUpdateRunner: DictionaryAutoUpdateRunner,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result =
         runCatching {
-            dictionaryUpdateService.updateDictionaries()
+            dictionaryAutoUpdateRunner.updateIfDue()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() },

@@ -12,6 +12,8 @@ import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CancellationException
+import org.junit.Assert.assertThrows
 
 class DictionaryRepositoryTest {
     @get:Rule
@@ -273,6 +275,31 @@ class DictionaryRepositoryTest {
     }
 
     @Test
+    fun updateDictionariesRethrowsCancellation() {
+        val filesDir = temporaryFolder.newFolder("cancelled-update-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val installed = updatableTestDictionaryIndex()
+        val repository = DictionaryRepository(
+            filesDir,
+            storage,
+            DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+            DictionaryLookupQueryService(RecordingDictionaryNativeBridge()),
+            FakeDictionaryRemoteDataSource(
+                indexes = emptyMap(),
+                archives = emptyMap(),
+                cancelledIndexUrls = setOf(installed.indexUrl),
+            ),
+        )
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+        storage.saveConfigFromStorage()
+
+        assertThrows(CancellationException::class.java) {
+            repository.updateDictionaries()
+        }
+        assertEquals(listOf(installed.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
+    }
+
+    @Test
     fun importRecommendedDictionariesDownloadsSelectedIndexesByType() {
         val filesDir = temporaryFolder.newFolder("recommended-files")
         val storage = DictionaryStorageDataSource(filesDir)
@@ -470,10 +497,12 @@ class DictionaryRepositoryTest {
         private val archives: Map<String, ByteArray>,
         private val failedIndexUrls: Set<String> = emptySet(),
         private val failedArchiveUrls: Set<String> = emptySet(),
+        private val cancelledIndexUrls: Set<String> = emptySet(),
     ) : DictionaryRemoteDataSource {
         val downloadedUrls = mutableListOf<String>()
 
         override fun fetchIndex(url: String): DictionaryIndex {
+            if (url in cancelledIndexUrls) throw CancellationException("cancelled")
             if (url in failedIndexUrls) error("fetch failed")
             return indexes.getValue(url)
         }
