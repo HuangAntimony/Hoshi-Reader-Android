@@ -15,7 +15,6 @@ import moe.antimony.hoshi.dictionary.DictionaryUpdateFailure
 import moe.antimony.hoshi.dictionary.DictionaryUpdateProgress
 import moe.antimony.hoshi.dictionary.DictionaryUpdateStage
 import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
-import moe.antimony.hoshi.features.anki.AnkiSettings
 import moe.antimony.hoshi.ui.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -86,6 +85,7 @@ class DictionaryViewModelTest {
             importOperation = { onProgress ->
                 onProgress(item)
                 repository.onImport!!.invoke()
+                repository.publishCompletedChange()
                 DictionaryImportBatchResult(imported = listOf(item), failed = emptyList())
             },
         )
@@ -340,6 +340,7 @@ class DictionaryViewModelTest {
             onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, updated.index.title))
             repository.dictionaries = mapOf(DictionaryType.Term to listOf(updated))
             repository.updatableDictionaries = emptyList()
+            repository.publishCompletedChange()
             DictionaryUpdateSummary(
                 checkedCount = 1,
                 updatedCount = 1,
@@ -368,7 +369,6 @@ class DictionaryViewModelTest {
         assertEquals(emptyList<DictionaryUpdateCandidate>(), viewModel.uiState.value.updatableDictionaries)
         assertEquals(setOf(old.index.title, "Other"), viewModel.uiState.value.settings.collapsedDictionaries)
         assertNull(repository.savedSettings)
-        assertNull(repository.savedAnkiSettings)
         assertTrue(messages.contains("Downloading ${updated.index.title}"))
     }
 
@@ -388,6 +388,7 @@ class DictionaryViewModelTest {
             onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, old.index.title))
             repository.dictionaries = mapOf(DictionaryType.Term to listOf(updated))
             repository.updatableDictionaries = emptyList()
+            repository.publishCompletedChange()
             DictionaryUpdateSummary(
                 checkedCount = 2,
                 successfulCount = 1,
@@ -408,6 +409,39 @@ class DictionaryViewModelTest {
         assertEquals(listOf(updated), viewModel.uiState.value.currentDictionaries)
         assertEquals(emptyList<DictionaryUpdateCandidate>(), viewModel.uiState.value.updatableDictionaries)
         assertEquals("Failed to update:\nJiten: fetch failed", viewModel.uiState.value.errorMessage.testString())
+    }
+
+    @Test
+    fun publicUpdateRefreshesOnceFromCompletedMutationChange() {
+        val old = dictionary("old-jmdict", "JMdict [2026-04-27]", isUpdatable = true)
+        val updated = dictionary("new-jmdict", "JMdict [2099-01-01]")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(old)),
+            updatableDictionaries = listOf(DictionaryUpdateCandidate(old, DictionaryType.Term)),
+        )
+        repository.onUpdate = {
+            repository.dictionaries = mapOf(DictionaryType.Term to listOf(updated))
+            repository.updatableDictionaries = emptyList()
+            repository.publishCompletedChange()
+            DictionaryUpdateSummary(
+                checkedCount = 1,
+                successfulCount = 1,
+                updatedCount = 1,
+            )
+        }
+        val viewModel = DictionaryViewModel(
+            repository = repository,
+            coroutineScope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.reload()
+        val loadCountAfterInitialReload = repository.loadDictionariesCount
+
+        viewModel.updateDictionaries()
+
+        assertEquals(listOf(updated), viewModel.uiState.value.currentDictionaries)
+        assertEquals(loadCountAfterInitialReload + 1, repository.loadDictionariesCount)
+        assertEquals(loadCountAfterInitialReload + 1, repository.rebuildCount)
     }
 
     @Test
@@ -589,7 +623,6 @@ private fun UiText?.testString(): String? =
 private class FakeDictionaryRepository(
     var dictionaries: Map<DictionaryType, List<DictionaryInfo>> = emptyMap(),
     settings: DictionarySettings = DictionarySettings(),
-    private var ankiSettings: AnkiSettings = AnkiSettings(),
     var updatableDictionaries: List<DictionaryUpdateCandidate> = emptyList(),
     private val failedImportItems: Set<DictionaryImportItem> = emptySet(),
 ) : DictionaryViewModelRepository {
@@ -610,7 +643,6 @@ private class FakeDictionaryRepository(
     val importedRecommendedDictionaries = mutableListOf<RecommendedDictionary>()
     val recommendedProgressMessages = mutableListOf<String?>()
     var savedSettings: DictionarySettings? = null
-    var savedAnkiSettings: AnkiSettings? = null
 
     override suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>> {
         loadDictionariesCount += 1
@@ -634,6 +666,9 @@ private class FakeDictionaryRepository(
                 onImport?.invoke()
             }
         }
+        if (imported.isNotEmpty()) {
+            publishCompletedChange()
+        }
         return DictionaryImportBatchResult(imported = imported, failed = failed)
     }
 
@@ -648,6 +683,7 @@ private class FakeDictionaryRepository(
         recommendedProgressMessages += "Downloading ${dictionaries.last().name}"
         onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, dictionaries.last().name))
         recommendedProgressMessages += "Importing ${dictionaries.last().name}"
+        publishCompletedChange()
     }
 
     override suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
@@ -666,8 +702,17 @@ private class FakeDictionaryRepository(
         mutationStateFlow.value = state
     }
 
+    fun publishCompletedChange() {
+        mutationStateFlow.value = mutationStateFlow.value.copy(
+            operation = null,
+            progress = null,
+            completedChangeVersion = mutationStateFlow.value.completedChangeVersion + 1L,
+        )
+    }
+
     override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean {
         enabledCalls += "$fileName:$enabled"
+        publishCompletedChange()
         return true
     }
 
@@ -676,12 +721,14 @@ private class FakeDictionaryRepository(
         updateSettings { current ->
             current.copy(collapsedDictionaries = current.collapsedDictionaries - title)
         }
+        publishCompletedChange()
         return true
     }
 
     override suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int): Boolean {
         moveCalls += type to (fromIndex to toIndex)
         onMove?.invoke()
+        publishCompletedChange()
         return true
     }
 
@@ -693,10 +740,5 @@ private class FakeDictionaryRepository(
         val next = transform(settingsFlow.value).normalized()
         settingsFlow.value = next
         savedSettings = next
-    }
-
-    override suspend fun updateAnkiSettings(transform: (AnkiSettings) -> AnkiSettings) {
-        ankiSettings = transform(ankiSettings)
-        savedAnkiSettings = ankiSettings
     }
 }

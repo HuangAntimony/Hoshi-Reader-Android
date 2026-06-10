@@ -28,8 +28,6 @@ import moe.antimony.hoshi.dictionary.DictionaryUpdateStage
 import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.di.IoDispatcher
-import moe.antimony.hoshi.features.anki.AnkiSettings
-import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
 import moe.antimony.hoshi.ui.UiText
 
 internal interface DictionaryViewModelRepository {
@@ -51,7 +49,6 @@ internal interface DictionaryViewModelRepository {
     val settings: Flow<DictionarySettings>
     val mutationState: StateFlow<DictionaryMutationState>
     suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings)
-    suspend fun updateAnkiSettings(transform: (AnkiSettings) -> AnkiSettings)
 }
 
 internal data class DictionaryImportItem(
@@ -69,7 +66,6 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     private val contentResolver: ContentResolver,
     private val dictionaryRepository: DictionaryRepository,
     private val settingsRepository: DictionarySettingsRepository,
-    private val ankiSettingsRepository: AnkiSettingsRepository,
     private val dictionaryUpdateService: DictionaryUpdateService,
     private val mutationCoordinator: DictionaryMutationCoordinator,
 ) : DictionaryViewModelRepository {
@@ -168,10 +164,6 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
 
     override suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
         settingsRepository.update(transform)
-    }
-
-    override suspend fun updateAnkiSettings(transform: (AnkiSettings) -> AnkiSettings) {
-        ankiSettingsRepository.update(transform)
     }
 }
 
@@ -302,8 +294,6 @@ internal class DictionaryViewModel : ViewModel {
                         }
                     }
                 }
-            }.onSuccess {
-                reloadDictionaries(clearError = true)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -330,7 +320,6 @@ internal class DictionaryViewModel : ViewModel {
                     }
                 }
             }.onSuccess { summary ->
-                reloadDictionaries(clearError = true)
                 if (summary.failures.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
@@ -373,7 +362,6 @@ internal class DictionaryViewModel : ViewModel {
                     }
                 }
             }.onSuccess { result ->
-                reloadDictionaries(clearError = true)
                 if (result.failed.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
@@ -399,11 +387,8 @@ internal class DictionaryViewModel : ViewModel {
     fun setDictionaryEnabled(dictionary: DictionaryInfo, enabled: Boolean) {
         val type = _uiState.value.selectedType
         scope.launch {
-            val changed = withContext(ioDispatcher) {
+            withContext(ioDispatcher) {
                 repository.setDictionaryEnabled(type, dictionary.path.name, enabled)
-            }
-            if (changed) {
-                reloadDictionaries(clearError = false)
             }
         }
     }
@@ -411,11 +396,8 @@ internal class DictionaryViewModel : ViewModel {
     fun deleteDictionary(dictionary: DictionaryInfo) {
         val type = _uiState.value.selectedType
         scope.launch {
-            val changed = withContext(ioDispatcher) {
+            withContext(ioDispatcher) {
                 repository.deleteDictionary(type, dictionary.path.name, dictionary.index.title)
-            }
-            if (changed) {
-                reloadDictionaries(clearError = false)
             }
         }
     }
@@ -432,10 +414,12 @@ internal class DictionaryViewModel : ViewModel {
             }
         }
         scope.launch {
-            withContext(ioDispatcher) {
+            val changed = withContext(ioDispatcher) {
                 repository.moveDictionary(type, fromIndex, toIndex)
             }
-            reloadDictionaries(clearError = false)
+            if (!changed) {
+                reloadDictionaries(clearError = false)
+            }
         }
     }
 
