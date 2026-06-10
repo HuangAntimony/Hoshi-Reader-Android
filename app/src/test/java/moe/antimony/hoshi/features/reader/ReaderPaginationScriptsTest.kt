@@ -85,7 +85,8 @@ class ReaderPaginationScriptsTest {
             456,
             readerViewportCssLayout(ReaderSettings(verticalWriting = false), 480, 800).imageMaxWidthPx,
         )
-        assertTrue(continuousVertical.contains("Math.max(1, Math.floor(window.innerWidth * 1.0) - 1)"))
+        assertTrue(continuousVertical.contains("var viewportWidth = window.innerWidth;"))
+        assertTrue(continuousVertical.contains("Math.max(1, Math.floor(viewportWidth * 1.0) - 1)"))
         assertTrue(paginatedVertical.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 1)"))
         assertTrue(paginatedHorizontal.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 0)"))
         assertFalse(paginatedVertical.contains("window.hoshiReaderViewport"))
@@ -124,7 +125,8 @@ class ReaderPaginationScriptsTest {
 
         assertEquals(688, layout.imageMaxHeightPx)
         assertTrue(layout.cssVariables().contains("--hoshi-image-max-height: 688px;"))
-        assertTrue(script.contains("Math.max(1, Math.floor(window.innerHeight * 0.86))"))
+        assertTrue(script.contains("var viewportHeight = window.innerHeight;"))
+        assertTrue(script.contains("Math.max(1, Math.floor(viewportHeight * 0.86))"))
     }
 
     @Test
@@ -173,7 +175,7 @@ class ReaderPaginationScriptsTest {
     fun verticalPageHeightExtendsPastViewportByBottomOverlap() {
         val script = ReaderPaginationScripts.shellScript()
 
-        assertTrue(script.contains("var pageHeight = window.innerHeight + 22;"))
+        assertTrue(script.contains("var pageHeight = (window.innerHeight + 22);"))
     }
 
     @Test
@@ -182,7 +184,7 @@ class ReaderPaginationScriptsTest {
             settings = ReaderSettings(verticalWriting = false),
         )
 
-        assertTrue(script.contains("var pageHeight = window.innerHeight + 0;"))
+        assertTrue(script.contains("var pageHeight = (window.innerHeight + 0);"))
         assertFalse(script.contains("window.innerHeight + 22"))
     }
 
