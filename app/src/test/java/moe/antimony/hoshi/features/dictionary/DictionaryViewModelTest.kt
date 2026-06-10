@@ -11,6 +11,7 @@ import moe.antimony.hoshi.dictionary.DictionaryRename
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.DictionaryUpdateCandidate
+import moe.antimony.hoshi.dictionary.DictionaryUpdateFailure
 import moe.antimony.hoshi.dictionary.DictionaryUpdateProgress
 import moe.antimony.hoshi.dictionary.DictionaryUpdateStage
 import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
@@ -317,6 +318,44 @@ class DictionaryViewModelTest {
     }
 
     @Test
+    fun updateDictionariesReportsPartialFailuresAfterRefreshingSuccessfulUpdates() {
+        val old = dictionary(
+            fileName = "old-jmdict",
+            title = "JMdict [2026-04-27]",
+            isUpdatable = true,
+        )
+        val updated = dictionary("new-jmdict", "JMdict [2099-01-01]")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(old)),
+            updatableDictionaries = listOf(DictionaryUpdateCandidate(old, DictionaryType.Term)),
+        )
+        repository.onUpdate = { onProgress ->
+            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, old.index.title))
+            repository.dictionaries = mapOf(DictionaryType.Term to listOf(updated))
+            repository.updatableDictionaries = emptyList()
+            DictionaryUpdateSummary(
+                checkedCount = 2,
+                successfulCount = 1,
+                updatedCount = 1,
+                failures = listOf(DictionaryUpdateFailure("Jiten", "fetch failed")),
+            )
+        }
+        val viewModel = DictionaryViewModel(
+            repository = repository,
+            coroutineScope = testScope,
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        viewModel.reload()
+
+        viewModel.updateDictionaries()
+
+        assertFalse(viewModel.uiState.value.isUpdating)
+        assertEquals(listOf(updated), viewModel.uiState.value.currentDictionaries)
+        assertEquals(emptyList<DictionaryUpdateCandidate>(), viewModel.uiState.value.updatableDictionaries)
+        assertEquals("Failed to update:\nJiten: fetch failed", viewModel.uiState.value.errorMessage.testString())
+    }
+
+    @Test
     fun importFailureKeepsExistingDictionariesAndCanRetry() {
         val existing = dictionary("term", "Existing")
         val repository = FakeDictionaryRepository(
@@ -486,6 +525,7 @@ private fun UiText?.testString(): String? =
             R.string.dictionary_importing_named_format -> "Importing ${args[0]}"
             R.string.dictionary_downloading_named_format -> "Downloading ${args[0]}"
             R.string.dictionary_import_failed_list_format -> "Failed to import:\n${args[0]}"
+            R.string.dictionary_update_failed_list_format -> "Failed to update:\n${args[0]}"
             else -> "resource:$id:${args.joinToString()}"
         }
         is UiText.Plural -> "plural:$id:$quantity:${args.joinToString()}"
@@ -561,6 +601,7 @@ private class FakeDictionaryRepository(
     ): DictionaryUpdateSummary =
         onUpdate?.invoke(onProgress) ?: DictionaryUpdateSummary(
             checkedCount = updatableDictionaries.size,
+            successfulCount = updatableDictionaries.size,
             updatedCount = 0,
         )
 

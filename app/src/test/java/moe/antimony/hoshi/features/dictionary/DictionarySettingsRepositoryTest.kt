@@ -32,6 +32,9 @@ class DictionarySettingsRepositoryTest {
     fun migratesLegacySharedPreferencesSettingsOnceAndKeepsNormalization() = runBlocking {
         val legacy = FakeLegacyDictionarySettingsSource(
             DictionarySettings(
+                autoUpdateDictionaries = false,
+                dictionaryUpdateInterval = DictionaryUpdateInterval.Monthly,
+                lastDictionaryUpdateEpochMillis = 1_800_000_000_000L,
                 dictionaryTabDefault = true,
                 scanNonJapaneseText = false,
                 maxResults = 100,
@@ -52,6 +55,9 @@ class DictionarySettingsRepositoryTest {
         repository(legacy).use { repository ->
             val migrated = repository.settings.first()
 
+            assertFalse(migrated.autoUpdateDictionaries)
+            assertEquals(DictionaryUpdateInterval.Monthly, migrated.dictionaryUpdateInterval)
+            assertEquals(1_800_000_000_000L, migrated.lastDictionaryUpdateEpochMillis)
             assertTrue(migrated.dictionaryTabDefault)
             assertFalse(migrated.scanNonJapaneseText)
             assertEquals(50, migrated.maxResults)
@@ -78,6 +84,9 @@ class DictionarySettingsRepositoryTest {
         repository().use { repository ->
             repository.update {
                 it.copy(
+                    autoUpdateDictionaries = false,
+                    dictionaryUpdateInterval = DictionaryUpdateInterval.Daily,
+                    lastDictionaryUpdateEpochMillis = 1_900_000_000_000L,
                     dictionaryTabDefault = true,
                     scanNonJapaneseText = false,
                     maxResults = 0,
@@ -97,6 +106,9 @@ class DictionarySettingsRepositoryTest {
 
             val saved = repository.settings.first()
 
+            assertFalse(saved.autoUpdateDictionaries)
+            assertEquals(DictionaryUpdateInterval.Daily, saved.dictionaryUpdateInterval)
+            assertEquals(1_900_000_000_000L, saved.lastDictionaryUpdateEpochMillis)
             assertTrue(saved.dictionaryTabDefault)
             assertFalse(saved.scanNonJapaneseText)
             assertEquals(1, saved.maxResults)

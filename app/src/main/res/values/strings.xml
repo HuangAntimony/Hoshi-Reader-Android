@@ -132,6 +132,7 @@
     <string name="dictionary_select_zip_archive">Select a .zip dictionary archive.</string>
     <string name="dictionary_download_failed">Failed to download dictionaries.</string>
     <string name="dictionary_update_failed">Failed to update dictionaries.</string>
+    <string name="dictionary_update_failed_list_format">Failed to update:\n%1$s</string>
     <string name="dictionary_import_failed">Failed to import dictionary.</string>
     <string name="dictionary_import_failed_list_format" comment="Dictionary batch import failure summary; intentionally matches the bookshelf batch import format.">Failed to import:\n%1$s</string>
     <string name="dictionary_fetching_named_format">Fetching %1$s</string>
@@ -143,6 +144,14 @@
     <string name="dictionary_supported_archive_types">Yomitan term, frequency, and pitch dictionaries (.zip) are supported</string>
     <string name="dictionary_default_tab">Default to Dictionary Tab</string>
     <string name="dictionary_empty_type_format">No %1$s Dictionaries</string>
+    <string name="dictionary_updates_section" comment="Dictionary settings section label for installed dictionary update controls; intentionally matches the About update section label.">Updates</string>
+    <string name="dictionary_update_automatically">Update Automatically</string>
+    <string name="dictionary_update_interval">Interval</string>
+    <string name="dictionary_last_update">Last Update</string>
+    <string name="dictionary_last_update_never">Never</string>
+    <string name="dictionary_update_interval_daily">Daily</string>
+    <string name="dictionary_update_interval_weekly">Weekly</string>
+    <string name="dictionary_update_interval_monthly">Monthly</string>
     <string name="dictionary_update_title">Update Dictionaries</string>
     <string name="dictionary_update_confirmation_format">This will check for and install updates for these dictionaries:\n%1$s</string>
     <string name="dictionary_download_title">Download Dictionaries</string>
@@ -467,7 +476,7 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
-    <string name="about_updates">Updates</string>
+    <string name="about_updates" comment="About screen section label for app release update controls; intentionally matches the Dictionary update section label.">Updates</string>
     <string name="about_check_updates">Check for Updates</string>
     <string name="about_update_check_failed">Failed to check for updates.</string>
     <string name="about_update_download_failed">Failed to download update.</string>

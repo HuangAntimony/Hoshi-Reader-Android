@@ -130,6 +130,7 @@
     <string name="dictionary_select_zip_archive">请选择 .zip 辞典压缩包。</string>
     <string name="dictionary_download_failed">无法下载辞典。</string>
     <string name="dictionary_update_failed">无法更新辞典。</string>
+    <string name="dictionary_update_failed_list_format">更新失败：\n%1$s</string>
     <string name="dictionary_import_failed">无法导入辞典。</string>
     <string name="dictionary_import_failed_list_format" comment="Dictionary batch import failure summary; intentionally matches the bookshelf batch import format.">导入失败：\n%1$s</string>
     <string name="dictionary_fetching_named_format">正在获取 %1$s</string>
@@ -141,6 +142,14 @@
     <string name="dictionary_supported_archive_types">支持 Yomitan 词条、词频和音调辞典（.zip）</string>
     <string name="dictionary_default_tab">默认打开查词标签页</string>
     <string name="dictionary_empty_type_format">没有%1$s辞典</string>
+    <string name="dictionary_updates_section" comment="Dictionary settings section label for installed dictionary update controls; intentionally matches the About update section label.">更新</string>
+    <string name="dictionary_update_automatically">自动更新</string>
+    <string name="dictionary_update_interval">间隔</string>
+    <string name="dictionary_last_update">上次更新</string>
+    <string name="dictionary_last_update_never">从未</string>
+    <string name="dictionary_update_interval_daily">每日</string>
+    <string name="dictionary_update_interval_weekly">每周</string>
+    <string name="dictionary_update_interval_monthly">每月</string>
     <string name="dictionary_update_title">更新辞典</string>
     <string name="dictionary_update_confirmation_format">将检查并安装以下辞典的更新：\n%1$s</string>
     <string name="dictionary_download_title">下载辞典</string>
@@ -465,7 +474,7 @@
         <item quantity="one">%1$d 项</item>
         <item quantity="other">%1$d 项</item>
     </plurals>
-    <string name="about_updates">更新</string>
+    <string name="about_updates" comment="About screen section label for app release update controls; intentionally matches the Dictionary update section label.">更新</string>
     <string name="about_check_updates">检查更新</string>
     <string name="about_update_check_failed">无法检查更新。</string>
     <string name="about_update_download_failed">无法下载更新。</string>

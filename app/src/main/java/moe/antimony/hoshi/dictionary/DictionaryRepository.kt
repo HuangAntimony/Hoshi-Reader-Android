@@ -100,51 +100,70 @@ internal class DictionaryRepository private constructor(
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
     ): DictionaryUpdateSummary {
         val candidates = updatableDictionaries()
+        var successfulCount = 0
         var updatedCount = 0
         val renames = mutableListOf<DictionaryRename>()
+        val failures = mutableListOf<DictionaryUpdateFailure>()
         candidates.forEach { candidate ->
             val installed = candidate.dictionary
             val installedIndex = installed.index
-            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, installedIndex.title))
-            val remoteIndex = remoteDataSource.fetchIndex(installedIndex.indexUrl)
-            if (remoteIndex.revision == installedIndex.revision) return@forEach
+            try {
+                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, installedIndex.title))
+                val remoteIndex = remoteDataSource.fetchIndex(installedIndex.indexUrl)
+                if (remoteIndex.revision == installedIndex.revision) {
+                    successfulCount += 1
+                    return@forEach
+                }
 
-            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, remoteIndex.title))
-            val imported = remoteDataSource.downloadArchive(remoteIndex.downloadUrl).use { input ->
-                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, remoteIndex.title))
-                importDataSource.importDictionaryWithResult(
-                    input = input,
-                    typeDirectory = storage.typeDirectory(candidate.type),
-                    lowRamImport = lowRamImport,
+                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, remoteIndex.title))
+                val imported = remoteDataSource.downloadArchive(remoteIndex.downloadUrl).use { input ->
+                    onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, remoteIndex.title))
+                    importDataSource.importDictionaryWithResult(
+                        input = input,
+                        typeDirectory = storage.typeDirectory(candidate.type),
+                        lowRamImport = lowRamImport,
+                    )
+                }
+                val replacement = imported.firstOrNull()
+                if (replacement == null) {
+                    failures += DictionaryUpdateFailure(installedIndex.title, "Import failed")
+                    return@forEach
+                }
+                if (replacement.fileName != installed.path.name) {
+                    storage.deleteDictionary(candidate.type, installed.path.name)
+                }
+                storage.saveConfig(
+                    storage.configWithImportedDictionaryReplacing(
+                        type = candidate.type,
+                        replacementFileName = replacement.fileName,
+                        enabled = installed.isEnabled,
+                        order = installed.order,
+                    ),
+                )
+                if (replacement.index.title != installedIndex.title) {
+                    renames += DictionaryRename(
+                        oldTitle = installedIndex.title,
+                        newTitle = replacement.index.title,
+                    )
+                }
+                successfulCount += 1
+                updatedCount += 1
+            } catch (error: Exception) {
+                failures += DictionaryUpdateFailure(
+                    title = installedIndex.title,
+                    message = error.localizedMessage ?: error::class.java.simpleName,
                 )
             }
-            val replacement = imported.firstOrNull() ?: return@forEach
-            if (replacement.fileName != installed.path.name) {
-                storage.deleteDictionary(candidate.type, installed.path.name)
-            }
-            storage.saveConfig(
-                storage.configWithImportedDictionaryReplacing(
-                    type = candidate.type,
-                    replacementFileName = replacement.fileName,
-                    enabled = installed.isEnabled,
-                    order = installed.order,
-                ),
-            )
-            if (replacement.index.title != installedIndex.title) {
-                renames += DictionaryRename(
-                    oldTitle = installedIndex.title,
-                    newTitle = replacement.index.title,
-                )
-            }
-            updatedCount += 1
         }
         if (updatedCount > 0) {
             rebuildLookupQuery()
         }
         return DictionaryUpdateSummary(
             checkedCount = candidates.size,
+            successfulCount = successfulCount,
             updatedCount = updatedCount,
             renamedDictionaries = renames,
+            failures = failures,
         )
     }
 

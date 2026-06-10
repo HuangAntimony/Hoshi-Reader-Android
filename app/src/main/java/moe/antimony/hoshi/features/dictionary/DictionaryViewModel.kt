@@ -70,6 +70,7 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     private val dictionaryRepository: DictionaryRepository,
     private val settingsRepository: DictionarySettingsRepository,
     private val ankiSettingsRepository: AnkiSettingsRepository,
+    private val dictionaryUpdateService: DictionaryUpdateService,
 ) : DictionaryViewModelRepository {
     override val settings: Flow<DictionarySettings> = settingsRepository.settings
 
@@ -119,10 +120,7 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     override suspend fun updateDictionaries(
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ): DictionaryUpdateSummary =
-        dictionaryRepository.updateDictionaries(
-            onProgress = onProgress,
-            lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport,
-        )
+        dictionaryUpdateService.updateDictionaries(onProgress)
 
     override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean) {
         dictionaryRepository.setDictionaryEnabled(type, fileName, enabled)
@@ -277,6 +275,18 @@ internal class DictionaryViewModel : ViewModel {
             }.onSuccess { summary ->
                 migrateDictionaryTitles(summary.renamedDictionaries)
                 reloadDictionaries(clearError = true)
+                if (summary.failures.isNotEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            errorMessage = UiText.Resource(
+                                R.string.dictionary_update_failed_list_format,
+                                summary.failures.joinToString(separator = "\n") { failure ->
+                                    "${failure.title}: ${failure.message}"
+                                },
+                            ),
+                        )
+                    }
+                }
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
