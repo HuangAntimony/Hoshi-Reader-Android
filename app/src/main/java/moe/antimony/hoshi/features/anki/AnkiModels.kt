@@ -69,6 +69,11 @@ data class AnkiPopupSettings(
 internal fun Map<String, String>.referencesAnkiHandlebar(handlebar: String): Boolean =
     values.any { template -> handlebar in template }
 
+internal fun Map<String, String>.activeAnkiFieldMappings(noteType: AnkiNoteType): Map<String, String> =
+    noteType.fields.mapNotNull { field ->
+        this[field]?.let { field to it }
+    }.toMap()
+
 @Serializable
 data class DictionaryMedia(
     val dictionary: String,

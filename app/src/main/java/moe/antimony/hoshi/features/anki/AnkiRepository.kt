@@ -179,7 +179,7 @@ internal class AnkiRepository(
         val noteType = availableNoteTypes.firstOrNull { it.id == settings.selectedNoteTypeId }
             ?: settings.selectedNoteTypeName?.let { name -> availableNoteTypes.firstOrNull { it.name == name } }
             ?: return@withContext false
-        val fieldMappings = settings.fieldMappings
+        val fieldMappings = settings.fieldMappings.activeAnkiFieldMappings(noteType)
         val payload = runCatching { AnkiMiningPayload.fromJson(rawPayload) }.getOrNull()
             ?: return@withContext false
         val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")

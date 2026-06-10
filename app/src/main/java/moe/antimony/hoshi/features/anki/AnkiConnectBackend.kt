@@ -193,7 +193,9 @@ class AnkiConnectBackend(
             put(
                 "fields",
                 buildJsonObject {
-                    fieldsByName.forEach { (field, value) -> put(field, value) }
+                    fieldsByName
+                        .activeAnkiFieldMappings(noteType)
+                        .forEach { (field, value) -> put(field, value) }
                 },
             )
             put("options", options)

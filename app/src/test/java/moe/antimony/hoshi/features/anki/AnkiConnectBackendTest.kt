@@ -127,6 +127,40 @@ class AnkiConnectBackendTest {
     }
 
     @Test
+    fun addNoteIgnoresFieldsOutsideSelectedNoteType() {
+        val transport = FakeAnkiConnectTransport("""{"result":123,"error":null}""")
+        val backend = AnkiConnectBackend("https://anki.example.com", transport)
+
+        assertTrue(
+            backend.addNote(
+                deck = AnkiDeck(id = 1L, name = "Mining"),
+                noteType = AnkiNoteType(id = 2L, name = "Basic", fields = listOf("Front", "Back")),
+                fieldsByName = mapOf(
+                    "Expression" to "食べる",
+                    "Front" to "食べる",
+                    "Back" to "eat",
+                    "Picture" to "cover.png",
+                ),
+                tags = emptySet(),
+                allowDupes = false,
+                duplicateScope = AnkiDuplicateScope.Collection,
+                checkDuplicatesAcrossAllModels = false,
+            ),
+        )
+
+        val fields = transport.lastBody()
+            .getValue("params")
+            .jsonObject
+            .getValue("note")
+            .jsonObject
+            .getValue("fields")
+            .jsonObject
+        assertEquals(setOf("Front", "Back"), fields.keys)
+        assertEquals("食べる", fields.getValue("Front").jsonPrimitive.content)
+        assertEquals("eat", fields.getValue("Back").jsonPrimitive.content)
+    }
+
+    @Test
     fun ankiConnectErrorBecomesFetchExceptionMessage() {
         val transport = FakeAnkiConnectTransport("""{"result":null,"error":"permission denied"}""")
         val backend = AnkiConnectBackend("https://anki.example.com", transport)

@@ -293,6 +293,86 @@ class AnkiRepositoryBackendSelectionTest {
     }
 
     @Test
+    fun mineEntrySubmitsOnlySelectedNoteTypeFields() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Front", "Back"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    fieldMappings = mapOf(
+                        "Expression" to "{expression}",
+                        "Front" to "{expression}",
+                        "Back" to "{glossary-first}",
+                    ),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる","glossaryFirst":"eat"}""",
+                context = AnkiMiningContext(sentence = "パンを食べる。"),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        assertEquals(mapOf("Front" to "食べる", "Back" to "eat"), ankiConnect.lastFields)
+    }
+
+    @Test
+    fun mineEntryIgnoresStaleMediaMappingsOutsideSelectedNoteType() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Front"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val cover = Files.createTempFile("hoshi-cover", ".png").also { Files.write(it, byteArrayOf(1, 2, 3)) }
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    fieldMappings = mapOf(
+                        "Front" to "{expression}",
+                        "Picture" to "{book-cover}",
+                    ),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる"}""",
+                context = AnkiMiningContext(
+                    sentence = "パンを食べる。",
+                    coverPath = cover.toString(),
+                ),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        assertEquals(0, ankiConnect.addMediaFromBytesCalls)
+        assertEquals(mapOf("Front" to "食べる"), ankiConnect.lastFields)
+    }
+
+    @Test
     fun mineEntryDoesNotStoreUnreferencedHandlebarMedia() = runBlocking {
         val deck = AnkiDeck(10L, "Mining")
         val noteType = AnkiNoteType(20L, "Basic", listOf("Expression"))
