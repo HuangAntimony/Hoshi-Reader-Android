@@ -17,10 +17,12 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
@@ -51,6 +53,7 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.HighlightColor
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
@@ -112,6 +115,13 @@ internal fun ChapterWebView(
     val currentWebViewRestoreEpoch = rememberUpdatedState(webViewRestoreEpoch)
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
+    val loadTiming = remember { ReaderChapterLoadTiming() }
+    remember {
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader chapter WebView first composed chapter=${chapterPosition.index}",
+        )
+    }
     val context = LocalContext.current
     val readerWebAssets = remember(context) { ReaderWebAssets.load(context) }
     val viewportDensity = context.resources.displayMetrics.density.coerceAtLeast(1f)
@@ -123,6 +133,7 @@ internal fun ChapterWebView(
                 .coerceAtLeast(1),
         )
     }
+    val isReaderViewportReady = readerWebViewReadyToLoad(webViewViewportSize)
     var lastContinuousProgressUpdate by remember { mutableStateOf(0L) }
     var continuousScrollSaveRequestId by remember { mutableStateOf(0L) }
     val chapter = book.chapters[chapterPosition.index]
@@ -143,6 +154,44 @@ internal fun ChapterWebView(
     val readerAppearanceScript = remember(appearanceUpdateKey) {
         readerAppearanceScript(appearanceUpdateKey)
     }
+    val readerContentCss = remember(
+        readerSettings,
+        fontFaceUrl,
+        systemDark,
+        contentLanguageProfile,
+        webViewViewportCssSize,
+        sasayakiTextColor,
+        sasayakiBackgroundColor,
+        readerWebAssets,
+        isReaderViewportReady,
+    ) {
+        if (!isReaderViewportReady) {
+            PerformanceLog.d(
+                PerformanceLog.ReaderTag,
+                "reader content CSS build skipped pending viewport chapter=${chapterPosition.index} viewport=$webViewViewportSize",
+            )
+            return@remember ""
+        }
+        val start = PerformanceLog.start()
+        readerContentCss(
+            settings = readerSettings,
+            fontFaceUrl = fontFaceUrl,
+            systemDark = systemDark,
+            contentLanguageProfile = contentLanguageProfile,
+            webViewViewportCssSize = webViewViewportCssSize,
+            sasayakiTextColor = sasayakiTextColor,
+            sasayakiBackgroundColor = sasayakiBackgroundColor,
+            assets = readerWebAssets,
+        ).also { css ->
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader content CSS built",
+                start,
+                "chapter=${chapterPosition.index} viewport=$webViewViewportCssSize chars=${css.length}",
+            )
+        }
+    }
+    val currentReaderContentCss = rememberUpdatedState(readerContentCss)
     val readerSetupReloadKey = remember(
         chapterPosition.progress,
         chapterFragment,
@@ -175,38 +224,61 @@ internal fun ChapterWebView(
         scanNonJapaneseText,
         contentLanguageProfile,
         webViewViewportCssSize,
-        sasayakiTextColor,
-        sasayakiBackgroundColor,
+        readerContentCss,
         chapterSasayakiCuesJson,
         chapterHighlightsJson,
         loadKey,
         readerWebAssets,
+        isReaderViewportReady,
     ) {
+        if (!isReaderViewportReady) {
+            PerformanceLog.d(
+                PerformanceLog.ReaderTag,
+                "reader setup script build skipped pending viewport chapter=${chapterPosition.index} viewport=$webViewViewportSize",
+            )
+            return@remember null
+        }
+        val start = PerformanceLog.start()
         readerSetupScript(
             initialProgress = chapterPosition.progress,
             initialFragment = chapterFragment,
             settings = readerSettings,
-            fontFaceUrl = fontFaceUrl,
-            systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
             contentLanguageProfile = contentLanguageProfile,
             webViewViewportCssSize = webViewViewportCssSize,
-            sasayakiTextColor = sasayakiTextColor,
-            sasayakiBackgroundColor = sasayakiBackgroundColor,
+            readerContentCss = readerContentCss,
             sasayakiCuesJson = chapterSasayakiCuesJson,
             highlightsJson = chapterHighlightsJson,
             restoreToken = loadKey,
             assets = readerWebAssets,
-        )
+        ).also { script ->
+            PerformanceLog.d(
+                PerformanceLog.ReaderTag,
+                "reader setup script built took ${PerformanceLog.elapsedMillis(start)}ms chapter=${chapterPosition.index} href=${chapter.href} viewport=$webViewViewportCssSize chars=${script.length} highlightsChars=${chapterHighlightsJson?.length ?: 0} cssChars=${readerContentCss.length}",
+            )
+        }
     }
     val currentOnFragmentRestored = rememberUpdatedState<(WebView, String) -> Boolean> { restoredWebView, restoreToken ->
         if (restoreToken != loadKey) return@rememberUpdatedState false
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader JS restore callback chapter=${chapterPosition.index} fragment=${chapterFragment != null}",
+        )
         if (chapterFragment != null) {
+            val progressStart = PerformanceLog.start()
             restoredWebView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "reader fragment progress read",
+                    progressStart,
+                    "chapter=${chapterPosition.index}",
+                )
                 ReaderPaginationScripts.doubleResult(progressResult)?.let(currentOnSaveBookmark.value)
+                loadTiming.restoreCompleted(chapterPosition.index)
                 currentOnRestoreCompleted.value()
             }
         } else {
+            loadTiming.restoreCompleted(chapterPosition.index)
             currentOnRestoreCompleted.value()
         }
         true
@@ -220,9 +292,17 @@ internal fun ChapterWebView(
     }
     AndroidView(
         modifier = modifier
-            .onSizeChanged(onReaderViewportSizeChanged)
+            .onSizeChanged { size ->
+                PerformanceLog.d(
+                    PerformanceLog.ReaderTag,
+                    "reader WebView size changed chapter=${chapterPosition.index} viewport=$size",
+                )
+                onReaderViewportSizeChanged(size)
+            }
             .background(Color(readerSettings.backgroundColor(systemDark))),
         factory = { context ->
+            ReaderWebViewWarmup.release()
+            val factoryStart = PerformanceLog.start()
             HoshiReaderWebView(context).apply {
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
@@ -251,16 +331,31 @@ internal fun ChapterWebView(
                     "HoshiReaderImage",
                 )
                 ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder)
+                webChromeClient = ReaderPerfConsoleClient()
                 webViewClient = EpubWebViewClient(
                     book = book,
                     fontManager = fontManager,
                     onInternalLink = onInternalLink,
+                    initialReaderCss = { currentReaderContentCss.value },
                     popupResourceHandler = { currentReaderPopupResourceHandler.value },
                 ) { view ->
-                    view.evaluateJavascript(readerSetupScript, null)
+                    val setupScript = readerSetupScript
+                    if (setupScript != null) {
+                        loadTiming.pageFinished(baseUrl, chapterPosition.index)
+                        val setupStart = PerformanceLog.start()
+                        view.evaluateJavascript(setupScript) {
+                            PerformanceLog.dElapsed(
+                                PerformanceLog.ReaderTag,
+                                "reader setup script evaluated",
+                                setupStart,
+                                "chapter=${chapterPosition.index}",
+                            )
+                        }
+                    }
                 }
                 readerWebView = this
                 onWebViewReady(this)
+                PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "reader WebView factory created", factoryStart)
             }
         },
         update = { webView ->
@@ -398,7 +493,8 @@ internal fun ChapterWebView(
                 })
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
-            if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
+            if (!isReaderViewportReady) return@AndroidView
+            val setupScript = readerSetupScript ?: return@AndroidView
             if (webView.tag != loadKey) {
                 webView.tag = loadKey
                 webView.hideForReaderRestore()
@@ -407,15 +503,114 @@ internal fun ChapterWebView(
                     book = book,
                     fontManager = fontManager,
                     onInternalLink = onInternalLink,
+                    initialReaderCss = { currentReaderContentCss.value },
                     popupResourceHandler = { currentReaderPopupResourceHandler.value },
                 ) { view ->
-                    view.evaluateJavascript(readerSetupScript, null)
+                    loadTiming.pageFinished(baseUrl, chapterPosition.index)
+                    val setupStart = PerformanceLog.start()
+                    view.evaluateJavascript(setupScript) {
+                        PerformanceLog.dElapsed(
+                            PerformanceLog.ReaderTag,
+                            "reader setup script evaluated",
+                            setupStart,
+                            "chapter=${chapterPosition.index}",
+                        )
+                    }
                 }
+                loadTiming.begin(
+                    key = loadKey,
+                    baseUrl = baseUrl,
+                    chapterIndex = chapterPosition.index,
+                    progress = chapterPosition.progress,
+                    fragment = chapterFragment,
+                    viewport = webViewViewportSize,
+                )
                 webView.loadUrl(baseUrl)
             }
         },
     )
 }
+
+private class ReaderChapterLoadTiming {
+    private var key: String? = null
+    private var baseUrl: String? = null
+    private var startNanos: Long = 0L
+    private var pageFinishedNanos: Long = 0L
+
+    fun begin(
+        key: String,
+        baseUrl: String,
+        chapterIndex: Int,
+        progress: Double,
+        fragment: String?,
+        viewport: IntSize,
+    ) {
+        this.key = key
+        this.baseUrl = baseUrl
+        startNanos = PerformanceLog.start()
+        pageFinishedNanos = 0L
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader WebView loadUrl chapter=$chapterIndex progress=$progress fragment=${fragment != null} viewport=$viewport url=$baseUrl",
+        )
+    }
+
+    fun pageFinished(url: String, chapterIndex: Int) {
+        pageFinishedNanos = PerformanceLog.start()
+        val start = startNanos.takeIf { it != 0L }
+        if (url == baseUrl && start != null) {
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader WebView page finished",
+                start,
+                "chapter=$chapterIndex url=$url",
+            )
+        } else {
+            PerformanceLog.d(
+                PerformanceLog.ReaderTag,
+                "reader WebView page finished chapter=$chapterIndex url=$url activeKey=${key != null}",
+            )
+        }
+    }
+
+    fun restoreCompleted(chapterIndex: Int) {
+        val start = startNanos.takeIf { it != 0L }
+        if (start != null) {
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader chapter load restored",
+                start,
+                "chapter=$chapterIndex",
+            )
+        } else {
+            PerformanceLog.d(
+                PerformanceLog.ReaderTag,
+                "reader chapter restore completed chapter=$chapterIndex without active load timing",
+            )
+        }
+        if (pageFinishedNanos != 0L) {
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader restore after page finished",
+                pageFinishedNanos,
+                "chapter=$chapterIndex",
+            )
+        }
+    }
+}
+
+private class ReaderPerfConsoleClient : WebChromeClient() {
+    override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+        val message = consoleMessage.message()
+        if (message.startsWith(ReaderPerfConsolePrefix)) {
+            PerformanceLog.d(PerformanceLog.ReaderTag, message.removePrefix(ReaderPerfConsolePrefix))
+            return true
+        }
+        return super.onConsoleMessage(consoleMessage)
+    }
+}
+
+private const val ReaderPerfConsolePrefix = "HoshiReaderPerf "
 
 internal fun readerWebViewReadyToLoad(webViewViewportSize: IntSize): Boolean =
     webViewViewportSize != IntSize.Zero
@@ -462,17 +657,28 @@ internal fun readerWebViewLoadKey(
 ): String =
     "$baseUrl#${readerContentReloadKey.hashCode()}#${readerSetupReloadKey.hashCode()}#$webViewViewportSize"
 
-internal fun readerHtmlWithEarlyViewport(html: String): String {
+internal fun readerHtmlWithEarlyViewport(html: String, initialReaderCss: String? = null): String {
     val normalizedHtml = html.removeWhitespaceBeforeXmlDeclaration()
     val withoutViewport = readerViewportMetaRegex.replace(normalizedHtml, "")
     val head = readerHeadOpenTagRegex.find(withoutViewport)
-    val viewport = """<meta name="viewport" content="$ReaderViewportContent" />"""
+    val headInjection = buildString {
+        append("""<meta name="viewport" content="$ReaderViewportContent" />""")
+        val css = initialReaderCss?.takeIf { it.isNotBlank() }
+        if (css != null) {
+            append("\n<style id=\"hoshi-reader-style\">\n")
+            append(css.escapeStyleElementText())
+            append("\n</style>")
+        }
+    }
     if (head != null) {
         val insertAt = head.range.last + 1
-        return withoutViewport.substring(0, insertAt) + "\n$viewport" + withoutViewport.substring(insertAt)
+        return withoutViewport.substring(0, insertAt) + "\n$headInjection" + withoutViewport.substring(insertAt)
     }
     return withoutViewport
 }
+
+private fun String.escapeStyleElementText(): String =
+    replace("</style", "<\\/style", ignoreCase = true)
 
 private fun String.removeWhitespaceBeforeXmlDeclaration(): String {
     val trimmed = trimStart()
@@ -696,10 +902,11 @@ private class EpubWebViewClient(
     private val book: EpubBook,
     private val fontManager: ReaderFontManager,
     private val onInternalLink: (ReaderInternalLinkTarget) -> Unit,
+    private val initialReaderCss: (() -> String?)? = null,
     private val popupResourceHandler: () -> ReaderLookupPopupResourceHandler?,
     private val onReaderPageFinished: (WebView) -> Unit,
 ) : WebViewClient() {
-    private val resourceBridge = ReaderWebResourceBridge(book, fontManager)
+    private val resourceBridge = ReaderWebResourceBridge(book, fontManager, initialReaderCss)
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val target = book.resolveInternalReaderLink(request.url?.toString().orEmpty()) ?: return false
@@ -726,30 +933,22 @@ private class EpubWebViewClient(
     }
 }
 
-private fun readerSetupScript(
-    initialProgress: Double,
-    initialFragment: String?,
+private fun readerContentCss(
     settings: ReaderSettings,
     fontFaceUrl: String?,
     systemDark: Boolean,
-    scanNonJapaneseText: Boolean,
     contentLanguageProfile: ContentLanguageProfile,
     webViewViewportCssSize: IntSize,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
-    sasayakiCuesJson: String?,
-    highlightsJson: String?,
-    restoreToken: String,
     assets: ReaderWebAssets,
 ): String {
-    val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
-    val contentLanguageTag = readerJavaScriptStringLiteral(contentLanguageProfile.htmlLang)
     val viewportLayout = readerViewportCssLayout(
         settings = settings,
         viewportCssWidth = webViewViewportCssSize.width,
         viewportCssHeight = webViewViewportCssSize.height,
     )
-    val css = ReaderContentStyles.css(
+    return ReaderContentStyles.css(
         settings = settings,
         fontFaceUrl = fontFaceUrl,
         systemDark = systemDark,
@@ -759,27 +958,56 @@ private fun readerSetupScript(
         readerCssTemplate = assets.readerCss,
     ).let { css ->
         "${viewportLayout.cssVariables()}\n$css"
-    }.let(::readerJavaScriptStringLiteral)
+    }
+}
+
+private fun readerSetupScript(
+    initialProgress: Double,
+    initialFragment: String?,
+    settings: ReaderSettings,
+    scanNonJapaneseText: Boolean,
+    contentLanguageProfile: ContentLanguageProfile,
+    webViewViewportCssSize: IntSize,
+    readerContentCss: String,
+    sasayakiCuesJson: String?,
+    highlightsJson: String?,
+    restoreToken: String,
+    assets: ReaderWebAssets,
+): String {
+    val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
+    val contentLanguageTag = readerJavaScriptStringLiteral(contentLanguageProfile.htmlLang)
+    val css = readerContentCss.let(::readerJavaScriptStringLiteral)
     val selectionScript = assets.selectionJs
+    val paginationStart = PerformanceLog.start()
     val paginationScript = ReaderPaginationScripts.shellScriptWithRestoreToken(
         initialProgress = initialProgress,
         initialFragment = initialFragment,
         settings = settings,
         sasayakiCuesJson = sasayakiCuesJson,
         highlightsJson = highlightsJson,
+        viewportCssSize = webViewViewportCssSize,
         restoreToken = restoreToken,
         assets = assets,
     ).scriptTagBody()
-    return """
+    PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "reader pagination script stage", paginationStart)
+    val wrapperStart = PerformanceLog.start()
+    val wrapperPrefix = """
         (function() {
           document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode;
           document.documentElement.lang = $contentLanguageTag;
           document.documentElement.dataset.hoshiContentLanguage = $contentLanguageTag;
-          var style = document.createElement('style');
-          style.textContent = $css;
-          document.head.appendChild(style);
+          var style = document.getElementById('hoshi-reader-style');
+          if (!style) {
+            style = document.createElement('style');
+            style.id = 'hoshi-reader-style';
+            style.textContent = $css;
+            document.head.appendChild(style);
+          } else if (style.textContent !== $css) {
+            style.textContent = $css;
+          }
           window.scanNonJapaneseText = $scanNonJapaneseText;
-          $selectionScript
+    """.trimIndent()
+    val wrapperConfigure = """
           window.hoshiSelection.configure({
             bridge: 'android-reader',
             linkTapResult: 'link',
@@ -793,9 +1021,24 @@ private fun readerSetupScript(
             popupHostScript.src = 'https://appassets.androidplatform.net/popup/reader-popup-host.js';
             document.head.appendChild(popupHostScript);
           }
-          $paginationScript
-        })();
     """.trimIndent()
+    val wrapperSuffix = "})();"
+    return buildString(
+        wrapperPrefix.length + selectionScript.length + wrapperConfigure.length +
+            paginationScript.length + wrapperSuffix.length + 4,
+    ) {
+        append(wrapperPrefix)
+        append('\n')
+        append(selectionScript)
+        append('\n')
+        append(wrapperConfigure)
+        append('\n')
+        append(paginationScript)
+        append('\n')
+        append(wrapperSuffix)
+    }.also {
+        PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "reader setup wrapper stage", wrapperStart, "chars=${it.length}")
+    }
 }
 
 internal data class ReaderViewportCssLayout(
@@ -1120,6 +1363,29 @@ private const val CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS = 250L
 
 private const val ReaderSasayakiMatchFileName = "sasayaki_match.json"
 private const val ReaderSasayakiPlaybackFileName = "sasayaki_playback.json"
+
+internal fun warmReaderSetupScriptCache(context: android.content.Context, settings: ReaderSettings) {
+    val viewport = ReaderViewportCache.load(context)
+    if (viewport == IntSize.Zero) return
+    val density = context.resources.displayMetrics.density.coerceAtLeast(1f)
+    val viewportCssSize = IntSize(
+        width = androidPixelsToCssPixels(viewport.width.toFloat(), density).roundToInt().coerceAtLeast(1),
+        height = androidPixelsToCssPixels(viewport.height.toFloat(), density).roundToInt().coerceAtLeast(1),
+    )
+    val warmStart = PerformanceLog.start()
+    ReaderPaginationScripts.shellScriptWithRestoreToken(
+        settings = settings,
+        viewportCssSize = viewportCssSize,
+        restoreToken = "warm",
+        assets = ReaderWebAssets.load(context),
+    )
+    PerformanceLog.dElapsed(
+        PerformanceLog.ReaderTag,
+        "reader setup script cache warm",
+        warmStart,
+        "viewport=$viewportCssSize",
+    )
+}
 
 internal fun androidPixelsToCssPixels(value: Float, density: Float): Float =
     value / density.coerceAtLeast(1f)

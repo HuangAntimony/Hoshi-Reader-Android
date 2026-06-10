@@ -9,8 +9,12 @@
   ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
   nodeStartOffsets: new WeakMap(),
   nodeStartRawOffsets: new WeakMap(),
+  verticalModeCache: __HOSHI_VERTICAL_WRITING_JS__,
   isVertical: function() {
-    return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+    if (this.verticalModeCache === null) {
+      this.verticalModeCache = window.getComputedStyle(document.body).writingMode === "vertical-rl";
+    }
+    return this.verticalModeCache;
   },
   readerCssVariable: function(name) {
     return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -85,8 +89,11 @@
     while (node = walker.nextNode()) {
       offsets.set(node, count);
       rawOffsets.set(node, rawCount);
-      count += this.countChars(node.textContent);
-      rawCount += this.countRawChars(node.textContent);
+      var text = node.textContent || '';
+      for (var char of text) {
+        rawCount += 1;
+        if (this.ttuRegex.test(char)) count += 1;
+      }
     }
     this.nodeStartOffsets = offsets;
     this.nodeStartRawOffsets = rawOffsets;
@@ -569,6 +576,7 @@
     this.stabilizeRubyAdjacentTextNodes(parent);
   },
   normalizeRubyTextNodes: function(root) {
+    var normalizeStart = performance.now();
     var rubyNodes = new Set();
     if (root && root.nodeType === Node.ELEMENT_NODE && String(root.tagName).toLowerCase() === 'ruby') {
       rubyNodes.add(root);
@@ -577,18 +585,23 @@
     Array.from(scope.querySelectorAll('ruby')).forEach(function(ruby) {
       rubyNodes.add(ruby);
     });
+    var wrapped = 0;
+    var removed = 0;
     rubyNodes.forEach(function(ruby) {
       Array.from(ruby.childNodes).forEach(function(node) {
         if (node.nodeType !== Node.TEXT_NODE) return;
         if (!node.nodeValue.trim()) {
           ruby.removeChild(node);
+          removed += 1;
           return;
         }
         var wrapper = document.createElement('span');
         ruby.insertBefore(wrapper, node);
         wrapper.appendChild(node);
+        wrapped += 1;
       });
     });
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('normalizeRubyTextNodes', normalizeStart, 'rubies=' + rubyNodes.size + ' wrapped=' + wrapped + ' removed=' + removed);
   },
   isJapaneseBreakCharacter: function(text) {
     var code = (text || '').codePointAt(0);
@@ -600,6 +613,7 @@
   },
   stabilizeRubyAdjacentTextNodes: function(root) {
     if (!this.isVertical()) return;
+    var stabilizeStart = performance.now();
     var self = this;
     var splitLimit = 64;
     var scope = root && root.querySelectorAll ? root : document;
@@ -607,6 +621,9 @@
     if (root && root.tagName && root.tagName.toLowerCase() === 'ruby') {
       rubies.unshift(root);
     }
+    var candidates = 0;
+    var splitNodes = 0;
+    var createdNodes = 0;
     rubies.forEach(function(ruby) {
       if (ruby.closest('rt, rp')) return;
       var node = ruby.nextSibling;
@@ -616,6 +633,7 @@
       if (!node || node.nodeType !== Node.TEXT_NODE || !node.nodeValue) return;
       var chars = Array.from(node.nodeValue);
       if (chars.length <= 1) return;
+      candidates += 1;
       var fragment = document.createDocumentFragment();
       var pending = '';
       var splitCount = 0;
@@ -635,8 +653,11 @@
       });
       if (splitCount === 0) return;
       flush();
+      splitNodes += 1;
+      createdNodes += fragment.childNodes.length;
       node.replaceWith(fragment);
     });
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('stabilizeRubyAdjacentTextNodes', stabilizeStart, 'rubies=' + rubies.length + ' candidates=' + candidates + ' splitNodes=' + splitNodes + ' createdNodes=' + createdNodes);
   },
   calculateProgress: function() {
     var vertical = this.isVertical();
@@ -651,23 +672,37 @@
     }
     return totalChars > 0 ? exploredChars / totalChars : 0;
   },
+  waitForImageLayout: function() {
+    return new Promise(function(resolve) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(resolve);
+      });
+    });
+  },
   restoreProgress: async function(progress) {
+    var restoreStart = performance.now();
+    window.hoshiReaderPerf && window.hoshiReaderPerf.mark('restoreProgress start', 'progress=' + progress);
     await document.fonts.ready;
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress fonts ready', restoreStart);
     if (progress <= 0) {
       this.scrollToChapterStart();
       requestAnimationFrame(() => {
         this.scrollToChapterStart();
+        window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify chapter start', restoreStart);
         this.notifyRestoreComplete();
       });
       return;
     }
+    var countStart = performance.now();
     var walker = this.createWalker();
     var totalChars = 0;
     var node;
     while (node = walker.nextNode()) {
       totalChars += this.countChars(node.textContent);
     }
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress count total chars', countStart, 'chars=' + totalChars);
     if (totalChars <= 0) {
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify empty chapter', restoreStart);
       this.notifyRestoreComplete();
       return;
     }
@@ -676,6 +711,7 @@
     var targetNode = null;
     var targetOffset = 0;
     var lastTargetNode = null;
+    var targetStart = performance.now();
     walker = this.createWalker();
     while (node = walker.nextNode()) {
       var nodeLen = this.countChars(node.textContent);
@@ -687,8 +723,10 @@
       }
       runningSum += nodeLen;
     }
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress find target node', targetStart, 'targetFound=' + !!targetNode);
     if (!targetNode) targetNode = lastTargetNode;
     if (targetNode) {
+      var scrollStart = performance.now();
       if (progress >= 0.999999 && targetNode.parentElement) {
         targetNode.parentElement.scrollIntoView({
           block: 'end',
@@ -715,9 +753,13 @@
       marker.remove();
       this.normalizeReaderText(parent);
       }
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress scroll target', scrollStart);
     }
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => this.notifyRestoreComplete());
+      requestAnimationFrame(() => {
+        window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify restored', restoreStart);
+        this.notifyRestoreComplete();
+      });
     });
   },
   jumpToFragment: async function(fragment) {
@@ -751,17 +793,26 @@ __HOSHI_HIGHLIGHTS_SCRIPT__
 window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
   window.hoshiReader.didInitialize = true;
-  var viewport = document.querySelector('meta[name="viewport"]');
-  if (viewport) { viewport.remove(); }
-  var newViewport = document.createElement('meta');
-  newViewport.name = 'viewport';
-  newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-  document.head.appendChild(newViewport);
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-continuous-height', window.innerHeight + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(window.innerWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(window.innerHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
+  var initializeStart = performance.now();
+  window.hoshiReaderPerf && window.hoshiReaderPerf.mark('initialize start', 'readyState=' + document.readyState);
+  var hasInitialReaderStyle = !!document.getElementById('hoshi-reader-style');
+  if (!hasInitialReaderStyle) {
+    var viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) { viewport.remove(); }
+    var newViewport = document.createElement('meta');
+    newViewport.name = 'viewport';
+    newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.head.appendChild(newViewport);
+    var viewportWidth = __HOSHI_VIEWPORT_WIDTH_JS__;
+    var viewportHeight = __HOSHI_VIEWPORT_HEIGHT_JS__;
+    document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewportHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
+    document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (viewportHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
+    document.documentElement.style.setProperty('--hoshi-continuous-height', viewportHeight + 'px');
+    document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(viewportWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
+    document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(viewportHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
+  }
+  window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize viewport/css/image variables', initializeStart, 'initialStyle=' + hasInitialReaderStyle);
+  var imageSetupStart = performance.now();
   function setupReaderImage(element, src, wrap, blurElement) {
   if (!element || !src) return;
   blurElement = blurElement || element;
@@ -797,6 +848,7 @@ window.hoshiReader.initialize = function() {
     setupReaderImage(svgImage, svgImageSrc, false, svg);
   });
   var images = Array.from(document.querySelectorAll('img'));
+  window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize svg/img query', imageSetupStart, 'svg=' + svgImages.length + ' img=' + images.length);
   var imagePromises = images.map(function(img) {
     return new Promise(function(resolve) {
       var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
@@ -820,12 +872,21 @@ window.hoshiReader.initialize = function() {
     });
   });
   Promise.all(imagePromises).then(function() {
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize images ready', initializeStart, 'count=' + images.length);
     if (!images.length) return;
-    return new Promise(function(resolve) { setTimeout(resolve, 50); });
+    var settleStart = performance.now();
+    return window.hoshiReader.waitForImageLayout().then(function() {
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize image layout settled', settleStart);
+    });
   }).then(function() {
+    var normalizeStart = performance.now();
     window.hoshiReader.normalizeRubyTextNodes();
     window.hoshiReader.stabilizeRubyAdjacentTextNodes();
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize normalize ruby text', normalizeStart);
+    var offsetsStart = performance.now();
     window.hoshiReader.buildNodeOffsets();
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize buildNodeOffsets', offsetsStart);
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize before initial restore', initializeStart);
     __HOSHI_RESTORE_SCRIPTS__
   });
 };

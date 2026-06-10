@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
+import moe.antimony.hoshi.features.reader.ReaderWebViewWarmup
 import moe.antimony.hoshi.features.update.UpdateApkCleanup
 import moe.antimony.hoshi.features.update.UpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateStartupSnapshot
@@ -33,6 +34,7 @@ class HoshiApplication : Application(), Configuration.Provider {
         installCrashDiagnostics(this)
         prepareUpdateStartupState()
         updateScheduler.get().sync()
+        ReaderWebViewWarmup.warmUp(this)
     }
 
     private fun prepareUpdateStartupState() {

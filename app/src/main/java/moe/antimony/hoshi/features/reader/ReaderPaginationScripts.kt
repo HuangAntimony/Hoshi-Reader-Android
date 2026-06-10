@@ -1,12 +1,37 @@
 package moe.antimony.hoshi.features.reader
 
+import androidx.compose.ui.unit.IntSize
 import java.io.File
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 
 internal enum class ReaderNavigationDirection(val jsValue: String) {
     Forward("forward"),
     Backward("backward"),
 }
+
+private fun readerPerfScript(mode: String): String = """
+    window.hoshiReaderPerf = {
+      mode: '$mode',
+      start: performance.now(),
+      mark: function(label, extra) {
+        console.debug(
+          'HoshiReaderPerf js ' + this.mode + ' ' + label +
+          ' +' + Math.round(performance.now() - this.start) + 'ms' +
+          (extra ? ' ' + extra : '')
+        );
+      },
+      time: function(label, startedAt, extra) {
+        console.debug(
+          'HoshiReaderPerf js ' + this.mode + ' ' + label +
+          ' took ' + Math.round(performance.now() - startedAt) + 'ms' +
+          ' total=+' + Math.round(performance.now() - this.start) + 'ms' +
+          (extra ? ' ' + extra : '')
+        );
+      }
+    };
+    window.hoshiReaderPerf.mark('script top-level');
+""".trimIndent()
 
 internal object ReaderPaginationScripts {
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
@@ -39,6 +64,7 @@ internal object ReaderPaginationScripts {
         sasayakiCuesJson: String? = null,
         highlightsJson: String? = null,
         initialFragment: String? = null,
+        viewportCssSize: IntSize? = null,
         assets: ReaderWebAssets? = null,
     ): String = shellScriptWithRestoreToken(
         initialProgress = initialProgress,
@@ -46,6 +72,7 @@ internal object ReaderPaginationScripts {
         sasayakiCuesJson = sasayakiCuesJson,
         highlightsJson = highlightsJson,
         initialFragment = initialFragment,
+        viewportCssSize = viewportCssSize,
         restoreToken = "restoreCompleted",
         assets = assets,
     )
@@ -56,6 +83,7 @@ internal object ReaderPaginationScripts {
         sasayakiCuesJson: String? = null,
         highlightsJson: String? = null,
         initialFragment: String? = null,
+        viewportCssSize: IntSize? = null,
         restoreToken: String,
         assets: ReaderWebAssets? = null,
     ): String {
@@ -67,13 +95,50 @@ internal object ReaderPaginationScripts {
             highlightsJson = highlightsJson,
             initialRestoreScript = initialRestoreScript,
         )
+        val body = settingsStageBody(settings, viewportCssSize, assets)
+            .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
+            .replace("__HOSHI_RESTORE_SCRIPTS__", restoreScripts)
+        return "<script>\n$body\n</script>"
+    }
+
+    private data class SettingsStageKey(
+        val settings: ReaderSettings,
+        val viewportCssSize: IntSize?,
+        val assets: ReaderWebAssets?,
+    )
+
+    @Volatile
+    private var cachedSettingsStage: Pair<SettingsStageKey, String>? = null
+
+    private fun settingsStageBody(
+        settings: ReaderSettings,
+        viewportCssSize: IntSize?,
+        assets: ReaderWebAssets?,
+    ): String {
+        val key = SettingsStageKey(settings, viewportCssSize, assets)
+        cachedSettingsStage?.let { (cachedKey, cachedBody) ->
+            if (cachedKey == key) return cachedBody
+        }
+        PerformanceLog.d(PerformanceLog.ReaderTag, "reader script settings stage rebuilt cached=${cachedSettingsStage != null}")
         val source = ReaderPaginationAssetSource.load(assets)
+        val mode = if (settings.continuousMode) "continuous" else "paginated"
         val template = if (settings.continuousMode) source.continuous else source.paginated
         val generatedLayout = ReaderGeneratedLayout.from(settings)
-        val body = template
+        val viewportWidthJs = viewportCssSize?.width?.coerceAtLeast(1)?.toString() ?: "window.innerWidth"
+        val viewportHeightJs = viewportCssSize?.height?.coerceAtLeast(1)?.toString() ?: "window.innerHeight"
+        val pageHeightJs = viewportCssSize?.height
+            ?.coerceAtLeast(1)
+            ?.let { (it + settings.bottomOverlapPx).toString() }
+            ?: "(window.innerHeight + ${settings.bottomOverlapPx})"
+        val pageWidthJs = viewportWidthJs
+        val body = "${readerPerfScript(mode)}\n" + template
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
-            .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
             .replace("__HOSHI_BOTTOM_OVERLAP_PX__", settings.bottomOverlapPx.toString())
+            .replace("__HOSHI_VIEWPORT_WIDTH_JS__", viewportWidthJs)
+            .replace("__HOSHI_VIEWPORT_HEIGHT_JS__", viewportHeightJs)
+            .replace("__HOSHI_PAGE_HEIGHT_JS__", pageHeightJs)
+            .replace("__HOSHI_PAGE_WIDTH_JS__", pageWidthJs)
+            .replace("__HOSHI_VERTICAL_WRITING_JS__", settings.verticalWriting.toString())
             .replace("__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__", (settings.verticalPadding / 200.0).toString())
             .replace("__HOSHI_VERTICAL_PADDING_GAP_RATIO__", (settings.verticalPadding / 100.0).toString())
             .replace("__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__", generatedLayout.imageWidthViewportRatio.toString())
@@ -82,8 +147,8 @@ internal object ReaderPaginationScripts {
             .replace("__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__", settings.trailingSpacerHeightCss.javaScriptSingleQuotedStringLiteral())
             .replace("__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__", settings.trailingSpacerWidthCss.javaScriptSingleQuotedStringLiteral())
             .replace("__HOSHI_BLUR_IMAGES__", settings.blurImages.toString())
-            .replace("__HOSHI_RESTORE_SCRIPTS__", restoreScripts)
-        return "<script>\n$body\n</script>"
+        cachedSettingsStage = key to body
+        return body
     }
 }
 
