@@ -316,7 +316,7 @@ private fun ReaderAppearanceContent(
                     StepperRow(
                         label = stringResource(R.string.reader_appearance_font_size),
                         value = settings.fontSize.toString(),
-                        onDecrease = { onSettingsChange(settings.copy(fontSize = (settings.fontSize - 1).coerceAtLeast(16))) },
+                        onDecrease = { onSettingsChange(settings.copy(fontSize = (settings.fontSize - 1).coerceAtLeast(10))) },
                         onIncrease = { onSettingsChange(settings.copy(fontSize = (settings.fontSize + 1).coerceAtMost(60))) },
                         palette = palette,
                     )
