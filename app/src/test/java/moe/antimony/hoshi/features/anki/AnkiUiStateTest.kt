@@ -62,6 +62,31 @@ class AnkiUiStateTest {
     }
 
     @Test
+    fun popupMediaNeedsIgnoreInactiveMappingsFromOtherNoteTypes() {
+        val basic = AnkiNoteType(
+            id = 5L,
+            name = "Basic",
+            fields = listOf("Front"),
+        )
+        val state = AnkiUiState(
+            settings = AnkiSettings(
+                selectedDeckId = 3L,
+                selectedNoteTypeId = basic.id,
+                selectedNoteTypeName = basic.name,
+                availableNoteTypes = listOf(basic),
+                fieldMappings = mapOf(
+                    "Front" to "{expression}",
+                    "ExpressionAudio" to "{audio}",
+                    "SentenceAudio" to "{sasayaki-audio}",
+                ),
+            ),
+        )
+
+        assertFalse(state.popupSettings.needsAudio)
+        assertFalse(state.popupSettings.needsSasayakiAudio)
+    }
+
+    @Test
     fun popupMediaNeedsAreOffWhenMediaHandlebarsAreAbsent() {
         val state = AnkiUiState(
             settings = AnkiSettings(fieldMappings = mapOf("Expression" to "{expression}")),

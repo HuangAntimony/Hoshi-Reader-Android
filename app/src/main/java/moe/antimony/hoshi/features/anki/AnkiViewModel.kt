@@ -37,14 +37,18 @@ data class AnkiUiState(
         get() = settings.selectedDeckId != null && settings.selectedNoteTypeId != null
 
     val popupSettings: AnkiPopupSettings
-        get() = AnkiPopupSettings(
-            isConfigured = isConfigured,
-            useAnkiConnect = settings.backendKind == AnkiBackendKind.AnkiConnect,
-            needsAudio = settings.fieldMappings.referencesAnkiHandlebar("{audio}"),
-            needsSasayakiAudio = settings.fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}"),
-            allowDupes = settings.allowDupes,
-            compactGlossaries = settings.compactGlossaries,
-        )
+        get() {
+            val activeMappings = selectedNoteType?.let(settings.fieldMappings::activeAnkiFieldMappings)
+                ?: settings.fieldMappings
+            return AnkiPopupSettings(
+                isConfigured = isConfigured,
+                useAnkiConnect = settings.backendKind == AnkiBackendKind.AnkiConnect,
+                needsAudio = activeMappings.referencesAnkiHandlebar("{audio}"),
+                needsSasayakiAudio = activeMappings.referencesAnkiHandlebar("{sasayaki-audio}"),
+                allowDupes = settings.allowDupes,
+                compactGlossaries = settings.compactGlossaries,
+            )
+        }
 }
 
 enum class AnkiErrorAction {
