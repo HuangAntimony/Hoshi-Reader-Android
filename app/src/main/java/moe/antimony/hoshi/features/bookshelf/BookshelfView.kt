@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -53,10 +54,12 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Done
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.ReportProblem
@@ -512,6 +515,7 @@ fun BookshelfView(
             onShowReadingChange = booksViewModel::changeShowReading,
             onCreateShelf = booksViewModel::createShelf,
             onDeleteShelf = booksViewModel::deleteShelf,
+            onRenameShelf = booksViewModel::renameShelf,
             onMoveShelf = booksViewModel::moveShelf,
             onDismiss = { showShelfManagement = false },
         )
@@ -583,6 +587,7 @@ internal fun HoshiMainShell(
 }
 
 internal const val CompactNavigationBarTag = "compact-navigation-bar"
+internal const val ShelfManagementShelfListTag = "shelf-management-shelf-list"
 
 @Composable
 private fun HoshiCompactBottomNavigation(
@@ -651,6 +656,12 @@ private fun MainShellFontWeight.toFontWeight(): FontWeight =
         MainShellFontWeight.Normal -> FontWeight.Normal
         MainShellFontWeight.Medium -> FontWeight.Medium
         MainShellFontWeight.SemiBold -> FontWeight.SemiBold
+    }
+
+private fun MainShellTextOverflow.toTextOverflow(): TextOverflow =
+    when (this) {
+        MainShellTextOverflow.Clip -> TextOverflow.Clip
+        MainShellTextOverflow.Ellipsis -> TextOverflow.Ellipsis
     }
 
 internal data class BookContextMenuTarget(
@@ -1289,6 +1300,7 @@ private fun BookshelfSectionHeader(
     onToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val textLayout = bookshelfHeaderTextLayout()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1298,15 +1310,20 @@ private fun BookshelfSectionHeader(
     ) {
         Text(
             text = title,
+            modifier = if (textLayout.titleUsesRemainingWidth) Modifier.weight(1f, fill = false) else Modifier,
             style = layoutSpec.shelfTitleTextStyle.toTextStyle(),
             fontWeight = layoutSpec.shelfTitleFontWeight.toFontWeight(),
             color = MaterialTheme.colorScheme.onBackground,
+            maxLines = textLayout.titleMaxLines,
+            overflow = textLayout.titleOverflow.toTextOverflow(),
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = count.toString(),
             style = layoutSpec.shelfCountTextStyle.toTextStyle(),
             color = Color(0xFF8C8C92),
+            maxLines = textLayout.countMaxLines,
+            softWrap = textLayout.countSoftWrap,
         )
         if (isCollapsible) {
             Spacer(Modifier.width(8.dp))
@@ -1823,12 +1840,13 @@ private fun MoveDestinationMenu(
 }
 
 @Composable
-private fun ShelfManagementDialog(
+internal fun ShelfManagementDialog(
     shelves: List<BookShelf>,
     showReading: Boolean,
     onShowReadingChange: (Boolean) -> Unit,
     onCreateShelf: (String) -> Unit,
     onDeleteShelf: (String) -> Unit,
+    onRenameShelf: (String, String) -> Unit,
     onMoveShelf: (Int, Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1840,86 +1858,88 @@ private fun ShelfManagementDialog(
         scrollState = newShelfNameScrollState,
     )
     val trimmedName = newShelfName.trim()
+    val shelfNames = remember(shelves) { shelves.mapTo(mutableSetOf()) { it.name } }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.bookshelf_manage_shelves)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.bookshelf_reading_shelf), style = MaterialTheme.typography.bodyLarge)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ShelfManagementShelfListTag),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "reading-shelf") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.bookshelf_reading_shelf), style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                stringResource(R.string.bookshelf_reading_shelf_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = showReading,
+                            onCheckedChange = onShowReadingChange,
+                        )
+                    }
+                }
+                item(key = "reading-shelf-divider") {
+                    HorizontalDivider()
+                }
+                item(key = "shelves-heading") {
+                    Text(stringResource(R.string.bookshelf_shelves), style = MaterialTheme.typography.titleMedium)
+                }
+                if (shelves.isEmpty()) {
+                    item(key = "empty-shelves") {
                         Text(
-                            stringResource(R.string.bookshelf_reading_shelf_description),
-                            style = MaterialTheme.typography.bodySmall,
+                            stringResource(R.string.bookshelf_no_shelves),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(
-                        checked = showReading,
-                        onCheckedChange = onShowReadingChange,
-                    )
-                }
-                HorizontalDivider()
-                Text(stringResource(R.string.bookshelf_shelves), style = MaterialTheme.typography.titleMedium)
-                if (shelves.isEmpty()) {
-                    Text(
-                        stringResource(R.string.bookshelf_no_shelves),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 } else {
-                    shelves.forEachIndexed { index, shelf ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = shelf.name,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            IconButton(
-                                onClick = { onMoveShelf(index, index - 1) },
-                                enabled = index > 0,
-                            ) {
-                                Icon(Icons.Rounded.ArrowUpward, contentDescription = stringResource(R.string.bookshelf_move_shelf_up))
-                            }
-                            IconButton(
-                                onClick = { onMoveShelf(index, index + 1) },
-                                enabled = index < shelves.lastIndex,
-                            ) {
-                                Icon(Icons.Rounded.ArrowDownward, contentDescription = stringResource(R.string.bookshelf_move_shelf_down))
-                            }
-                            IconButton(onClick = { onDeleteShelf(shelf.name) }) {
-                                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.bookshelf_delete_shelf))
-                            }
-                        }
+                    itemsIndexed(
+                        items = shelves,
+                        key = { _, shelf -> shelf.name },
+                    ) { index, shelf ->
+                        ShelfManagementShelfRow(
+                            shelf = shelf,
+                            index = index,
+                            lastIndex = shelves.lastIndex,
+                            shelfNames = shelfNames,
+                            onDeleteShelf = onDeleteShelf,
+                            onRenameShelf = onRenameShelf,
+                            onMoveShelf = onMoveShelf,
+                        )
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OutlinedTextField(
-                        state = newShelfNameState,
-                        label = { Text(stringResource(R.string.bookshelf_shelf_name)) },
-                        lineLimits = hoshiSingleLineTextFieldLineLimits(),
-                        scrollState = newShelfNameScrollState,
-                        colors = hoshiOutlinedTextFieldColors(),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(
-                        onClick = {
-                            onCreateShelf(trimmedName)
-                            newShelfName = ""
-                        },
-                        enabled = trimmedName.isNotEmpty(),
+                item(key = "new-shelf") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.bookshelf_add_shelf))
+                        OutlinedTextField(
+                            state = newShelfNameState,
+                            label = { Text(stringResource(R.string.bookshelf_shelf_name)) },
+                            lineLimits = hoshiSingleLineTextFieldLineLimits(),
+                            scrollState = newShelfNameScrollState,
+                            colors = hoshiOutlinedTextFieldColors(),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = {
+                                onCreateShelf(trimmedName)
+                                newShelfName = ""
+                            },
+                            enabled = trimmedName.isNotEmpty(),
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.bookshelf_add_shelf))
+                        }
                     }
                 }
             }
@@ -1930,6 +1950,122 @@ private fun ShelfManagementDialog(
             }
         },
     )
+}
+
+@Composable
+private fun ShelfManagementShelfRow(
+    shelf: BookShelf,
+    index: Int,
+    lastIndex: Int,
+    shelfNames: Set<String>,
+    onDeleteShelf: (String) -> Unit,
+    onRenameShelf: (String, String) -> Unit,
+    onMoveShelf: (Int, Int) -> Unit,
+) {
+    var isRenaming by remember(shelf.name) { mutableStateOf(false) }
+    var draftName by remember(shelf.name) { mutableStateOf(shelf.name) }
+    if (isRenaming) {
+        val draftScrollState = rememberScrollState()
+        val draftNameState = rememberSyncedTextFieldState(
+            value = draftName,
+            onValueChange = { draftName = it },
+            scrollState = draftScrollState,
+        )
+        val trimmedName = draftName.trim()
+        val isDuplicateName = trimmedName != shelf.name && trimmedName in shelfNames
+        val canSaveName = trimmedName.isNotEmpty() && !isDuplicateName
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(Modifier.weight(1f)) {
+                OutlinedTextField(
+                    state = draftNameState,
+                    label = { Text(stringResource(R.string.bookshelf_shelf_name)) },
+                    lineLimits = hoshiSingleLineTextFieldLineLimits(),
+                    scrollState = draftScrollState,
+                    colors = hoshiOutlinedTextFieldColors(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    isError = isDuplicateName,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (isDuplicateName) {
+                    Text(
+                        text = stringResource(R.string.bookshelf_shelf_name_exists),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            IconButton(
+                onClick = {
+                    if (trimmedName != shelf.name) {
+                        onRenameShelf(shelf.name, trimmedName)
+                    }
+                    isRenaming = false
+                },
+                enabled = canSaveName,
+            ) {
+                Icon(Icons.Rounded.Done, contentDescription = stringResource(R.string.bookshelf_save_shelf_name))
+            }
+        }
+    } else {
+        var menuExpanded by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = shelf.name,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.action_more))
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bookshelf_rename_shelf)) },
+                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                        onClick = {
+                            draftName = shelf.name
+                            isRenaming = true
+                            menuExpanded = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bookshelf_move_shelf_up)) },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
+                        enabled = index > 0,
+                        onClick = {
+                            onMoveShelf(index, index - 1)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bookshelf_move_shelf_down)) },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                        enabled = index < lastIndex,
+                        onClick = {
+                            onMoveShelf(index, index + 1)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bookshelf_delete_shelf)) },
+                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                        onClick = {
+                            onDeleteShelf(shelf.name)
+                            menuExpanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

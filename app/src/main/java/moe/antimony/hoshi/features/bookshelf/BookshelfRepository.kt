@@ -68,6 +68,7 @@ internal interface BookshelfRepository {
     suspend fun moveBooks(bookIds: Set<String>, shelfName: String?)
     suspend fun createShelf(name: String)
     suspend fun deleteShelf(name: String)
+    suspend fun renameShelf(oldName: String, newName: String)
     suspend fun moveShelf(fromIndex: Int, toIndex: Int)
     suspend fun markRead(entry: BookEntry)
     suspend fun renameBook(entry: BookEntry, title: String?)
@@ -215,6 +216,14 @@ internal class AndroidBookshelfRepository @Inject constructor(
         bookRepository.saveShelves(bookRepository.loadShelves().filterNot { it.name == name })
     }
 
+    override suspend fun renameShelf(oldName: String, newName: String) = withContext(ioDispatcher) {
+        val shelves = bookRepository.loadShelves()
+        val renamedShelves = renameShelfList(shelves, oldName, newName)
+        if (renamedShelves != shelves) {
+            bookRepository.saveShelves(renamedShelves)
+        }
+    }
+
     override suspend fun moveShelf(fromIndex: Int, toIndex: Int) = withContext(ioDispatcher) {
         val shelves = bookRepository.loadShelves().toMutableList()
         if (fromIndex !in shelves.indices || toIndex !in shelves.indices || fromIndex == toIndex) {
@@ -353,6 +362,30 @@ internal class AndroidBookshelfRepository @Inject constructor(
             Uri.parse(uriString),
             Intent.FLAG_GRANT_READ_URI_PERMISSION,
         )
+    }
+}
+
+internal fun renameShelfList(
+    shelves: List<BookShelf>,
+    oldName: String,
+    newName: String,
+): List<BookShelf> {
+    val trimmedName = newName.trim()
+    if (trimmedName.isEmpty() || trimmedName == oldName) {
+        return shelves
+    }
+    if (shelves.none { it.name == oldName }) {
+        return shelves
+    }
+    if (shelves.any { it.name == trimmedName }) {
+        return shelves
+    }
+    return shelves.map { shelf ->
+        if (shelf.name == oldName) {
+            shelf.copy(name = trimmedName)
+        } else {
+            shelf
+        }
     }
 }
 

@@ -27,6 +27,7 @@
     <string name="action_edit">编辑</string>
     <string name="action_choose">选择</string>
     <string name="action_open">打开</string>
+    <string name="action_more">更多</string>
     <string name="action_fetch">获取</string>
     <string name="action_connect">连接</string>
     <string name="action_sign_out">退出登录</string>
@@ -111,7 +112,10 @@
     <string name="bookshelf_no_shelves">没有书架</string>
     <string name="bookshelf_move_shelf_up">上移书架</string>
     <string name="bookshelf_move_shelf_down">下移书架</string>
+    <string name="bookshelf_rename_shelf">重命名书架</string>
+    <string name="bookshelf_save_shelf_name">保存书架名称</string>
     <string name="bookshelf_delete_shelf">删除书架</string>
+    <string name="bookshelf_shelf_name_exists">已存在同名书架。</string>
     <string name="bookshelf_shelf_name">书架名称</string>
     <string name="bookshelf_add_shelf">添加书架</string>
     <string name="bookshelf_empty_title">没有书籍</string>

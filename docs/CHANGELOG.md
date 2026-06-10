@@ -5,12 +5,18 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 ## [Unreleased]
 
+### Added
+
+- Add shelf renaming from each shelf row's management menu.
+
 ### Changed
 
 - Update the ッツ Sync setup guidance to link to Hoshi Reader's ッツ Sync guide and match the Android Device Code client setup steps.
 
 ### Fixed
 
+- Keep the shelf management dialog usable for long custom-shelf lists.
+- Keep long bookshelf shelf names from wrapping over the book count and expansion chevron.
 - Recover packed EPUB reader caches when a cached chapter file is missing, preventing migrated books from showing a WebView 404 for an otherwise valid chapter.
 - Improve lookup popup responsiveness after repeated lookups by removing obsolete native button frame synchronization from iframe popups.
 - Keep Sasayaki reader highlights from clipping the left edge of non-ruby characters in vertical writing mode.

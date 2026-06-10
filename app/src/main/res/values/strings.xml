@@ -27,6 +27,7 @@
     <string name="action_edit">Edit</string>
     <string name="action_choose">Choose</string>
     <string name="action_open">Open</string>
+    <string name="action_more">More</string>
     <string name="action_fetch">Fetch</string>
     <string name="action_connect">Connect</string>
     <string name="action_sign_out">Sign out</string>
@@ -113,7 +114,10 @@
     <string name="bookshelf_no_shelves">No shelves</string>
     <string name="bookshelf_move_shelf_up">Move shelf up</string>
     <string name="bookshelf_move_shelf_down">Move shelf down</string>
+    <string name="bookshelf_rename_shelf">Rename shelf</string>
+    <string name="bookshelf_save_shelf_name">Save shelf name</string>
     <string name="bookshelf_delete_shelf">Delete shelf</string>
+    <string name="bookshelf_shelf_name_exists">A shelf with this name already exists.</string>
     <string name="bookshelf_shelf_name">Shelf name</string>
     <string name="bookshelf_add_shelf">Add shelf</string>
     <string name="bookshelf_empty_title">No Books</string>

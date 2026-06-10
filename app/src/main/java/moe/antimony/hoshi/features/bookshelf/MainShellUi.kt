@@ -29,6 +29,28 @@ enum class MainShellFontWeight {
     SemiBold,
 }
 
+enum class MainShellTextOverflow {
+    Clip,
+    Ellipsis,
+}
+
+data class BookshelfHeaderTextLayout(
+    val titleMaxLines: Int,
+    val titleOverflow: MainShellTextOverflow,
+    val titleUsesRemainingWidth: Boolean,
+    val countMaxLines: Int,
+    val countSoftWrap: Boolean,
+)
+
+internal fun bookshelfHeaderTextLayout(): BookshelfHeaderTextLayout =
+    BookshelfHeaderTextLayout(
+        titleMaxLines = 1,
+        titleOverflow = MainShellTextOverflow.Ellipsis,
+        titleUsesRemainingWidth = true,
+        countMaxLines = 1,
+        countSoftWrap = false,
+    )
+
 data class MainShellLayoutSpec(
     val navigationLayout: MainShellNavigationLayout,
     val pageHorizontalPaddingDp: Int,

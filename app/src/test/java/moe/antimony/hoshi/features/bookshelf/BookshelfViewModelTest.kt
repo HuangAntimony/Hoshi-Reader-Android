@@ -717,6 +717,36 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun renameShelfTrimsNameDelegatesToRepositoryAndReloadsShelf() {
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.renameShelf("Manga", "  Novels  ")
+
+        assertEquals(listOf("Manga" to "Novels"), repository.renamedShelves)
+        assertEquals(listOf(BookSortOption.Recent), repository.loadRequests)
+    }
+
+    @Test
+    fun renameShelfListPreservesMembershipAndRejectsInvalidNames() {
+        val shelves = listOf(
+            BookShelf(name = "Manga", bookIds = listOf("book-a")),
+            BookShelf(name = "Novels", bookIds = listOf("book-b")),
+        )
+
+        assertEquals(
+            listOf(
+                BookShelf(name = "Mystery", bookIds = listOf("book-a")),
+                BookShelf(name = "Novels", bookIds = listOf("book-b")),
+            ),
+            renameShelfList(shelves, oldName = "Manga", newName = " Mystery "),
+        )
+        assertEquals(shelves, renameShelfList(shelves, oldName = "Manga", newName = "   "))
+        assertEquals(shelves, renameShelfList(shelves, oldName = "Manga", newName = "Novels"))
+        assertEquals(shelves, renameShelfList(shelves, oldName = "Missing", newName = "Mystery"))
+    }
+
+    @Test
     fun markReadWritesCompletedBookmarkThroughRepository() {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(entries = listOf(entry))
@@ -880,6 +910,7 @@ class BookshelfViewModelTest {
         val movedBooks = mutableListOf<Pair<Set<String>, String?>>()
         val createdShelves = mutableListOf<String>()
         val deletedShelves = mutableListOf<String>()
+        val renamedShelves = mutableListOf<Pair<String, String>>()
         val movedShelves = mutableListOf<Pair<Int, Int>>()
         val markedReadEntries = mutableListOf<BookEntry>()
         val importedRemoteEntries = mutableListOf<ImportedRemoteBook>()
@@ -961,6 +992,10 @@ class BookshelfViewModelTest {
 
         override suspend fun deleteShelf(name: String) {
             deletedShelves += name
+        }
+
+        override suspend fun renameShelf(oldName: String, newName: String) {
+            renamedShelves += oldName to newName
         }
 
         override suspend fun moveShelf(fromIndex: Int, toIndex: Int) {

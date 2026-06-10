@@ -421,6 +421,15 @@ internal class BookshelfViewModel : ViewModel {
         }
     }
 
+    fun renameShelf(oldName: String, newName: String) {
+        val trimmedName = newName.trim()
+        if (trimmedName.isEmpty()) return
+        workScope.launch {
+            repository.renameShelf(oldName, trimmedName)
+            reloadBookEntriesSync()
+        }
+    }
+
     fun moveShelf(fromIndex: Int, toIndex: Int) {
         workScope.launch {
             repository.moveShelf(fromIndex, toIndex)

@@ -298,6 +298,17 @@ class MainShellUiTest {
     }
 
     @Test
+    fun bookshelfHeaderKeepsTrailingMetadataVisibleForLongShelfNames() {
+        val textLayout = bookshelfHeaderTextLayout()
+
+        assertEquals(1, textLayout.titleMaxLines)
+        assertEquals(MainShellTextOverflow.Ellipsis, textLayout.titleOverflow)
+        assertTrue(textLayout.titleUsesRemainingWidth)
+        assertEquals(1, textLayout.countMaxLines)
+        assertFalse(textLayout.countSoftWrap)
+    }
+
+    @Test
     fun mediumWindowsUseNavigationRailAndConstrainedBookGrid() {
         val spec = MainShellLayoutSpec.forWidthDp(700)
 
