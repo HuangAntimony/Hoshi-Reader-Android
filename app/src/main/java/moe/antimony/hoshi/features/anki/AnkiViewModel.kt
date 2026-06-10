@@ -147,7 +147,7 @@ internal class AnkiViewModel @Inject constructor(
                     selectedNoteTypeId = noteType.id,
                     selectedNoteTypeName = noteType.name,
                     availableNoteTypes = (it.availableNoteTypes + noteType).distinctBy(AnkiNoteType::id),
-                    fieldMappings = LapisPreset.applyDefaults(noteType, emptyMap()),
+                    fieldMappings = AnkiFieldTemplates.applyDefaultsIfUnmapped(noteType, it.fieldMappings),
                 )
             }
         }

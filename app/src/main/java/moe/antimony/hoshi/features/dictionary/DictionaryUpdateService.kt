@@ -97,18 +97,30 @@ internal class DictionaryUpdateService(
             ankiSettingsRepository.update { current ->
                 current.copy(
                     fieldMappings = current.fieldMappings.mapValues { (_, template) ->
-                        summary.renamedDictionaries.fold(template) { value, rename ->
-                            value.replace(
-                                oldValue = "{single-glossary-${rename.oldTitle}}",
-                                newValue = "{single-glossary-${rename.newTitle}}",
-                            )
-                        }
+                        template.renamedSingleGlossaryHandlebars(summary.renamedDictionaries)
                     },
                 )
             }
         }
     }
 }
+
+private fun String.renamedSingleGlossaryHandlebars(renames: List<DictionaryRename>): String =
+    renames.fold(this) { value, rename ->
+        value
+            .replace(
+                oldValue = "{single-glossary-${rename.oldTitle}}",
+                newValue = "{single-glossary-${rename.newTitle}}",
+            )
+            .replace(
+                oldValue = "{single-glossary-${rename.oldTitle}-brief}",
+                newValue = "{single-glossary-${rename.newTitle}-brief}",
+            )
+            .replace(
+                oldValue = "{single-glossary-${rename.oldTitle}-no-dictionary}",
+                newValue = "{single-glossary-${rename.newTitle}-no-dictionary}",
+            )
+    }
 
 private fun Set<String>.renamedBy(renames: List<DictionaryRename>): Set<String> {
     val renameMap = renames.associate { it.oldTitle to it.newTitle }

@@ -58,7 +58,7 @@ class AnkiRepositoryTest {
     }
 
     @Test
-    fun firstFetchAppliesLapisDefaultsWhenNoAnkiSettingsExist() {
+    fun firstFetchAppliesLapisDefaultsWhenNoSelectedModelFieldsAreMapped() {
         val noteType = AnkiNoteType(
             id = 7L,
             name = "Lapis",
@@ -77,7 +77,7 @@ class AnkiRepositoryTest {
     }
 
     @Test
-    fun fetchDoesNotApplyLapisDefaultsWhenUserAlreadyHasAnkiSettings() {
+    fun fetchDoesNotApplyDefaultsWhenSelectedModelFieldsAreAlreadyMapped() {
         val noteType = AnkiNoteType(
             id = 7L,
             name = "Lapis",
@@ -96,7 +96,7 @@ class AnkiRepositoryTest {
     }
 
     @Test
-    fun fetchAppliesLapisDefaultsWhenSwitchingFromNonLapisToLapis() {
+    fun fetchAppliesDefaultsWhenSwitchingFromNonTemplateModelToTemplateModel() {
         val noteType = AnkiNoteType(
             id = 7L,
             name = "Lapis",
@@ -117,6 +117,36 @@ class AnkiRepositoryTest {
                 "Picture" to "{book-cover}",
             ),
             fieldMappingsAfterFetch(noteType, current),
+        )
+    }
+
+    @Test
+    fun fetchAppliesSenrenDefaultsWhenNoSelectedModelFieldsAreMapped() {
+        val noteType = AnkiNoteType(
+            id = 8L,
+            name = "Senren",
+            fields = listOf(
+                "word",
+                "reading",
+                "sentenceCard",
+                "definition",
+                "wordAudio",
+                "sentenceAudio",
+                "freqSort",
+            ),
+        )
+
+        assertEquals(
+            mapOf(
+                "word" to "{expression}",
+                "reading" to "{reading}",
+                "sentenceCard" to "x",
+                "definition" to "{glossary-first}",
+                "wordAudio" to "{audio}",
+                "sentenceAudio" to "{sasayaki-audio}",
+                "freqSort" to "{frequency-harmonic-rank}",
+            ),
+            fieldMappingsAfterFetch(noteType, AnkiSettings()),
         )
     }
 

@@ -9,6 +9,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 
 - Add shelf renaming from each shelf row's management menu.
 - Add iOS-style automatic dictionary updates with Daily, Weekly, and Monthly intervals, Last Update display, foreground checks on unmetered networks, shared import/update busy state, and partial-failure handling for manual updates.
+- Add Anki field templates for Lapis, Kiku, and Senren models using Hoshi's Android Lapis defaults on the corresponding model fields, plus additional glossary handlebars for brief, no-dictionary, selected-dictionary fallback, and per-dictionary glossary variants.
 
 ### Changed
 

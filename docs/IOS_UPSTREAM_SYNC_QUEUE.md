@@ -45,51 +45,36 @@ Validation:
 - Import, enable/disable, reorder, delete, update, and backup-restore dictionaries while search/reader lookup is active; confirm the UI remains responsive and stale rebuilds do not replace newer dictionaries.
 - `./gradlew test` and `./gradlew assembleDebug` on a clean native build after submodule updates.
 
-### 2. Anki field templates, dictionary IPA display, and glossary handlebars
+### 2. Dictionary IPA display
 
-Status: pending Android sync; native frequency-sort dependency already present, newer normalization dependency tracked separately above.
+Status: pending Android sync; deferred while Anki template and glossary handlebar work is completed separately.
 
 Commits:
 
-- `8ffca61` - autofill Lapis, Kiku, and Senren field mappings.
-- `8ef25f4` - glossary-brief, glossary-first-brief, selected-glossary-fallback, selected-glossary-brief, selected-glossary-brief-fallback handlebars.
 - `36be339` - support for IPA dicts.
-- `5cbdaa8` - glossary-no-dictionary, use regex to create alt glossary handlebars.
 
 Why this follows lookup normalization:
 
-- IPA pitch display and Anki glossary payloads are generated from lookup data. Land the native normalization/query rebuild slice first, then adjust payload and settings-template semantics.
+- IPA pitch display is generated from lookup data. Land the native normalization/query rebuild slice first, then expose transcription data through the bridge and popup payload.
 
 iOS behavior to mirror:
 
-- Anki settings autofill field mappings for Lapis, Kiku, and Senren note types when no fields in the selected model are already mapped. Selecting/fetching a note type triggers autofill, but existing user mappings block automatic replacement.
 - Pitch dictionaries can provide IPA/transcription strings alongside numeric pitch positions. Popup pitch groups render both, and duplicate pitch positions are still deduplicated across dictionaries.
-- Anki mining supports new glossary handlebar variants:
-  - brief variants strip glossary header labels.
-  - no-dictionary variants remove dictionary names from labels.
-  - selected-glossary fallback variants fall back to the first glossary when no selected dictionary value exists.
-  - per-dictionary `{single-glossary-<dict>-brief}` and `{single-glossary-<dict>-no-dictionary}` are supported even if not all variants are shown in the insertion picker.
 
 Android current gap:
 
 - The Android hoshidicts bridge submodule is already at the newer `497578824f...` native revision, matching the iOS package update context and covering the native frequency-sort change from `e70008d`.
-- Android JNI models currently expose `pitchPositions` but not transcription/IPA strings.
-- Android popup HTML and Anki renderer support core glossary and selected/single glossary handlebar values, but not the new brief/no-dictionary/fallback variants.
-- Android `LapisPreset` supports only Lapis-like fields. `AnkiViewModel.selectNoteType()` currently replaces mappings with `LapisPreset.applyDefaults(noteType, emptyMap())`, so Kiku/Senren are not autofilled and existing user mappings can be cleared on note-type selection instead of preserving iOS's "autofill only when no selected-model fields are mapped" behavior.
+- `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts/include/hoshidicts/query.hpp` already has `PitchEntry.transcriptions`, but `app/src/main/java/de/manhhao/hoshi/HoshiDicts.kt` and `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts_jni.cpp` still expose only `pitchPositions`.
+- `LookupPopupHtml.toEntryJson()` still serializes pitch groups with only `pitchPositions`, and `app/src/main/assets/hoshi-web/popup/popup.js` still renders pitch groups without transcription rows.
 
 Suggested slice:
 
-- Extend the bridge-facing pitch model only if `third_party/hoshidicts-kotlin-bridge` exposes transcription data; otherwise document the bridge gap first.
+- Extend the bridge-facing pitch model by updating the hoshidicts Kotlin/JNI bridge submodule and Android model copy to expose `transcriptions`.
 - Render IPA/transcription rows in popup pitch groups without breaking compact pitch and pitch deduplication behavior.
-- Add Anki handlebar rendering and focused tests for brief, no-dictionary, fallback, and per-dictionary suffix forms.
-- Replace `LapisPreset` with a template set covering Lapis, Kiku, and Senren field names, and gate autofill so existing selected-model field mappings are never overwritten.
-- Keep insertion UI aligned with iOS by hiding advanced variants that iOS does not surface directly.
 
 Validation:
 
 - Import an IPA-capable pitch dictionary and confirm lookup popups show transcription rows.
-- Fetch/select Lapis, Kiku, and Senren models through AnkiDroid and AnkiConnect; confirm only empty model mappings are autofilled and custom mappings persist.
-- Mine Anki notes through AnkiDroid and AnkiConnect with each new handlebar variant, including dictionary media embedding and selected-dictionary fallback.
 
 ## Covered Or No Android Action
 
@@ -113,19 +98,17 @@ Validation:
 - `078d59f`: Android already overrides publisher column counts in paginated mode through `ReaderContentStyles` with `body * { column-count: auto !important; -webkit-column-count: auto !important; }`.
 - `1fcf287`: iOS SwiftUI file-importer placement fix. Android backup restore uses dedicated `rememberLauncherForActivityResult(FileImportContent())` launchers for `.hoshi` and TTU `.zip` imports.
 - `b1509d9`, `a7a8380`, `55a32cd`, `2b8a599`, `98b6534`: Android reader now matches this slice. `selection.js` keeps SVG containers outside image-hit blocking while preserving SVG `<image>` hits and emits per-character highlight ranges; `ReaderBottomSafeProgress` handles bottom safe-area taps for focus/popup dismissal; `ReaderGeneratedLayout` applies the vertical one-pixel image-width guard; paginated and continuous reader JS remove whitespace-only ruby text nodes and wrap ruby base text before lookup offsets are built.
+- `8ef25f4`, `5cbdaa8`, `8ffca61`: Android now covers the Anki template and glossary handlebar slice. `AnkiFieldTemplates` covers exact Lapis, Kiku, and Senren models using Hoshi's Android Lapis handlebar defaults on the corresponding model fields; fetch and note-type selection only autofill when selected-model fields are unmapped; `AnkiHandlebarRenderer` supports brief, no-dictionary, selected fallback, and suffixed single-glossary variants; dictionary-title update migration rewrites the supported per-dictionary variants; and the insertion picker exposes only the iOS-visible variants.
 
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
-| `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
 | `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
-| `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
-| `8ffca61` | 2026-06-02 | Autofill Lapis, Kiku, and Senren Anki field mappings | Pending |
 | `0d6c072` | 2026-06-04 | hoshidicts normalization processor bump | Pending bridge/native sync |
 | `cfc1e50` | 2026-06-04 | Build lookup query off main thread | Pending |
 
 ## Suggested Implementation Order
 
 1. Dictionary lookup normalization and query rebuild threading.
-2. Anki field templates, dictionary IPA display, and glossary handlebars.
+2. Dictionary IPA display.

@@ -126,4 +126,75 @@ class AnkiHandlebarRendererTest {
 
         assertEquals("", rendered)
     }
+
+    @Test
+    fun rendersBriefNoDictionaryAndFallbackGlossaryHandlebars() {
+        val glossary =
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><i>(1, n, JMdict)</i> <span>eat</span></li><li data-dictionary="JMdict"><i>(2)</i> <span>consume</span></li></ol></div>"""
+        val firstGlossary =
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><i>(JMdict)</i> <span>eat</span></li></ol></div>"""
+        val payload = AnkiMiningPayload(
+            expression = "食べる",
+            glossary = glossary,
+            glossaryFirst = firstGlossary,
+            singleGlossaries = mapOf(
+                "JMdict" to glossary,
+                "明鏡国語辞典" to """<li data-dictionary="明鏡国語辞典"><i>(名詞, 明鏡国語辞典)</i> <span>辞書</span></li>""",
+            ),
+            selectedDictionary = "Missing",
+        )
+
+        assertEquals(
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><span>eat</span></li><li data-dictionary="JMdict"><span>consume</span></li></ol></div>""",
+            AnkiHandlebarRenderer.render("{glossary-brief}", payload, AnkiMiningContext(sentence = "")),
+        )
+        assertEquals(
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><i>(1, n)</i> <span>eat</span></li><li data-dictionary="JMdict"><i>(2)</i> <span>consume</span></li></ol></div>""",
+            AnkiHandlebarRenderer.render("{glossary-no-dictionary}", payload, AnkiMiningContext(sentence = "")),
+        )
+        assertEquals(
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><span>eat</span></li></ol></div>""",
+            AnkiHandlebarRenderer.render("{glossary-first-brief}", payload, AnkiMiningContext(sentence = "")),
+        )
+        assertEquals(
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><span>eat</span></li></ol></div>""",
+            AnkiHandlebarRenderer.render("{glossary-first-no-dictionary}", payload, AnkiMiningContext(sentence = "")),
+        )
+        assertEquals(
+            firstGlossary,
+            AnkiHandlebarRenderer.render("{selected-glossary-fallback}", payload, AnkiMiningContext(sentence = "")),
+        )
+        assertEquals(
+            """<div class="yomitan-glossary"><ol><li data-dictionary="JMdict"><span>eat</span></li></ol></div>""",
+            AnkiHandlebarRenderer.render("{selected-glossary-brief-fallback}", payload, AnkiMiningContext(sentence = "")),
+        )
+    }
+
+    @Test
+    fun rendersSelectedAndSingleGlossarySuffixVariantsWithDictionaryNameNormalization() {
+        val payload = AnkiMiningPayload(
+            expression = "読む",
+            glossaryFirst = """<li data-dictionary="JMdict"><i>(JMdict)</i> <span>read</span></li>""",
+            singleGlossaries = mapOf(
+                "JMdict" to """<li data-dictionary="JMdict"><i>(JMdict)</i> <span>read</span></li>""",
+                "明鏡国語辞典" to """<li data-dictionary="明鏡国語辞典"><i>(名詞, 明鏡国語辞典)</i> <span>よむ</span></li>""",
+            ),
+            selectedDictionary = "JMdict [2026-04-27]",
+        )
+
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{selected-glossary-brief}|{selected-glossary-no-dictionary}|" +
+                "{single-glossary-JMdict [2026-04-27]-brief}|{single-glossary-明鏡国語辞典-no-dictionary}",
+            payload = payload,
+            context = AnkiMiningContext(sentence = "本を読む。"),
+        )
+
+        assertEquals(
+            """<li data-dictionary="JMdict"><span>read</span></li>|""" +
+                """<li data-dictionary="JMdict"><span>read</span></li>|""" +
+                """<li data-dictionary="JMdict"><span>read</span></li>|""" +
+                """<li data-dictionary="明鏡国語辞典"><i>(名詞)</i> <span>よむ</span></li>""",
+            rendered,
+        )
+    }
 }

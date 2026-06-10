@@ -62,6 +62,8 @@ class DictionaryUpdateServiceTest {
                 AnkiSettings(
                     fieldMappings = mapOf(
                         "MainDefinition" to "{single-glossary-${installed.title}}",
+                        "BriefDefinition" to "{single-glossary-${installed.title}-brief}",
+                        "CleanDefinition" to "{single-glossary-${installed.title}-no-dictionary}",
                         "Sentence" to "{sentence}",
                     ),
                 ),
@@ -95,6 +97,14 @@ class DictionaryUpdateServiceTest {
             assertEquals(
                 "{single-glossary-${remoteIndex.title}}",
                 ankiRepository.settings.first().fieldMappings["MainDefinition"],
+            )
+            assertEquals(
+                "{single-glossary-${remoteIndex.title}-brief}",
+                ankiRepository.settings.first().fieldMappings["BriefDefinition"],
+            )
+            assertEquals(
+                "{single-glossary-${remoteIndex.title}-no-dictionary}",
+                ankiRepository.settings.first().fieldMappings["CleanDefinition"],
             )
         }
     }

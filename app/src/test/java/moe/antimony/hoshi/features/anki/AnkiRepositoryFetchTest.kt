@@ -70,6 +70,7 @@ class AnkiRepositoryFetchTest {
                 selectedDeckName = "Mining",
                 selectedNoteTypeId = 7L,
                 selectedNoteTypeName = "Lapis",
+                fieldMappings = mapOf("MainDefinition" to "{single-glossary-JMdict}"),
             ),
         )
         val repository = repository(settingsRepository = settingsRepository)
@@ -78,6 +79,42 @@ class AnkiRepositoryFetchTest {
 
         assertEquals(2L, settingsRepository.current.selectedDeckId)
         assertEquals(7L, settingsRepository.current.selectedNoteTypeId)
+        assertEquals(
+            mapOf("MainDefinition" to "{single-glossary-JMdict}"),
+            settingsRepository.current.fieldMappings,
+        )
+    }
+
+    @Test
+    fun fetchAppliesTemplateDefaultsForFetchedSenrenModel() = runBlocking {
+        val settingsRepository = InMemoryAnkiSettingsRepository()
+        val repository = repository(
+            backend = FakeAnkiBackend(
+                noteTypes = listOf(
+                    AnkiNoteType(
+                        8L,
+                        "Senren",
+                        listOf("word", "reading", "sentenceCard", "definition", "wordAudio", "sentenceAudio"),
+                    ),
+                ),
+            ),
+            settingsRepository = settingsRepository,
+        )
+
+        repository.fetchConfiguration()
+
+        assertEquals(8L, settingsRepository.current.selectedNoteTypeId)
+        assertEquals(
+            mapOf(
+                "word" to "{expression}",
+                "reading" to "{reading}",
+                "sentenceCard" to "x",
+                "definition" to "{glossary-first}",
+                "wordAudio" to "{audio}",
+                "sentenceAudio" to "{sasayaki-audio}",
+            ),
+            settingsRepository.current.fieldMappings,
+        )
     }
 
     private fun repository(

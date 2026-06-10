@@ -141,7 +141,11 @@ data class AnkiMiningContext(
 
 object AnkiHandlebarRenderer {
     private val handlebarRegex = Regex("\\{[^}]*\\}")
+    private val glossaryHeaderRegex = Regex("""(<li data-dictionary="[^"]*">)<i>[^<]*</i> """)
+    private val dictionaryLabelRegex = Regex("""<li data-dictionary="([^"]+)"><i>([^<]*)</i> """)
     private const val SingleGlossaryPrefix = "{single-glossary-"
+    private const val BriefSuffix = "-brief"
+    private const val NoDictionarySuffix = "-no-dictionary"
 
     fun render(
         template: String,
@@ -157,8 +161,7 @@ object AnkiHandlebarRenderer {
         context: AnkiMiningContext,
     ): String {
         if (handlebar.startsWith(SingleGlossaryPrefix)) {
-            val dictionary = handlebar.removePrefix(SingleGlossaryPrefix).removeSuffix("}")
-            return payload.singleGlossaryForDictionary(dictionary)
+            return payload.singleGlossaryHandlebarValue(handlebar)
         }
         return when (handlebar) {
             "{expression}" -> payload.expression
@@ -166,8 +169,21 @@ object AnkiHandlebarRenderer {
             "{furigana-plain}" -> payload.furiganaPlain
             "{audio}" -> payload.audio
             "{glossary}" -> payload.glossary
+            "{glossary-brief}" -> stripGlossaryHeaders(payload.glossary)
+            "{glossary-no-dictionary}" -> stripDictionaryName(payload.glossary)
             "{glossary-first}" -> payload.glossaryFirst
+            "{glossary-first-brief}" -> stripGlossaryHeaders(payload.glossaryFirst)
+            "{glossary-first-no-dictionary}" -> stripDictionaryName(payload.glossaryFirst)
             "{selected-glossary}" -> payload.singleGlossaryForDictionary(payload.selectedDictionary)
+            "{selected-glossary-fallback}" -> payload.selectedGlossaryOrFallback()
+            "{selected-glossary-brief}" -> stripGlossaryHeaders(
+                payload.singleGlossaryForDictionary(payload.selectedDictionary),
+            )
+            "{selected-glossary-brief-fallback}" -> stripGlossaryHeaders(payload.selectedGlossaryOrFallback())
+            "{selected-glossary-no-dictionary}" -> stripDictionaryName(
+                payload.singleGlossaryForDictionary(payload.selectedDictionary),
+            )
+            "{selected-glossary-no-dictionary-fallback}" -> stripDictionaryName(payload.selectedGlossaryOrFallback())
             "{popup-selection-text}" -> payload.popupSelectionText
             "{sentence}" -> sentenceValue(payload, context)
             "{frequencies}" -> payload.frequenciesHtml
@@ -181,6 +197,24 @@ object AnkiHandlebarRenderer {
         }
     }
 
+    private fun AnkiMiningPayload.singleGlossaryHandlebarValue(handlebar: String): String {
+        val dictionary = handlebar.removePrefix(SingleGlossaryPrefix).removeSuffix("}")
+        return when {
+            dictionary.endsWith(BriefSuffix) -> {
+                val baseDictionary = dictionary.removeSuffix(BriefSuffix)
+                stripGlossaryHeaders(singleGlossaryForDictionary(baseDictionary))
+            }
+            dictionary.endsWith(NoDictionarySuffix) -> {
+                val baseDictionary = dictionary.removeSuffix(NoDictionarySuffix)
+                stripDictionaryName(singleGlossaryForDictionary(baseDictionary))
+            }
+            else -> singleGlossaryForDictionary(dictionary)
+        }
+    }
+
+    private fun AnkiMiningPayload.selectedGlossaryOrFallback(): String =
+        singleGlossaryForDictionary(selectedDictionary).ifBlank { glossaryFirst }
+
     private fun AnkiMiningPayload.singleGlossaryForDictionary(dictionary: String): String {
         if (dictionary.isBlank()) return ""
         singleGlossaries[dictionary]?.let { return it }
@@ -189,6 +223,21 @@ object AnkiHandlebarRenderer {
             name.normalizedDictionaryName() == normalizedDictionary
         }?.value.orEmpty()
     }
+
+    private fun stripGlossaryHeaders(html: String): String =
+        glossaryHeaderRegex.replace(html) { match -> match.groupValues[1] }
+
+    private fun stripDictionaryName(html: String): String =
+        dictionaryLabelRegex.replace(html) { match ->
+            val dict = match.groupValues[1]
+            val label = match.groupValues[2]
+            val stripped = label.replace(", $dict)", ")")
+            if (stripped == "($dict)") {
+                """<li data-dictionary="$dict">"""
+            } else {
+                """<li data-dictionary="$dict"><i>$stripped</i> """
+            }
+        }
 
     private fun String.normalizedDictionaryName(): String =
         trim().replace(Regex("""\s*\[[^]]+]\s*$"""), "")
