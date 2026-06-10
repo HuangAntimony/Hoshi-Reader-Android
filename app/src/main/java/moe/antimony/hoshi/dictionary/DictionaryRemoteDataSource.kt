@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.inject.Inject
 
 internal interface DictionaryRemoteDataSource {
     fun fetchIndex(url: String): DictionaryIndex
@@ -11,8 +12,11 @@ internal interface DictionaryRemoteDataSource {
 }
 
 internal class UrlDictionaryRemoteDataSource(
-    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val json: Json,
 ) : DictionaryRemoteDataSource {
+    @Inject
+    constructor() : this(Json { ignoreUnknownKeys = true })
+
     override fun fetchIndex(url: String): DictionaryIndex =
         openConnection(url).use { connection ->
             require(connection.responseCode in 200..299) { "Unable to fetch dictionary index." }

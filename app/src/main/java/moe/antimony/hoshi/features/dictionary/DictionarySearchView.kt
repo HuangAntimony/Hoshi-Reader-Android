@@ -174,6 +174,7 @@ fun DictionarySearchView(
     var pullDistancePx by remember { mutableFloatStateOf(0f) }
     var localFocusRequestKey by remember { mutableIntStateOf(0) }
     val localAudioRepository = appContainer.localAudioRepository
+    val dictionaryRepository = appContainer.dictionaryRepository
     val fontManager = appContainer.readerFontManager
     val fontFaceCss = fontManager.popupFontFaceCss()
     val rootContentLanguageProfile = ContentLanguageProfile.Default
@@ -245,13 +246,13 @@ fun DictionarySearchView(
     val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
         readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
     }
-    val readerPopupResourceHandler = remember(context, assets, fontManager, localAudioRepository) {
+    val readerPopupResourceHandler = remember(context, assets, fontManager, localAudioRepository, dictionaryRepository) {
         ReaderLookupPopupResourceHandler(
             context = context.applicationContext,
             assets = assets,
             fontManager = fontManager,
             audioRequestHandler = AudioRequestHandler(localAudioRepository),
-            imageRequestHandler = DictionaryImageRequestHandler(),
+            imageRequestHandler = DictionaryImageRequestHandler(dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
     }

@@ -1,15 +1,20 @@
 package moe.antimony.hoshi.dictionary
 
-import kotlinx.serialization.json.Json
 import java.io.File
+import javax.inject.Inject
+import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.di.FilesDir
 
 internal class DictionaryStorageDataSource(
     filesDir: File,
-    private val json: Json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    },
+    private val json: Json,
 ) {
+    @Inject
+    constructor(@FilesDir filesDir: File) : this(
+        filesDir = filesDir,
+        json = defaultJson(),
+    )
+
     private val dictionariesDir = File(filesDir, "Dictionaries")
     private val configFile = File(dictionariesDir, "config.json")
 
@@ -136,6 +141,13 @@ internal class DictionaryStorageDataSource(
             if (!configFile.exists()) return EmptyDictionaryConfig
             json.decodeFromString<DictionaryConfig>(configFile.readText())
         }.getOrDefault(EmptyDictionaryConfig)
+
+    private companion object {
+        fun defaultJson(): Json = Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
+    }
 }
 
 private val EmptyDictionaryConfig = DictionaryConfig(

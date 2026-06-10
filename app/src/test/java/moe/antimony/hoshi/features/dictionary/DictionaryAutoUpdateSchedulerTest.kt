@@ -306,7 +306,7 @@ class DictionaryAutoUpdateSchedulerTest {
         override fun importDictionary(zipPath: String, outputDir: String, lowRam: Boolean): NativeDictionaryImportResult =
             error("No imports expected.")
 
-        override fun rebuildQuery(termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
+        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
     }
 
     private class FakeDictionaryUpdateClock(private val now: Long) : DictionaryUpdateClock {

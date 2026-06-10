@@ -52,7 +52,7 @@ enum class AnkiErrorAction {
 }
 
 @HiltViewModel
-class AnkiViewModel @Inject constructor(
+internal class AnkiViewModel @Inject constructor(
     private val repository: AnkiRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AnkiUiState())

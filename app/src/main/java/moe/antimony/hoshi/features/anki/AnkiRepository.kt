@@ -4,10 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
-import de.manhhao.hoshi.HoshiDicts
 import javax.inject.Inject
 import javax.inject.Singleton
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.features.audio.LocalAudioFile
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.LocalAudioResolver
@@ -20,12 +20,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 @Singleton
-class AnkiRepository(
+internal class AnkiRepository(
     private val context: Context,
     private val backend: AnkiBackend,
     private val settingsRepository: AnkiSettingsRepository,
     private val localAudioRepository: LocalAudioRepository,
     private val ankiConnectBackendFactory: (String) -> AnkiBackend,
+    private val loadDictionaryMedia: (DictionaryMedia) -> ByteArray?,
 ) {
     @Inject
     constructor(
@@ -33,12 +34,29 @@ class AnkiRepository(
         backend: AnkiBackend,
         settingsRepository: AnkiSettingsRepository,
         localAudioRepository: LocalAudioRepository,
+        dictionaryRepository: DictionaryRepository,
     ) : this(
         context = context,
         backend = backend,
         settingsRepository = settingsRepository,
         localAudioRepository = localAudioRepository,
         ankiConnectBackendFactory = { endpoint: String -> AnkiConnectBackend(endpoint) },
+        loadDictionaryMedia = { media -> dictionaryRepository.dictionaryMedia(media.dictionary, media.path) },
+    )
+
+    internal constructor(
+        context: Context,
+        backend: AnkiBackend,
+        settingsRepository: AnkiSettingsRepository,
+        localAudioRepository: LocalAudioRepository,
+        ankiConnectBackendFactory: (String) -> AnkiBackend = { endpoint: String -> AnkiConnectBackend(endpoint) },
+    ) : this(
+        context = context,
+        backend = backend,
+        settingsRepository = settingsRepository,
+        localAudioRepository = localAudioRepository,
+        ankiConnectBackendFactory = ankiConnectBackendFactory,
+        loadDictionaryMedia = { null },
     )
 
     val settings: Flow<AnkiSettings> = settingsRepository.settings
@@ -252,8 +270,7 @@ class AnkiRepository(
 
     private fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
         runCatching {
-            val data = HoshiDicts.getMediaFile(HoshiDicts.lookupObject, media.dictionary, media.path)
-                ?: return null
+            val data = loadDictionaryMedia(media) ?: return null
             val file = mediaCacheFile("hoshi_dict_${data.contentHashCode()}.${media.path.substringAfterLast('.', "bin")}")
             file.writeBytes(data)
             addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path), activeBackend, backendKind)

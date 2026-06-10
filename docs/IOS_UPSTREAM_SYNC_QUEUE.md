@@ -31,13 +31,12 @@ iOS behavior to mirror:
 Android current gap:
 
 - `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts` is still at `497578824f...`, while iOS now uses `1198201a...`; Android therefore lacks the new native text processors and their `utf8proc` / kanji-processor dependencies.
-- `DictionaryRepository.rebuildLookupQuery()` and `DictionaryLookupQueryService.rebuild()` synchronously call `HoshiDicts.rebuildQuery(...)`. `DictionarySearchViewModel` wraps search rebuilds in `withContext(ioDispatcher)`, but the repository/service contract itself does not enforce an IO boundary or stale-build tokening for other callers.
-- `LookupEngine.lookup()` and `LookupEngine.getStyles()` read the singleton `HoshiDicts.lookupObject` directly, so there is no Android-side ready/empty guard equivalent if query rebuild becomes asynchronous.
+- `DictionaryRepository.rebuildLookupQuery()` and `DictionaryLookupQueryService.rebuild()` still run synchronously on the caller's dispatcher. Dictionary mutation callers use IO dispatchers, but the repository/service contract itself does not expose an asynchronous rebuild API.
 
 Suggested slice:
 
 - Update `third_party/hoshidicts-kotlin-bridge` and nested hoshidicts submodules to the new native revision, wiring any new CMake/JNI dependencies without changing Android lookup models unnecessarily.
-- Move lookup rebuild ownership to a coroutine/dispatcher-aware service API with stale-build protection, then adapt Dictionary tab, Bookshelf startup, backup restore, dictionary import/update, reader lookup, and process-text lookup callers.
+- Move lookup rebuild ownership to a coroutine/dispatcher-aware service API if rebuild callers need service-enforced IO dispatching after the native revision update.
 - Add behavior tests around lookup rebuild ordering and native normalization where feasible; if native fixture coverage is limited, add a small tracked dictionary fixture or construct one in test.
 
 Validation:

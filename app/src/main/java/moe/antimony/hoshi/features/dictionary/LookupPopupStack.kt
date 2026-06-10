@@ -3,7 +3,6 @@ package moe.antimony.hoshi.features.dictionary
 import de.manhhao.hoshi.LookupResult
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.SasayakiMatch
-import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
@@ -71,10 +70,10 @@ internal fun createLookupPopupItem(
     selection: ReaderSelectionData,
     options: LookupPopupOptions,
     dictionaryStyles: Map<String, String>? = null,
-    lookup: (String, Int, Int) -> List<de.manhhao.hoshi.LookupResult> = LookupEngine::lookup,
+    lookup: (String, Int, Int) -> List<de.manhhao.hoshi.LookupResult> = { _, _, _ -> emptyList() },
 ): Pair<LookupPopupItem, Int>? {
     val settings = options.dictionarySettings.normalized()
-    val styles = dictionaryStyles ?: currentDictionaryStyles()
+    val styles = dictionaryStyles.orEmpty()
     val contentLanguageProfile = options.contentLanguageProfile
     val results = runCatching {
         lookup(selection.text, settings.maxResults, settings.scanLength)
@@ -112,11 +111,6 @@ internal fun createLookupPopupItem(
         ),
     ) to first.matched.codePointCount(0, first.matched.length)
 }
-
-internal fun currentDictionaryStyles(): Map<String, String> =
-    runCatching {
-        LookupEngine.getStyles().associate { it.dictName to it.styles }
-    }.getOrDefault(emptyMap())
 
 internal fun closeChildPopups(
     popups: List<LookupPopupItem>,

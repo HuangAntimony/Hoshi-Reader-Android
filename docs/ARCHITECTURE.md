@@ -40,6 +40,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are persisted through book sidecar repositories and models.
 - Dictionary import, lookup, media, style extraction, and deinflection behavior
   are owned by `third_party/hoshidicts-kotlin-bridge`.
+- `DictionaryLookupQueryService` owns the active native lookup session. Rebuilds
+  construct a new native query session before swapping it into service; lookup,
+  style, and dictionary-media reads use the currently published session and
+  return empty results when no session is ready.
 - Frequency and pitch dictionaries are type-specific and are not treated as term
   fallback dictionaries.
 - Dictionary storage/config mutations share a Hilt singleton mutation

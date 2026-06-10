@@ -565,6 +565,7 @@ class DictionaryRepositoryTest {
         }
 
         override fun rebuildQuery(
+            session: Long,
             termPaths: Array<String>,
             freqPaths: Array<String>,
             pitchPaths: Array<String>,

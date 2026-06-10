@@ -8,24 +8,16 @@ import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import moe.antimony.hoshi.di.FilesDir
 
 @Singleton
-internal class DictionaryRepository private constructor(
+internal class DictionaryRepository @Inject constructor(
     private val storage: DictionaryStorageDataSource,
     private val importDataSource: DictionaryImportDataSource,
     private val lookupQueryService: DictionaryLookupQueryService,
     private val remoteDataSource: DictionaryRemoteDataSource,
 ) {
-    @Inject
-    constructor(@FilesDir filesDir: File) : this(
-        storage = DictionaryStorageDataSource(filesDir),
-        importDataSource = DictionaryImportDataSource(),
-        lookupQueryService = DictionaryLookupQueryService(),
-        remoteDataSource = UrlDictionaryRemoteDataSource(),
-    )
-
     internal constructor(
+        @Suppress("UNUSED_PARAMETER")
         filesDir: File,
         storage: DictionaryStorageDataSource,
         importDataSource: DictionaryImportDataSource,
@@ -218,12 +210,17 @@ internal class DictionaryRepository private constructor(
 
     fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16): List<LookupResult> {
         ensureLookupQueryReady()
-        return LookupEngine.lookup(text, maxResults, scanLength)
+        return lookupQueryService.lookup(text, maxResults, scanLength)
     }
 
     fun dictionaryStyles(): Map<String, String> {
         ensureLookupQueryReady()
-        return LookupEngine.getStyles().associate { it.dictName to it.styles }
+        return lookupQueryService.getStyles().associate { it.dictName to it.styles }
+    }
+
+    fun dictionaryMedia(dictionary: String, path: String): ByteArray? {
+        ensureLookupQueryReady()
+        return lookupQueryService.getMediaFile(dictionary, path)
     }
 
     private fun rebuildLookupQueryLocked() {
