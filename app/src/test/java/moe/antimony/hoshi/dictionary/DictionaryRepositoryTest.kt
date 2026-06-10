@@ -12,6 +12,8 @@ import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CancellationException
+import org.junit.Assert.assertThrows
 
 class DictionaryRepositoryTest {
     @get:Rule
@@ -143,6 +145,8 @@ class DictionaryRepositoryTest {
         }
 
         assertEquals(1, summary.updatedCount)
+        assertEquals(1, summary.successfulCount)
+        assertEquals(emptyList<DictionaryUpdateFailure>(), summary.failures)
         assertEquals(
             listOf(
                 "Checking:${installedIndex.title}",
@@ -188,8 +192,111 @@ class DictionaryRepositoryTest {
         val summary = repository.updateDictionaries()
 
         assertEquals(0, summary.updatedCount)
+        assertEquals(1, summary.successfulCount)
+        assertEquals(emptyList<DictionaryUpdateFailure>(), summary.failures)
         assertEquals(emptyList<String>(), remote.downloadedUrls)
         assertEquals(listOf(installedIndex.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
+    }
+
+    @Test
+    fun updateDictionariesKeepsGoingAfterOneDictionaryFails() {
+        val filesDir = temporaryFolder.newFolder("partial-update-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val bridge = ImportingDictionaryNativeBridge()
+        val installedSuccess = updatableTestDictionaryIndex()
+        val remoteSuccess = installedSuccess.copy(
+            title = "JMdict [2099-01-01]",
+            revision = "JMdict.2099-01-01",
+            downloadUrl = "https://example.invalid/JMdict_english_2099.zip",
+        )
+        val installedFailure = DictionaryIndex(
+            title = "Jiten",
+            format = 3,
+            revision = "Jiten.2026-01-01",
+            isUpdatable = true,
+            indexUrl = "https://example.invalid/jiten.json",
+            downloadUrl = "https://example.invalid/jiten.zip",
+        )
+        val remote = FakeDictionaryRemoteDataSource(
+            indexes = mapOf(installedSuccess.indexUrl to remoteSuccess),
+            archives = mapOf(remoteSuccess.downloadUrl to dictionaryArchive(remoteSuccess)),
+            failedIndexUrls = setOf(installedFailure.indexUrl),
+        )
+        val repository = DictionaryRepository(
+            filesDir,
+            storage,
+            DictionaryImportDataSource(bridge),
+            DictionaryLookupQueryService(bridge),
+            remote,
+        )
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), installedSuccess.title, installedSuccess)
+        writeDictionary(storage.typeDirectory(DictionaryType.Frequency), installedFailure.title, installedFailure)
+        storage.saveConfigFromStorage()
+
+        val summary = repository.updateDictionaries()
+
+        assertEquals(2, summary.checkedCount)
+        assertEquals(1, summary.successfulCount)
+        assertEquals(1, summary.updatedCount)
+        assertEquals(listOf("Jiten: fetch failed"), summary.failures.map { "${it.title}: ${it.message}" })
+        assertEquals(listOf(remoteSuccess.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
+        assertEquals(listOf(installedFailure.title), repository.loadDictionaries(DictionaryType.Frequency).map { it.index.title })
+    }
+
+    @Test
+    fun updateDictionariesReportsAllFailuresWithoutRebuildingLookup() {
+        val filesDir = temporaryFolder.newFolder("failed-update-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val bridge = ImportingDictionaryNativeBridge()
+        val installedFailure = updatableTestDictionaryIndex()
+        val remote = FakeDictionaryRemoteDataSource(
+            indexes = emptyMap(),
+            archives = emptyMap(),
+            failedIndexUrls = setOf(installedFailure.indexUrl),
+        )
+        val repository = DictionaryRepository(
+            filesDir,
+            storage,
+            DictionaryImportDataSource(bridge),
+            DictionaryLookupQueryService(bridge),
+            remote,
+        )
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), installedFailure.title, installedFailure)
+        storage.saveConfigFromStorage()
+
+        val summary = repository.updateDictionaries()
+
+        assertEquals(1, summary.checkedCount)
+        assertEquals(0, summary.successfulCount)
+        assertEquals(0, summary.updatedCount)
+        assertEquals(listOf("JMdict [2026-01-01]: fetch failed"), summary.failures.map { "${it.title}: ${it.message}" })
+        assertEquals(listOf(installedFailure.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
+        assertEquals(0, bridge.rebuildCount)
+    }
+
+    @Test
+    fun updateDictionariesRethrowsCancellation() {
+        val filesDir = temporaryFolder.newFolder("cancelled-update-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val installed = updatableTestDictionaryIndex()
+        val repository = DictionaryRepository(
+            filesDir,
+            storage,
+            DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+            DictionaryLookupQueryService(RecordingDictionaryNativeBridge()),
+            FakeDictionaryRemoteDataSource(
+                indexes = emptyMap(),
+                archives = emptyMap(),
+                cancelledIndexUrls = setOf(installed.indexUrl),
+            ),
+        )
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+        storage.saveConfigFromStorage()
+
+        assertThrows(CancellationException::class.java) {
+            repository.updateDictionaries()
+        }
+        assertEquals(listOf(installed.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
     }
 
     @Test
@@ -388,13 +495,20 @@ class DictionaryRepositoryTest {
     private class FakeDictionaryRemoteDataSource(
         private val indexes: Map<String, DictionaryIndex>,
         private val archives: Map<String, ByteArray>,
+        private val failedIndexUrls: Set<String> = emptySet(),
+        private val failedArchiveUrls: Set<String> = emptySet(),
+        private val cancelledIndexUrls: Set<String> = emptySet(),
     ) : DictionaryRemoteDataSource {
         val downloadedUrls = mutableListOf<String>()
 
-        override fun fetchIndex(url: String): DictionaryIndex =
-            indexes.getValue(url)
+        override fun fetchIndex(url: String): DictionaryIndex {
+            if (url in cancelledIndexUrls) throw CancellationException("cancelled")
+            if (url in failedIndexUrls) error("fetch failed")
+            return indexes.getValue(url)
+        }
 
         override fun downloadArchive(url: String): InputStream {
+            if (url in failedArchiveUrls) error("download failed")
             downloadedUrls += url
             return ByteArrayInputStream(archives.getValue(url))
         }
@@ -451,6 +565,7 @@ class DictionaryRepositoryTest {
         }
 
         override fun rebuildQuery(
+            session: Long,
             termPaths: Array<String>,
             freqPaths: Array<String>,
             pitchPaths: Array<String>,

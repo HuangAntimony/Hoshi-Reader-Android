@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
+import moe.antimony.hoshi.features.dictionary.DictionaryAutoUpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateApkCleanup
 import moe.antimony.hoshi.features.update.UpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateStartupSnapshot
@@ -18,6 +19,7 @@ import moe.antimony.hoshi.features.update.UpdateDownloadStore
 @HiltAndroidApp
 class HoshiApplication : Application(), Configuration.Provider {
     @Inject internal lateinit var updateApkCleanup: UpdateApkCleanup
+    @Inject internal lateinit var dictionaryAutoUpdateScheduler: Lazy<DictionaryAutoUpdateScheduler>
     @Inject internal lateinit var updateDownloadStore: UpdateDownloadStore
     @Inject internal lateinit var updateScheduler: Lazy<UpdateScheduler>
     @Inject internal lateinit var workerFactory: HiltWorkerFactory
@@ -33,6 +35,7 @@ class HoshiApplication : Application(), Configuration.Provider {
         installCrashDiagnostics(this)
         prepareUpdateStartupState()
         updateScheduler.get().sync()
+        dictionaryAutoUpdateScheduler.get().registerProcessForegroundChecks()
     }
 
     private fun prepareUpdateStartupState() {

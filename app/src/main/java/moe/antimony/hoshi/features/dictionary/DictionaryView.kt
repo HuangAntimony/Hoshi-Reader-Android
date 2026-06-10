@@ -100,6 +100,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryInfo
@@ -130,6 +132,7 @@ fun DictionaryView(
     var destination by remember { mutableStateOf<DictionaryDestination?>(null) }
     var showUpdateConfirmation by remember { mutableStateOf(false) }
     var showDownloadConfirmation by remember { mutableStateOf(false) }
+    var intervalMenuExpanded by remember { mutableStateOf(false) }
 
     val importer = rememberLauncherForActivityResult(MultipleFileImportContent()) { uris: List<Uri> ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
@@ -153,7 +156,15 @@ fun DictionaryView(
 
     val selectedType = uiState.selectedType
     val currentDictionaries = uiState.currentDictionaries
-    val isBusy = uiState.isImporting || uiState.isUpdating
+    val settings = uiState.settings
+    val isBusy = uiState.isMutationInProgress || uiState.isImporting || uiState.isUpdating
+    val lastDictionaryUpdateText = settings.lastDictionaryUpdateEpochMillis
+        ?.let { millis ->
+            remember(millis) {
+                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
+            }
+        }
+        ?: stringResource(R.string.dictionary_last_update_never)
     val listLayout = DictionaryListLayout.from(uiState.errorMessage)
     val listState = rememberLazyListState()
     val density = LocalDensity.current
@@ -392,24 +403,6 @@ fun DictionaryView(
                                         showDownloadConfirmation = true
                                     },
                                 )
-                                if (uiState.updatableDictionaries.isNotEmpty()) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = 16.dp),
-                                        color = colorScheme.outlineVariant,
-                                    )
-                                    ListItem(
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                        headlineContent = {
-                                            Text(
-                                                text = stringResource(R.string.dictionary_update_title),
-                                                color = colorScheme.primary,
-                                            )
-                                        },
-                                        modifier = Modifier.clickable(enabled = !isBusy) {
-                                            showUpdateConfirmation = true
-                                        },
-                                    )
-                                }
                             }
                         }
                         Text(
@@ -419,6 +412,107 @@ fun DictionaryView(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         )
                         Spacer(modifier = Modifier.height(18.dp))
+                        if (uiState.updatableDictionaries.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.dictionary_updates_section),
+                                color = colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                            )
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(24.dp),
+                                color = colorScheme.surface,
+                                border = BorderStroke(1.dp, colorScheme.outlineVariant),
+                                tonalElevation = 0.dp,
+                            ) {
+                                Column {
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = { Text(stringResource(R.string.dictionary_update_automatically)) },
+                                        trailingContent = {
+                                            HoshiSwitch(
+                                                checked = settings.autoUpdateDictionaries,
+                                                onCheckedChange = { checked ->
+                                                    dictionaryViewModel.updateSettings {
+                                                        it.copy(autoUpdateDictionaries = checked)
+                                                    }
+                                                },
+                                                enabled = !isBusy,
+                                            )
+                                        },
+                                    )
+                                    if (settings.autoUpdateDictionaries) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = colorScheme.outlineVariant,
+                                        )
+                                        ListItem(
+                                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                            headlineContent = { Text(stringResource(R.string.dictionary_update_interval)) },
+                                            trailingContent = {
+                                                Box {
+                                                    TextButton(
+                                                        onClick = { intervalMenuExpanded = true },
+                                                        enabled = !isBusy,
+                                                    ) {
+                                                        Text(stringResource(settings.dictionaryUpdateInterval.labelRes))
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = intervalMenuExpanded,
+                                                        onDismissRequest = { intervalMenuExpanded = false },
+                                                    ) {
+                                                        DictionaryUpdateInterval.entries.forEach { interval ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(stringResource(interval.labelRes)) },
+                                                                onClick = {
+                                                                    intervalMenuExpanded = false
+                                                                    dictionaryViewModel.updateSettings {
+                                                                        it.copy(dictionaryUpdateInterval = interval)
+                                                                    }
+                                                                },
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = colorScheme.outlineVariant,
+                                    )
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = { Text(stringResource(R.string.dictionary_last_update)) },
+                                        trailingContent = {
+                                            Text(
+                                                text = lastDictionaryUpdateText,
+                                                color = colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = colorScheme.outlineVariant,
+                                    )
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = {
+                                            Text(
+                                                text = stringResource(R.string.action_update),
+                                                color = colorScheme.primary,
+                                            )
+                                        },
+                                        modifier = Modifier.clickable(enabled = !isBusy) {
+                                            showUpdateConfirmation = true
+                                        },
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(18.dp))
+                        }
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(24.dp),
@@ -564,7 +658,7 @@ fun DictionaryView(
                     }
                 }
             }
-            if (isBusy) {
+            if (uiState.showBlockingProgress || uiState.isImporting || uiState.isUpdating) {
                 HoshiBlockingProgressOverlay(
                     message = uiState.currentImportMessage?.asString() ?: stringResource(R.string.loading),
                     modifier = Modifier

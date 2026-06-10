@@ -9,47 +9,7 @@ This document tracks open Android work after checking iOS upstream `develop`.
 
 ## Current Queue
 
-### 1. Dictionary automatic updates
-
-Status: pending Android sync.
-
-Commit:
-
-- `94d0c41` - dictionary auto updates.
-
-Why this is broader:
-
-- It crosses settings, dictionary repository import/update code, app foreground lifecycle, network constraints, partial-failure behavior, and update-result persistence.
-
-iOS behavior to mirror:
-
-- Dictionary settings show an Updates section when installed dictionaries are updatable.
-- Users can enable automatic updates, choose Daily/Weekly/Monthly, and see the last successful update time or Never.
-- On app activation, iOS checks elapsed interval and installed updatable dictionaries before starting updates.
-- Automatic update sessions disallow expensive and constrained network access.
-- Failed dictionaries do not cancel the whole batch; last-update time advances after at least one successful check/import.
-- Manual update still reports failures.
-- Updated dictionaries import into a temporary directory first, then replace the installed copy.
-
-Android current gap:
-
-- Android supports manual update checks for installed updatable dictionaries, preserving enabled state, order, and collapsed-title migration on rename.
-- Android lacks automatic update settings, last-update display, activation-triggered checks, non-expensive network gating, partial-failure batch behavior, and temp-then-move update import.
-
-Suggested slice:
-
-- Add persisted auto-update settings and localized settings UI.
-- Use Android network APIs/WorkManager constraints after confirming the current recommended Jetpack behavior.
-- Make repository update import transactional per dictionary and record last successful update after at least one success.
-
-Validation:
-
-- Install an updatable dictionary, open Dictionaries, and confirm automatic update controls, interval choices, last update, and manual Update.
-- Foreground the app on an allowed network after the interval elapses; confirm update runs without blocking dictionary use.
-- Simulate one failure and one success; confirm success is applied, manual failure is surfaced, and last-update advances only after success.
-- Confirm failed imports leave installed dictionaries intact.
-
-### 2. Dictionary lookup normalization and query rebuild threading
+### 1. Dictionary lookup normalization and query rebuild threading
 
 Status: pending Android sync.
 
@@ -71,13 +31,12 @@ iOS behavior to mirror:
 Android current gap:
 
 - `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts` is still at `497578824f...`, while iOS now uses `1198201a...`; Android therefore lacks the new native text processors and their `utf8proc` / kanji-processor dependencies.
-- `DictionaryRepository.rebuildLookupQuery()` and `DictionaryLookupQueryService.rebuild()` synchronously call `HoshiDicts.rebuildQuery(...)`. `DictionarySearchViewModel` wraps search rebuilds in `withContext(ioDispatcher)`, but the repository/service contract itself does not enforce an IO boundary or stale-build tokening for other callers.
-- `LookupEngine.lookup()` and `LookupEngine.getStyles()` read the singleton `HoshiDicts.lookupObject` directly, so there is no Android-side ready/empty guard equivalent if query rebuild becomes asynchronous.
+- `DictionaryRepository.rebuildLookupQuery()` and `DictionaryLookupQueryService.rebuild()` still run synchronously on the caller's dispatcher. Dictionary mutation callers use IO dispatchers, but the repository/service contract itself does not expose an asynchronous rebuild API.
 
 Suggested slice:
 
 - Update `third_party/hoshidicts-kotlin-bridge` and nested hoshidicts submodules to the new native revision, wiring any new CMake/JNI dependencies without changing Android lookup models unnecessarily.
-- Move lookup rebuild ownership to a coroutine/dispatcher-aware service API with stale-build protection, then adapt Dictionary tab, Bookshelf startup, backup restore, dictionary import/update, reader lookup, and process-text lookup callers.
+- Move lookup rebuild ownership to a coroutine/dispatcher-aware service API if rebuild callers need service-enforced IO dispatching after the native revision update.
 - Add behavior tests around lookup rebuild ordering and native normalization where feasible; if native fixture coverage is limited, add a small tracked dictionary fixture or construct one in test.
 
 Validation:
@@ -86,7 +45,7 @@ Validation:
 - Import, enable/disable, reorder, delete, update, and backup-restore dictionaries while search/reader lookup is active; confirm the UI remains responsive and stale rebuilds do not replace newer dictionaries.
 - `./gradlew test` and `./gradlew assembleDebug` on a clean native build after submodule updates.
 
-### 3. Anki field templates, dictionary IPA display, and glossary handlebars
+### 2. Anki field templates, dictionary IPA display, and glossary handlebars
 
 Status: pending Android sync; native frequency-sort dependency already present, newer normalization dependency tracked separately above.
 
@@ -134,6 +93,7 @@ Validation:
 
 ## Covered Or No Android Action
 
+- `94d0c41`: Android now mirrors dictionary automatic updates. Updatable dictionaries show an Updates section with automatic update controls, Daily/Weekly/Monthly intervals, Last Update/Never display, manual Update, foreground-triggered WorkManager checks constrained to unmetered networks, shared import/update busy state across the Dictionary UI and automatic updates, per-dictionary partial-failure handling, last-update persistence after at least one successful check/import, and staged import replacement that leaves failed dictionaries intact.
 - `ab6722e`, `67bdbb9`, `1aaee97`, `c2e1c09`, `32d76d2`: Android now covers the TTU/Google Drive book-data slice. Book folders retain `<folder>.epub` and `BookMetadata.epub`; legacy extracted books are repacked only after parse verification; Books can export stored EPUBs; Backup settings expose TTU bookdata export/import; Google Drive sync lists remote book folders, discovers TTU sidecars, uploads missing bookdata when Upload Books is enabled, imports remote-only books, trashes remote folders, clears cached Drive IDs/covers, and only preflights for an active network with internet capability before Drive REST requests.
 - `73a9e62`: Android now mirrors the Dictionary pull-to-clear/show-keyboard slice with reader-style iframe search results, localized pull/release labels, active Dictionary tab refocus/select-all, and measured search-result placement below the search field.
 - `a713c0c`: iOS keeps command-center previous/next cue controls wired even when skip controls are enabled. Android already keeps cue navigation available through reader chrome, Sasayaki sheet controls, and media-session previous/next commands.
@@ -158,7 +118,6 @@ Validation:
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
-| `94d0c41` | 2026-05-19 | Automatic dictionary updates | Pending |
 | `8ef25f4` | 2026-05-24 | New Anki glossary brief/fallback handlebars | Pending |
 | `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
 | `5cbdaa8` | 2026-05-29 | Glossary no-dictionary handlebars and regex stripping | Pending |
@@ -168,6 +127,5 @@ Validation:
 
 ## Suggested Implementation Order
 
-1. Dictionary automatic updates.
-2. Dictionary lookup normalization and query rebuild threading.
-3. Anki field templates, dictionary IPA display, and glossary handlebars.
+1. Dictionary lookup normalization and query rebuild threading.
+2. Anki field templates, dictionary IPA display, and glossary handlebars.

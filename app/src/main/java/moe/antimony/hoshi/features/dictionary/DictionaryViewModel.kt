@@ -20,7 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryInfo
-import moe.antimony.hoshi.dictionary.DictionaryRename
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.DictionaryUpdateCandidate
@@ -29,8 +28,6 @@ import moe.antimony.hoshi.dictionary.DictionaryUpdateStage
 import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.di.IoDispatcher
-import moe.antimony.hoshi.features.anki.AnkiSettings
-import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
 import moe.antimony.hoshi.ui.UiText
 
 internal interface DictionaryViewModelRepository {
@@ -45,13 +42,13 @@ internal interface DictionaryViewModelRepository {
         onProgress: (DictionaryUpdateProgress) -> Unit,
     )
     suspend fun updateDictionaries(onProgress: (DictionaryUpdateProgress) -> Unit): DictionaryUpdateSummary
-    suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean)
-    suspend fun deleteDictionary(type: DictionaryType, fileName: String)
-    suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int)
+    suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean
+    suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean
+    suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int): Boolean
     suspend fun rebuildLookupQuery()
     val settings: Flow<DictionarySettings>
+    val mutationState: StateFlow<DictionaryMutationState>
     suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings)
-    suspend fun updateAnkiSettings(transform: (AnkiSettings) -> AnkiSettings)
 }
 
 internal data class DictionaryImportItem(
@@ -69,9 +66,11 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     private val contentResolver: ContentResolver,
     private val dictionaryRepository: DictionaryRepository,
     private val settingsRepository: DictionarySettingsRepository,
-    private val ankiSettingsRepository: AnkiSettingsRepository,
+    private val dictionaryUpdateService: DictionaryUpdateService,
+    private val mutationCoordinator: DictionaryMutationCoordinator,
 ) : DictionaryViewModelRepository {
     override val settings: Flow<DictionarySettings> = settingsRepository.settings
+    override val mutationState: StateFlow<DictionaryMutationState> = mutationCoordinator.state
 
     override suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>> =
         DictionaryType.entries.associateWith { type ->
@@ -81,26 +80,32 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     override suspend fun importDictionaries(
         items: List<DictionaryImportItem>,
         onProgress: (DictionaryImportItem) -> Unit,
-    ): DictionaryImportBatchResult {
-        val lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport
-        val imported = mutableListOf<DictionaryImportItem>()
-        val failed = mutableListOf<DictionaryImportItem>()
-        items.forEach { item ->
-            onProgress(item)
-            try {
-                dictionaryRepository.importDictionary(
-                    contentResolver = contentResolver,
-                    uri = requireNotNull(item.uri),
-                    lowRamImport = lowRamImport,
-                )
-                imported += item
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                failed += item
+    ): DictionaryImportBatchResult =
+        mutationCoordinator.runExclusive(DictionaryMutationOperation.Import) {
+            val lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport
+            val imported = mutableListOf<DictionaryImportItem>()
+            val failed = mutableListOf<DictionaryImportItem>()
+            var importedCount = 0
+            items.forEach { item ->
+                report(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, item.displayName))
+                onProgress(item)
+                try {
+                    importedCount += dictionaryRepository.importDictionary(
+                        contentResolver = contentResolver,
+                        uri = requireNotNull(item.uri),
+                        lowRamImport = lowRamImport,
+                    )
+                    imported += item
+                } catch (error: Throwable) {
+                    if (error is CancellationException) throw error
+                    failed += item
+                }
             }
-        }
-        return DictionaryImportBatchResult(imported = imported, failed = failed)
-    }
+            if (importedCount > 0) {
+                markDictionariesChanged()
+            }
+            DictionaryImportBatchResult(imported = imported, failed = failed)
+        } ?: DictionaryImportBatchResult(imported = emptyList(), failed = emptyList())
 
     override suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         dictionaryRepository.updatableDictionaries()
@@ -109,32 +114,49 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
         dictionaries: List<RecommendedDictionary>,
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ) {
-        dictionaryRepository.importRecommendedDictionaries(
-            dictionaries = dictionaries,
-            onProgress = onProgress,
-            lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport,
-        )
+        mutationCoordinator.runExclusive(DictionaryMutationOperation.RecommendedImport) {
+            val importedCount = dictionaryRepository.importRecommendedDictionaries(
+                dictionaries = dictionaries,
+                onProgress = { progress ->
+                    report(progress)
+                    onProgress(progress)
+                },
+                lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport,
+            )
+            if (importedCount > 0) {
+                markDictionariesChanged()
+            }
+        }
     }
 
     override suspend fun updateDictionaries(
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ): DictionaryUpdateSummary =
-        dictionaryRepository.updateDictionaries(
-            onProgress = onProgress,
-            lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport,
-        )
+        dictionaryUpdateService.updateDictionaries(onProgress)
 
-    override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean) {
-        dictionaryRepository.setDictionaryEnabled(type, fileName, enabled)
-    }
+    override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean =
+        mutationCoordinator.runExclusive(DictionaryMutationOperation.Edit) {
+            dictionaryRepository.setDictionaryEnabled(type, fileName, enabled)
+            markDictionariesChanged()
+            true
+        } ?: false
 
-    override suspend fun deleteDictionary(type: DictionaryType, fileName: String) {
-        dictionaryRepository.deleteDictionary(type, fileName)
-    }
+    override suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean =
+        mutationCoordinator.runExclusive(DictionaryMutationOperation.Edit) {
+            dictionaryRepository.deleteDictionary(type, fileName)
+            settingsRepository.update { current ->
+                current.copy(collapsedDictionaries = current.collapsedDictionaries - title)
+            }
+            markDictionariesChanged()
+            true
+        } ?: false
 
-    override suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int) {
-        dictionaryRepository.moveDictionary(type, fromIndex, toIndex)
-    }
+    override suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int): Boolean =
+        mutationCoordinator.runExclusive(DictionaryMutationOperation.Edit) {
+            dictionaryRepository.moveDictionary(type, fromIndex, toIndex)
+            markDictionariesChanged()
+            true
+        } ?: false
 
     override suspend fun rebuildLookupQuery() {
         dictionaryRepository.rebuildLookupQuery()
@@ -143,10 +165,6 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     override suspend fun updateSettings(transform: (DictionarySettings) -> DictionarySettings) {
         settingsRepository.update(transform)
     }
-
-    override suspend fun updateAnkiSettings(transform: (AnkiSettings) -> AnkiSettings) {
-        ankiSettingsRepository.update(transform)
-    }
 }
 
 @HiltViewModel
@@ -154,6 +172,7 @@ internal class DictionaryViewModel : ViewModel {
     private val repository: DictionaryViewModelRepository
     private val ioDispatcher: CoroutineDispatcher
     private val injectedScope: CoroutineScope?
+    private var lastCompletedChangeVersion = 0L
     private val scope: CoroutineScope
         get() = injectedScope ?: viewModelScope
 
@@ -188,7 +207,9 @@ internal class DictionaryViewModel : ViewModel {
         this.repository = repository
         this.ioDispatcher = ioDispatcher
         injectedScope = coroutineScope
+        lastCompletedChangeVersion = repository.mutationState.value.completedChangeVersion
         collectSettings()
+        collectMutationState()
     }
 
     private val _uiState = MutableStateFlow(DictionaryUiState())
@@ -199,6 +220,32 @@ internal class DictionaryViewModel : ViewModel {
         scope.launch {
             repository.settings.collect { settings ->
                 _uiState.update { it.copy(settings = settings) }
+            }
+        }
+    }
+
+    private fun collectMutationState() {
+        scope.launch {
+            repository.mutationState.collect { mutationState ->
+                val operation = mutationState.operation
+                _uiState.update {
+                    it.copy(
+                        mutationOperation = operation,
+                        isImporting = operation == DictionaryMutationOperation.Import ||
+                            operation == DictionaryMutationOperation.RecommendedImport,
+                        isUpdating = operation == DictionaryMutationOperation.ManualUpdate ||
+                            operation == DictionaryMutationOperation.AutoUpdate,
+                        showBlockingProgress = operation == DictionaryMutationOperation.Import ||
+                            operation == DictionaryMutationOperation.RecommendedImport ||
+                            operation == DictionaryMutationOperation.ManualUpdate ||
+                            operation == DictionaryMutationOperation.AutoUpdate,
+                        currentImportMessage = mutationState.progress?.message(),
+                    )
+                }
+                if (mutationState.completedChangeVersion != lastCompletedChangeVersion) {
+                    lastCompletedChangeVersion = mutationState.completedChangeVersion
+                    reloadDictionaries(clearError = false)
+                }
             }
         }
     }
@@ -247,8 +294,6 @@ internal class DictionaryViewModel : ViewModel {
                         }
                     }
                 }
-            }.onSuccess {
-                reloadDictionaries(clearError = true)
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -275,8 +320,18 @@ internal class DictionaryViewModel : ViewModel {
                     }
                 }
             }.onSuccess { summary ->
-                migrateDictionaryTitles(summary.renamedDictionaries)
-                reloadDictionaries(clearError = true)
+                if (summary.failures.isNotEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            errorMessage = UiText.Resource(
+                                R.string.dictionary_update_failed_list_format,
+                                summary.failures.joinToString(separator = "\n") { failure ->
+                                    "${failure.title}: ${failure.message}"
+                                },
+                            ),
+                        )
+                    }
+                }
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -307,7 +362,6 @@ internal class DictionaryViewModel : ViewModel {
                     }
                 }
             }.onSuccess { result ->
-                reloadDictionaries(clearError = true)
                 if (result.failed.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
@@ -336,7 +390,6 @@ internal class DictionaryViewModel : ViewModel {
             withContext(ioDispatcher) {
                 repository.setDictionaryEnabled(type, dictionary.path.name, enabled)
             }
-            reloadDictionaries(clearError = false)
         }
     }
 
@@ -344,12 +397,8 @@ internal class DictionaryViewModel : ViewModel {
         val type = _uiState.value.selectedType
         scope.launch {
             withContext(ioDispatcher) {
-                repository.deleteDictionary(type, dictionary.path.name)
+                repository.deleteDictionary(type, dictionary.path.name, dictionary.index.title)
             }
-            repository.updateSettings { current ->
-                current.copy(collapsedDictionaries = current.collapsedDictionaries - dictionary.index.title)
-            }
-            reloadDictionaries(clearError = false)
         }
     }
 
@@ -365,10 +414,12 @@ internal class DictionaryViewModel : ViewModel {
             }
         }
         scope.launch {
-            withContext(ioDispatcher) {
+            val changed = withContext(ioDispatcher) {
                 repository.moveDictionary(type, fromIndex, toIndex)
             }
-            reloadDictionaries(clearError = false)
+            if (!changed) {
+                reloadDictionaries(clearError = false)
+            }
         }
     }
 
@@ -396,30 +447,6 @@ internal class DictionaryViewModel : ViewModel {
                 dictionaries = dictionaries,
                 updatableDictionaries = updatableDictionaries,
                 errorMessage = if (clearError) null else state.errorMessage,
-            )
-        }
-    }
-
-    private suspend fun migrateDictionaryTitles(renames: List<DictionaryRename>) {
-        if (renames.isEmpty()) return
-        val renameMap = renames.associate { it.oldTitle to it.newTitle }
-        repository.updateSettings { current ->
-            current.copy(
-                collapsedDictionaries = current.collapsedDictionaries.mapTo(mutableSetOf()) { title ->
-                    renameMap[title] ?: title
-                },
-            )
-        }
-        repository.updateAnkiSettings { current ->
-            current.copy(
-                fieldMappings = current.fieldMappings.mapValues { (_, template) ->
-                    renameMap.entries.fold(template) { value, (oldTitle, newTitle) ->
-                        value.replace(
-                            oldValue = "{single-glossary-$oldTitle}",
-                            newValue = "{single-glossary-$newTitle}",
-                        )
-                    }
-                },
             )
         }
     }

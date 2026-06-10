@@ -444,7 +444,7 @@ internal class ReaderLookupPopupResourceHandler(
     private val assets: LookupPopupAssets,
     private val fontManager: ReaderFontManager,
     private val audioRequestHandler: AudioRequestHandler,
-    private val imageRequestHandler: DictionaryImageRequestHandler = DictionaryImageRequestHandler(),
+    private val imageRequestHandler: DictionaryImageRequestHandler,
     private val iframeDocument: () -> String,
 ) {
     fun handle(uri: Uri): WebResourceResponse? =

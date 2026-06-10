@@ -16,11 +16,18 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.UUID
 import java.util.zip.ZipFile
+import javax.inject.Inject
 
 internal class DictionaryImportDataSource(
-    private val nativeBridge: DictionaryNativeBridge = HoshiDictionaryNativeBridge,
-    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val nativeBridge: DictionaryNativeBridge,
+    private val json: Json,
 ) {
+    @Inject
+    constructor(nativeBridge: DictionaryNativeBridge) : this(
+        nativeBridge = nativeBridge,
+        json = Json { ignoreUnknownKeys = true },
+    )
+
     fun importDictionary(
         contentResolver: ContentResolver,
         uri: Uri,

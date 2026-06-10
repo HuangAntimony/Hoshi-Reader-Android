@@ -40,10 +40,17 @@ data class DictionaryRename(
     val newTitle: String,
 )
 
+data class DictionaryUpdateFailure(
+    val title: String,
+    val message: String,
+)
+
 data class DictionaryUpdateSummary(
     val checkedCount: Int,
+    val successfulCount: Int = 0,
     val updatedCount: Int,
     val renamedDictionaries: List<DictionaryRename> = emptyList(),
+    val failures: List<DictionaryUpdateFailure> = emptyList(),
 )
 
 data class ImportedDictionary(

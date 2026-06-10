@@ -7,24 +7,17 @@ import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
-import moe.antimony.hoshi.di.FilesDir
+import kotlinx.coroutines.CancellationException
 
 @Singleton
-internal class DictionaryRepository private constructor(
+internal class DictionaryRepository @Inject constructor(
     private val storage: DictionaryStorageDataSource,
     private val importDataSource: DictionaryImportDataSource,
     private val lookupQueryService: DictionaryLookupQueryService,
     private val remoteDataSource: DictionaryRemoteDataSource,
 ) {
-    @Inject
-    constructor(@FilesDir filesDir: File) : this(
-        storage = DictionaryStorageDataSource(filesDir),
-        importDataSource = DictionaryImportDataSource(),
-        lookupQueryService = DictionaryLookupQueryService(),
-        remoteDataSource = UrlDictionaryRemoteDataSource(),
-    )
-
     internal constructor(
+        @Suppress("UNUSED_PARAMETER")
         filesDir: File,
         storage: DictionaryStorageDataSource,
         importDataSource: DictionaryImportDataSource,
@@ -48,7 +41,7 @@ internal class DictionaryRepository private constructor(
     fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         storage.updatableDictionaries()
 
-    fun importDictionary(contentResolver: ContentResolver, uri: Uri, lowRamImport: Boolean = false) {
+    fun importDictionary(contentResolver: ContentResolver, uri: Uri, lowRamImport: Boolean = false): Int {
         val imported = importDataSource.importDictionaryByDetectedTypes(
             contentResolver = contentResolver,
             uri = uri,
@@ -61,9 +54,10 @@ internal class DictionaryRepository private constructor(
             storage.saveConfigFromStorage()
             rebuildLookupQuery()
         }
+        return imported
     }
 
-    fun importDictionary(input: InputStream, lowRamImport: Boolean = false) {
+    fun importDictionary(input: InputStream, lowRamImport: Boolean = false): Int {
         val imported = importDataSource.importDictionaryByDetectedTypes(
             input = input,
             importRootDirectory = storage.importRootDirectory(),
@@ -75,6 +69,7 @@ internal class DictionaryRepository private constructor(
             storage.saveConfigFromStorage()
             rebuildLookupQuery()
         }
+        return imported
     }
 
     fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean) {
@@ -100,51 +95,71 @@ internal class DictionaryRepository private constructor(
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
     ): DictionaryUpdateSummary {
         val candidates = updatableDictionaries()
+        var successfulCount = 0
         var updatedCount = 0
         val renames = mutableListOf<DictionaryRename>()
+        val failures = mutableListOf<DictionaryUpdateFailure>()
         candidates.forEach { candidate ->
             val installed = candidate.dictionary
             val installedIndex = installed.index
-            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, installedIndex.title))
-            val remoteIndex = remoteDataSource.fetchIndex(installedIndex.indexUrl)
-            if (remoteIndex.revision == installedIndex.revision) return@forEach
+            try {
+                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Checking, installedIndex.title))
+                val remoteIndex = remoteDataSource.fetchIndex(installedIndex.indexUrl)
+                if (remoteIndex.revision == installedIndex.revision) {
+                    successfulCount += 1
+                    return@forEach
+                }
 
-            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, remoteIndex.title))
-            val imported = remoteDataSource.downloadArchive(remoteIndex.downloadUrl).use { input ->
-                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, remoteIndex.title))
-                importDataSource.importDictionaryWithResult(
-                    input = input,
-                    typeDirectory = storage.typeDirectory(candidate.type),
-                    lowRamImport = lowRamImport,
+                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, remoteIndex.title))
+                val imported = remoteDataSource.downloadArchive(remoteIndex.downloadUrl).use { input ->
+                    onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, remoteIndex.title))
+                    importDataSource.importDictionaryWithResult(
+                        input = input,
+                        typeDirectory = storage.typeDirectory(candidate.type),
+                        lowRamImport = lowRamImport,
+                    )
+                }
+                val replacement = imported.firstOrNull()
+                if (replacement == null) {
+                    failures += DictionaryUpdateFailure(installedIndex.title, "Import failed")
+                    return@forEach
+                }
+                if (replacement.fileName != installed.path.name) {
+                    storage.deleteDictionary(candidate.type, installed.path.name)
+                }
+                storage.saveConfig(
+                    storage.configWithImportedDictionaryReplacing(
+                        type = candidate.type,
+                        replacementFileName = replacement.fileName,
+                        enabled = installed.isEnabled,
+                        order = installed.order,
+                    ),
+                )
+                if (replacement.index.title != installedIndex.title) {
+                    renames += DictionaryRename(
+                        oldTitle = installedIndex.title,
+                        newTitle = replacement.index.title,
+                    )
+                }
+                successfulCount += 1
+                updatedCount += 1
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                failures += DictionaryUpdateFailure(
+                    title = installedIndex.title,
+                    message = error.localizedMessage ?: error::class.java.simpleName,
                 )
             }
-            val replacement = imported.firstOrNull() ?: return@forEach
-            if (replacement.fileName != installed.path.name) {
-                storage.deleteDictionary(candidate.type, installed.path.name)
-            }
-            storage.saveConfig(
-                storage.configWithImportedDictionaryReplacing(
-                    type = candidate.type,
-                    replacementFileName = replacement.fileName,
-                    enabled = installed.isEnabled,
-                    order = installed.order,
-                ),
-            )
-            if (replacement.index.title != installedIndex.title) {
-                renames += DictionaryRename(
-                    oldTitle = installedIndex.title,
-                    newTitle = replacement.index.title,
-                )
-            }
-            updatedCount += 1
         }
         if (updatedCount > 0) {
             rebuildLookupQuery()
         }
         return DictionaryUpdateSummary(
             checkedCount = candidates.size,
+            successfulCount = successfulCount,
             updatedCount = updatedCount,
             renamedDictionaries = renames,
+            failures = failures,
         )
     }
 
@@ -152,7 +167,7 @@ internal class DictionaryRepository private constructor(
         dictionaries: List<RecommendedDictionary>,
         lowRamImport: Boolean = false,
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
-    ) {
+    ): Int {
         var importedCount = 0
         dictionaries.forEach { dictionary ->
             onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Fetching, dictionary.name))
@@ -175,6 +190,7 @@ internal class DictionaryRepository private constructor(
         if (importedCount > 0) {
             rebuildLookupQuery()
         }
+        return importedCount
     }
 
     fun rebuildLookupQuery() {
@@ -194,12 +210,17 @@ internal class DictionaryRepository private constructor(
 
     fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16): List<LookupResult> {
         ensureLookupQueryReady()
-        return LookupEngine.lookup(text, maxResults, scanLength)
+        return lookupQueryService.lookup(text, maxResults, scanLength)
     }
 
     fun dictionaryStyles(): Map<String, String> {
         ensureLookupQueryReady()
-        return LookupEngine.getStyles().associate { it.dictName to it.styles }
+        return lookupQueryService.getStyles().associate { it.dictName to it.styles }
+    }
+
+    fun dictionaryMedia(dictionary: String, path: String): ByteArray? {
+        ensureLookupQueryReady()
+        return lookupQueryService.getMediaFile(dictionary, path)
     }
 
     private fun rebuildLookupQueryLocked() {

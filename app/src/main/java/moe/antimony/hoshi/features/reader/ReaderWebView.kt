@@ -242,13 +242,13 @@ fun ReaderWebView(
             null,
         )
     }
-    val readerPopupResourceHandler = remember(context, popupAssets, fontManager) {
+    val readerPopupResourceHandler = remember(context, popupAssets, fontManager, dictionaryRepository) {
         ReaderLookupPopupResourceHandler(
             context = context.applicationContext,
             assets = popupAssets,
             fontManager = fontManager,
             audioRequestHandler = AudioRequestHandler(LocalAudioRepository.fromContext(context.applicationContext)),
-            imageRequestHandler = DictionaryImageRequestHandler(),
+            imageRequestHandler = DictionaryImageRequestHandler(dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
     }

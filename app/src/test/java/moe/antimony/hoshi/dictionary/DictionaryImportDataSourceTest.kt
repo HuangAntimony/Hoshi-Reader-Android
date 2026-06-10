@@ -222,7 +222,7 @@ class DictionaryImportDataSourceTest {
             )
         }
 
-        override fun rebuildQuery(termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
+        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
     }
 
     private class FailingDictionaryBridge : DictionaryNativeBridge {
@@ -246,7 +246,7 @@ class DictionaryImportDataSourceTest {
             )
         }
 
-        override fun rebuildQuery(termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
+        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
     }
 }
 

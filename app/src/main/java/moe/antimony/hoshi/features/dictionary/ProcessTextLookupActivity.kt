@@ -37,7 +37,6 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.ProcessTextLookupRequest
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.dictionary.DictionaryRepository
-import moe.antimony.hoshi.dictionary.LookupEngine
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
@@ -186,7 +185,7 @@ private fun ProcessTextLookupOverlay(
             assets = assets,
             fontManager = dependencies.readerFontManager,
             audioRequestHandler = AudioRequestHandler(dependencies.localAudioRepository),
-            imageRequestHandler = DictionaryImageRequestHandler(),
+            imageRequestHandler = DictionaryImageRequestHandler(dependencies.dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
     }
@@ -198,7 +197,7 @@ private fun ProcessTextLookupOverlay(
                 dependencies.dictionaryRepository.rebuildLookupQuery()
                 val dictionarySettings = dependencies.dictionarySettingsRepository.settings.first().normalized()
                 val audioSettings = dependencies.audioSettingsRepository.settings.first()
-                val styles = currentDictionaryStyles()
+                val styles = dependencies.dictionaryRepository.dictionaryStyles()
                 val selection = ReaderSelectionData(
                     text = query,
                     sentence = query,
@@ -206,7 +205,7 @@ private fun ProcessTextLookupOverlay(
                     normalizedOffset = 0,
                     sentenceOffset = 0,
                 )
-                val results = LookupEngine.lookup(
+                val results = dependencies.dictionaryRepository.lookup(
                     query,
                     dictionarySettings.maxResults,
                     dictionarySettings.scanLength,
@@ -299,6 +298,8 @@ private fun ProcessTextLookupOverlay(
         fun lookupChildPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
             createLookupPopupItem(
                 selection = selection,
+                dictionaryStyles = popupSettings?.dictionaryStyles ?: dependencies.dictionaryRepository.dictionaryStyles(),
+                lookup = dependencies.dictionaryRepository::lookup,
                 options = LookupPopupOptions(
                     isVertical = false,
                     isFullWidth = false,
@@ -318,7 +319,6 @@ private fun ProcessTextLookupOverlay(
                     popupActionBar = false,
                     contentLanguageProfile = contentLanguageProfile,
                 ),
-                dictionaryStyles = popupSettings?.dictionaryStyles,
             )
         fun handleReaderPopupBridgeMessage(message: ReaderLookupPopupBridgeMessage) {
             when (message) {
