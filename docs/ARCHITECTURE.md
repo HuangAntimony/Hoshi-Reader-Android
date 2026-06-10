@@ -42,6 +42,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are owned by `third_party/hoshidicts-kotlin-bridge`.
 - Frequency and pitch dictionaries are type-specific and are not treated as term
   fallback dictionaries.
+- Dictionary storage/config mutations share a Hilt singleton mutation
+  coordinator. Dictionary UI, manual updates, imports, and WorkManager automatic
+  updates observe the same in-process busy/progress state and completed-change
+  version; durable settings such as update interval and last update remain in
+  DataStore.
 
 ## Reader
 

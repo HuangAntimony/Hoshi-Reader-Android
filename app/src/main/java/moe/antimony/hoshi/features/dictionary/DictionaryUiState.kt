@@ -10,11 +10,16 @@ internal data class DictionaryUiState(
     val dictionaries: Map<DictionaryType, List<DictionaryInfo>> = emptyMap(),
     val updatableDictionaries: List<DictionaryUpdateCandidate> = emptyList(),
     val settings: DictionarySettings = DictionarySettings(),
+    val mutationOperation: DictionaryMutationOperation? = null,
     val isImporting: Boolean = false,
     val isUpdating: Boolean = false,
+    val showBlockingProgress: Boolean = false,
     val currentImportMessage: UiText? = null,
     val errorMessage: UiText? = null,
 ) {
+    val isMutationInProgress: Boolean
+        get() = mutationOperation != null
+
     val currentDictionaries: List<DictionaryInfo>
         get() = dictionaries[selectedType].orEmpty()
 }

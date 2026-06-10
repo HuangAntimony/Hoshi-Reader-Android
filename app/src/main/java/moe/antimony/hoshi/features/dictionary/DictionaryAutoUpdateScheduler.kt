@@ -9,6 +9,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -18,6 +19,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -63,7 +65,9 @@ internal class DictionaryAutoUpdateRunner @Inject constructor(
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): DictionaryUpdateSummary? {
         if (!isDue(nowEpochMillis)) return null
-        return dictionaryUpdateService.updateDictionaries()
+        return dictionaryUpdateService.updateDictionaries(
+            operation = DictionaryMutationOperation.AutoUpdate,
+        )
     }
 }
 
@@ -123,10 +127,19 @@ internal class DictionaryAutoUpdateWorker @AssistedInject constructor(
     private val dictionaryAutoUpdateRunner: DictionaryAutoUpdateRunner,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result =
-        runCatching {
+        runDictionaryAutoUpdateWork {
             dictionaryAutoUpdateRunner.updateIfDue()
-        }.fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
-        )
+        }
 }
+
+internal suspend fun runDictionaryAutoUpdateWork(
+    updateIfDue: suspend () -> DictionaryUpdateSummary?,
+): ListenableWorker.Result =
+    try {
+        updateIfDue()
+        ListenableWorker.Result.success()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Throwable) {
+        ListenableWorker.Result.retry()
+    }

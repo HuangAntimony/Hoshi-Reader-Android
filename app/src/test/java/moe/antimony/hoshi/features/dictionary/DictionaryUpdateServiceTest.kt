@@ -11,7 +11,9 @@ import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -27,6 +29,8 @@ import moe.antimony.hoshi.dictionary.NativeDictionaryImportResult
 import moe.antimony.hoshi.features.anki.AnkiSettings
 import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -62,6 +66,7 @@ class DictionaryUpdateServiceTest {
                     ),
                 ),
             )
+            val coordinator = DictionaryMutationCoordinator()
             val service = DictionaryUpdateService(
                 dictionaryRepository = DictionaryRepository(
                     filesDir,
@@ -77,11 +82,13 @@ class DictionaryUpdateServiceTest {
                 ankiSettingsRepository = ankiRepository,
                 ioDispatcher = Dispatchers.Unconfined,
                 clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
             )
 
             val summary = service.updateDictionaries()
 
             assertEquals(1, summary.successfulCount)
+            assertEquals(1L, coordinator.state.value.completedChangeVersion)
             val savedSettings = settingsHandle.repository.settings.first()
             assertEquals(1_900_000_000_000L, savedSettings.lastDictionaryUpdateEpochMillis)
             assertEquals(setOf(remoteIndex.title, "Other"), savedSettings.collapsedDictionaries)
@@ -100,6 +107,7 @@ class DictionaryUpdateServiceTest {
             val installed = updatableIndex("JMdict [2026-01-01]", "rev-2026")
             writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
             storage.saveConfigFromStorage()
+            val coordinator = DictionaryMutationCoordinator()
             val service = DictionaryUpdateService(
                 dictionaryRepository = DictionaryRepository(
                     filesDir,
@@ -116,12 +124,150 @@ class DictionaryUpdateServiceTest {
                 ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
                 ioDispatcher = Dispatchers.Unconfined,
                 clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
             )
 
             val summary = service.updateDictionaries()
 
             assertEquals(0, summary.successfulCount)
+            assertEquals(0L, coordinator.state.value.completedChangeVersion)
             assertEquals(null, settingsHandle.repository.settings.first().lastDictionaryUpdateEpochMillis)
+        }
+    }
+
+    @Test
+    fun autoUpdatePublishesMutationStateAndProgress() = runBlocking {
+        settingsRepository().use { settingsHandle ->
+            val filesDir = temporaryFolder.newFolder("service-auto-files")
+            val storage = DictionaryStorageDataSource(filesDir)
+            val installed = updatableIndex("JMdict [2026-01-01]", "rev-2026")
+            val remoteIndex = installed.copy(
+                title = "JMdict [2099-01-01]",
+                revision = "rev-2099",
+                downloadUrl = "https://example.invalid/jmdict-2099.zip",
+            )
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+            storage.saveConfigFromStorage()
+            val coordinator = DictionaryMutationCoordinator()
+            val service = DictionaryUpdateService(
+                dictionaryRepository = DictionaryRepository(
+                    filesDir,
+                    storage,
+                    DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+                    DictionaryLookupQueryService(NoOpDictionaryNativeBridge),
+                    FakeDictionaryRemoteDataSource(
+                        indexes = mapOf(installed.indexUrl to remoteIndex),
+                        archives = mapOf(remoteIndex.downloadUrl to dictionaryArchive(remoteIndex)),
+                    ),
+                ),
+                dictionarySettingsRepository = settingsHandle.repository,
+                ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
+                ioDispatcher = Dispatchers.Unconfined,
+                clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
+            )
+            val observedOperations = mutableListOf<DictionaryMutationOperation?>()
+            val observedProgressTitles = mutableListOf<String?>()
+
+            service.updateDictionaries(
+                operation = DictionaryMutationOperation.AutoUpdate,
+                onProgress = {
+                observedOperations += coordinator.state.value.operation
+                observedProgressTitles += coordinator.state.value.progress?.title
+                },
+            )
+
+            assertTrue(observedOperations.all { it == DictionaryMutationOperation.AutoUpdate })
+            assertTrue(observedProgressTitles.contains(installed.title))
+            assertTrue(observedProgressTitles.contains(remoteIndex.title))
+            assertEquals(DictionaryMutationState(completedChangeVersion = 1L), coordinator.state.value)
+        }
+    }
+
+    @Test
+    fun busyMutationSkipsUpdateWithoutTouchingRepository() = runBlocking {
+        settingsRepository().use { settingsHandle ->
+            val filesDir = temporaryFolder.newFolder("service-busy-files")
+            val storage = DictionaryStorageDataSource(filesDir)
+            val installed = updatableIndex("JMdict [2026-01-01]", "rev-2026")
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+            storage.saveConfigFromStorage()
+            val remote = FakeDictionaryRemoteDataSource(
+                indexes = mapOf(installed.indexUrl to installed),
+                archives = emptyMap(),
+            )
+            val coordinator = DictionaryMutationCoordinator()
+            val service = DictionaryUpdateService(
+                dictionaryRepository = DictionaryRepository(
+                    filesDir,
+                    storage,
+                    DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+                    DictionaryLookupQueryService(NoOpDictionaryNativeBridge),
+                    remote,
+                ),
+                dictionarySettingsRepository = settingsHandle.repository,
+                ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
+                ioDispatcher = Dispatchers.Unconfined,
+                clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
+            )
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val running = async {
+                coordinator.runExclusive(DictionaryMutationOperation.Import) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+            }
+            entered.await()
+
+            val summary = service.updateDictionaries()
+
+            release.complete(Unit)
+            running.await()
+            assertEquals(0, summary.checkedCount)
+            assertEquals(0, remote.fetchCount)
+            assertEquals(null, settingsHandle.repository.settings.first().lastDictionaryUpdateEpochMillis)
+        }
+    }
+
+    @Test
+    fun unchangedPartialSuccessRecordsLastUpdateWithoutCompletedChangeVersion() = runBlocking {
+        settingsRepository().use { settingsHandle ->
+            val filesDir = temporaryFolder.newFolder("service-partial-files")
+            val storage = DictionaryStorageDataSource(filesDir)
+            val unchanged = updatableIndex("JMdict [2026-01-01]", "rev-2026")
+            val failing = updatableIndex("Jiten [2026-01-01]", "rev-failing")
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), unchanged.title, unchanged)
+            writeDictionary(storage.typeDirectory(DictionaryType.Frequency), failing.title, failing)
+            storage.saveConfigFromStorage()
+            val coordinator = DictionaryMutationCoordinator()
+            val service = DictionaryUpdateService(
+                dictionaryRepository = DictionaryRepository(
+                    filesDir,
+                    storage,
+                    DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+                    DictionaryLookupQueryService(NoOpDictionaryNativeBridge),
+                    FakeDictionaryRemoteDataSource(
+                        indexes = mapOf(unchanged.indexUrl to unchanged),
+                        archives = emptyMap(),
+                        failedIndexUrls = setOf(failing.indexUrl),
+                    ),
+                ),
+                dictionarySettingsRepository = settingsHandle.repository,
+                ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
+                ioDispatcher = Dispatchers.Unconfined,
+                clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
+            )
+
+            val summary = service.updateDictionaries()
+
+            assertEquals(1, summary.successfulCount)
+            assertEquals(0, summary.updatedCount)
+            assertEquals(1, summary.failures.size)
+            assertEquals(1_900_000_000_000L, settingsHandle.repository.settings.first().lastDictionaryUpdateEpochMillis)
+            assertEquals(0L, coordinator.state.value.completedChangeVersion)
         }
     }
 
@@ -176,7 +322,11 @@ class DictionaryUpdateServiceTest {
         private val archives: Map<String, ByteArray>,
         private val failedIndexUrls: Set<String> = emptySet(),
     ) : DictionaryRemoteDataSource {
+        var fetchCount = 0
+            private set
+
         override fun fetchIndex(url: String): DictionaryIndex {
+            fetchCount += 1
             if (url in failedIndexUrls) error("fetch failed")
             return indexes.getValue(url)
         }

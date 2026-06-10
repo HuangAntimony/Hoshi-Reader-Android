@@ -8,7 +8,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 ### Added
 
 - Add shelf renaming from each shelf row's management menu.
-- Add iOS-style automatic dictionary updates with Daily, Weekly, and Monthly intervals, Last Update display, foreground checks on unmetered networks, and partial-failure handling for manual updates.
+- Add iOS-style automatic dictionary updates with Daily, Weekly, and Monthly intervals, Last Update display, foreground checks on unmetered networks, shared import/update busy state, and partial-failure handling for manual updates.
 
 ### Changed
 

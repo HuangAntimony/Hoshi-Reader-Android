@@ -3,9 +3,12 @@ package moe.antimony.hoshi.features.dictionary
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.File
 import java.io.InputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -24,6 +27,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -162,6 +166,65 @@ class DictionaryAutoUpdateSchedulerTest {
         }
     }
 
+    @Test
+    fun workerRunnerSkipsWhenDictionaryMutationIsAlreadyInProgress() = runBlocking {
+        settingsRepository("busy-worker").use { settingsHandle ->
+            val filesDir = temporaryFolder.newFolder("busy-worker-files")
+            val storage = DictionaryStorageDataSource(filesDir)
+            val installed = updatableIndex()
+            val remote = CountingDictionaryRemoteDataSource()
+            val coordinator = DictionaryMutationCoordinator()
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+            storage.saveConfigFromStorage()
+            settingsHandle.repository.update {
+                it.copy(autoUpdateDictionaries = true)
+            }
+            val runner = autoUpdateRunner(
+                filesDir = filesDir,
+                storage = storage,
+                remote = remote,
+                settingsRepository = settingsHandle.repository,
+                mutationCoordinator = coordinator,
+            )
+            val running = async {
+                coordinator.runExclusive(DictionaryMutationOperation.Import) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+            }
+            entered.await()
+
+            val summary = runner.updateIfDue(nowEpochMillis = 1_900_000_000_000L)
+
+            release.complete(Unit)
+            running.await()
+            assertNull(summary)
+            assertEquals(0, remote.fetchCount)
+        }
+    }
+
+    @Test
+    fun workerResultRethrowsCancellation() = runBlocking {
+        try {
+            runDictionaryAutoUpdateWork {
+                throw CancellationException("stopped")
+            }
+            fail("CancellationException should be rethrown.")
+        } catch (_: CancellationException) {
+        }
+    }
+
+    @Test
+    fun workerResultRetriesNonCancellationFailure() = runBlocking {
+        val result = runDictionaryAutoUpdateWork {
+            error("network failed")
+        }
+
+        assertEquals(androidx.work.ListenableWorker.Result.retry(), result)
+    }
+
     private fun settingsRepository(name: String): SettingsHandle {
         val scope = CoroutineScope(Dispatchers.IO + Job())
         val dataStore = PreferenceDataStoreFactory.create(
@@ -176,6 +239,7 @@ class DictionaryAutoUpdateSchedulerTest {
         storage: DictionaryStorageDataSource,
         remote: DictionaryRemoteDataSource,
         settingsRepository: DictionarySettingsRepository,
+        mutationCoordinator: DictionaryMutationCoordinator = DictionaryMutationCoordinator(),
     ): DictionaryAutoUpdateRunner {
         val dictionaryRepository = DictionaryRepository(
             filesDir,
@@ -193,6 +257,7 @@ class DictionaryAutoUpdateSchedulerTest {
                 ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
                 ioDispatcher = Dispatchers.Unconfined,
                 clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = mutationCoordinator,
             ),
         )
     }

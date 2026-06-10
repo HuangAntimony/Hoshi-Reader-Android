@@ -4,7 +4,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.dictionary.DictionaryRename
@@ -28,6 +27,7 @@ internal class DictionaryUpdateService(
     private val ankiSettingsRepository: AnkiSettingsRepository,
     private val ioDispatcher: CoroutineDispatcher,
     private val clock: DictionaryUpdateClock,
+    private val mutationCoordinator: DictionaryMutationCoordinator,
 ) {
     @Inject
     constructor(
@@ -35,42 +35,45 @@ internal class DictionaryUpdateService(
         dictionarySettingsRepository: DictionarySettingsRepository,
         ankiSettingsRepository: AnkiSettingsRepository,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        mutationCoordinator: DictionaryMutationCoordinator,
     ) : this(
         dictionaryRepository = dictionaryRepository,
         dictionarySettingsRepository = dictionarySettingsRepository,
         ankiSettingsRepository = ankiSettingsRepository,
         ioDispatcher = ioDispatcher,
         clock = SystemDictionaryUpdateClock,
+        mutationCoordinator = mutationCoordinator,
     )
 
-    private val updateMutex = Mutex()
-
     val isMutationInProgress: Boolean
-        get() = updateMutex.isLocked
+        get() = mutationCoordinator.isMutationInProgress
 
     suspend fun updateDictionaries(
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
+        operation: DictionaryMutationOperation = DictionaryMutationOperation.ManualUpdate,
     ): DictionaryUpdateSummary {
-        if (!updateMutex.tryLock()) {
-            return DictionaryUpdateSummary(
-                checkedCount = 0,
-                successfulCount = 0,
-                updatedCount = 0,
-            )
-        }
-        try {
-            return withContext(ioDispatcher) {
+        return mutationCoordinator.runExclusive(operation) {
+            val session = this
+            withContext(ioDispatcher) {
                 val settings = dictionarySettingsRepository.settings.first()
                 val summary = dictionaryRepository.updateDictionaries(
                     lowRamImport = settings.lowRamDictionaryImport,
-                    onProgress = onProgress,
+                    onProgress = { progress ->
+                        session.report(progress)
+                        onProgress(progress)
+                    },
                 )
                 persistUpdateEffects(summary)
+                if (summary.updatedCount > 0) {
+                    session.markDictionariesChanged()
+                }
                 summary
             }
-        } finally {
-            updateMutex.unlock()
-        }
+        } ?: DictionaryUpdateSummary(
+            checkedCount = 0,
+            successfulCount = 0,
+            updatedCount = 0,
+        )
     }
 
     private suspend fun persistUpdateEffects(summary: DictionaryUpdateSummary) {

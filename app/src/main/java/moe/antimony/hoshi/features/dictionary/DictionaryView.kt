@@ -157,7 +157,7 @@ fun DictionaryView(
     val selectedType = uiState.selectedType
     val currentDictionaries = uiState.currentDictionaries
     val settings = uiState.settings
-    val isBusy = uiState.isImporting || uiState.isUpdating
+    val isBusy = uiState.isMutationInProgress || uiState.isImporting || uiState.isUpdating
     val lastDictionaryUpdateText = settings.lastDictionaryUpdateEpochMillis
         ?.let { millis ->
             remember(millis) {
@@ -658,7 +658,7 @@ fun DictionaryView(
                     }
                 }
             }
-            if (isBusy) {
+            if (uiState.showBlockingProgress || uiState.isImporting || uiState.isUpdating) {
                 HoshiBlockingProgressOverlay(
                     message = uiState.currentImportMessage?.asString() ?: stringResource(R.string.loading),
                     modifier = Modifier

@@ -49,7 +49,7 @@ internal class DictionaryRepository private constructor(
     fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         storage.updatableDictionaries()
 
-    fun importDictionary(contentResolver: ContentResolver, uri: Uri, lowRamImport: Boolean = false) {
+    fun importDictionary(contentResolver: ContentResolver, uri: Uri, lowRamImport: Boolean = false): Int {
         val imported = importDataSource.importDictionaryByDetectedTypes(
             contentResolver = contentResolver,
             uri = uri,
@@ -62,9 +62,10 @@ internal class DictionaryRepository private constructor(
             storage.saveConfigFromStorage()
             rebuildLookupQuery()
         }
+        return imported
     }
 
-    fun importDictionary(input: InputStream, lowRamImport: Boolean = false) {
+    fun importDictionary(input: InputStream, lowRamImport: Boolean = false): Int {
         val imported = importDataSource.importDictionaryByDetectedTypes(
             input = input,
             importRootDirectory = storage.importRootDirectory(),
@@ -76,6 +77,7 @@ internal class DictionaryRepository private constructor(
             storage.saveConfigFromStorage()
             rebuildLookupQuery()
         }
+        return imported
     }
 
     fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean) {
@@ -173,7 +175,7 @@ internal class DictionaryRepository private constructor(
         dictionaries: List<RecommendedDictionary>,
         lowRamImport: Boolean = false,
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
-    ) {
+    ): Int {
         var importedCount = 0
         dictionaries.forEach { dictionary ->
             onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Fetching, dictionary.name))
@@ -196,6 +198,7 @@ internal class DictionaryRepository private constructor(
         if (importedCount > 0) {
             rebuildLookupQuery()
         }
+        return importedCount
     }
 
     fun rebuildLookupQuery() {
