@@ -3,6 +3,7 @@ package moe.antimony.hoshi.epub
 import uniffi.hoshiepub.EpubBook as NativeEpubBook
 import uniffi.hoshiepub.TocNode as NativeTocNode
 import uniffi.hoshiepub.parseExtractedEpub
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import java.io.File
 import javax.inject.Inject
 import javax.xml.parsers.DocumentBuilderFactory
@@ -117,19 +118,53 @@ class EpubBookParser @Inject constructor(
     private fun parseExtracted(root: File, fallbackTitle: String? = null, cachedBookInfo: BookInfo? = null): EpubBook {
         require(root.isDirectory) { "Extracted EPUB directory does not exist: ${root.absolutePath}" }
 
+        val totalStart = PerformanceLog.start()
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "EPUB parse started root=${root.name} cachedBookInfo=${cachedBookInfo != null}",
+        )
+        val nativeParseStart = PerformanceLog.start()
         val nativeBook = parseExtractedEpub(root.absolutePath)
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "native parseExtractedEpub",
+            nativeParseStart,
+            "root=${root.name}",
+        )
         return try {
-            nativeBook.toReaderBook(root, fallbackTitle, cachedBookInfo)
+            nativeBook.toReaderBook(root, fallbackTitle, cachedBookInfo).also { book ->
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "EPUB parse complete",
+                    totalStart,
+                    "root=${root.name} chapters=${book.chapters.size} chars=${book.bookInfo.characterCount}",
+                )
+            }
         } finally {
             nativeBook.destroy()
         }
     }
 
     private fun NativeEpubBook.toReaderBook(root: File, fallbackTitle: String?, cachedBookInfo: BookInfo?): EpubBook {
+        val manifestStart = PerformanceLog.start()
         val manifest = manifest().associateBy { it.id }
         val contentDirectory = File(contentDir())
         val contentDirectoryPrefix = contentDirectory.relativeDirectoryHref(root)
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "EPUB manifest read",
+            manifestStart,
+            "root=${root.name} items=${manifest.size}",
+        )
+        val guideStart = PerformanceLog.start()
         val guideTocHrefs = root.readGuideTocHrefs()
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "EPUB guide TOC read",
+            guideStart,
+            "root=${root.name} entries=${guideTocHrefs.size}",
+        )
+        val spineStart = PerformanceLog.start()
         val chapterShells = spine().mapIndexedNotNull { index, spineItem ->
             val manifestItem = manifest[spineItem.idref] ?: return@mapIndexedNotNull null
             if (!manifestItem.mediaType.isHtmlMediaType()) return@mapIndexedNotNull null
@@ -146,34 +181,87 @@ class EpubBookParser @Inject constructor(
                     guideTocHrefs.contains(href.normalizeResourceHref()),
             )
         }
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "EPUB spine shells built",
+            spineStart,
+            "root=${root.name} chapters=${chapterShells.size}",
+        )
 
         require(chapterShells.isNotEmpty()) { "EPUB spine contains no readable chapters" }
         val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesChapterShells(chapterShells) }
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "EPUB bookinfo cache reusable root=${root.name} reusable=${reusableBookInfo != null}",
+        )
         val chapters = if (reusableBookInfo != null) {
             chapterShells
         } else {
+            val readChaptersStart = PerformanceLog.start()
             chapterShells.map { chapter ->
                 val spineIndex = chapter.spineIndex ?: return@map chapter
-                chapter.copy(html = readSpineItemText(spineIndex.toUInt()))
+                val chapterStart = PerformanceLog.start()
+                chapter.copy(html = readSpineItemText(spineIndex.toUInt())).also { loadedChapter ->
+                    val elapsed = PerformanceLog.elapsedMillis(chapterStart)
+                    if (elapsed >= SlowChapterReadLogThresholdMs) {
+                        PerformanceLog.d(
+                            PerformanceLog.ReaderTag,
+                            "slow EPUB chapter text read took ${elapsed}ms root=${root.name} index=$spineIndex href=${loadedChapter.href} chars=${loadedChapter.html.length}",
+                        )
+                    }
+                }
+            }.also {
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "EPUB chapter text reads",
+                    readChaptersStart,
+                    "root=${root.name} chapters=${it.size}",
+                )
             }
         }
 
+        val resourcesStart = PerformanceLog.start()
         val resources = manifest.values.mapNotNull { manifestItem ->
             val href = contentDirectoryPrefix.resolveManifestHref(manifestItem.href)
             val file = root.resolve(href)
             href to EpubResource.file(manifestItem.mediaType, file)
         }.toMap()
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "EPUB resources indexed",
+            resourcesStart,
+            "root=${root.name} resources=${resources.size}",
+        )
+        val tocStart = PerformanceLog.start()
+        val tocItems = toc().children.map { it.toReaderTocItem(root, contentDirectory) }
+        PerformanceLog.dElapsed(
+            PerformanceLog.ReaderTag,
+            "EPUB TOC built",
+            tocStart,
+            "root=${root.name} topLevel=${tocItems.size}",
+        )
+        val bookInfo = reusableBookInfo ?: run {
+            val bookInfoStart = PerformanceLog.start()
+            chapters.toBookInfo().also { info ->
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "EPUB bookinfo computed",
+                    bookInfoStart,
+                    "root=${root.name} chars=${info.characterCount}",
+                )
+            }
+        }
 
         return EpubBook(
             title = title()?.ifBlank { null } ?: fallbackTitle?.takeIf { it.isNotBlank() } ?: root.nameWithoutExtension,
             coverHref = coverHref()
                 ?.let { contentDirectoryPrefix.resolveManifestHref(it) }
                 ?: resources.entries.firstOrNull { (_, resource) -> resource.mediaType.startsWith("image/") }?.key,
-            toc = toc().children.map { it.toReaderTocItem(root, contentDirectory) },
+            toc = tocItems,
             chapters = chapters,
             resources = resources,
             rootDirectory = root,
-            bookInfo = reusableBookInfo ?: chapters.toBookInfo(),
+            bookInfo = bookInfo,
         )
     }
 }
@@ -227,6 +315,8 @@ private fun File.stableExtractionDirectoryName(): String {
 private val epubParserJson = Json {
     ignoreUnknownKeys = true
 }
+
+private const val SlowChapterReadLogThresholdMs = 100L
 
 internal fun BookInfo.matchesChapterShells(chapters: List<EpubChapter>): Boolean {
     if (characterCount < 0) return false

@@ -6,9 +6,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -18,12 +18,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import moe.antimony.hoshi.features.reader.ReaderLoadingIndicator
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import moe.antimony.hoshi.features.reader.warmReaderSetupScriptCache
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.epub.BookEntry
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
@@ -52,6 +58,12 @@ internal fun ReaderRouteDestination(
         ReaderAutoSyncExportController(appContainer.appScope)
     }
     val systemDarkTheme = isSystemInDarkTheme()
+    val context = LocalContext.current
+    LaunchedEffect(readerSettings) {
+        withContext(Dispatchers.IO) {
+            warmReaderSetupScriptCache(context, readerSettings)
+        }
+    }
     val readerLoadingBackground = Modifier.background(
         Color(readerSettings.backgroundColor(systemDarkTheme)),
     )
@@ -67,6 +79,11 @@ internal fun ReaderRouteDestination(
                 sasayakiSettings = sasayakiSettings ?: appContainer.sasayakiSettingsRepository.settings.first(),
             )
             if (initialAutoSyncState.shouldSyncOnOpen) {
+                val syncStart = PerformanceLog.start()
+                PerformanceLog.d(
+                    PerformanceLog.ReaderTag,
+                    "reader sync-on-open import started root=${entry.root.name}",
+                )
                 runCatching {
                     appContainer.syncManager.syncBook(
                         entry = entry,
@@ -77,6 +94,12 @@ internal fun ReaderRouteDestination(
                         importOnly = true,
                     )
                 }
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "reader sync-on-open import",
+                    syncStart,
+                    "root=${entry.root.name}",
+                )
             }
         }
     }
@@ -135,7 +158,10 @@ internal fun ReaderRouteDestination(
                 .then(readerLoadingBackground),
             contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator()
+            ReaderLoadingIndicator(
+                settings = readerSettings,
+                systemDark = systemDarkTheme,
+            )
         }
         is ReaderRouteLoadState.Error -> Box(
             modifier = modifier

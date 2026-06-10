@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 
 internal class ReaderWebViewStateHolder(
     initialSettings: ReaderSettings,
@@ -214,11 +215,19 @@ internal class ReaderWebViewStateHolder(
     }
 
     fun prepareReloadAtDisplayedPosition() {
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader reload prepared at displayed position chapter=${readerPosition.displayedPosition.index} progress=${readerPosition.displayedPosition.progress}",
+        )
         readerPosition = readerPosition.prepareReloadAtDisplayedPosition()
         markWebViewRestoring()
     }
 
     fun jumpTo(position: ReaderChapterPosition, fragment: String? = null): ReaderChapterPosition {
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader chapter load requested from=${readerPosition.loadPosition.index} to=${position.index} progress=${position.progress} fragment=${fragment != null}",
+        )
         readerPosition = readerPosition.jumpTo(position, fragment)
         markWebViewRestoring()
         return readerPosition.displayedPosition
@@ -252,10 +261,18 @@ internal class ReaderWebViewStateHolder(
     fun markWebViewRestoring() {
         webViewRestoreEpoch += 1
         isWebViewRestoring = true
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader WebView restore started epoch=$webViewRestoreEpoch chapter=${readerPosition.loadPosition.index} progress=${readerPosition.loadPosition.progress}",
+        )
     }
 
     fun markWebViewRestored() {
         isWebViewRestoring = false
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader WebView restore completed epoch=$webViewRestoreEpoch chapter=${readerPosition.loadPosition.index} displayedProgress=${readerPosition.displayedPosition.progress}",
+        )
     }
 
     fun goToNextChapter(lastIndex: Int): ReaderChapterPosition? {
@@ -270,6 +287,10 @@ internal class ReaderWebViewStateHolder(
 
     fun updateViewportSize(size: IntSize) {
         if (size == webViewViewportSize) return
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader viewport state changed old=$webViewViewportSize new=$size reload=${webViewViewportSize != IntSize.Zero}",
+        )
         if (webViewViewportSize != IntSize.Zero) {
             prepareReloadAtDisplayedPosition()
         }

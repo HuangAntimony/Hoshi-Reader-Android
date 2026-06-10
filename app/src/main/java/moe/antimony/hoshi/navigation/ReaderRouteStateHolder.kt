@@ -9,6 +9,7 @@ import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.ReaderRouteBookRepository
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import java.io.File
 
 internal class ReaderRouteStateHolder(
@@ -20,11 +21,35 @@ internal class ReaderRouteStateHolder(
         bookId: String,
         beforeBookmarkLoad: suspend (moe.antimony.hoshi.epub.BookEntry) -> Unit = {},
     ): ReaderRouteLoadState = withContext(ioDispatcher) {
+        val totalStart = PerformanceLog.start()
+        PerformanceLog.d(PerformanceLog.ReaderTag, "reader route load started bookId=$bookId")
         runCatching {
+            val entryStart = PerformanceLog.start()
             val entry = repository.loadBookEntry(bookId)
                 ?: error("Book not found.")
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "loadBookEntry",
+                entryStart,
+                "bookId=$bookId root=${entry.root.name}",
+            )
+            val bookInfoStart = PerformanceLog.start()
             val cachedBookInfo = repository.loadReaderBookInfo(entry.root)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "loadReaderBookInfo",
+                bookInfoStart,
+                "root=${entry.root.name} cached=${cachedBookInfo != null}",
+            )
+            val parseStart = PerformanceLog.start()
             val parsedBook = parser.parse(entry.root, cachedBookInfo)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "parse reader EPUB",
+                parseStart,
+                "root=${entry.root.name} chapters=${parsedBook.chapters.size} chars=${parsedBook.bookInfo.characterCount}",
+            )
+            val metadataStart = PerformanceLog.start()
             val metadata = entry.metadata.copy(
                 title = parsedBook.title,
                 cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref) ?: entry.metadata.cover,
@@ -35,14 +60,47 @@ internal class ReaderRouteStateHolder(
                 entry.root,
                 metadata,
             )
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "update reader metadata",
+                metadataStart,
+                "root=${entry.root.name} cover=${metadata.cover != null}",
+            )
             val displayEntry = entry.copy(metadata = metadata)
             val displayBook = parsedBook.copy(title = displayEntry.displayTitle)
             if (cachedBookInfo != displayBook.bookInfo) {
+                val saveBookInfoStart = PerformanceLog.start()
                 repository.saveBookInfo(entry.root, displayBook.bookInfo)
+                PerformanceLog.dElapsed(
+                    PerformanceLog.ReaderTag,
+                    "save reader bookinfo",
+                    saveBookInfoStart,
+                    "root=${entry.root.name}",
+                )
             }
             val bookCoverFile = resolveMetadataCoverFile(entry.root, metadata.cover)
+            val beforeBookmarkStart = PerformanceLog.start()
             beforeBookmarkLoad(displayEntry)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "before bookmark reader hook",
+                beforeBookmarkStart,
+                "root=${entry.root.name}",
+            )
+            val bookmarkStart = PerformanceLog.start()
             val bookmark = repository.loadBookmark(entry.root)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "load reader bookmark",
+                bookmarkStart,
+                "root=${entry.root.name} bookmark=${bookmark != null}",
+            )
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader route load ready",
+                totalStart,
+                "bookId=$bookId root=${entry.root.name}",
+            )
             ReaderRouteLoadState.Ready(
                 entry = displayEntry,
                 bookRoot = entry.root,
@@ -51,6 +109,12 @@ internal class ReaderRouteStateHolder(
                 bookmark = bookmark,
             )
         }.getOrElse { error ->
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "reader route load failed",
+                totalStart,
+                "bookId=$bookId error=${error::class.java.simpleName}",
+            )
             ReaderRouteLoadState.Error(error.localizedMessage ?: "Failed to open EPUB.")
         }
     }

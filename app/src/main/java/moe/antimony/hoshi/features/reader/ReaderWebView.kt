@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -70,6 +71,7 @@ import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 import moe.antimony.hoshi.features.dictionary.dismissPopupAt
 import moe.antimony.hoshi.features.dictionary.openPopupExternalLink
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
+import moe.antimony.hoshi.features.diagnostics.PerformanceLog
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
@@ -141,6 +143,7 @@ fun ReaderWebView(
     val systemDarkTheme = isSystemInDarkTheme()
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
     val stateHolder = remember(book) {
+        PerformanceLog.d(PerformanceLog.ReaderTag, "reader WebView composable composed")
         ReaderWebViewStateHolder(
             initialSettings = readerSettings,
             initialPosition = ReaderChapterPosition(
@@ -148,6 +151,14 @@ fun ReaderWebView(
                 progress = initialProgress.coerceIn(0.0, 1.0),
             ),
         )
+    }
+    LaunchedEffect(stateHolder.webViewViewportSize) {
+        val viewportSize = stateHolder.webViewViewportSize
+        if (viewportSize != IntSize.Zero) {
+            withContext(Dispatchers.IO) {
+                ReaderViewportCache.save(context, viewportSize)
+            }
+        }
     }
     LaunchedEffect(readerSettings) {
         stateHolder.syncSettings(readerSettings)
@@ -330,6 +341,10 @@ fun ReaderWebView(
         return statisticsTracker?.statisticsForPersistenceOrNull()
     }
     fun saveReaderPosition(position: ReaderChapterPosition, statistics: List<ReadingStatistics>? = statisticsForSave()) {
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "reader bookmark save requested chapter=${position.index} progress=${position.progress} stats=${statistics != null}",
+        )
         onSaveBookmark(position.index, position.progress, statistics)
     }
     fun saveCurrentDisplayedPosition() {
@@ -552,27 +567,57 @@ fun ReaderWebView(
         sasayakiPlayer?.readerSkipButtonAction = settings.readerSkipButtonAction
     }
     fun goToNextChapter(): Boolean {
-        if (!stateHolder.canAcceptReaderNavigationInput()) return false
+        val start = PerformanceLog.start()
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "next chapter requested current=${stateHolder.readerPosition.loadPosition.index}",
+        )
+        if (!stateHolder.canAcceptReaderNavigationInput()) {
+            PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "next chapter ignored while restoring", start)
+            return false
+        }
         startStatisticsForProgressChangeIfNeeded()
         val next = stateHolder.goToNextChapter(book.chapters.lastIndex)
         if (next != null) {
             stateHolder.clearForwardHistoryAfterManualMovement()
             recordStatisticsAtDisplayedPosition()
             saveReaderPosition(next)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "next chapter accepted",
+                start,
+                "target=${next.index}",
+            )
             return true
         }
+        PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "next chapter ignored at boundary", start)
         return false
     }
     fun goToPreviousChapter(): Boolean {
-        if (!stateHolder.canAcceptReaderNavigationInput()) return false
+        val start = PerformanceLog.start()
+        PerformanceLog.d(
+            PerformanceLog.ReaderTag,
+            "previous chapter requested current=${stateHolder.readerPosition.loadPosition.index}",
+        )
+        if (!stateHolder.canAcceptReaderNavigationInput()) {
+            PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "previous chapter ignored while restoring", start)
+            return false
+        }
         startStatisticsForProgressChangeIfNeeded()
         val previous = stateHolder.goToPreviousChapter()
         if (previous != null) {
             stateHolder.clearForwardHistoryAfterManualMovement()
             recordStatisticsAtDisplayedPosition()
             saveReaderPosition(previous)
+            PerformanceLog.dElapsed(
+                PerformanceLog.ReaderTag,
+                "previous chapter accepted",
+                start,
+                "target=${previous.index}",
+            )
             return true
         }
+        PerformanceLog.dElapsed(PerformanceLog.ReaderTag, "previous chapter ignored at boundary", start)
         return false
     }
     fun saveDisplayedProgress(progress: Double) {
@@ -1278,6 +1323,13 @@ fun ReaderWebView(
                     rootHighlight = readerRootSelectionHighlightPayload,
                 )
             }
+        }
+        if (stateHolder.isWebViewRestoring) {
+            ReaderLoadingIndicator(
+                settings = effectiveSettings,
+                systemDark = systemDarkTheme,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
         ReaderTopInfo(
             state = chromeState,

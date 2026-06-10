@@ -19,6 +19,11 @@ function readerSource(url) {
         .replaceAll('__HOSHI_BLUR_IMAGES__', 'false')
         .replaceAll('__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__', JSON.stringify('0px'))
         .replaceAll('__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__', JSON.stringify('0px'))
+        .replaceAll('__HOSHI_VIEWPORT_WIDTH_JS__', 'window.innerWidth')
+        .replaceAll('__HOSHI_VIEWPORT_HEIGHT_JS__', 'window.innerHeight')
+        .replaceAll('__HOSHI_PAGE_HEIGHT_JS__', '(window.innerHeight + 0)')
+        .replaceAll('__HOSHI_PAGE_WIDTH_JS__', 'window.innerWidth')
+        .replaceAll('__HOSHI_VERTICAL_WRITING_JS__', 'null')
         .replaceAll('__HOSHI_RESTORE_SCRIPTS__', '');
 }
 
@@ -302,6 +307,9 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             if (selector === 'img') return queryByTag(body, 'img');
             return [];
         },
+        getElementById() {
+            return null;
+        },
         getElementsByTagName(tagName) {
             return tagName.toLowerCase() === 'head' ? [head] : [];
         },
@@ -324,6 +332,11 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         Highlight: class {},
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
+        performance: { now: () => 0 },
+        requestAnimationFrame(callback) {
+            callback();
+            return 0;
+        },
         setTimeout(callback) {
             callback();
             return 0;

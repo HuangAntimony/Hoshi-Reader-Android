@@ -14,8 +14,12 @@ window.hoshiReader = {
   nodeStartOffsets: new WeakMap(),
   nodeStartRawOffsets: new WeakMap(),
   paginationMetrics: null,
+  verticalModeCache: __HOSHI_VERTICAL_WRITING_JS__,
   isVertical: function() {
-    return window.getComputedStyle(document.body).writingMode === "vertical-rl";
+    if (this.verticalModeCache === null) {
+      this.verticalModeCache = window.getComputedStyle(document.body).writingMode === "vertical-rl";
+    }
+    return this.verticalModeCache;
   },
   readerCssVariable: function(name) {
     return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -59,7 +63,19 @@ window.hoshiReader = {
     if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
       window.HoshiReaderRestore.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
     }
-    this.warmPaginationMetrics();
+    this.schedulePaginationMetricsWarmup();
+  },
+  schedulePaginationMetricsWarmup: function() {
+    var self = this;
+    var warm = function() {
+      if (self.paginationMetrics) return;
+      self.buildPaginationMetrics();
+    };
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(warm, { timeout: 2000 });
+    } else {
+      setTimeout(warm, 250);
+    }
   },
   createWalker: function(rootNode) {
     var root = rootNode || document.body;
@@ -81,8 +97,11 @@ window.hoshiReader = {
     while (node = walker.nextNode()) {
       offsets.set(node, count);
       rawOffsets.set(node, rawCount);
-      count += this.countChars(node.textContent);
-      rawCount += this.countRawChars(node.textContent);
+      var text = node.textContent || '';
+      for (var char of text) {
+        rawCount += 1;
+        if (this.ttuRegex.test(char)) count += 1;
+      }
     }
     this.nodeStartOffsets = offsets;
     this.nodeStartRawOffsets = rawOffsets;
@@ -542,6 +561,7 @@ window.hoshiReader = {
     this.stabilizeRubyAdjacentTextNodes(parent);
   },
   normalizeRubyTextNodes: function(root) {
+    var normalizeStart = performance.now();
     var rubyNodes = new Set();
     if (root && root.nodeType === Node.ELEMENT_NODE && String(root.tagName).toLowerCase() === 'ruby') {
       rubyNodes.add(root);
@@ -550,18 +570,23 @@ window.hoshiReader = {
     Array.from(scope.querySelectorAll('ruby')).forEach(function(ruby) {
       rubyNodes.add(ruby);
     });
+    var wrapped = 0;
+    var removed = 0;
     rubyNodes.forEach(function(ruby) {
       Array.from(ruby.childNodes).forEach(function(node) {
         if (node.nodeType !== Node.TEXT_NODE) return;
         if (!node.nodeValue.trim()) {
           ruby.removeChild(node);
+          removed += 1;
           return;
         }
         var wrapper = document.createElement('span');
         ruby.insertBefore(wrapper, node);
         wrapper.appendChild(node);
+        wrapped += 1;
       });
     });
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('normalizeRubyTextNodes', normalizeStart, 'rubies=' + rubyNodes.size + ' wrapped=' + wrapped + ' removed=' + removed);
   },
   isJapaneseBreakCharacter: function(text) {
     var code = (text || '').codePointAt(0);
@@ -573,6 +598,7 @@ window.hoshiReader = {
   },
   stabilizeRubyAdjacentTextNodes: function(root) {
     if (!this.isVertical()) return;
+    var stabilizeStart = performance.now();
     var self = this;
     var splitLimit = 64;
     var scope = root && root.querySelectorAll ? root : document;
@@ -580,6 +606,9 @@ window.hoshiReader = {
     if (root && root.tagName && root.tagName.toLowerCase() === 'ruby') {
       rubies.unshift(root);
     }
+    var candidates = 0;
+    var splitNodes = 0;
+    var createdNodes = 0;
     rubies.forEach(function(ruby) {
       if (ruby.closest('rt, rp')) return;
       var node = ruby.nextSibling;
@@ -589,6 +618,7 @@ window.hoshiReader = {
       if (!node || node.nodeType !== Node.TEXT_NODE || !node.nodeValue) return;
       var chars = Array.from(node.nodeValue);
       if (chars.length <= 1) return;
+      candidates += 1;
       var fragment = document.createDocumentFragment();
       var pending = '';
       var splitCount = 0;
@@ -608,8 +638,11 @@ window.hoshiReader = {
       });
       if (splitCount === 0) return;
       flush();
+      splitNodes += 1;
+      createdNodes += fragment.childNodes.length;
       node.replaceWith(fragment);
     });
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('stabilizeRubyAdjacentTextNodes', stabilizeStart, 'rubies=' + rubies.length + ' candidates=' + candidates + ' splitNodes=' + splitNodes + ' createdNodes=' + createdNodes);
   },
   getScrollContext: function() {
     var vertical = this.isVertical();
@@ -735,6 +768,17 @@ window.hoshiReader = {
     });
     return true;
   },
+  fastLastPageScroll: function(context) {
+    if (context.pageSize <= 0) return 0;
+    return Math.max(0, Math.floor(context.maxScroll / context.pageSize) * context.pageSize);
+  },
+  waitForImageLayout: function() {
+    return new Promise(function(resolve) {
+      requestAnimationFrame(function() {
+        requestAnimationFrame(resolve);
+      });
+    });
+  },
   contentLastPageScroll: function(context) {
     var metrics = this.paginationMetrics || this.buildPaginationMetrics();
     return metrics.maxScroll;
@@ -743,45 +787,29 @@ window.hoshiReader = {
     var metrics = this.paginationMetrics || this.buildPaginationMetrics();
     return metrics.minScroll;
   },
-  warmPaginationMetrics: function() {
-    if (this.paginationMetrics) return;
-    var run = () => {
-      if (this.paginationMetrics) return;
-      this.buildPaginationMetrics();
-    };
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(run, { timeout: 1000 });
-    } else {
-      setTimeout(run, 200);
-    }
-  },
   buildPaginationMetrics: function() {
+    var metricsStart = performance.now();
     var context = this.getScrollContext();
     var currentScroll = this.getPagePosition(context);
     var maxAlignedScroll = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
     if (context.pageSize <= 0) {
-      var emptyMetrics = { minScroll: 0, maxScroll: 0, totalChars: 0, progressStops: [] };
+      var emptyMetrics = { minScroll: 0, maxScroll: 0 };
       this.paginationMetrics = emptyMetrics;
       return emptyMetrics;
     }
     var lastContentEdge = 0;
     var firstContentEdge = null;
-    var progressStops = [];
-    var exploredChars = 0;
-    var totalChars = 0;
+    var textNodes = [];
     var walker = this.createWalker();
     var node;
     while (node = walker.nextNode()) {
-      var nodeLen = this.countChars(node.textContent);
-      totalChars += nodeLen;
-      if (nodeLen <= 0) continue;
+      if (node.nodeValue && node.nodeValue.trim()) textNodes.push(node);
+    }
+    var measureNodeEdges = (target) => {
       var range = document.createRange();
-      range.selectNodeContents(node);
+      range.selectNodeContents(target);
       var rects = range.getClientRects();
-      var progressRect = this.getRect(range);
-      var nodeStartEdge = progressRect && progressRect.width > 0 && progressRect.height > 0
-        ? (context.vertical ? progressRect.top : progressRect.left) + currentScroll
-        : null;
+      var found = false;
       for (var i = 0; i < rects.length; i++) {
         var rect = rects[i];
         if (rect.width <= 0 || rect.height <= 0) continue;
@@ -789,11 +817,19 @@ window.hoshiReader = {
         var endEdge = (context.vertical ? rect.bottom : rect.right) + currentScroll;
         firstContentEdge = firstContentEdge === null ? startEdge : Math.min(firstContentEdge, startEdge);
         lastContentEdge = Math.max(lastContentEdge, endEdge);
+        found = true;
       }
-      if (nodeStartEdge !== null) {
-        progressStops.push({ scroll: nodeStartEdge, exploredChars: exploredChars + nodeLen });
+      return found;
+    };
+    var firstMeasuredIndex = -1;
+    for (var f = 0; f < textNodes.length; f++) {
+      if (measureNodeEdges(textNodes[f])) {
+        firstMeasuredIndex = f;
+        break;
       }
-      exploredChars += nodeLen;
+    }
+    for (var b = textNodes.length - 1; b > firstMeasuredIndex; b--) {
+      if (measureNodeEdges(textNodes[b])) break;
     }
 
     var media = document.querySelectorAll('img, svg, image, video, canvas');
@@ -809,14 +845,12 @@ window.hoshiReader = {
     var minScroll = firstContentEdge === null ? 0 : Math.min(maxAlignedScroll, this.alignContentStartToPage(context, firstContentEdge));
     var lastContentScroll = lastContentEdge <= 0 ? 0 : this.alignToPage(context, lastContentEdge - 1);
     var maxScroll = Math.min(context.maxScroll, lastContentScroll);
-    progressStops.sort(function(a, b) { return a.scroll - b.scroll; });
     var metrics = {
       minScroll: minScroll,
-      maxScroll: maxScroll,
-      totalChars: totalChars,
-      progressStops: progressStops
+      maxScroll: maxScroll
     };
     this.paginationMetrics = metrics;
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('buildPaginationMetrics', metricsStart, 'minScroll=' + minScroll + ' maxScroll=' + maxScroll);
     return metrics;
   },
   calculateProgress: function() {
@@ -833,40 +867,54 @@ window.hoshiReader = {
     return totalChars > 0 ? exploredChars / totalChars : 0;
   },
   restoreProgress: async function(progress) {
+    var restoreStart = performance.now();
+    window.hoshiReaderPerf && window.hoshiReaderPerf.mark('restoreProgress start', 'progress=' + progress);
     await document.fonts.ready;
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress fonts ready', restoreStart);
     var context = this.getScrollContext();
     if (context.pageSize <= 0) {
       this.registerSnapScroll(0);
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify no page', restoreStart);
       this.notifyRestoreComplete();
       return;
     }
     if (progress <= 0) {
       this.setPagePosition(context, 0);
       this.registerSnapScroll(0);
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify first page', restoreStart);
       this.notifyRestoreComplete();
       return;
     }
     if (progress >= 0.99) {
-      var lastPage = this.contentLastPageScroll(context);
+      var lastStart = performance.now();
+      var hadCachedMetrics = !!this.paginationMetrics;
+      var lastPage = hadCachedMetrics ? this.contentLastPageScroll(context) : this.fastLastPageScroll(context);
       lastPage = Math.max(0, lastPage);
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress last page target', lastStart, 'lastPage=' + lastPage + ' cachedMetrics=' + hadCachedMetrics + ' maxScroll=' + context.maxScroll);
       this.setPagePosition(context, lastPage);
       requestAnimationFrame(() => {
         this.setPagePosition(context, lastPage);
         this.registerSnapScroll(lastPage);
-        requestAnimationFrame(() => this.notifyRestoreComplete());
+        requestAnimationFrame(() => {
+          window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify last page', restoreStart);
+          this.notifyRestoreComplete();
+        });
       });
       return;
     }
+    var countStart = performance.now();
     var walker = this.createWalker();
     var totalChars = 0;
     var node;
     while (node = walker.nextNode()) {
       totalChars += this.countChars(node.textContent);
     }
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress count total chars', countStart, 'chars=' + totalChars);
     var targetCharCount = Math.ceil(totalChars * progress);
     var runningSum = 0;
     var targetNode = null;
     var targetOffset = 0;
+    var targetStart = performance.now();
     walker = this.createWalker();
     while (node = walker.nextNode()) {
       var nodeLen = this.countChars(node.textContent);
@@ -877,7 +925,9 @@ window.hoshiReader = {
       }
       runningSum += nodeLen;
     }
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress find target node', targetStart, 'targetFound=' + !!targetNode);
     if (targetNode) {
+      var rangeStart = performance.now();
       var range = document.createRange();
       var targetText = targetNode.textContent || '';
       var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
@@ -887,6 +937,7 @@ window.hoshiReader = {
       var currentScroll = this.getPagePosition(context);
       var anchor = (context.vertical ? rect.top : rect.left) + currentScroll;
       var targetScroll = this.alignToPage(context, anchor);
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress target range layout', rangeStart, 'targetScroll=' + targetScroll);
       this.setPagePosition(context, targetScroll);
       requestAnimationFrame(() => {
         this.setPagePosition(context, targetScroll);
@@ -898,7 +949,10 @@ window.hoshiReader = {
       this.registerSnapScroll(firstPage);
     }
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => this.notifyRestoreComplete());
+      requestAnimationFrame(() => {
+        window.hoshiReaderPerf && window.hoshiReaderPerf.time('restoreProgress notify middle page', restoreStart);
+        this.notifyRestoreComplete();
+      });
     });
   },
   jumpToFragment: async function(fragment) {
@@ -955,22 +1009,32 @@ __HOSHI_HIGHLIGHTS_SCRIPT__
 window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
   window.hoshiReader.didInitialize = true;
-  var viewport = document.querySelector('meta[name="viewport"]');
-  if (viewport) { viewport.remove(); }
-  var newViewport = document.createElement('meta');
-  newViewport.name = 'viewport';
-  newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-  document.head.appendChild(newViewport);
-  var pageHeight = window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__;
-  var pageWidth = window.innerWidth;
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--page-height', pageHeight + 'px');
-  document.documentElement.style.setProperty('--page-width', pageWidth + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(pageWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(window.innerHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
+  var initializeStart = performance.now();
+  window.hoshiReaderPerf && window.hoshiReaderPerf.mark('initialize start', 'readyState=' + document.readyState);
+  var hasInitialReaderStyle = !!document.getElementById('hoshi-reader-style');
+  if (!hasInitialReaderStyle) {
+    var viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) { viewport.remove(); }
+    var newViewport = document.createElement('meta');
+    newViewport.name = 'viewport';
+    newViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.head.appendChild(newViewport);
+  }
+  var viewportHeight = __HOSHI_VIEWPORT_HEIGHT_JS__;
+  var pageHeight = __HOSHI_PAGE_HEIGHT_JS__;
+  var pageWidth = __HOSHI_PAGE_WIDTH_JS__;
+  if (!hasInitialReaderStyle) {
+    document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewportHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
+    document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (viewportHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
+    document.documentElement.style.setProperty('--page-height', pageHeight + 'px');
+    document.documentElement.style.setProperty('--page-width', pageWidth + 'px');
+    document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(pageWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
+    document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(viewportHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
+  }
   window.hoshiReader.pageHeight = pageHeight;
   window.hoshiReader.pageWidth = pageWidth;
+  window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize viewport/css/image variables', initializeStart, 'initialStyle=' + hasInitialReaderStyle);
+  var imageSetupStart = performance.now();
   function setupReaderImage(element, src, wrap, blurElement) {
   if (!element || !src) return;
   blurElement = blurElement || element;
@@ -1006,6 +1070,7 @@ window.hoshiReader.initialize = function() {
     setupReaderImage(svgImage, svgImageSrc, false, svg);
   });
   var images = Array.from(document.querySelectorAll('img'));
+  window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize svg/img query', imageSetupStart, 'svg=' + svgImages.length + ' img=' + images.length);
   var imagePromises = images.map(function(img) {
     return new Promise(function(resolve) {
       var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
@@ -1034,13 +1099,22 @@ window.hoshiReader.initialize = function() {
   spacer.style.display = 'block';
   spacer.style.breakInside = 'avoid';
   document.body.appendChild(spacer);
+  var normalizeStart = performance.now();
   window.hoshiReader.normalizeRubyTextNodes();
   window.hoshiReader.stabilizeRubyAdjacentTextNodes();
+  window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize normalize ruby text', normalizeStart);
   Promise.all(imagePromises).then(function() {
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize images ready', initializeStart, 'count=' + images.length);
     if (!images.length) return;
-    return new Promise(function(resolve) { setTimeout(resolve, 50); });
+    var settleStart = performance.now();
+    return window.hoshiReader.waitForImageLayout().then(function() {
+      window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize image layout settled', settleStart);
+    });
   }).then(function() {
+    var offsetsStart = performance.now();
     window.hoshiReader.buildNodeOffsets();
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize buildNodeOffsets', offsetsStart);
+    window.hoshiReaderPerf && window.hoshiReaderPerf.time('initialize before initial restore', initializeStart);
     __HOSHI_RESTORE_SCRIPTS__
   });
 };
