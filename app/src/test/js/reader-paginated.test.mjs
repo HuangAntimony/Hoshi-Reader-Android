@@ -98,17 +98,33 @@ class TestElement extends TestNode {
         super(1);
         this.tagName = tagName.toUpperCase();
         this.childNodes = [];
+        this.className = '';
         this.style = testStyle();
         this.classList = {
-            add() {},
-            remove() {},
-            contains() {
-                return false;
+            add: (...names) => {
+                const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+                names.forEach((name) => classes.add(name));
+                this.className = [...classes].join(' ');
+            },
+            remove: (...names) => {
+                const remove = new Set(names);
+                this.className = this.className
+                    .split(/\s+/)
+                    .filter((name) => name && !remove.has(name))
+                    .join(' ');
+            },
+            contains: (name) => {
+                return this.className.split(/\s+/).includes(name);
             },
         };
     }
 
     appendChild(child) {
+        if (child.nodeType === 11) {
+            [...child.childNodes].forEach((fragmentChild) => this.appendChild(fragmentChild));
+            child.childNodes = [];
+            return child;
+        }
         child.parentNode?.removeChild(child);
         child.parentNode = this;
         this.childNodes.push(child);
@@ -194,22 +210,80 @@ class TestFragment extends TestNode {
         this.childNodes.push(child);
         return child;
     }
+
+    removeChild(child) {
+        const index = this.childNodes.indexOf(child);
+        if (index >= 0) {
+            this.childNodes.splice(index, 1);
+            child.parentNode = null;
+        }
+        return child;
+    }
 }
 
 class TestRange {
     constructor() {
         this.node = null;
+        this.startNode = null;
+        this.startOffset = 0;
+        this.endNode = null;
+        this.endOffset = 0;
+        this.insertionParent = null;
+        this.insertionIndex = null;
     }
 
     selectNodeContents(node) {
         this.node = node;
+        this.startNode = node;
+        this.startOffset = 0;
+        this.endNode = node;
+        this.endOffset = node.textContent?.length ?? 0;
     }
 
-    setStart(node) {
+    setStart(node, offset = 0) {
         this.node = node;
+        this.startNode = node;
+        this.startOffset = offset;
     }
 
-    setEnd() {}
+    setEnd(node, offset = node.textContent?.length ?? 0) {
+        this.endNode = node;
+        this.endOffset = offset;
+    }
+
+    extractContents() {
+        const fragment = new TestFragment();
+        if (this.startNode !== this.endNode || this.startNode?.nodeType !== 3) return fragment;
+        const textNode = this.startNode;
+        const parent = textNode.parentNode;
+        if (!parent) return fragment;
+        const index = parent.childNodes.indexOf(textNode);
+        if (index < 0) return fragment;
+        const value = textNode.nodeValue;
+        const before = value.slice(0, this.startOffset);
+        const selected = value.slice(this.startOffset, this.endOffset);
+        const after = value.slice(this.endOffset);
+        const replacements = [];
+        if (before) replacements.push(new TestText(before));
+        if (after) replacements.push(new TestText(after));
+        replacements.forEach((node) => {
+            node.parentNode = parent;
+        });
+        parent.childNodes.splice(index, 1, ...replacements);
+        textNode.parentNode = null;
+        this.insertionParent = parent;
+        this.insertionIndex = before ? index + 1 : index;
+        if (selected) fragment.appendChild(new TestText(selected));
+        return fragment;
+    }
+
+    insertNode(node) {
+        if (!this.insertionParent || this.insertionIndex === null) return;
+        node.parentNode?.removeChild(node);
+        node.parentNode = this.insertionParent;
+        this.insertionParent.childNodes.splice(this.insertionIndex, 0, node);
+        this.insertionIndex += 1;
+    }
 
     getClientRects() {
         return this.node?.rects ?? [];
@@ -318,10 +392,10 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             return { writingMode: 'vertical-rl', getPropertyValue: () => '' };
         },
     };
+    const css = options.css ?? { highlights: { delete() {}, set() {} } };
     vm.runInNewContext(readerSource(sourceUrl), {
-        CSS: { highlights: { delete() {}, set() {} } },
+        CSS: css,
         document,
-        Highlight: class {},
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
         setTimeout(callback) {
@@ -558,6 +632,35 @@ test('continuous reader re-stabilizes ruby-adjacent text after unwrap normalizes
     reader.unwrap([wrapper]);
 
     assert.deepEqual(textRunAfter(ruby).slice(0, 4), ['。', 'そ', 'れ', '追']);
+});
+
+test('Sasayaki highlight applies active DOM state without CSS Highlight API', () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('蒸し暑い'));
+        let cssHighlightSetCount = 0;
+        const css = {
+            highlights: {
+                delete() {},
+                set() {
+                    cssHighlightSetCount += 1;
+                },
+            },
+        };
+        const { reader } = loadReader(body, sourceUrl, { css });
+        reader.isEInkMode = () => false;
+
+        reader.applySasayakiCues([{ id: 'cue', start: 0, length: 4 }]);
+        reader.highlightSasayakiCue('cue', false);
+
+        const wrapper = body.firstChild;
+        assert.equal(body.childNodes.length, 1);
+        assert.equal(wrapper.nodeType, 1);
+        assert.equal(wrapper.classList.contains('hoshi-sasayaki-cue'), true);
+        assert.equal(wrapper.classList.contains('hoshi-sasayaki-active'), true);
+        assert.equal(wrapper.textContent, '蒸し暑い');
+        assert.equal(cssHighlightSetCount, 0);
+    }
 });
 
 test('reader initialization requires XHTML document.head like iOS', () => {

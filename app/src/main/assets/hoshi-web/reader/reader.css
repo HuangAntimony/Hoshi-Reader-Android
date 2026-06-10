@@ -65,25 +65,9 @@ html[data-hoshi-reader-eink-mode="true"] ::highlight(hoshi-selection) {
     text-decoration-thickness: 1.5px;
     text-underline-offset: 2px;
 }
-html[data-hoshi-reader-eink-mode="true"] ::highlight(hoshi-sasayaki) {
-    color: inherit !important;
-    background-color: transparent !important;
-}
-html[data-hoshi-reader-eink-mode="true"] ruby.hoshi-sasayaki-ruby-active {
-    color: inherit !important;
-    background-color: transparent !important;
-}
 html[data-hoshi-reader-eink-mode="true"] .hoshi-sasayaki-cue.hoshi-sasayaki-active {
     color: inherit !important;
     background-color: transparent !important;
-}
-html:not([data-hoshi-reader-eink-mode="true"]) ::highlight(hoshi-sasayaki) {
-    color: var(--hoshi-sasayaki-text-color) !important;
-    background-color: var(--hoshi-sasayaki-background-color) !important;
-}
-html:not([data-hoshi-reader-eink-mode="true"]) ruby.hoshi-sasayaki-ruby-active {
-    color: var(--hoshi-sasayaki-text-color) !important;
-    background-color: var(--hoshi-sasayaki-background-color) !important;
 }
 html:not([data-hoshi-reader-eink-mode="true"]) .hoshi-sasayaki-cue.hoshi-sasayaki-active {
     color: var(--hoshi-sasayaki-text-color) !important;
