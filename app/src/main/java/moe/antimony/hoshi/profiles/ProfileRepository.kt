@@ -133,6 +133,9 @@ class ProfileRepository internal constructor(
     fun dictionaryConfigFile(profileId: String = currentEffectiveProfileId): File =
         profileDataFile(profileId, DictionaryConfigFileName)
 
+    fun dictionarySettingsFile(profileId: String = currentEffectiveProfileId): File =
+        profileDataFile(profileId, DictionarySettingsFileName)
+
     fun collapsedDictionariesFile(profileId: String = currentEffectiveProfileId): File =
         profileDataFile(profileId, DictionaryCollapsedFileName)
 
@@ -282,11 +285,13 @@ class ProfileRepository internal constructor(
         private const val IndexFileName = "profiles.json"
         private const val LegacyDictionaryConfigFileName = "config.json"
         private const val DictionaryConfigFileName = "dictionary_config.json"
+        private const val DictionarySettingsFileName = "dictionary_settings.json"
         private const val DictionaryCollapsedFileName = "dictionary_collapsed.json"
         private const val AnkiConfigFileName = "anki_config.json"
         private const val ReaderSettingsFileName = "reader_settings.json"
         private val ProfileOwnedFileNames = listOf(
             DictionaryConfigFileName,
+            DictionarySettingsFileName,
             DictionaryCollapsedFileName,
             AnkiConfigFileName,
             ReaderSettingsFileName,

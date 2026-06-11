@@ -15,8 +15,13 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.profiles.ProfileRepository
 
@@ -200,36 +205,34 @@ class DictionarySettingsRepository(
                 profileRepository.state,
                 profileSettingsVersion,
             ) { preferences, _, _ ->
-                    val globalSettings = preferences.toDictionarySettings()
-                    globalSettings.copy(
-                        collapsedDictionaries = profileRepository.loadCollapsedDictionariesOrMigrate(
-                            globalSettings.collapsedDictionaries,
-                        ),
-                    )
+                val globalSettings = preferences.toDictionarySettings()
+                globalSettings.withProfileDictionarySettings(
+                    profileDictionarySettingsOrMigrate(globalSettings),
+                )
             }
         }
 
     suspend fun update(transform: (DictionarySettings) -> DictionarySettings) {
         migrateLegacySettingsIfNeeded()
+        if (profileRepository != null) {
+            val globalCurrent = dataStore.data.first().toDictionarySettings()
+            val current = globalCurrent.withProfileDictionarySettings(
+                profileDictionarySettingsOrMigrate(globalCurrent),
+            )
+            val updated = transform(current).normalized()
+            saveProfileDictionarySettings(updated.toProfileDictionarySettings())
+            dataStore.edit { preferences ->
+                preferences.writeGlobalDictionarySettings(updated)
+                preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
+            }
+            profileSettingsVersion.value += 1
+            return
+        }
         dataStore.edit { preferences ->
             val globalCurrent = preferences.toDictionarySettings()
-            val current = if (profileRepository == null) {
-                globalCurrent
-            } else {
-                globalCurrent.copy(
-                    collapsedDictionaries = profileRepository.loadCollapsedDictionariesOrMigrate(
-                        globalCurrent.collapsedDictionaries,
-                    ),
-                )
-            }
+            val current = globalCurrent
             val updated = transform(current).normalized()
-            if (profileRepository != null) {
-                profileRepository.saveCollapsedDictionaries(updated.collapsedDictionaries)
-                profileSettingsVersion.value += 1
-                preferences.writeDictionarySettings(updated.copy(collapsedDictionaries = emptySet()))
-            } else {
-                preferences.writeDictionarySettings(updated)
-            }
+            preferences.writeDictionarySettings(updated)
             preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
         }
     }
@@ -297,6 +300,49 @@ class DictionarySettingsRepository(
         this[KEY_CUSTOM_CSS] = normalized.customCSS
     }
 
+    private fun MutablePreferences.writeGlobalDictionarySettings(settings: DictionarySettings) {
+        val normalized = settings.normalized()
+        this[KEY_AUTO_UPDATE_DICTIONARIES] = normalized.autoUpdateDictionaries
+        this[KEY_DICTIONARY_UPDATE_INTERVAL] = normalized.dictionaryUpdateInterval.rawValue
+        val lastUpdate = normalized.lastDictionaryUpdateEpochMillis
+        if (lastUpdate == null) {
+            remove(KEY_LAST_DICTIONARY_UPDATE_EPOCH_MILLIS)
+        } else {
+            this[KEY_LAST_DICTIONARY_UPDATE_EPOCH_MILLIS] = lastUpdate
+        }
+        this[KEY_LOW_RAM_DICTIONARY_IMPORT] = normalized.lowRamDictionaryImport
+    }
+
+    private fun profileDictionarySettingsOrMigrate(globalSettings: DictionarySettings): ProfileDictionarySettings {
+        val repository = profileRepository ?: return globalSettings.toProfileDictionarySettings()
+        val file = repository.dictionarySettingsFile()
+        if (file.isFile) {
+            return runCatching {
+                json.decodeFromString<ProfileDictionarySettings>(file.readText()).normalized()
+            }.getOrDefault(globalSettings.toProfileDictionarySettings())
+        }
+        val migrated = globalSettings.toProfileDictionarySettings().copy(
+            collapsedDictionaries = legacyCollapsedDictionariesOrNull()?.toSet()
+                ?: globalSettings.collapsedDictionaries,
+        ).normalized()
+        saveProfileDictionarySettings(migrated)
+        return migrated
+    }
+
+    private fun legacyCollapsedDictionariesOrNull(): Set<String>? {
+        val file = profileRepository?.collapsedDictionariesFile() ?: return null
+        if (!file.isFile) return null
+        return runCatching {
+            json.decodeFromString(StringSetSerializer, file.readText())
+        }.getOrNull()
+    }
+
+    private fun saveProfileDictionarySettings(settings: ProfileDictionarySettings) {
+        val file = profileRepository?.dictionarySettingsFile() ?: return
+        file.parentFile?.mkdirs()
+        file.writeText(json.encodeToString(ProfileDictionarySettings.serializer(), settings.normalized()))
+    }
+
     companion object {
         const val DataStoreName = "dictionary-settings"
 
@@ -320,5 +366,69 @@ class DictionarySettingsRepository(
         private val KEY_COMPACT_PITCH_ACCENTS = booleanPreferencesKey("compactPitchAccents")
         private val KEY_LOW_RAM_DICTIONARY_IMPORT = booleanPreferencesKey("lowRamDictionaryImport")
         private val KEY_CUSTOM_CSS = stringPreferencesKey("customCSS")
+        private val StringSetSerializer = SetSerializer(String.serializer())
+        private val json = Json {
+            prettyPrint = true
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
     }
 }
+
+@Serializable
+private data class ProfileDictionarySettings(
+    val dictionaryTabDefault: Boolean = false,
+    val scanNonJapaneseText: Boolean = true,
+    val maxResults: Int = 16,
+    val scanLength: Int = 16,
+    val collapseMode: DictionaryCollapseMode = DictionaryCollapseMode.ExpandAll,
+    val expandFirstDictionary: Boolean = false,
+    val collapsedDictionaries: Set<String> = emptySet(),
+    val compactGlossaries: Boolean = true,
+    val showExpressionTags: Boolean = false,
+    val harmonicFrequency: Boolean = false,
+    val deduplicatePitchAccents: Boolean = false,
+    val compactPitchAccents: Boolean = true,
+    val customCSS: String = "",
+) {
+    fun normalized(): ProfileDictionarySettings = copy(
+        maxResults = maxResults.coerceIn(DictionarySettings.MIN_MAX_RESULTS, DictionarySettings.MAX_MAX_RESULTS),
+        scanLength = scanLength.coerceIn(DictionarySettings.MIN_SCAN_LENGTH, DictionarySettings.MAX_SCAN_LENGTH),
+    )
+}
+
+private fun DictionarySettings.toProfileDictionarySettings(): ProfileDictionarySettings =
+    normalized().let { settings ->
+        ProfileDictionarySettings(
+            dictionaryTabDefault = settings.dictionaryTabDefault,
+            scanNonJapaneseText = settings.scanNonJapaneseText,
+            maxResults = settings.maxResults,
+            scanLength = settings.scanLength,
+            collapseMode = settings.collapseMode,
+            expandFirstDictionary = settings.expandFirstDictionary,
+            collapsedDictionaries = settings.collapsedDictionaries,
+            compactGlossaries = settings.compactGlossaries,
+            showExpressionTags = settings.showExpressionTags,
+            harmonicFrequency = settings.harmonicFrequency,
+            deduplicatePitchAccents = settings.deduplicatePitchAccents,
+            compactPitchAccents = settings.compactPitchAccents,
+            customCSS = settings.customCSS,
+        )
+    }
+
+private fun DictionarySettings.withProfileDictionarySettings(profileSettings: ProfileDictionarySettings): DictionarySettings =
+    copy(
+        dictionaryTabDefault = profileSettings.dictionaryTabDefault,
+        scanNonJapaneseText = profileSettings.scanNonJapaneseText,
+        maxResults = profileSettings.maxResults,
+        scanLength = profileSettings.scanLength,
+        collapseMode = profileSettings.collapseMode,
+        expandFirstDictionary = profileSettings.expandFirstDictionary,
+        collapsedDictionaries = profileSettings.collapsedDictionaries,
+        compactGlossaries = profileSettings.compactGlossaries,
+        showExpressionTags = profileSettings.showExpressionTags,
+        harmonicFrequency = profileSettings.harmonicFrequency,
+        deduplicatePitchAccents = profileSettings.deduplicatePitchAccents,
+        compactPitchAccents = profileSettings.compactPitchAccents,
+        customCSS = profileSettings.customCSS,
+    ).normalized()

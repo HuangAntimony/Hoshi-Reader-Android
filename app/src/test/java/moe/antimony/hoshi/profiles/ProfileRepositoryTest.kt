@@ -52,10 +52,12 @@ class ProfileRepositoryTest {
         val repository = ProfileRepository(tempFolder.newFolder("files"))
         val sourceProfileId = repository.state.value.globalActiveProfileId
         val dictionaryConfig = """{"termDictionaries":[{"fileName":"b","isEnabled":true,"order":0}]}"""
+        val dictionarySettings = """{"maxResults":12,"customCSS":".term{}"}"""
         val collapsed = """["JMdict","Jitendex"]"""
         val ankiConfig = """{"selectedDeckName":"Japanese"}"""
         val readerSettings = """{"theme":"Dark","fontSize":30}"""
         repository.dictionaryConfigFile(sourceProfileId).writeProfileText(dictionaryConfig)
+        repository.dictionarySettingsFile(sourceProfileId).writeProfileText(dictionarySettings)
         repository.collapsedDictionariesFile(sourceProfileId).writeProfileText(collapsed)
         repository.ankiConfigFile(sourceProfileId).writeProfileText(ankiConfig)
         repository.readerSettingsFile(sourceProfileId).writeProfileText(readerSettings)
@@ -63,6 +65,7 @@ class ProfileRepositoryTest {
         val english = repository.createProfile("English", "en")
 
         assertEquals(dictionaryConfig, repository.dictionaryConfigFile(english.id).readText())
+        assertEquals(dictionarySettings, repository.dictionarySettingsFile(english.id).readText())
         assertEquals(collapsed, repository.collapsedDictionariesFile(english.id).readText())
         assertEquals(ankiConfig, repository.ankiConfigFile(english.id).readText())
         assertEquals(readerSettings, repository.readerSettingsFile(english.id).readText())

@@ -55,7 +55,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   reads use the currently published session and return empty results when no
   session is ready.
 - Dictionary data directories remain global under `Dictionaries/`, while each
-  profile owns `dictionary_config.json` and `dictionary_collapsed.json` under
+  profile owns `dictionary_config.json` and `dictionary_settings.json` under
   `Profiles/<profileId>/`.
 - Reader Appearance settings are stored per active/effective profile in
   `Profiles/<profileId>/reader_settings.json`; Reader Behavior and statistics
@@ -65,8 +65,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Dictionary storage/config mutations share a Hilt singleton mutation
   coordinator. Dictionary UI, manual updates, imports, and WorkManager automatic
   updates observe the same in-process busy/progress state and completed-change
-  version; durable settings such as update interval and last update remain in
-  DataStore.
+  version; operational dictionary settings such as update interval, last update,
+  and low-memory import remain in DataStore.
 
 ## Reader
 
