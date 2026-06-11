@@ -285,7 +285,7 @@ test('popup transcription entries do not render as Japanese pitch accents', () =
             {
                 dictionary: 'English',
                 pitchPositions: [],
-                transcriptions: ['riːd', 'rɛd'],
+                transcriptions: ['/riːd/', '/rɛd/'],
             },
         ],
     });
@@ -295,4 +295,26 @@ test('popup transcription entries do not render as Japanese pitch accents', () =
     assert.equal(nodes.some((node) => String(node.className).split(' ').includes('transcription-list')), true);
     assert.equal(nodes.some((node) => String(node.className).split(' ').includes('pitch-group')), false);
     assert.equal(nodes.some((node) => node.textContent === '/riːd/'), true);
+});
+
+test('popup preserves IPA dictionary transcription delimiters', () => {
+    const { context } = popupContext();
+
+    const tags = context.createTags({
+        expression: 'read',
+        reading: 'read',
+        deinflectionTrace: [],
+        frequencies: [],
+        pitches: [
+            {
+                dictionary: 'seth-oald-ipa',
+                pitchPositions: [],
+                transcriptions: ['/riːd/'],
+            },
+        ],
+    });
+    const nodes = descendants(tags);
+
+    assert.equal(nodes.some((node) => node.textContent === '/riːd/'), true);
+    assert.equal(nodes.some((node) => node.textContent === '//riːd//'), false);
 });

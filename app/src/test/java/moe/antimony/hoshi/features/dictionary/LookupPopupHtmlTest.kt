@@ -196,13 +196,13 @@ class LookupPopupHtmlTest {
                     PitchEntry(
                         dictName = "English",
                         pitchPositions = intArrayOf(),
-                        transcriptions = arrayOf("riːd", "rɛd"),
+                        transcriptions = arrayOf("/riːd/", "/rɛd/"),
                     ),
                 ),
             ),
         )
 
-        assertTrue(entryJson.contains(""""transcriptions":["riːd","rɛd"]"""))
+        assertTrue(entryJson.contains(""""transcriptions":["/riːd/","/rɛd/"]"""))
         assertTrue(entryJson.contains(""""pitchPositions":[]"""))
     }
 

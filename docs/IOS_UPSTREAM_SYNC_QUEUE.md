@@ -45,39 +45,9 @@ Validation:
 - Import, enable/disable, reorder, delete, update, and backup-restore dictionaries while search/reader lookup is active; confirm the UI remains responsive and stale rebuilds do not replace newer dictionaries.
 - `./gradlew test` and `./gradlew assembleDebug` on a clean native build after submodule updates.
 
-### 2. Dictionary IPA display
-
-Status: pending Android sync; deferred while Anki template and glossary handlebar work is completed separately.
-
-Commits:
-
-- `36be339` - support for IPA dicts.
-
-Why this follows lookup normalization:
-
-- IPA pitch display is generated from lookup data. Land the native normalization/query rebuild slice first, then expose transcription data through the bridge and popup payload.
-
-iOS behavior to mirror:
-
-- Pitch dictionaries can provide IPA/transcription strings alongside numeric pitch positions. Popup pitch groups render both, and duplicate pitch positions are still deduplicated across dictionaries.
-
-Android current gap:
-
-- The Android hoshidicts bridge submodule is already at the newer `497578824f...` native revision, matching the iOS package update context and covering the native frequency-sort change from `e70008d`.
-- `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts/include/hoshidicts/query.hpp` already has `PitchEntry.transcriptions`, but `app/src/main/java/de/manhhao/hoshi/HoshiDicts.kt` and `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts_jni.cpp` still expose only `pitchPositions`.
-- `LookupPopupHtml.toEntryJson()` still serializes pitch groups with only `pitchPositions`, and `app/src/main/assets/hoshi-web/popup/popup.js` still renders pitch groups without transcription rows.
-
-Suggested slice:
-
-- Extend the bridge-facing pitch model by updating the hoshidicts Kotlin/JNI bridge submodule and Android model copy to expose `transcriptions`.
-- Render IPA/transcription rows in popup pitch groups without breaking compact pitch and pitch deduplication behavior.
-
-Validation:
-
-- Import an IPA-capable pitch dictionary and confirm lookup popups show transcription rows.
-
 ## Covered Or No Android Action
 
+- `36be339`: Android now covers IPA/transcription pitch dictionary display. The hoshidicts Kotlin/JNI bridge exposes `PitchEntry.transcriptions`; lookup popup payloads serialize transcriptions separately from numeric pitch positions; popup JavaScript renders transcription rows without treating them as Japanese pitch accents; and transcription text is rendered as supplied by the IPA dictionary.
 - `94d0c41`: Android now mirrors dictionary automatic updates. Updatable dictionaries show an Updates section with automatic update controls, Daily/Weekly/Monthly intervals, Last Update/Never display, manual Update, foreground-triggered WorkManager checks constrained to unmetered networks, shared import/update busy state across the Dictionary UI and automatic updates, per-dictionary partial-failure handling, last-update persistence after at least one successful check/import, and staged import replacement that leaves failed dictionaries intact.
 - `ab6722e`, `67bdbb9`, `1aaee97`, `c2e1c09`, `32d76d2`: Android now covers the TTU/Google Drive book-data slice. Book folders retain `<folder>.epub` and `BookMetadata.epub`; legacy extracted books are repacked only after parse verification; Books can export stored EPUBs; Backup settings expose TTU bookdata export/import; Google Drive sync lists remote book folders, discovers TTU sidecars, uploads missing bookdata when Upload Books is enabled, imports remote-only books, trashes remote folders, clears cached Drive IDs/covers, and only preflights for an active network with internet capability before Drive REST requests.
 - `73a9e62`: Android now mirrors the Dictionary pull-to-clear/show-keyboard slice with reader-style iframe search results, localized pull/release labels, active Dictionary tab refocus/select-all, and measured search-result placement below the search field.
@@ -104,11 +74,9 @@ Validation:
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
-| `36be339` | 2026-05-25 | IPA/transcription pitch dictionary display | Pending bridge/UI sync |
 | `0d6c072` | 2026-06-04 | hoshidicts normalization processor bump | Pending bridge/native sync |
 | `cfc1e50` | 2026-06-04 | Build lookup query off main thread | Pending |
 
 ## Suggested Implementation Order
 
 1. Dictionary lookup normalization and query rebuild threading.
-2. Dictionary IPA display.

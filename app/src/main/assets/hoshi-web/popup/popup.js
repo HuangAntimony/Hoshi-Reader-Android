@@ -1175,7 +1175,7 @@ function createTranscriptionGroup(transcriptionData) {
     transcriptionData.transcriptions?.forEach((transcription) => {
         if (!transcription) return;
         const li = el('li');
-        li.appendChild(el('span', { className: 'transcription-text', textContent: `/${transcription}/` }));
+        li.appendChild(el('span', { className: 'transcription-text', textContent: transcription }));
         list.appendChild(li);
     });
     container.appendChild(list);
