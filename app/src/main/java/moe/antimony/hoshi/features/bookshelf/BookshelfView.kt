@@ -1885,8 +1885,18 @@ private fun ProfileDestinationMenu(
     ) {
         SortMenuHeader(text = stringResource(R.string.bookshelf_profile))
         HorizontalDivider()
+        val automaticProfile = profileState.automaticBookProfile(entry.metadata.bookLanguage)
         DropdownMenuItem(
-            text = { Text(stringResource(R.string.bookshelf_profile_automatic)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.bookshelf_profile_automatic))
+                    Text(
+                        text = stringResource(R.string.bookshelf_profile_automatic_uses_format, automaticProfile.name),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
             leadingIcon = {
                 if (entry.metadata.profileId == null) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null)

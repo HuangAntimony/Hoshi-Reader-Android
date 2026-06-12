@@ -211,6 +211,7 @@
     <string name="profiles_default_cannot_delete">默认 Profile 不能删除。</string>
     <string name="bookshelf_profile">Profile</string>
     <string name="bookshelf_profile_automatic">自动</string>
+    <string name="bookshelf_profile_automatic_uses_format">将使用 %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">音量键翻页</string>
     <string name="reader_behavior_volume_keys_seek_sasayaki">音量键跳转有声书</string>
     <string name="reader_behavior_reverse_volume_key_direction">反转音量键方向</string>

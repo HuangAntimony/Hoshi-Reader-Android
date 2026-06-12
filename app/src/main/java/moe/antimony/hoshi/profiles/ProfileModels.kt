@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.profiles
 
+import java.util.Locale
 import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.content.ContentLanguageProfile
 
@@ -33,4 +34,14 @@ data class ProfileState(
 
     fun profileById(profileId: String): HoshiProfile? =
         profiles.firstOrNull { it.id == profileId }
+
+    fun automaticBookProfile(bookLanguage: String?): HoshiProfile {
+        val automaticProfile = bookLanguage
+            ?.substringBefore('-')
+            ?.substringBefore('_')
+            ?.lowercase(Locale.ROOT)
+            ?.let { primaryProfileIdsByLanguage[it] }
+            ?.let { profileById(it) }
+        return automaticProfile ?: globalActiveProfile
+    }
 }

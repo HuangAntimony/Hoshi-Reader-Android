@@ -213,6 +213,7 @@
     <string name="profiles_default_cannot_delete">The default profile cannot be deleted.</string>
     <string name="bookshelf_profile">Profile</string>
     <string name="bookshelf_profile_automatic">Automatic</string>
+    <string name="bookshelf_profile_automatic_uses_format">Uses %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">Volume Keys Turn Pages</string>
     <string name="reader_behavior_volume_keys_seek_sasayaki">Volume Keys Seek Sasayaki</string>
     <string name="reader_behavior_reverse_volume_key_direction">Reverse Volume Key Direction</string>
