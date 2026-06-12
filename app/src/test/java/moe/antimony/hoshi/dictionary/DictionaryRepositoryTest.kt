@@ -13,6 +13,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.content.ContentLanguageProfile
 import org.junit.Assert.assertThrows
 
 class DictionaryRepositoryTest {
@@ -328,16 +329,40 @@ class DictionaryRepositoryTest {
             indexUrl = "https://jitendex.org/static/yomitan.json",
             downloadUrl = "https://example.invalid/jitendex.zip",
         )
+        val englishIpaIndex = DictionaryIndex(
+            title = "wty-en-en-ipa",
+            format = 3,
+            revision = "2026.06.10",
+            isUpdatable = true,
+            indexUrl = "https://example.invalid/wty-en-en-ipa-index.json",
+            downloadUrl = "https://example.invalid/wty-en-en-ipa.zip",
+        )
+        val leipzigEnglishWebRankIndex = DictionaryIndex(
+            title = "Leipzig English Web (Rank)",
+            format = 3,
+            revision = "2024.08.31",
+            downloadUrl = "https://example.invalid/Leipzig.English.Web.Rank.zip",
+        )
+        val leipzigEnglishWikipediaRankIndex = DictionaryIndex(
+            title = "Leipzig English Wikipedia (Rank)",
+            format = 3,
+            revision = "2024.08.31",
+            downloadUrl = "https://example.invalid/Leipzig.English.Wikipedia.Rank.zip",
+        )
         val remote = FakeDictionaryRemoteDataSource(
             indexes = mapOf(
                 jmdictIndex.indexUrl to jmdictIndex,
                 jitenIndex.indexUrl to jitenIndex,
                 jitendexIndex.indexUrl to jitendexIndex,
+                englishIpaIndex.indexUrl to englishIpaIndex,
             ),
             archives = mapOf(
                 jmdictIndex.downloadUrl to dictionaryArchive(jmdictIndex),
                 jitenIndex.downloadUrl to dictionaryArchive(jitenIndex),
                 jitendexIndex.downloadUrl to dictionaryArchive(jitendexIndex),
+                englishIpaIndex.downloadUrl to dictionaryArchive(englishIpaIndex),
+                leipzigEnglishWebRankIndex.downloadUrl to dictionaryArchive(leipzigEnglishWebRankIndex),
+                leipzigEnglishWikipediaRankIndex.downloadUrl to dictionaryArchive(leipzigEnglishWikipediaRankIndex),
             ),
         )
         val repository = DictionaryRepository(
@@ -366,6 +391,29 @@ class DictionaryRepositoryTest {
                 type = DictionaryType.Term,
                 indexUrl = jitendexIndex.indexUrl,
             ),
+            RecommendedDictionary(
+                id = "wty-en-en-ipa",
+                name = "wty-en-en-ipa",
+                type = DictionaryType.Pitch,
+                indexUrl = englishIpaIndex.indexUrl,
+                languageId = ContentLanguageProfile.EnglishLanguageId,
+            ),
+            RecommendedDictionary(
+                id = "leipzig-english-web-rank",
+                name = "Leipzig English Web",
+                type = DictionaryType.Frequency,
+                indexUrl = "",
+                downloadUrl = leipzigEnglishWebRankIndex.downloadUrl,
+                languageId = ContentLanguageProfile.EnglishLanguageId,
+            ),
+            RecommendedDictionary(
+                id = "leipzig-english-wikipedia-rank",
+                name = "Leipzig English Wikipedia",
+                type = DictionaryType.Frequency,
+                indexUrl = "",
+                downloadUrl = leipzigEnglishWikipediaRankIndex.downloadUrl,
+                languageId = ContentLanguageProfile.EnglishLanguageId,
+            ),
         )
         val progress = mutableListOf<String>()
 
@@ -384,16 +432,34 @@ class DictionaryRepositoryTest {
                 "Fetching:Jitendex",
                 "Downloading:${jitendexIndex.title}",
                 "Importing:${jitendexIndex.title}",
+                "Fetching:wty-en-en-ipa",
+                "Downloading:${englishIpaIndex.title}",
+                "Importing:${englishIpaIndex.title}",
+                "Downloading:Leipzig English Web",
+                "Importing:Leipzig English Web",
+                "Downloading:Leipzig English Wikipedia",
+                "Importing:Leipzig English Wikipedia",
             ),
             progress,
         )
         assertEquals(
-            listOf(jmdictIndex.downloadUrl, jitenIndex.downloadUrl, jitendexIndex.downloadUrl),
+            listOf(
+                jmdictIndex.downloadUrl,
+                jitenIndex.downloadUrl,
+                jitendexIndex.downloadUrl,
+                englishIpaIndex.downloadUrl,
+                leipzigEnglishWebRankIndex.downloadUrl,
+                leipzigEnglishWikipediaRankIndex.downloadUrl,
+            ),
             remote.downloadedUrls,
         )
-        assertEquals(listOf(true, true, true), bridge.lowRamModes)
+        assertEquals(listOf(true, true, true, true, true, true), bridge.lowRamModes)
         assertEquals(listOf(jmdictIndex.title, jitendexIndex.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
-        assertEquals(listOf(jitenIndex.title), repository.loadDictionaries(DictionaryType.Frequency).map { it.index.title })
+        assertEquals(
+            listOf(jitenIndex.title, leipzigEnglishWebRankIndex.title, leipzigEnglishWikipediaRankIndex.title),
+            repository.loadDictionaries(DictionaryType.Frequency).map { it.index.title },
+        )
+        assertEquals(listOf(englishIpaIndex.title), repository.loadDictionaries(DictionaryType.Pitch).map { it.index.title })
         assertEquals(
             listOf(
                 filesDir.resolve("Dictionaries/Term/${jmdictIndex.title}").absolutePath,
@@ -402,8 +468,16 @@ class DictionaryRepositoryTest {
             bridge.termPaths.toList(),
         )
         assertEquals(
-            listOf(filesDir.resolve("Dictionaries/Frequency/${jitenIndex.title}").absolutePath),
+            listOf(
+                filesDir.resolve("Dictionaries/Frequency/${jitenIndex.title}").absolutePath,
+                filesDir.resolve("Dictionaries/Frequency/${leipzigEnglishWebRankIndex.title}").absolutePath,
+                filesDir.resolve("Dictionaries/Frequency/${leipzigEnglishWikipediaRankIndex.title}").absolutePath,
+            ),
             bridge.freqPaths.toList(),
+        )
+        assertEquals(
+            listOf(filesDir.resolve("Dictionaries/Pitch/${englishIpaIndex.title}").absolutePath),
+            bridge.pitchPaths.toList(),
         )
     }
 
@@ -444,14 +518,98 @@ class DictionaryRepositoryTest {
     }
 
     @Test
-    fun recommendedDictionariesMatchIosList() {
+    fun recommendedDictionariesKeepJapaneseListAndAddEnglishWtyList() {
         assertEquals(
             listOf("jmdict", "jmnedict", "jiten", "jitendex"),
-            RecommendedDictionaries.map { it.id },
+            recommendedDictionariesForLanguage(ContentLanguageProfile.JapaneseLanguageId).map { it.id },
         )
         assertEquals(
             "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english_without_proper_names.json",
             RecommendedDictionaries.first { it.id == "jmdict" }.indexUrl,
+        )
+
+        val englishRecommendations = recommendedDictionariesForLanguage(ContentLanguageProfile.EnglishLanguageId)
+        assertEquals(
+            listOf(
+                "wty-en-en",
+                "wty-en-en-ipa",
+                "wty-simple-simple",
+                "wty-en-ja",
+                "wty-en-ja-gloss",
+                "leipzig-english-web-rank",
+                "leipzig-english-wikipedia-rank",
+            ),
+            englishRecommendations.map { it.id },
+        )
+        assertFalse(englishRecommendations.any { it.id == "wty-en-en-gloss" })
+        assertFalse(englishRecommendations.any { it.id == "wty-en-zh" })
+        assertFalse(englishRecommendations.any { it.id == "wty-en-zh-gloss" })
+
+        val englishById = englishRecommendations.associateBy { it.id }
+        assertEquals(
+            "Wiktionary English-English",
+            englishById.getValue("wty-en-en").name,
+        )
+        assertEquals(
+            "Wiktionary English-English IPA",
+            englishById.getValue("wty-en-en-ipa").name,
+        )
+        assertEquals(
+            "Wiktionary Simple English-Simple English",
+            englishById.getValue("wty-simple-simple").name,
+        )
+        assertEquals(
+            "Wiktionary English-Japanese",
+            englishById.getValue("wty-en-ja").name,
+        )
+        assertEquals(
+            "Wiktionary English-Japanese Glossary",
+            englishById.getValue("wty-en-ja-gloss").name,
+        )
+        assertEquals(
+            "Leipzig English Web",
+            englishById.getValue("leipzig-english-web-rank").name,
+        )
+        assertEquals(
+            "Leipzig English Wikipedia",
+            englishById.getValue("leipzig-english-wikipedia-rank").name,
+        )
+
+        assertEquals(DictionaryType.Term, englishById.getValue("wty-en-en").type)
+        assertEquals(DictionaryType.Pitch, englishById.getValue("wty-en-en-ipa").type)
+        assertEquals(DictionaryType.Term, englishById.getValue("wty-simple-simple").type)
+        assertEquals(DictionaryType.Term, englishById.getValue("wty-en-ja").type)
+        assertEquals(DictionaryType.Term, englishById.getValue("wty-en-ja-gloss").type)
+        assertEquals(DictionaryType.Frequency, englishById.getValue("leipzig-english-web-rank").type)
+        assertEquals(DictionaryType.Frequency, englishById.getValue("leipzig-english-wikipedia-rank").type)
+
+        assertEquals(
+            "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-index.json?download=true",
+            englishById.getValue("wty-en-en").indexUrl,
+        )
+        assertEquals(
+            "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-ipa-index.json?download=true",
+            englishById.getValue("wty-en-en-ipa").indexUrl,
+        )
+        assertEquals(
+            "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-simple-simple-index.json?download=true",
+            englishById.getValue("wty-simple-simple").indexUrl,
+        )
+        assertEquals(
+            "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-ja-index.json?download=true",
+            englishById.getValue("wty-en-ja").indexUrl,
+        )
+        assertEquals(
+            "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-ja-gloss-index.json?download=true",
+            englishById.getValue("wty-en-ja-gloss").indexUrl,
+        )
+        assertEquals(
+            "https://github.com/StefanVukovic99/leipzig-to-yomitan/releases/latest/download/Leipzig.English.Web.Rank.zip",
+            englishById.getValue("leipzig-english-web-rank").downloadUrl,
+        )
+        assertEquals(
+            "https://github.com/StefanVukovic99/leipzig-to-yomitan/releases/latest/download/Leipzig.English.Wikipedia.Rank.zip",
+            englishById.getValue("leipzig-english-wikipedia-rank").downloadUrl,
         )
     }
 

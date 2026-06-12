@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.dictionary
 
 import kotlinx.serialization.Serializable
+import moe.antimony.hoshi.content.ContentLanguageProfile
 import java.io.File
 import java.util.UUID
 
@@ -62,9 +63,10 @@ data class RecommendedDictionary(
     val id: String,
     val name: String,
     val type: DictionaryType,
-    val indexUrl: String,
+    val indexUrl: String = "",
+    val downloadUrl: String = "",
     val description: String = "",
-    val languageId: String = "ja",
+    val languageId: String = ContentLanguageProfile.JapaneseLanguageId,
 )
 
 val RecommendedDictionaries: List<RecommendedDictionary> = listOf(
@@ -95,6 +97,62 @@ val RecommendedDictionaries: List<RecommendedDictionary> = listOf(
         type = DictionaryType.Term,
         indexUrl = "https://jitendex.org/static/yomitan.json",
         description = "Term",
+    ),
+    RecommendedDictionary(
+        id = "wty-en-en",
+        name = "Wiktionary English-English",
+        type = DictionaryType.Term,
+        indexUrl = "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-index.json?download=true",
+        description = "Term",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "wty-en-en-ipa",
+        name = "Wiktionary English-English IPA",
+        type = DictionaryType.Pitch,
+        indexUrl = "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-en-ipa-index.json?download=true",
+        description = "IPA",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "wty-simple-simple",
+        name = "Wiktionary Simple English-Simple English",
+        type = DictionaryType.Term,
+        indexUrl = "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-simple-simple-index.json?download=true",
+        description = "Term",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "wty-en-ja",
+        name = "Wiktionary English-Japanese",
+        type = DictionaryType.Term,
+        indexUrl = "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-ja-index.json?download=true",
+        description = "Term",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "wty-en-ja-gloss",
+        name = "Wiktionary English-Japanese Glossary",
+        type = DictionaryType.Term,
+        indexUrl = "https://huggingface.co/datasets/daxida/wty-release/resolve/main/latest/index/wty-en-ja-gloss-index.json?download=true",
+        description = "Glossary",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "leipzig-english-web-rank",
+        name = "Leipzig English Web",
+        type = DictionaryType.Frequency,
+        downloadUrl = "https://github.com/StefanVukovic99/leipzig-to-yomitan/releases/latest/download/Leipzig.English.Web.Rank.zip",
+        description = "Frequency",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
+    ),
+    RecommendedDictionary(
+        id = "leipzig-english-wikipedia-rank",
+        name = "Leipzig English Wikipedia",
+        type = DictionaryType.Frequency,
+        downloadUrl = "https://github.com/StefanVukovic99/leipzig-to-yomitan/releases/latest/download/Leipzig.English.Wikipedia.Rank.zip",
+        description = "Frequency",
+        languageId = ContentLanguageProfile.EnglishLanguageId,
     ),
 )
 

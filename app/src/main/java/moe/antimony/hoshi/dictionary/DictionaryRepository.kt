@@ -181,8 +181,17 @@ internal class DictionaryRepository @Inject constructor(
     ): Int {
         var importedCount = 0
         dictionaries.forEach { dictionary ->
-            onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Fetching, dictionary.name))
-            val remoteIndex = remoteDataSource.fetchIndex(dictionary.indexUrl)
+            val remoteIndex = if (dictionary.downloadUrl.isBlank()) {
+                onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Fetching, dictionary.name))
+                remoteDataSource.fetchIndex(dictionary.indexUrl)
+            } else {
+                DictionaryIndex(
+                    title = dictionary.name,
+                    format = 3,
+                    revision = "",
+                    downloadUrl = dictionary.downloadUrl,
+                )
+            }
             onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Downloading, remoteIndex.title))
             val imported = remoteDataSource.downloadArchive(remoteIndex.downloadUrl).use { input ->
                 onProgress(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, remoteIndex.title))
