@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
+import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +58,7 @@ fun SasayakiSettingsView(
     val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
     val settings = repository.settings.collectAsLoadedSettings()
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
+    var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
 
     fun save(next: SasayakiSettings) {
         scope.launch {
@@ -208,6 +211,20 @@ fun SasayakiSettingsView(
                                 )
                             },
                         )
+                        SettingsDivider()
+                        SasayakiColorSettingsSection(
+                            title = stringResource(R.string.sasayaki_light_theme),
+                            rows = SasayakiColorRow.lightRows,
+                            settings = loadedSettings,
+                            onRowClick = { colorDialogRow = it },
+                        )
+                        SettingsDivider()
+                        SasayakiColorSettingsSection(
+                            title = stringResource(R.string.sasayaki_dark_theme),
+                            rows = SasayakiColorRow.darkRows,
+                            settings = loadedSettings,
+                            onRowClick = { colorDialogRow = it },
+                        )
                     }
                 }
                 Text(
@@ -218,6 +235,45 @@ fun SasayakiSettingsView(
                 )
             }
         }
+    }
+    val currentSettings = settings
+    val currentColorDialogRow = colorDialogRow
+    if (currentSettings != null && currentColorDialogRow != null) {
+        ReaderColorPickerDialog(
+            title = stringResource(currentColorDialogRow.labelRes),
+            initialColor = currentColorDialogRow.color(currentSettings),
+            defaultColor = currentColorDialogRow.defaultColor,
+            onColorChange = { color ->
+                save(currentColorDialogRow.updated(currentSettings, color))
+                colorDialogRow = null
+            },
+            onDismiss = { colorDialogRow = null },
+        )
+    }
+}
+
+@Composable
+private fun SasayakiColorSettingsSection(
+    title: String,
+    rows: List<SasayakiColorRow>,
+    settings: SasayakiSettings,
+    onRowClick: (SasayakiColorRow) -> Unit,
+) {
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+    )
+    rows.forEachIndexed { index, row ->
+        if (index > 0) SettingsDivider()
+        ReaderColorSettingRow(
+            label = stringResource(row.labelRes),
+            color = row.color(settings),
+            onClick = { onRowClick(row) },
+            horizontalPadding = 16.dp,
+        )
     }
 }
 

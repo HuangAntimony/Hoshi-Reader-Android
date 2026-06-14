@@ -46,6 +46,8 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
+import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
+import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
 import moe.antimony.hoshi.features.reader.readerSheetDensityMetrics
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.importing.ImportFileType
@@ -73,6 +75,7 @@ fun SasayakiSheet(
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
+    var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
     val importFailedMessage = stringResource(R.string.sasayaki_import_audiobook_failed)
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
         if (uri == null || isImporting) return@rememberLauncherForActivityResult
@@ -259,6 +262,20 @@ fun SasayakiSheet(
                     checked = settings.autoPause,
                     onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                SasayakiColorSheetSection(
+                    title = stringResource(R.string.sasayaki_light_theme),
+                    rows = SasayakiColorRow.lightRows,
+                    settings = settings,
+                    onRowClick = { colorDialogRow = it },
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+                SasayakiColorSheetSection(
+                    title = stringResource(R.string.sasayaki_dark_theme),
+                    rows = SasayakiColorRow.darkRows,
+                    settings = settings,
+                    onRowClick = { colorDialogRow = it },
+                )
             }
             if (isImporting) {
                 HoshiBlockingProgressOverlay(
@@ -267,6 +284,42 @@ fun SasayakiSheet(
                 )
             }
         }
+    }
+    colorDialogRow?.let { row ->
+        ReaderColorPickerDialog(
+            title = stringResource(row.labelRes),
+            initialColor = row.color(settings),
+            defaultColor = row.defaultColor,
+            onColorChange = { color ->
+                onSettingsChange(row.updated(settings, color))
+                colorDialogRow = null
+            },
+            onDismiss = { colorDialogRow = null },
+        )
+    }
+}
+
+@Composable
+private fun SasayakiColorSheetSection(
+    title: String,
+    rows: List<SasayakiColorRow>,
+    settings: SasayakiSettings,
+    onRowClick: (SasayakiColorRow) -> Unit,
+) {
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+    )
+    rows.forEach { row ->
+        ReaderColorSettingRow(
+            label = stringResource(row.labelRes),
+            color = row.color(settings),
+            onClick = { onRowClick(row) },
+            horizontalPadding = 20.dp,
+        )
     }
 }
 

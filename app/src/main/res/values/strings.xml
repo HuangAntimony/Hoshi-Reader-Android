@@ -537,6 +537,8 @@
     <string name="sasayaki_reverse_vertical_skip_buttons">Reverse in Vertical</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">In vertical writing, swap only the bottom reader skip button actions.</string>
     <string name="sasayaki_playback">Playback</string>
+    <string name="sasayaki_light_theme">Light Theme</string>
+    <string name="sasayaki_dark_theme">Dark Theme</string>
     <string name="sasayaki_auto_scroll">Auto-Scroll</string>
     <string name="sasayaki_auto_pause_on_lookup">Auto-Pause on Lookup</string>
     <string name="sasayaki_importing_audio">Importing audio...</string>

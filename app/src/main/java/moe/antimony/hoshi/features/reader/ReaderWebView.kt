@@ -1209,6 +1209,11 @@ fun ReaderWebView(
                 }
                 if (highlights != null) {
                     val loadChapter = currentLoadChapter()
+                    val currentSasayakiColors = readerSasayakiColors(
+                        settings = effectiveSettings,
+                        sasayakiSettings = sasayakiSettings,
+                        systemDark = systemDarkTheme,
+                    )
                     ChapterWebView(
                         book = book,
                         chapterPosition = readerPosition.loadPosition,
@@ -1264,8 +1269,8 @@ fun ReaderWebView(
                             matchData = sasayakiMatchData,
                             chapterIndex = readerPosition.loadPosition.index,
                         ),
-                        sasayakiTextColor = sasayakiSettings.textColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
-                        sasayakiBackgroundColor = sasayakiSettings.backgroundColor(effectiveSettings.usesDarkInterface(systemDarkTheme)),
+                        sasayakiTextColor = currentSasayakiColors.textColor,
+                        sasayakiBackgroundColor = currentSasayakiColors.backgroundColor,
                         onTextSelected = handleTextSelected,
                         onClearLookupPopup = ::closeLookupPopupsAndSelection,
                         onReaderTapOutside = ::handleReaderTapOutside,

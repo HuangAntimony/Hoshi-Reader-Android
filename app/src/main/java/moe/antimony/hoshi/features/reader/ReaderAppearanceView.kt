@@ -36,7 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -68,7 +67,6 @@ import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.importDisplayName
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
-import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.util.Locale
 import kotlin.math.round
@@ -271,7 +269,7 @@ private fun ReaderAppearanceContent(
                         )
                         readerAppearanceCustomColorRows(settings).forEach { row ->
                             AppearanceDivider(palette)
-                            ColorRow(
+                            ReaderColorSettingRow(
                                 label = stringResource(row.labelRes),
                                 color = row.color(settings),
                                 onClick = { colorDialogRow = row },
@@ -639,16 +637,17 @@ private fun ReaderAppearanceContent(
         )
     }
     colorDialogRow?.let { row ->
-        ReaderColorDialog(
+        ReaderColorPickerDialog(
             title = stringResource(row.labelRes),
             initialColor = row.color(settings),
             defaultColor = row.defaultColor,
-            palette = palette,
             onColorChange = { color ->
                 onSettingsChange(row.updated(settings, color))
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },
+            previewBorderColor = palette.divider,
+            cursorColor = palette.onGroup,
         )
     }
 }
@@ -940,185 +939,6 @@ private fun ReaderFontRow(
         }
     }
 }
-
-@Composable
-private fun ColorRow(
-    label: String,
-    color: Long,
-    onClick: () -> Unit,
-) {
-    val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(28.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(color),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                tonalElevation = 0.dp,
-            ) {}
-            Text(
-                text = color.toReaderColorHexInput(includeAlpha = color.readerColorAlpha() != 0xFF),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReaderColorDialog(
-    title: String,
-    initialColor: Long,
-    defaultColor: Long,
-    palette: AppearancePalette,
-    onColorChange: (Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var draftColor by remember(initialColor) { mutableStateOf(initialColor) }
-    var hexInput by remember(initialColor) {
-        mutableStateOf(initialColor.toReaderColorHexInput(includeAlpha = initialColor.readerColorAlpha() != 0xFF))
-    }
-    val parsedColor = readerColorFromHexInput(hexInput)
-    val inputError = hexInput.isNotBlank() && parsedColor == null
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = draftColor.toOpaqueReaderColor(),
-                    border = BorderStroke(1.dp, palette.divider),
-                    tonalElevation = 0.dp,
-                ) {}
-                OutlinedTextField(
-                    value = hexInput,
-                    onValueChange = { value ->
-                        hexInput = value
-                        readerColorFromHexInput(value)?.let { draftColor = it }
-                    },
-                    label = { Text(stringResource(R.string.reader_appearance_color_hex)) },
-                    singleLine = true,
-                    isError = inputError,
-                    supportingText = if (inputError) {
-                        { Text(stringResource(R.string.reader_appearance_color_invalid)) }
-                    } else {
-                        null
-                    },
-                    colors = hoshiOutlinedTextFieldColors(cursorColor = palette.onGroup),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ReaderColorChannelSlider(
-                    label = stringResource(R.string.reader_appearance_color_alpha),
-                    value = draftColor.readerColorAlpha(),
-                    onValueChange = { value ->
-                        draftColor = draftColor.withReaderColorAlpha(value)
-                        hexInput = draftColor.toReaderColorHexInput(includeAlpha = true)
-                    },
-                )
-                ReaderColorChannelSlider(
-                    label = stringResource(R.string.reader_appearance_color_red),
-                    value = draftColor.readerColorRed(),
-                    onValueChange = { value ->
-                        draftColor = draftColor.withReaderColorRed(value)
-                        hexInput = draftColor.toReaderColorHexInput(includeAlpha = draftColor.readerColorAlpha() != 0xFF)
-                    },
-                )
-                ReaderColorChannelSlider(
-                    label = stringResource(R.string.reader_appearance_color_green),
-                    value = draftColor.readerColorGreen(),
-                    onValueChange = { value ->
-                        draftColor = draftColor.withReaderColorGreen(value)
-                        hexInput = draftColor.toReaderColorHexInput(includeAlpha = draftColor.readerColorAlpha() != 0xFF)
-                    },
-                )
-                ReaderColorChannelSlider(
-                    label = stringResource(R.string.reader_appearance_color_blue),
-                    value = draftColor.readerColorBlue(),
-                    onValueChange = { value ->
-                        draftColor = draftColor.withReaderColorBlue(value)
-                        hexInput = draftColor.toReaderColorHexInput(includeAlpha = draftColor.readerColorAlpha() != 0xFF)
-                    },
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !inputError,
-                onClick = { onColorChange(parsedColor ?: draftColor) },
-            ) {
-                Text(stringResource(R.string.action_save))
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(
-                    onClick = {
-                        draftColor = defaultColor
-                        hexInput = defaultColor.toReaderColorHexInput(includeAlpha = defaultColor.readerColorAlpha() != 0xFF)
-                    },
-                ) {
-                    Text(stringResource(R.string.action_reset))
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        },
-    )
-}
-
-@Composable
-private fun ReaderColorChannelSlider(
-    label: String,
-    value: Int,
-    onValueChange: (Int) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = label,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(value.toString(), style = MaterialTheme.typography.bodyMedium)
-        }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onValueChange(round(it).toInt()) },
-            valueRange = 0f..255f,
-            steps = 254,
-        )
-    }
-}
-
-private fun Long.toOpaqueReaderColor(): Color =
-    Color(withReaderColorAlpha(0xFF))
 
 @Composable
 private fun ActionRow(

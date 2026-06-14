@@ -535,6 +535,8 @@
     <string name="sasayaki_reverse_vertical_skip_buttons">纵排时反转</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">纵排阅读时，仅交换阅读器底部跳转按钮的实际操作。</string>
     <string name="sasayaki_playback">播放</string>
+    <string name="sasayaki_light_theme">浅色主题</string>
+    <string name="sasayaki_dark_theme">深色主题</string>
     <string name="sasayaki_auto_scroll">自动翻页</string>
     <string name="sasayaki_auto_pause_on_lookup">查词时自动暂停</string>
     <string name="sasayaki_importing_audio">正在导入音频...</string>

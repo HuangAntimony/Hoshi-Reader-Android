@@ -11,6 +11,7 @@ The format follows a Keep a Changelog style, and release sections use Semantic V
 - Show English dictionary transcriptions in lookup popups and expose them to Anki templates via `{phonetic-transcriptions}` while keeping Japanese pitch accent rendering separate.
 - Add recommended wty English, Simple English, English-Japanese, and Leipzig English frequency dictionary downloads for English profiles.
 - Add a Behavior setting to lock the app to the current screen orientation.
+- Add iOS-aligned Sasayaki light and dark text/background color controls for non-E-ink reader highlights.
 
 ### Changed
 
