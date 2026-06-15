@@ -237,6 +237,7 @@ internal object ReaderContentStyles {
                     height: var(--page-height, 100vh) !important;
                     width: var(--page-width, 100vw) !important;
                     padding: ${settings.pagePaddingCss} !important;
+                    padding-bottom: ${settings.bottomPaddingCss} !important;
                 }
                 .hoshi-vn-content {
                     writing-mode: ${settings.writingModeCss} !important;
