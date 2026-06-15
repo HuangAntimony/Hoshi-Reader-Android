@@ -290,6 +290,14 @@
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">模式</string>
     <string name="reader_appearance_paginated">分页</string>
     <string name="reader_appearance_continuous">连续</string>
+    <string name="reader_appearance_visual_novel">VN</string>
+    <string name="reader_visual_novel_reveal_speed">VN 显示速度</string>
+    <string name="reader_visual_novel_screen_mode">VN 屏幕内容</string>
+    <string name="reader_visual_novel_screen_mode_block">段落块</string>
+    <string name="reader_visual_novel_screen_mode_sentences">句子</string>
+    <string name="reader_visual_novel_sentences_per_screen">每屏句数</string>
+    <string name="reader_visual_novel_preserve_dialogue">保留对话气泡</string>
+    <string name="reader_visual_novel_click_advance">空白区域点击推进</string>
     <string name="reader_appearance_chapter_swipe_distance">章节滑动距离</string>
     <string name="reader_appearance_horizontal_padding">水平边距</string>
     <string name="reader_appearance_vertical_padding">垂直边距</string>

@@ -463,7 +463,7 @@ class ReaderWebViewStateHolderTest {
 
     @Test
     fun readerContentReloadKeyIgnoresPopupSettings() {
-        val base = ReaderSettings(continuousMode = true)
+        val base = ReaderSettings(viewMode = ReaderViewMode.Continuous)
         val popupOnly = base.copy(
             popupWidth = 420,
             popupHeight = 360,
@@ -483,6 +483,37 @@ class ReaderWebViewStateHolderTest {
         assertFalse(base.readerContentReloadKey() == base.copy(fontSize = 28).readerContentReloadKey())
         assertFalse(base.readerContentReloadKey() == base.copy(verticalWriting = false).readerContentReloadKey())
         assertFalse(base.readerContentReloadKey() == base.copy(paragraphSpacing = 1.2).readerContentReloadKey())
+    }
+
+    @Test
+    fun readerContentReloadKeyChangesForVisualNovelModeAndSplitSettings() {
+        val base = ReaderSettings()
+        val visualNovel = base.copy(viewMode = ReaderViewMode.VisualNovel)
+
+        assertFalse(base.readerContentReloadKey() == visualNovel.readerContentReloadKey())
+        assertFalse(
+            visualNovel.readerContentReloadKey() ==
+                visualNovel.copy(visualNovelScreenMode = VisualNovelScreenMode.Sentences).readerContentReloadKey(),
+        )
+        assertFalse(
+            visualNovel.readerContentReloadKey() ==
+                visualNovel.copy(visualNovelSentencesPerScreen = 4).readerContentReloadKey(),
+        )
+        assertFalse(
+            visualNovel.readerContentReloadKey() ==
+                visualNovel.copy(visualNovelPreserveDialogueBubbles = true).readerContentReloadKey(),
+        )
+        assertFalse(
+            visualNovel.readerContentReloadKey() ==
+                visualNovel.copy(visualNovelRevealSpeed = 0).readerContentReloadKey(),
+        )
+    }
+
+    @Test
+    fun readerContentReloadKeyIgnoresVisualNovelClickAdvanceSetting() {
+        val base = ReaderSettings(viewMode = ReaderViewMode.VisualNovel)
+
+        assertEquals(base.readerContentReloadKey(), base.copy(visualNovelClickAdvance = false).readerContentReloadKey())
     }
 
     @Test

@@ -59,7 +59,13 @@ class ReaderSettingsRepositoryTest {
             assertEquals(ReaderFontManager.defaultMinchoFont, settings.selectedFont)
             assertEquals(22, settings.fontSize)
             assertFalse(settings.hideFurigana)
+            assertEquals(ReaderViewMode.Paginated, settings.viewMode)
             assertFalse(settings.continuousMode)
+            assertEquals(45, settings.visualNovelRevealSpeed)
+            assertEquals(VisualNovelScreenMode.Block, settings.visualNovelScreenMode)
+            assertEquals(1, settings.visualNovelSentencesPerScreen)
+            assertFalse(settings.visualNovelPreserveDialogueBubbles)
+            assertTrue(settings.visualNovelClickAdvance)
             assertFalse(settings.blurImages)
             assertFalse(settings.enableStatistics)
             assertEquals(StatisticsAutostartMode.Off, settings.statisticsAutostartMode)
@@ -109,7 +115,7 @@ class ReaderSettingsRepositoryTest {
                 customInfoColor = 0xFF778899,
                 selectedFont = ReaderFontManager.defaultMinchoFont,
                 fontSize = 29,
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 chapterSwipeDistance = 120,
                 lineHeight = 1.9,
                 paragraphSpacing = 2.2,
@@ -133,6 +139,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(0xFF778899, migrated.customInfoColor)
             assertEquals(ReaderFontManager.defaultMinchoFont, migrated.selectedFont)
             assertEquals(29, migrated.fontSize)
+            assertEquals(ReaderViewMode.Continuous, migrated.viewMode)
             assertTrue(migrated.continuousMode)
             assertEquals(60, migrated.chapterSwipeDistance)
             assertEquals(1.9, migrated.lineHeight, 0.000001)
@@ -166,7 +173,12 @@ class ReaderSettingsRepositoryTest {
                     selectedFont = ReaderFontManager.defaultGothicFont,
                     fontSize = 24,
                     hideFurigana = true,
-                    continuousMode = true,
+                    viewMode = ReaderViewMode.VisualNovel,
+                    visualNovelRevealSpeed = 80,
+                    visualNovelScreenMode = VisualNovelScreenMode.Sentences,
+                    visualNovelSentencesPerScreen = 3,
+                    visualNovelPreserveDialogueBubbles = true,
+                    visualNovelClickAdvance = false,
                     blurImages = true,
                     enableStatistics = true,
                     statisticsAutostartMode = StatisticsAutostartMode.PageTurn,
@@ -217,7 +229,13 @@ class ReaderSettingsRepositoryTest {
             assertEquals(ReaderFontManager.defaultGothicFont, saved.selectedFont)
             assertEquals(24, saved.fontSize)
             assertTrue(saved.hideFurigana)
-            assertTrue(saved.continuousMode)
+            assertEquals(ReaderViewMode.VisualNovel, saved.viewMode)
+            assertFalse(saved.continuousMode)
+            assertEquals(80, saved.visualNovelRevealSpeed)
+            assertEquals(VisualNovelScreenMode.Sentences, saved.visualNovelScreenMode)
+            assertEquals(3, saved.visualNovelSentencesPerScreen)
+            assertTrue(saved.visualNovelPreserveDialogueBubbles)
+            assertFalse(saved.visualNovelClickAdvance)
             assertTrue(saved.blurImages)
             assertTrue(saved.enableStatistics)
             assertEquals(StatisticsAutostartMode.PageTurn, saved.statisticsAutostartMode)

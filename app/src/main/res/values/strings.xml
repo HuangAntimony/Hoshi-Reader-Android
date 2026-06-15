@@ -292,6 +292,14 @@
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">Mode</string>
     <string name="reader_appearance_paginated">Paginated</string>
     <string name="reader_appearance_continuous">Continuous</string>
+    <string name="reader_appearance_visual_novel">VN</string>
+    <string name="reader_visual_novel_reveal_speed">VN Reveal Speed</string>
+    <string name="reader_visual_novel_screen_mode">VN Screen Content</string>
+    <string name="reader_visual_novel_screen_mode_block">Block</string>
+    <string name="reader_visual_novel_screen_mode_sentences">Sentences</string>
+    <string name="reader_visual_novel_sentences_per_screen">Sentences Per Screen</string>
+    <string name="reader_visual_novel_preserve_dialogue">Preserve Dialogue Bubbles</string>
+    <string name="reader_visual_novel_click_advance">Blank-area Click Advance</string>
     <string name="reader_appearance_chapter_swipe_distance">Chapter Swipe Distance</string>
     <string name="reader_appearance_horizontal_padding">Horizontal Padding</string>
     <string name="reader_appearance_vertical_padding">Vertical Padding</string>

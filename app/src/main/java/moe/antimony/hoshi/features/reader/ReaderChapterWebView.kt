@@ -268,7 +268,7 @@ internal fun ChapterWebView(
             }
         },
         update = { webView ->
-            fun selectAt(x: Float, y: Float) {
+            fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
                     ReaderSelectionCommand.SelectText(
@@ -280,7 +280,7 @@ internal fun ChapterWebView(
                     val selectionResult = ReaderSelectionResult.fromWebViewResult(result)
                     when {
                         selectionResult.isImageTap || selectionResult.isLinkTap -> Unit
-                        selectionResult.selectedNothing -> currentOnReaderTapOutside.value()
+                        selectionResult.selectedNothing -> onBlankTap()
                     }
                 }
             }
@@ -295,111 +295,130 @@ internal fun ChapterWebView(
                     y = androidPixelsToCssPixels(event.y, density).toDouble(),
                 )
             }
-            if (readerSettings.continuousMode) {
-                webView.setOnTouchListener(
-                    ContinuousScrollTouchListener(
-                        settings = readerSettings,
-                        shouldIgnoreReaderGesture = ::shouldIgnoreReaderGestureEvent,
-                        onTap = ::selectAt,
-                        onScrollGesture = currentOnReaderInteraction.value,
-                        onNextChapter = {
-                            currentOnReaderInteraction.value()
-                            currentOnClearLookupPopup.value()
-                            val changed = currentOnNextChapter.value()
-                            if (changed) webView.hideForReaderRestore()
-                            changed
-                        },
-                        onPreviousChapter = {
-                            currentOnReaderInteraction.value()
-                            currentOnClearLookupPopup.value()
-                            val changed = currentOnPreviousChapter.value()
-                            if (changed) webView.hideForReaderRestore()
-                            changed
-                        },
-                    ),
-                )
-                webView.setOnScrollChangeListener { _, _, _, _, _ ->
-                    val now = SystemClock.uptimeMillis()
-                    if (now - lastContinuousProgressUpdate < CONTINUOUS_PROGRESS_THROTTLE_MS) return@setOnScrollChangeListener
-                    lastContinuousProgressUpdate = now
-                    if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
-                    val restoreEpoch = currentWebViewRestoreEpoch.value
-                    continuousScrollSaveRequestId += 1L
-                    val requestId = continuousScrollSaveRequestId
-                    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
-                    currentOnClearLookupPopup.value()
-                    webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                        if (continuousScrollSaveRequestId != requestId) return@evaluateJavascript
-                        ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
-                            when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
-                                ReaderProgressPersistenceAction.DisplayOnly -> {
-                                    currentOnContinuousScrollDisplayProgress.value(progress, restoreEpoch)
-                                }
-                                ReaderProgressPersistenceAction.SaveBookmark -> {
-                                    currentOnContinuousScrollProgress.value(progress, restoreEpoch)
-                                }
-                            }
-                            lateinit var saveCallback: Runnable
-                            saveCallback = Runnable {
-                                if (continuousScrollSaveRequestId != requestId) return@Runnable
-                                if (readerPendingProgressSaveCallbacks[webView] == saveCallback) {
-                                    readerPendingProgressSaveCallbacks.remove(webView)
-                                }
-                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollIdle)) {
-                                    ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+            when (readerSettings.viewMode) {
+                ReaderViewMode.Continuous -> {
+                    webView.setOnTouchListener(
+                        ContinuousScrollTouchListener(
+                            settings = readerSettings,
+                            shouldIgnoreReaderGesture = ::shouldIgnoreReaderGestureEvent,
+                            onTap = { x, y -> selectAt(x, y) { currentOnReaderTapOutside.value() } },
+                            onScrollGesture = currentOnReaderInteraction.value,
+                            onNextChapter = {
+                                currentOnReaderInteraction.value()
+                                currentOnClearLookupPopup.value()
+                                val changed = currentOnNextChapter.value()
+                                if (changed) webView.hideForReaderRestore()
+                                changed
+                            },
+                            onPreviousChapter = {
+                                currentOnReaderInteraction.value()
+                                currentOnClearLookupPopup.value()
+                                val changed = currentOnPreviousChapter.value()
+                                if (changed) webView.hideForReaderRestore()
+                                changed
+                            },
+                        ),
+                    )
+                    webView.setOnScrollChangeListener { _, _, _, _, _ ->
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastContinuousProgressUpdate < CONTINUOUS_PROGRESS_THROTTLE_MS) return@setOnScrollChangeListener
+                        lastContinuousProgressUpdate = now
+                        if (currentIsWebViewRestoring.value) return@setOnScrollChangeListener
+                        val restoreEpoch = currentWebViewRestoreEpoch.value
+                        continuousScrollSaveRequestId += 1L
+                        val requestId = continuousScrollSaveRequestId
+                        readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
+                        currentOnClearLookupPopup.value()
+                        webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                            if (continuousScrollSaveRequestId != requestId) return@evaluateJavascript
+                            ReaderPaginationScripts.doubleResult(progressResult)?.let { progress ->
+                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
+                                    ReaderProgressPersistenceAction.DisplayOnly -> {
+                                        currentOnContinuousScrollDisplayProgress.value(progress, restoreEpoch)
+                                    }
                                     ReaderProgressPersistenceAction.SaveBookmark -> {
                                         currentOnContinuousScrollProgress.value(progress, restoreEpoch)
                                     }
                                 }
+                                lateinit var saveCallback: Runnable
+                                saveCallback = Runnable {
+                                    if (continuousScrollSaveRequestId != requestId) return@Runnable
+                                    if (readerPendingProgressSaveCallbacks[webView] == saveCallback) {
+                                        readerPendingProgressSaveCallbacks.remove(webView)
+                                    }
+                                    when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollIdle)) {
+                                        ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
+                                        ReaderProgressPersistenceAction.SaveBookmark -> {
+                                            currentOnContinuousScrollProgress.value(progress, restoreEpoch)
+                                        }
+                                    }
+                                }
+                                readerPendingProgressSaveCallbacks[webView] = saveCallback
+                                webView.postDelayed(saveCallback, CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS)
                             }
-                            readerPendingProgressSaveCallbacks[webView] = saveCallback
-                            webView.postDelayed(saveCallback, CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS)
                         }
                     }
                 }
-            } else {
-                readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
-                webView.setOnScrollChangeListener(null)
-                webView.setOnTouchListener(object : SwipePageTouchListener() {
-                    override fun shouldIgnoreReaderGesture(event: MotionEvent): Boolean =
-                        shouldIgnoreReaderGestureEvent(event)
+                ReaderViewMode.Paginated,
+                ReaderViewMode.VisualNovel,
+                -> {
+                    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
+                    webView.setOnScrollChangeListener(null)
+                    webView.setOnTouchListener(object : SwipePageTouchListener() {
+                        override fun shouldIgnoreReaderGesture(event: MotionEvent): Boolean =
+                            shouldIgnoreReaderGestureEvent(event)
 
-                    override fun onTap(x: Float, y: Float) {
-                        selectAt(x, y)
-                    }
+                        override fun onTap(x: Float, y: Float) {
+                            selectAt(x, y) {
+                                if (readerSettings.viewMode == ReaderViewMode.VisualNovel && readerSettings.visualNovelClickAdvance) {
+                                    currentOnReaderInteraction.value()
+                                    currentOnClearLookupPopup.value()
+                                    webView.navigatePageForDirection(
+                                        direction = ReaderNavigationDirection.Forward,
+                                        onNextChapter = currentOnNextChapter.value,
+                                        onPreviousChapter = currentOnPreviousChapter.value,
+                                        onDisplayedProgress = currentOnDisplayProgress.value,
+                                        onSaveProgress = currentOnSaveBookmark.value,
+                                    )
+                                } else {
+                                    currentOnReaderTapOutside.value()
+                                }
+                            }
+                        }
 
-                    override fun onLeftSwipe() {
-                        currentOnReaderInteraction.value()
-                        currentOnClearLookupPopup.value()
-                        val direction = readerNavigationDirectionForSwipe(
-                            isVerticalWriting = readerSettings.verticalWriting,
-                            swipeDirection = ReaderSwipeDirection.Left,
-                        )
-                        webView.navigatePageForDirection(
-                            direction = direction,
-                            onNextChapter = currentOnNextChapter.value,
-                            onPreviousChapter = currentOnPreviousChapter.value,
-                            onDisplayedProgress = currentOnDisplayProgress.value,
-                            onSaveProgress = currentOnSaveBookmark.value,
-                        )
-                    }
+                        override fun onLeftSwipe() {
+                            currentOnReaderInteraction.value()
+                            currentOnClearLookupPopup.value()
+                            val direction = readerNavigationDirectionForSwipe(
+                                isVerticalWriting = readerSettings.verticalWriting,
+                                swipeDirection = ReaderSwipeDirection.Left,
+                            )
+                            webView.navigatePageForDirection(
+                                direction = direction,
+                                onNextChapter = currentOnNextChapter.value,
+                                onPreviousChapter = currentOnPreviousChapter.value,
+                                onDisplayedProgress = currentOnDisplayProgress.value,
+                                onSaveProgress = currentOnSaveBookmark.value,
+                            )
+                        }
 
-                    override fun onRightSwipe() {
-                        currentOnReaderInteraction.value()
-                        currentOnClearLookupPopup.value()
-                        val direction = readerNavigationDirectionForSwipe(
-                            isVerticalWriting = readerSettings.verticalWriting,
-                            swipeDirection = ReaderSwipeDirection.Right,
-                        )
-                        webView.navigatePageForDirection(
-                            direction = direction,
-                            onNextChapter = currentOnNextChapter.value,
-                            onPreviousChapter = currentOnPreviousChapter.value,
-                            onDisplayedProgress = currentOnDisplayProgress.value,
-                            onSaveProgress = currentOnSaveBookmark.value,
-                        )
-                    }
-                })
+                        override fun onRightSwipe() {
+                            currentOnReaderInteraction.value()
+                            currentOnClearLookupPopup.value()
+                            val direction = readerNavigationDirectionForSwipe(
+                                isVerticalWriting = readerSettings.verticalWriting,
+                                swipeDirection = ReaderSwipeDirection.Right,
+                            )
+                            webView.navigatePageForDirection(
+                                direction = direction,
+                                onNextChapter = currentOnNextChapter.value,
+                                onPreviousChapter = currentOnPreviousChapter.value,
+                                onDisplayedProgress = currentOnDisplayProgress.value,
+                                onSaveProgress = currentOnSaveBookmark.value,
+                            )
+                        }
+                    })
+                }
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
             if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
@@ -931,33 +950,39 @@ internal fun WebView.navigatePage(
     onSaveProgress: (progress: Double) -> Unit,
 ) {
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
-        if (ReaderPaginationScripts.didScroll(result)) {
-            val webView = this
-            val requestId = nextReaderPageTurnProgressRequestId()
-            readerPageTurnProgressRequestIds[webView] = requestId
-            webView.postVisualStateCallback(
-                requestId,
-                object : WebView.VisualStateCallback() {
-                    override fun onComplete(requestId: Long) {
-                        if (readerPageTurnProgressRequestIds[webView] != requestId) return
-                        webView.postOnAnimation {
-                            webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                                if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
-                                readerPageTurnProgressRequestIds.remove(webView)
-                                val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
-                                onDisplayedProgress(progress)
-                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
-                                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
-                                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
+        when (ReaderPaginationScripts.navigationResult(result)) {
+            ReaderNavigationResult.Advanced -> {
+                val webView = this
+                val requestId = nextReaderPageTurnProgressRequestId()
+                readerPageTurnProgressRequestIds[webView] = requestId
+                webView.postVisualStateCallback(
+                    requestId,
+                    object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            if (readerPageTurnProgressRequestIds[webView] != requestId) return
+                            webView.postOnAnimation {
+                                webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
+                                    if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
+                                    readerPageTurnProgressRequestIds.remove(webView)
+                                    val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
+                                    onDisplayedProgress(progress)
+                                    when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
+                                        ReaderProgressPersistenceAction.DisplayOnly -> Unit
+                                        ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-            )
-        } else {
-            readerPageTurnProgressRequestIds.remove(this)
-            onLimit()
+                    },
+                )
+            }
+            ReaderNavigationResult.Revealed -> {
+                readerPageTurnProgressRequestIds.remove(this)
+            }
+            ReaderNavigationResult.Limit -> {
+                readerPageTurnProgressRequestIds.remove(this)
+                onLimit()
+            }
         }
     }
 }

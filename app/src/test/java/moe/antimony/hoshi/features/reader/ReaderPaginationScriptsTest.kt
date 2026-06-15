@@ -52,6 +52,14 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun parsesVisualNovelRevealNavigationResultWithoutSavingProgress() {
+        assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("\"scrolled\""))
+        assertEquals(ReaderNavigationResult.Revealed, ReaderPaginationScripts.navigationResult("\"revealed\""))
+        assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult("\"limit\""))
+        assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult(null))
+    }
+
+    @Test
     fun exportsImageBoundsFromMeasuredViewportForAndroidWebView() {
         val layout = readerViewportCssLayout(
             settings = ReaderSettings(verticalWriting = true),
@@ -74,7 +82,7 @@ class ReaderPaginationScriptsTest {
             settings = ReaderSettings(verticalWriting = false),
         )
         val continuousVertical = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(continuousMode = true, verticalWriting = true),
+            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = true),
         )
 
         assertEquals(
@@ -148,7 +156,7 @@ class ReaderPaginationScriptsTest {
     fun imageTapScriptRunsForPagedAndContinuousReadersLikeIos() {
         val scripts = listOf(
             ReaderPaginationScripts.shellScript(settings = ReaderSettings(blurImages = true)),
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(continuousMode = true, blurImages = true)),
+            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, blurImages = true)),
         )
 
         scripts.forEach { script ->
@@ -214,6 +222,41 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun visualNovelScriptSelectsVisualNovelAssetAndInjectsSettings() {
+        val assets = ReaderWebAssets(
+            languageJapaneseJs = "",
+            selectionJapaneseJs = "",
+            selectionEnglishJs = "",
+            selectionJs = "",
+            readerPaginatedJs = "PAGINATED_ASSET",
+            readerContinuousJs = "CONTINUOUS_ASSET",
+            readerVisualNovelJs = "VN __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
+            highlightsJs = "",
+            readerCss = "",
+        )
+
+        val script = ReaderPaginationScripts.shellScript(
+            initialProgress = 0.25,
+            initialFragment = "chapter-start",
+            highlightsJson = """[{"id":"h1"}]""",
+            settings = ReaderSettings(
+                viewMode = ReaderViewMode.VisualNovel,
+                visualNovelRevealSpeed = 80,
+                visualNovelScreenMode = VisualNovelScreenMode.Sentences,
+                visualNovelSentencesPerScreen = 3,
+                visualNovelPreserveDialogueBubbles = true,
+            ),
+            assets = assets,
+        )
+
+        assertTrue(script.contains("VN 80 \"sentences\" 3 true 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",))
+        assertTrue(script.contains("\"restoreCompleted\""))
+        assertFalse(script.contains("PAGINATED_ASSET"))
+        assertFalse(script.contains("CONTINUOUS_ASSET"))
+        assertFalse(script.contains("__HOSHI_"))
+    }
+
+    @Test
     fun loadScriptOmitsAbsentOptionalPayloadScriptsBeforeRestore() {
         val script = ReaderPaginationScripts.shellScript(
             sasayakiCuesJson = null,
@@ -274,7 +317,7 @@ class ReaderPaginationScriptsTest {
     @Test
     fun continuousRestoreProgressZeroResetsAndroidWebViewScrollToChapterStart() {
         val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(continuousMode = true),
+            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
         )
         val restoreProgress = script.substringAfter("restoreProgress: async function(progress)")
             .substringBefore("var walker = this.createWalker()")
@@ -291,7 +334,7 @@ class ReaderPaginationScriptsTest {
     @Test
     fun continuousRestoreProgressOneKeepsLastTextTargetLikeIos() {
         val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(continuousMode = true),
+            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
         )
         val restoreProgress = script.substringAfter("restoreProgress: async function(progress)")
             .substringBefore("jumpToFragment: async function(fragment)")

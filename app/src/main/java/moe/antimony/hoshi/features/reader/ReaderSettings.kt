@@ -43,7 +43,12 @@ data class ReaderSettings(
     val selectedFont: String = ReaderFontManager.defaultMinchoFont,
     val fontSize: Int = 22,
     val hideFurigana: Boolean = false,
-    val continuousMode: Boolean = false,
+    val viewMode: ReaderViewMode = ReaderViewMode.Paginated,
+    val visualNovelRevealSpeed: Int = 45,
+    val visualNovelScreenMode: VisualNovelScreenMode = VisualNovelScreenMode.Block,
+    val visualNovelSentencesPerScreen: Int = 1,
+    val visualNovelPreserveDialogueBubbles: Boolean = false,
+    val visualNovelClickAdvance: Boolean = true,
     val enableStatistics: Boolean = false,
     val statisticsAutostartMode: StatisticsAutostartMode = StatisticsAutostartMode.Off,
     val statisticsSyncEnabled: Boolean = false,
@@ -84,6 +89,9 @@ data class ReaderSettings(
     val lockCurrentOrientation: Boolean = false,
     val openLastReadBookOnLaunch: Boolean = false,
 ) {
+    val continuousMode: Boolean
+        get() = viewMode == ReaderViewMode.Continuous
+
     val bottomOverlapPx: Int
         get() = if (verticalWriting) fontSize else 0
 
@@ -207,6 +215,28 @@ enum class ReaderInterfaceTheme(val label: String) {
     }
 }
 
+enum class ReaderViewMode(val rawValue: String) {
+    Paginated("paginated"),
+    Continuous("continuous"),
+    VisualNovel("visualNovel");
+
+    companion object {
+        fun fromStorage(value: String?, legacyContinuousMode: Boolean = false): ReaderViewMode =
+            entries.firstOrNull { it.rawValue == value || it.name == value }
+                ?: if (legacyContinuousMode) Continuous else Paginated
+    }
+}
+
+enum class VisualNovelScreenMode(val rawValue: String, @get:StringRes val labelRes: Int) {
+    Block("block", R.string.reader_visual_novel_screen_mode_block),
+    Sentences("sentences", R.string.reader_visual_novel_screen_mode_sentences);
+
+    companion object {
+        fun fromStorage(value: String?): VisualNovelScreenMode =
+            entries.firstOrNull { it.rawValue == value || it.name == value } ?: Block
+    }
+}
+
 enum class StatisticsAutostartMode(val rawValue: String, @get:StringRes val labelRes: Int) {
     Off("Off", R.string.reader_statistics_autostart_off),
     PageTurn("Page Turn", R.string.reader_statistics_autostart_page_turn),
@@ -257,7 +287,15 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         selectedFont = preferences.getString("selectedFont", null) ?: ReaderFontManager.defaultMinchoFont,
         fontSize = preferences.getInt("fontSize", 22),
         hideFurigana = preferences.getBoolean("readerHideFurigana", false),
-        continuousMode = preferences.getBoolean("continuousMode", false),
+        viewMode = ReaderViewMode.fromStorage(
+            preferences.getString("readerViewMode", null),
+            legacyContinuousMode = preferences.getBoolean("continuousMode", false),
+        ),
+        visualNovelRevealSpeed = preferences.getInt("visualNovelRevealSpeed", 45).coerceVisualNovelRevealSpeed(),
+        visualNovelScreenMode = VisualNovelScreenMode.fromStorage(preferences.getString("visualNovelScreenMode", null)),
+        visualNovelSentencesPerScreen = preferences.getInt("visualNovelSentencesPerScreen", 1).coerceIn(1, 12),
+        visualNovelPreserveDialogueBubbles = preferences.getBoolean("visualNovelPreserveDialogueBubbles", false),
+        visualNovelClickAdvance = preferences.getBoolean("visualNovelClickAdvance", true),
         enableStatistics = preferences.getBoolean("enableStatistics", false),
         statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(
             preferences.getString("statisticsAutostartMode", null),
@@ -315,7 +353,13 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putString("selectedFont", settings.selectedFont)
             .putInt("fontSize", settings.fontSize)
             .putBoolean("readerHideFurigana", settings.hideFurigana)
+            .putString("readerViewMode", settings.viewMode.rawValue)
             .putBoolean("continuousMode", settings.continuousMode)
+            .putInt("visualNovelRevealSpeed", settings.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed())
+            .putString("visualNovelScreenMode", settings.visualNovelScreenMode.rawValue)
+            .putInt("visualNovelSentencesPerScreen", settings.visualNovelSentencesPerScreen.coerceIn(1, 12))
+            .putBoolean("visualNovelPreserveDialogueBubbles", settings.visualNovelPreserveDialogueBubbles)
+            .putBoolean("visualNovelClickAdvance", settings.visualNovelClickAdvance)
             .putBoolean("enableStatistics", settings.enableStatistics)
             .putString("statisticsAutostartMode", settings.statisticsAutostartMode.rawValue)
             .putBoolean("statisticsEnableSync", settings.statisticsSyncEnabled)
@@ -447,7 +491,15 @@ class ReaderSettingsRepository(
             selectedFont = this[KEY_SELECTED_FONT] ?: ReaderFontManager.defaultMinchoFont,
             fontSize = this[KEY_FONT_SIZE] ?: 22,
             hideFurigana = this[KEY_HIDE_FURIGANA] ?: false,
-            continuousMode = this[KEY_CONTINUOUS_MODE] ?: false,
+            viewMode = ReaderViewMode.fromStorage(
+                this[KEY_READER_VIEW_MODE],
+                legacyContinuousMode = this[KEY_CONTINUOUS_MODE] ?: false,
+            ),
+            visualNovelRevealSpeed = (this[KEY_VISUAL_NOVEL_REVEAL_SPEED] ?: 45).coerceVisualNovelRevealSpeed(),
+            visualNovelScreenMode = VisualNovelScreenMode.fromStorage(this[KEY_VISUAL_NOVEL_SCREEN_MODE]),
+            visualNovelSentencesPerScreen = (this[KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN] ?: 1).coerceIn(1, 12),
+            visualNovelPreserveDialogueBubbles = this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] ?: false,
+            visualNovelClickAdvance = this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] ?: true,
             enableStatistics = this[KEY_ENABLE_STATISTICS] ?: false,
             statisticsAutostartMode = StatisticsAutostartMode.fromRawValue(this[KEY_STATISTICS_AUTOSTART_MODE]),
             statisticsSyncEnabled = this[KEY_STATISTICS_SYNC_ENABLED] ?: false,
@@ -502,7 +554,13 @@ class ReaderSettingsRepository(
         this[KEY_SELECTED_FONT] = settings.selectedFont
         this[KEY_FONT_SIZE] = settings.fontSize
         this[KEY_HIDE_FURIGANA] = settings.hideFurigana
+        this[KEY_READER_VIEW_MODE] = settings.viewMode.rawValue
         this[KEY_CONTINUOUS_MODE] = settings.continuousMode
+        this[KEY_VISUAL_NOVEL_REVEAL_SPEED] = settings.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed()
+        this[KEY_VISUAL_NOVEL_SCREEN_MODE] = settings.visualNovelScreenMode.rawValue
+        this[KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN] = settings.visualNovelSentencesPerScreen.coerceIn(1, 12)
+        this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] = settings.visualNovelPreserveDialogueBubbles
+        this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] = settings.visualNovelClickAdvance
         this[KEY_ENABLE_STATISTICS] = settings.enableStatistics
         this[KEY_STATISTICS_AUTOSTART_MODE] = settings.statisticsAutostartMode.rawValue
         this[KEY_STATISTICS_SYNC_ENABLED] = settings.statisticsSyncEnabled
@@ -603,7 +661,14 @@ class ReaderSettingsRepository(
         private val KEY_SELECTED_FONT = stringPreferencesKey("selectedFont")
         private val KEY_FONT_SIZE = intPreferencesKey("fontSize")
         private val KEY_HIDE_FURIGANA = booleanPreferencesKey("readerHideFurigana")
+        private val KEY_READER_VIEW_MODE = stringPreferencesKey("readerViewMode")
         private val KEY_CONTINUOUS_MODE = booleanPreferencesKey("continuousMode")
+        private val KEY_VISUAL_NOVEL_REVEAL_SPEED = intPreferencesKey("visualNovelRevealSpeed")
+        private val KEY_VISUAL_NOVEL_SCREEN_MODE = stringPreferencesKey("visualNovelScreenMode")
+        private val KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN = intPreferencesKey("visualNovelSentencesPerScreen")
+        private val KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES =
+            booleanPreferencesKey("visualNovelPreserveDialogueBubbles")
+        private val KEY_VISUAL_NOVEL_CLICK_ADVANCE = booleanPreferencesKey("visualNovelClickAdvance")
         private val KEY_ENABLE_STATISTICS = booleanPreferencesKey("enableStatistics")
         private val KEY_STATISTICS_AUTOSTART_MODE = stringPreferencesKey("statisticsAutostartMode")
         private val KEY_STATISTICS_SYNC_ENABLED = booleanPreferencesKey("statisticsEnableSync")
@@ -666,7 +731,13 @@ private data class ProfileReaderAppearanceSettings(
     val selectedFont: String = ReaderFontManager.defaultMinchoFont,
     val fontSize: Int = 22,
     val hideFurigana: Boolean = false,
+    val viewMode: ReaderViewMode? = null,
     val continuousMode: Boolean = false,
+    val visualNovelRevealSpeed: Int = 45,
+    val visualNovelScreenMode: VisualNovelScreenMode = VisualNovelScreenMode.Block,
+    val visualNovelSentencesPerScreen: Int = 1,
+    val visualNovelPreserveDialogueBubbles: Boolean = false,
+    val visualNovelClickAdvance: Boolean = true,
     val showStatisticsToggle: Boolean = false,
     val showReadingSpeed: Boolean = false,
     val showReadingTime: Boolean = false,
@@ -712,7 +783,13 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         selectedFont = selectedFont,
         fontSize = fontSize,
         hideFurigana = hideFurigana,
+        viewMode = viewMode,
         continuousMode = continuousMode,
+        visualNovelRevealSpeed = visualNovelRevealSpeed.coerceVisualNovelRevealSpeed(),
+        visualNovelScreenMode = visualNovelScreenMode,
+        visualNovelSentencesPerScreen = visualNovelSentencesPerScreen.coerceIn(1, 12),
+        visualNovelPreserveDialogueBubbles = visualNovelPreserveDialogueBubbles,
+        visualNovelClickAdvance = visualNovelClickAdvance,
         showStatisticsToggle = showStatisticsToggle,
         showReadingSpeed = showReadingSpeed,
         showReadingTime = showReadingTime,
@@ -758,7 +835,16 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         selectedFont = appearance.selectedFont,
         fontSize = appearance.fontSize,
         hideFurigana = appearance.hideFurigana,
-        continuousMode = appearance.continuousMode,
+        viewMode = appearance.viewMode ?: if (appearance.continuousMode) {
+            ReaderViewMode.Continuous
+        } else {
+            ReaderViewMode.Paginated
+        },
+        visualNovelRevealSpeed = appearance.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed(),
+        visualNovelScreenMode = appearance.visualNovelScreenMode,
+        visualNovelSentencesPerScreen = appearance.visualNovelSentencesPerScreen.coerceIn(1, 12),
+        visualNovelPreserveDialogueBubbles = appearance.visualNovelPreserveDialogueBubbles,
+        visualNovelClickAdvance = appearance.visualNovelClickAdvance,
         showStatisticsToggle = appearance.showStatisticsToggle,
         showReadingSpeed = appearance.showReadingSpeed,
         showReadingTime = appearance.showReadingTime,
@@ -803,3 +889,9 @@ private fun ReaderSettings.withStatisticsTransitionFrom(previous: ReaderSettings
 
 internal fun Double.cssNumber(): String =
     String.format(Locale.US, "%.1f", this)
+
+private fun Int.coerceVisualNovelRevealSpeed(): Int =
+    (roundToNearestStep(step = 5)).coerceIn(0, 120)
+
+private fun Int.roundToNearestStep(step: Int): Int =
+    ((this + step / 2) / step) * step

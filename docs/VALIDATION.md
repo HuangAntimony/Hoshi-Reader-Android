@@ -78,7 +78,9 @@ press is for native selection/highlight-style flows when those are under test.
 Manual reader validation should cover:
 
 - cover image pages and multi-image illustration pages.
-- paginated and continuous modes in vertical and horizontal writing.
+- paginated, continuous, and VN modes in vertical and horizontal writing.
+- VN block and sentence screens, reveal speed 0/45/120, blank-area click
+  advance, text lookup taps, links, images, restore, and chapter boundaries.
 - long text page turns, chapter-list jumps into mid-book chapters, and bookmark
   restore.
 - forward and backward chapter boundaries, including reverse landing at the

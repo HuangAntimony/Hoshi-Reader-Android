@@ -82,6 +82,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 - Reader rendering and lookup remain WebView-based to preserve iOS-aligned
   visible behavior.
+- Reader layout modes are WebView-backed assets for paginated, continuous, and
+  VN reading. Kotlin selects the asset, injects typed settings, and keeps
+  persisted progress as chapter progress mapped to whole-book character count.
 - Reader fixes compare against the iOS `ReaderWebView` and matching JS/CSS
   before adding Android-specific behavior.
 - Reader resource loading must stay on the repository's safe loading path and

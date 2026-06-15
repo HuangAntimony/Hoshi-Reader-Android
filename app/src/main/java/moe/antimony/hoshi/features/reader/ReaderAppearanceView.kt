@@ -331,16 +331,29 @@ private fun ReaderAppearanceContent(
                 AppearanceSection(title = stringResource(R.string.reader_appearance_layout), palette = palette) {
                     val paginatedLabel = stringResource(R.string.reader_appearance_paginated)
                     val continuousLabel = stringResource(R.string.reader_appearance_continuous)
+                    val visualNovelLabel = stringResource(R.string.reader_appearance_visual_novel)
                     SegmentedRow(
                         label = stringResource(R.string.reader_appearance_mode),
-                        options = listOf(paginatedLabel, continuousLabel),
-                        selected = if (settings.continuousMode) continuousLabel else paginatedLabel,
+                        options = listOf(paginatedLabel, continuousLabel, visualNovelLabel),
+                        selected = when (settings.viewMode) {
+                            ReaderViewMode.Paginated -> paginatedLabel
+                            ReaderViewMode.Continuous -> continuousLabel
+                            ReaderViewMode.VisualNovel -> visualNovelLabel
+                        },
                         onSelected = { label ->
-                            onSettingsChange(settings.copy(continuousMode = label == continuousLabel))
+                            onSettingsChange(
+                                settings.copy(
+                                    viewMode = when (label) {
+                                        continuousLabel -> ReaderViewMode.Continuous
+                                        visualNovelLabel -> ReaderViewMode.VisualNovel
+                                        else -> ReaderViewMode.Paginated
+                                    },
+                                ),
+                            )
                         },
                         palette = palette,
                     )
-                    if (settings.continuousMode) {
+                    if (settings.viewMode == ReaderViewMode.Continuous) {
                         AppearanceDivider(palette)
                         SliderRow(
                             label = stringResource(R.string.reader_appearance_chapter_swipe_distance),
@@ -351,6 +364,76 @@ private fun ReaderAppearanceContent(
                             onValueChange = { value ->
                                 onSettingsChange(settings.copy(chapterSwipeDistance = (round(value / 5) * 5).toInt()))
                             },
+                        )
+                    }
+                    if (settings.viewMode == ReaderViewMode.VisualNovel) {
+                        AppearanceDivider(palette)
+                        SliderRow(
+                            label = stringResource(R.string.reader_visual_novel_reveal_speed),
+                            value = settings.visualNovelRevealSpeed.toString(),
+                            sliderValue = settings.visualNovelRevealSpeed.toFloat(),
+                            valueRange = 0f..120f,
+                            steps = 23,
+                            onValueChange = { value ->
+                                onSettingsChange(settings.copy(visualNovelRevealSpeed = (round(value / 5) * 5).toInt()))
+                            },
+                        )
+                        AppearanceDivider(palette)
+                        val blockLabel = stringResource(R.string.reader_visual_novel_screen_mode_block)
+                        val sentencesLabel = stringResource(R.string.reader_visual_novel_screen_mode_sentences)
+                        SegmentedRow(
+                            label = stringResource(R.string.reader_visual_novel_screen_mode),
+                            options = listOf(blockLabel, sentencesLabel),
+                            selected = when (settings.visualNovelScreenMode) {
+                                VisualNovelScreenMode.Block -> blockLabel
+                                VisualNovelScreenMode.Sentences -> sentencesLabel
+                            },
+                            onSelected = { label ->
+                                onSettingsChange(
+                                    settings.copy(
+                                        visualNovelScreenMode = if (label == sentencesLabel) {
+                                            VisualNovelScreenMode.Sentences
+                                        } else {
+                                            VisualNovelScreenMode.Block
+                                        },
+                                    ),
+                                )
+                            },
+                            palette = palette,
+                        )
+                        if (settings.visualNovelScreenMode == VisualNovelScreenMode.Sentences) {
+                            AppearanceDivider(palette)
+                            StepperRow(
+                                label = stringResource(R.string.reader_visual_novel_sentences_per_screen),
+                                value = settings.visualNovelSentencesPerScreen.toString(),
+                                onDecrease = {
+                                    onSettingsChange(
+                                        settings.copy(
+                                            visualNovelSentencesPerScreen = (settings.visualNovelSentencesPerScreen - 1).coerceAtLeast(1),
+                                        ),
+                                    )
+                                },
+                                onIncrease = {
+                                    onSettingsChange(
+                                        settings.copy(
+                                            visualNovelSentencesPerScreen = (settings.visualNovelSentencesPerScreen + 1).coerceAtMost(12),
+                                        ),
+                                    )
+                                },
+                                palette = palette,
+                            )
+                            AppearanceDivider(palette)
+                            SwitchRow(
+                                label = stringResource(R.string.reader_visual_novel_preserve_dialogue),
+                                checked = settings.visualNovelPreserveDialogueBubbles,
+                                onCheckedChange = { onSettingsChange(settings.copy(visualNovelPreserveDialogueBubbles = it)) },
+                            )
+                        }
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_visual_novel_click_advance),
+                            checked = settings.visualNovelClickAdvance,
+                            onCheckedChange = { onSettingsChange(settings.copy(visualNovelClickAdvance = it)) },
                         )
                     }
                     AppearanceDivider(palette)
@@ -369,12 +452,14 @@ private fun ReaderAppearanceContent(
                         onIncrease = { onSettingsChange(settings.copy(verticalPadding = (settings.verticalPadding + 1).coerceAtMost(50))) },
                         palette = palette,
                     )
-                    AppearanceDivider(palette)
-                    SwitchRow(
-                        label = stringResource(R.string.reader_appearance_avoid_page_break),
-                        checked = settings.avoidPageBreak,
-                        onCheckedChange = { onSettingsChange(settings.copy(avoidPageBreak = it)) },
-                    )
+                    if (settings.viewMode != ReaderViewMode.VisualNovel) {
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_appearance_avoid_page_break),
+                            checked = settings.avoidPageBreak,
+                            onCheckedChange = { onSettingsChange(settings.copy(avoidPageBreak = it)) },
+                        )
+                    }
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_justify_text),

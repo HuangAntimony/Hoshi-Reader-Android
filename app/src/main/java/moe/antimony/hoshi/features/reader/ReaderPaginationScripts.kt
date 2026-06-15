@@ -8,6 +8,12 @@ internal enum class ReaderNavigationDirection(val jsValue: String) {
     Backward("backward"),
 }
 
+internal enum class ReaderNavigationResult {
+    Advanced,
+    Revealed,
+    Limit,
+}
+
 internal object ReaderPaginationScripts {
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
         "window.hoshiReader.paginate('${direction.jsValue}')"
@@ -28,7 +34,14 @@ internal object ReaderPaginationScripts {
         "window.hoshiReader.clearSasayakiCue()"
 
     fun didScroll(result: String?): Boolean =
-        result?.trim()?.trim('"') == "scrolled"
+        navigationResult(result) == ReaderNavigationResult.Advanced
+
+    fun navigationResult(result: String?): ReaderNavigationResult =
+        when (result?.trim()?.trim('"')) {
+            "scrolled" -> ReaderNavigationResult.Advanced
+            "revealed" -> ReaderNavigationResult.Revealed
+            else -> ReaderNavigationResult.Limit
+        }
 
     fun doubleResult(result: String?): Double? =
         result?.trim()?.trim('"')?.toDoubleOrNull()
@@ -62,16 +75,37 @@ internal object ReaderPaginationScripts {
         val initialRestoreScript = initialFragment?.let { fragment ->
             "window.hoshiReader.jumpToFragment(${fragment.javaScriptStringLiteral()});"
         } ?: "window.hoshiReader.restoreProgress($initialProgress);"
-        val restoreScripts = readerRestoreScripts(
-            highlightsJson = highlightsJson,
-            initialRestoreScript = initialRestoreScript,
-        )
         val source = ReaderPaginationAssetSource.load(assets)
-        val template = if (settings.continuousMode) source.continuous else source.paginated
+        val template = when (settings.viewMode) {
+            ReaderViewMode.Paginated -> source.paginated
+            ReaderViewMode.Continuous -> source.continuous
+            ReaderViewMode.VisualNovel -> source.visualNovel
+        }
+        val restoreScripts = if (settings.viewMode == ReaderViewMode.VisualNovel) {
+            ""
+        } else {
+            readerRestoreScripts(
+                highlightsJson = highlightsJson,
+                initialRestoreScript = initialRestoreScript,
+            )
+        }
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         val body = template
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
             .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
+            .replace("__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__", settings.visualNovelRevealSpeed.coerceIn(0, 120).toString())
+            .replace("__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__", settings.visualNovelScreenMode.rawValue.javaScriptStringLiteral())
+            .replace(
+                "__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__",
+                settings.visualNovelSentencesPerScreen.coerceIn(1, 12).toString(),
+            )
+            .replace("__HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__", settings.visualNovelPreserveDialogueBubbles.toString())
+            .replace("__HOSHI_INITIAL_PROGRESS__", initialProgress.toString())
+            .replace(
+                "__HOSHI_INITIAL_FRAGMENT_LITERAL__",
+                initialFragment?.javaScriptStringLiteral() ?: "null",
+            )
+            .replace("__HOSHI_INITIAL_HIGHLIGHTS_JSON__", highlightsJson ?: "null")
             .replace("__HOSHI_BOTTOM_OVERLAP_PX__", settings.bottomOverlapPx.toString())
             .replace("__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__", (settings.verticalPadding / 200.0).toString())
             .replace("__HOSHI_VERTICAL_PADDING_GAP_RATIO__", (settings.verticalPadding / 100.0).toString())
@@ -89,6 +123,7 @@ internal object ReaderPaginationScripts {
 private data class ReaderPaginationAssetSource(
     val paginated: String,
     val continuous: String,
+    val visualNovel: String,
     val highlights: String,
 ) {
     companion object {
@@ -97,6 +132,7 @@ private data class ReaderPaginationAssetSource(
                 return ReaderPaginationAssetSource(
                     paginated = assets.readerPaginatedJs,
                     continuous = assets.readerContinuousJs,
+                    visualNovel = assets.readerVisualNovelJs,
                     highlights = assets.highlightsJs,
                 )
             }
@@ -110,6 +146,7 @@ private object SourceTreeReaderPaginationAssets {
         ReaderPaginationAssetSource(
             paginated = readSourceAsset("hoshi-web/reader/reader-paginated.js"),
             continuous = readSourceAsset("hoshi-web/reader/reader-continuous.js"),
+            visualNovel = readSourceAsset("hoshi-web/reader/reader-visual-novel.js"),
             highlights = readSourceAsset("hoshi-web/reader/highlights.js"),
         )
     }

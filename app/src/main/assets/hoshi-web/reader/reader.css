@@ -73,6 +73,29 @@ html:not([data-hoshi-reader-eink-mode="true"]) .hoshi-sasayaki-cue.hoshi-sasayak
     color: var(--hoshi-sasayaki-text-color) !important;
     background-color: var(--hoshi-sasayaki-background-color) !important;
 }
+.hoshi-vn-stage {
+    min-height: 100vh;
+    min-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    color: var(--hoshi-text-color);
+    background: var(--hoshi-background-color);
+    writing-mode: inherit;
+}
+.hoshi-vn-screen {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 100vh;
+    color: inherit;
+    background: inherit;
+    writing-mode: inherit;
+    overflow: hidden;
+}
+[data-hoshi-visual-novel-unrevealed] {
+    visibility: hidden !important;
+}
 __HOSHI_HIGHLIGHT_COLOR_CSS__
 a {
     color: rgba(66, 108, 245, 1) !important;

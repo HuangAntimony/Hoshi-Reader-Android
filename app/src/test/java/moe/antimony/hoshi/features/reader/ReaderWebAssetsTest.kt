@@ -15,6 +15,7 @@ class ReaderWebAssetsTest {
             "hoshi-web/shared/selection.js",
             "hoshi-web/reader/reader-paginated.js",
             "hoshi-web/reader/reader-continuous.js",
+            "hoshi-web/reader/reader-visual-novel.js",
             "hoshi-web/reader/highlights.js",
             "hoshi-web/reader/reader.css",
             "hoshi-web/popup/popup.js",

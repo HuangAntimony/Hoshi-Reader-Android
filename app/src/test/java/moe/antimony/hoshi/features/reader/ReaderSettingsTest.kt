@@ -219,7 +219,7 @@ class ReaderSettingsTest {
 
     @Test
     fun continuousReaderCssUsesScrollableIosLayoutInsteadOfPagedColumns() {
-        val css = ReaderContentStyles.styleTag(ReaderSettings(continuousMode = true))
+        val css = ReaderContentStyles.styleTag(ReaderSettings(viewMode = ReaderViewMode.Continuous))
 
         assertTrue(css.contains("overflow-y: hidden !important;"))
         assertTrue(css.lines().any { it.trim() == "height: var(--hoshi-continuous-height, 100vh) !important;" })
@@ -233,7 +233,7 @@ class ReaderSettingsTest {
     fun verticalContinuousLayoutMovesHorizontalPaddingToViewportOnly() {
         val layout = ReaderGeneratedLayout.from(
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = true,
                 horizontalPadding = 24,
                 verticalPadding = 10,
@@ -267,7 +267,7 @@ class ReaderSettingsTest {
     fun horizontalContinuousLayoutMovesVerticalPaddingToViewportOnly() {
         val layout = ReaderGeneratedLayout.from(
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = false,
                 horizontalPadding = 24,
                 verticalPadding = 10,
@@ -298,7 +298,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.125,
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = true,
                 horizontalPadding = 25,
             ).continuousViewportHorizontalPaddingRatio,
@@ -307,7 +307,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.0,
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = false,
                 horizontalPadding = 25,
             ).continuousViewportHorizontalPaddingRatio,
@@ -316,7 +316,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.0,
             ReaderSettings(
-                continuousMode = false,
+                viewMode = ReaderViewMode.Paginated,
                 verticalWriting = true,
                 horizontalPadding = 25,
             ).continuousViewportHorizontalPaddingRatio,
@@ -329,7 +329,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.16,
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = false,
                 verticalPadding = 32,
             ).continuousViewportVerticalPaddingRatio,
@@ -338,7 +338,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.0,
             ReaderSettings(
-                continuousMode = true,
+                viewMode = ReaderViewMode.Continuous,
                 verticalWriting = true,
                 verticalPadding = 32,
             ).continuousViewportVerticalPaddingRatio,
@@ -347,7 +347,7 @@ class ReaderSettingsTest {
         assertEquals(
             0.0,
             ReaderSettings(
-                continuousMode = false,
+                viewMode = ReaderViewMode.Paginated,
                 verticalWriting = false,
                 verticalPadding = 32,
             ).continuousViewportVerticalPaddingRatio,
@@ -541,10 +541,10 @@ class ReaderSettingsTest {
     @Test
     fun paginatedReaderCssAllowsFillingPageBottomAcrossParagraphs() {
         val paginatedCss = ReaderContentStyles.styleTag(
-            ReaderSettings(continuousMode = false),
+            ReaderSettings(viewMode = ReaderViewMode.Paginated),
         )
         val continuousCss = ReaderContentStyles.styleTag(
-            ReaderSettings(continuousMode = true),
+            ReaderSettings(viewMode = ReaderViewMode.Continuous),
         )
 
         assertTrue(paginatedCss.contains("orphans: 1 !important;"))
@@ -556,13 +556,13 @@ class ReaderSettingsTest {
     @Test
     fun paginatedReaderCssResetsNestedColumnCounts() {
         val paginatedCss = ReaderContentStyles.styleTag(
-            ReaderSettings(continuousMode = false),
+            ReaderSettings(viewMode = ReaderViewMode.Paginated),
         )
         val continuousCss = ReaderContentStyles.styleTag(
-            ReaderSettings(continuousMode = true),
+            ReaderSettings(viewMode = ReaderViewMode.Continuous),
         )
 
-        assertTrue(paginatedCss.contains("body * {\n                column-count: auto !important;"))
+        assertTrue(Regex("""body \* \{\s+column-count: auto !important;""").containsMatchIn(paginatedCss))
         assertTrue(paginatedCss.contains("-webkit-column-count: auto !important;"))
         assertFalse(continuousCss.contains("column-count: auto !important;"))
         assertFalse(continuousCss.contains("-webkit-column-count: auto !important;"))
