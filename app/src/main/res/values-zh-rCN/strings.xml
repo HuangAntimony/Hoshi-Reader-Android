@@ -292,6 +292,7 @@
     <string name="reader_appearance_continuous">连续</string>
     <string name="reader_appearance_visual_novel">VN</string>
     <string name="reader_visual_novel_reveal_speed">文字显示速度</string>
+    <string name="reader_visual_novel_reveal_speed_instant">立即</string>
     <string name="reader_visual_novel_screen_mode">屏幕内容</string>
     <string name="reader_visual_novel_screen_mode_block">按段落</string>
     <string name="reader_visual_novel_screen_mode_sentences">按句子</string>

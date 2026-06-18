@@ -9,7 +9,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Add a Behavior setting to open the last read book on app launch.
-- Add a VN reading mode with block and sentence screens, clearer appearance controls, blank-area tap advance, Sasayaki cue highlighting, overflow paging for oversized text blocks, and correctly sized cover/illustration image pages.
+- Add a VN reading mode with block and sentence screens, clearer appearance controls including an Instant zero-speed reveal label, blank-area tap advance, Sasayaki cue highlighting, overflow paging for oversized text blocks, and correctly sized cover/illustration image pages.
 
 ### Fixed
 

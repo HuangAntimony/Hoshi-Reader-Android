@@ -370,7 +370,11 @@ private fun ReaderAppearanceContent(
                         AppearanceDivider(palette)
                         SliderRow(
                             label = stringResource(R.string.reader_visual_novel_reveal_speed),
-                            value = settings.visualNovelRevealSpeed.toString(),
+                            value = if (settings.visualNovelRevealSpeed == 0) {
+                                stringResource(R.string.reader_visual_novel_reveal_speed_instant)
+                            } else {
+                                settings.visualNovelRevealSpeed.toString()
+                            },
                             sliderValue = settings.visualNovelRevealSpeed.toFloat(),
                             valueRange = 0f..120f,
                             steps = 23,

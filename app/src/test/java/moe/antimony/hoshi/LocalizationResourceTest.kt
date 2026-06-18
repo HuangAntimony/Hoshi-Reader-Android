@@ -131,6 +131,7 @@ class LocalizationResourceTest {
         val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
 
         assertEquals("Text Reveal Speed", defaultResources.strings.getValue("reader_visual_novel_reveal_speed").value)
+        assertEquals("Instant", defaultResources.strings.getValue("reader_visual_novel_reveal_speed_instant").value)
         assertEquals("Screen Content", defaultResources.strings.getValue("reader_visual_novel_screen_mode").value)
         assertEquals("Block", defaultResources.strings.getValue("reader_visual_novel_screen_mode_block").value)
         assertEquals("Sentences", defaultResources.strings.getValue("reader_visual_novel_screen_mode_sentences").value)
@@ -139,6 +140,7 @@ class LocalizationResourceTest {
         assertEquals("Tap Blank Area to Advance", defaultResources.strings.getValue("reader_visual_novel_click_advance").value)
 
         assertEquals("文字显示速度", zhResources.strings.getValue("reader_visual_novel_reveal_speed").value)
+        assertEquals("立即", zhResources.strings.getValue("reader_visual_novel_reveal_speed_instant").value)
         assertEquals("屏幕内容", zhResources.strings.getValue("reader_visual_novel_screen_mode").value)
         assertEquals("按段落", zhResources.strings.getValue("reader_visual_novel_screen_mode_block").value)
         assertEquals("按句子", zhResources.strings.getValue("reader_visual_novel_screen_mode_sentences").value)

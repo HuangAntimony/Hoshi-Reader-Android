@@ -294,6 +294,7 @@
     <string name="reader_appearance_continuous">Continuous</string>
     <string name="reader_appearance_visual_novel">VN</string>
     <string name="reader_visual_novel_reveal_speed">Text Reveal Speed</string>
+    <string name="reader_visual_novel_reveal_speed_instant">Instant</string>
     <string name="reader_visual_novel_screen_mode">Screen Content</string>
     <string name="reader_visual_novel_screen_mode_block">Block</string>
     <string name="reader_visual_novel_screen_mode_sentences">Sentences</string>
