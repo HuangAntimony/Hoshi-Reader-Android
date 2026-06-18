@@ -22,17 +22,37 @@ internal enum class MineSentenceMode {
     Term,
 }
 
+/** The Picture picked in the options sheet, resolved by the {image} marker. */
+internal sealed interface MineImageChoice {
+    /** No picture. */
+    data object None : MineImageChoice
+
+    /** The book cover — only offered when the surface carries one (the reader). */
+    data object Cover : MineImageChoice
+
+    /** A Bing image at [url], downloaded and attached on mine. */
+    data class Web(val url: String) : MineImageChoice
+}
+
 /**
  * The context committed by the options flow. A picked sentence replaces the
  * sentence (clearing the stale in-book offset); a null pick keeps the base context
  * unchanged, so "mine with options" with the in-book sentence equals instant mine.
+ * [image] sets exactly one of cover/web on the context (or neither), which the
+ * single {image} marker then resolves: web first, else cover.
  */
-internal fun augmentedMiningContext(base: AnkiMiningContext, picked: String?): AnkiMiningContext =
-    if (picked != null) {
-        base.copy(sentence = picked, sentenceOffset = null)
-    } else {
-        base
+internal fun augmentedMiningContext(
+    base: AnkiMiningContext,
+    picked: String?,
+    image: MineImageChoice,
+): AnkiMiningContext {
+    val withSentence = if (picked != null) base.copy(sentence = picked, sentenceOffset = null) else base
+    return when (image) {
+        MineImageChoice.None -> withSentence.copy(coverPath = null, webImageUrl = null)
+        MineImageChoice.Cover -> withSentence.copy(webImageUrl = null)
+        is MineImageChoice.Web -> withSentence.copy(coverPath = null, webImageUrl = image.url)
     }
+}
 
 /**
  * Mounts [MineWithOptionsSheet] for [request] and routes its result. Reused by the
@@ -58,8 +78,9 @@ internal fun MineWithOptionsSheetHost(
     MineWithOptionsSheet(
         term = req.term,
         currentSentence = inBookSentence,
-        onConfirm = { picked ->
-            mine(req.payloadJson, augmentedMiningContext(req.baseContext, picked)) { mined ->
+        bookCoverPath = req.baseContext.coverPath,
+        onConfirm = { picked, image ->
+            mine(req.payloadJson, augmentedMiningContext(req.baseContext, picked, image)) { mined ->
                 reply(req.popupId, req.messageId, mined.toString())
             }
             onClose()

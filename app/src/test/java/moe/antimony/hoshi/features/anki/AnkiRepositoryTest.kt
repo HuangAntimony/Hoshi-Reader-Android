@@ -70,7 +70,7 @@ class AnkiRepositoryTest {
                 "Expression" to "{expression}",
                 "MainDefinition" to "{glossary-first}",
                 "Sentence" to "{sentence}",
-                "Picture" to "{book-cover}",
+                "Picture" to "{image}",
             ),
             fieldMappingsAfterFetch(noteType, AnkiSettings()),
         )
@@ -114,7 +114,7 @@ class AnkiRepositoryTest {
                 "Expression" to "{expression}",
                 "MainDefinition" to "{glossary-first}",
                 "Sentence" to "{sentence}",
-                "Picture" to "{book-cover}",
+                "Picture" to "{image}",
             ),
             fieldMappingsAfterFetch(noteType, current),
         )

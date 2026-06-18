@@ -519,7 +519,7 @@ internal object AnkiHandlebarOptions {
         "{pitch-accent-categories}",
         "{phonetic-transcriptions}",
         "{document-title}",
-        "{book-cover}",
+        "{image}",
         "{sasayaki-audio}",
     )
 

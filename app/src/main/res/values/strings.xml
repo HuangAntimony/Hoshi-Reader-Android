@@ -577,4 +577,11 @@
     <string name="mine_with_options_sentence_section">Sentence</string>
     <string name="mine_with_options_loading">Loading examples...</string>
     <string name="mine_with_options_add">Add</string>
+    <string name="mine_with_options_next">Next</string>
+    <string name="mine_with_options_back">@string/action_back</string>
+    <string name="mine_with_options_image_section">Image</string>
+    <string name="mine_with_options_image_loading">Loading images…</string>
+    <string name="mine_with_options_image_none">@string/none</string>
+    <string name="mine_with_options_image_cover">Book cover</string>
+    <string name="mine_with_options_no_images">No images found</string>
 </resources>

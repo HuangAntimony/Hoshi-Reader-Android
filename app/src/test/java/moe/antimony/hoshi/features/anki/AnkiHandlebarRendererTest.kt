@@ -35,7 +35,7 @@ class AnkiHandlebarRendererTest {
             template = "{expression}|{reading}|{furigana-plain}|{audio}|{glossary}|{glossary-first}|" +
                 "{selected-glossary}|{popup-selection-text}|{sentence}|{frequencies}|{frequency-harmonic-rank}|" +
                 "{pitch-accent-positions}|{pitch-accent-categories}|{phonetic-transcriptions}|" +
-                "{document-title}|{book-cover}|{sasayaki-audio}",
+                "{document-title}|{image}|{sasayaki-audio}",
             payload = payload,
             context = context,
         )
@@ -198,6 +198,23 @@ class AnkiHandlebarRendererTest {
 
         val skipped = AnkiMiningContext(sentence = "", sentenceOffset = null)
         assertEquals("", AnkiHandlebarRenderer.render("{sentence}", payload, skipped))
+    }
+
+    @Test
+    fun imageResolvesWebThenCoverElseEmpty() {
+        val payload = AnkiMiningPayload(expression = "勉強", matched = "勉強")
+        // Picked web image wins over the cover.
+        val web = AnkiMiningContext(sentence = "本。", coverPath = "cover.jpg", webImagePath = "hoshi_img_42.jpg")
+        assertEquals("hoshi_img_42.jpg", AnkiHandlebarRenderer.render("{image}", payload, web))
+        // No web image → fall back to the cover.
+        val cover = AnkiMiningContext(sentence = "本。", coverPath = "cover.jpg")
+        assertEquals("cover.jpg", AnkiHandlebarRenderer.render("{image}", payload, cover))
+        // Neither → empty.
+        val none = AnkiMiningContext(sentence = "本。")
+        assertEquals("", AnkiHandlebarRenderer.render("{image}", payload, none))
+        // Deprecated aliases resolve to the same merged value.
+        assertEquals("cover.jpg", AnkiHandlebarRenderer.render("{book-cover}", payload, cover))
+        assertEquals("hoshi_img_42.jpg", AnkiHandlebarRenderer.render("{web-image}", payload, web))
     }
 
     @Test

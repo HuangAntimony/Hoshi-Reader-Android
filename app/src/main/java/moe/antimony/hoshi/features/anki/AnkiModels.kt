@@ -144,6 +144,10 @@ data class AnkiMiningContext(
     val coverPath: String? = null,
     val sasayakiAudioPath: String? = null,
     val sentenceOffset: Int? = null,
+    /** The chosen Bing image URL carried from the options sheet (pre-download). */
+    val webImageUrl: String? = null,
+    /** The downloaded, Anki-attached image ref the renderer emits (resolved in mineEntry). */
+    val webImagePath: String? = null,
 )
 
 object AnkiHandlebarRenderer {
@@ -199,11 +203,17 @@ object AnkiHandlebarRenderer {
             "{pitch-accent-categories}" -> payload.pitchCategories
             "{phonetic-transcriptions}" -> payload.phoneticTranscriptions
             "{document-title}" -> context.documentTitle.orEmpty()
-            "{book-cover}" -> context.coverPath.orEmpty()
+            "{image}" -> context.imageValue()
+            // Deprecated aliases (pre-merge {book-cover}/{web-image}); resolve to the chosen image.
+            "{book-cover}", "{web-image}" -> context.imageValue()
             "{sasayaki-audio}" -> context.sasayakiAudioPath.orEmpty()
             else -> ""
         }
     }
+
+    /** The mined Picture: the picked web image when present, otherwise the book cover. */
+    private fun AnkiMiningContext.imageValue(): String =
+        webImagePath?.takeIf { it.isNotBlank() } ?: coverPath.orEmpty()
 
     private fun AnkiMiningPayload.singleGlossaryHandlebarValue(handlebar: String): String {
         val dictionary = handlebar.removePrefix(SingleGlossaryPrefix).removeSuffix("}")

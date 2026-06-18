@@ -268,7 +268,7 @@ class AnkiRepositoryBackendSelectionTest {
                     availableNoteTypes = listOf(noteType),
                     fieldMappings = mapOf(
                         "Expression" to "{expression}",
-                        "Cover" to "{book-cover}",
+                        "Cover" to "{image}",
                     ),
                 ),
             ),
@@ -410,6 +410,89 @@ class AnkiRepositoryBackendSelectionTest {
             ),
         )
 
+        assertEquals(0, ankiConnect.addMediaFromBytesCalls)
+        assertEquals(mapOf("Expression" to "食べる"), ankiConnect.lastFields)
+    }
+
+    @Test
+    fun mineEntryDoesNotFetchWebImageWhenHandlebarUnreferenced() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Expression"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    // No {image} marker (nor its aliases) referenced in any mapping
+                    fieldMappings = mapOf("Expression" to "{expression}"),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる"}""",
+                context = AnkiMiningContext(
+                    sentence = "パンを食べる。",
+                    webImageUrl = "https://example.test/x.jpg",
+                ),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        // Gate: needsImage is false → addRemoteImage never invoked
+        assertEquals(0, ankiConnect.addMediaFromBytesCalls)
+        assertEquals(mapOf("Expression" to "食べる"), ankiConnect.lastFields)
+    }
+
+    @Test
+    fun mineEntryDoesNotFetchWebImageWhenNoUrlPicked() = runBlocking {
+        val deck = AnkiDeck(10L, "Mining")
+        val noteType = AnkiNoteType(20L, "Basic", listOf("Expression", "Picture"))
+        val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(
+                AnkiSettings(
+                    backendKind = AnkiBackendKind.AnkiConnect,
+                    ankiConnectUrl = "https://anki.example.com",
+                    selectedDeckId = deck.id,
+                    selectedDeckName = deck.name,
+                    selectedNoteTypeId = noteType.id,
+                    selectedNoteTypeName = noteType.name,
+                    availableDecks = listOf(deck),
+                    availableNoteTypes = listOf(noteType),
+                    // {web-image} IS referenced, but no URL was picked
+                    fieldMappings = mapOf(
+                        "Expression" to "{expression}",
+                        "Picture" to "{web-image}",
+                    ),
+                ),
+            ),
+            ankiConnectBackendFactory = { ankiConnect },
+        )
+
+        assertTrue(
+            repository.mineEntry(
+                rawPayload = """{"expression":"食べる"}""",
+                context = AnkiMiningContext(
+                    sentence = "パンを食べる。",
+                    webImageUrl = null,
+                ),
+                decks = emptyList(),
+                noteTypes = emptyList(),
+            ),
+        )
+
+        // Gate: webImageUrl is null → addRemoteImage never invoked; {web-image} renders blank → field filtered out
         assertEquals(0, ankiConnect.addMediaFromBytesCalls)
         assertEquals(mapOf("Expression" to "食べる"), ankiConnect.lastFields)
     }

@@ -16,7 +16,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
+import moe.antimony.hoshi.features.anki.BingImageSearchSource
 import moe.antimony.hoshi.features.anki.ExampleSentenceSource
+import moe.antimony.hoshi.features.anki.ImageSearchSource
 import moe.antimony.hoshi.features.anki.MassifExampleSentenceSource
 import moe.antimony.hoshi.features.anki.ankiSettingsRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
@@ -115,6 +117,11 @@ internal object HoshiAppModule {
     @Provides
     @Singleton
     fun provideExampleSentenceSource(): ExampleSentenceSource = MassifExampleSentenceSource()
+
+    @Provides
+    @Singleton
+    fun provideImageSearchSource(@ApplicationContext context: Context): ImageSearchSource =
+        BingImageSearchSource(context)
 
     @Provides
     @Singleton

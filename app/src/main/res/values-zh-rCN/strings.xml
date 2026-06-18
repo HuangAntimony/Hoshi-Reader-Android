@@ -575,4 +575,11 @@
     <string name="mine_with_options_sentence_section">句子</string>
     <string name="mine_with_options_loading">正在加载例句...</string>
     <string name="mine_with_options_add">添加</string>
+    <string name="mine_with_options_next">下一步</string>
+    <string name="mine_with_options_back">返回</string>
+    <string name="mine_with_options_image_section">图片</string>
+    <string name="mine_with_options_image_loading">正在加载图片…</string>
+    <string name="mine_with_options_image_none">无</string>
+    <string name="mine_with_options_image_cover">封面</string>
+    <string name="mine_with_options_no_images">未找到图片</string>
 </resources>

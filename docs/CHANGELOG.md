@@ -9,6 +9,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Add a "Mine with options" button to each lookup entry — next to the existing one-tap "Add to Anki" — that opens a sheet to pick a Massif example sentence for the card before adding it.
+- Extend the "Mine with options" sheet to also set the card's Picture: none, the book cover, or an image from a Bing search of the word. The choice fills the Picture field through a single `{image}` Anki marker.
 
 ## [v1.2.1] - 2026-06-18
 

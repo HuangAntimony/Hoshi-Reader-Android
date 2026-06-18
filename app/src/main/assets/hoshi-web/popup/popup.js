@@ -954,7 +954,7 @@ async function mineEntryWithOptions(entryIndex) {
     }
     const audio = audioUrls[idx] || '';
 
-    return await webkit.messageHandlers.mineWithOptions.postMessage({
+    const mined = await webkit.messageHandlers.mineWithOptions.postMessage({
         expression,
         reading,
         matched,
@@ -972,6 +972,24 @@ async function mineEntryWithOptions(entryIndex) {
         selectedDictionary: selectedDictionaries[idx]?.name || '',
         dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
     });
+    if (mined) {
+        if (!window.allowDupes) {
+            updateButtonSlot(getButtonSlot('mine', idx), { enabled: false });
+            updateButtonSlot(getButtonSlot('mineOptions', idx), { enabled: false });
+        }
+        const refreshDuplicate = async () => {
+            const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
+            const enabled = !(wasAdded && !window.allowDupes);
+            updateButtonSlot(getButtonSlot('mine', idx), { state: wasAdded ? 'duplicate' : 'default', enabled });
+            updateButtonSlot(getButtonSlot('mineOptions', idx), { enabled });
+        };
+        if (window.useAnkiConnect) {
+            await refreshDuplicate();
+        } else {
+            setTimeout(refreshDuplicate, 1000);
+        }
+    }
+    return mined;
 }
 
 function renderStructuredContent(parent, node, language = null, dictName = null, exporting = false) {

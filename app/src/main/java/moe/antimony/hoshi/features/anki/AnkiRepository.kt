@@ -182,19 +182,26 @@ internal class AnkiRepository(
         val fieldMappings = settings.fieldMappings.activeAnkiFieldMappings(noteType)
         val payload = runCatching { AnkiMiningPayload.fromJson(rawPayload) }.getOrNull()
             ?: return@withContext false
-        val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")
+        // The merged {image} marker (plus the deprecated {book-cover}/{web-image} aliases) gates
+        // both the cover and the picked web image — only one is ever set on the context at a time.
+        val needsImage = fieldMappings.referencesAnkiHandlebar("{image}") ||
+            fieldMappings.referencesAnkiHandlebar("{book-cover}") ||
+            fieldMappings.referencesAnkiHandlebar("{web-image}")
         val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
         val needsAudio = fieldMappings.referencesAnkiHandlebar("{audio}")
         val mediaContext = AnkiMiningContext(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
-            coverPath = context.coverPath?.takeIf { needsCover }?.let {
+            coverPath = context.coverPath?.takeIf { needsImage }?.let {
                 addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it), activeBackend, settings.backendKind)
             },
             sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
                 addMediaFile(it, File(it).name, mimeTypeForPath(it), activeBackend, settings.backendKind)
             },
             sentenceOffset = context.sentenceOffset,
+            webImagePath = context.webImageUrl?.takeIf { needsImage }?.let {
+                addRemoteImage(it, activeBackend, settings.backendKind)
+            },
         )
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { needsAudio && it.isNotBlank() }
@@ -268,6 +275,29 @@ internal class AnkiRepository(
             addMediaFile(file.absolutePath, file.name, media.mimeType, activeBackend, backendKind)
         }.getOrNull()
 
+    private fun addRemoteImage(url: String, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
+        runCatching {
+            val conn = (URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 8_000
+                readTimeout = 8_000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Mozilla/5.0")
+            }
+            val contentType: String?
+            val data: ByteArray
+            try {
+                if (conn.responseCode !in 200..299) return null
+                contentType = conn.contentType
+                data = conn.inputStream.use { it.readBytes() }
+            } finally {
+                conn.disconnect()
+            }
+            val media = validateAnkiImageBytes(url, contentType, data) ?: return null
+            val file = mediaCacheFile(media.preferredName)
+            file.writeBytes(data)
+            addMediaFile(file.absolutePath, file.name, media.mimeType, activeBackend, backendKind)
+        }.onFailure { Log.w(TAG, "Failed to add remote image", it) }.getOrNull()
+
     private fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
         runCatching {
             val data = loadDictionaryMedia(media) ?: return null
@@ -330,6 +360,28 @@ internal data class AnkiAudioMediaFile(
     val preferredName: String,
     val mimeType: String,
 )
+
+/** The max bytes we'll attach for a web image (guards against multi-MB originals). */
+internal const val ANKI_MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
+/** Validates a fetched web image and derives its media-file name/mime. Null = reject (non-image type or oversize). Pure; the actual fetch is the caller's. */
+internal fun validateAnkiImageBytes(
+    url: String,
+    contentType: String?,
+    data: ByteArray,
+    maxBytes: Int = ANKI_MAX_IMAGE_BYTES,
+): AnkiAudioMediaFile? {
+    if (contentType == null || !contentType.startsWith("image/")) return null
+    if (data.isEmpty() || data.size > maxBytes) return null
+    val ext = runCatching { URL(url).path }
+        .getOrDefault(url.substringBefore('?'))
+        .substringAfterLast('.', missingDelimiterValue = "")
+        .lowercase()
+        .takeIf { it in setOf("png", "jpg", "jpeg", "gif", "webp", "avif") }
+        ?: "jpg"
+    val name = "hoshi_img_${data.contentHashCode()}.$ext"
+    return AnkiAudioMediaFile(preferredName = name, mimeType = mimeTypeForPath(name))
+}
 
 internal fun ankiAudioMediaFile(url: String, data: ByteArray): AnkiAudioMediaFile {
     val extension = ankiAudioExtension(url)
