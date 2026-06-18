@@ -6,10 +6,12 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+## [v1.2.1] - 2026-06-18
+
 ### Added
 
 - Add a Behavior setting to open the last read book on app launch.
-- Add a VN reading mode with block and sentence screens, clearer appearance controls including an Instant zero-speed reveal label, default-off blank-area tap advance, optional cross-screen Sasayaki cue screen merging, Sasayaki cue highlighting, overflow paging for oversized text blocks, and correctly sized cover/illustration image pages.
+- Add a VN reading mode with block and sentence screens, dedicated appearance controls, optional tap-to-advance, and Sasayaki cue merging and highlighting.
 - Add a Reader Appearance Publisher font option that keeps EPUB-provided font families instead of forcing a reader font override.
 
 ### Fixed
