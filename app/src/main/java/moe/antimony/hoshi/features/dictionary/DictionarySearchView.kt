@@ -80,7 +80,11 @@ import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
+import moe.antimony.hoshi.features.anki.AnkiMiningPayload
 import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.reader.MineSentenceMode
+import moe.antimony.hoshi.features.reader.MineWithOptionsRequest
+import moe.antimony.hoshi.features.reader.MineWithOptionsSheetHost
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
@@ -185,6 +189,7 @@ fun DictionarySearchView(
     var searchBarBottomDp by remember { mutableStateOf(0.0) }
     var pullDistancePx by remember { mutableFloatStateOf(0f) }
     var localFocusRequestKey by remember { mutableIntStateOf(0) }
+    var mineWithOptionsRequest by remember { mutableStateOf<MineWithOptionsRequest?>(null) }
     val localAudioRepository = appContainer.localAudioRepository
     val dictionaryRepository = appContainer.dictionaryRepository
     val fontManager = appContainer.readerFontManager
@@ -417,6 +422,27 @@ fun DictionarySearchView(
                     replyIframeMessage(message.popupId, messageId, mined.toString())
                 }
             }
+            is ReaderLookupPopupBridgeMessage.MineWithOptions -> {
+                val messageId = message.messageId ?: return
+                val baseContext = if (message.popupId == DictionarySearchRootPopupId) {
+                    AnkiMiningContext(sentence = uiState.lastQuery.ifBlank { uiState.query })
+                } else {
+                    popupById(message.popupId)?.state?.ankiContext ?: return
+                }
+                val term = runCatching { AnkiMiningPayload.fromJson(message.payloadJson).expression }
+                    .getOrNull().orEmpty()
+                if (term.isBlank()) {
+                    replyIframeMessage(message.popupId, messageId, false.toString())
+                    return
+                }
+                mineWithOptionsRequest = MineWithOptionsRequest(
+                    popupId = message.popupId,
+                    messageId = messageId,
+                    payloadJson = message.payloadJson,
+                    baseContext = baseContext,
+                    term = term,
+                )
+            }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
                 val messageId = message.messageId ?: return
                 ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
@@ -607,6 +633,13 @@ fun DictionarySearchView(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface),
+        )
+        MineWithOptionsSheetHost(
+            request = mineWithOptionsRequest,
+            mine = ankiViewModel::mineEntryAsync,
+            reply = ::replyIframeMessage,
+            onClose = { mineWithOptionsRequest = null },
+            sentenceMode = MineSentenceMode.Term,
         )
     }
 }

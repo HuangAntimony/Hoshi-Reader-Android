@@ -8,6 +8,7 @@ import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,10 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -42,7 +46,11 @@ import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.anki.AnkiMiningPayload
 import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.reader.MineSentenceMode
+import moe.antimony.hoshi.features.reader.MineWithOptionsRequest
+import moe.antimony.hoshi.features.reader.MineWithOptionsSheetHost
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
@@ -79,6 +87,7 @@ internal class ProcessTextLookupDependencies @Inject constructor(
 class ProcessTextLookupActivity : ComponentActivity() {
     @Inject internal lateinit var dependencies: ProcessTextLookupDependencies
 
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val request = ProcessTextLookupRequest.fromIntent(intent) ?: run {
@@ -105,13 +114,15 @@ class ProcessTextLookupActivity : ComponentActivity() {
                 eInkMode = loadedReaderSettings.eInkMode,
                 useDarkSystemBarIcons = loadedReaderSettings.usesDarkSystemBarIcons(systemDark),
             ) {
-                ProcessTextLookupOverlay(
-                    query = request.query,
-                    readerSettings = loadedReaderSettings,
-                    contentLanguageProfile = profileState.effectiveContentLanguageProfile,
-                    dependencies = dependencies,
-                    onClose = ::finish,
-                )
+                Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                    ProcessTextLookupOverlay(
+                        query = request.query,
+                        readerSettings = loadedReaderSettings,
+                        contentLanguageProfile = profileState.effectiveContentLanguageProfile,
+                        dependencies = dependencies,
+                        onClose = ::finish,
+                    )
+                }
             }
         }
     }
@@ -129,6 +140,7 @@ private fun ProcessTextLookupOverlay(
     var popupHistories by remember(query) { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var error by remember(query) { mutableStateOf<Throwable?>(null) }
     var iframeHostWebView by remember { mutableStateOf<WebView?>(null) }
+    var mineWithOptionsRequest by remember { mutableStateOf<MineWithOptionsRequest?>(null) }
     val context = LocalContext.current
     val darkMode = MaterialTheme.colorScheme.background.luminanceForPopup() < 0.5f
     val density = LocalDensity.current
@@ -360,6 +372,23 @@ private fun ProcessTextLookupOverlay(
                         replyIframeMessage(message.popupId, messageId, mined.toString())
                     }
                 }
+                is ReaderLookupPopupBridgeMessage.MineWithOptions -> {
+                    val popup = popupById(message.popupId) ?: return
+                    val messageId = message.messageId ?: return
+                    val term = runCatching { AnkiMiningPayload.fromJson(message.payloadJson).expression }
+                        .getOrNull().orEmpty()
+                    if (term.isBlank()) {
+                        replyIframeMessage(message.popupId, messageId, false.toString())
+                        return
+                    }
+                    mineWithOptionsRequest = MineWithOptionsRequest(
+                        popupId = message.popupId,
+                        messageId = messageId,
+                        payloadJson = message.payloadJson,
+                        baseContext = popup.state.ankiContext,
+                        term = term,
+                    )
+                }
                 is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
                     val messageId = message.messageId ?: return
                     ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
@@ -451,6 +480,13 @@ private fun ProcessTextLookupOverlay(
                 rootHighlight = null,
             )
         }
+        MineWithOptionsSheetHost(
+            request = mineWithOptionsRequest,
+            mine = ankiViewModel::mineEntryAsync,
+            reply = ::replyIframeMessage,
+            onClose = { mineWithOptionsRequest = null },
+            sentenceMode = MineSentenceMode.InBookSentence,
+        )
     }
 }
 

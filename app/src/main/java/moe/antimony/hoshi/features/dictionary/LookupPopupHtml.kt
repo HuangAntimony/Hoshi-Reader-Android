@@ -172,6 +172,7 @@ internal object LookupPopupHtml {
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
                             mineEntry: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('mineEntry', content); } },
+                            mineWithOptions: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('mineWithOptions', content); } },
                             duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
                             getEntry: { postMessage: function(index) { return window.HoshiAndroidPopup.requestMessage('getEntry', index); } },
                             lookupRedirect: { postMessage: function(query) { return window.HoshiAndroidPopup.requestMessage('lookupRedirect', query); } }
@@ -320,6 +321,7 @@ internal object LookupPopupHtml {
                             }
                             if (message.type === 'navigateForward') {
                                 window.navigateForward?.();
+                                return;
                             }
                         });
                         webkit.messageHandlers.shellReady.postMessage(null);

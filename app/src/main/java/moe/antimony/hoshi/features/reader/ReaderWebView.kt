@@ -56,6 +56,7 @@ import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
+import moe.antimony.hoshi.features.anki.AnkiMiningPayload
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
@@ -692,6 +693,31 @@ fun ReaderWebView(
                 ankiViewModel.mineEntryAsync(message.payloadJson, ankiContext) { mined ->
                     replyReaderPopupMessage(message.popupId, messageId, mined.toString())
                 }
+            }
+            is ReaderLookupPopupBridgeMessage.MineWithOptions -> {
+                val popup = popupById(message.popupId) ?: return
+                val messageId = message.messageId ?: return
+                val baseContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
+                    popup.state.ankiContext.copy(
+                        sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
+                    )
+                } ?: popup.state.ankiContext
+                val term = runCatching {
+                    AnkiMiningPayload.fromJson(message.payloadJson).expression
+                }.getOrNull().orEmpty()
+                if (term.isBlank()) {
+                    replyReaderPopupMessage(message.popupId, messageId, false.toString())
+                    return
+                }
+                stateHolder.openMineWithOptions(
+                    MineWithOptionsRequest(
+                        popupId = message.popupId,
+                        messageId = messageId,
+                        payloadJson = message.payloadJson,
+                        baseContext = baseContext,
+                        term = term,
+                    ),
+                )
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
                 ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
@@ -1426,6 +1452,13 @@ fun ReaderWebView(
                 onDismiss = stateHolder::dismissSasayaki,
             )
         }
+        MineWithOptionsSheetHost(
+            request = stateHolder.mineWithOptionsRequest,
+            mine = ankiViewModel::mineEntryAsync,
+            reply = ::replyReaderPopupMessage,
+            onClose = stateHolder::dismissMineWithOptions,
+            sentenceMode = MineSentenceMode.InBookSentence,
+        )
         if (showStatistics && statisticsState != null) {
             ReaderStatisticsSheet(
                 state = requireNotNull(statisticsState),

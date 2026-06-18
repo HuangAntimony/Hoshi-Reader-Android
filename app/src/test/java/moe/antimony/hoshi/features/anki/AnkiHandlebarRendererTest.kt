@@ -188,6 +188,19 @@ class AnkiHandlebarRendererTest {
     }
 
     @Test
+    fun sentenceOverrideResolvesFromContext() {
+        val payload = AnkiMiningPayload(expression = "勉強", reading = "べんきょう", matched = "勉強")
+        val picked = AnkiMiningContext(sentence = "とっても勉強になりました。", sentenceOffset = null)
+        assertEquals(
+            "とっても<b>勉強</b>になりました。",
+            AnkiHandlebarRenderer.render("{sentence}", payload, picked),
+        )
+
+        val skipped = AnkiMiningContext(sentence = "", sentenceOffset = null)
+        assertEquals("", AnkiHandlebarRenderer.render("{sentence}", payload, skipped))
+    }
+
+    @Test
     fun rendersSelectedAndSingleGlossarySuffixVariantsWithDictionaryNameNormalization() {
         val payload = AnkiMiningPayload(
             expression = "読む",

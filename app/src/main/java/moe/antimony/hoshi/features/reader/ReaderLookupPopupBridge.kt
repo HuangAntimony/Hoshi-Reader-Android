@@ -234,6 +234,12 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         val payloadJson: String,
     ) : ReaderLookupPopupBridgeMessage()
 
+    data class MineWithOptions(
+        override val popupId: String,
+        override val messageId: String?,
+        val payloadJson: String,
+    ) : ReaderLookupPopupBridgeMessage()
+
     data class DuplicateCheck(
         override val popupId: String,
         override val messageId: String?,
@@ -323,6 +329,11 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                     )
                 }
                 "mineEntry" -> MineEntry(
+                    popupId = popupId,
+                    messageId = messageId ?: return null,
+                    payloadJson = payload["body"]?.takeIf { it !is JsonNull }?.toString() ?: return null,
+                )
+                "mineWithOptions" -> MineWithOptions(
                     popupId = popupId,
                     messageId = messageId ?: return null,
                     payloadJson = payload["body"]?.takeIf { it !is JsonNull }?.toString() ?: return null,

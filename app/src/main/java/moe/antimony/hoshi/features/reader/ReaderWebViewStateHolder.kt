@@ -58,6 +58,17 @@ internal class ReaderWebViewStateHolder(
     var sasayakiWasPausedByLookup by mutableStateOf(false)
         private set
 
+    var mineWithOptionsRequest by mutableStateOf<MineWithOptionsRequest?>(null)
+        private set
+
+    fun openMineWithOptions(request: MineWithOptionsRequest) {
+        mineWithOptionsRequest = request
+    }
+
+    fun dismissMineWithOptions() {
+        mineWithOptionsRequest = null
+    }
+
     fun syncSettings(settings: ReaderSettings) {
         val shouldReloadContent = effectiveSettings.readerContentReloadKey() != settings.readerContentReloadKey()
         effectiveSettings = settings

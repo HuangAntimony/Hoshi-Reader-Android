@@ -571,4 +571,8 @@
     <string name="sasayaki_matching">正在匹配...</string>
     <string name="sasayaki_current_match">当前匹配</string>
     <string name="sasayaki_match_rate">匹配率</string>
+    <string name="mine_with_options_title">按选项制卡</string>
+    <string name="mine_with_options_sentence_section">句子</string>
+    <string name="mine_with_options_loading">正在加载例句...</string>
+    <string name="mine_with_options_add">添加</string>
 </resources>

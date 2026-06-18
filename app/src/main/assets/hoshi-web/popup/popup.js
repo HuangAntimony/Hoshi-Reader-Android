@@ -931,6 +931,49 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     });
 }
 
+async function mineEntryWithOptions(entryIndex) {
+    const idx = entryIndex || 0;
+    const entry = window.lookupEntries?.[idx];
+    if (!entry) { return false; }
+    const { expression, reading, frequencies, pitches, rules, matched } = entry;
+    const furiganaPlain = constructFuriganaPlain(expression, reading);
+    currentDictionaryMedia = new Map();
+    const glossary = constructGlossaryHtml(idx);
+    const freqHarmonicRank = getFrequencyHarmonicRank(frequencies);
+    const frequenciesHtml = constructFrequencyHtml(frequencies);
+    const singleGlossaries = constructSingleGlossaryHtml(idx);
+    const dictionaryMedia = currentDictionaryMedia;
+    currentDictionaryMedia = null;
+    const glossaryFirst = Object.values(singleGlossaries)[0] || '';
+    const pitchPositions = constructPitchPositionHtml(pitches);
+    const pitchCategories = constructPitchCategories(pitches, reading, rules);
+    const phoneticTranscriptions = constructPhoneticTranscriptionsHtml(pitches);
+
+    if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
+        audioUrls[idx] = await fetchAudioUrl(expression, reading || expression);
+    }
+    const audio = audioUrls[idx] || '';
+
+    return await webkit.messageHandlers.mineWithOptions.postMessage({
+        expression,
+        reading,
+        matched,
+        furiganaPlain,
+        frequenciesHtml,
+        freqHarmonicRank,
+        glossary,
+        glossaryFirst,
+        singleGlossaries: JSON.stringify(singleGlossaries),
+        pitchPositions,
+        pitchCategories,
+        phoneticTranscriptions,
+        popupSelectionText: getPopupSelectionText(),
+        audio,
+        selectedDictionary: selectedDictionaries[idx]?.name || '',
+        dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
+    });
+}
+
 function renderStructuredContent(parent, node, language = null, dictName = null, exporting = false) {
     if (typeof node === 'string') {
         node.split(/\r?\n/).forEach((line, i) => {
@@ -1358,7 +1401,7 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
         'data-enabled': String(enabled)
     });
     slot.type = 'button';
-    slot.setAttribute('aria-label', kind === 'audio' ? 'Play audio' : 'Add to Anki');
+    slot.setAttribute('aria-label', kind === 'audio' ? 'Play audio' : kind === 'mineOptions' ? 'Mine with options' : 'Add to Anki');
     slot.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1367,6 +1410,8 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
             playEntryAudio(entryIndex);
         } else if (kind === 'mine') {
             mineEntryAtIndex(entryIndex);
+        } else if (kind === 'mineOptions') {
+            mineEntryWithOptions(entryIndex);
         }
     });
     slot.appendChild(el('span', { className: 'button-slot-icon' }));
@@ -1392,7 +1437,9 @@ function applyButtonSlotVisualState(slot) {
     const enabled = slot.dataset.enabled !== 'false';
     const iconName = kind === 'audio'
         ? (state === 'error' ? 'volume_off' : 'volume_up')
-        : (state === 'duplicate' ? 'check_box' : 'add_box');
+        : kind === 'mineOptions'
+            ? 'note_add'
+            : (state === 'duplicate' ? 'check_box' : 'add_box');
     slot.disabled = !enabled;
     slot.style.setProperty('--button-icon-url', `url("https://appassets.androidplatform.net/popup/icons/${iconName}.svg")`);
 }
@@ -1416,17 +1463,21 @@ async function mineEntryAtIndex(entryIndex) {
     if (!entry) { return; }
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const mineSlot = getButtonSlot('mine', entryIndex);
+    const mineOptionsSlot = getButtonSlot('mineOptions', entryIndex);
 
     lastSelection = getPopupSelectionText();
     updateButtonSlot(mineSlot, { enabled: false });
+    updateButtonSlot(mineOptionsSlot, { enabled: false });
 
     const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
     const checkDuplicate = async () => {
         const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
+        const enabled = !(wasAdded && !window.allowDupes);
         updateButtonSlot(mineSlot, {
             state: wasAdded ? 'duplicate' : 'default',
-            enabled: !(wasAdded && !window.allowDupes)
+            enabled
         });
+        updateButtonSlot(mineOptionsSlot, { enabled });
     };
 
     if (isAnkiConnect) {
@@ -1463,11 +1514,17 @@ function createEntryHeader(entry, idx) {
 
     const mineSlot = createButtonSlot('mine', idx, false);
     buttonsContainer.appendChild(mineSlot);
+
+    const mineOptionsSlot = createButtonSlot('mineOptions', idx, false);
+    buttonsContainer.appendChild(mineOptionsSlot);
+
     webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
+        const enabled = !(isDuplicate && !window.allowDupes);
         updateButtonSlot(mineSlot, {
             state: isDuplicate ? 'duplicate' : 'default',
-            enabled: !(isDuplicate && !window.allowDupes)
+            enabled
         });
+        updateButtonSlot(mineOptionsSlot, { enabled });
     });
 
     header.appendChild(buttonsContainer);

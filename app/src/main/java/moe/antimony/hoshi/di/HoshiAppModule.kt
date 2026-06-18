@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
+import moe.antimony.hoshi.features.anki.ExampleSentenceSource
+import moe.antimony.hoshi.features.anki.MassifExampleSentenceSource
 import moe.antimony.hoshi.features.anki.ankiSettingsRepository
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.audio.audioSettingsRepository
@@ -109,6 +111,10 @@ internal object HoshiAppModule {
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): AnkiSettingsRepository =
         context.ankiSettingsRepository(profileRepository, ioDispatcher)
+
+    @Provides
+    @Singleton
+    fun provideExampleSentenceSource(): ExampleSentenceSource = MassifExampleSentenceSource()
 
     @Provides
     @Singleton
