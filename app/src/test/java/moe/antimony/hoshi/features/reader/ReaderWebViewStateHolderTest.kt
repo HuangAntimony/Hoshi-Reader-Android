@@ -53,6 +53,20 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun jumpingToCurrentDisplayedPositionDoesNotStartRestoreOrRecordHistory() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.markWebViewRestored()
+        holder.recordDisplayedProgress(0.42)
+
+        val saved = holder.jumpToWithHistory(ReaderChapterPosition(index = 2, progress = 0.42))
+
+        assertEquals(ReaderChapterPosition(index = 2, progress = 0.42), saved)
+        assertEquals(ReaderChapterPosition(index = 2, progress = 0.42), holder.readerPosition.displayedPosition)
+        assertTrue(holder.canAcceptReaderNavigationInput())
+        assertNull(holder.backTargetPosition)
+    }
+
+    @Test
     fun jumpHistoryBackAndForwardMirrorIosReaderBehavior() {
         val holder = stateHolder(initialIndex = 2)
         holder.recordDisplayedProgress(0.42)
