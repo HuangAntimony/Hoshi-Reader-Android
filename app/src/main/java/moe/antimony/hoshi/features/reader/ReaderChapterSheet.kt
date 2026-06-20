@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.reader
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -13,21 +12,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,12 +28,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
@@ -53,78 +50,7 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.util.Locale
 
 @Composable
-internal fun ReaderChapterSheet(
-    book: EpubBook,
-    currentPosition: ReaderChapterPosition,
-    progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
-    onJump: (ReaderChapterPosition, String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val rows = remember(book, currentPosition.index) { book.chapterRows(currentPosition.index) }
-    val sheetStyle = readerSheetStyle()
-    val chrome = readerChapterSheetChrome()
-    val coverBitmap = remember(book) {
-        if (chrome.cacheCoverOutsideLazyList) book.decodeCoverImageBitmap() else null
-    }
-    val scrollState = rememberScrollState()
-    var showJumpDialog by remember { mutableStateOf(false) }
-
-    ReaderBottomPanel(
-        sheetStyle = sheetStyle,
-        onDismiss = onDismiss,
-    ) {
-        CompositionLocalProvider(
-            LocalOverscrollFactory provides if (chrome.disableListOverscrollEffect) null else LocalOverscrollFactory.current,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(scrollState)
-                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            ) {
-                if (chrome.showBookHeader) {
-                    ReaderChapterBookHeader(
-                        book = book,
-                        coverBitmap = coverBitmap,
-                        currentPosition = currentPosition,
-                        progressDisplay = progressDisplay,
-                        onJumpToCharacter = { showJumpDialog = true },
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
-                rows.forEach { row ->
-                    ReaderChapterListRow(
-                        row = row,
-                        progressDisplay = progressDisplay,
-                        onClick = {
-                            onJump(
-                                ReaderChapterPosition(index = row.spineIndex, progress = 0.0),
-                                row.fragment,
-                            )
-                        },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
-                }
-            }
-        }
-    }
-
-    if (showJumpDialog) {
-        JumpToCharacterDialog(
-            totalCharacters = book.bookInfo.characterCount,
-            progressDisplay = progressDisplay,
-            onDismiss = { showJumpDialog = false },
-            onConfirm = { count ->
-                showJumpDialog = false
-                onJump(book.chapterPositionForCharacter(count), null)
-            },
-        )
-    }
-}
-
-@Composable
-private fun ReaderChapterBookHeader(
+internal fun ReaderGoToBookHeader(
     book: EpubBook,
     coverBitmap: ImageBitmap?,
     currentPosition: ReaderChapterPosition,
@@ -139,7 +65,6 @@ private fun ReaderChapterBookHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onJumpToCharacter)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -167,17 +92,14 @@ private fun ReaderChapterBookHeader(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-            contentDescription = stringResource(R.string.reader_jump_to_character),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(26.dp),
-        )
+        TextButton(onClick = onJumpToCharacter) {
+            Text(stringResource(R.string.reader_jump))
+        }
     }
 }
 
 @Composable
-private fun ReaderChapterCover(
+internal fun ReaderChapterCover(
     coverBitmap: ImageBitmap?,
     modifier: Modifier = Modifier,
 ) {
@@ -197,14 +119,14 @@ private fun ReaderChapterCover(
     }
 }
 
-private fun EpubBook.decodeCoverImageBitmap(): ImageBitmap? =
+internal fun EpubBook.decodeCoverImageBitmap(): ImageBitmap? =
     coverHref
         ?.let(::readResource)
         ?.let { bytes -> runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }
         ?.asImageBitmap()
 
 @Composable
-private fun ReaderChapterListRow(
+internal fun ReaderChapterListRow(
     row: ReaderChapterRow,
     progressDisplay: ReaderProgressDisplay,
     onClick: () -> Unit,
@@ -261,7 +183,7 @@ private fun ReaderChapterListRow(
 }
 
 @Composable
-private fun JumpToCharacterDialog(
+internal fun JumpToCharacterDialog(
     totalCharacters: Int,
     progressDisplay: ReaderProgressDisplay,
     onDismiss: () -> Unit,
@@ -269,12 +191,22 @@ private fun JumpToCharacterDialog(
 ) {
     var input by remember { mutableStateOf("") }
     val inputScrollState = rememberScrollState()
+    val inputFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val inputState = rememberSyncedTextFieldState(
         value = input,
         onValueChange = { input = it.filter(Char::isDigit) },
         scrollState = inputScrollState,
     )
-    val parsed = input.filter(Char::isDigit).toIntOrNull()
+    val target = readerJumpTargetFromInput(
+        input = input,
+        totalCharacters = totalCharacters,
+        progressDisplay = progressDisplay,
+    )
+    LaunchedEffect(inputFocusRequester) {
+        inputFocusRequester.requestFocus()
+        keyboardController?.show()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -291,6 +223,7 @@ private fun JumpToCharacterDialog(
         text = {
             OutlinedTextField(
                 state = inputState,
+                modifier = Modifier.focusRequester(inputFocusRequester),
                 label = {
                     Text(
                         stringResource(
@@ -302,7 +235,20 @@ private fun JumpToCharacterDialog(
                         ),
                     )
                 },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done,
+                    showKeyboardOnFocus = true,
+                ),
+                onKeyboardAction = {
+                    readerJumpImeAction(
+                        input = input,
+                        totalCharacters = totalCharacters,
+                        progressDisplay = progressDisplay,
+                        onConfirm = onConfirm,
+                        hideKeyboard = { keyboardController?.hide() },
+                    )
+                },
                 lineLimits = hoshiSingleLineTextFieldLineLimits(),
                 scrollState = inputScrollState,
                 colors = hoshiOutlinedTextFieldColors(),
@@ -310,14 +256,9 @@ private fun JumpToCharacterDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = parsed != null,
+                enabled = target != null,
                 onClick = {
-                    onConfirm(
-                        progressDisplay.rawTargetFromDisplayCount(
-                            displayCount = parsed ?: 0,
-                            totalCharacters = totalCharacters,
-                        ),
-                    )
+                    target?.let(onConfirm)
                 },
             ) {
                 Text(stringResource(R.string.reader_jump))
@@ -331,7 +272,7 @@ private fun JumpToCharacterDialog(
     )
 }
 
-private data class ReaderChapterRow(
+internal data class ReaderChapterRow(
     val label: String,
     val spineIndex: Int,
     val fragment: String?,
@@ -340,7 +281,7 @@ private data class ReaderChapterRow(
     val indentLevel: Int,
 )
 
-private fun EpubBook.chapterRows(currentIndex: Int): List<ReaderChapterRow> {
+internal fun EpubBook.chapterRows(currentIndex: Int): List<ReaderChapterRow> {
     val tocRows = toc.flatMap { item ->
         flattenChapterRows(item, indentLevel = 0, currentIndex = currentIndex)
     }
@@ -389,7 +330,7 @@ private fun EpubBook.chapterIndexForHref(href: String): Int? {
     }.takeIf { it >= 0 }
 }
 
-private fun EpubBook.chapterPositionForCharacter(characterCount: Int): ReaderChapterPosition {
+internal fun EpubBook.chapterPositionForCharacter(characterCount: Int): ReaderChapterPosition {
     val targetCharacter = characterCount.coerceIn(0, bookInfo.characterCount)
     val chapterEntries = chapters.mapIndexedNotNull { index, chapter ->
         bookInfo.chapterInfo[chapter.href]?.let { info -> index to info }

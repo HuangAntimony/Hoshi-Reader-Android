@@ -190,7 +190,7 @@
     <string name="dictionary_expanded">Expanded</string>
     <string name="dictionary_custom_css_font" comment="Custom CSS font setting, intentionally matching reader font labels.">Font</string>
     <string name="dictionary_custom_css_selector">Selector</string>
-    <string name="dictionary_search_placeholder">Search</string>
+    <string name="dictionary_search_placeholder" comment="Dictionary search field placeholder, intentionally matching reader search tab label.">Search</string>
     <string name="dictionary_lookup_failed">Lookup failed.</string>
     <string name="dictionary_pull_clear">Pull down to clear</string>
     <string name="dictionary_release_clear">Release to clear</string>
@@ -226,6 +226,17 @@
     <string name="reader_jump_back">Return to previous jump position</string>
     <string name="reader_jump_forward">Return to later jump position</string>
     <string name="reader_menu">Reader Menu</string>
+    <string name="reader_go_to">Go to</string>
+    <string name="reader_search" comment="Reader Go to panel tab label, distinct from dictionary search placeholder.">Search</string>
+    <string name="reader_search_in_book">Search in this book</string>
+    <string name="reader_search_empty_prompt">Enter text to search this book</string>
+    <string name="reader_searching">Searching...</string>
+    <string name="reader_no_search_results">No matches</string>
+    <string name="reader_search_failed">Could not search this book</string>
+    <plurals name="reader_search_result_count">
+        <item quantity="one">%d result</item>
+        <item quantity="other">%d results</item>
+    </plurals>
     <string name="reader_image_clip_label">Hoshi reader image</string>
     <string name="reader_image_copied">Image copied.</string>
     <string name="reader_image_saved">Image saved.</string>

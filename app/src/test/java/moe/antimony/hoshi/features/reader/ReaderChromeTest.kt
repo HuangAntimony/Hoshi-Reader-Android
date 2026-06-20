@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.TravelExplore
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -74,6 +75,20 @@ class ReaderChromeTest {
         assertEquals("1", display.countText(1))
         assertEquals("71", display.countText(355))
         assertEquals("720 / h", display.speedText(3_600))
+    }
+
+    @Test
+    fun formatsSearchResultPositionWithRawPercentage() {
+        val display = ReaderProgressDisplay.characters()
+
+        assertEquals("355 (0.21%)", display.countWithPercentText(355, 169_325))
+    }
+
+    @Test
+    fun formatsEnglishSearchResultPositionWithDisplayedWordCountAndRawPercentage() {
+        val display = ReaderProgressDisplay.word()
+
+        assertEquals("71 (0.21%)", display.countWithPercentText(355, 169_325))
     }
 
     @Test
@@ -618,8 +633,7 @@ class ReaderChromeTest {
             listOf(
                 ReaderMenuDestination.Sasayaki,
                 ReaderMenuDestination.Statistics,
-                ReaderMenuDestination.Highlights,
-                ReaderMenuDestination.Chapters,
+                ReaderMenuDestination.GoTo,
                 ReaderMenuDestination.Appearance,
             ),
             readerBottomMenuVisualOrder(showStatistics = true, showSasayaki = true),
@@ -630,12 +644,16 @@ class ReaderChromeTest {
     fun bottomMenuOmitsUnavailableOptionalDestinationsWithoutChangingIosOrder() {
         assertEquals(
             listOf(
-                ReaderMenuDestination.Highlights,
-                ReaderMenuDestination.Chapters,
+                ReaderMenuDestination.GoTo,
                 ReaderMenuDestination.Appearance,
             ),
             readerBottomMenuVisualOrder(showStatistics = false, showSasayaki = false),
         )
+    }
+
+    @Test
+    fun bottomMenuGoToUsesNavigationIconInsteadOfChapterListIcon() {
+        assertEquals(Icons.Rounded.TravelExplore, readerBottomMenuIcon(ReaderMenuDestination.GoTo))
     }
 
     @Test

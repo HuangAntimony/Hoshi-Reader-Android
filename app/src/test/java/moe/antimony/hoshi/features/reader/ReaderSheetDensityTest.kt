@@ -22,8 +22,6 @@ class ReaderSheetDensityTest {
 
         assertEquals(36, metrics.stepperButtonSizeDp)
         assertEquals(20, metrics.stepperIconSizeDp)
-        assertEquals(24, metrics.chapterCloseIconSizeDp)
-        assertEquals(40, metrics.chapterCloseButtonSizeDp)
     }
 
     @Test
@@ -35,14 +33,4 @@ class ReaderSheetDensityTest {
         assertEquals(metrics.appearanceRowVerticalPaddingDp, metrics.appearanceFontRowVerticalPaddingDp)
     }
 
-    @Test
-    fun chapterSheetKeepsBookHeaderButOmitsNavigationHeader() {
-        val chrome = readerChapterSheetChrome()
-
-        assertEquals(false, chrome.showNavigationHeader)
-        assertEquals(true, chrome.showBookHeader)
-        assertEquals(true, chrome.cacheCoverOutsideLazyList)
-        assertEquals(true, chrome.disableListOverscrollEffect)
-        assertEquals(true, chrome.useEagerScrollColumn)
-    }
 }

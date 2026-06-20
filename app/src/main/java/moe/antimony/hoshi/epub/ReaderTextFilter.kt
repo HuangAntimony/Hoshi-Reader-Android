@@ -1,15 +1,7 @@
 package moe.antimony.hoshi.epub
 
 internal fun String.filteredReaderText(): String {
-    var text = Regex("(?s)<body.*?</body>").find(this)?.value ?: this
-    text = text.replace(Regex("(?s)<rt[^>]*>.*?</rt>"), "")
-    text = text.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
-    text = text.replace(Regex("<[^>]+>"), "")
-    text = text
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
+    val text = visibleReaderText()
     return buildString {
         text.codePoints().forEach { codePoint ->
             if (codePoint.isReaderMatchableCodePoint()) {
@@ -19,7 +11,19 @@ internal fun String.filteredReaderText(): String {
     }
 }
 
-private fun Int.isReaderMatchableCodePoint(): Boolean =
+internal fun String.visibleReaderText(): String {
+    var text = Regex("(?s)<body.*?</body>").find(this)?.value ?: this
+    text = text.replace(Regex("(?s)<rt[^>]*>.*?</rt>"), "")
+    text = text.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
+    text = text.replace(Regex("<[^>]+>"), "")
+    return text
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+}
+
+internal fun Int.isReaderMatchableCodePoint(): Boolean =
     when (this) {
         in '0'.code..'9'.code,
         in 'A'.code..'Z'.code,

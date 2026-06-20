@@ -53,6 +53,34 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun jumpingToCurrentDisplayedPositionDoesNotStartRestoreOrRecordHistory() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.markWebViewRestored()
+        holder.recordDisplayedProgress(0.42)
+
+        val saved = holder.jumpToWithHistory(ReaderChapterPosition(index = 2, progress = 0.42))
+
+        assertEquals(ReaderChapterPosition(index = 2, progress = 0.42), saved)
+        assertEquals(ReaderChapterPosition(index = 2, progress = 0.42), holder.readerPosition.displayedPosition)
+        assertTrue(holder.canAcceptReaderNavigationInput())
+        assertNull(holder.backTargetPosition)
+    }
+
+    @Test
+    fun jumpingToCurrentLoadPositionAfterDisplayedProgressMovedStartsNewRestoreEpoch() {
+        val holder = stateHolder(initialIndex = 2, initialProgress = 0.42)
+        holder.markWebViewRestored()
+        holder.recordDisplayedProgress(0.50)
+        val previousEpoch = holder.webViewRestoreEpoch
+
+        val saved = holder.jumpToWithHistory(ReaderChapterPosition(index = 2, progress = 0.42))
+
+        assertEquals(ReaderChapterPosition(index = 2, progress = 0.42), saved)
+        assertTrue(holder.isWebViewRestoring)
+        assertEquals(previousEpoch + 1, holder.webViewRestoreEpoch)
+    }
+
+    @Test
     fun jumpHistoryBackAndForwardMirrorIosReaderBehavior() {
         val holder = stateHolder(initialIndex = 2)
         holder.recordDisplayedProgress(0.42)
@@ -296,6 +324,16 @@ class ReaderWebViewStateHolderTest {
         )
 
         assertFalse(baseLoadKey == changedLoadKey)
+    }
+
+    @Test
+    fun readerWebViewRestoreTokenTracksRestoreEpochEvenWhenLoadKeyIsUnchanged() {
+        val loadKey = "https://appassets.androidplatform.net/epub/chapter.xhtml#reader-load"
+
+        val baseToken = readerWebViewRestoreToken(loadKey, restoreEpoch = 1)
+        val changedToken = readerWebViewRestoreToken(loadKey, restoreEpoch = 2)
+
+        assertFalse(baseToken == changedToken)
     }
 
     @Test
@@ -737,11 +775,11 @@ class ReaderWebViewStateHolderTest {
 
         holder.dismissAppearance()
         holder.showReaderMenu()
-        holder.openChaptersFromMenu()
+        holder.openGoToFromMenu()
         assertFalse(holder.showReaderMenu)
-        assertTrue(holder.showChapters)
+        assertTrue(holder.showGoTo)
 
-        holder.dismissChapters()
+        holder.dismissGoTo()
         holder.showReaderMenu()
         holder.openSasayakiFromMenu()
         assertFalse(holder.showReaderMenu)

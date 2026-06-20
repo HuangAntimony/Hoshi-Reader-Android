@@ -165,6 +165,7 @@ internal fun ChapterWebView(
         readerSetupReloadKey = readerSetupReloadKey,
         webViewViewportSize = webViewViewportSize,
     )
+    val restoreToken = readerWebViewRestoreToken(loadKey, webViewRestoreEpoch)
     val readerSetupScript = remember(
         chapter,
         chapterPosition.progress,
@@ -180,7 +181,7 @@ internal fun ChapterWebView(
         sasayakiBackgroundColor,
         chapterSasayakiCuesJson,
         chapterHighlightsJson,
-        loadKey,
+        restoreToken,
         readerWebAssets,
     ) {
         readerSetupScript(
@@ -196,12 +197,12 @@ internal fun ChapterWebView(
             sasayakiBackgroundColor = sasayakiBackgroundColor,
             sasayakiCuesJson = chapterSasayakiCuesJson,
             highlightsJson = chapterHighlightsJson,
-            restoreToken = loadKey,
+            restoreToken = restoreToken,
             assets = readerWebAssets,
         )
     }
-    val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> (() -> Unit)?> { restoredWebView, restoreToken ->
-        if (restoreToken != loadKey) return@rememberUpdatedState null
+    val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> (() -> Unit)?> { restoredWebView, reportedRestoreToken ->
+        if (reportedRestoreToken != restoreToken) return@rememberUpdatedState null
         readerRestoreCompletionAfterVisibleAction(
             chapterFragment = chapterFragment,
             evaluateProgress = { callback ->
@@ -211,12 +212,12 @@ internal fun ChapterWebView(
             onRestoreCompleted = currentOnRestoreCompleted.value,
         )
     }
-    LaunchedEffect(readerWebView, loadKey, chapterSasayakiCuesJson, isWebViewRestoring) {
+    LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, isWebViewRestoring) {
         val webView = readerWebView ?: return@LaunchedEffect
         val cuesJson = chapterSasayakiCuesJson ?: return@LaunchedEffect
         if (isWebViewRestoring) return@LaunchedEffect
-        if (webView.tag != loadKey) return@LaunchedEffect
-        webView.applyReaderSasayakiCues(loadKey, cuesJson)
+        if (webView.tag != restoreToken) return@LaunchedEffect
+        webView.applyReaderSasayakiCues(restoreToken, cuesJson)
     }
     AndroidView(
         modifier = modifier
@@ -259,7 +260,7 @@ internal fun ChapterWebView(
                 ) { view ->
                     view.evaluateReaderSetupScript(
                         source = readerSetupScript,
-                        loadKey = loadKey,
+                        restoreToken = restoreToken,
                     )
                 }
                 readerWebView = this
@@ -427,10 +428,13 @@ internal fun ChapterWebView(
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
             if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
-            if (webView.tag != loadKey) {
-                webView.tag = loadKey
+            if (webView.tag != restoreToken) {
+                if (!currentIsWebViewRestoring.value) {
+                    currentOnRestoreStarted.value()
+                    return@AndroidView
+                }
+                webView.tag = restoreToken
                 webView.hideForReaderRestore()
-                currentOnRestoreStarted.value()
                 webView.webViewClient = EpubWebViewClient(
                     book = book,
                     fontManager = fontManager,
@@ -439,7 +443,7 @@ internal fun ChapterWebView(
                 ) { view ->
                     view.evaluateReaderSetupScript(
                         source = readerSetupScript,
-                        loadKey = loadKey,
+                        restoreToken = restoreToken,
                     )
                 }
                 webView.loadUrl(baseUrl)
@@ -517,6 +521,9 @@ internal fun readerWebViewLoadKey(
     webViewViewportSize: IntSize,
 ): String =
     "$baseUrl#${readerContentReloadKey.hashCode()}#${readerSetupReloadKey.hashCode()}#$webViewViewportSize"
+
+internal fun readerWebViewRestoreToken(loadKey: String, restoreEpoch: Int): String =
+    "$loadKey#$restoreEpoch"
 
 internal fun readerHtmlWithEarlyViewport(html: String): String {
     val normalizedHtml = html.removeWhitespaceBeforeXmlDeclaration()
@@ -1302,7 +1309,7 @@ private fun WebView.showAfterReaderRestore(onVisible: () -> Unit) {
 
 private fun WebView.evaluateReaderSetupScript(
     source: String,
-    loadKey: String,
+    restoreToken: String,
 ) {
     readerAppliedSasayakiCues.remove(this)
     evaluateJavascript(source, null)
