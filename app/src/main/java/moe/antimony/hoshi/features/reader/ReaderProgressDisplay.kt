@@ -39,6 +39,9 @@ data class ReaderProgressDisplay(
     fun countText(rawCount: Int): String =
         formatDisplayNumber(displayCount(rawCount))
 
+    fun countWithPercentText(rawCount: Int, totalRawCount: Int): String =
+        "${countText(rawCount)} (${rawProgressPercentText(rawCount, totalRawCount)})"
+
     fun speedText(rawSpeed: Int): String =
         "${formatDisplayNumber(displayCount(rawSpeed))} / h"
 
@@ -51,6 +54,15 @@ data class ReaderProgressDisplay(
         } else {
             value.toString()
         }
+
+    private fun rawProgressPercentText(rawCount: Int, totalRawCount: Int): String {
+        val percent = if (totalRawCount > 0) {
+            rawCount.coerceIn(0, totalRawCount).toDouble() / totalRawCount.toDouble() * 100.0
+        } else {
+            0.0
+        }
+        return String.format(Locale.US, "%.2f%%", percent)
+    }
 
     companion object {
         private const val CharactersPerDisplayedWord = 5

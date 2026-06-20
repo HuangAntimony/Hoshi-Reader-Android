@@ -78,6 +78,20 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun formatsSearchResultPositionWithRawPercentage() {
+        val display = ReaderProgressDisplay.characters()
+
+        assertEquals("355 (0.21%)", display.countWithPercentText(355, 169_325))
+    }
+
+    @Test
+    fun formatsEnglishSearchResultPositionWithDisplayedWordCountAndRawPercentage() {
+        val display = ReaderProgressDisplay.word()
+
+        assertEquals("71 (0.21%)", display.countWithPercentText(355, 169_325))
+    }
+
+    @Test
     fun formatsEnglishProfileJumpTargetsAsWordCounts() {
         assertEquals("71", readerJumpTargetText(355, ReaderProgressDisplay.word()))
     }

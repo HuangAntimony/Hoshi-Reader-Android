@@ -2,6 +2,8 @@ package moe.antimony.hoshi.features.reader
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
@@ -40,6 +42,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -55,11 +62,13 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.ReaderHighlight
+import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
+import moe.antimony.hoshi.ui.hoshiTextFieldCursorBrush
+import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 
 internal enum class ReaderGoToTab {
     Search,
@@ -83,6 +92,33 @@ internal fun ReaderGoToSheet(
     var selectedTab by remember { mutableStateOf(ReaderGoToTab.Search) }
     var showJumpDialog by remember { mutableStateOf(false) }
     val coverBitmap = remember(book) { book.decodeCoverImageBitmap() }
+    val searchState = remember(book) { ReaderSearchSheetState() }
+    val searchEngine = remember(book) { ReaderSearchEngine(book) }
+
+    LaunchedEffect(book, searchState.searchNonce) {
+        if (searchState.searchNonce == searchState.handledSearchNonce) {
+            return@LaunchedEffect
+        }
+        searchState.handledSearchNonce = searchState.searchNonce
+        val captured = searchState.submittedQuery
+        if (!readerSearchQueryHasMatchableText(captured)) {
+            searchState.clearSubmittedSearch()
+            return@LaunchedEffect
+        }
+        searchState.searching = true
+        searchState.failed = false
+        when (val searchResult = loadReaderSearchResults { withContext(Dispatchers.IO) { searchEngine.search(captured) } }) {
+            is ReaderSearchLoadResult.Success -> {
+                searchState.results = searchResult.value
+                searchState.searching = false
+            }
+            ReaderSearchLoadResult.Failure -> {
+                searchState.results = emptyList()
+                searchState.searching = false
+                searchState.failed = true
+            }
+        }
+    }
 
     ReaderBottomPanel(
         sheetStyle = readerSheetStyle(),
@@ -103,8 +139,9 @@ internal fun ReaderGoToSheet(
         )
         when (selectedTab) {
             ReaderGoToTab.Search -> ReaderSearchTab(
-                book = book,
+                searchState = searchState,
                 progressDisplay = progressDisplay,
+                totalCharacters = book.bookInfo.characterCount,
                 onJump = onSearchResultJump,
                 modifier = Modifier.weight(1f),
             )
@@ -135,6 +172,39 @@ internal fun ReaderGoToSheet(
                 onCharacterJump(count)
             },
         )
+    }
+}
+
+internal class ReaderSearchSheetState {
+    var query by mutableStateOf("")
+    var submittedQuery by mutableStateOf("")
+    var results by mutableStateOf(emptyList<ReaderSearchResult>())
+    var searching by mutableStateOf(false)
+    var failed by mutableStateOf(false)
+    var searchNonce by mutableStateOf(0)
+    var handledSearchNonce by mutableStateOf(0)
+
+    fun updateQuery(value: String) {
+        query = value
+        if (!readerSearchQueryHasMatchableText(value)) {
+            clearSubmittedSearch()
+        }
+    }
+
+    fun submitQuery() {
+        if (!readerSearchQueryHasMatchableText(query)) {
+            clearSubmittedSearch()
+            return
+        }
+        submittedQuery = query
+        searchNonce += 1
+    }
+
+    fun clearSubmittedSearch() {
+        submittedQuery = ""
+        results = emptyList()
+        searching = false
+        failed = false
     }
 }
 
@@ -182,58 +252,23 @@ private fun ReaderGoToTabs(
 
 @Composable
 private fun ReaderSearchTab(
-    book: EpubBook,
+    searchState: ReaderSearchSheetState,
     progressDisplay: ReaderProgressDisplay,
+    totalCharacters: Int,
     onJump: (ReaderSearchResult) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var query by remember(book) { mutableStateOf("") }
-    var results by remember(book) { mutableStateOf(emptyList<ReaderSearchResult>()) }
-    var searching by remember(book) { mutableStateOf(false) }
-    var failed by remember(book) { mutableStateOf(false) }
-    var searchNonce by remember(book) { mutableStateOf(0) }
-    var handledSearchNonce by remember(book) { mutableStateOf(0) }
-    val engine = remember(book) { ReaderSearchEngine(book) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(book, query, searchNonce) {
-        val captured = query
-        val runImmediately = searchNonce != handledSearchNonce
-        if (runImmediately) {
-            handledSearchNonce = searchNonce
-        } else {
-            delay(SearchDebounceMillis)
-        }
-        if (!readerSearchQueryHasMatchableText(captured)) {
-            searching = false
-            failed = false
-            results = emptyList()
-            return@LaunchedEffect
-        }
-        searching = true
-        failed = false
-        when (val searchResult = loadReaderSearchResults { withContext(Dispatchers.IO) { engine.search(captured) } }) {
-            is ReaderSearchLoadResult.Success -> {
-                results = searchResult.value
-                searching = false
-            }
-            ReaderSearchLoadResult.Failure -> {
-                results = emptyList()
-                searching = false
-                failed = true
-            }
-        }
-    }
-
     Column(modifier = modifier.fillMaxWidth()) {
         ReaderCompactSearchField(
-            query = query,
-            onQueryChange = { query = it },
+            query = searchState.query,
+            onQueryChange = searchState::updateQuery,
             onSearch = {
                 readerSearchImeAction(
-                    onSearch = { searchNonce += 1 },
+                    onSearch = searchState::submitQuery,
                     clearFocus = { focusManager.clearFocus() },
                     hideKeyboard = { keyboardController?.hide() },
                 )
@@ -242,11 +277,12 @@ private fun ReaderSearchTab(
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         )
         ReaderSearchResultsContent(
-            query = query,
-            searching = searching,
-            failed = failed,
-            results = results,
+            query = searchState.submittedQuery,
+            searching = searchState.searching,
+            failed = searchState.failed,
+            results = searchState.results,
             progressDisplay = progressDisplay,
+            totalCharacters = totalCharacters,
             onJump = onJump,
             modifier = Modifier.weight(1f),
         )
@@ -261,6 +297,13 @@ private fun ReaderCompactSearchField(
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
+    val fieldScrollState = rememberScrollState()
+    val fieldState = rememberSyncedTextFieldState(
+        value = query,
+        onValueChange = onQueryChange,
+        scrollState = fieldScrollState,
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -280,28 +323,55 @@ private fun ReaderCompactSearchField(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, showKeyboardOnFocus = true),
-                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                decorationBox = { innerTextField ->
-                    if (query.isBlank()) {
-                        Text(
-                            text = stringResource(R.string.reader_search_in_book),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    innerTextField()
-                },
+            ReaderCompactSearchInput(
+                fieldState = fieldState,
+                query = query,
+                onSearch = onSearch,
+                fieldScrollState = fieldScrollState,
+                focusRequester = focusRequester,
+                modifier = Modifier.weight(1f),
             )
         }
+    }
+}
+
+@Composable
+private fun ReaderCompactSearchInput(
+    fieldState: TextFieldState,
+    query: String,
+    onSearch: () -> Unit,
+    fieldScrollState: ScrollState,
+    focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        if (query.isBlank()) {
+            Text(
+                text = stringResource(R.string.reader_search_in_book),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        BasicTextField(
+            state = fieldState,
+            lineLimits = hoshiSingleLineTextFieldLineLimits(),
+            scrollState = fieldScrollState,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, showKeyboardOnFocus = true),
+            onKeyboardAction = { onSearch() },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = hoshiTextFieldCursorBrush(MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
+                        onSearch()
+                        true
+                    } else {
+                        false
+                    }
+                },
+        )
     }
 }
 
@@ -312,6 +382,7 @@ private fun ReaderSearchResultsContent(
     failed: Boolean,
     results: List<ReaderSearchResult>,
     progressDisplay: ReaderProgressDisplay,
+    totalCharacters: Int,
     onJump: (ReaderSearchResult) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -362,6 +433,7 @@ private fun ReaderSearchResultsContent(
                     ReaderSearchResultRow(
                         result = result,
                         progressDisplay = progressDisplay,
+                        totalCharacters = totalCharacters,
                         chapterLabel = label.ifBlank { stringResource(R.string.reader_untitled_chapter) },
                         onClick = { onJump(result) },
                     )
@@ -376,10 +448,11 @@ private fun ReaderSearchResultsContent(
 private fun ReaderSearchResultRow(
     result: ReaderSearchResult,
     progressDisplay: ReaderProgressDisplay,
+    totalCharacters: Int,
     chapterLabel: String,
     onClick: () -> Unit,
 ) {
-    val positionText = progressDisplay.countText(result.character)
+    val positionText = progressDisplay.countWithPercentText(result.character, totalCharacters)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -582,5 +655,3 @@ internal fun readerJumpTargetFromInput(
         totalCharacters = totalCharacters,
     )
 }
-
-private const val SearchDebounceMillis = 220L
