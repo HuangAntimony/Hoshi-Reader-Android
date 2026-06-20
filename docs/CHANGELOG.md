@@ -14,6 +14,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Update VN reveal speed in Reader Appearance without reloading the current chapter.
 - Keep VN vertical text screens from splitting closing Japanese quotation marks onto their own page.
+- Prevent repeated Reader re-entry from accumulating WebViews and causing long Sasayaki blank screens.
 
 ## [v1.2.1] - 2026-06-18
 

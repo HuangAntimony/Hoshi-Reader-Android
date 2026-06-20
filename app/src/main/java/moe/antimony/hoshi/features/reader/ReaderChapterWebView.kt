@@ -440,6 +440,12 @@ internal fun ChapterWebView(
                 webView.loadUrl(baseUrl)
             }
         },
+        onRelease = { webView ->
+            if (readerWebView == webView) {
+                readerWebView = null
+            }
+            releaseReaderWebView(webView)
+        },
     )
 }
 
@@ -678,6 +684,12 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     override fun startActionMode(callback: ActionMode.Callback, type: Int): ActionMode? =
         super.startActionMode(ReaderHighlightActionModeCallback(this, callback), type)
+
+    fun releaseForDestroy() {
+        dismissHighlightColorPopup()
+        setNativeSelectionActionMode(null)
+        onHighlightCreated = { _, _, _ -> }
+    }
 }
 
 private class ReaderHighlightActionModeCallback(
@@ -1181,6 +1193,23 @@ private fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String) {
     if (readerAppliedSasayakiCues[this] == appliedCues) return
     readerAppliedSasayakiCues[this] = appliedCues
     evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson), null)
+}
+
+private fun releaseReaderWebView(webView: HoshiReaderWebView) {
+    webView.animate().cancel()
+    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
+    readerRestoreGenerations.remove(webView)
+    readerAppliedSasayakiCues.remove(webView)
+    readerPageTurnProgressRequestIds.remove(webView)
+    webView.releaseForDestroy()
+    webView.setOnTouchListener(null)
+    webView.setOnScrollChangeListener(null)
+    webView.webViewClient = WebViewClient()
+    webView.removeJavascriptInterface("HoshiTextSelection")
+    webView.removeJavascriptInterface("HoshiReaderRestore")
+    webView.removeJavascriptInterface("HoshiReaderImage")
+    webView.stopLoading()
+    webView.destroy()
 }
 
 private data class ReaderAppliedSasayakiCues(
