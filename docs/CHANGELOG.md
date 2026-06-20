@@ -8,7 +8,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Added reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters, highlights, and character jumps.
+- Added reader in-book search with chapter-grouped, punctuation-preserving results and a unified Go to panel for search, chapters, highlights, and character jumps.
 
 ### Changed
 

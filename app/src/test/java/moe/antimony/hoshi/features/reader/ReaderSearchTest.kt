@@ -38,7 +38,7 @@ class ReaderSearchTest {
         assertEquals(1, results.size)
         assertEquals(0, results.single().chapterIndex)
         assertEquals(0, results.single().character)
-        assertTrue(results.single().snippet.contains("漢字A"))
+        assertTrue(results.single().snippet.contains("漢字 A"))
     }
 
     @Test
@@ -66,6 +66,83 @@ class ReaderSearchTest {
 
         assertEquals(listOf(0, 3), results.map { it.character })
         assertEquals(listOf("First", "Second"), results.map { it.chapterLabel })
+    }
+
+    @Test
+    fun searchSnippetKeepsDisplayPunctuationWithoutChangingCharacterOffset() {
+        val book = searchBook(
+            chapters = listOf(chapter("c0.xhtml", "")),
+            resources = mapOf("c0.xhtml" to xhtml("<html><body>吾輩は「猫、です。」犬</body></html>")),
+            bookInfo = BookInfo(
+                characterCount = 7,
+                chapterInfo = mapOf("c0.xhtml" to BookInfo.ChapterInfo(spineIndex = 0, currentTotal = 0, chapterCount = 7)),
+            ),
+        )
+
+        val result = ReaderSearchEngine(book).search("猫です").single()
+
+        assertEquals(3, result.character)
+        assertTrue(result.snippet.contains("「猫、です。」"))
+        assertEquals("猫、です", result.highlightedText())
+    }
+
+    @Test
+    fun searchQueryPunctuationRemainsIgnoredWhenSnippetKeepsDisplayPunctuation() {
+        val book = searchBook(
+            chapters = listOf(chapter("c0.xhtml", "")),
+            resources = mapOf("c0.xhtml" to xhtml("<html><body>吾輩は「猫、です。」犬</body></html>")),
+            bookInfo = BookInfo(
+                characterCount = 7,
+                chapterInfo = mapOf("c0.xhtml" to BookInfo.ChapterInfo(spineIndex = 0, currentTotal = 0, chapterCount = 7)),
+            ),
+        )
+
+        val result = ReaderSearchEngine(book).search("猫!です").single()
+
+        assertEquals(3, result.character)
+        assertEquals("猫、です", result.highlightedText())
+    }
+
+    @Test
+    fun searchSnippetExcludesRubyAndScriptsButKeepsVisiblePunctuation() {
+        val book = searchBook(
+            chapters = listOf(chapter("c0.xhtml", "")),
+            resources = mapOf(
+                "c0.xhtml" to xhtml(
+                    "<html><body><ruby>漢<rt>かん</rt></ruby>、字<script>bad。</script></body></html>",
+                ),
+            ),
+            bookInfo = BookInfo(
+                characterCount = 2,
+                chapterInfo = mapOf("c0.xhtml" to BookInfo.ChapterInfo(spineIndex = 0, currentTotal = 0, chapterCount = 2)),
+            ),
+        )
+
+        val result = ReaderSearchEngine(book).search("漢字").single()
+
+        assertEquals(0, result.character)
+        assertTrue(result.snippet.contains("漢、字"))
+        assertTrue(!result.snippet.contains("かん"))
+        assertTrue(!result.snippet.contains("bad"))
+        assertEquals("漢、字", result.highlightedText())
+    }
+
+    @Test
+    fun searchHighlightMappingHandlesNonBmpDisplayCodePointsBetweenMatchedCharacters() {
+        val book = searchBook(
+            chapters = listOf(chapter("c0.xhtml", "")),
+            resources = mapOf("c0.xhtml" to xhtml("<html><body>A🙂B</body></html>")),
+            bookInfo = BookInfo(
+                characterCount = 2,
+                chapterInfo = mapOf("c0.xhtml" to BookInfo.ChapterInfo(spineIndex = 0, currentTotal = 0, chapterCount = 2)),
+            ),
+        )
+
+        val result = ReaderSearchEngine(book).search("AB").single()
+
+        assertEquals(0, result.character)
+        assertEquals("A🙂B", result.snippet)
+        assertEquals("A🙂B", result.highlightedText())
     }
 
     @Test
@@ -172,4 +249,13 @@ class ReaderSearchTest {
 
     private fun xhtml(value: String): EpubResource =
         EpubResource("application/xhtml+xml", value.toByteArray())
+}
+
+private fun ReaderSearchResult.highlightedText(): String =
+    snippet.substringByCodePoints(snippetMatchStart, snippetMatchEnd)
+
+private fun String.substringByCodePoints(start: Int, end: Int): String {
+    val startIndex = offsetByCodePoints(0, start)
+    val endIndex = offsetByCodePoints(0, end)
+    return substring(startIndex, endIndex)
 }
