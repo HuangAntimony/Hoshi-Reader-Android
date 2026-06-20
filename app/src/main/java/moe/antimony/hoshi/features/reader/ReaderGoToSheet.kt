@@ -386,6 +386,7 @@ private fun ReaderSearchResultsContent(
     onJump: (ReaderSearchResult) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val resultsByChapter = remember(results) { results.groupBy { it.chapterIndex } }
     when {
         !readerSearchQueryHasMatchableText(query) -> ReaderGoToEmptyState(
             icon = Icons.Rounded.Search,
@@ -408,7 +409,7 @@ private fun ReaderSearchResultsContent(
                 .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
         ) {
-            results.groupBy { it.chapterIndex }.forEach { (_, chapterResults) ->
+            resultsByChapter.forEach { (_, chapterResults) ->
                 val label = chapterResults.first().chapterLabel
                 item {
                     Text(

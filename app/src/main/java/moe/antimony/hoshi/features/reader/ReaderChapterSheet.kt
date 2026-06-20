@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.reader
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -13,21 +12,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,130 +48,6 @@ import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
 import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.util.Locale
-
-@Composable
-internal fun ReaderChapterSheet(
-    book: EpubBook,
-    currentPosition: ReaderChapterPosition,
-    progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
-    onJump: (ReaderChapterPosition, String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val rows = remember(book, currentPosition.index) { book.chapterRows(currentPosition.index) }
-    val sheetStyle = readerSheetStyle()
-    val chrome = readerChapterSheetChrome()
-    val coverBitmap = remember(book) {
-        if (chrome.cacheCoverOutsideLazyList) book.decodeCoverImageBitmap() else null
-    }
-    val scrollState = rememberScrollState()
-    var showJumpDialog by remember { mutableStateOf(false) }
-
-    ReaderBottomPanel(
-        sheetStyle = sheetStyle,
-        onDismiss = onDismiss,
-    ) {
-        CompositionLocalProvider(
-            LocalOverscrollFactory provides if (chrome.disableListOverscrollEffect) null else LocalOverscrollFactory.current,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(scrollState)
-                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            ) {
-                if (chrome.showBookHeader) {
-                    ReaderChapterBookHeader(
-                        book = book,
-                        coverBitmap = coverBitmap,
-                        currentPosition = currentPosition,
-                        progressDisplay = progressDisplay,
-                        onJumpToCharacter = { showJumpDialog = true },
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
-                rows.forEach { row ->
-                    ReaderChapterListRow(
-                        row = row,
-                        progressDisplay = progressDisplay,
-                        onClick = {
-                            onJump(
-                                ReaderChapterPosition(index = row.spineIndex, progress = 0.0),
-                                row.fragment,
-                            )
-                        },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
-                }
-            }
-        }
-    }
-
-    if (showJumpDialog) {
-        JumpToCharacterDialog(
-            totalCharacters = book.bookInfo.characterCount,
-            progressDisplay = progressDisplay,
-            onDismiss = { showJumpDialog = false },
-            onConfirm = { count ->
-                showJumpDialog = false
-                onJump(book.chapterPositionForCharacter(count), null)
-            },
-        )
-    }
-}
-
-@Composable
-internal fun ReaderChapterBookHeader(
-    book: EpubBook,
-    coverBitmap: ImageBitmap?,
-    currentPosition: ReaderChapterPosition,
-    progressDisplay: ReaderProgressDisplay,
-    onJumpToCharacter: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val currentCharacter = book.characterCountAt(currentPosition.index, currentPosition.progress)
-    val totalCharacters = book.bookInfo.characterCount
-    val percent = if (totalCharacters > 0) currentCharacter.toDouble() / totalCharacters.toDouble() * 100.0 else 0.0
-    val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onJumpToCharacter)
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ReaderChapterCover(
-            coverBitmap = coverBitmap,
-            modifier = Modifier.size(
-                width = metrics.chapterHeaderCoverWidthDp.dp,
-                height = metrics.chapterHeaderCoverHeightDp.dp,
-            ),
-        )
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = book.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-            )
-            Text(
-                text = "${progressDisplay.rangeText(currentCharacter, totalCharacters)} (${String.format(Locale.US, "%.1f", percent)}%)",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-            contentDescription = stringResource(R.string.reader_jump_to_character),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(26.dp),
-        )
-    }
-}
 
 @Composable
 internal fun ReaderGoToBookHeader(

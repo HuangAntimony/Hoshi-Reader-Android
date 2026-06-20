@@ -103,6 +103,7 @@ private data class ReaderSearchDocument(
         fun from(book: EpubBook): ReaderSearchDocument {
             val builder = ReaderSearchDocumentBuilder()
             val chapters = mutableListOf<ReaderSearchChapterRange>()
+            val labels = ReaderChapterLabels.labels(book)
             book.chapters.forEachIndexed { fallbackIndex, chapter ->
                 val index = chapter.spineIndex ?: fallbackIndex
                 val html = book.readResource(chapter.href)?.toString(Charsets.UTF_8) ?: chapter.html
@@ -113,7 +114,7 @@ private data class ReaderSearchDocument(
                     endSearchCharacter = bounds.endSearchCharacter,
                     startDisplayCharacter = bounds.startDisplayCharacter,
                     endDisplayCharacter = bounds.endDisplayCharacter,
-                    label = ReaderChapterLabels.sectionLabelForIndex(book, index),
+                    label = ReaderChapterLabels.sectionLabelForIndex(labels, index),
                 )
             }
             return ReaderSearchDocument(

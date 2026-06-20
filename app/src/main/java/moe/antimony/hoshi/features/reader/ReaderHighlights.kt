@@ -88,7 +88,7 @@ internal object ReaderHighlightSections {
         return grouped.map { (chapterIndex, items) ->
             ReaderHighlightSection(
                 chapterIndex = chapterIndex,
-                label = ReaderChapterLabels.sectionLabelForIndex(book, chapterIndex),
+                label = ReaderChapterLabels.sectionLabelForIndex(labels, chapterIndex),
                 highlights = items.sortedBy { it.character },
             )
         }.sortedBy { it.chapterIndex }

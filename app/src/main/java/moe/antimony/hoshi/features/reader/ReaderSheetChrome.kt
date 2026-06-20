@@ -51,8 +51,6 @@ internal data class ReaderSheetDensityMetrics(
     val chapterRowCornerRadiusDp: Int,
     val chapterHeaderCoverWidthDp: Int,
     val chapterHeaderCoverHeightDp: Int,
-    val chapterCloseButtonSizeDp: Int,
-    val chapterCloseIconSizeDp: Int,
     val statisticsSectionBottomPaddingDp: Int,
     val statisticsRowVerticalPaddingDp: Int,
     val sasayakiRowVerticalPaddingDp: Int,
@@ -75,30 +73,10 @@ internal fun readerSheetDensityMetrics(): ReaderSheetDensityMetrics =
         chapterRowCornerRadiusDp = 8,
         chapterHeaderCoverWidthDp = 44,
         chapterHeaderCoverHeightDp = 66,
-        chapterCloseButtonSizeDp = 40,
-        chapterCloseIconSizeDp = 24,
         statisticsSectionBottomPaddingDp = 12,
         statisticsRowVerticalPaddingDp = 6,
         sasayakiRowVerticalPaddingDp = 6,
         sasayakiSliderVerticalPaddingDp = 6,
-    )
-
-@Immutable
-internal data class ReaderChapterSheetChrome(
-    val showNavigationHeader: Boolean,
-    val showBookHeader: Boolean,
-    val cacheCoverOutsideLazyList: Boolean,
-    val disableListOverscrollEffect: Boolean,
-    val useEagerScrollColumn: Boolean,
-)
-
-internal fun readerChapterSheetChrome(): ReaderChapterSheetChrome =
-    ReaderChapterSheetChrome(
-        showNavigationHeader = false,
-        showBookHeader = true,
-        cacheCoverOutsideLazyList = true,
-        disableListOverscrollEffect = true,
-        useEagerScrollColumn = true,
     )
 
 @Immutable

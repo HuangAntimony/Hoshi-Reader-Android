@@ -28,7 +28,10 @@ internal object ReaderChapterLabels {
     }
 
     fun sectionLabelForIndex(book: EpubBook, chapterIndex: Int): String {
-        val labels = labels(book)
+        return sectionLabelForIndex(labels(book), chapterIndex)
+    }
+
+    fun sectionLabelForIndex(labels: Map<Int, String>, chapterIndex: Int): String {
         var index = chapterIndex
         while (index > 0 && labels[index] == null) {
             index -= 1
