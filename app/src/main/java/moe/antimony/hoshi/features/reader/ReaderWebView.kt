@@ -270,8 +270,7 @@ fun ReaderWebView(
     }
     val showReaderMenu = stateHolder.showReaderMenu
     val showAppearance = stateHolder.showAppearance
-    val showChapters = stateHolder.showChapters
-    val showHighlights = stateHolder.showHighlights
+    val showGoTo = stateHolder.showGoTo
     val showSasayaki = stateHolder.showSasayaki
     val showStatistics = stateHolder.showStatistics
     val focusMode = stateHolder.focusMode
@@ -1360,8 +1359,7 @@ fun ReaderWebView(
             onMenu = stateHolder::toggleReaderMenu,
             menuExpanded = showReaderMenu,
             onDismissMenu = stateHolder::dismissReaderMenu,
-            onChapters = stateHolder::openChaptersFromMenu,
-            onHighlights = stateHolder::openHighlightsFromMenu,
+            onGoTo = stateHolder::openGoToFromMenu,
             onAppearance = stateHolder::openAppearanceFromMenu,
             onStatistics = if (effectiveSettings.enableStatistics) {
                 stateHolder::openStatisticsFromMenu
@@ -1390,31 +1388,36 @@ fun ReaderWebView(
                 onDismiss = stateHolder::dismissAppearance,
             )
         }
-        if (showChapters) {
-            ReaderChapterSheet(
+        if (showGoTo) {
+            ReaderGoToSheet(
                 book = book,
                 currentPosition = readerPosition.displayedPosition,
                 progressDisplay = progressDisplay,
-                onJump = { target, fragment ->
+                highlights = highlights.orEmpty(),
+                onChapterJump = { target, fragment ->
                     closeLookupPopupsAndSelection()
                     jumpToPositionWithHistory(target, fragment)
-                    stateHolder.dismissChapters()
+                    stateHolder.dismissGoTo()
                 },
-                onDismiss = stateHolder::dismissChapters,
-            )
-        }
-        if (showHighlights && highlights != null) {
-            ReaderHighlightSheet(
-                book = book,
-                highlights = highlights.orEmpty(),
-                onJump = { highlight ->
+                onCharacterJump = { count ->
+                    closeLookupPopupsAndSelection()
+                    jumpToPositionWithHistory(book.chapterPositionForCharacter(count), null)
+                    stateHolder.dismissGoTo()
+                },
+                onSearchResultJump = { result ->
+                    closeLookupPopupsAndSelection()
+                    val target = ReaderHighlights.positionForCharacter(book.bookInfo, result.character)
+                    jumpToPositionWithHistory(target)
+                    stateHolder.dismissGoTo()
+                },
+                onHighlightJump = { highlight ->
                     closeLookupPopupsAndSelection()
                     val target = ReaderHighlights.positionForCharacter(book.bookInfo, highlight.character)
                     jumpToPositionWithHistory(target)
-                    stateHolder.dismissHighlights()
+                    stateHolder.dismissGoTo()
                 },
-                onDelete = ::removeHighlight,
-                onDismiss = stateHolder::dismissHighlights,
+                onHighlightDelete = ::removeHighlight,
+                onDismiss = stateHolder::dismissGoTo,
             )
         }
         if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {

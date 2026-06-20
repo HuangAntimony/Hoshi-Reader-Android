@@ -5,7 +5,6 @@ import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
-import moe.antimony.hoshi.epub.EpubTocItem
 import moe.antimony.hoshi.epub.ReaderHighlight
 
 internal object ReaderHighlights {
@@ -76,40 +75,23 @@ internal object ReaderHighlights {
 
 internal object ReaderHighlightSections {
     fun sections(book: EpubBook, highlights: List<ReaderHighlight>): List<ReaderHighlightSection> {
-        val labels = chapterLabels(book)
+        val labels = ReaderChapterLabels.labels(book)
         val grouped = highlights.groupBy { highlight ->
-            val position = ReaderHighlights.positionForCharacter(book.bookInfo, highlight.character)
-            var index = position.index
-            while (index > 0 && labels[index] == null) {
-                index -= 1
+            ReaderHighlights.positionForCharacter(book.bookInfo, highlight.character).index.let { index ->
+                var resolved = index
+                while (resolved > 0 && labels[resolved] == null) {
+                    resolved -= 1
+                }
+                resolved
             }
-            index
         }
         return grouped.map { (chapterIndex, items) ->
             ReaderHighlightSection(
                 chapterIndex = chapterIndex,
-                label = labels[chapterIndex].orEmpty(),
+                label = ReaderChapterLabels.sectionLabelForIndex(book, chapterIndex),
                 highlights = items.sortedBy { it.character },
             )
         }.sortedBy { it.chapterIndex }
-    }
-
-    private fun chapterLabels(book: EpubBook): Map<Int, String> {
-        val pathToSpine = book.chapters.associate { chapter -> chapter.href to (chapter.spineIndex ?: book.chapters.indexOf(chapter)) }
-        val labels = linkedMapOf<Int, String>()
-        fun walk(items: List<EpubTocItem>, topLabel: String?) {
-            items.forEach { item ->
-                val label = topLabel ?: item.label
-                val path = item.href?.substringBefore("#")
-                val index = path?.let(pathToSpine::get)
-                if (index != null && labels[index] == null) {
-                    labels[index] = label
-                }
-                walk(item.children, label)
-            }
-        }
-        walk(book.toc, null)
-        return labels
     }
 }
 

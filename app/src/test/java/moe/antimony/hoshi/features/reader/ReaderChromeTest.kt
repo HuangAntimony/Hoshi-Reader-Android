@@ -618,8 +618,7 @@ class ReaderChromeTest {
             listOf(
                 ReaderMenuDestination.Sasayaki,
                 ReaderMenuDestination.Statistics,
-                ReaderMenuDestination.Highlights,
-                ReaderMenuDestination.Chapters,
+                ReaderMenuDestination.GoTo,
                 ReaderMenuDestination.Appearance,
             ),
             readerBottomMenuVisualOrder(showStatistics = true, showSasayaki = true),
@@ -630,8 +629,7 @@ class ReaderChromeTest {
     fun bottomMenuOmitsUnavailableOptionalDestinationsWithoutChangingIosOrder() {
         assertEquals(
             listOf(
-                ReaderMenuDestination.Highlights,
-                ReaderMenuDestination.Chapters,
+                ReaderMenuDestination.GoTo,
                 ReaderMenuDestination.Appearance,
             ),
             readerBottomMenuVisualOrder(showStatistics = false, showSasayaki = false),

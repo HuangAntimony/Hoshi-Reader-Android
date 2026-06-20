@@ -124,7 +124,7 @@ internal fun ReaderChapterSheet(
 }
 
 @Composable
-private fun ReaderChapterBookHeader(
+internal fun ReaderChapterBookHeader(
     book: EpubBook,
     coverBitmap: ImageBitmap?,
     currentPosition: ReaderChapterPosition,
@@ -177,7 +177,56 @@ private fun ReaderChapterBookHeader(
 }
 
 @Composable
-private fun ReaderChapterCover(
+internal fun ReaderGoToBookHeader(
+    book: EpubBook,
+    coverBitmap: ImageBitmap?,
+    currentPosition: ReaderChapterPosition,
+    progressDisplay: ReaderProgressDisplay,
+    onJumpToCharacter: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentCharacter = book.characterCountAt(currentPosition.index, currentPosition.progress)
+    val totalCharacters = book.bookInfo.characterCount
+    val percent = if (totalCharacters > 0) currentCharacter.toDouble() / totalCharacters.toDouble() * 100.0 else 0.0
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ReaderChapterCover(
+            coverBitmap = coverBitmap,
+            modifier = Modifier.size(
+                width = metrics.chapterHeaderCoverWidthDp.dp,
+                height = metrics.chapterHeaderCoverHeightDp.dp,
+            ),
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = book.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                text = "${progressDisplay.rangeText(currentCharacter, totalCharacters)} (${String.format(Locale.US, "%.1f", percent)}%)",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        TextButton(onClick = onJumpToCharacter) {
+            Text(stringResource(R.string.reader_jump))
+        }
+    }
+}
+
+@Composable
+internal fun ReaderChapterCover(
     coverBitmap: ImageBitmap?,
     modifier: Modifier = Modifier,
 ) {
@@ -197,14 +246,14 @@ private fun ReaderChapterCover(
     }
 }
 
-private fun EpubBook.decodeCoverImageBitmap(): ImageBitmap? =
+internal fun EpubBook.decodeCoverImageBitmap(): ImageBitmap? =
     coverHref
         ?.let(::readResource)
         ?.let { bytes -> runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }
         ?.asImageBitmap()
 
 @Composable
-private fun ReaderChapterListRow(
+internal fun ReaderChapterListRow(
     row: ReaderChapterRow,
     progressDisplay: ReaderProgressDisplay,
     onClick: () -> Unit,
@@ -261,7 +310,7 @@ private fun ReaderChapterListRow(
 }
 
 @Composable
-private fun JumpToCharacterDialog(
+internal fun JumpToCharacterDialog(
     totalCharacters: Int,
     progressDisplay: ReaderProgressDisplay,
     onDismiss: () -> Unit,
@@ -331,7 +380,7 @@ private fun JumpToCharacterDialog(
     )
 }
 
-private data class ReaderChapterRow(
+internal data class ReaderChapterRow(
     val label: String,
     val spineIndex: Int,
     val fragment: String?,
@@ -340,7 +389,7 @@ private data class ReaderChapterRow(
     val indentLevel: Int,
 )
 
-private fun EpubBook.chapterRows(currentIndex: Int): List<ReaderChapterRow> {
+internal fun EpubBook.chapterRows(currentIndex: Int): List<ReaderChapterRow> {
     val tocRows = toc.flatMap { item ->
         flattenChapterRows(item, indentLevel = 0, currentIndex = currentIndex)
     }
@@ -389,7 +438,7 @@ private fun EpubBook.chapterIndexForHref(href: String): Int? {
     }.takeIf { it >= 0 }
 }
 
-private fun EpubBook.chapterPositionForCharacter(characterCount: Int): ReaderChapterPosition {
+internal fun EpubBook.chapterPositionForCharacter(characterCount: Int): ReaderChapterPosition {
     val targetCharacter = characterCount.coerceIn(0, bookInfo.characterCount)
     val chapterEntries = chapters.mapIndexedNotNull { index, chapter ->
         bookInfo.chapterInfo[chapter.href]?.let { info -> index to info }

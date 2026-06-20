@@ -95,6 +95,14 @@ class ReaderHighlightBehaviorTest {
     }
 
     @Test
+    fun sharedChapterLabelsResolveUnlabeledSpineItemsToPreviousChapter() {
+        val book = readerBookWithUnlabeledSpineItem()
+
+        assertEquals("Chapter One", ReaderChapterLabels.sectionLabelForIndex(book, 1))
+        assertEquals("Chapter Two", ReaderChapterLabels.sectionLabelForIndex(book, 2))
+    }
+
+    @Test
     fun creationResultParsesValidWebViewJsonAndRejectsMissingData() {
         val result = ReaderHighlightCreationResult.fromWebViewResult(
             """{"start":4,"offset":9,"text":"食べる"}""",

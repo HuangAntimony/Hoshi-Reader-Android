@@ -115,7 +115,7 @@ internal fun ReaderHighlightSheet(
 }
 
 @Composable
-private fun ReaderHighlightRow(
+internal fun ReaderHighlightRow(
     highlight: ReaderHighlight,
     createdAtText: String,
     onJump: () -> Unit,
@@ -164,7 +164,7 @@ private fun ReaderHighlightRow(
     }
 }
 
-private fun ReaderHighlight.createdAtDisplayText(formatter: DateTimeFormatter): String {
+internal fun ReaderHighlight.createdAtDisplayText(formatter: DateTimeFormatter): String {
     val epochMillis = ((createdAt + AppleReferenceEpochSeconds) * 1_000.0).roundToLong()
     return formatter.format(Instant.ofEpochMilli(epochMillis))
 }

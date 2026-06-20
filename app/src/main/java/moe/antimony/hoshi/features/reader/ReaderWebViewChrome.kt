@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
-import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -380,8 +379,7 @@ internal fun BoxScope.ReaderBottomChrome(
     onMenu: () -> Unit,
     menuExpanded: Boolean,
     onDismissMenu: () -> Unit,
-    onChapters: () -> Unit,
-    onHighlights: () -> Unit,
+    onGoTo: () -> Unit,
     onAppearance: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
@@ -400,8 +398,7 @@ internal fun BoxScope.ReaderBottomChrome(
         ReaderMenuCard(
             colors = colors,
             metrics = metrics,
-            onChapters = onChapters,
-            onHighlights = onHighlights,
+            onGoTo = onGoTo,
             onAppearance = onAppearance,
             onStatistics = onStatistics,
             onSasayaki = onSasayaki,
@@ -629,8 +626,7 @@ private fun ReaderBottomSafePlaybackButton(
 private fun ReaderMenuCard(
     colors: ReaderChromeColors,
     metrics: ReaderBottomChromeMetrics,
-    onChapters: () -> Unit,
-    onHighlights: () -> Unit,
+    onGoTo: () -> Unit,
     onAppearance: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
@@ -686,8 +682,8 @@ private fun ReaderMenuCard(
                         onClick = onAppearance,
                     )
 
-                    ReaderMenuDestination.Chapters -> ReaderMenuItem(
-                        text = stringResource(R.string.reader_chapters),
+                    ReaderMenuDestination.GoTo -> ReaderMenuItem(
+                        text = stringResource(R.string.reader_go_to),
                         icon = {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.List,
@@ -697,21 +693,7 @@ private fun ReaderMenuCard(
                         },
                         colors = colors,
                         metrics = metrics,
-                        onClick = onChapters,
-                    )
-
-                    ReaderMenuDestination.Highlights -> ReaderMenuItem(
-                        text = stringResource(R.string.reader_highlights),
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Rounded.BorderColor,
-                                contentDescription = null,
-                                tint = Color(colors.menuContent),
-                            )
-                        },
-                        colors = colors,
-                        metrics = metrics,
-                        onClick = onHighlights,
+                        onClick = onGoTo,
                     )
 
                     ReaderMenuDestination.Statistics -> ReaderMenuItem(

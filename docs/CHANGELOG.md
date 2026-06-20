@@ -6,6 +6,10 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Added reader in-book search with chapter-grouped results and a unified Go to panel for search, chapters, highlights, and character jumps.
+
 ### Changed
 
 - Support installing Hoshi Reader Android on Android 8.0 and 8.1 devices.

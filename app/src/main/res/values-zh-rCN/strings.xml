@@ -188,7 +188,7 @@
     <string name="dictionary_expanded">已展开</string>
     <string name="dictionary_custom_css_font" comment="Custom CSS font setting, intentionally matching reader font labels.">字体</string>
     <string name="dictionary_custom_css_selector">选择器</string>
-    <string name="dictionary_search_placeholder">搜索</string>
+    <string name="dictionary_search_placeholder" comment="Dictionary search field placeholder, intentionally matching reader search tab label.">搜索</string>
     <string name="dictionary_lookup_failed">查词失败。</string>
     <string name="dictionary_pull_clear">下拉清除</string>
     <string name="dictionary_release_clear">松开清除</string>
@@ -224,6 +224,17 @@
     <string name="reader_jump_back">返回上一个跳转位置</string>
     <string name="reader_jump_forward">返回后一个跳转位置</string>
     <string name="reader_menu">阅读器菜单</string>
+    <string name="reader_go_to">跳转</string>
+    <string name="reader_search" comment="Reader Go to panel tab label, distinct from dictionary search placeholder.">搜索</string>
+    <string name="reader_search_in_book">在书中搜索</string>
+    <string name="reader_search_empty_prompt">输入文本搜索本书</string>
+    <string name="reader_searching">正在搜索...</string>
+    <string name="reader_no_search_results">没有匹配结果</string>
+    <string name="reader_search_failed">无法搜索本书</string>
+    <plurals name="reader_search_result_count">
+        <item quantity="one">%d 个结果</item>
+        <item quantity="other">%d 个结果</item>
+    </plurals>
     <string name="reader_image_clip_label">Hoshi 阅读器图片</string>
     <string name="reader_image_copied">已复制图片。</string>
     <string name="reader_image_saved">已保存图片。</string>

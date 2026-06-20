@@ -16,13 +16,10 @@ internal class ReaderWebViewStateHolder(
     var showAppearance by mutableStateOf(false)
         private set
 
-    var showChapters by mutableStateOf(false)
+    var showGoTo by mutableStateOf(false)
         private set
 
     var showSasayaki by mutableStateOf(false)
-        private set
-
-    var showHighlights by mutableStateOf(false)
         private set
 
     var showStatistics by mutableStateOf(false)
@@ -112,13 +109,13 @@ internal class ReaderWebViewStateHolder(
         return true
     }
 
-    fun openChaptersFromMenu() {
+    fun openGoToFromMenu() {
         showReaderMenu = false
-        showChapters = true
+        showGoTo = true
     }
 
-    fun dismissChapters() {
-        showChapters = false
+    fun dismissGoTo() {
+        showGoTo = false
     }
 
     fun openAppearanceFromMenu() {
@@ -137,15 +134,6 @@ internal class ReaderWebViewStateHolder(
 
     fun dismissSasayaki() {
         showSasayaki = false
-    }
-
-    fun openHighlightsFromMenu() {
-        showReaderMenu = false
-        showHighlights = true
-    }
-
-    fun dismissHighlights() {
-        showHighlights = false
     }
 
     fun openStatisticsFromMenu() {

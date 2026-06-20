@@ -737,11 +737,11 @@ class ReaderWebViewStateHolderTest {
 
         holder.dismissAppearance()
         holder.showReaderMenu()
-        holder.openChaptersFromMenu()
+        holder.openGoToFromMenu()
         assertFalse(holder.showReaderMenu)
-        assertTrue(holder.showChapters)
+        assertTrue(holder.showGoTo)
 
-        holder.dismissChapters()
+        holder.dismissGoTo()
         holder.showReaderMenu()
         holder.openSasayakiFromMenu()
         assertFalse(holder.showReaderMenu)
