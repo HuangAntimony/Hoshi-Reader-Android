@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.TravelExplore
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -634,6 +635,11 @@ class ReaderChromeTest {
             ),
             readerBottomMenuVisualOrder(showStatistics = false, showSasayaki = false),
         )
+    }
+
+    @Test
+    fun bottomMenuGoToUsesNavigationIconInsteadOfChapterListIcon() {
+        assertEquals(Icons.Rounded.TravelExplore, readerBottomMenuIcon(ReaderMenuDestination.GoTo))
     }
 
     @Test

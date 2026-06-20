@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -194,12 +195,9 @@ private fun ReaderSearchTab(
     var handledSearchNonce by remember(book) { mutableStateOf(0) }
     val engine = remember(book) { ReaderSearchEngine(book) }
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(focusRequester) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
-    }
     LaunchedEffect(book, query, searchNonce) {
         val captured = query
         val runImmediately = searchNonce != handledSearchNonce
@@ -233,7 +231,13 @@ private fun ReaderSearchTab(
         ReaderCompactSearchField(
             query = query,
             onQueryChange = { query = it },
-            onSearch = { searchNonce += 1 },
+            onSearch = {
+                readerSearchImeAction(
+                    onSearch = { searchNonce += 1 },
+                    clearFocus = { focusManager.clearFocus() },
+                    hideKeyboard = { keyboardController?.hide() },
+                )
+            },
             focusRequester = focusRequester,
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         )
@@ -539,5 +543,44 @@ private fun ReaderGoToLoadingState(modifier: Modifier = Modifier) {
 
 private fun String.codePointIndex(codePointOffset: Int): Int =
     offsetByCodePoints(0, codePointOffset.coerceIn(0, codePointCount(0, length)))
+
+internal fun readerSearchImeAction(
+    onSearch: () -> Unit,
+    clearFocus: () -> Unit,
+    hideKeyboard: () -> Unit,
+) {
+    onSearch()
+    clearFocus()
+    hideKeyboard()
+}
+
+internal fun readerJumpImeAction(
+    input: String,
+    totalCharacters: Int,
+    progressDisplay: ReaderProgressDisplay,
+    onConfirm: (Int) -> Unit,
+    hideKeyboard: () -> Unit,
+): Boolean {
+    val target = readerJumpTargetFromInput(
+        input = input,
+        totalCharacters = totalCharacters,
+        progressDisplay = progressDisplay,
+    ) ?: return false
+    onConfirm(target)
+    hideKeyboard()
+    return true
+}
+
+internal fun readerJumpTargetFromInput(
+    input: String,
+    totalCharacters: Int,
+    progressDisplay: ReaderProgressDisplay,
+): Int? {
+    val parsed = input.filter(Char::isDigit).toIntOrNull() ?: return null
+    return progressDisplay.rawTargetFromDisplayCount(
+        displayCount = parsed,
+        totalCharacters = totalCharacters,
+    )
+}
 
 private const val SearchDebounceMillis = 220L

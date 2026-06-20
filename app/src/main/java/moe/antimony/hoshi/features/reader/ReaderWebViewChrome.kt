@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
@@ -34,6 +33,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -672,7 +672,7 @@ private fun ReaderMenuCard(
                         text = stringResource(R.string.settings_appearance),
                         icon = {
                             Icon(
-                                imageVector = Icons.Rounded.Palette,
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.Appearance),
                                 contentDescription = null,
                                 tint = Color(colors.menuContent),
                             )
@@ -686,7 +686,7 @@ private fun ReaderMenuCard(
                         text = stringResource(R.string.reader_go_to),
                         icon = {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.List,
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.GoTo),
                                 contentDescription = null,
                                 tint = Color(colors.menuContent),
                             )
@@ -700,7 +700,7 @@ private fun ReaderMenuCard(
                         text = stringResource(R.string.reader_statistics),
                         icon = {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ShowChart,
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.Statistics),
                                 contentDescription = null,
                                 tint = Color(colors.menuContent),
                             )
@@ -714,7 +714,7 @@ private fun ReaderMenuCard(
                         text = stringResource(R.string.sasayaki_title),
                         icon = {
                             Icon(
-                                imageVector = Icons.Rounded.GraphicEq,
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.Sasayaki),
                                 contentDescription = null,
                                 tint = Color(colors.menuContent),
                             )
@@ -728,6 +728,14 @@ private fun ReaderMenuCard(
         }
     }
 }
+
+internal fun readerBottomMenuIcon(destination: ReaderMenuDestination): ImageVector =
+    when (destination) {
+        ReaderMenuDestination.Appearance -> Icons.Rounded.Palette
+        ReaderMenuDestination.GoTo -> Icons.Rounded.TravelExplore
+        ReaderMenuDestination.Statistics -> Icons.AutoMirrored.Rounded.ShowChart
+        ReaderMenuDestination.Sasayaki -> Icons.Rounded.GraphicEq
+    }
 
 @Composable
 private fun ReaderMenuItem(
