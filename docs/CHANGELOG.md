@@ -6,6 +6,8 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+## [v1.2.2] - 2026-06-21
+
 ### Added
 
 - Added reader in-book search with chapter-grouped, punctuation-preserving results, progress percentages, and a unified Go to panel for search, chapters, highlights, and character jumps.
