@@ -50,7 +50,19 @@ internal fun MutableList<NavKey>.routeExternalBookImport(
     )
 }
 
-internal fun MutableList<NavKey>.returnFromMediaSession() = Unit
+internal fun MutableList<NavKey>.returnFromMediaSession(
+    bookId: String,
+    onReaderRouteRemoved: () -> Unit = {},
+) {
+    if (lastOrNull() == AppRoute.ReaderRoute(bookId)) {
+        return
+    }
+    replaceWithTopLevelRoute(
+        route = AppRoute.BooksRoute,
+        onReaderRouteRemoved = onReaderRouteRemoved,
+    )
+    add(AppRoute.ReaderRoute(bookId))
+}
 
 private fun List<NavKey>.containsReaderRoute(): Boolean =
     any { route -> route is AppRoute.ReaderRoute }

@@ -170,6 +170,7 @@ internal fun ReaderRouteDestination(
                 }
             }
             ReaderWebView(
+                bookId = bookId,
                 book = readyState.book,
                 bookRoot = readyState.bookRoot,
                 bookCoverFile = readyState.bookCoverFile,

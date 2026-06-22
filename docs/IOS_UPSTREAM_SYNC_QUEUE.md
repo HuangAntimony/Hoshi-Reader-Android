@@ -211,7 +211,7 @@ Validation:
   send it as the top-level `"key"` field on AnkiConnect requests when non-empty.
 - `9e191af`: Android settings already use Nav3 typed routes through `AppShell`, `SettingsDetailRoute`, and independent tab back stacks.
 - `5764c5c`: Android audio-source toggles update by `AudioSource` identity through `AudioSettings.withAudioSourceEnabled(source, enabled)`, not stale list indices.
-- `35c928e`: iOS AVAudioSession deactivation threading has no direct Android analogue; Android Sasayaki uses Media3 session release through `SasayakiMediaSessionHandle`.
+- `35c928e`: iOS AVAudioSession deactivation threading has no direct Android analogue; Android Sasayaki owns playback through a Media3 `MediaSessionService`.
 - `f4e9684`: iPad safe-area/focus workaround is platform-specific; Android reader chrome uses WindowInsets and already has focus-mode inset tests.
 - `3f174c3`: Android does not run iOS document migrations or eager WebView preloading from Activity initialization; legacy book migration happens through the repository on IO with progress state.
 - `929c6a6`, `387b6bb`, `20fa179`, `544aeb5`, `8c0e305`, `24e356f`: iOS release, warning, compiler setting, or Xcode project maintenance only.

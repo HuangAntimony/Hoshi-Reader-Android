@@ -3,7 +3,6 @@ package moe.antimony.hoshi.features.sasayaki
 class SasayakiPlaybackStartCoordinator(
     private val playbackCommands: SasayakiPlaybackCommandCoordinator,
     private val cuePresentation: SasayakiCuePresentationState,
-    private val mediaSessionPublishing: SasayakiMediaSessionPublishingCoordinator,
 ) {
     fun start(
         rate: Float,
@@ -16,7 +15,6 @@ class SasayakiPlaybackStartCoordinator(
             markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
                 updateMediaSession()
-                mediaSessionPublishing.activate()
                 redisplayCue(currentTime())
             },
         )

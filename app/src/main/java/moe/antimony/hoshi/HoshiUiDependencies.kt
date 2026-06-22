@@ -14,6 +14,7 @@ import moe.antimony.hoshi.features.backup.HoshiBackupRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackServiceRuntime
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
 import moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer
@@ -36,6 +37,7 @@ internal class HoshiUiDependencies @Inject constructor(
     private val dictionarySettingsRepositoryProvider: Lazy<DictionarySettingsRepository>,
     private val audioSettingsRepositoryProvider: Lazy<AudioSettingsRepository>,
     private val sasayakiSettingsRepositoryProvider: Lazy<SasayakiSettingsRepository>,
+    private val sasayakiPlaybackServiceRuntimeProvider: Lazy<SasayakiPlaybackServiceRuntime>,
     private val syncSettingsRepositoryProvider: Lazy<SyncSettingsRepository>,
     private val updateSettingsRepositoryProvider: Lazy<UpdateSettingsRepository>,
     private val updateDownloadStoreProvider: Lazy<UpdateDownloadStore>,
@@ -60,6 +62,7 @@ internal class HoshiUiDependencies @Inject constructor(
     val dictionarySettingsRepository: DictionarySettingsRepository get() = dictionarySettingsRepositoryProvider.get()
     val audioSettingsRepository: AudioSettingsRepository get() = audioSettingsRepositoryProvider.get()
     val sasayakiSettingsRepository: SasayakiSettingsRepository get() = sasayakiSettingsRepositoryProvider.get()
+    val sasayakiPlaybackServiceRuntime: SasayakiPlaybackServiceRuntime get() = sasayakiPlaybackServiceRuntimeProvider.get()
     val syncSettingsRepository: SyncSettingsRepository get() = syncSettingsRepositoryProvider.get()
     val updateSettingsRepository: UpdateSettingsRepository get() = updateSettingsRepositoryProvider.get()
     val updateDownloadStore: UpdateDownloadStore get() = updateDownloadStoreProvider.get()

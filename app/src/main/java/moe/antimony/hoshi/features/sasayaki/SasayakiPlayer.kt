@@ -4,17 +4,18 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiMatch
 
-import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import moe.antimony.hoshi.ui.UiText
 import java.io.File
 
-class SasayakiPlayer internal constructor(
+class SasayakiPlayer private constructor(
     private val controller: SasayakiPlaybackControllerContract,
+    private val releaseController: () -> Unit = controller::release,
+    private val stopPlaybackController: () -> Unit = controller::release,
 ) {
-    constructor(
-        context: Context,
+    internal constructor(
+        bookId: String,
         bookRoot: File,
         playbackRepository: SasayakiPlaybackRepository,
         bookTitle: String?,
@@ -26,9 +27,10 @@ class SasayakiPlayer internal constructor(
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
         onLoadChapter: (Int) -> Unit,
+        playbackServiceRuntime: SasayakiPlaybackRuntime,
     ) : this(
-        SasayakiPlaybackController(
-            context = context,
+        createControllerBundle(
+            bookId = bookId,
             bookRoot = bookRoot,
             playbackRepository = playbackRepository,
             bookTitle = bookTitle,
@@ -40,7 +42,16 @@ class SasayakiPlayer internal constructor(
             onCue = onCue,
             onClearCue = onClearCue,
             onLoadChapter = onLoadChapter,
+            playbackServiceRuntime = playbackServiceRuntime,
         ),
+    )
+
+    private constructor(
+        controllerBundle: SasayakiPlaybackControllerBundle,
+    ) : this(
+        controller = controllerBundle.controller,
+        releaseController = controllerBundle.releaseController,
+        stopPlaybackController = controllerBundle.stopPlaybackController,
     )
 
     val playback: SasayakiPlaybackData get() = controller.playback
@@ -104,6 +115,10 @@ class SasayakiPlayer internal constructor(
         controller.skipBackward(seconds)
     }
 
+    fun seekTo(seconds: Double) {
+        controller.seekTo(seconds)
+    }
+
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
         controller.findCue(chapterIndex = chapterIndex, offset = offset)
 
@@ -115,6 +130,56 @@ class SasayakiPlayer internal constructor(
         controller.exportCueAudio(cue = cue, sentence = sentence)
 
     fun release() {
-        controller.release()
+        releaseController()
+    }
+
+    fun stopPlayback() {
+        stopPlaybackController()
+    }
+
+    private data class SasayakiPlaybackControllerBundle(
+        val controller: SasayakiPlaybackControllerContract,
+        val releaseController: () -> Unit,
+        val stopPlaybackController: () -> Unit,
+    )
+
+    private companion object {
+        fun createControllerBundle(
+            bookId: String,
+            bookRoot: File,
+            playbackRepository: SasayakiPlaybackRepository,
+            bookTitle: String?,
+            bookCoverFile: File?,
+            matchData: SasayakiMatchData?,
+            initialPlayback: SasayakiPlaybackData?,
+            persistenceScope: CoroutineScope,
+            getCurrentChapterIndex: () -> Int,
+            onCue: (SasayakiMatch, Boolean) -> Unit,
+            onClearCue: () -> Unit,
+            onLoadChapter: (Int) -> Unit,
+            playbackServiceRuntime: SasayakiPlaybackRuntime,
+        ): SasayakiPlaybackControllerBundle {
+            val controller = playbackServiceRuntime.load(
+                request = SasayakiPlaybackRuntimeLoadRequest(
+                    bookId = bookId,
+                    bookRoot = bookRoot,
+                    playbackRepository = playbackRepository,
+                    bookTitle = bookTitle,
+                    bookCoverFile = bookCoverFile,
+                    matchData = matchData,
+                    initialPlayback = initialPlayback,
+                    persistenceScope = persistenceScope,
+                ),
+                getCurrentChapterIndex = getCurrentChapterIndex,
+                onCue = onCue,
+                onClearCue = onClearCue,
+                onLoadChapter = onLoadChapter,
+            )
+            return SasayakiPlaybackControllerBundle(
+                controller = controller,
+                releaseController = playbackServiceRuntime::detachReader,
+                stopPlaybackController = playbackServiceRuntime::stopPlayback,
+            )
+        }
     }
 }

@@ -68,6 +68,8 @@ private val NoPredictiveNavContentTransition:
 fun AppShell(
     pendingImportUri: Uri? = null,
     onPendingImportConsumed: () -> Unit = {},
+    pendingSasayakiReaderBookId: String? = null,
+    onPendingSasayakiReaderConsumed: () -> Unit = {},
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
@@ -93,9 +95,11 @@ fun AppShell(
     val scope = rememberCoroutineScope()
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnPendingImportConsumed by rememberUpdatedState(onPendingImportConsumed)
+    val currentOnPendingSasayakiReaderConsumed by rememberUpdatedState(onPendingSasayakiReaderConsumed)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
+    val currentPendingSasayakiReaderBookId by rememberUpdatedState(pendingSasayakiReaderBookId)
     val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
     var dictionaryFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
@@ -142,7 +146,7 @@ fun AppShell(
             launchRouteStateHolder.defaultRouteAfterSettingsLoad(
                 readerSettings = currentReaderSettings,
                 dictionarySettings = settings,
-                hasPendingImport = currentPendingImportUri != null,
+                hasPendingImport = currentPendingImportUri != null || currentPendingSasayakiReaderBookId != null,
                 isBooksTabSelected = selectedTab == MainTab.Books,
                 backStack = booksBackStack,
                 recentBookIdProvider = {
@@ -190,6 +194,14 @@ fun AppShell(
         booksBackStack.openReaderRoute(bookId)
     }
 
+    fun returnToSasayakiReader(bookId: String) {
+        selectedTab = MainTab.Books
+        booksBackStack.returnFromMediaSession(
+            bookId = bookId,
+            onReaderRouteRemoved = ::clearLoadedReaderProfile,
+        )
+    }
+
     fun openSasayakiMatch(request: SasayakiMatchRequest) {
         sasayakiMatchRequestStore.put(request)
         selectedTab = MainTab.Books
@@ -209,6 +221,12 @@ fun AppShell(
         if (hasPendingImport) {
             selectedTab = MainTab.Books
         }
+    }
+
+    LaunchedEffect(pendingSasayakiReaderBookId) {
+        val bookId = pendingSasayakiReaderBookId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        returnToSasayakiReader(bookId)
+        currentOnPendingSasayakiReaderConsumed()
     }
 
     val entryProvider: (NavKey) -> NavEntry<NavKey> = { key ->

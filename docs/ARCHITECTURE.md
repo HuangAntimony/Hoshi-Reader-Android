@@ -117,8 +117,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   grouped sync-file discovery, bookdata upload/download, trash, cache clearing,
   and network preflight; Books keeps remote-only Google Drive books as
   `RemoteBookEntry` models rather than local `BookEntry` placeholders.
-- Audio and Sasayaki playback use Media3/ExoPlayer with controller/repository
-  boundaries.
+- Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
+- Sasayaki audiobook playback is owned by a Hilt-backed Media3
+  `MediaSessionService`. The service runtime owns the active ExoPlayer,
+  MediaSession, Sasayaki playback controller, and active book id. Reader UI
+  attaches/detaches cue sinks and sends explicit stop on reader exit; Android
+  media controls and notification return actions route through the same
+  service-owned session.
 - Update checks use WorkManager unique work, with worker dependencies supplied
   by Hilt's WorkManager integration.
 

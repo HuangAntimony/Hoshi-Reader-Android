@@ -110,12 +110,18 @@ class SasayakiPlaybackCommandCoordinator(
         )
     }
 
-    fun mediaSessionSeek(
-        positionMs: Long,
+    fun seekTo(
+        seconds: Double,
+        duration: Double,
         isPlaying: Boolean,
     ) {
         playbackState.clearStopPlaybackTime()
-        seek(positionMs.toDouble() / 1000.0, startPlayback = isPlaying)
+        val target = if (duration > 0.0) {
+            seconds.coerceIn(0.0, duration)
+        } else {
+            seconds.coerceAtLeast(0.0)
+        }
+        seek(target, startPlayback = isPlaying, revealCue = true)
     }
 
     fun seek(

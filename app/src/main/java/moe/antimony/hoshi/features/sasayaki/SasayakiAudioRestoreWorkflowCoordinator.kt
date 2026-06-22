@@ -10,20 +10,13 @@ class SasayakiAudioRestoreWorkflowCoordinator(
     fun restore(
         playback: SasayakiPlaybackData,
         currentTime: () -> Double,
-        releaseExistingMediaSession: () -> Unit,
         updateMediaSession: () -> Unit,
         handleSeekComplete: () -> Unit,
-        startPlayback: () -> Unit,
-        pausePlayback: () -> Unit,
-        previousCue: () -> Unit,
-        nextCue: () -> Unit,
-        isPlaying: () -> Boolean,
         updateCue: (Double) -> Unit,
     ) {
         val result = runCatching {
             audioRestore.restore(
                 playback = playback,
-                releaseExistingMediaSession = releaseExistingMediaSession,
                 callbacks = audioRestoreCallbacks.build(
                     updateMediaSession = updateMediaSession,
                     handlePrepared = { durationMs ->
@@ -36,11 +29,6 @@ class SasayakiAudioRestoreWorkflowCoordinator(
                     },
                     handleSeekComplete = handleSeekComplete,
                     handleError = audioRestoreResult::handleFailure,
-                    startPlayback = startPlayback,
-                    pausePlayback = pausePlayback,
-                    previousCue = previousCue,
-                    nextCue = nextCue,
-                    isPlaying = isPlaying,
                 ),
             )
         }.onFailure(audioRestoreResult::handleFailure).getOrNull() ?: return

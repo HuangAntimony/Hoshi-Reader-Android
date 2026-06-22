@@ -36,6 +36,7 @@ internal interface SasayakiPlaybackControllerContract {
     fun previousCue()
     fun skipForward(seconds: Int)
     fun skipBackward(seconds: Int)
+    fun seekTo(seconds: Double)
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch?
     fun playCue(cue: SasayakiMatch, stop: Boolean)
     fun exportCueAudio(cue: SasayakiMatch, sentence: String): File?
@@ -55,6 +56,7 @@ internal class SasayakiPlaybackController(
     onCue: (SasayakiMatch, Boolean) -> Unit,
     onClearCue: () -> Unit,
     onLoadChapter: (Int) -> Unit,
+    playbackPreparer: SasayakiPlaybackPreparer,
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
@@ -102,7 +104,6 @@ internal class SasayakiPlaybackController(
     )
     private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator(
         playbackLifecycle = playbackLifecycle,
-        playbackCommands = playbackCommands,
     )
     private val playbackSettings = SasayakiPlaybackSettingsCoordinator(
         playbackPersistence = playbackPersistence,
@@ -116,12 +117,12 @@ internal class SasayakiPlaybackController(
         cueDisplay = cueDisplay,
     )
     private val audioRestore = SasayakiAudioRestoreController(
-        context = appContext,
         bookRoot = bookRoot,
         bookTitle = bookTitle,
         bookCoverFile = bookCoverFile,
         audioSourceRepository = audioSourceRepository,
         playbackLifecycle = playbackLifecycle,
+        playbackPreparer = playbackPreparer,
     )
     private val audioAvailability = SasayakiAudioAvailabilityState()
     private val audioCommands = SasayakiAudioCommandCoordinator(
@@ -131,12 +132,7 @@ internal class SasayakiPlaybackController(
         audioAvailability = audioAvailability,
         contentResolver = appContext.contentResolver,
     )
-    private val mediaSessionHandle = SasayakiMediaSessionHandleCoordinator()
-    private val mediaSessionPublishing = SasayakiMediaSessionPublishingCoordinator(
-        mediaSessionHandle = mediaSessionHandle,
-    )
     private val audioRestoreResult = SasayakiAudioRestoreResultCoordinator(
-        mediaSessionHandle = mediaSessionHandle,
         playbackState = playbackState,
         audioAvailability = audioAvailability,
     )
@@ -147,7 +143,6 @@ internal class SasayakiPlaybackController(
     )
     private val playbackTeardown = SasayakiPlaybackTeardownCoordinator(
         playbackLifecycle = playbackLifecycle,
-        mediaSessionHandle = mediaSessionHandle,
         audioAvailability = audioAvailability,
         cueDisplay = cueDisplay,
     )
@@ -155,7 +150,6 @@ internal class SasayakiPlaybackController(
     private val playbackStart = SasayakiPlaybackStartCoordinator(
         playbackCommands = playbackCommands,
         cuePresentation = cuePresentation,
-        mediaSessionPublishing = mediaSessionPublishing,
     )
     private val playbackTick = SasayakiPlaybackTickCoordinator(
         playbackEvents = playbackEvents,
@@ -294,6 +288,14 @@ internal class SasayakiPlaybackController(
         )
     }
 
+    override fun seekTo(seconds: Double) {
+        playbackCommands.seekTo(
+            seconds = seconds,
+            duration = duration,
+            isPlaying = isPlaying,
+        )
+    }
+
     override fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
         cueNavigation.findCue(chapterIndex = chapterIndex, offset = offset)
 
@@ -351,14 +353,8 @@ internal class SasayakiPlaybackController(
         audioRestoreWorkflow.restore(
             playback = playback,
             currentTime = { currentTime },
-            releaseExistingMediaSession = mediaSessionHandle::releaseExisting,
             updateMediaSession = ::updateMediaSession,
             handleSeekComplete = ::handleSeekComplete,
-            startPlayback = ::startPlayback,
-            pausePlayback = { pausePlayback(restoreTemporaryPosition = true) },
-            previousCue = ::previousCue,
-            nextCue = ::nextCue,
-            isPlaying = { isPlaying },
             updateCue = ::updateCue,
         )
     }
@@ -390,12 +386,7 @@ internal class SasayakiPlaybackController(
     }
 
     private fun updateMediaSession() {
-        mediaSessionPublishing.update(
-            isPlaying = isPlaying,
-            currentTime = currentTime,
-            duration = duration,
-            rate = rate,
-        )
+        // MediaSession state is published by SasayakiPlaybackService's Media3 player.
     }
 
     private fun restoreTemporaryPlaybackPositionIfNeeded() {

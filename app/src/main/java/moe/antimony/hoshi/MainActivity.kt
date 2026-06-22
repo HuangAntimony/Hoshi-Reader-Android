@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackReturnAction
+import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackReturnBookIdExtra
 import moe.antimony.hoshi.features.update.DownloadedUpdatePrompt
 import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
@@ -33,11 +35,13 @@ class MainActivity : ComponentActivity() {
     @Inject internal lateinit var uiDependencies: HoshiUiDependencies
 
     private var pendingImportUri by mutableStateOf<Uri?>(null)
+    private var pendingSasayakiReaderBookId by mutableStateOf<String?>(null)
     private var readerKeyEventHandler: ((KeyEvent) -> Boolean)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingImportUri = intent.importUri()
+        pendingSasayakiReaderBookId = intent.sasayakiReaderBookIdOrActivePlayback()
         enableEdgeToEdge()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -69,6 +73,8 @@ class MainActivity : ComponentActivity() {
                     AppShell(
                         pendingImportUri = pendingImportUri,
                         onPendingImportConsumed = { pendingImportUri = null },
+                        pendingSasayakiReaderBookId = pendingSasayakiReaderBookId,
+                        onPendingSasayakiReaderConsumed = { pendingSasayakiReaderBookId = null },
                         readerSettings = loadedReaderSettings,
                         onReaderSettingsChange = { settings ->
                             readerSettings = settings
@@ -98,10 +104,20 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         intent.importUri()?.let { pendingImportUri = it }
+        intent.sasayakiReaderBookIdOrActivePlayback()?.let { pendingSasayakiReaderBookId = it }
     }
 
     private fun Intent?.importUri(): Uri? =
         this?.data?.takeIf { action == Intent.ACTION_VIEW }
+
+    private fun Intent?.sasayakiReaderBookId(): String? =
+        this?.getStringExtra(SasayakiPlaybackReturnBookIdExtra)
+            ?.takeIf { action == SasayakiPlaybackReturnAction && it.isNotBlank() }
+
+    private fun Intent?.sasayakiReaderBookIdOrActivePlayback(): String? =
+        sasayakiReaderBookId()
+            ?: takeIf { it?.action == Intent.ACTION_MAIN }
+                ?.let { uiDependencies.sasayakiPlaybackServiceRuntime.activePlaybackBookId() }
 }
 
 internal fun requestedOrientationForLockCurrentOrientation(lockCurrentOrientation: Boolean): Int =

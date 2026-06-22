@@ -1,7 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
 class SasayakiAudioRestoreResultCoordinator(
-    private val mediaSessionHandle: SasayakiMediaSessionHandleCoordinator,
     private val playbackState: SasayakiPlaybackStateCoordinator,
     private val audioAvailability: SasayakiAudioAvailabilityState,
 ) {
@@ -15,7 +14,6 @@ class SasayakiAudioRestoreResultCoordinator(
         updateCue: (Double) -> Unit,
         updateMediaSession: () -> Unit,
     ) {
-        mediaSessionHandle.replace(result.mediaSession)
         handlePrepared(
             durationMs = result.durationMs,
             currentTime = currentTime,

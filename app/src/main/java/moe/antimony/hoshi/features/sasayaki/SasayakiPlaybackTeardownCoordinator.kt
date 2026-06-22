@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.sasayaki
 
 class SasayakiPlaybackTeardownCoordinator(
     private val playbackLifecycle: SasayakiPlaybackLifecycleController,
-    private val mediaSessionHandle: SasayakiMediaSessionHandleCoordinator,
     private val audioAvailability: SasayakiAudioAvailabilityState,
     private val cueDisplay: SasayakiCueDisplayCoordinator,
 ) {
@@ -13,7 +12,6 @@ class SasayakiPlaybackTeardownCoordinator(
     ) {
         pausePlayback()
         playbackLifecycle.releaseEngine()
-        mediaSessionHandle.releaseAndClear()
         audioAvailability.markAudioUnavailable()
         if (clearCue) applyCueDisplayAction(cueDisplay.clear())
     }

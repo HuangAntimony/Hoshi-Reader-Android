@@ -55,7 +55,19 @@ class AppRouteBackStackTest {
             AppRoute.ReaderRoute("book-a"),
         )
 
-        backStack.returnFromMediaSession()
+        backStack.returnFromMediaSession("book-a")
+
+        assertEquals(
+            listOf(AppRoute.BooksRoute, AppRoute.ReaderRoute("book-a")),
+            backStack,
+        )
+    }
+
+    @Test
+    fun mediaSessionReturnOpensActiveBookReaderFromBookshelf() {
+        val backStack = mutableListOf<NavKey>(AppRoute.BooksRoute)
+
+        backStack.returnFromMediaSession("book-a")
 
         assertEquals(
             listOf(AppRoute.BooksRoute, AppRoute.ReaderRoute("book-a")),

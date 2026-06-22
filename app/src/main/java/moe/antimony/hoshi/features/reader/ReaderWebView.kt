@@ -81,6 +81,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderWebView(
+    bookId: String,
     book: EpubBook,
     bookRoot: File? = null,
     bookCoverFile: File? = null,
@@ -109,6 +110,7 @@ fun ReaderWebView(
     val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
     val audioSettingsRepository = appContainer.audioSettingsRepository
     val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
+    val sasayakiPlaybackServiceRuntime = appContainer.sasayakiPlaybackServiceRuntime
     val bookRepository = appContainer.bookRepository
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
     var sasayakiMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
@@ -497,6 +499,8 @@ fun ReaderWebView(
         if (plan.flushAutoSyncExport) {
             onFlushAutoSyncExport()
         }
+        sasayakiPlayer?.stopPlayback()
+        sasayakiPlayer = null
         onClose()
     }
     fun clearReaderSelection(onCleared: () -> Unit = {}) {
@@ -897,7 +901,7 @@ fun ReaderWebView(
         sasayakiPlayer?.release()
         sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
-                context = context,
+                bookId = bookId,
                 bookRoot = bookRoot,
                 playbackRepository = BookSasayakiPlaybackRepository(bookRoot, bookRepository),
                 bookTitle = book.title,
@@ -920,6 +924,7 @@ fun ReaderWebView(
                     resetStatisticsBaseline()
                     saveReaderPosition(savedPosition, statisticsTracker?.statisticsForPersistenceOrNull())
                 },
+                playbackServiceRuntime = sasayakiPlaybackServiceRuntime,
             )
         } else {
             null

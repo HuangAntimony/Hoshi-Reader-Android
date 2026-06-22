@@ -11,7 +11,6 @@ class SasayakiSourceTestPolicyTest {
 
         listOf(
             "SasayakiAudioRestoreResultCoordinatorSourceTest.kt",
-            "SasayakiMediaSessionHandleCoordinatorSourceTest.kt",
             "SasayakiPlaybackLifecycleControllerSourceTest.kt",
             "SasayakiPlaybackPersistenceStateSourceTest.kt",
             "SasayakiTemporaryPlaybackRestoreCoordinatorSourceTest.kt",

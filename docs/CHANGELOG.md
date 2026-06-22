@@ -6,6 +6,10 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep Sasayaki playback owned by the media playback service so background playback can continue reliably, reader exit stops playback, and notification or launcher return opens the active reader.
+
 ## [v1.2.2] - 2026-06-21
 
 ### Added
