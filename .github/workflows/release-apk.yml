@@ -271,11 +271,6 @@ jobs:
             "${build_tools}/apksigner" verify --print-certs "${apk_source}"
             cp "${apk_source}" "${apk_asset}"
             apk_assets+=("${apk_asset}")
-            if [[ "${abi}" == "arm64-v8a" ]]; then
-              legacy_apk_asset="Hoshi-Reader-${tag}.apk"
-              cp "${apk_source}" "${legacy_apk_asset}"
-              apk_assets+=("${legacy_apk_asset}")
-            fi
           done
 
           echo "apk_assets=${apk_assets[*]}" >> "${GITHUB_OUTPUT}"
