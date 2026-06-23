@@ -14,7 +14,7 @@ class SasayakiPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        runtime.createSession()
+        addSession(runtime.createSession())
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

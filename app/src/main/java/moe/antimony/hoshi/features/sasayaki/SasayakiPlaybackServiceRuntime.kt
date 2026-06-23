@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingSimpleBasePlayer
@@ -11,6 +12,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
+import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,6 +30,8 @@ import java.io.File
 
 internal const val SasayakiPlaybackReturnAction = "moe.antimony.hoshi.action.RETURN_TO_SASAYAKI_READER"
 internal const val SasayakiPlaybackReturnBookIdExtra = "moe.antimony.hoshi.extra.SASAYAKI_BOOK_ID"
+private const val SasayakiPreviousCueAction = "moe.antimony.hoshi.sasayaki.action.PREVIOUS_CUE"
+private const val SasayakiNextCueAction = "moe.antimony.hoshi.sasayaki.action.NEXT_CUE"
 
 internal data class SasayakiPlaybackRuntimeLoadRequest(
     val bookId: String,
@@ -79,7 +85,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             .setId(SasayakiPlaybackService.SessionId)
             .setMediaButtonPreferences(mediaButtons)
             .setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, activeBookId))
-            .setCallback(SasayakiPlaybackServiceSessionCallback(mediaButtons))
+            .setCallback(SasayakiPlaybackServiceSessionCallback(runtime = this, mediaButtons = mediaButtons))
             .build()
 
         player = createdPlayer
@@ -250,6 +256,7 @@ private class SasayakiServiceSessionPlayer(
 
 @OptIn(UnstableApi::class)
 private class SasayakiPlaybackServiceSessionCallback(
+    private val runtime: SasayakiPlaybackServiceRuntime,
     private val mediaButtons: List<CommandButton>,
 ) : MediaSession.Callback {
     override fun onConnect(
@@ -270,9 +277,24 @@ private class SasayakiPlaybackServiceSessionCallback(
             .add(Player.COMMAND_RELEASE)
             .build()
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+            .setAvailableSessionCommands(sasayakiServiceSessionCommands())
             .setAvailablePlayerCommands(playerCommands)
             .setMediaButtonPreferences(mediaButtons)
             .build()
+    }
+
+    override fun onCustomCommand(
+        session: MediaSession,
+        controller: MediaSession.ControllerInfo,
+        customCommand: SessionCommand,
+        args: Bundle,
+    ): ListenableFuture<SessionResult> {
+        when (customCommand.customAction) {
+            SasayakiPreviousCueAction -> runtime.previousFromSession()
+            SasayakiNextCueAction -> runtime.nextFromSession()
+            else -> return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
+        }
+        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }
 }
 
@@ -281,15 +303,27 @@ private fun sasayakiServiceMediaButtons(context: Context): List<CommandButton> =
     listOf(
         CommandButton.Builder(CommandButton.ICON_PREVIOUS)
             .setDisplayName(context.getString(R.string.sasayaki_previous_cue))
-            .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .setSessionCommand(sasayakiPreviousCueCommand())
             .setSlots(CommandButton.SLOT_BACK)
             .build(),
         CommandButton.Builder(CommandButton.ICON_NEXT)
             .setDisplayName(context.getString(R.string.sasayaki_next_cue))
-            .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
+            .setSessionCommand(sasayakiNextCueCommand())
             .setSlots(CommandButton.SLOT_FORWARD)
             .build(),
     )
+
+private fun sasayakiServiceSessionCommands(): SessionCommands =
+    SessionCommands.Builder()
+        .add(sasayakiPreviousCueCommand())
+        .add(sasayakiNextCueCommand())
+        .build()
+
+private fun sasayakiPreviousCueCommand(): SessionCommand =
+    SessionCommand(SasayakiPreviousCueAction, Bundle.EMPTY)
+
+private fun sasayakiNextCueCommand(): SessionCommand =
+    SessionCommand(SasayakiNextCueAction, Bundle.EMPTY)
 
 internal fun sasayakiPlaybackReturnActivityFlags(): Int =
     Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
