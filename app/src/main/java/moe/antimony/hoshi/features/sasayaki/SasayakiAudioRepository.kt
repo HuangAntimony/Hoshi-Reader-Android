@@ -3,7 +3,9 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 
 import android.content.ContentResolver
+import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
@@ -55,6 +57,25 @@ class SasayakiAudioRepository(private val bookRoot: File) {
             emptyList()
         }
 
+    internal fun audiobookMetadata(
+        playback: SasayakiPlaybackData,
+        context: Context,
+    ): SasayakiAudiobookMetadata =
+        audiobookMetadata(playback) { source ->
+            AndroidSasayakiAudiobookMetadataReader.read(context, source)
+        }
+
+    internal fun audiobookMetadata(
+        playback: SasayakiPlaybackData,
+        readMetadata: (SasayakiPlaybackSource) -> SasayakiAudiobookMetadata,
+    ): SasayakiAudiobookMetadata {
+        val source = runCatching { playbackSource(playback) }.getOrNull()
+            ?: return SasayakiAudiobookMetadata.Empty
+        return runCatching {
+            readMetadata(source).normalized()
+        }.getOrDefault(SasayakiAudiobookMetadata.Empty)
+    }
+
     fun clearAudioSource(playback: SasayakiPlaybackData, contentResolver: ContentResolver) {
         deleteAudio(playback)
         playback.audioUri?.let { uriString ->
@@ -104,6 +125,52 @@ class SasayakiAudioRepository(private val bookRoot: File) {
     private fun audioDirectory(): File =
         bookRoot.resolve("Sasayaki").also { it.mkdirs() }
 }
+
+internal data class SasayakiAudiobookMetadata(
+    val title: String? = null,
+    val artist: String? = null,
+    val albumArtist: String? = null,
+    val author: String? = null,
+    val artworkData: ByteArray? = null,
+) {
+    fun normalized(): SasayakiAudiobookMetadata =
+        SasayakiAudiobookMetadata(
+            title = title.normalizedMetadataText(),
+            artist = firstNonBlankMetadataText(artist, albumArtist, author),
+            artworkData = artworkData,
+        )
+
+    companion object {
+        val Empty = SasayakiAudiobookMetadata()
+    }
+}
+
+private object AndroidSasayakiAudiobookMetadataReader {
+    fun read(context: Context, source: SasayakiPlaybackSource): SasayakiAudiobookMetadata {
+        val retriever = MediaMetadataRetriever()
+        try {
+            when (source) {
+                is SasayakiPlaybackSource.ExternalUri -> retriever.setDataSource(context, source.uri)
+                is SasayakiPlaybackSource.PrivateFile -> retriever.setDataSource(source.file.absolutePath)
+            }
+            return SasayakiAudiobookMetadata(
+                title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),
+                artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST),
+                albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
+                author = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR),
+                artworkData = retriever.embeddedPicture,
+            )
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+}
+
+private fun firstNonBlankMetadataText(vararg values: String?): String? =
+    values.firstNotNullOfOrNull(String?::normalizedMetadataText)
+
+private fun String?.normalizedMetadataText(): String? =
+    this?.trim()?.takeIf { it.isNotBlank() }
 
 private fun ContentResolver.displayName(uri: Uri): String =
     query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->

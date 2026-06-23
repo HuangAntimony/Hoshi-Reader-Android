@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -52,5 +53,58 @@ class SasayakiSheetTest {
     @Test
     fun subtitleMatchSummaryIsAbsentWithoutMatchData() {
         assertNull(sasayakiSubtitleMatchSummary(null))
+    }
+
+    @Test
+    fun playbackHeaderInfoUsesAudiobookMetadataAndCurrentChapter() {
+        val info = sasayakiPlaybackHeaderInfo(
+            playback = SasayakiPlaybackData(
+                lastPosition = 0.0,
+                audioFileName = "sasayaki_audio.m4b",
+            ),
+            metadata = SasayakiAudiobookMetadata(
+                title = "  M4B Title  ",
+                artist = " Narrator ",
+            ),
+            fallbackBookTitle = "Reader Book",
+            currentChapter = SasayakiAudiobookChapter(
+                index = 2,
+                title = " Chapter 3 ",
+                startSeconds = 42.0,
+                endSeconds = 84.0,
+            ),
+        )
+
+        assertEquals("M4B Title", info.title)
+        assertEquals("Narrator", info.artist)
+        assertEquals("Chapter 3", info.chapterTitle)
+    }
+
+    @Test
+    fun playbackHeaderInfoFallsBackToAudioFileNameThenBookTitle() {
+        assertEquals(
+            "Side Story",
+            sasayakiPlaybackHeaderInfo(
+                playback = SasayakiPlaybackData(
+                    lastPosition = 0.0,
+                    audioFileName = "Side Story.m4b",
+                ),
+                metadata = SasayakiAudiobookMetadata.Empty,
+                fallbackBookTitle = "Reader Book",
+                currentChapter = null,
+            ).title,
+        )
+        assertEquals(
+            "Reader Book",
+            sasayakiPlaybackHeaderInfo(
+                playback = SasayakiPlaybackData(
+                    lastPosition = 0.0,
+                    audioFileName = "sasayaki_audio.m4b",
+                ),
+                metadata = SasayakiAudiobookMetadata.Empty,
+                fallbackBookTitle = "Reader Book",
+                currentChapter = null,
+            ).title,
+        )
     }
 }

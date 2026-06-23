@@ -570,6 +570,7 @@
     <string name="sasayaki_tab_chapters">M4B Chapters</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">Settings</string>
     <string name="sasayaki_audiobook_resource">Audiobook</string>
+    <string name="sasayaki_audiobook_cover">Audiobook cover</string>
     <string name="sasayaki_remove_audio">Remove</string>
     <string name="sasayaki_storage_copied">Copied to app storage. The original audiobook file can be deleted.</string>
     <string name="sasayaki_storage_linked">Linked to the external audiobook file. Keep the original file available.</string>

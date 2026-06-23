@@ -74,6 +74,7 @@ import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookChapter
+import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookMetadata
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
@@ -147,6 +148,9 @@ fun ReaderWebView(
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
     var sasayakiAudiobookChapters by remember(bookRoot) {
         mutableStateOf<List<SasayakiAudiobookChapter>>(emptyList())
+    }
+    var sasayakiAudiobookMetadata by remember(bookRoot) {
+        mutableStateOf(SasayakiAudiobookMetadata.Empty)
     }
     val sasayakiCoverFile = remember(bookCoverFile) {
         bookCoverFile?.takeIf { it.isFile }
@@ -957,6 +961,13 @@ fun ReaderWebView(
         } else {
             emptyList()
         }
+        sasayakiAudiobookMetadata = if (repository != null && playback != null) {
+            withContext(Dispatchers.IO) {
+                repository.audiobookMetadata(playback, context)
+            }
+        } else {
+            SasayakiAudiobookMetadata.Empty
+        }
     }
     DisposableEffect(Unit) {
         onDispose { sasayakiPlayer?.release() }
@@ -1457,6 +1468,9 @@ fun ReaderWebView(
                 player = requireNotNull(sasayakiPlayer),
                 audioRepository = sasayakiAudioRepository,
                 settings = sasayakiSettings,
+                bookTitle = book.title,
+                bookCoverFile = sasayakiCoverFile,
+                audiobookMetadata = sasayakiAudiobookMetadata,
                 subtitleMatchData = sasayakiSheetMatchData,
                 matchDependencies = bookEntry?.let { entry ->
                     SasayakiMatchDependencies(

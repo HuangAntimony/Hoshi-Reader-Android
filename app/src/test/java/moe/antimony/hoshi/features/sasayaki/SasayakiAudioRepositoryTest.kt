@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -108,6 +109,51 @@ class SasayakiAudioRepositoryTest {
 
         assertEquals("content://audio/external.m4b", openedUri)
         assertEquals(listOf("External Opening"), chapters.map { it.title })
+    }
+
+    @Test
+    fun audiobookMetadataUsesResolvedSourceAndNormalizesMetadata() {
+        val bookRoot = temporaryFolder.newFolder("metadata-book")
+        val repository = SasayakiAudioRepository(bookRoot)
+        val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.m4b")
+        audioFile.parentFile!!.mkdirs()
+        audioFile.writeText("audio")
+        val artwork = byteArrayOf(1, 2, 3)
+        var sourceRead: SasayakiPlaybackSource? = null
+
+        val metadata = repository.audiobookMetadata(playback(audioFileName = "sasayaki_audio.m4b")) { source ->
+            sourceRead = source
+            SasayakiAudiobookMetadata(
+                title = "  Recorded Book  ",
+                artist = "",
+                albumArtist = " Narrator ",
+                author = "Author",
+                artworkData = artwork,
+            )
+        }
+
+        assertEquals(SasayakiPlaybackSource.PrivateFile(audioFile.canonicalFile), sourceRead)
+        assertEquals("Recorded Book", metadata.title)
+        assertEquals("Narrator", metadata.artist)
+        assertArrayEquals(artwork, metadata.artworkData)
+    }
+
+    @Test
+    fun audiobookMetadataReturnsEmptyWhenAudioMissingOrReaderFails() {
+        val repository = SasayakiAudioRepository(temporaryFolder.newFolder("missing-metadata-book"))
+
+        assertEquals(
+            SasayakiAudiobookMetadata.Empty,
+            repository.audiobookMetadata(playback()) {
+                error("Should not read metadata without an audio source.")
+            },
+        )
+        assertEquals(
+            SasayakiAudiobookMetadata.Empty,
+            repository.audiobookMetadata(playback(audioUri = "content://audio/book.m4b")) {
+                error("Metadata read failed.")
+            },
+        )
     }
 
     private fun playback(

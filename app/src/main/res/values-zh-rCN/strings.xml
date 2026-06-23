@@ -568,6 +568,7 @@
     <string name="sasayaki_tab_chapters">M4B 章节</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">设置</string>
     <string name="sasayaki_audiobook_resource">有声书</string>
+    <string name="sasayaki_audiobook_cover">有声书封面</string>
     <string name="sasayaki_remove_audio">移除</string>
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>

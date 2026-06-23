@@ -1,9 +1,12 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,12 +17,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
@@ -46,12 +51,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,6 +88,9 @@ internal fun SasayakiSheet(
     player: SasayakiPlayer,
     audioRepository: SasayakiAudioRepository,
     settings: SasayakiSettings,
+    bookTitle: String,
+    bookCoverFile: File?,
+    audiobookMetadata: SasayakiAudiobookMetadata,
     subtitleMatchData: SasayakiMatchData?,
     matchDependencies: SasayakiMatchDependencies?,
     chapters: List<SasayakiAudiobookChapter>,
@@ -156,6 +168,9 @@ internal fun SasayakiSheet(
             Column(modifier = Modifier.fillMaxSize()) {
                 SasayakiPlaybackHeader(
                     player = player,
+                    bookTitle = bookTitle,
+                    bookCoverFile = bookCoverFile,
+                    audiobookMetadata = audiobookMetadata,
                     currentChapter = currentChapter,
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
                 )
@@ -228,29 +243,62 @@ internal fun SasayakiSheet(
 @Composable
 private fun SasayakiPlaybackHeader(
     player: SasayakiPlayer,
+    bookTitle: String,
+    bookCoverFile: File?,
+    audiobookMetadata: SasayakiAudiobookMetadata,
     currentChapter: SasayakiAudiobookChapter?,
     modifier: Modifier = Modifier,
 ) {
+    val headerInfo = sasayakiPlaybackHeaderInfo(
+        playback = player.playback,
+        metadata = audiobookMetadata,
+        fallbackBookTitle = bookTitle,
+        currentChapter = currentChapter,
+    )
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.sasayaki_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = currentChapter?.title ?: player.playback.audioStorageSummaryText(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SasayakiAudiobookCover(
+                metadata = audiobookMetadata,
+                fallbackCoverFile = bookCoverFile,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = headerInfo.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                headerInfo.artist?.let { artist ->
+                    Text(
+                        text = artist,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                headerInfo.chapterTitle?.let { chapterTitle ->
+                    Text(
+                        text = chapterTitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp),
+                .padding(top = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -282,6 +330,53 @@ private fun SasayakiPlaybackHeader(
         }
         SasayakiPlaybackProgress(player = player)
     }
+}
+
+@Composable
+private fun SasayakiAudiobookCover(
+    metadata: SasayakiAudiobookMetadata,
+    fallbackCoverFile: File?,
+) {
+    val coverBitmap = rememberSasayakiCoverBitmap(metadata, fallbackCoverFile)
+    Box(
+        modifier = Modifier
+            .size(58.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (coverBitmap != null) {
+            Image(
+                bitmap = coverBitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.sasayaki_audiobook_cover),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Album,
+                contentDescription = stringResource(R.string.sasayaki_audiobook_cover),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberSasayakiCoverBitmap(
+    metadata: SasayakiAudiobookMetadata,
+    fallbackCoverFile: File?,
+): Bitmap? {
+    var bitmap by remember(metadata.artworkData, fallbackCoverFile?.absolutePath) {
+        mutableStateOf<Bitmap?>(null)
+    }
+    LaunchedEffect(metadata.artworkData, fallbackCoverFile?.absolutePath) {
+        bitmap = withContext(Dispatchers.IO) {
+            metadata.artworkData?.let(::decodeSampledSasayakiCoverBitmap)
+                ?: fallbackCoverFile?.let(::decodeSampledSasayakiCoverBitmap)
+        }
+    }
+    return bitmap
 }
 
 @Composable
@@ -832,6 +927,85 @@ private fun formatDuration(seconds: Double): String =
 
 private fun Double.nonNegativeFiniteSeconds(): Double =
     if (isFinite()) coerceAtLeast(0.0) else 0.0
+
+internal data class SasayakiPlaybackHeaderInfo(
+    val title: String,
+    val artist: String?,
+    val chapterTitle: String?,
+)
+
+internal fun sasayakiPlaybackHeaderInfo(
+    playback: SasayakiPlaybackData,
+    metadata: SasayakiAudiobookMetadata,
+    fallbackBookTitle: String,
+    currentChapter: SasayakiAudiobookChapter?,
+): SasayakiPlaybackHeaderInfo {
+    val normalizedMetadata = metadata.normalized()
+    return SasayakiPlaybackHeaderInfo(
+        title = normalizedMetadata.title
+            ?: playback.audioSourceDisplayTitle()
+            ?: fallbackBookTitle.trim().takeIf { it.isNotBlank() }
+            ?: "",
+        artist = normalizedMetadata.artist,
+        chapterTitle = currentChapter?.title?.trim()?.takeIf { it.isNotBlank() },
+    )
+}
+
+private fun SasayakiPlaybackData.audioSourceDisplayTitle(): String? =
+    when {
+        audioFileName != null -> audioFileName.audioSourceNameTitle()
+        audioUri != null -> audioUri.audioSourceNameTitle()
+        else -> null
+    }
+
+private fun String.audioSourceNameTitle(): String? {
+    val name = substringBefore('?')
+        .substringBefore('#')
+        .substringAfterLast('/')
+        .trim()
+    val title = name.substringBeforeLast('.', missingDelimiterValue = name)
+        .trim()
+        .takeIf { it.isNotBlank() }
+        ?.takeUnless { it.equals("sasayaki_audio", ignoreCase = true) }
+    return title
+}
+
+private const val SasayakiCoverMaxDimensionPx = 512
+
+private fun decodeSampledSasayakiCoverBitmap(file: File): Bitmap? {
+    if (!file.isFile) return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.absolutePath, bounds)
+    return BitmapFactory.decodeFile(
+        file.absolutePath,
+        BitmapFactory.Options().apply {
+            inSampleSize = sasayakiCoverSampleSize(bounds.outWidth, bounds.outHeight)
+        },
+    )
+}
+
+private fun decodeSampledSasayakiCoverBitmap(data: ByteArray): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+    return BitmapFactory.decodeByteArray(
+        data,
+        0,
+        data.size,
+        BitmapFactory.Options().apply {
+            inSampleSize = sasayakiCoverSampleSize(bounds.outWidth, bounds.outHeight)
+        },
+    )
+}
+
+private fun sasayakiCoverSampleSize(width: Int, height: Int): Int {
+    val largest = maxOf(width, height)
+    if (largest <= SasayakiCoverMaxDimensionPx || largest <= 0) return 1
+    var sampleSize = 1
+    while (largest / (sampleSize * 2) >= SasayakiCoverMaxDimensionPx) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
 
 @Composable
 private fun SasayakiPlaybackData.audioStorageSummaryText(): String =
