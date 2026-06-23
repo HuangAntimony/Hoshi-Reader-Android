@@ -22,16 +22,20 @@ class SasayakiPlaybackService : MediaSessionService() {
             notificationManager = getSystemService(NotificationManager::class.java),
             contentIntent = runtime::playbackReturnPendingIntent,
         )
-        if (runtime.requiresOemRestrictedPlaybackNotificationFallback()) {
-            setMediaNotificationProvider(
-                SasayakiOemRestrictedPlaybackNotificationProvider(oemRestrictedNotificationRenderer),
-            )
-        }
         addSession(runtime.createServiceSession(this))
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         runtime.currentSession()
+
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        if (runtime.requiresOemRestrictedPlaybackNotificationFallback()) {
+            oemRestrictedNotificationRenderer.show(session)
+        } else {
+            oemRestrictedNotificationRenderer.cancel()
+            super.onUpdateNotification(session, startInForegroundRequired)
+        }
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         if (sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing())) {

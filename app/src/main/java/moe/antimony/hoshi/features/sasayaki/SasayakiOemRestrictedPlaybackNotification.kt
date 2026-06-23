@@ -8,15 +8,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
-import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.CommandButton
-import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.PlaybackPendingIntentBuilder
-import com.google.common.collect.ImmutableList
 import moe.antimony.hoshi.R
 import androidx.media3.session.R as Media3R
 
@@ -67,21 +63,16 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
             cancel()
             return
         }
+        ensureChannel()
         notificationManager.notify(SasayakiPlaybackNotificationId, buildNotification(session))
     }
-
-    fun buildNotification(session: MediaSession): Notification =
-        ensureChannel().let { createNotification(session) }
-
-    fun channelName(): String =
-        context.getString(R.string.sasayaki_title)
 
     fun cancel() {
         notificationManager.cancel(SasayakiPlaybackNotificationId)
     }
 
     @OptIn(UnstableApi::class)
-    private fun createNotification(session: MediaSession): Notification {
+    private fun buildNotification(session: MediaSession): Notification {
         val player = session.player
         val metadata = player.mediaMetadata
         val title = metadata.title?.takeIf { it.isNotBlank() } ?: context.getString(R.string.sasayaki_title)
@@ -130,7 +121,7 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
     private fun ensureChannel() {
         val channel = NotificationChannel(
             SasayakiPlaybackNotificationChannelId,
-            channelName(),
+            context.getString(R.string.sasayaki_title),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
             setSound(null, null)
@@ -139,29 +130,4 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
         }
         notificationManager.createNotificationChannel(channel)
     }
-}
-
-@OptIn(UnstableApi::class)
-internal class SasayakiOemRestrictedPlaybackNotificationProvider(
-    private val renderer: SasayakiOemRestrictedPlaybackNotificationRenderer,
-) : MediaNotification.Provider {
-    override fun createNotification(
-        session: MediaSession,
-        customLayout: ImmutableList<CommandButton>,
-        actionFactory: MediaNotification.ActionFactory,
-        onNotificationChangedCallback: MediaNotification.Provider.Callback,
-    ): MediaNotification =
-        MediaNotification(SasayakiPlaybackNotificationId, renderer.buildNotification(session))
-
-    override fun handleCustomCommand(
-        session: MediaSession,
-        action: String,
-        extras: Bundle,
-    ): Boolean = false
-
-    override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
-        MediaNotification.Provider.NotificationChannelInfo(
-            SasayakiPlaybackNotificationChannelId,
-            renderer.channelName(),
-        )
 }
