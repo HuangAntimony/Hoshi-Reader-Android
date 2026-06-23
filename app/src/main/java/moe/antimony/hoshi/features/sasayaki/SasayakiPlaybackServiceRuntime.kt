@@ -69,7 +69,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     private val appContext = context.applicationContext
     private var player: ExoPlayerSasayakiPlayerHandle? = null
     private var session: MediaSession? = null
-    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var playbackServiceConnection: ListenableFuture<MediaController>? = null
     private var activeKey: ActivePlaybackKey? = null
     private var activeBookId: String? = null
     private var activeController: SasayakiPlaybackControllerContract? = null
@@ -127,7 +127,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         onLoadChapter: (Int) -> Unit,
     ): SasayakiPlaybackControllerContract {
         createSession()
-        ensureControllerConnection()
+        ensurePlaybackServiceConnection()
 
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
@@ -173,7 +173,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             playbackPreparer = ServiceOwnedSasayakiPlaybackPreparer(
                 playerProvider = ::requirePlayer,
             ),
-            onPlaybackStartRequested = ::ensureControllerConnection,
+            onPlaybackStartRequested = ::ensurePlaybackServiceConnection,
         )
         activeKey = requestedKey
         activeController = controller
@@ -187,7 +187,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     override fun stopPlayback() {
         releaseActiveController()
         readerAttachment.detach()
-        releaseControllerConnection()
+        releasePlaybackServiceConnection()
         appContext.stopService(playbackServiceIntent())
     }
 
@@ -231,7 +231,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     fun release() {
         releaseActiveController()
         readerAttachment.detach()
-        releaseControllerConnection()
+        releasePlaybackServiceConnection()
         session?.release()
         session = null
         player?.release()
@@ -246,18 +246,19 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     private fun playbackServiceIntent(): Intent =
         Intent(MediaSessionService.SERVICE_INTERFACE).setClass(appContext, SasayakiPlaybackService::class.java)
 
-    private fun ensureControllerConnection() {
-        if (controllerFuture != null) return
+    private fun ensurePlaybackServiceConnection() {
+        if (playbackServiceConnection != null) return
+        // Reader still calls this in-process runtime; the service connection enters the MediaSessionService lifecycle.
         val sessionToken = SessionToken(
             appContext,
             ComponentName(appContext, SasayakiPlaybackService::class.java),
         )
-        controllerFuture = MediaController.Builder(appContext, sessionToken).buildAsync()
+        playbackServiceConnection = MediaController.Builder(appContext, sessionToken).buildAsync()
     }
 
-    private fun releaseControllerConnection() {
-        controllerFuture?.let(MediaController::releaseFuture)
-        controllerFuture = null
+    private fun releasePlaybackServiceConnection() {
+        playbackServiceConnection?.let(MediaController::releaseFuture)
+        playbackServiceConnection = null
     }
 
     private fun releaseActiveController(clearBookId: Boolean = true) {

@@ -305,6 +305,35 @@ Exit criteria:
 - Refactoring can move methods/classes without breaking unrelated tests.
 - Remaining source-shape tests document why behavior coverage is insufficient.
 
+## Target 10: Finish Sasayaki MediaController Boundary
+
+Priority: high
+
+Sasayaki playback now has a service-owned player/session, but Reader still calls
+an in-process runtime facade for load, cue attachment, and playback commands.
+This keeps the current UI behavior small, but the remaining boundary should be
+completed so Reader talks to `SasayakiPlaybackService` through a deliberate
+Media3 controller/session API rather than a direct runtime bridge.
+
+Target shape:
+
+- Keep ExoPlayer and MediaSession creation in the `MediaSessionService`
+  lifecycle.
+- Move Reader playback commands and load/stop handoff behind a MediaController
+  or equivalently explicit service-session boundary.
+- Remove the process-local service connection once Reader no longer needs it to
+  enter the service lifecycle.
+- Keep cue callbacks and Reader-only UI state outside the long-lived service
+  owner.
+
+Exit criteria:
+
+- Reader can open, control, detach from, and return to active Sasayaki playback
+  through the media-session boundary.
+- The service runtime no longer exposes a direct UI-facing playback facade.
+- Background playback, notification controls, and explicit reader-exit stop
+  remain covered by tests and manual validation.
+
 ## Recommended Sequence
 
 1. Continue dispatcher/scope injection in the next repository or ViewModel slice
@@ -315,8 +344,10 @@ Exit criteria:
 4. Stabilize sidecar/model contracts.
 5. Extract long reader JavaScript/CSS out of Kotlin string script files.
 6. Characterize and split Rust/native build logic.
-7. Add baseline profile and macrobenchmark entry points.
-8. Modularize only after the Hilt graph and model, reader, and build boundaries
+7. Finish the Sasayaki MediaController boundary after service-owned playback is
+   stable on device.
+8. Add baseline profile and macrobenchmark entry points.
+9. Modularize only after the Hilt graph and model, reader, and build boundaries
    are stable.
 
 Every slice must preserve iOS-aligned user-visible behavior unless it explicitly
