@@ -1,9 +1,11 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.app.PendingIntent
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -104,6 +106,13 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     fun activePlaybackBookId(): String? =
         activeBookId.takeIf { activeController != null }
 
+    fun isBackgroundRestricted(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            appContext.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true
+
+    fun playbackReturnPendingIntent(): PendingIntent =
+        sasayakiPlaybackReturnPendingIntent(appContext, activeBookId)
+
     override fun load(
         request: SasayakiPlaybackRuntimeLoadRequest,
         getCurrentChapterIndex: () -> Int,
@@ -171,6 +180,10 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
 
     fun previousFromSession() {
         activeController?.previousCue()
+    }
+
+    fun toggleFromNotification() {
+        activeController?.togglePlayback()
     }
 
     fun nextFromSession() {
