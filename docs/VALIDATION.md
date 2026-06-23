@@ -232,16 +232,22 @@ Validate relevant sync/update/Sasayaki changes with:
   the existing app task instead of creating a duplicate task.
 - Sasayaki long-running background playback on a physical device. Check the
   package app-op before triage. The normal path should use Media3's
-  `mediaPlayback` foreground-service notification. On background-restricted
-  Samsung devices, only the isolated OEM-restricted fallback should keep a
-  MediaSession transport notification while ensuring `SasayakiPlaybackService`
-  is not left as a started service that can be stopped by app idle:
+  `mediaPlayback` foreground-service notification. A detached transport
+  notification without a foreground service can leave the process in
+  cached/background-restricted state and make playback stop while the
+  notification remains visible:
 
   ```bash
   adb shell appops get <package-name> | rg 'RUN_ANY_IN_BACKGROUND|START_FOREGROUND|WAKE_LOCK'
   adb shell dumpsys activity services <package-name> | rg 'SasayakiPlaybackService|startRequested|allowStartForeground'
   ```
 
-  `RUN_ANY_IN_BACKGROUND: ignore` or `deny` means the device is intentionally
-  restricting background execution and is not a valid foreground-media-service
-  stability baseline. Record the restriction state in the manual QA notes.
+  `RUN_ANY_IN_BACKGROUND: ignore` or `deny`, or
+  `ActivityManager.isBackgroundRestricted() == true`, means the device or user
+  is intentionally restricting background execution. Android's documented
+  behavior for that state is aggressive background restriction; at minimum,
+  foreground services cannot be started unless an app activity is in the
+  foreground. Do not classify background playback failure in that state as a
+  Media3 lifecycle regression until the same flow is reproduced with the app
+  allowed to run in the background. Record both restriction states in manual QA
+  notes.

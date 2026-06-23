@@ -201,15 +201,18 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         activeController?.previousCue()
     }
 
-    fun playFromSession() {
-        val controller = activeController ?: return
+    fun playFromSession(): Boolean {
+        val controller = activeController ?: return false
         if (!controller.isPlaying) {
             controller.togglePlayback()
         }
+        return true
     }
 
-    fun pauseFromSession() {
-        activeController?.pausePlayback(restoreTemporaryPosition = true)
+    fun pauseFromSession(): Boolean {
+        val controller = activeController ?: return false
+        controller.pausePlayback(restoreTemporaryPosition = true)
+        return true
     }
 
     fun nextFromSession() {
@@ -318,19 +321,19 @@ private class SasayakiPlaybackServiceSessionCallback(
 @OptIn(UnstableApi::class)
 private class SasayakiServiceSessionPlayer(
     player: Player,
-    private val onPlay: () -> Unit,
-    private val onPause: () -> Unit,
+    private val onPlay: () -> Boolean,
+    private val onPause: () -> Boolean,
     private val onSkipToPrevious: () -> Unit,
     private val onSkipToNext: () -> Unit,
     private val onSeekTo: (Long) -> Unit,
 ) : ForwardingSimpleBasePlayer(player) {
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        if (playWhenReady) {
+        val handled = if (playWhenReady) {
             onPlay()
         } else {
             onPause()
         }
-        return Futures.immediateFuture(null)
+        return if (handled) super.handleSetPlayWhenReady(playWhenReady) else Futures.immediateFuture(null)
     }
 
     override fun handleSeek(

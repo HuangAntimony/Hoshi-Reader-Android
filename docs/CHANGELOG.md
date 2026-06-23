@@ -8,7 +8,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
-- Keep Sasayaki playback owned by a service-backed MediaSession so background playback stays alive on background-restricted Samsung devices, fallback notification controls stay routed through the media session, reader exit stops playback, and notification or launcher return opens the active reader.
+- Keep Sasayaki playback owned by a service-backed MediaSession so background playback uses Android's media foreground-service path, fallback notification controls stay routed through the media session, reader exit stops playback, and notification or launcher return opens the active reader.
 - Keep the Sasayaki notification's rewind and fast-forward controls visually consistent and working from system media controls.
 
 ## [v1.2.2] - 2026-06-21

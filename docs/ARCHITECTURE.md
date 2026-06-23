@@ -136,9 +136,15 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `mediaPlayback` foreground-service path, and the ExoPlayer uses local wake
   mode for long-running playback. The only non-default notification branch is
   the isolated OEM-restricted fallback used when Android reports the app as
-  background restricted; that branch uses a MediaSession-backed transport
-  notification whose controls send Media3 player commands back to
-  `SasayakiPlaybackService`.
+  background restricted; that branch still belongs to
+  `SasayakiPlaybackService` and uses a MediaSession-backed transport
+  notification whose controls send Media3 player commands back to the service.
+  If Android reports `ActivityManager.isBackgroundRestricted()` for the app,
+  the platform treats background work as user-restricted; this can prevent
+  media foreground-service startup after the Reader activity leaves the
+  foreground, so the app must treat long-running background playback in that
+  state as a device/user restriction rather than an in-process lifecycle
+  guarantee.
 - Update checks use WorkManager unique work, with worker dependencies supplied
   by Hilt's WorkManager integration.
 
