@@ -135,11 +135,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Background playback uses Android's `mediaPlayback` foreground-service path
   inside the Media3 `MediaSessionService`; Media3 owns foreground-service
   start/stop and Sasayaki does not call `startForegroundService()`,
-  `startForeground()`, `stopForeground()`, or `stopSelf()` directly for this
-  lifecycle. Sasayaki customizes notification rendering through a Media3
-  `MediaNotification.Provider` using the service MediaSession token and
-  Media3 player-command PendingIntents for transport controls, and the
-  ExoPlayer uses local wake mode for long-running playback.
+  `startForeground()`, `stopForeground()`, `stopSelf()`, or `stopService()`
+  directly for this lifecycle. Sasayaki customizes notification rendering
+  through a Media3 `MediaNotification.Provider` using the service MediaSession
+  token and Media3 player-command PendingIntents for transport controls, and
+  the ExoPlayer uses local wake mode for long-running playback.
   If Android reports `ActivityManager.isBackgroundRestricted()` for the app,
   the platform treats background work as user-restricted; this can prevent
   media foreground-service startup after the Reader activity leaves the

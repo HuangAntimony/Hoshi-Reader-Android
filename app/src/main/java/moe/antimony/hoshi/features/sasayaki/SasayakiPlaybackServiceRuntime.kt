@@ -201,7 +201,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         releaseActiveController()
         readerAttachment.detach()
         releasePlaybackServiceConnection()
-        appContext.stopService(playbackServiceIntent())
     }
 
     fun previousFromSession() {
@@ -246,9 +245,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             "SasayakiPlaybackService must create the player before audio can be restored."
         }
     }
-
-    private fun playbackServiceIntent(): Intent =
-        Intent(MediaSessionService.SERVICE_INTERFACE).setClass(appContext, SasayakiPlaybackService::class.java)
 
     private fun ensurePlaybackServiceConnection(): ListenableFuture<MediaController> {
         playbackServiceConnection?.let { return it }
