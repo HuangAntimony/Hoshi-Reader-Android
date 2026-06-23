@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.epub.SasayakiMatch
 
@@ -54,6 +55,7 @@ class SasayakiPlayerFacadeTest {
         player.skipForward(10)
         player.skipBackward(5)
         player.seekTo(40.0)
+        player.updateMatchData(SasayakiMatchData(matches = listOf(cue), unmatched = 0))
         assertSame(cue, player.findCue(chapterIndex = 2, offset = 10))
         player.playCue(cue, stop = true)
         assertEquals(File("cue.m4a"), player.exportCueAudio(cue, "sentence"))
@@ -71,6 +73,7 @@ class SasayakiPlayerFacadeTest {
                 "skipForward:10",
                 "skipBackward:5",
                 "seekTo:40.0",
+                "updateMatchData:1",
                 "findCue:2:10",
                 "playCue:cue:true",
                 "exportCueAudio:cue:sentence",
@@ -208,6 +211,10 @@ class SasayakiPlayerFacadeTest {
 
         override fun seekTo(seconds: Double) {
             commands += "seekTo:$seconds"
+        }
+
+        override fun updateMatchData(matchData: SasayakiMatchData?) {
+            commands += "updateMatchData:${matchData?.matches?.size ?: 0}"
         }
 
         override fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? {

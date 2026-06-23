@@ -122,4 +122,22 @@ class SasayakiCueNavigationControllerTest {
         assertNull(navigation.findCue(chapterIndex = 0, offset = 11))
         assertEquals("c", navigation.findCue(chapterIndex = 1, offset = 1)?.id)
     }
+
+    @Test
+    fun updateMatchDataReplacesCueTimelineWithoutRecreatingNavigation() {
+        val navigation = SasayakiCueNavigationController(matchData = null)
+
+        assertNull(navigation.nextCueSeekTime(currentTime = 3.0, delay = 0.0))
+
+        navigation.updateMatchData(
+            SasayakiMatchData(
+                matches = listOf(
+                    SasayakiMatch("new", 8.0, 9.0, "new", 0, 0, 3),
+                ),
+                unmatched = 0,
+            ),
+        )
+
+        assertEquals(8.0, navigation.nextCueSeekTime(currentTime = 3.0, delay = 0.0) ?: -1.0, 0.0)
+    }
 }

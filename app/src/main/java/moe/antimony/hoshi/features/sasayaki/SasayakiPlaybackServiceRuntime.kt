@@ -138,7 +138,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     ): SasayakiPlaybackControllerContract {
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
-            matchData = request.matchData,
         )
         activeController?.let { controller ->
             if (activeKey == requestedKey) {
@@ -150,6 +149,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
                     onClearCue = onClearCue,
                     onLoadChapter = onLoadChapter,
                 )
+                controller.updateMatchData(request.matchData)
                 return controller
             }
         }
@@ -287,7 +287,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
 
     private data class ActivePlaybackKey(
         val bookRoot: File,
-        val matchData: SasayakiMatchData?,
     )
 
     private fun File.stableIdentity(): File =

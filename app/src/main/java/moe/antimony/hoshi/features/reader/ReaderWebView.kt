@@ -119,10 +119,13 @@ fun ReaderWebView(
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
     var sasayakiMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
     var sasayakiSheetMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
+    var isSasayakiMatchLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
     LaunchedEffect(bookRoot, bookRepository) {
+        isSasayakiMatchLoaded = bookRoot == null
         val loadedMatch = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
         sasayakiMatchData = loadedMatch
         sasayakiSheetMatchData = loadedMatch
+        isSasayakiMatchLoaded = true
     }
     var highlights by remember(bookRoot) {
         mutableStateOf<List<ReaderHighlight>?>(if (bookRoot == null) emptyList() else null)
@@ -907,9 +910,9 @@ fun ReaderWebView(
         }
         dispatchSasayakiCueToReader(pending.cue, pending.reveal)
     }
-    LaunchedEffect(bookRoot, sasayakiMatchData, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
+    LaunchedEffect(bookRoot, isSasayakiMatchLoaded, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         sasayakiPlayer?.release()
-        sasayakiPlayer = if (bookRoot != null && isSasayakiPlaybackLoaded) {
+        sasayakiPlayer = if (bookRoot != null && isSasayakiMatchLoaded && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
                 bookId = bookId,
                 bookRoot = bookRoot,
@@ -1466,6 +1469,7 @@ fun ReaderWebView(
                 onSubtitleMatchUpdated = { matchData ->
                     sasayakiMatchData = matchData
                     sasayakiSheetMatchData = matchData
+                    sasayakiPlayer?.updateMatchData(matchData)
                 },
                 onSettingsChange = ::updateSasayakiSettings,
                 onDismiss = stateHolder::dismissSasayaki,

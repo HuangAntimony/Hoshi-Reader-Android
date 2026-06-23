@@ -6,7 +6,11 @@ import moe.antimony.hoshi.epub.SasayakiMatch
 import kotlin.math.max
 
 class SasayakiCueNavigationController(matchData: SasayakiMatchData?) {
-    private val timeline = CueTimeline(matchData)
+    private var timeline = CueTimeline(matchData)
+
+    fun updateMatchData(matchData: SasayakiMatchData?) {
+        timeline = CueTimeline(matchData)
+    }
 
     fun nextCueSeekTime(
         currentTime: Double,

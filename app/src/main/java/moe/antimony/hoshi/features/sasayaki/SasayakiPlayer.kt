@@ -116,6 +116,10 @@ class SasayakiPlayer private constructor(
         controller.seekTo(seconds)
     }
 
+    fun updateMatchData(matchData: SasayakiMatchData?) {
+        controller.updateMatchData(matchData)
+    }
+
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
         controller.findCue(chapterIndex = chapterIndex, offset = offset)
 
