@@ -60,6 +60,7 @@ internal class SasayakiPlaybackController(
     playbackPreparer: SasayakiPlaybackPreparer,
     persistenceDispatcher: CoroutineDispatcher,
     private val onPlaybackStartRequested: () -> Unit = {},
+    restoreAudioOnCreate: Boolean = true,
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
@@ -116,7 +117,9 @@ internal class SasayakiPlaybackController(
         playbackLifecycle = playbackLifecycle,
         playbackPreparer = playbackPreparer,
     )
-    private val audioAvailability = SasayakiAudioAvailabilityState()
+    private val audioAvailability = SasayakiAudioAvailabilityState(
+        initialHasAudio = audioSourceRepository.playbackSource(playbackPersistence.playback) != null,
+    )
     private val cuePresentation = SasayakiCuePresentationState()
 
     override val playback: SasayakiPlaybackData get() = playbackPersistence.playback
@@ -138,7 +141,9 @@ internal class SasayakiPlaybackController(
         get() = playbackPersistence.audioStorageSummary
 
     init {
-        restoreAudio()
+        if (restoreAudioOnCreate) {
+            restoreAudio()
+        }
     }
 
     override fun setDelay(value: Double) {
@@ -297,7 +302,7 @@ internal class SasayakiPlaybackController(
         )
     }
 
-    private fun restoreAudio() {
+    internal fun restoreAudio() {
         val result = runCatching {
             audioRestore.restore(
                 playback = playback,

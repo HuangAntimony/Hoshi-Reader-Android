@@ -10,6 +10,14 @@ import moe.antimony.hoshi.ui.UiText
 
 class SasayakiAudioAvailabilityStateTest {
     @Test
+    fun storedAudioSourceKeepsControlsAvailableBeforePlayerRestore() {
+        val state = SasayakiAudioAvailabilityState(initialHasAudio = true)
+
+        assertTrue(state.hasAudio)
+        assertNull(state.errorMessage)
+    }
+
+    @Test
     fun restoreSuccessMarksAudioAvailableAndClearsError() {
         val state = SasayakiAudioAvailabilityState()
         state.markRestoreFailed(IllegalStateException("missing"))

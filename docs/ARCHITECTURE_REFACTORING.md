@@ -309,16 +309,15 @@ Exit criteria:
 
 Priority: high
 
-Sasayaki playback now has a service-owned player/session, but Reader still calls
-an in-process runtime facade for load, cue attachment, and playback commands.
-This keeps the current UI behavior small, but the remaining boundary should be
-completed so Reader talks to `SasayakiPlaybackService` through a deliberate
-Media3 controller/session API rather than a direct runtime bridge.
+Sasayaki playback now creates the player/session from the
+`MediaSessionService` lifecycle, but Reader still calls an in-process runtime
+facade for load, cue attachment, and playback commands. This keeps the current
+UI behavior small, but the remaining boundary should be completed so Reader
+talks to `SasayakiPlaybackService` through a deliberate Media3
+controller/session API rather than a direct runtime bridge.
 
 Target shape:
 
-- Keep ExoPlayer and MediaSession creation in the `MediaSessionService`
-  lifecycle.
 - Move Reader playback commands and load/stop handoff behind a MediaController
   or equivalently explicit service-session boundary.
 - Remove the process-local service connection once Reader no longer needs it to

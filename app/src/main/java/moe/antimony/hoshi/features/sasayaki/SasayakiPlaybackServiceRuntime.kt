@@ -6,6 +6,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingSimpleBasePlayer
@@ -32,6 +34,7 @@ import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import java.io.File
+import java.util.concurrent.Executor
 
 internal const val SasayakiPlaybackReturnAction = "moe.antimony.hoshi.action.RETURN_TO_SASAYAKI_READER"
 internal const val SasayakiPlaybackReturnBookIdExtra = "moe.antimony.hoshi.extra.SASAYAKI_BOOK_ID"
@@ -74,12 +77,14 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     private var activeBookId: String? = null
     private var activeController: SasayakiPlaybackControllerContract? = null
     private val readerAttachment = SasayakiReaderAttachment()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainExecutor = Executor { command -> mainHandler.post(command) }
 
-    fun createSession(): MediaSession {
+    fun createServiceSession(serviceContext: Context): MediaSession {
         session?.let { return it }
 
         val createdPlayer = ExoPlayerSasayakiPlayerHandle(
-            ExoPlayer.Builder(appContext)
+            ExoPlayer.Builder(serviceContext)
                 .setWakeMode(C.WAKE_MODE_LOCAL)
                 .build(),
         ).apply {
@@ -94,7 +99,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             onSkipToNext = ::nextFromSession,
             onSeekTo = ::seekToFromSession,
         )
-        val createdSession = MediaSession.Builder(appContext, sessionPlayer)
+        val createdSession = MediaSession.Builder(serviceContext, sessionPlayer)
             .setId(SasayakiPlaybackService.SessionId)
             .setMediaButtonPreferences(mediaButtons)
             .setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, activeBookId))
@@ -110,7 +115,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         session
 
     fun activePlaybackBookId(): String? =
-        activeBookId.takeIf { activeController != null }
+        activeBookId.takeIf { activeController?.hasAudio == true }
 
     fun requiresOemRestrictedPlaybackNotificationFallback(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
@@ -126,8 +131,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         onClearCue: () -> Unit,
         onLoadChapter: (Int) -> Unit,
     ): SasayakiPlaybackControllerContract {
-        createSession()
-        ensurePlaybackServiceConnection()
+        val serviceConnection = ensurePlaybackServiceConnection()
 
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
@@ -174,9 +178,11 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
                 playerProvider = ::requirePlayer,
             ),
             onPlaybackStartRequested = ::ensurePlaybackServiceConnection,
+            restoreAudioOnCreate = false,
         )
         activeKey = requestedKey
         activeController = controller
+        restoreAudioWhenServiceReady(controller, serviceConnection)
         return controller
     }
 
@@ -239,26 +245,43 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     }
 
     private fun requirePlayer(): Media3SasayakiPlayerHandle {
-        createSession()
-        return requireNotNull(player)
+        return requireNotNull(player) {
+            "SasayakiPlaybackService must create the player before audio can be restored."
+        }
     }
 
     private fun playbackServiceIntent(): Intent =
         Intent(MediaSessionService.SERVICE_INTERFACE).setClass(appContext, SasayakiPlaybackService::class.java)
 
-    private fun ensurePlaybackServiceConnection() {
-        if (playbackServiceConnection != null) return
+    private fun ensurePlaybackServiceConnection(): ListenableFuture<MediaController> {
+        playbackServiceConnection?.let { return it }
         // Reader still calls this in-process runtime; the service connection enters the MediaSessionService lifecycle.
         val sessionToken = SessionToken(
             appContext,
             ComponentName(appContext, SasayakiPlaybackService::class.java),
         )
-        playbackServiceConnection = MediaController.Builder(appContext, sessionToken).buildAsync()
+        return MediaController.Builder(appContext, sessionToken).buildAsync().also { future ->
+            playbackServiceConnection = future
+        }
     }
 
-    private fun releasePlaybackServiceConnection() {
+    internal fun releasePlaybackServiceConnection() {
         playbackServiceConnection?.let(MediaController::releaseFuture)
         playbackServiceConnection = null
+    }
+
+    private fun restoreAudioWhenServiceReady(
+        controller: SasayakiPlaybackController,
+        serviceConnection: ListenableFuture<MediaController>,
+    ) {
+        serviceConnection.addListener(
+            {
+                if (activeController !== controller) return@addListener
+                runCatching { Futures.getDone(serviceConnection) }.getOrNull() ?: return@addListener
+                controller.restoreAudio()
+            },
+            mainExecutor,
+        )
     }
 
     private fun releaseActiveController(clearBookId: Boolean = true) {

@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.OptIn
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -25,7 +24,7 @@ class SasayakiPlaybackService : MediaSessionService() {
             notificationManager = getSystemService(NotificationManager::class.java),
             contentIntent = runtime::playbackReturnPendingIntent,
         )
-        addSession(runtime.createSession())
+        addSession(runtime.createServiceSession(this))
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
@@ -43,9 +42,10 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (runtime.currentSession()?.player?.hasForegroundPlayback() != true) {
-            super.onTaskRemoved(rootIntent)
+        if (sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing())) {
+            runtime.releasePlaybackServiceConnection()
         }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
@@ -75,12 +75,5 @@ internal class SasayakiOemRestrictedPlaybackNotificationReceiver : BroadcastRece
     }
 }
 
-private fun Player.hasForegroundPlayback(): Boolean =
-    isPlaying ||
-        (
-            playWhenReady &&
-                (
-                    playbackState == Player.STATE_READY ||
-                        playbackState == Player.STATE_BUFFERING
-                )
-        )
+internal fun sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing: Boolean): Boolean =
+    !isPlaybackOngoing

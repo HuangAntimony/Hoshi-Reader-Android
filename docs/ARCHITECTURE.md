@@ -119,16 +119,20 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `RemoteBookEntry` models rather than local `BookEntry` placeholders.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
-  `MediaSessionService`. The service runtime owns the active ExoPlayer,
-  MediaSession, Sasayaki playback controller, and active book id. Reader UI
+  `MediaSessionService`. The service `onCreate` lifecycle creates the active
+  ExoPlayer and MediaSession; Reader load paths can connect to the service but
+  do not create the player or session directly. The service runtime owns the
+  active Sasayaki playback controller and active book id. Reader UI
   attaches/detaches cue sinks and sends explicit stop on reader exit; Android
   media controls and notification return actions route through the same
   service-owned session. Until Reader UI is fully MediaController-based, the
-  runtime keeps one process-local controller connection while playback is
-  active so the MediaSessionService lifecycle is entered explicitly. Playback
-  persistence uses the application scope with the injected IO dispatcher rather
-  than Reader's Compose scope, and saves are serialized with latest-snapshot
-  conflation. Normal background playback promotes the service through Android's
+  runtime keeps one process-local controller connection after entering the
+  MediaSessionService lifecycle, releases that internal connection before
+  stopping non-ongoing playback on task removal, and otherwise follows
+  Media3's ongoing-playback service semantics. Playback persistence uses the
+  application scope with the injected IO dispatcher rather than Reader's
+  Compose scope, and saves are serialized with latest-snapshot conflation.
+  Normal background playback promotes the service through Android's
   `mediaPlayback` foreground-service path, and the ExoPlayer uses local wake
   mode for long-running playback. The only non-default notification branch is
   the isolated OEM-restricted fallback used when Android reports the app as
