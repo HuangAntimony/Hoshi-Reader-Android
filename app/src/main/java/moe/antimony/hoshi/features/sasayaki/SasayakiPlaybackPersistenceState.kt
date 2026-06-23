@@ -6,8 +6,10 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -17,6 +19,7 @@ class SasayakiPlaybackPersistenceState(
     private val audioSourceRepository: SasayakiAudioRepository,
     initialPlayback: SasayakiPlaybackData?,
     private val persistenceScope: CoroutineScope,
+    private val persistenceDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     var playback by mutableStateOf(initialPlayback ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
@@ -58,7 +61,7 @@ class SasayakiPlaybackPersistenceState(
     private fun save() {
         val snapshot = playback
         persistenceScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            withContext(NonCancellable) {
+            withContext(NonCancellable + persistenceDispatcher) {
                 playbackRepository.save(snapshot)
             }
         }

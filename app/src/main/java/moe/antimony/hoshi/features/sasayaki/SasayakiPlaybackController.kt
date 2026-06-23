@@ -8,6 +8,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import moe.antimony.hoshi.ui.UiText
 import java.io.File
@@ -57,6 +58,7 @@ internal class SasayakiPlaybackController(
     onClearCue: () -> Unit,
     onLoadChapter: (Int) -> Unit,
     playbackPreparer: SasayakiPlaybackPreparer,
+    persistenceDispatcher: CoroutineDispatcher,
     private val onPlaybackStartRequested: () -> Unit = {},
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
@@ -69,6 +71,7 @@ internal class SasayakiPlaybackController(
         audioSourceRepository = audioSourceRepository,
         initialPlayback = initialPlayback,
         persistenceScope = persistenceScope,
+        persistenceDispatcher = persistenceDispatcher,
     )
     private val handler = Handler(Looper.getMainLooper())
     private val cueNavigation = SasayakiCueNavigationController(matchData)
@@ -199,10 +202,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun setRate(value: Float) {
-        playbackSettings.setRate(
-            value = value,
-            updateMediaSession = ::updateMediaSession,
-        )
+        playbackSettings.setRate(value)
     }
 
     override fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {
@@ -232,7 +232,6 @@ internal class SasayakiPlaybackController(
     override fun pausePlayback(restoreTemporaryPosition: Boolean) {
         playbackCommands.pause(
             restoreTemporaryPosition = restoreTemporaryPosition,
-            updateMediaSession = ::updateMediaSession,
             restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
         )
     }
@@ -335,7 +334,6 @@ internal class SasayakiPlaybackController(
             rate = rate,
             beforeStart = onPlaybackStartRequested,
             currentTime = { currentTime },
-            updateMediaSession = ::updateMediaSession,
             redisplayCue = { time -> updateCue(time, forceDisplay = true) },
         )
     }
@@ -346,7 +344,6 @@ internal class SasayakiPlaybackController(
             hasMatch = hasMatch,
             delay = delay,
             startPlayback = ::startPlayback,
-            updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }
@@ -355,7 +352,6 @@ internal class SasayakiPlaybackController(
         audioRestoreWorkflow.restore(
             playback = playback,
             currentTime = { currentTime },
-            updateMediaSession = ::updateMediaSession,
             handleSeekComplete = ::handleSeekComplete,
             handlePlaybackActiveChanged = ::handlePlaybackActiveChanged,
             handlePositionChanged = ::handlePlayerPositionChanged,
@@ -369,7 +365,6 @@ internal class SasayakiPlaybackController(
             hasMatch = hasMatch,
             delay = delay,
             pausePlayback = { pausePlayback(restoreTemporaryPosition = true) },
-            updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }
@@ -379,10 +374,8 @@ internal class SasayakiPlaybackController(
             active = active,
             markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
-                updateMediaSession()
                 updateCue(currentTime, forceDisplay = true)
             },
-            updateMediaSession = ::updateMediaSession,
             restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
         )
     }
@@ -396,7 +389,6 @@ internal class SasayakiPlaybackController(
             playbackPersistence.savePosition(currentTime)
         }
         updateCue(currentTime, forceDisplay = true)
-        updateMediaSession()
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
@@ -414,14 +406,9 @@ internal class SasayakiPlaybackController(
         cueDisplayActionDispatcher.apply(action)
     }
 
-    private fun updateMediaSession() {
-        // MediaSession state is published by SasayakiPlaybackService's Media3 player.
-    }
-
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
         temporaryPlaybackRestore.restoreIfNeeded(
             updateCue = ::updateCue,
-            updateMediaSession = ::updateMediaSession,
         )
     }
 

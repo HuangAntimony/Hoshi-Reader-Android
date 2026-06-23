@@ -10,7 +10,6 @@ class SasayakiSeekCompleteCoordinator(
         hasMatch: Boolean,
         delay: Double,
         startPlayback: () -> Unit,
-        updateMediaSession: () -> Unit,
         applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
     ) {
         playbackEvents.handleSeekComplete(
@@ -21,7 +20,6 @@ class SasayakiSeekCompleteCoordinator(
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
             startPlayback = startPlayback,
-            updateMediaSession = updateMediaSession,
             applyCueDisplayAction = applyCueDisplayAction,
         )
     }

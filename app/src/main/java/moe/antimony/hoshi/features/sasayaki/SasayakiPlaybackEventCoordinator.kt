@@ -15,7 +15,6 @@ class SasayakiPlaybackEventCoordinator(
         autoScroll: Boolean,
         hasPlayedOnce: Boolean,
         startPlayback: () -> Unit,
-        updateMediaSession: () -> Unit,
         applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
     ) {
         val seek = playbackState.completeSeek() ?: return
@@ -46,7 +45,6 @@ class SasayakiPlaybackEventCoordinator(
             )
         }
         if (seek.startPlayback) startPlayback()
-        updateMediaSession()
     }
 
     fun tick(
@@ -57,7 +55,6 @@ class SasayakiPlaybackEventCoordinator(
         autoScroll: Boolean,
         hasPlayedOnce: Boolean,
         pausePlayback: () -> Unit,
-        updateMediaSession: () -> Unit,
         applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
     ) {
         val tick = playbackLifecycle.updateTick() ?: return
@@ -78,7 +75,6 @@ class SasayakiPlaybackEventCoordinator(
             forceDisplay = false,
             applyCueDisplayAction = applyCueDisplayAction,
         )
-        updateMediaSession()
     }
 
     fun updateCue(

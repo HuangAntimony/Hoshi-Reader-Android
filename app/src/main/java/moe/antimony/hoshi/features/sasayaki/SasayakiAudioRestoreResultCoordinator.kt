@@ -12,13 +12,11 @@ class SasayakiAudioRestoreResultCoordinator(
         result: SasayakiAudioRestoreResult,
         currentTime: Double,
         updateCue: (Double) -> Unit,
-        updateMediaSession: () -> Unit,
     ) {
         handlePrepared(
             durationMs = result.durationMs,
             currentTime = currentTime,
             updateCue = updateCue,
-            updateMediaSession = updateMediaSession,
         )
     }
 
@@ -26,11 +24,9 @@ class SasayakiAudioRestoreResultCoordinator(
         durationMs: Int,
         currentTime: Double,
         updateCue: (Double) -> Unit,
-        updateMediaSession: () -> Unit,
     ) {
         playbackState.updateDuration(durationMs)
         audioAvailability.markRestoreSucceeded()
         updateCue(currentTime)
-        updateMediaSession()
     }
 }

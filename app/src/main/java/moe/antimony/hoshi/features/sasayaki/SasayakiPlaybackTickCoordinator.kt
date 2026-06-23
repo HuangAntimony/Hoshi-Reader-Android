@@ -10,7 +10,6 @@ class SasayakiPlaybackTickCoordinator(
         hasMatch: Boolean,
         delay: Double,
         pausePlayback: () -> Unit,
-        updateMediaSession: () -> Unit,
         applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
     ) {
         playbackEvents.tick(
@@ -21,7 +20,6 @@ class SasayakiPlaybackTickCoordinator(
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
             pausePlayback = pausePlayback,
-            updateMediaSession = updateMediaSession,
             applyCueDisplayAction = applyCueDisplayAction,
         )
     }

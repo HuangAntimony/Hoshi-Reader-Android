@@ -51,7 +51,6 @@ class SasayakiPlaybackEventCoordinatorTest {
             autoScroll = true,
             hasPlayedOnce = false,
             startPlayback = {},
-            updateMediaSession = {},
             applyCueDisplayAction = { actions += it },
         )
 

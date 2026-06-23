@@ -18,14 +18,14 @@ import androidx.media3.session.R as Media3R
 
 internal const val SasayakiPlaybackNotificationId = 1001
 internal const val SasayakiPlaybackNotificationChannelId = "hoshi_sasayaki_playback"
-internal const val SasayakiNotificationPreviousCueAction =
-    "moe.antimony.hoshi.sasayaki.notification.PREVIOUS_CUE"
-internal const val SasayakiNotificationTogglePlaybackAction =
-    "moe.antimony.hoshi.sasayaki.notification.TOGGLE_PLAYBACK"
-internal const val SasayakiNotificationNextCueAction =
-    "moe.antimony.hoshi.sasayaki.notification.NEXT_CUE"
+internal const val SasayakiOemRestrictedNotificationPreviousCueAction =
+    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.PREVIOUS_CUE"
+internal const val SasayakiOemRestrictedNotificationTogglePlaybackAction =
+    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.TOGGLE_PLAYBACK"
+internal const val SasayakiOemRestrictedNotificationNextCueAction =
+    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.NEXT_CUE"
 
-internal data class SasayakiNotificationActionSpec(
+internal data class SasayakiOemRestrictedNotificationActionSpec(
     val action: String,
     val iconResId: Int,
     val titleResId: Int,
@@ -33,16 +33,18 @@ internal data class SasayakiNotificationActionSpec(
 )
 
 @OptIn(UnstableApi::class)
-internal fun sasayakiRestrictedNotificationActionSpecs(isPlaying: Boolean): List<SasayakiNotificationActionSpec> =
+internal fun sasayakiOemRestrictedNotificationActionSpecs(
+    isPlaying: Boolean,
+): List<SasayakiOemRestrictedNotificationActionSpec> =
     listOf(
-        SasayakiNotificationActionSpec(
-            action = SasayakiNotificationPreviousCueAction,
+        SasayakiOemRestrictedNotificationActionSpec(
+            action = SasayakiOemRestrictedNotificationPreviousCueAction,
             iconResId = Media3R.drawable.media3_icon_previous,
             titleResId = R.string.sasayaki_previous_cue,
             requestCode = 20,
         ),
-        SasayakiNotificationActionSpec(
-            action = SasayakiNotificationTogglePlaybackAction,
+        SasayakiOemRestrictedNotificationActionSpec(
+            action = SasayakiOemRestrictedNotificationTogglePlaybackAction,
             iconResId = if (isPlaying) {
                 Media3R.drawable.media3_icon_pause
             } else {
@@ -51,15 +53,15 @@ internal fun sasayakiRestrictedNotificationActionSpecs(isPlaying: Boolean): List
             titleResId = if (isPlaying) R.string.sasayaki_pause else R.string.sasayaki_play,
             requestCode = 21,
         ),
-        SasayakiNotificationActionSpec(
-            action = SasayakiNotificationNextCueAction,
+        SasayakiOemRestrictedNotificationActionSpec(
+            action = SasayakiOemRestrictedNotificationNextCueAction,
             iconResId = Media3R.drawable.media3_icon_next,
             titleResId = R.string.sasayaki_next_cue,
             requestCode = 22,
         ),
     )
 
-internal class SasayakiPlaybackNotificationRenderer(
+internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
     private val context: Context,
     private val notificationManager: NotificationManager,
     private val contentIntent: () -> PendingIntent,
@@ -103,7 +105,7 @@ internal class SasayakiPlaybackNotificationRenderer(
             ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
             ?.let(builder::setLargeIcon)
 
-        sasayakiRestrictedNotificationActionSpecs(player.isPlaying).forEach { spec ->
+        sasayakiOemRestrictedNotificationActionSpecs(player.isPlaying).forEach { spec ->
             builder.addAction(
                 Notification.Action.Builder(
                     Icon.createWithResource(context, spec.iconResId),
@@ -115,7 +117,7 @@ internal class SasayakiPlaybackNotificationRenderer(
         return builder.build()
     }
 
-    private fun actionIntent(spec: SasayakiNotificationActionSpec): PendingIntent =
+    private fun actionIntent(spec: SasayakiOemRestrictedNotificationActionSpec): PendingIntent =
         PendingIntent.getService(
             context,
             spec.requestCode,

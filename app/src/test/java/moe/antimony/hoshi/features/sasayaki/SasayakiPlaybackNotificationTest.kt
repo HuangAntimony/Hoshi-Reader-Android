@@ -26,21 +26,21 @@ class SasayakiPlaybackNotificationTest {
     }
 
     @Test
-    fun restrictedNotificationUsesCueControlsAroundPlaybackToggle() {
-        val specs = sasayakiRestrictedNotificationActionSpecs(isPlaying = true)
+    fun oemRestrictedFallbackNotificationUsesCueControlsAroundPlaybackToggle() {
+        val specs = sasayakiOemRestrictedNotificationActionSpecs(isPlaying = true)
 
         assertEquals(3, specs.size)
-        assertEquals(SasayakiNotificationPreviousCueAction, specs[0].action)
-        assertEquals(SasayakiNotificationTogglePlaybackAction, specs[1].action)
-        assertEquals(SasayakiNotificationNextCueAction, specs[2].action)
+        assertEquals(SasayakiOemRestrictedNotificationPreviousCueAction, specs[0].action)
+        assertEquals(SasayakiOemRestrictedNotificationTogglePlaybackAction, specs[1].action)
+        assertEquals(SasayakiOemRestrictedNotificationNextCueAction, specs[2].action)
         assertEquals(R.string.sasayaki_pause, specs[1].titleResId)
     }
 
     @Test
-    fun restrictedNotificationToggleLabelReflectsPausedPlayback() {
-        val specs = sasayakiRestrictedNotificationActionSpecs(isPlaying = false)
+    fun oemRestrictedFallbackNotificationToggleLabelReflectsPausedPlayback() {
+        val specs = sasayakiOemRestrictedNotificationActionSpecs(isPlaying = false)
 
-        assertEquals(SasayakiNotificationTogglePlaybackAction, specs[1].action)
+        assertEquals(SasayakiOemRestrictedNotificationTogglePlaybackAction, specs[1].action)
         assertEquals(R.string.sasayaki_play, specs[1].titleResId)
     }
 }

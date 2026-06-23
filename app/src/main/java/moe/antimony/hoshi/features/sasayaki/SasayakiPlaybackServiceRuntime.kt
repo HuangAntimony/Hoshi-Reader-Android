@@ -26,7 +26,10 @@ import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import moe.antimony.hoshi.di.ApplicationScope
+import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.MainActivity
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatch
@@ -47,7 +50,6 @@ internal data class SasayakiPlaybackRuntimeLoadRequest(
     val bookCoverFile: File?,
     val matchData: SasayakiMatchData?,
     val initialPlayback: SasayakiPlaybackData?,
-    val persistenceScope: CoroutineScope,
 )
 
 internal interface SasayakiPlaybackRuntime {
@@ -67,6 +69,8 @@ internal interface SasayakiPlaybackRuntime {
 @Singleton
 internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     @ApplicationContext context: Context,
+    @param:ApplicationScope private val appScope: CoroutineScope,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : SasayakiPlaybackRuntime {
     private val appContext = context.applicationContext
     private var player: ExoPlayerSasayakiPlayerHandle? = null
@@ -106,7 +110,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     fun activePlaybackBookId(): String? =
         activeBookId.takeIf { activeController != null }
 
-    fun isBackgroundRestricted(): Boolean =
+    fun requiresOemRestrictedPlaybackNotificationFallback(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
             appContext.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true
 
@@ -152,7 +156,8 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             bookCoverFile = request.bookCoverFile,
             matchData = request.matchData,
             initialPlayback = request.initialPlayback,
-            persistenceScope = request.persistenceScope,
+            persistenceScope = appScope,
+            persistenceDispatcher = ioDispatcher,
             getCurrentChapterIndex = readerAttachment::currentChapterIndex,
             onCue = readerAttachment::cue,
             onClearCue = readerAttachment::clearCue,

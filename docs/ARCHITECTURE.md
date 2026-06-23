@@ -123,10 +123,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   MediaSession, Sasayaki playback controller, and active book id. Reader UI
   attaches/detaches cue sinks and sends explicit stop on reader exit; Android
   media controls and notification return actions route through the same
-  service-owned session. Normal background playback promotes the service through
-  Android's `mediaPlayback` foreground-service path, and the ExoPlayer uses
-  local wake mode for long-running playback. When Android reports the app as
-  background restricted, Sasayaki uses a MediaSession-backed transport
+  service-owned session. Playback persistence uses the application scope with
+  the injected IO dispatcher rather than Reader's Compose scope. Normal
+  background playback promotes the service through Android's `mediaPlayback`
+  foreground-service path, and the ExoPlayer uses local wake mode for
+  long-running playback. The only non-default notification branch is the
+  isolated OEM-restricted fallback used when Android reports the app as
+  background restricted; that branch uses a MediaSession-backed transport
   notification and clears started-service state so Samsung app-idle handling
   does not stop a demoted foreground service.
 - Update checks use WorkManager unique work, with worker dependencies supplied

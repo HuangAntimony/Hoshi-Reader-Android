@@ -25,6 +25,7 @@ class SasayakiPlaybackPersistenceStateTest {
             audioSourceRepository = SasayakiAudioRepository(File("book-root")),
             initialPlayback = initial,
             persistenceScope = CoroutineScope(Dispatchers.Unconfined),
+            persistenceDispatcher = Dispatchers.Unconfined,
         )
 
         assertEquals(initial, state.playback)
@@ -64,6 +65,7 @@ class SasayakiPlaybackPersistenceStateTest {
             audioSourceRepository = SasayakiAudioRepository(bookRoot),
             initialPlayback = repository.initial,
             persistenceScope = CoroutineScope(Dispatchers.Unconfined),
+            persistenceDispatcher = Dispatchers.Unconfined,
         )
 
         assertEquals("Copied to app storage. The original audiobook file can be deleted.", state.audioStorageSummary)

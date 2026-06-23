@@ -10,7 +10,6 @@ class SasayakiAudioRestoreWorkflowCoordinator(
     fun restore(
         playback: SasayakiPlaybackData,
         currentTime: () -> Double,
-        updateMediaSession: () -> Unit,
         handleSeekComplete: () -> Unit,
         handlePlaybackActiveChanged: (Boolean) -> Unit,
         handlePositionChanged: (Int, Int) -> Unit,
@@ -20,13 +19,11 @@ class SasayakiAudioRestoreWorkflowCoordinator(
             audioRestore.restore(
                 playback = playback,
                 callbacks = audioRestoreCallbacks.build(
-                    updateMediaSession = updateMediaSession,
                     handlePrepared = { durationMs ->
                         audioRestoreResult.handlePrepared(
                             durationMs = durationMs,
                             currentTime = currentTime(),
                             updateCue = updateCue,
-                            updateMediaSession = updateMediaSession,
                         )
                     },
                     handleSeekComplete = handleSeekComplete,
@@ -40,7 +37,6 @@ class SasayakiAudioRestoreWorkflowCoordinator(
             result = result,
             currentTime = currentTime(),
             updateCue = updateCue,
-            updateMediaSession = updateMediaSession,
         )
     }
 }

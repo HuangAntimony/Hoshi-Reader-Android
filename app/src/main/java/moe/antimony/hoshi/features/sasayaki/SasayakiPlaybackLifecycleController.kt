@@ -57,13 +57,11 @@ class SasayakiPlaybackLifecycleController(
 
     fun pause(
         restoreTemporaryPosition: Boolean,
-        updateMediaSession: () -> Unit,
         restoreTemporaryPositionIfNeeded: () -> Unit,
     ) {
         engine?.pause()
         playbackState.markPaused()
         stopTicking()
-        updateMediaSession()
         if (restoreTemporaryPosition) {
             restoreTemporaryPositionIfNeeded()
         }
@@ -95,17 +93,15 @@ class SasayakiPlaybackLifecycleController(
         return true
     }
 
-    fun markCompleted(updateMediaSession: () -> Unit) {
+    fun markCompleted() {
         playbackState.markCompleted()
         stopTicking()
-        updateMediaSession()
     }
 
     fun syncPlayerPlaybackActive(
         active: Boolean,
         markPlayedOnce: () -> Unit,
         afterMarkedPlaying: () -> Unit,
-        updateMediaSession: () -> Unit,
         restoreTemporaryPositionIfNeeded: () -> Unit,
     ) {
         if (active) {
@@ -121,7 +117,6 @@ class SasayakiPlaybackLifecycleController(
         if (!playbackState.isPlaying) return
         playbackState.markPaused()
         stopTicking()
-        updateMediaSession()
         restoreTemporaryPositionIfNeeded()
     }
 

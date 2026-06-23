@@ -10,24 +10,22 @@ class SasayakiTemporaryPlaybackRestoreCoordinatorTest {
 
         harness.coordinator.restoreIfNeeded(
             updateCue = { harness.events += "cue:$it" },
-            updateMediaSession = { harness.events += "session" },
         )
 
         assertEquals(emptyList<String>(), harness.events)
     }
 
     @Test
-    fun restoreSeeksEngineThenRefreshesCueAndMediaSession() {
+    fun restoreSeeksEngineThenRefreshesCue() {
         val harness = restoreHarness()
         harness.playbackState.setTemporaryPlaybackReturnPosition(14.25)
 
         harness.coordinator.restoreIfNeeded(
             updateCue = { harness.events += "cue:$it" },
-            updateMediaSession = { harness.events += "session" },
         )
 
         assertEquals(14.25, harness.playbackState.currentTime, 0.0)
-        assertEquals(listOf("engine-seek:14250", "cue:14.25", "session"), harness.events)
+        assertEquals(listOf("engine-seek:14250", "cue:14.25"), harness.events)
     }
 
     private fun restoreHarness(): RestoreHarness {

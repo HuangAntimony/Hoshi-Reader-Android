@@ -40,7 +40,7 @@ class SasayakiPlaybackLifecycleControllerTest {
     }
 
     @Test
-    fun pauseStopsTickingUpdatesMediaSessionAndRestoresTemporaryPositionWhenRequested() {
+    fun pauseStopsTickingAndRestoresTemporaryPositionWhenRequested() {
         val harness = lifecycleHarness()
         harness.controller.attachEngine(harness.engine)
         harness.controller.start(rate = 1f, beforeStart = {}, markPlayedOnce = {}, afterMarkedPlaying = {})
@@ -48,13 +48,12 @@ class SasayakiPlaybackLifecycleControllerTest {
 
         harness.controller.pause(
             restoreTemporaryPosition = true,
-            updateMediaSession = { harness.events += "update-session:${harness.playbackState.isPlaying}" },
             restoreTemporaryPositionIfNeeded = { harness.events += "restore-temporary" },
         )
 
         assertFalse(harness.playbackState.isPlaying)
         assertEquals(
-            listOf("engine-pause", "scheduler-stop", "update-session:false", "restore-temporary"),
+            listOf("engine-pause", "scheduler-stop", "restore-temporary"),
             harness.events,
         )
     }
@@ -67,7 +66,6 @@ class SasayakiPlaybackLifecycleControllerTest {
             active = true,
             markPlayedOnce = { harness.events += "mark-played" },
             afterMarkedPlaying = { harness.events += "after-playing:${harness.playbackState.isPlaying}" },
-            updateMediaSession = { harness.events += "update-session" },
             restoreTemporaryPositionIfNeeded = { harness.events += "restore-temporary" },
         )
 
@@ -85,7 +83,6 @@ class SasayakiPlaybackLifecycleControllerTest {
             active = true,
             markPlayedOnce = {},
             afterMarkedPlaying = {},
-            updateMediaSession = {},
             restoreTemporaryPositionIfNeeded = {},
         )
         harness.events.clear()
@@ -94,13 +91,12 @@ class SasayakiPlaybackLifecycleControllerTest {
             active = false,
             markPlayedOnce = { harness.events += "mark-played" },
             afterMarkedPlaying = { harness.events += "after-playing" },
-            updateMediaSession = { harness.events += "update-session:${harness.playbackState.isPlaying}" },
             restoreTemporaryPositionIfNeeded = { harness.events += "restore-temporary" },
         )
 
         assertFalse(harness.playbackState.isPlaying)
         assertEquals(
-            listOf("scheduler-stop", "update-session:false", "restore-temporary"),
+            listOf("scheduler-stop", "restore-temporary"),
             harness.events,
         )
     }

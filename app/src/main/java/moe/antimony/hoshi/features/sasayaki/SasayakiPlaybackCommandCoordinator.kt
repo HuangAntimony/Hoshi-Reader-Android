@@ -31,12 +31,10 @@ class SasayakiPlaybackCommandCoordinator(
 
     fun pause(
         restoreTemporaryPosition: Boolean,
-        updateMediaSession: () -> Unit,
         restoreTemporaryPositionIfNeeded: () -> Unit,
     ) {
         playbackLifecycle.pause(
             restoreTemporaryPosition = restoreTemporaryPosition,
-            updateMediaSession = updateMediaSession,
             restoreTemporaryPositionIfNeeded = restoreTemporaryPositionIfNeeded,
         )
     }

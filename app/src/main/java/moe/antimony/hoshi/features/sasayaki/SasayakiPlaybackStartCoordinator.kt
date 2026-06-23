@@ -8,7 +8,6 @@ class SasayakiPlaybackStartCoordinator(
         rate: Float,
         beforeStart: () -> Unit,
         currentTime: () -> Double,
-        updateMediaSession: () -> Unit,
         redisplayCue: (Double) -> Unit,
     ) {
         playbackCommands.start(
@@ -16,7 +15,6 @@ class SasayakiPlaybackStartCoordinator(
             beforeStart = beforeStart,
             markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
-                updateMediaSession()
                 redisplayCue(currentTime())
             },
         )

@@ -14,11 +14,11 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SasayakiPlaybackService : MediaSessionService() {
     @Inject internal lateinit var runtime: SasayakiPlaybackServiceRuntime
-    private lateinit var restrictedNotificationRenderer: SasayakiPlaybackNotificationRenderer
+    private lateinit var oemRestrictedNotificationRenderer: SasayakiOemRestrictedPlaybackNotificationRenderer
 
     override fun onCreate() {
         super.onCreate()
-        restrictedNotificationRenderer = SasayakiPlaybackNotificationRenderer(
+        oemRestrictedNotificationRenderer = SasayakiOemRestrictedPlaybackNotificationRenderer(
             context = this,
             notificationManager = getSystemService(NotificationManager::class.java),
             contentIntent = runtime::playbackReturnPendingIntent,
@@ -27,11 +27,11 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action in SasayakiRestrictedNotificationActions) {
+        if (intent?.action in SasayakiOemRestrictedNotificationActions) {
             when (intent?.action) {
-                SasayakiNotificationPreviousCueAction -> runtime.previousFromSession()
-                SasayakiNotificationTogglePlaybackAction -> runtime.toggleFromNotification()
-                SasayakiNotificationNextCueAction -> runtime.nextFromSession()
+                SasayakiOemRestrictedNotificationPreviousCueAction -> runtime.previousFromSession()
+                SasayakiOemRestrictedNotificationTogglePlaybackAction -> runtime.toggleFromNotification()
+                SasayakiOemRestrictedNotificationNextCueAction -> runtime.nextFromSession()
             }
             runtime.currentSession()?.let { onUpdateNotification(it, startInForegroundRequired = false) }
             stopSelf(startId)
@@ -44,12 +44,12 @@ class SasayakiPlaybackService : MediaSessionService() {
         runtime.currentSession()
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-        if (runtime.isBackgroundRestricted()) {
-            restrictedNotificationRenderer.show(session)
+        if (runtime.requiresOemRestrictedPlaybackNotificationFallback()) {
+            oemRestrictedNotificationRenderer.show(session)
             stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
         } else {
-            restrictedNotificationRenderer.cancel()
+            oemRestrictedNotificationRenderer.cancel()
             super.onUpdateNotification(session, startInForegroundRequired)
         }
     }
@@ -61,7 +61,7 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        restrictedNotificationRenderer.cancel()
+        oemRestrictedNotificationRenderer.cancel()
         runtime.release()
         super.onDestroy()
     }
@@ -71,10 +71,10 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 }
 
-private val SasayakiRestrictedNotificationActions = setOf(
-    SasayakiNotificationPreviousCueAction,
-    SasayakiNotificationTogglePlaybackAction,
-    SasayakiNotificationNextCueAction,
+private val SasayakiOemRestrictedNotificationActions = setOf(
+    SasayakiOemRestrictedNotificationPreviousCueAction,
+    SasayakiOemRestrictedNotificationTogglePlaybackAction,
+    SasayakiOemRestrictedNotificationNextCueAction,
 )
 
 private fun Player.hasForegroundPlayback(): Boolean =

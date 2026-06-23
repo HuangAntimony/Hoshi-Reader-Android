@@ -24,7 +24,7 @@ class SasayakiAudioRestoreResultCoordinatorTest {
     }
 
     @Test
-    fun successUpdatesDurationAndThenRefreshesCueAndSession() {
+    fun successUpdatesDurationAndThenRefreshesCue() {
         val events = mutableListOf<String>()
         val playbackState = SasayakiPlaybackStateCoordinator(initialPosition = 0.0)
         val availability = SasayakiAudioAvailabilityState()
@@ -39,14 +39,11 @@ class SasayakiAudioRestoreResultCoordinatorTest {
             ),
             currentTime = 3.25,
             updateCue = { events += "cue:$it" },
-            updateMediaSession = {
-                events += "session:${playbackState.duration}:${availability.hasAudio}"
-            },
         )
 
         assertEquals(12.5, playbackState.duration, 0.0)
         assertTrue(availability.hasAudio)
         assertNull(availability.errorMessage)
-        assertEquals(listOf("cue:3.25", "session:12.5:true"), events)
+        assertEquals(listOf("cue:3.25"), events)
     }
 }

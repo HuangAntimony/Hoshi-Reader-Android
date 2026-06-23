@@ -231,10 +231,11 @@ Validate relevant sync/update/Sasayaki changes with:
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
 - Sasayaki long-running background playback on a physical device. Check the
-  package app-op before triage; on background-restricted Samsung devices,
-  playback should keep a MediaSession transport notification and must not leave
-  `SasayakiPlaybackService` as a started service that can be stopped by app
-  idle:
+  package app-op before triage. The normal path should use Media3's
+  `mediaPlayback` foreground-service notification. On background-restricted
+  Samsung devices, only the isolated OEM-restricted fallback should keep a
+  MediaSession transport notification while ensuring `SasayakiPlaybackService`
+  is not left as a started service that can be stopped by app idle:
 
   ```bash
   adb shell appops get <package-name> | rg 'RUN_ANY_IN_BACKGROUND|START_FOREGROUND|WAKE_LOCK'

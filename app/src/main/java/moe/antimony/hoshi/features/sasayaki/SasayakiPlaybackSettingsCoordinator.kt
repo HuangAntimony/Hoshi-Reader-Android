@@ -13,12 +13,8 @@ class SasayakiPlaybackSettingsCoordinator(
         updateCue(currentTime)
     }
 
-    fun setRate(
-        value: Float,
-        updateMediaSession: () -> Unit,
-    ) {
+    fun setRate(value: Float) {
         playbackPersistence.setRate(value)
         playbackLifecycle.setRateIfPlaying(value)
-        updateMediaSession()
     }
 }

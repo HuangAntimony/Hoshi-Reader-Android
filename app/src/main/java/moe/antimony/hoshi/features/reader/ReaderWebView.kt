@@ -908,7 +908,6 @@ fun ReaderWebView(
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,
                 initialPlayback = sasayakiPlaybackData,
-                persistenceScope = scope,
                 getCurrentChapterIndex = { stateHolder.readerPosition.displayedPosition.index },
                 onCue = { cue, reveal ->
                     dispatchSasayakiCueToReader(cue, reveal)

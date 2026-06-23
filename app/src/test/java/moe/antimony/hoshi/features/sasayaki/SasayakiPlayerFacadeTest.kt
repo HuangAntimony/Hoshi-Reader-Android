@@ -4,8 +4,6 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.epub.SasayakiMatch
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -93,7 +91,6 @@ class SasayakiPlayerFacadeTest {
             bookCoverFile = null,
             matchData = null,
             initialPlayback = null,
-            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
@@ -108,6 +105,17 @@ class SasayakiPlayerFacadeTest {
         assertEquals(emptyList<String>(), controller.commands)
     }
 
+    @Test
+    fun runtimeLoadRequestDoesNotCarryReaderCoroutineScope() {
+        val fieldNames = SasayakiPlaybackRuntimeLoadRequest::class.java.declaredFields
+            .map { it.name }
+
+        assertFalse(
+            "Sasayaki playback persistence must be owned by the service runtime, not Reader's Compose scope.",
+            "persistenceScope" in fieldNames,
+        )
+    }
+
     private fun playerFor(controller: SasayakiPlaybackControllerContract): SasayakiPlayer =
         SasayakiPlayer(
             bookId = "book-id",
@@ -117,7 +125,6 @@ class SasayakiPlayerFacadeTest {
             bookCoverFile = null,
             matchData = null,
             initialPlayback = null,
-            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},

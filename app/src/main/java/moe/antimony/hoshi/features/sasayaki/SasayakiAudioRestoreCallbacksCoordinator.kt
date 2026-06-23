@@ -4,7 +4,6 @@ class SasayakiAudioRestoreCallbacksCoordinator(
     private val playbackLifecycle: SasayakiPlaybackLifecycleController,
 ) {
     fun build(
-        updateMediaSession: () -> Unit,
         handlePrepared: (Int) -> Unit,
         handleSeekComplete: () -> Unit,
         handlePlaybackActiveChanged: (Boolean) -> Unit,
@@ -14,7 +13,7 @@ class SasayakiAudioRestoreCallbacksCoordinator(
         SasayakiAudioRestoreCallbacks(
             onPrepared = handlePrepared,
             onCompletion = {
-                playbackLifecycle.markCompleted(updateMediaSession = updateMediaSession)
+                playbackLifecycle.markCompleted()
             },
             onSeekComplete = handleSeekComplete,
             onPlaybackActiveChanged = handlePlaybackActiveChanged,

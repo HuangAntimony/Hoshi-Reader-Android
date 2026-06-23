@@ -5,7 +5,6 @@ import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import android.net.Uri
-import kotlinx.coroutines.CoroutineScope
 import moe.antimony.hoshi.ui.UiText
 import java.io.File
 
@@ -22,7 +21,6 @@ class SasayakiPlayer private constructor(
         bookCoverFile: File?,
         matchData: SasayakiMatchData?,
         initialPlayback: SasayakiPlaybackData?,
-        persistenceScope: CoroutineScope,
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
@@ -37,7 +35,6 @@ class SasayakiPlayer private constructor(
             bookCoverFile = bookCoverFile,
             matchData = matchData,
             initialPlayback = initialPlayback,
-            persistenceScope = persistenceScope,
             getCurrentChapterIndex = getCurrentChapterIndex,
             onCue = onCue,
             onClearCue = onClearCue,
@@ -152,7 +149,6 @@ class SasayakiPlayer private constructor(
             bookCoverFile: File?,
             matchData: SasayakiMatchData?,
             initialPlayback: SasayakiPlaybackData?,
-            persistenceScope: CoroutineScope,
             getCurrentChapterIndex: () -> Int,
             onCue: (SasayakiMatch, Boolean) -> Unit,
             onClearCue: () -> Unit,
@@ -168,7 +164,6 @@ class SasayakiPlayer private constructor(
                     bookCoverFile = bookCoverFile,
                     matchData = matchData,
                     initialPlayback = initialPlayback,
-                    persistenceScope = persistenceScope,
                 ),
                 getCurrentChapterIndex = getCurrentChapterIndex,
                 onCue = onCue,
