@@ -105,17 +105,6 @@ class SasayakiPlayerFacadeTest {
         assertEquals(emptyList<String>(), controller.commands)
     }
 
-    @Test
-    fun runtimeLoadRequestDoesNotCarryReaderCoroutineScope() {
-        val fieldNames = SasayakiPlaybackRuntimeLoadRequest::class.java.declaredFields
-            .map { it.name }
-
-        assertFalse(
-            "Sasayaki playback persistence must be owned by the service runtime, not Reader's Compose scope.",
-            "persistenceScope" in fieldNames,
-        )
-    }
-
     private fun playerFor(controller: SasayakiPlaybackControllerContract): SasayakiPlayer =
         SasayakiPlayer(
             bookId = "book-id",

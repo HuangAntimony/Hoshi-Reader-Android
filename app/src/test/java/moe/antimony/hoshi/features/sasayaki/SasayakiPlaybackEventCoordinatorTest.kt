@@ -3,13 +3,13 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 class SasayakiPlaybackEventCoordinatorTest {
     @Test
@@ -27,10 +27,6 @@ class SasayakiPlaybackEventCoordinatorTest {
         val actions = mutableListOf<SasayakiCueDisplayAction>()
         val coordinator = SasayakiPlaybackEventCoordinator(
             playbackState = playbackState,
-            playbackLifecycle = SasayakiPlaybackLifecycleController(
-                playbackState = playbackState,
-                tickScheduler = NoopTickScheduler,
-            ),
             playbackPersistence = SasayakiPlaybackPersistenceState(
                 playbackRepository = NoopPlaybackRepository,
                 audioSourceRepository = SasayakiAudioRepository(File("book-root")),
@@ -60,11 +56,6 @@ class SasayakiPlaybackEventCoordinatorTest {
         display as SasayakiCueDisplayAction.Display
         assertSame(targetCue, display.cue)
         assertTrue(display.reveal)
-    }
-
-    private object NoopTickScheduler : SasayakiTickScheduler {
-        override fun postTick() = Unit
-        override fun stopTicking() = Unit
     }
 
     private object NoopPlaybackRepository : SasayakiPlaybackRepository {

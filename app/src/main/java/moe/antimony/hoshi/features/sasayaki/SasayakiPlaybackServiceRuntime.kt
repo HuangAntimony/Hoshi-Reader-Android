@@ -275,14 +275,28 @@ private class SasayakiPlaybackServiceSessionCallback(
         controller: MediaSession.ControllerInfo,
         customCommand: SessionCommand,
         args: Bundle,
-    ): ListenableFuture<SessionResult> {
-        when (customCommand.customAction) {
-            SasayakiPreviousCueAction -> runtime.previousFromSession()
-            SasayakiNextCueAction -> runtime.nextFromSession()
-            else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
-        }
-        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+    ): ListenableFuture<SessionResult> = Futures.immediateFuture(
+        SessionResult(
+            dispatchSasayakiServiceSessionAction(
+                customAction = customCommand.customAction,
+                previousCue = runtime::previousFromSession,
+                nextCue = runtime::nextFromSession,
+            ),
+        ),
+    )
+}
+
+internal fun dispatchSasayakiServiceSessionAction(
+    customAction: String,
+    previousCue: () -> Unit,
+    nextCue: () -> Unit,
+): Int {
+    when (customAction) {
+        SasayakiPreviousCueAction -> previousCue()
+        SasayakiNextCueAction -> nextCue()
+        else -> return SessionError.ERROR_NOT_SUPPORTED
     }
+    return SessionResult.RESULT_SUCCESS
 }
 
 internal data class SasayakiServiceMediaButtonSpec(

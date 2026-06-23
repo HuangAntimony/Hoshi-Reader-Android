@@ -104,7 +104,6 @@ internal class SasayakiPlaybackController(
     )
     private val playbackEvents = SasayakiPlaybackEventCoordinator(
         playbackState = playbackState,
-        playbackLifecycle = playbackLifecycle,
         playbackPersistence = playbackPersistence,
         cueNavigation = cueNavigation,
         cueDisplay = cueDisplay,
