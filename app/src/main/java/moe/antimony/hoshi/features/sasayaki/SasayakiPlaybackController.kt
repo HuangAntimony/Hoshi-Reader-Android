@@ -97,21 +97,10 @@ internal class SasayakiPlaybackController(
             tickRunnable = tickRunnable,
         ),
     )
-    private val temporaryPlaybackRestore = SasayakiTemporaryPlaybackRestoreCoordinator(
-        playbackState = playbackState,
-        playbackLifecycle = playbackLifecycle,
-    )
     private val playbackCommands = SasayakiPlaybackCommandCoordinator(
         playbackState = playbackState,
         playbackLifecycle = playbackLifecycle,
         cueNavigation = cueNavigation,
-    )
-    private val audioRestoreCallbacks = SasayakiAudioRestoreCallbacksCoordinator(
-        playbackLifecycle = playbackLifecycle,
-    )
-    private val playbackSettings = SasayakiPlaybackSettingsCoordinator(
-        playbackPersistence = playbackPersistence,
-        playbackLifecycle = playbackLifecycle,
     )
     private val playbackEvents = SasayakiPlaybackEventCoordinator(
         playbackState = playbackState,
@@ -129,47 +118,7 @@ internal class SasayakiPlaybackController(
         playbackPreparer = playbackPreparer,
     )
     private val audioAvailability = SasayakiAudioAvailabilityState()
-    private val audioCommands = SasayakiAudioCommandCoordinator(
-        audioSourceRepository = audioSourceRepository,
-        playbackPersistence = playbackPersistence,
-        playbackState = playbackState,
-        audioAvailability = audioAvailability,
-        contentResolver = appContext.contentResolver,
-    )
-    private val audioRestoreResult = SasayakiAudioRestoreResultCoordinator(
-        playbackState = playbackState,
-        audioAvailability = audioAvailability,
-    )
-    private val audioRestoreWorkflow = SasayakiAudioRestoreWorkflowCoordinator(
-        audioRestore = audioRestore,
-        audioRestoreCallbacks = audioRestoreCallbacks,
-        audioRestoreResult = audioRestoreResult,
-    )
-    private val playbackTeardown = SasayakiPlaybackTeardownCoordinator(
-        playbackLifecycle = playbackLifecycle,
-        audioAvailability = audioAvailability,
-        cueDisplay = cueDisplay,
-    )
     private val cuePresentation = SasayakiCuePresentationState()
-    private val playbackStart = SasayakiPlaybackStartCoordinator(
-        playbackCommands = playbackCommands,
-        cuePresentation = cuePresentation,
-    )
-    private val playbackTick = SasayakiPlaybackTickCoordinator(
-        playbackEvents = playbackEvents,
-        cuePresentation = cuePresentation,
-        getCurrentChapterIndex = getCurrentChapterIndex,
-    )
-    private val cueUpdate = SasayakiCueUpdateCoordinator(
-        playbackEvents = playbackEvents,
-        cuePresentation = cuePresentation,
-        getCurrentChapterIndex = getCurrentChapterIndex,
-    )
-    private val seekComplete = SasayakiSeekCompleteCoordinator(
-        playbackEvents = playbackEvents,
-        cuePresentation = cuePresentation,
-        getCurrentChapterIndex = getCurrentChapterIndex,
-    )
 
     override val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     override val currentTime: Double get() = playbackState.currentTime
@@ -194,31 +143,27 @@ internal class SasayakiPlaybackController(
     }
 
     override fun setDelay(value: Double) {
-        playbackSettings.setDelay(
-            value = value,
-            currentTime = currentTime,
-            updateCue = ::updateCue,
-        )
+        playbackPersistence.setDelay(value)
+        updateCue(currentTime)
     }
 
     override fun setRate(value: Float) {
-        playbackSettings.setRate(value)
+        playbackPersistence.setRate(value)
+        playbackLifecycle.setRateIfPlaying(value)
     }
 
     override fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {
-        audioCommands.importAudio(
-            audioUri = audioUri,
-            copiedAudioFileName = copiedAudioFileName,
-            teardownPlayer = ::teardownPlayer,
-            restoreAudio = ::restoreAudio,
-        )
+        teardownPlayer(clearCue = false)
+        playbackPersistence.importAudio(audioUri, copiedAudioFileName)
+        restoreAudio()
     }
 
     override fun clearAudio() {
-        audioCommands.clearAudio(
-            playback = playback,
-            teardownPlayer = ::teardownPlayer,
-        )
+        audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)
+        teardownPlayer(clearCue = true)
+        playbackPersistence.clearAudioMetadata()
+        playbackState.clearAudioState()
+        audioAvailability.markAudioCleared()
     }
 
     override fun togglePlayback() {
@@ -330,41 +275,74 @@ internal class SasayakiPlaybackController(
     }
 
     private fun startPlayback() {
-        playbackStart.start(
+        playbackCommands.start(
             rate = rate,
             beforeStart = onPlaybackStartRequested,
-            currentTime = { currentTime },
-            redisplayCue = { time -> updateCue(time, forceDisplay = true) },
+            markPlayedOnce = cuePresentation::markPlayedOnce,
+            afterMarkedPlaying = {
+                updateCue(currentTime, forceDisplay = true)
+            },
         )
     }
 
     private fun handleSeekComplete() {
-        seekComplete.handle(
+        playbackEvents.handleSeekComplete(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
             delay = delay,
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             startPlayback = ::startPlayback,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }
 
     private fun restoreAudio() {
-        audioRestoreWorkflow.restore(
-            playback = playback,
-            currentTime = { currentTime },
-            handleSeekComplete = ::handleSeekComplete,
-            handlePlaybackActiveChanged = ::handlePlaybackActiveChanged,
-            handlePositionChanged = ::handlePlayerPositionChanged,
-            updateCue = ::updateCue,
-        )
+        val result = runCatching {
+            audioRestore.restore(
+                playback = playback,
+                callbacks = SasayakiAudioRestoreCallbacks(
+                    onPrepared = { durationMs ->
+                        handleAudioPrepared(durationMs = durationMs, currentTime = currentTime)
+                    },
+                    onCompletion = playbackLifecycle::markCompleted,
+                    onSeekComplete = ::handleSeekComplete,
+                    onPlaybackActiveChanged = ::handlePlaybackActiveChanged,
+                    onPositionChanged = ::handlePlayerPositionChanged,
+                    onError = ::handleAudioRestoreFailure,
+                ),
+            )
+        }.onFailure(::handleAudioRestoreFailure).getOrNull() ?: return
+        handleAudioPrepared(durationMs = result.durationMs, currentTime = currentTime)
+    }
+
+    private fun handleAudioRestoreFailure(error: Throwable) {
+        audioAvailability.markRestoreFailed(error)
+    }
+
+    private fun handleAudioPrepared(durationMs: Int, currentTime: Double) {
+        playbackState.updateDuration(durationMs)
+        audioAvailability.markRestoreSucceeded()
+        updateCue(currentTime)
     }
 
     private fun tick() {
-        playbackTick.tick(
+        val tick = playbackLifecycle.updateTick() ?: return
+        if (tick.shouldSavePosition) {
+            playbackPersistence.savePosition(currentTime)
+        }
+        if (tick.shouldStopPlayback) {
+            pausePlayback(restoreTemporaryPosition = true)
+        }
+        playbackEvents.updateCue(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
+            time = currentTime,
             delay = delay,
-            pausePlayback = { pausePlayback(restoreTemporaryPosition = true) },
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }
@@ -392,11 +370,14 @@ internal class SasayakiPlaybackController(
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
-        cueUpdate.update(
+        playbackEvents.updateCue(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
             time = time,
             delay = delay,
+            currentChapterIndex = getCurrentChapterIndex(),
+            autoScroll = cuePresentation.autoScroll,
+            hasPlayedOnce = cuePresentation.hasPlayedOnce,
             forceDisplay = forceDisplay,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
@@ -407,16 +388,15 @@ internal class SasayakiPlaybackController(
     }
 
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
-        temporaryPlaybackRestore.restoreIfNeeded(
-            updateCue = ::updateCue,
-        )
+        val returnPosition = playbackState.restoreTemporaryPlaybackPositionIfNeeded() ?: return
+        playbackLifecycle.seekTo((returnPosition * 1000.0).toInt())
+        updateCue(returnPosition)
     }
 
     private fun teardownPlayer(clearCue: Boolean) {
-        playbackTeardown.teardown(
-            clearCue = clearCue,
-            pausePlayback = { pausePlayback(restoreTemporaryPosition = true) },
-            applyCueDisplayAction = ::applyCueDisplayAction,
-        )
+        pausePlayback(restoreTemporaryPosition = true)
+        playbackLifecycle.releaseEngine()
+        audioAvailability.markAudioUnavailable()
+        if (clearCue) applyCueDisplayAction(cueDisplay.clear())
     }
 }
