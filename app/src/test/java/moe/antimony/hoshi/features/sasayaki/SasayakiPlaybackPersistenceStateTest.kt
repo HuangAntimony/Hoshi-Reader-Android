@@ -9,6 +9,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class SasayakiPlaybackPersistenceStateTest {
     @Test
@@ -82,6 +85,28 @@ class SasayakiPlaybackPersistenceStateTest {
         assertTrue(copiedAudio.exists())
     }
 
+    @Test
+    fun savesLatestPendingSnapshotAfterInFlightSaveCompletes() {
+        val repository = BlockingPlaybackRepository()
+        val state = SasayakiPlaybackPersistenceState(
+            playbackRepository = repository,
+            audioSourceRepository = SasayakiAudioRepository(File("book-root")),
+            initialPlayback = SasayakiPlaybackData(lastPosition = 0.0),
+            persistenceScope = CoroutineScope(Dispatchers.Unconfined),
+            persistenceDispatcher = Dispatchers.Unconfined,
+        )
+
+        state.savePosition(1.0)
+        state.savePosition(2.0)
+        state.savePosition(3.0)
+
+        assertEquals(listOf(1.0), repository.saved.map { it.lastPosition })
+
+        repository.completeFirstSave()
+
+        assertEquals(listOf(1.0, 3.0), repository.saved.map { it.lastPosition })
+    }
+
     private class FakePlaybackRepository(
         val initial: SasayakiPlaybackData?,
     ) : SasayakiPlaybackRepository {
@@ -91,6 +116,27 @@ class SasayakiPlaybackPersistenceStateTest {
 
         override suspend fun save(playback: SasayakiPlaybackData) {
             saved += playback
+        }
+    }
+
+    private class BlockingPlaybackRepository : SasayakiPlaybackRepository {
+        val saved = mutableListOf<SasayakiPlaybackData>()
+        private var firstSaveContinuation: Continuation<Unit>? = null
+
+        override suspend fun load(): SasayakiPlaybackData? = null
+
+        override suspend fun save(playback: SasayakiPlaybackData) {
+            saved += playback
+            if (saved.size == 1) {
+                suspendCoroutine { continuation ->
+                    firstSaveContinuation = continuation
+                }
+            }
+        }
+
+        fun completeFirstSave() {
+            firstSaveContinuation?.resume(Unit)
+            firstSaveContinuation = null
         }
     }
 }

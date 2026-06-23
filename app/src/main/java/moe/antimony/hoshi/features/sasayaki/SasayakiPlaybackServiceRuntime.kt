@@ -128,12 +128,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     ): SasayakiPlaybackControllerContract {
         createSession()
         ensureControllerConnection()
-        readerAttachment.attach(
-            getCurrentChapterIndex = getCurrentChapterIndex,
-            onCue = onCue,
-            onClearCue = onClearCue,
-            onLoadChapter = onLoadChapter,
-        )
 
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
@@ -143,11 +137,23 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             if (activeKey == requestedKey) {
                 activeBookId = request.bookId
                 session?.setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, request.bookId))
+                readerAttachment.attach(
+                    getCurrentChapterIndex = getCurrentChapterIndex,
+                    onCue = onCue,
+                    onClearCue = onClearCue,
+                    onLoadChapter = onLoadChapter,
+                )
                 return controller
             }
         }
 
         releaseActiveController(clearBookId = false)
+        readerAttachment.attach(
+            getCurrentChapterIndex = getCurrentChapterIndex,
+            onCue = onCue,
+            onClearCue = onClearCue,
+            onLoadChapter = onLoadChapter,
+        )
         activeBookId = request.bookId
         session?.setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, request.bookId))
         val controller = SasayakiPlaybackController(
