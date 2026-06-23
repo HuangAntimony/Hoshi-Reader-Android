@@ -240,7 +240,7 @@
     <string name="reader_image_copied">Image copied.</string>
     <string name="reader_image_saved">Image saved.</string>
     <string name="reader_image_save_failed">Could not save image.</string>
-    <string name="reader_chapters">Chapters</string>
+    <string name="reader_chapters" comment="Reader chapter-list label; Sasayaki intentionally reuses the same visible label for audiobook chapters.">Chapters</string>
     <string name="reader_highlights">Highlights</string>
     <string name="reader_statistics" comment="Reader menu label, intentionally matching advanced statistics.">Statistics</string>
     <string name="reader_untitled_chapter">Untitled</string>
@@ -567,7 +567,7 @@
     <string name="sasayaki_auto_pause_on_lookup">Auto-Pause on Lookup</string>
     <string name="sasayaki_importing_audio">Importing audio...</string>
     <string name="sasayaki_tab_resources">Resources</string>
-    <string name="sasayaki_tab_chapters">M4B Chapters</string>
+    <string name="sasayaki_tab_chapters" comment="Sasayaki audiobook chapter-list tab label; intentionally matches the Reader chapters label.">Chapters</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">Settings</string>
     <string name="sasayaki_audiobook_resource">Audiobook</string>
     <string name="sasayaki_audiobook_cover">Audiobook cover</string>

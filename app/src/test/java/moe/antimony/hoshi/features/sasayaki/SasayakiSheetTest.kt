@@ -67,6 +67,21 @@ class SasayakiSheetTest {
     }
 
     @Test
+    fun chapterRowInfoKeepsTitleAsPrimaryTextAndTimeAsTrailingText() {
+        val info = sasayakiChapterRowInfo(
+            SasayakiAudiobookChapter(
+                index = 1,
+                title = "  Chapter 2  ",
+                startSeconds = 65.0,
+                endSeconds = 120.0,
+            ),
+        )
+
+        assertEquals("Chapter 2", info.title)
+        assertEquals("1:05", formatSasayakiChapterRowTime(info.startSeconds))
+    }
+
+    @Test
     fun playbackHeaderInfoUsesAudiobookMetadataAndCurrentChapter() {
         val info = sasayakiPlaybackHeaderInfo(
             playback = SasayakiPlaybackData(

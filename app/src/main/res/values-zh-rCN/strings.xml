@@ -238,7 +238,7 @@
     <string name="reader_image_copied">已复制图片。</string>
     <string name="reader_image_saved">已保存图片。</string>
     <string name="reader_image_save_failed">无法保存图片。</string>
-    <string name="reader_chapters">章节</string>
+    <string name="reader_chapters" comment="Reader chapter-list label; Sasayaki intentionally reuses the same visible label for audiobook chapters.">章节</string>
     <string name="reader_highlights">标注</string>
     <string name="reader_statistics" comment="Reader menu label, intentionally matching advanced statistics.">统计</string>
     <string name="reader_untitled_chapter">未命名</string>
@@ -565,7 +565,7 @@
     <string name="sasayaki_auto_pause_on_lookup">查词时自动暂停</string>
     <string name="sasayaki_importing_audio">正在导入音频...</string>
     <string name="sasayaki_tab_resources">资源</string>
-    <string name="sasayaki_tab_chapters">M4B 章节</string>
+    <string name="sasayaki_tab_chapters" comment="Sasayaki audiobook chapter-list tab label; intentionally matches the Reader chapters label.">章节</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">设置</string>
     <string name="sasayaki_audiobook_resource">有声书</string>
     <string name="sasayaki_audiobook_cover">有声书封面</string>

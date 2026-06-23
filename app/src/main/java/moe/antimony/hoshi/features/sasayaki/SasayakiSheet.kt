@@ -3,7 +3,6 @@ package moe.antimony.hoshi.features.sasayaki
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -624,6 +623,7 @@ private fun SasayakiChapterRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val rowInfo = sasayakiChapterRowInfo(chapter)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -641,19 +641,9 @@ private fun SasayakiChapterRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = formatDuration(chapter.startSeconds),
-                color = if (selected) {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = chapter.title.ifBlank { stringResource(R.string.sasayaki_unknown_chapter) },
+                    text = rowInfo.title ?: stringResource(R.string.sasayaki_unknown_chapter),
                     color = if (selected) {
                         MaterialTheme.colorScheme.onSecondaryContainer
                     } else {
@@ -671,6 +661,18 @@ private fun SasayakiChapterRow(
                     )
                 }
             }
+            Text(
+                text = formatSasayakiChapterRowTime(rowInfo.startSeconds),
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                textAlign = TextAlign.End,
+            )
         }
     }
 }
@@ -934,8 +936,31 @@ private fun SasayakiErrorMessage(message: String) {
     )
 }
 
-private fun formatDuration(seconds: Double): String =
-    DateUtils.formatElapsedTime(seconds.nonNegativeFiniteSeconds().toLong())
+private fun formatDuration(seconds: Double): String {
+    val totalSeconds = seconds.nonNegativeFiniteSeconds().toLong()
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val remainingSeconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, remainingSeconds)
+    } else {
+        String.format(Locale.US, "%d:%02d", minutes, remainingSeconds)
+    }
+}
+
+internal data class SasayakiChapterRowInfo(
+    val title: String?,
+    val startSeconds: Double,
+)
+
+internal fun sasayakiChapterRowInfo(chapter: SasayakiAudiobookChapter): SasayakiChapterRowInfo =
+    SasayakiChapterRowInfo(
+        title = chapter.title.trim().takeIf { it.isNotBlank() },
+        startSeconds = chapter.startSeconds,
+    )
+
+internal fun formatSasayakiChapterRowTime(seconds: Double): String =
+    formatDuration(seconds)
 
 private fun Double.nonNegativeFiniteSeconds(): Double =
     if (isFinite()) coerceAtLeast(0.0) else 0.0
