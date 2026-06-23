@@ -300,10 +300,7 @@ private class SasayakiPlaybackServiceSessionCallback(
         val playerCommands = Player.Commands.Builder()
             .add(Player.COMMAND_PLAY_PAUSE)
             .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
-            .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
-            .add(Player.COMMAND_SEEK_TO_NEXT)
-            .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .add(Player.COMMAND_SEEK_BACK)
             .add(Player.COMMAND_SEEK_FORWARD)
             .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_GET_TIMELINE)
@@ -360,6 +357,7 @@ internal fun dispatchSasayakiServicePlayerSeekCommand(
     seekTo: (Long) -> Unit,
 ) {
     when (seekCommand) {
+        Player.COMMAND_SEEK_BACK,
         Player.COMMAND_SEEK_TO_PREVIOUS,
         Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
         -> previousCue()
@@ -384,10 +382,10 @@ internal data class SasayakiServiceMediaButtonSpec(
 internal fun sasayakiServiceMediaButtonSpecs(): List<SasayakiServiceMediaButtonSpec> =
     listOf(
         SasayakiServiceMediaButtonSpec(
-            icon = CommandButton.ICON_PREVIOUS,
-            displayNameResId = R.string.sasayaki_previous_cue,
+            icon = CommandButton.ICON_REWIND,
+            displayNameResId = R.string.sasayaki_rewind,
             slot = CommandButton.SLOT_BACK,
-            playerCommand = Player.COMMAND_SEEK_TO_PREVIOUS,
+            playerCommand = Player.COMMAND_SEEK_BACK,
         ),
         SasayakiServiceMediaButtonSpec(
             icon = CommandButton.ICON_FAST_FORWARD,

@@ -31,9 +31,9 @@ internal fun sasayakiOemRestrictedNotificationActionSpecs(
 ): List<SasayakiOemRestrictedNotificationActionSpec> =
     listOf(
         SasayakiOemRestrictedNotificationActionSpec(
-            playerCommand = Player.COMMAND_SEEK_TO_PREVIOUS,
-            iconResId = Media3R.drawable.media3_icon_previous,
-            titleResId = R.string.sasayaki_previous_cue,
+            playerCommand = Player.COMMAND_SEEK_BACK,
+            iconResId = Media3R.drawable.media3_icon_rewind,
+            titleResId = R.string.sasayaki_rewind,
         ),
         SasayakiOemRestrictedNotificationActionSpec(
             playerCommand = Player.COMMAND_PLAY_PAUSE,
@@ -45,9 +45,9 @@ internal fun sasayakiOemRestrictedNotificationActionSpecs(
             titleResId = if (isPlaying) R.string.sasayaki_pause else R.string.sasayaki_play,
         ),
         SasayakiOemRestrictedNotificationActionSpec(
-            playerCommand = Player.COMMAND_SEEK_TO_NEXT,
-            iconResId = Media3R.drawable.media3_icon_next,
-            titleResId = R.string.sasayaki_next_cue,
+            playerCommand = Player.COMMAND_SEEK_FORWARD,
+            iconResId = Media3R.drawable.media3_icon_fast_forward,
+            titleResId = R.string.sasayaki_fast_forward,
         ),
     )
 
