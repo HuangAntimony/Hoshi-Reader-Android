@@ -2,16 +2,11 @@ package moe.antimony.hoshi.navigation
 
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.runBlocking
-import moe.antimony.hoshi.epub.BookEntry
-import moe.antimony.hoshi.epub.BookMetadata
-import moe.antimony.hoshi.features.bookshelf.SasayakiMatchRequest
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
-import java.io.File
 
 class AppShellCoordinatorTest {
     @Test
@@ -173,26 +168,4 @@ class AppShellCoordinatorTest {
         assertEquals(1, readerRouteRemovedCount)
     }
 
-    @Test
-    fun sasayakiMatchRequestStoreStoresRequestsByBookId() {
-        val store = SasayakiMatchRequestStore()
-        val request = SasayakiMatchRequest(
-            bookId = "book-a",
-            bookEntry = BookEntry(
-                root = File("book-a"),
-                metadata = BookMetadata(
-                    id = "book-a",
-                    title = "Book A",
-                    cover = null,
-                    folder = "book-a",
-                    lastAccess = 0.0,
-                ),
-            ),
-        )
-
-        store.put(request)
-
-        assertSame(request, store.get("book-a"))
-        assertNull(store.get("missing"))
-    }
 }

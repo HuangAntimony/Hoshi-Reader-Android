@@ -36,7 +36,6 @@ import moe.antimony.hoshi.features.anki.AnkiView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.HoshiMainShell
 import moe.antimony.hoshi.features.bookshelf.MainTab
-import moe.antimony.hoshi.features.bookshelf.SasayakiMatchRequest
 import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
@@ -47,7 +46,6 @@ import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.profiles.ProfilesView
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatchView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.settings.AdvancedSettingsView
 import moe.antimony.hoshi.features.update.AboutScreen
@@ -80,7 +78,6 @@ fun AppShell(
     val dictionarySettingsRepository = appContainer.dictionarySettingsRepository
     val launchRouteStateHolder = remember { AppLaunchRouteStateHolder() }
     val pendingImportRouteCoordinator = remember { PendingImportRouteCoordinator() }
-    val sasayakiMatchRequestStore = remember { SasayakiMatchRequestStore() }
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.Books) }
     val booksBackStack = rememberNavBackStack(AppRoute.BooksRoute)
     val dictionaryBackStack = rememberNavBackStack(AppRoute.DictionaryRoute)
@@ -202,15 +199,6 @@ fun AppShell(
         )
     }
 
-    fun openSasayakiMatch(request: SasayakiMatchRequest) {
-        sasayakiMatchRequestStore.put(request)
-        selectedTab = MainTab.Books
-        booksBackStack.openSasayakiMatchRoute(
-            bookId = request.bookId,
-            onReaderRouteRemoved = ::clearLoadedReaderProfile,
-        )
-    }
-
     LaunchedEffect(pendingImportUri) {
         val hasPendingImport = pendingImportUri != null
         pendingImportRouteCoordinator.routePendingImport(
@@ -240,7 +228,6 @@ fun AppShell(
                     readerSettings = currentReaderSettings,
                     onReaderSettingsChange = currentOnReaderSettingsChange,
                     onOpenReader = ::openReader,
-                    onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
                     onSelectedTabChange = ::selectMainTab,
@@ -252,7 +239,6 @@ fun AppShell(
                     readerSettings = currentReaderSettings,
                     onReaderSettingsChange = currentOnReaderSettingsChange,
                     onOpenReader = ::openReader,
-                    onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
                     onSelectedTabChange = ::selectMainTab,
@@ -264,7 +250,6 @@ fun AppShell(
                     readerSettings = currentReaderSettings,
                     onReaderSettingsChange = currentOnReaderSettingsChange,
                     onOpenReader = ::openReader,
-                    onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
                     onSelectedTabChange = ::selectMainTab,
@@ -304,25 +289,6 @@ fun AppShell(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                is AppRoute.SasayakiMatchRoute -> {
-                    val request = sasayakiMatchRequestStore.get(route.bookId)
-                    if (request != null) {
-                        SasayakiMatchView(
-                            bookEntry = request.bookEntry,
-                            bookRepository = bookRepository,
-                            epubBookParser = epubBookParser,
-                            onClose = ::popRoute,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        MissingRouteRedirect {
-                            booksBackStack.routeExternalBookImport(
-                                onReaderRouteRemoved = ::clearLoadedReaderProfile,
-                            )
-                            selectedTab = MainTab.Books
-                        }
-                    }
-                }
                 AppRoute.MainRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Books,
                     pendingImportUri = currentPendingImportUri,
@@ -330,7 +296,6 @@ fun AppShell(
                     readerSettings = currentReaderSettings,
                     onReaderSettingsChange = currentOnReaderSettingsChange,
                     onOpenReader = ::openReader,
-                    onOpenSasayakiMatch = ::openSasayakiMatch,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
                     onSelectedTabChange = ::selectMainTab,
@@ -390,13 +355,6 @@ internal class ReaderBookmarkRefreshState {
 }
 
 @Composable
-private fun MissingRouteRedirect(onRedirect: () -> Unit) {
-    LaunchedEffect(Unit) {
-        onRedirect()
-    }
-}
-
-@Composable
 private fun TopLevelRouteContent(
     selectedTab: MainTab,
     pendingImportUri: Uri?,
@@ -404,7 +362,6 @@ private fun TopLevelRouteContent(
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onOpenReader: (String) -> Unit,
-    onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     bookshelfRefreshKey: Int,
     dictionaryFocusRequestKey: Int,
     onSelectedTabChange: (MainTab) -> Unit,
@@ -419,7 +376,6 @@ private fun TopLevelRouteContent(
                 pendingImportUri = pendingImportUri,
                 onPendingImportConsumed = onPendingImportConsumed,
                 onOpenReader = onOpenReader,
-                onOpenSasayakiMatch = onOpenSasayakiMatch,
                 refreshKey = bookshelfRefreshKey,
                 layoutSpec = layoutSpec,
                 modifier = contentModifier,
@@ -517,7 +473,7 @@ private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.MainRoute, AppRoute.BooksRoute -> MainTab.Books
     AppRoute.DictionaryRoute -> MainTab.Dictionary
     AppRoute.SettingsRoute -> MainTab.Settings
-    is AppRoute.ReaderRoute, is AppRoute.SasayakiMatchRoute -> MainTab.Books
+    is AppRoute.ReaderRoute -> MainTab.Books
     is AppRoute.SettingsDetailRoute -> MainTab.Settings
 }
 

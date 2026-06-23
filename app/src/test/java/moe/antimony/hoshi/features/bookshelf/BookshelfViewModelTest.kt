@@ -32,7 +32,7 @@ class BookshelfViewModelTest {
     }
 
     @Test
-    fun reloadBooksPublishesEntriesProgressAndSasayakiState() {
+    fun reloadBooksPublishesEntriesAndProgress() {
         val entry = bookEntry("book-a")
         val coverSource = BookCoverSource(
             path = "/tmp/book-a/cover.jpg",
@@ -48,7 +48,6 @@ class BookshelfViewModelTest {
         val viewModel = BookshelfViewModel(repository, testScope())
 
         viewModel.reloadBookEntries()
-        viewModel.setSasayakiEnabled(true)
 
         assertEquals(listOf(entry), viewModel.uiState.value.bookEntries)
         assertEquals(mapOf("book-a" to 0.25), viewModel.uiState.value.bookProgressById)
@@ -57,7 +56,6 @@ class BookshelfViewModelTest {
         assertEquals(BookSortOption.Title, viewModel.uiState.value.sortOption)
         assertTrue(viewModel.uiState.value.showReading)
         assertTrue(viewModel.uiState.value.hasLoadedBooks)
-        assertTrue(viewModel.uiState.value.sasayakiEnabled)
         assertFalse(viewModel.uiState.value.isLoading)
         assertNull(viewModel.uiState.value.errorMessage.testString())
     }
@@ -790,15 +788,6 @@ class BookshelfViewModelTest {
 
         assertEquals(listOf(entry to "english"), repository.profiledBooks)
         assertEquals(listOf(BookSortOption.Recent), repository.loadRequests)
-    }
-
-    @Test
-    fun sasayakiEnabledCanBeDrivenByObservedSettingsState() {
-        val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
-
-        viewModel.setSasayakiEnabled(true)
-
-        assertTrue(viewModel.uiState.value.sasayakiEnabled)
     }
 
     @Test

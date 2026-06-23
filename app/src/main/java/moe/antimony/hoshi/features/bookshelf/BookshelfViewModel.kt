@@ -502,10 +502,6 @@ internal class BookshelfViewModel : ViewModel {
         }
     }
 
-    fun setSasayakiEnabled(enabled: Boolean) {
-        _uiState.update { it.copy(sasayakiEnabled = enabled) }
-    }
-
     fun rebuildLookupQuery() {
         workScope.launch {
             runCatching { repository.rebuildLookupQuery() }

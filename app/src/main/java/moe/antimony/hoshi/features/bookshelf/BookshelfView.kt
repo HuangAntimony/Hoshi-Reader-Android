@@ -154,18 +154,12 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.io.File
 import kotlin.math.max
 
-data class SasayakiMatchRequest(
-    val bookId: String,
-    val bookEntry: BookEntry,
-)
-
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BookshelfView(
     pendingImportUri: Uri? = null,
     onPendingImportConsumed: () -> Unit = {},
     onOpenReader: (String) -> Unit,
-    onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     refreshKey: Int = 0,
     layoutSpec: MainShellLayoutSpec,
     modifier: Modifier = Modifier,
@@ -261,10 +255,6 @@ fun BookshelfView(
         booksViewModel.rebuildLookupQuery()
     }
 
-    LaunchedEffect(sasayakiSettings.enabled) {
-        booksViewModel.setSasayakiEnabled(sasayakiSettings.enabled)
-    }
-
     LaunchedEffect(pendingImportUri) {
         val uri = pendingImportUri ?: return@LaunchedEffect
         onPendingImportConsumed()
@@ -339,10 +329,6 @@ fun BookshelfView(
         onMoveBook = booksViewModel::moveBook,
         profileState = profileState,
         onSetBookProfile = booksViewModel::setBookProfile,
-        sasayakiEnabled = uiState.sasayakiEnabled,
-        onMatchSasayaki = { entry ->
-            onOpenSasayakiMatch(SasayakiMatchRequest(entry.metadata.id, entry))
-        },
         syncSettings = syncSettings,
         driveAuthStatus = driveAuthStatus,
         onSyncBook = { entry, direction ->
@@ -856,8 +842,6 @@ private fun BooksTab(
     onMoveBook: (BookEntry, String?) -> Unit,
     profileState: ProfileState,
     onSetBookProfile: (BookEntry, String?) -> Unit,
-    sasayakiEnabled: Boolean,
-    onMatchSasayaki: (BookEntry) -> Unit,
     syncSettings: SyncSettings,
     driveAuthStatus: DriveAuthStatus?,
     onSyncBook: (BookEntry, SyncDirection?) -> Unit,
@@ -1024,10 +1008,8 @@ private fun BooksTab(
                                             currentShelfName = section.shelfName,
                                             hideMove = section.isReading,
                                             expanded = isBookContextMenuExpanded(contextMenuTarget, section, entry),
-                                            sasayakiEnabled = sasayakiEnabled,
                                             onDismiss = { onContextMenuTargetChange(null) },
                                             onMoveBook = onMoveBook,
-                                            onMatchSasayaki = onMatchSasayaki,
                                             onMarkReadCandidate = onMarkReadCandidate,
                                             onRenameCandidate = onRenameCandidate,
                                             onDeleteCandidate = onDeleteCandidate,
@@ -1647,10 +1629,8 @@ private fun BookContextMenu(
     currentShelfName: String?,
     hideMove: Boolean,
     expanded: Boolean,
-    sasayakiEnabled: Boolean,
     onDismiss: () -> Unit,
     onMoveBook: (BookEntry, String?) -> Unit,
-    onMatchSasayaki: (BookEntry) -> Unit,
     onMarkReadCandidate: (BookEntry) -> Unit,
     onRenameCandidate: (BookEntry) -> Unit,
     onDeleteCandidate: (BookEntry) -> Unit,
@@ -1723,15 +1703,6 @@ private fun BookContextMenu(
             onClick = { profileMenuExpanded = true },
         )
         HorizontalDivider()
-        if (sasayakiEnabled) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.bookshelf_match_sasayaki)) },
-                onClick = {
-                    onMatchSasayaki(entry)
-                    onDismiss()
-                },
-            )
-        }
         DropdownMenuItem(
             text = { Text(stringResource(R.string.action_rename)) },
             onClick = {

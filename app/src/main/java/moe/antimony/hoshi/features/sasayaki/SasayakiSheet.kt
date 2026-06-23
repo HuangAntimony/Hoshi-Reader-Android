@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import android.content.Intent
 import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -79,7 +80,7 @@ internal fun SasayakiSheet(
     audioRepository: SasayakiAudioRepository,
     settings: SasayakiSettings,
     subtitleMatchData: SasayakiMatchData?,
-    matchWindowDependencies: SasayakiMatchWindowDependencies?,
+    matchDependencies: SasayakiMatchDependencies?,
     chapters: List<SasayakiAudiobookChapter>,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
     onSettingsChange: (SasayakiSettings) -> Unit,
@@ -93,7 +94,6 @@ internal fun SasayakiSheet(
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
     var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
-    var showMatchWindow by remember { mutableStateOf(false) }
     val defaultTab = sasayakiDefaultSheetTab(
         hasAudio = player.hasAudio,
         hasChapters = chapters.isNotEmpty(),
@@ -172,6 +172,7 @@ internal fun SasayakiSheet(
                         player = player,
                         settings = settings,
                         subtitleMatchData = subtitleMatchData,
+                        matchDependencies = matchDependencies,
                         importError = importError,
                         isImporting = isImporting,
                         onAudioAction = {
@@ -182,8 +183,7 @@ internal fun SasayakiSheet(
                             }
                         },
                         onSettingsChange = onSettingsChange,
-                        matchEnabled = matchWindowDependencies != null,
-                        onMatchSubtitles = { showMatchWindow = true },
+                        onSubtitleMatchUpdated = onSubtitleMatchUpdated,
                         modifier = Modifier.weight(1f),
                     )
                     SasayakiSheetTab.Chapters -> SasayakiChaptersTab(
@@ -221,13 +221,6 @@ internal fun SasayakiSheet(
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },
-        )
-    }
-    if (showMatchWindow && matchWindowDependencies != null) {
-        SasayakiMatchDialog(
-            dependencies = matchWindowDependencies,
-            onDismiss = { showMatchWindow = false },
-            onMatchUpdated = onSubtitleMatchUpdated,
         )
     }
 }
@@ -386,12 +379,12 @@ private fun SasayakiResourcesTab(
     player: SasayakiPlayer,
     settings: SasayakiSettings,
     subtitleMatchData: SasayakiMatchData?,
+    matchDependencies: SasayakiMatchDependencies?,
     importError: String?,
     isImporting: Boolean,
     onAudioAction: () -> Unit,
     onSettingsChange: (SasayakiSettings) -> Unit,
-    matchEnabled: Boolean,
-    onMatchSubtitles: (() -> Unit)?,
+    onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -400,23 +393,12 @@ private fun SasayakiResourcesTab(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 28.dp),
     ) {
-        SasayakiResourceRow(
-            title = stringResource(R.string.sasayaki_audiobook_resource),
-            summary = player.playback.audioStorageSummaryText(),
-            action = if (player.hasAudio) {
-                stringResource(R.string.sasayaki_remove_audio)
-            } else if (isImporting) {
-                stringResource(R.string.reader_appearance_importing)
-            } else {
-                stringResource(R.string.action_open)
-            },
-            actionEnabled = !isImporting,
+        SasayakiAudiobookResourceCard(
+            player = player,
+            settings = settings,
+            isImporting = isImporting,
+            onSettingsChange = onSettingsChange,
             onAction = onAudioAction,
-        )
-        SasayakiSettingsSwitchRow(
-            label = stringResource(R.string.sasayaki_copy_audiobook_to_storage),
-            checked = settings.copyAudiobookToPrivateStorage,
-            onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
         )
         importError?.let { message ->
             SasayakiErrorMessage(message = message)
@@ -424,15 +406,72 @@ private fun SasayakiResourcesTab(
         player.errorMessage?.let { message ->
             SasayakiErrorMessage(message = message.asString())
         }
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-        SasayakiResourceRow(
-            title = stringResource(R.string.sasayaki_subtitle_match),
-            summary = sasayakiSubtitleMatchSummary(subtitleMatchData)
-                ?: stringResource(R.string.sasayaki_subtitle_match_optional),
-            action = stringResource(R.string.sasayaki_match_title),
-            actionEnabled = matchEnabled,
-            onAction = { onMatchSubtitles?.invoke() },
+        SasayakiSubtitleMatchSection(
+            dependencies = matchDependencies,
+            currentMatchData = subtitleMatchData,
+            onMatchUpdated = onSubtitleMatchUpdated,
         )
+    }
+}
+
+@Composable
+private fun SasayakiAudiobookResourceCard(
+    player: SasayakiPlayer,
+    settings: SasayakiSettings,
+    isImporting: Boolean,
+    onSettingsChange: (SasayakiSettings) -> Unit,
+    onAction: () -> Unit,
+) {
+    SasayakiResourceCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.sasayaki_audiobook_resource),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = player.playback.audioStorageSummaryText(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Button(
+                enabled = !isImporting,
+                onClick = onAction,
+            ) {
+                Text(
+                    if (player.hasAudio) {
+                        stringResource(R.string.sasayaki_remove_audio)
+                    } else if (isImporting) {
+                        stringResource(R.string.reader_appearance_importing)
+                    } else {
+                        stringResource(R.string.action_open)
+                    },
+                )
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.sasayaki_copy_audiobook_to_storage),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = settings.copyAudiobookToPrivateStorage,
+                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
+            )
+        }
     }
 }
 
@@ -674,30 +713,48 @@ private fun SliderRow(
 }
 
 @Composable
-private fun SasayakiResourceRow(
-    title: String,
-    summary: String,
+internal fun SasayakiResourceCard(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+internal fun SasayakiInlineActionRow(
+    label: String,
+    value: String,
     action: String,
     actionEnabled: Boolean,
     onAction: () -> Unit,
 ) {
-    val metrics = readerSheetDensityMetrics()
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = summary,
+                text = value,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Button(enabled = actionEnabled, onClick = onAction) {
+        TextButton(enabled = actionEnabled, onClick = onAction) {
             Text(action)
         }
     }

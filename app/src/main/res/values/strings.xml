@@ -106,7 +106,6 @@
     <string name="bookshelf_import_epub">Import EPUB</string>
     <string name="bookshelf_sync">Sync</string>
     <string name="bookshelf_move">Move</string>
-    <string name="bookshelf_match_sasayaki">Match Sasayaki</string>
     <string name="bookshelf_mark_read">Mark Read</string>
     <string name="bookshelf_export_epub">Export EPUB</string>
     <string name="bookshelf_reading_shelf">Reading Shelf</string>
@@ -570,20 +569,19 @@
     <string name="sasayaki_tab_resources">Resources</string>
     <string name="sasayaki_tab_chapters">M4B Chapters</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">Settings</string>
-    <string name="sasayaki_load_audio">Load Audio</string>
     <string name="sasayaki_audiobook_resource">Audiobook</string>
     <string name="sasayaki_remove_audio">Remove</string>
     <string name="sasayaki_storage_copied">Copied to app storage. The original audiobook file can be deleted.</string>
     <string name="sasayaki_storage_linked">Linked to the external audiobook file. Keep the original file available.</string>
     <string name="sasayaki_storage_select_audio">Select an .mp3 or .m4b audiobook</string>
     <string name="sasayaki_subtitle_match">Subtitle Match</string>
-    <string name="sasayaki_subtitle_match_optional">Optional. Playback works without subtitles.</string>
+    <string name="sasayaki_no_subtitle_match">No match</string>
     <string name="sasayaki_no_chapters">No chapters found in this audiobook.</string>
     <string name="sasayaki_unknown_chapter">Chapter</string>
     <string name="sasayaki_current_chapter">Current chapter</string>
     <string name="sasayaki_skip_cue">1 sentence</string>
     <string name="sasayaki_skip_seconds_format">%1$d seconds</string>
-    <string name="sasayaki_settings_description">Sasayaki syncs an audiobook with reader text. Long press a book and choose Match Sasayaki, select the matching .srt file, then open the reader and load an .mp3 or .m4b audiobook.</string>
+    <string name="sasayaki_settings_description">Open the Reader Sasayaki menu to load an .mp3 or .m4b audiobook. Subtitle matching is available from the Resources tab when you have a matching .srt file.</string>
     <string name="sasayaki_select_srt_file">Select an .srt subtitle file.</string>
     <string name="sasayaki_selected_srt">Selected SRT</string>
     <string name="sasayaki_open_srt_failed">Unable to open selected SRT.</string>
@@ -593,6 +591,4 @@
     <string name="sasayaki_no_file_selected">No file selected</string>
     <string name="sasayaki_search_window">Search Window</string>
     <string name="sasayaki_matching">Matching...</string>
-    <string name="sasayaki_current_match">Current Match</string>
-    <string name="sasayaki_match_rate">Match Rate</string>
 </resources>

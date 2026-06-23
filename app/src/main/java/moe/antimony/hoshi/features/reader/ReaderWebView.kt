@@ -78,7 +78,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
-import moe.antimony.hoshi.features.sasayaki.SasayakiMatchWindowDependencies
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatchDependencies
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1455,15 +1455,18 @@ fun ReaderWebView(
                 audioRepository = sasayakiAudioRepository,
                 settings = sasayakiSettings,
                 subtitleMatchData = sasayakiSheetMatchData,
-                matchWindowDependencies = bookEntry?.let { entry ->
-                    SasayakiMatchWindowDependencies(
+                matchDependencies = bookEntry?.let { entry ->
+                    SasayakiMatchDependencies(
                         bookEntry = entry,
                         bookRepository = bookRepository,
                         epubBookParser = appContainer.epubBookParser,
                     )
                 },
                 chapters = sasayakiAudiobookChapters,
-                onSubtitleMatchUpdated = { matchData -> sasayakiSheetMatchData = matchData },
+                onSubtitleMatchUpdated = { matchData ->
+                    sasayakiMatchData = matchData
+                    sasayakiSheetMatchData = matchData
+                },
                 onSettingsChange = ::updateSasayakiSettings,
                 onDismiss = stateHolder::dismissSasayaki,
             )

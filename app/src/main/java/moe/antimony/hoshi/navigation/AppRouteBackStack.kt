@@ -30,17 +30,6 @@ internal fun MutableList<NavKey>.openReaderRoute(bookId: String) {
     add(AppRoute.ReaderRoute(bookId))
 }
 
-internal fun MutableList<NavKey>.openSasayakiMatchRoute(
-    bookId: String,
-    onReaderRouteRemoved: () -> Unit = {},
-) {
-    replaceWithTopLevelRoute(
-        route = AppRoute.BooksRoute,
-        onReaderRouteRemoved = onReaderRouteRemoved,
-    )
-    add(AppRoute.SasayakiMatchRoute(bookId))
-}
-
 internal fun MutableList<NavKey>.routeExternalBookImport(
     onReaderRouteRemoved: () -> Unit = {},
 ) {

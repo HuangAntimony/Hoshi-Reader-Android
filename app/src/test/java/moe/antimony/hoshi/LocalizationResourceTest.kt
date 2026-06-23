@@ -109,8 +109,8 @@ class LocalizationResourceTest {
 
         assertEquals(emptyList<String>(), forbiddenUsages)
         assertEquals("查词", zhResources.strings.getValue("main_tab_dictionary").value)
-        assertEquals("匹配有声书", zhResources.strings.getValue("bookshelf_match_sasayaki").value)
         assertEquals("有声书", zhResources.strings.getValue("sasayaki_title").value)
+        assertEquals("未匹配", zhResources.strings.getValue("sasayaki_no_subtitle_match").value)
         assertEquals("自动翻页", zhResources.strings.getValue("sasayaki_auto_scroll").value)
         assertEquals("标注", zhResources.strings.getValue("reader_highlight_action").value)
         assertEquals("复制", zhResources.strings.getValue("action_copy").value)

@@ -23,7 +23,7 @@ internal fun sasayakiDefaultSheetTab(
         SasayakiSheetTab.Resources
     }
 
-internal data class SasayakiMatchWindowDependencies(
+internal data class SasayakiMatchDependencies(
     val bookEntry: BookEntry,
     val bookRepository: SasayakiSidecarRepository,
     val epubBookParser: EpubBookParser,

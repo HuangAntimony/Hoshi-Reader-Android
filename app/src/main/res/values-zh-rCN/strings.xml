@@ -104,7 +104,6 @@
     <string name="bookshelf_import_epub">导入 EPUB</string>
     <string name="bookshelf_sync">同步</string>
     <string name="bookshelf_move">移动</string>
-    <string name="bookshelf_match_sasayaki">匹配有声书</string>
     <string name="bookshelf_mark_read">标记已读</string>
     <string name="bookshelf_export_epub">导出 EPUB</string>
     <string name="bookshelf_reading_shelf">正在阅读书架</string>
@@ -568,20 +567,19 @@
     <string name="sasayaki_tab_resources">资源</string>
     <string name="sasayaki_tab_chapters">M4B 章节</string>
     <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">设置</string>
-    <string name="sasayaki_load_audio">载入音频</string>
     <string name="sasayaki_audiobook_resource">有声书</string>
     <string name="sasayaki_remove_audio">移除</string>
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
     <string name="sasayaki_storage_select_audio">选择 .mp3 或 .m4b 有声书</string>
     <string name="sasayaki_subtitle_match">字幕匹配</string>
-    <string name="sasayaki_subtitle_match_optional">可选；没有字幕也可以播放。</string>
+    <string name="sasayaki_no_subtitle_match">未匹配</string>
     <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
     <string name="sasayaki_unknown_chapter">章节</string>
     <string name="sasayaki_current_chapter">当前章节</string>
     <string name="sasayaki_skip_cue">1 句</string>
     <string name="sasayaki_skip_seconds_format">%1$d 秒</string>
-    <string name="sasayaki_settings_description">有声书会与阅读器文本同步。长按一本书并选择“匹配有声书”，选择对应的 .srt 文件，然后打开阅读器并载入 .mp3 或 .m4b 有声书。</string>
+    <string name="sasayaki_settings_description">在阅读器的有声书菜单中载入 .mp3 或 .m4b 有声书。如果有对应的 .srt 字幕文件，可以在资源页进行字幕匹配。</string>
     <string name="sasayaki_select_srt_file">请选择 .srt 字幕文件。</string>
     <string name="sasayaki_selected_srt">已选择 SRT</string>
     <string name="sasayaki_open_srt_failed">无法打开所选 SRT。</string>
@@ -591,6 +589,4 @@
     <string name="sasayaki_no_file_selected">未选择文件</string>
     <string name="sasayaki_search_window">搜索窗口</string>
     <string name="sasayaki_matching">正在匹配...</string>
-    <string name="sasayaki_current_match">当前匹配</string>
-    <string name="sasayaki_match_rate">匹配率</string>
 </resources>
