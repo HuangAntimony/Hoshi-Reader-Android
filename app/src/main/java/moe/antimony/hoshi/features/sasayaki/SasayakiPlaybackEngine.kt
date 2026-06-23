@@ -108,12 +108,15 @@ internal class ExoPlayerSasayakiPlayerHandle(
 class Media3SasayakiPlaybackEngine private constructor(
     private val player: Media3SasayakiPlayerHandle,
     private val onSeekComplete: () -> Unit,
+    private val onPlaybackActiveChanged: (Boolean) -> Unit,
+    private val onPositionChanged: (Int, Int) -> Unit,
     private val postSeekCompletion: (() -> Unit) -> Unit,
     private val releasePlayer: (Media3SasayakiPlayerHandle) -> Unit,
 ) : SasayakiPlaybackEngine {
     private var pendingSeekToken = 0
     private var completedSeekToken = 0
     private var listener: Player.Listener? = null
+    private var lastPlaybackActive: Boolean? = null
 
     override val durationMs: Int
         get() = player.durationMs
@@ -155,6 +158,15 @@ class Media3SasayakiPlaybackEngine private constructor(
         completePendingSeek(pendingSeekToken)
     }
 
+    private fun notifyPlaybackActiveIfNeeded(player: Player) {
+        val active = player.playWhenReady &&
+            player.playbackState != Player.STATE_IDLE &&
+            player.playbackState != Player.STATE_ENDED
+        if (lastPlaybackActive == active) return
+        lastPlaybackActive = active
+        onPlaybackActiveChanged(active)
+    }
+
     private fun completePendingSeek(token: Int) {
         if (token != pendingSeekToken || token <= completedSeekToken) return
         completedSeekToken = token
@@ -171,6 +183,8 @@ class Media3SasayakiPlaybackEngine private constructor(
             onPrepared: (Int) -> Unit,
             onCompletion: () -> Unit,
             onSeekComplete: () -> Unit,
+            onPlaybackActiveChanged: (Boolean) -> Unit,
+            onPositionChanged: (Int, Int) -> Unit,
             onError: (PlaybackException) -> Unit,
             postSeekCompletion: (() -> Unit) -> Unit,
             releasePlayer: (Media3SasayakiPlayerHandle) -> Unit,
@@ -178,10 +192,16 @@ class Media3SasayakiPlaybackEngine private constructor(
             val engine = Media3SasayakiPlaybackEngine(
                 player = player,
                 onSeekComplete = onSeekComplete,
+                onPlaybackActiveChanged = onPlaybackActiveChanged,
+                onPositionChanged = onPositionChanged,
                 postSeekCompletion = postSeekCompletion,
                 releasePlayer = releasePlayer,
             )
             val listener = object : Player.Listener {
+                override fun onEvents(player: Player, events: Player.Events) {
+                    engine.notifyPlaybackActiveIfNeeded(player)
+                }
+
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_READY -> onPrepared(player.durationMs)
@@ -199,6 +219,7 @@ class Media3SasayakiPlaybackEngine private constructor(
                         reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
                     ) {
                         engine.completePendingSeekFromPlayer()
+                        onPositionChanged(newPosition.positionMs.toMedia3PositionInt(), player.durationMs)
                     }
                 }
 
@@ -221,6 +242,9 @@ class Media3SasayakiPlaybackEngine private constructor(
 
 private fun playbackParameters(speed: Float): PlaybackParameters =
     PlaybackParameters(speed, 1f)
+
+private fun Long.toMedia3PositionInt(): Int =
+    coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
 
 private fun media3DurationMs(player: Player): Int {
     val duration = player.duration

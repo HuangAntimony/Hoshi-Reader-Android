@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-06-12
+Date: 2026-06-23
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -123,7 +123,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   MediaSession, Sasayaki playback controller, and active book id. Reader UI
   attaches/detaches cue sinks and sends explicit stop on reader exit; Android
   media controls and notification return actions route through the same
-  service-owned session.
+  service-owned session. Actual playback start promotes the service through the
+  Android `mediaPlayback` foreground-service path, and the ExoPlayer uses local
+  wake mode for long-running background playback.
 - Update checks use WorkManager unique work, with worker dependencies supplied
   by Hilt's WorkManager integration.
 

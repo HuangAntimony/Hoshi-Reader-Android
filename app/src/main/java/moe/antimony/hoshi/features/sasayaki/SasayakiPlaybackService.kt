@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import android.content.Intent
 import androidx.annotation.OptIn
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -20,6 +22,12 @@ class SasayakiPlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         runtime.currentSession()
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (runtime.currentSession()?.player?.hasForegroundPlayback() != true) {
+            super.onTaskRemoved(rootIntent)
+        }
+    }
+
     override fun onDestroy() {
         runtime.release()
         super.onDestroy()
@@ -29,3 +37,13 @@ class SasayakiPlaybackService : MediaSessionService() {
         internal const val SessionId = "hoshi-sasayaki-playback"
     }
 }
+
+private fun Player.hasForegroundPlayback(): Boolean =
+    isPlaying ||
+        (
+            playWhenReady &&
+                (
+                    playbackState == Player.STATE_READY ||
+                        playbackState == Player.STATE_BUFFERING
+                )
+        )

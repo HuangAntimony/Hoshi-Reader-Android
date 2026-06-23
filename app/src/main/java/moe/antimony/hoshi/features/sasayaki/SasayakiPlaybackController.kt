@@ -57,6 +57,7 @@ internal class SasayakiPlaybackController(
     onClearCue: () -> Unit,
     onLoadChapter: (Int) -> Unit,
     playbackPreparer: SasayakiPlaybackPreparer,
+    private val onPlaybackStartRequested: () -> Unit = {},
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
     private val audioSourceRepository = SasayakiAudioRepository(bookRoot)
@@ -332,6 +333,7 @@ internal class SasayakiPlaybackController(
     private fun startPlayback() {
         playbackStart.start(
             rate = rate,
+            beforeStart = onPlaybackStartRequested,
             currentTime = { currentTime },
             updateMediaSession = ::updateMediaSession,
             redisplayCue = { time -> updateCue(time, forceDisplay = true) },
@@ -355,6 +357,8 @@ internal class SasayakiPlaybackController(
             currentTime = { currentTime },
             updateMediaSession = ::updateMediaSession,
             handleSeekComplete = ::handleSeekComplete,
+            handlePlaybackActiveChanged = ::handlePlaybackActiveChanged,
+            handlePositionChanged = ::handlePlayerPositionChanged,
             updateCue = ::updateCue,
         )
     }
@@ -368,6 +372,31 @@ internal class SasayakiPlaybackController(
             updateMediaSession = ::updateMediaSession,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
+    }
+
+    private fun handlePlaybackActiveChanged(active: Boolean) {
+        playbackLifecycle.syncPlayerPlaybackActive(
+            active = active,
+            markPlayedOnce = cuePresentation::markPlayedOnce,
+            afterMarkedPlaying = {
+                updateMediaSession()
+                updateCue(currentTime, forceDisplay = true)
+            },
+            updateMediaSession = ::updateMediaSession,
+            restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
+        )
+    }
+
+    private fun handlePlayerPositionChanged(positionMs: Int, durationMs: Int) {
+        val shouldSavePosition = playbackLifecycle.syncPlayerPosition(
+            currentPositionMs = positionMs,
+            durationMs = durationMs,
+        )
+        if (shouldSavePosition) {
+            playbackPersistence.savePosition(currentTime)
+        }
+        updateCue(currentTime, forceDisplay = true)
+        updateMediaSession()
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {

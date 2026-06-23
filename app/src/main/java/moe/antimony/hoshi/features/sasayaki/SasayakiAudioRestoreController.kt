@@ -10,6 +10,8 @@ data class SasayakiAudioRestoreCallbacks(
     val onPrepared: (Int) -> Unit,
     val onCompletion: () -> Unit,
     val onSeekComplete: () -> Unit,
+    val onPlaybackActiveChanged: (Boolean) -> Unit,
+    val onPositionChanged: (Int, Int) -> Unit,
     val onError: (Throwable) -> Unit,
 )
 
@@ -54,6 +56,8 @@ internal class ServiceOwnedSasayakiPlaybackPreparer(
             onPrepared = callbacks.onPrepared,
             onCompletion = callbacks.onCompletion,
             onSeekComplete = callbacks.onSeekComplete,
+            onPlaybackActiveChanged = callbacks.onPlaybackActiveChanged,
+            onPositionChanged = callbacks.onPositionChanged,
             onError = callbacks.onError,
             postSeekCompletion = ::postOnMainThread,
             releasePlayer = ::releaseServiceOwnedPlayer,

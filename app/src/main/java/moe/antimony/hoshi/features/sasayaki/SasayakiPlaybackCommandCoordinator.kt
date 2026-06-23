@@ -17,11 +17,13 @@ class SasayakiPlaybackCommandCoordinator(
 
     fun start(
         rate: Float,
+        beforeStart: () -> Unit,
         markPlayedOnce: () -> Unit,
         afterMarkedPlaying: () -> Unit,
     ) {
         playbackLifecycle.start(
             rate = rate,
+            beforeStart = beforeStart,
             markPlayedOnce = markPlayedOnce,
             afterMarkedPlaying = afterMarkedPlaying,
         )

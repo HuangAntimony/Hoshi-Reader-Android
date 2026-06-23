@@ -230,3 +230,14 @@ Validate relevant sync/update/Sasayaki changes with:
   overlays when those areas change.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
+- Sasayaki long-running background playback on a physical device that is not in
+  a restricted background state. Check the package app-op before treating a
+  disappearing notification/session as an app regression:
+
+  ```bash
+  adb shell appops get <package-name> | rg 'RUN_ANY_IN_BACKGROUND|START_FOREGROUND|WAKE_LOCK'
+  ```
+
+  `RUN_ANY_IN_BACKGROUND: ignore` or `deny` means the device is intentionally
+  restricting background execution and is not a valid foreground-media-service
+  stability baseline. Record the restriction state in the manual QA notes.

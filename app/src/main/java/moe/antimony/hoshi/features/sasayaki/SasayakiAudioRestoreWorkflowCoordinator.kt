@@ -12,6 +12,8 @@ class SasayakiAudioRestoreWorkflowCoordinator(
         currentTime: () -> Double,
         updateMediaSession: () -> Unit,
         handleSeekComplete: () -> Unit,
+        handlePlaybackActiveChanged: (Boolean) -> Unit,
+        handlePositionChanged: (Int, Int) -> Unit,
         updateCue: (Double) -> Unit,
     ) {
         val result = runCatching {
@@ -28,6 +30,8 @@ class SasayakiAudioRestoreWorkflowCoordinator(
                         )
                     },
                     handleSeekComplete = handleSeekComplete,
+                    handlePlaybackActiveChanged = handlePlaybackActiveChanged,
+                    handlePositionChanged = handlePositionChanged,
                     handleError = audioRestoreResult::handleFailure,
                 ),
             )

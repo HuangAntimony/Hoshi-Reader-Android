@@ -74,6 +74,20 @@ class SasayakiPlaybackStateCoordinatorTest {
     }
 
     @Test
+    fun playerPositionUpdatesPausedNotificationSeeksAndWholeSecondSaves() {
+        val coordinator = SasayakiPlaybackStateCoordinator(initialPosition = 0.0)
+
+        val first = coordinator.updatePlayerPosition(currentPositionMs = 42_500, durationMs = 120_000)
+        assertEquals(42.5, coordinator.currentTime, 0.0)
+        assertEquals(120.0, coordinator.duration, 0.0)
+        assertTrue(first)
+
+        val sameSecond = coordinator.updatePlayerPosition(currentPositionMs = 42_800, durationMs = 120_000)
+        assertEquals(42.8, coordinator.currentTime, 0.0)
+        assertFalse(sameSecond)
+    }
+
+    @Test
     fun temporaryPlaybackReturnSuppressesSaveUntilRestoredPositionSecond() {
         val coordinator = SasayakiPlaybackStateCoordinator(initialPosition = 0.0)
 

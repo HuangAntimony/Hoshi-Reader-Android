@@ -6,12 +6,14 @@ class SasayakiPlaybackStartCoordinator(
 ) {
     fun start(
         rate: Float,
+        beforeStart: () -> Unit,
         currentTime: () -> Double,
         updateMediaSession: () -> Unit,
         redisplayCue: (Double) -> Unit,
     ) {
         playbackCommands.start(
             rate = rate,
+            beforeStart = beforeStart,
             markPlayedOnce = cuePresentation::markPlayedOnce,
             afterMarkedPlaying = {
                 updateMediaSession()

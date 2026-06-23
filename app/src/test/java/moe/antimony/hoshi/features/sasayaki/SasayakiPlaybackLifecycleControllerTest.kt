@@ -14,16 +14,19 @@ class SasayakiPlaybackLifecycleControllerTest {
         assertFalse(
             harness.controller.start(
                 rate = 1.25f,
+                beforeStart = { harness.events += "foreground" },
                 markPlayedOnce = { harness.events += "mark-played" },
                 afterMarkedPlaying = { harness.events += "after-playing:${harness.playbackState.isPlaying}" },
             ),
         )
+        assertEquals(emptyList<String>(), harness.events)
 
         harness.controller.attachEngine(harness.engine)
 
         assertTrue(
             harness.controller.start(
                 rate = 1.25f,
+                beforeStart = { harness.events += "foreground" },
                 markPlayedOnce = { harness.events += "mark-played" },
                 afterMarkedPlaying = { harness.events += "after-playing:${harness.playbackState.isPlaying}" },
             ),
@@ -31,7 +34,7 @@ class SasayakiPlaybackLifecycleControllerTest {
 
         assertTrue(harness.playbackState.isPlaying)
         assertEquals(
-            listOf("engine-start:1.25", "mark-played", "after-playing:true", "scheduler-post"),
+            listOf("foreground", "engine-start:1.25", "mark-played", "after-playing:true", "scheduler-post"),
             harness.events,
         )
     }
@@ -40,7 +43,7 @@ class SasayakiPlaybackLifecycleControllerTest {
     fun pauseStopsTickingUpdatesMediaSessionAndRestoresTemporaryPositionWhenRequested() {
         val harness = lifecycleHarness()
         harness.controller.attachEngine(harness.engine)
-        harness.controller.start(rate = 1f, markPlayedOnce = {}, afterMarkedPlaying = {})
+        harness.controller.start(rate = 1f, beforeStart = {}, markPlayedOnce = {}, afterMarkedPlaying = {})
         harness.events.clear()
 
         harness.controller.pause(
@@ -57,10 +60,56 @@ class SasayakiPlaybackLifecycleControllerTest {
     }
 
     @Test
+    fun externalPlayerStartMarksPlaybackWithoutStartingEngineAgain() {
+        val harness = lifecycleHarness()
+
+        harness.controller.syncPlayerPlaybackActive(
+            active = true,
+            markPlayedOnce = { harness.events += "mark-played" },
+            afterMarkedPlaying = { harness.events += "after-playing:${harness.playbackState.isPlaying}" },
+            updateMediaSession = { harness.events += "update-session" },
+            restoreTemporaryPositionIfNeeded = { harness.events += "restore-temporary" },
+        )
+
+        assertTrue(harness.playbackState.isPlaying)
+        assertEquals(
+            listOf("mark-played", "after-playing:true", "scheduler-post"),
+            harness.events,
+        )
+    }
+
+    @Test
+    fun externalPlayerPauseStopsTickingAndRestoresTemporaryPosition() {
+        val harness = lifecycleHarness()
+        harness.controller.syncPlayerPlaybackActive(
+            active = true,
+            markPlayedOnce = {},
+            afterMarkedPlaying = {},
+            updateMediaSession = {},
+            restoreTemporaryPositionIfNeeded = {},
+        )
+        harness.events.clear()
+
+        harness.controller.syncPlayerPlaybackActive(
+            active = false,
+            markPlayedOnce = { harness.events += "mark-played" },
+            afterMarkedPlaying = { harness.events += "after-playing" },
+            updateMediaSession = { harness.events += "update-session:${harness.playbackState.isPlaying}" },
+            restoreTemporaryPositionIfNeeded = { harness.events += "restore-temporary" },
+        )
+
+        assertFalse(harness.playbackState.isPlaying)
+        assertEquals(
+            listOf("scheduler-stop", "update-session:false", "restore-temporary"),
+            harness.events,
+        )
+    }
+
+    @Test
     fun seekDefersTickUntilEngineReportsCompletion() {
         val harness = lifecycleHarness()
         harness.controller.attachEngine(harness.engine)
-        harness.controller.start(rate = 1f, markPlayedOnce = {}, afterMarkedPlaying = {})
+        harness.controller.start(rate = 1f, beforeStart = {}, markPlayedOnce = {}, afterMarkedPlaying = {})
         harness.events.clear()
 
         assertTrue(

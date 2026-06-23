@@ -25,6 +25,10 @@ class SasayakiPlaybackServiceConfigurationTest {
             "Sasayaki playback must declare the Android 14+ media playback foreground-service permission.",
             "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" in permissions,
         )
+        assertTrue(
+            "Sasayaki playback uses ExoPlayer wake mode for long-running background audio.",
+            "android.permission.WAKE_LOCK" in permissions,
+        )
     }
 
     @Test

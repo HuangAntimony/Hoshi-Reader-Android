@@ -111,6 +111,18 @@ class SasayakiPlaybackStateCoordinator(initialPosition: Double) {
         )
     }
 
+    fun updatePlayerPosition(currentPositionMs: Int, durationMs: Int): Boolean {
+        currentTime = currentPositionMs.coerceAtLeast(0).toDouble() / 1000.0
+        updateDuration(durationMs)
+
+        val second = currentTime.toInt()
+        val shouldSavePosition = temporaryPlaybackReturnPosition == null && second != lastSavedSecond
+        if (shouldSavePosition) {
+            lastSavedSecond = second
+        }
+        return shouldSavePosition
+    }
+
     fun restoreTemporaryPlaybackPositionIfNeeded(): Double? {
         val returnPosition = temporaryPlaybackReturnPosition ?: return null
         temporaryPlaybackReturnPosition = null
