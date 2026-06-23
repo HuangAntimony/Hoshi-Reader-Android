@@ -33,10 +33,8 @@ class SasayakiPlaybackLifecycleController(
         this.engine = engine
     }
 
-    fun setRateIfPlaying(rate: Float) {
-        if (playbackState.isPlaying) {
-            engine?.setRate(rate)
-        }
+    fun setRate(rate: Float) {
+        engine?.setRate(rate)
     }
 
     fun start(

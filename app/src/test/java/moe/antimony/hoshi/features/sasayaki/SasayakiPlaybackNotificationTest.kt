@@ -1,28 +1,27 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import androidx.media3.common.Player
 import androidx.media3.session.CommandButton
-import androidx.media3.session.SessionError
-import androidx.media3.session.SessionResult
 import moe.antimony.hoshi.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SasayakiPlaybackNotificationTest {
     @Test
-    fun mediaButtonPreferencesPlaceCueCommandsInBackAndForwardSlots() {
+    fun mediaButtonPreferencesPlaceStandardCueCommandsInBackAndForwardSlots() {
         val specs = sasayakiServiceMediaButtonSpecs()
 
         assertEquals(2, specs.size)
         assertEquals(
-            "The left system media button must be Sasayaki previous-cue.",
-            SasayakiPreviousCueAction,
-            specs[0].customAction,
+            "The left system media button must use standard previous so platform controls route through Player.",
+            Player.COMMAND_SEEK_TO_PREVIOUS,
+            specs[0].playerCommand,
         )
         assertEquals(CommandButton.SLOT_BACK, specs[0].slot)
         assertEquals(
-            "The right system media button must be Sasayaki next-cue, not Media3 seek-to-next.",
-            SasayakiNextCueAction,
-            specs[1].customAction,
+            "The right system media button must use standard next so platform controls route through Player.",
+            Player.COMMAND_SEEK_TO_NEXT,
+            specs[1].playerCommand,
         )
         assertEquals(CommandButton.SLOT_FORWARD, specs[1].slot)
     }
@@ -47,41 +46,44 @@ class SasayakiPlaybackNotificationTest {
     }
 
     @Test
-    fun serviceSessionCommandDispatchesPreviousCue() {
+    fun standardPreviousSeekCommandDispatchesPreviousCue() {
         val commands = mutableListOf<String>()
-        val result = dispatchSasayakiServiceSessionAction(
-            customAction = SasayakiPreviousCueAction,
+        dispatchSasayakiServicePlayerSeekCommand(
+            seekCommand = Player.COMMAND_SEEK_TO_PREVIOUS,
+            positionMs = 5_000L,
             previousCue = { commands += "previous" },
             nextCue = { commands += "next" },
+            seekTo = { commands += "seek:$it" },
         )
 
-        assertEquals(SessionResult.RESULT_SUCCESS, result)
         assertEquals(listOf("previous"), commands)
     }
 
     @Test
-    fun serviceSessionCommandDispatchesNextCue() {
+    fun standardNextSeekCommandDispatchesNextCue() {
         val commands = mutableListOf<String>()
-        val result = dispatchSasayakiServiceSessionAction(
-            customAction = SasayakiNextCueAction,
+        dispatchSasayakiServicePlayerSeekCommand(
+            seekCommand = Player.COMMAND_SEEK_TO_NEXT,
+            positionMs = 5_000L,
             previousCue = { commands += "previous" },
             nextCue = { commands += "next" },
+            seekTo = { commands += "seek:$it" },
         )
 
-        assertEquals(SessionResult.RESULT_SUCCESS, result)
         assertEquals(listOf("next"), commands)
     }
 
     @Test
-    fun serviceSessionCommandRejectsUnknownAction() {
+    fun normalSeekCommandDispatchesAbsoluteSeek() {
         val commands = mutableListOf<String>()
-        val result = dispatchSasayakiServiceSessionAction(
-            customAction = "unknown",
+        dispatchSasayakiServicePlayerSeekCommand(
+            seekCommand = Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+            positionMs = 5_000L,
             previousCue = { commands += "previous" },
             nextCue = { commands += "next" },
+            seekTo = { commands += "seek:$it" },
         )
 
-        assertEquals(SessionError.ERROR_NOT_SUPPORTED, result)
-        assertEquals(emptyList<String>(), commands)
+        assertEquals(listOf("seek:5000"), commands)
     }
 }

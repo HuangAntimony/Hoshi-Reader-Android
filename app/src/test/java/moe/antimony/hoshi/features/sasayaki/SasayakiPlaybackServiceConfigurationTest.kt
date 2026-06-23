@@ -47,6 +47,13 @@ class SasayakiPlaybackServiceConfigurationTest {
     }
 
     @Test
+    fun oemRestrictedNotificationReceiverIsNotExported() {
+        val receiver = receiverElement(".features.sasayaki.SasayakiOemRestrictedPlaybackNotificationReceiver")
+
+        assertEquals("false", receiver.getAttribute("android:exported"))
+    }
+
+    @Test
     fun serviceExtendsMediaSessionService() {
         assertTrue(
             "SasayakiPlaybackService must extend MediaSessionService so Android can keep playback alive in the background.",
@@ -58,6 +65,17 @@ class SasayakiPlaybackServiceConfigurationTest {
         val services = sourceManifest().getElementsByTagName("service")
         for (index in 0 until services.length) {
             val element = services.item(index) as Element
+            if (element.getAttribute("android:name") == name) {
+                return element
+            }
+        }
+        error("$name not found in AndroidManifest.xml")
+    }
+
+    private fun receiverElement(name: String): Element {
+        val receivers = sourceManifest().getElementsByTagName("receiver")
+        for (index in 0 until receivers.length) {
+            val element = receivers.item(index) as Element
             if (element.getAttribute("android:name") == name) {
                 return element
             }

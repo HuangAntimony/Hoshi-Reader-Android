@@ -1,7 +1,9 @@
 package moe.antimony.hoshi.features.sasayaki
 
-import android.content.Intent
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -24,20 +26,6 @@ class SasayakiPlaybackService : MediaSessionService() {
             contentIntent = runtime::playbackReturnPendingIntent,
         )
         addSession(runtime.createSession())
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action in SasayakiOemRestrictedNotificationActions) {
-            when (intent?.action) {
-                SasayakiOemRestrictedNotificationPreviousCueAction -> runtime.previousFromSession()
-                SasayakiOemRestrictedNotificationTogglePlaybackAction -> runtime.toggleFromNotification()
-                SasayakiOemRestrictedNotificationNextCueAction -> runtime.nextFromSession()
-            }
-            runtime.currentSession()?.let { onUpdateNotification(it, startInForegroundRequired = false) }
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
@@ -71,11 +59,21 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 }
 
-private val SasayakiOemRestrictedNotificationActions = setOf(
-    SasayakiOemRestrictedNotificationPreviousCueAction,
-    SasayakiOemRestrictedNotificationTogglePlaybackAction,
-    SasayakiOemRestrictedNotificationNextCueAction,
-)
+@AndroidEntryPoint
+internal class SasayakiOemRestrictedPlaybackNotificationReceiver : BroadcastReceiver() {
+    @Inject internal lateinit var runtime: SasayakiPlaybackServiceRuntime
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (!runtime.dispatchOemRestrictedNotificationAction(intent.action)) return
+        runtime.currentSession()?.let { session ->
+            SasayakiOemRestrictedPlaybackNotificationRenderer(
+                context = context.applicationContext,
+                notificationManager = context.applicationContext.getSystemService(NotificationManager::class.java),
+                contentIntent = runtime::playbackReturnPendingIntent,
+            ).show(session)
+        }
+    }
+}
 
 private fun Player.hasForegroundPlayback(): Boolean =
     isPlaying ||

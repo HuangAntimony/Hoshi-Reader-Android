@@ -102,6 +102,16 @@ class SasayakiPlaybackLifecycleControllerTest {
     }
 
     @Test
+    fun rateChangeUpdatesAttachedEngineEvenWhenPaused() {
+        val harness = lifecycleHarness()
+        harness.controller.attachEngine(harness.engine)
+
+        harness.controller.setRate(1.5f)
+
+        assertEquals(listOf("engine-rate:1.5"), harness.events)
+    }
+
+    @Test
     fun seekDefersTickUntilEngineReportsCompletion() {
         val harness = lifecycleHarness()
         harness.controller.attachEngine(harness.engine)

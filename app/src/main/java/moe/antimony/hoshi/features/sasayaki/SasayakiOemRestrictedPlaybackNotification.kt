@@ -93,6 +93,7 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
             .setContentIntent(contentIntent())
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOngoing(player.isPlaying)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setStyle(
@@ -118,10 +119,10 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
     }
 
     private fun actionIntent(spec: SasayakiOemRestrictedNotificationActionSpec): PendingIntent =
-        PendingIntent.getService(
+        PendingIntent.getBroadcast(
             context,
             spec.requestCode,
-            Intent(spec.action).setClass(context, SasayakiPlaybackService::class.java),
+            Intent(spec.action).setClass(context, SasayakiOemRestrictedPlaybackNotificationReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

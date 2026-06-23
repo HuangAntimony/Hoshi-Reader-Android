@@ -148,7 +148,7 @@ internal class SasayakiPlaybackController(
 
     override fun setRate(value: Float) {
         playbackPersistence.setRate(value)
-        playbackLifecycle.setRateIfPlaying(value)
+        playbackLifecycle.setRate(value)
     }
 
     override fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {
