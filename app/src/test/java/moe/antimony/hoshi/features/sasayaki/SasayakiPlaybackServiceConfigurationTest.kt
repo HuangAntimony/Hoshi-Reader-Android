@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaNotification
+import androidx.media3.common.Player
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -48,10 +50,26 @@ class SasayakiPlaybackServiceConfigurationTest {
     }
 
     @Test
-    fun oemRestrictedFallbackDoesNotDeclarePrivateActionReceiver() {
+    fun playbackNotificationUsesMedia3ProviderContract() {
+        assertTrue(
+            "Sasayaki notification rendering may be customized, but foreground-service ownership must stay with Media3.",
+            MediaNotification.Provider::class.java.isAssignableFrom(SasayakiPlaybackNotificationProvider::class.java),
+        )
+    }
+
+    @Test
+    fun playbackServiceDelegatesForegroundLifecycleThroughMedia3NotificationUpdates() {
+        assertTrue(
+            "SasayakiPlaybackService may strengthen Media3's foreground requirement for active Sasayaki audio, but foreground-service start/stop ownership must stay in Media3.",
+            SasayakiPlaybackService::class.java.declaredMethods.any { it.name == "onUpdateNotification" },
+        )
+    }
+
+    @Test
+    fun playbackNotificationDoesNotDeclarePrivateActionReceiver() {
         assertFalse(
-            "OEM-restricted fallback actions must route through MediaSessionService PendingIntents, not an in-process BroadcastReceiver.",
-            hasReceiver(".features.sasayaki.SasayakiOemRestrictedPlaybackNotificationReceiver"),
+            "Sasayaki notification actions must route through MediaSessionService PendingIntents, not an in-process BroadcastReceiver.",
+            receiverNames().any { it.contains(".features.sasayaki.") },
         )
     }
 
@@ -60,6 +78,59 @@ class SasayakiPlaybackServiceConfigurationTest {
         assertTrue(
             "SasayakiPlaybackService must extend MediaSessionService so Android can keep playback alive in the background.",
             MediaSessionService::class.java.isAssignableFrom(SasayakiPlaybackService::class.java),
+        )
+    }
+
+    @Test
+    fun playbackForegroundPolicyMatchesOngoingAudioStates() {
+        assertTrue(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = true,
+                playWhenReady = false,
+                playbackState = Player.STATE_IDLE,
+            ),
+        )
+        assertTrue(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = true,
+                playWhenReady = true,
+                playbackState = Player.STATE_ENDED,
+            ),
+        )
+        assertTrue(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = false,
+                playWhenReady = true,
+                playbackState = Player.STATE_BUFFERING,
+            ),
+        )
+        assertTrue(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = false,
+                playWhenReady = true,
+                playbackState = Player.STATE_READY,
+            ),
+        )
+        assertFalse(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = false,
+                playWhenReady = false,
+                playbackState = Player.STATE_READY,
+            ),
+        )
+        assertFalse(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = false,
+                playWhenReady = true,
+                playbackState = Player.STATE_IDLE,
+            ),
+        )
+        assertFalse(
+            sasayakiShouldRunPlaybackServiceInForeground(
+                foregroundPlaybackRequested = false,
+                playWhenReady = true,
+                playbackState = Player.STATE_ENDED,
+            ),
         )
     }
 
@@ -74,15 +145,14 @@ class SasayakiPlaybackServiceConfigurationTest {
         error("$name not found in AndroidManifest.xml")
     }
 
-    private fun hasReceiver(name: String): Boolean {
+    private fun receiverNames(): List<String> {
         val receivers = sourceManifest().getElementsByTagName("receiver")
+        val names = mutableListOf<String>()
         for (index in 0 until receivers.length) {
             val element = receivers.item(index) as Element
-            if (element.getAttribute("android:name") == name) {
-                return true
-            }
+            names += element.getAttribute("android:name")
         }
-        return false
+        return names
     }
 
     private fun Element.hasAction(name: String): Boolean {

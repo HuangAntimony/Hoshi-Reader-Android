@@ -60,6 +60,7 @@ internal class SasayakiPlaybackController(
     playbackPreparer: SasayakiPlaybackPreparer,
     persistenceDispatcher: CoroutineDispatcher,
     private val onPlaybackStartRequested: () -> Unit = {},
+    private val onForegroundPlaybackRequestedChanged: (Boolean) -> Unit = {},
     restoreAudioOnCreate: Boolean = true,
 ) : SasayakiPlaybackControllerContract {
     private val appContext = context.applicationContext
@@ -179,6 +180,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun pausePlayback(restoreTemporaryPosition: Boolean) {
+        onForegroundPlaybackRequestedChanged(false)
         playbackCommands.pause(
             restoreTemporaryPosition = restoreTemporaryPosition,
             restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
@@ -279,7 +281,7 @@ internal class SasayakiPlaybackController(
     }
 
     private fun startPlayback() {
-        playbackCommands.start(
+        val started = playbackCommands.start(
             rate = rate,
             beforeStart = onPlaybackStartRequested,
             markPlayedOnce = cuePresentation::markPlayedOnce,
@@ -287,6 +289,9 @@ internal class SasayakiPlaybackController(
                 updateCue(currentTime, forceDisplay = true)
             },
         )
+        if (started) {
+            onForegroundPlaybackRequestedChanged(true)
+        }
     }
 
     private fun handleSeekComplete() {
@@ -310,7 +315,7 @@ internal class SasayakiPlaybackController(
                     onPrepared = { durationMs ->
                         handleAudioPrepared(durationMs = durationMs, currentTime = currentTime)
                     },
-                    onCompletion = playbackLifecycle::markCompleted,
+                    onCompletion = ::handlePlaybackCompleted,
                     onSeekComplete = ::handleSeekComplete,
                     onPlaybackActiveChanged = ::handlePlaybackActiveChanged,
                     onPositionChanged = ::handlePlayerPositionChanged,
@@ -322,7 +327,13 @@ internal class SasayakiPlaybackController(
     }
 
     private fun handleAudioRestoreFailure(error: Throwable) {
+        onForegroundPlaybackRequestedChanged(false)
         audioAvailability.markRestoreFailed(error)
+    }
+
+    private fun handlePlaybackCompleted() {
+        onForegroundPlaybackRequestedChanged(false)
+        playbackLifecycle.markCompleted()
     }
 
     private fun handleAudioPrepared(durationMs: Int, currentTime: Double) {
@@ -398,6 +409,7 @@ internal class SasayakiPlaybackController(
     }
 
     private fun teardownPlayer(clearCue: Boolean) {
+        onForegroundPlaybackRequestedChanged(false)
         pausePlayback(restoreTemporaryPosition = true)
         playbackLifecycle.releaseEngine()
         audioAvailability.markAudioUnavailable()

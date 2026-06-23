@@ -232,14 +232,20 @@ Validate relevant sync/update/Sasayaki changes with:
   the existing app task instead of creating a duplicate task.
 - Sasayaki long-running background playback on a physical device. Check the
   package app-op before triage. The normal path should use Media3's
-  `mediaPlayback` foreground-service notification. A detached transport
-  notification without a foreground service can leave the process in
-  cached/background-restricted state and make playback stop while the
-  notification remains visible:
+  MediaSession APIs and Android's `mediaPlayback` foreground-service type.
+  Sasayaki may customize notification rendering only through Media3's
+  `MediaNotification.Provider`; Media3 must own foreground-service start/stop
+  for the same MediaSession-backed notification id while audio is playing or
+  buffering. Do not add a second fallback notification path, private
+  notification action receiver, or manual service lifecycle calls around
+  Media3. A detached transport notification without a foreground service can
+  leave the process in cached/background-restricted state and make playback
+  stop while the notification remains visible:
 
   ```bash
   adb shell appops get <package-name> | rg 'RUN_ANY_IN_BACKGROUND|START_FOREGROUND|WAKE_LOCK'
-  adb shell dumpsys activity services <package-name> | rg 'SasayakiPlaybackService|startRequested|allowStartForeground'
+  adb shell dumpsys activity services <package-name> | rg 'SasayakiPlaybackService|foreground|startRequested|allowStartForeground'
+  adb shell dumpsys notification --noredact | rg 'hoshi_sasayaki_playback|android.mediaSession|NotificationRecord'
   ```
 
   `RUN_ANY_IN_BACKGROUND: ignore` or `deny`, or

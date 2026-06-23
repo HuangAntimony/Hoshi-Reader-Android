@@ -32,8 +32,8 @@ class SasayakiPlaybackNotificationTest {
     }
 
     @Test
-    fun oemRestrictedFallbackNotificationUsesMedia3PlayerCommands() {
-        val specs = sasayakiOemRestrictedNotificationActionSpecs(isPlaying = true)
+    fun playbackNotificationUsesMedia3PlayerCommands() {
+        val specs = sasayakiPlaybackNotificationActionSpecs(isPlaying = true)
 
         assertEquals(3, specs.size)
         assertEquals(Player.COMMAND_SEEK_BACK, specs[0].playerCommand)
@@ -47,8 +47,8 @@ class SasayakiPlaybackNotificationTest {
     }
 
     @Test
-    fun oemRestrictedFallbackNotificationToggleLabelReflectsPausedPlayback() {
-        val specs = sasayakiOemRestrictedNotificationActionSpecs(isPlaying = false)
+    fun playbackNotificationToggleLabelReflectsPausedPlayback() {
+        val specs = sasayakiPlaybackNotificationActionSpecs(isPlaying = false)
 
         assertEquals(Player.COMMAND_PLAY_PAUSE, specs[1].playerCommand)
         assertEquals(R.string.sasayaki_play, specs[1].titleResId)

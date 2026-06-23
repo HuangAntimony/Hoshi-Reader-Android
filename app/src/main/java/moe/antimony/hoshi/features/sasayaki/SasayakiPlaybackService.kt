@@ -1,8 +1,8 @@
 package moe.antimony.hoshi.features.sasayaki
 
-import android.app.NotificationManager
 import android.content.Intent
 import androidx.annotation.OptIn
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -13,15 +13,16 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SasayakiPlaybackService : MediaSessionService() {
     @Inject internal lateinit var runtime: SasayakiPlaybackServiceRuntime
-    private lateinit var oemRestrictedNotificationRenderer: SasayakiOemRestrictedPlaybackNotificationRenderer
+    private lateinit var notificationProvider: SasayakiPlaybackNotificationProvider
 
     override fun onCreate() {
         super.onCreate()
-        oemRestrictedNotificationRenderer = SasayakiOemRestrictedPlaybackNotificationRenderer(
+        notificationProvider = SasayakiPlaybackNotificationProvider(
             context = this,
-            notificationManager = getSystemService(NotificationManager::class.java),
             contentIntent = runtime::playbackReturnPendingIntent,
+            isPlaybackOngoing = runtime::isForegroundPlaybackRequested,
         )
+        setMediaNotificationProvider(notificationProvider)
         addSession(runtime.createServiceSession(this))
     }
 
@@ -29,12 +30,10 @@ class SasayakiPlaybackService : MediaSessionService() {
         runtime.currentSession()
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-        if (runtime.requiresOemRestrictedPlaybackNotificationFallback()) {
-            oemRestrictedNotificationRenderer.show(session)
-        } else {
-            oemRestrictedNotificationRenderer.cancel()
-            super.onUpdateNotification(session, startInForegroundRequired)
-        }
+        super.onUpdateNotification(
+            session,
+            startInForegroundRequired || runtime.shouldRunPlaybackServiceInForeground(session.player),
+        )
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -45,7 +44,7 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        oemRestrictedNotificationRenderer.cancel()
+        notificationProvider.cancel()
         runtime.release()
         super.onDestroy()
     }
@@ -57,3 +56,20 @@ class SasayakiPlaybackService : MediaSessionService() {
 
 internal fun sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing: Boolean): Boolean =
     !isPlaybackOngoing
+
+internal fun sasayakiShouldRunPlaybackServiceInForeground(player: Player): Boolean =
+    sasayakiShouldRunPlaybackServiceInForeground(
+        foregroundPlaybackRequested = false,
+        playWhenReady = player.playWhenReady,
+        playbackState = player.playbackState,
+    )
+
+internal fun sasayakiShouldRunPlaybackServiceInForeground(
+    foregroundPlaybackRequested: Boolean,
+    playWhenReady: Boolean,
+    playbackState: Int,
+): Boolean =
+    foregroundPlaybackRequested ||
+        playWhenReady &&
+        playbackState != Player.STATE_IDLE &&
+        playbackState != Player.STATE_ENDED

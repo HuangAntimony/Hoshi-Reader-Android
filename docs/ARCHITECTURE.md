@@ -132,13 +132,14 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Media3's ongoing-playback service semantics. Playback persistence uses the
   application scope with the injected IO dispatcher rather than Reader's
   Compose scope, and saves are serialized with latest-snapshot conflation.
-  Normal background playback promotes the service through Android's
-  `mediaPlayback` foreground-service path, and the ExoPlayer uses local wake
-  mode for long-running playback. The only non-default notification branch is
-  the isolated OEM-restricted fallback used when Android reports the app as
-  background restricted; that branch still belongs to
-  `SasayakiPlaybackService` and uses a MediaSession-backed transport
-  notification whose controls send Media3 player commands back to the service.
+  Background playback uses Android's `mediaPlayback` foreground-service path
+  inside the Media3 `MediaSessionService`; Media3 owns foreground-service
+  start/stop and Sasayaki does not call `startForegroundService()`,
+  `startForeground()`, `stopForeground()`, or `stopSelf()` directly for this
+  lifecycle. Sasayaki customizes notification rendering through a Media3
+  `MediaNotification.Provider` using the service MediaSession token and
+  Media3 player-command PendingIntents for transport controls, and the
+  ExoPlayer uses local wake mode for long-running playback.
   If Android reports `ActivityManager.isBackgroundRestricted()` for the app,
   the platform treats background work as user-restricted; this can prevent
   media foreground-service startup after the Reader activity leaves the

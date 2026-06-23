@@ -20,14 +20,13 @@ class SasayakiPlaybackCommandCoordinator(
         beforeStart: () -> Unit,
         markPlayedOnce: () -> Unit,
         afterMarkedPlaying: () -> Unit,
-    ) {
+    ): Boolean =
         playbackLifecycle.start(
             rate = rate,
             beforeStart = beforeStart,
             markPlayedOnce = markPlayedOnce,
             afterMarkedPlaying = afterMarkedPlaying,
         )
-    }
 
     fun pause(
         restoreTemporaryPosition: Boolean,

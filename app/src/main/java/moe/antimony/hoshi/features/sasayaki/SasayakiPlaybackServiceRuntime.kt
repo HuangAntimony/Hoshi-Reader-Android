@@ -1,16 +1,14 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.app.PendingIntent
-import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.C
-import androidx.media3.common.ForwardingSimpleBasePlayer
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -76,6 +74,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     private var activeKey: ActivePlaybackKey? = null
     private var activeBookId: String? = null
     private var activeController: SasayakiPlaybackControllerContract? = null
+    private var foregroundPlaybackRequested = false
     private val readerAttachment = SasayakiReaderAttachment()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val mainExecutor = Executor { command -> mainHandler.post(command) }
@@ -117,12 +116,18 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     fun activePlaybackBookId(): String? =
         activeBookId.takeIf { activeController?.hasAudio == true }
 
-    fun requiresOemRestrictedPlaybackNotificationFallback(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
-            appContext.getSystemService(ActivityManager::class.java)?.isBackgroundRestricted == true
-
     fun playbackReturnPendingIntent(): PendingIntent =
         sasayakiPlaybackReturnPendingIntent(appContext, activeBookId)
+
+    fun isForegroundPlaybackRequested(): Boolean =
+        foregroundPlaybackRequested
+
+    fun shouldRunPlaybackServiceInForeground(player: Player): Boolean =
+        sasayakiShouldRunPlaybackServiceInForeground(
+            foregroundPlaybackRequested = foregroundPlaybackRequested,
+            playWhenReady = player.playWhenReady,
+            playbackState = player.playbackState,
+        )
 
     override fun load(
         request: SasayakiPlaybackRuntimeLoadRequest,
@@ -178,6 +183,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
                 playerProvider = ::requirePlayer,
             ),
             onPlaybackStartRequested = ::ensurePlaybackServiceConnection,
+            onForegroundPlaybackRequestedChanged = ::setForegroundPlaybackRequested,
             restoreAudioOnCreate = false,
         )
         activeKey = requestedKey
@@ -191,6 +197,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     }
 
     override fun stopPlayback() {
+        setForegroundPlaybackRequested(false)
         releaseActiveController()
         readerAttachment.detach()
         releasePlaybackServiceConnection()
@@ -224,6 +231,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     }
 
     fun release() {
+        setForegroundPlaybackRequested(false)
         releaseActiveController()
         readerAttachment.detach()
         releasePlaybackServiceConnection()
@@ -259,6 +267,10 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         playbackServiceConnection = null
     }
 
+    private fun setForegroundPlaybackRequested(requested: Boolean) {
+        foregroundPlaybackRequested = requested
+    }
+
     private fun restoreAudioWhenServiceReady(
         controller: SasayakiPlaybackController,
         serviceConnection: ListenableFuture<MediaController>,
@@ -274,6 +286,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     }
 
     private fun releaseActiveController(clearBookId: Boolean = true) {
+        setForegroundPlaybackRequested(false)
         activeController?.release()
         activeController = null
         activeKey = null
@@ -326,29 +339,53 @@ private class SasayakiServiceSessionPlayer(
     private val onSkipToPrevious: () -> Unit,
     private val onSkipToNext: () -> Unit,
     private val onSeekTo: (Long) -> Unit,
-) : ForwardingSimpleBasePlayer(player) {
-    override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        val handled = if (playWhenReady) {
-            onPlay()
-        } else {
-            onPause()
-        }
-        return if (handled) super.handleSetPlayWhenReady(playWhenReady) else Futures.immediateFuture(null)
+) : ForwardingPlayer(player) {
+    override fun play() {
+        onPlay()
     }
 
-    override fun handleSeek(
-        mediaItemIndex: Int,
-        positionMs: Long,
-        seekCommand: Int,
-    ): ListenableFuture<*> {
-        dispatchSasayakiServicePlayerSeekCommand(
-            seekCommand = seekCommand,
-            positionMs = positionMs,
-            previousCue = onSkipToPrevious,
-            nextCue = onSkipToNext,
-            seekTo = onSeekTo,
-        )
-        return Futures.immediateFuture(null)
+    override fun pause() {
+        onPause()
+    }
+
+    override fun setPlayWhenReady(playWhenReady: Boolean) {
+        if (playWhenReady) {
+            play()
+        } else {
+            pause()
+        }
+    }
+
+    override fun seekBack() {
+        onSkipToPrevious()
+    }
+
+    override fun seekForward() {
+        onSkipToNext()
+    }
+
+    override fun seekToPrevious() {
+        onSkipToPrevious()
+    }
+
+    override fun seekToPreviousMediaItem() {
+        onSkipToPrevious()
+    }
+
+    override fun seekToNext() {
+        onSkipToNext()
+    }
+
+    override fun seekToNextMediaItem() {
+        onSkipToNext()
+    }
+
+    override fun seekTo(positionMs: Long) {
+        onSeekTo(positionMs)
+    }
+
+    override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+        onSeekTo(positionMs)
     }
 }
 
