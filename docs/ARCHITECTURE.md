@@ -137,7 +137,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   mode for long-running playback. The only non-default notification branch is
   the isolated OEM-restricted fallback used when Android reports the app as
   background restricted; that branch uses a MediaSession-backed transport
-  notification with non-exported in-app action dispatch.
+  notification whose controls send Media3 player commands back to
+  `SasayakiPlaybackService`.
 - Update checks use WorkManager unique work, with worker dependencies supplied
   by Hilt's WorkManager integration.
 

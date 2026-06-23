@@ -6,30 +6,23 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
+import androidx.media3.session.PlaybackPendingIntentBuilder
 import moe.antimony.hoshi.R
 import androidx.media3.session.R as Media3R
 
 internal const val SasayakiPlaybackNotificationId = 1001
 internal const val SasayakiPlaybackNotificationChannelId = "hoshi_sasayaki_playback"
-internal const val SasayakiOemRestrictedNotificationPreviousCueAction =
-    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.PREVIOUS_CUE"
-internal const val SasayakiOemRestrictedNotificationTogglePlaybackAction =
-    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.TOGGLE_PLAYBACK"
-internal const val SasayakiOemRestrictedNotificationNextCueAction =
-    "moe.antimony.hoshi.sasayaki.oem_restricted_notification.NEXT_CUE"
 
 internal data class SasayakiOemRestrictedNotificationActionSpec(
-    val action: String,
+    val playerCommand: Int,
     val iconResId: Int,
     val titleResId: Int,
-    val requestCode: Int,
 )
 
 @OptIn(UnstableApi::class)
@@ -38,26 +31,23 @@ internal fun sasayakiOemRestrictedNotificationActionSpecs(
 ): List<SasayakiOemRestrictedNotificationActionSpec> =
     listOf(
         SasayakiOemRestrictedNotificationActionSpec(
-            action = SasayakiOemRestrictedNotificationPreviousCueAction,
+            playerCommand = Player.COMMAND_SEEK_TO_PREVIOUS,
             iconResId = Media3R.drawable.media3_icon_previous,
             titleResId = R.string.sasayaki_previous_cue,
-            requestCode = 20,
         ),
         SasayakiOemRestrictedNotificationActionSpec(
-            action = SasayakiOemRestrictedNotificationTogglePlaybackAction,
+            playerCommand = Player.COMMAND_PLAY_PAUSE,
             iconResId = if (isPlaying) {
                 Media3R.drawable.media3_icon_pause
             } else {
                 Media3R.drawable.media3_icon_play
             },
             titleResId = if (isPlaying) R.string.sasayaki_pause else R.string.sasayaki_play,
-            requestCode = 21,
         ),
         SasayakiOemRestrictedNotificationActionSpec(
-            action = SasayakiOemRestrictedNotificationNextCueAction,
+            playerCommand = Player.COMMAND_SEEK_TO_NEXT,
             iconResId = Media3R.drawable.media3_icon_next,
             titleResId = R.string.sasayaki_next_cue,
-            requestCode = 22,
         ),
     )
 
@@ -118,13 +108,15 @@ internal class SasayakiOemRestrictedPlaybackNotificationRenderer(
         return builder.build()
     }
 
+    @OptIn(UnstableApi::class)
     private fun actionIntent(spec: SasayakiOemRestrictedNotificationActionSpec): PendingIntent =
-        PendingIntent.getBroadcast(
+        PlaybackPendingIntentBuilder(
             context,
-            spec.requestCode,
-            Intent(spec.action).setClass(context, SasayakiOemRestrictedPlaybackNotificationReceiver::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            spec.playerCommand,
+            SasayakiPlaybackService::class.java,
         )
+            .setSessionId(SasayakiPlaybackService.SessionId)
+            .build()
 
     private fun ensureChannel() {
         val channel = NotificationChannel(

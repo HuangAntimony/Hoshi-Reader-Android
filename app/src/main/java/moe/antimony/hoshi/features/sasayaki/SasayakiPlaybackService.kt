@@ -1,8 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
@@ -56,22 +54,6 @@ class SasayakiPlaybackService : MediaSessionService() {
 
     companion object {
         internal const val SessionId = "hoshi-sasayaki-playback"
-    }
-}
-
-@AndroidEntryPoint
-internal class SasayakiOemRestrictedPlaybackNotificationReceiver : BroadcastReceiver() {
-    @Inject internal lateinit var runtime: SasayakiPlaybackServiceRuntime
-
-    override fun onReceive(context: Context, intent: Intent) {
-        if (!runtime.dispatchOemRestrictedNotificationAction(intent.action)) return
-        runtime.currentSession()?.let { session ->
-            SasayakiOemRestrictedPlaybackNotificationRenderer(
-                context = context.applicationContext,
-                notificationManager = context.applicationContext.getSystemService(NotificationManager::class.java),
-                contentIntent = runtime::playbackReturnPendingIntent,
-            ).show(session)
-        }
     }
 }
 

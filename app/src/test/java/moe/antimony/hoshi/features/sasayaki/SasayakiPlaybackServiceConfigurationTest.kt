@@ -4,6 +4,7 @@ import androidx.media3.session.MediaSessionService
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Document
@@ -47,10 +48,11 @@ class SasayakiPlaybackServiceConfigurationTest {
     }
 
     @Test
-    fun oemRestrictedNotificationReceiverIsNotExported() {
-        val receiver = receiverElement(".features.sasayaki.SasayakiOemRestrictedPlaybackNotificationReceiver")
-
-        assertEquals("false", receiver.getAttribute("android:exported"))
+    fun oemRestrictedFallbackDoesNotDeclarePrivateActionReceiver() {
+        assertFalse(
+            "OEM-restricted fallback actions must route through MediaSessionService PendingIntents, not an in-process BroadcastReceiver.",
+            hasReceiver(".features.sasayaki.SasayakiOemRestrictedPlaybackNotificationReceiver"),
+        )
     }
 
     @Test
@@ -72,15 +74,15 @@ class SasayakiPlaybackServiceConfigurationTest {
         error("$name not found in AndroidManifest.xml")
     }
 
-    private fun receiverElement(name: String): Element {
+    private fun hasReceiver(name: String): Boolean {
         val receivers = sourceManifest().getElementsByTagName("receiver")
         for (index in 0 until receivers.length) {
             val element = receivers.item(index) as Element
             if (element.getAttribute("android:name") == name) {
-                return element
+                return true
             }
         }
-        error("$name not found in AndroidManifest.xml")
+        return false
     }
 
     private fun Element.hasAction(name: String): Boolean {

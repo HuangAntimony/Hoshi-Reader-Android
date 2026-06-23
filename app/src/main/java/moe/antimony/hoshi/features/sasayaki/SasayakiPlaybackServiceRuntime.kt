@@ -212,26 +212,12 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         activeController?.pausePlayback(restoreTemporaryPosition = true)
     }
 
-    fun toggleFromNotification() {
-        activeController?.togglePlayback()
-    }
-
     fun nextFromSession() {
         activeController?.nextCue()
     }
 
     fun seekToFromSession(positionMs: Long) {
         activeController?.seekTo(positionMs.coerceAtLeast(0L) / 1000.0)
-    }
-
-    fun dispatchOemRestrictedNotificationAction(action: String?): Boolean {
-        when (action) {
-            SasayakiOemRestrictedNotificationPreviousCueAction -> previousFromSession()
-            SasayakiOemRestrictedNotificationTogglePlaybackAction -> toggleFromNotification()
-            SasayakiOemRestrictedNotificationNextCueAction -> nextFromSession()
-            else -> return false
-        }
-        return true
     }
 
     fun release() {

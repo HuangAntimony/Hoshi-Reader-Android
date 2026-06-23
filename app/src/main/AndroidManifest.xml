@@ -54,9 +54,6 @@
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
             </intent-filter>
         </receiver>
-        <receiver
-            android:name=".features.sasayaki.SasayakiOemRestrictedPlaybackNotificationReceiver"
-            android:exported="false" />
         <service
             android:name=".features.sasayaki.SasayakiPlaybackService"
             android:exported="true"
