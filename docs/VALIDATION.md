@@ -230,17 +230,22 @@ Validate relevant sync/update/Sasayaki changes with:
   overlays when those areas change.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
+- Sasayaki paused task-removal behavior, confirming that pausing playback and
+  then removing the app from recent tasks clears the Sasayaki notification and
+  leaves no active media session or foreground service.
 - Sasayaki long-running background playback on a physical device. Check the
   package app-op before triage. The normal path should use Media3's
   MediaSession APIs and Android's `mediaPlayback` foreground-service type.
   Sasayaki may customize notification rendering only through Media3's
   `MediaNotification.Provider`; Media3 must own foreground-service start/stop
   for the same MediaSession-backed notification id while audio is playing or
-  buffering. Do not add a second fallback notification path, private
-  notification action receiver, or manual service lifecycle calls around
-  Media3. A detached transport notification without a foreground service can
-  leave the process in cached/background-restricted state and make playback
-  stop while the notification remains visible:
+  buffering. Paused task-removal cleanup should clear the service player before
+  calling Media3's `pauseAllPlayersAndStopSelf()`. Do not add a second fallback
+  notification path, private notification action receiver, or direct
+  NotificationManager cancellation path around Media3. A detached transport
+  notification without a foreground service can leave the process in
+  cached/background-restricted state and make playback stop while the
+  notification remains visible:
 
   ```bash
   adb shell appops get <package-name> | rg 'RUN_ANY_IN_BACKGROUND|START_FOREGROUND|WAKE_LOCK'

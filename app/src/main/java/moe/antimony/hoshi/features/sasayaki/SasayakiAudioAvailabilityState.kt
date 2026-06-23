@@ -22,6 +22,10 @@ class SasayakiAudioAvailabilityState(
     }
 
     fun markRestoreSucceeded() {
+        markAudioAvailable()
+    }
+
+    fun markAudioAvailable() {
         hasAudio = true
         errorMessage = null
     }

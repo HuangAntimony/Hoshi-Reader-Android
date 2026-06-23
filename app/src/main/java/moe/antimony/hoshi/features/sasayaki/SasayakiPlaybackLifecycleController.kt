@@ -28,6 +28,8 @@ class SasayakiPlaybackLifecycleController(
     private val tickScheduler: SasayakiTickScheduler,
 ) {
     private var engine: SasayakiPlaybackEngine? = null
+    val hasEngine: Boolean
+        get() = engine != null
 
     fun attachEngine(engine: SasayakiPlaybackEngine) {
         this.engine = engine

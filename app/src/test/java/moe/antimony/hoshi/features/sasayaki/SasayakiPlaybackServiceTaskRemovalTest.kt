@@ -6,12 +6,20 @@ import org.junit.Test
 
 class SasayakiPlaybackServiceTaskRemovalTest {
     @Test
-    fun keepsInternalControllerWhenMedia3ReportsOngoingPlayback() {
-        assertFalse(sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing = true))
+    fun keepsPlaybackWhenSasayakiPlaybackIsStillRequested() {
+        assertFalse(
+            sasayakiShouldStopPlaybackOnTaskRemoved(
+                isForegroundPlaybackRequested = true,
+            ),
+        )
     }
 
     @Test
-    fun releasesInternalControllerBeforeStoppingNonOngoingService() {
-        assertTrue(sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing = false))
+    fun stopsPlaybackAfterUserPausedBeforeTaskRemoval() {
+        assertTrue(
+            sasayakiShouldStopPlaybackOnTaskRemoved(
+                isForegroundPlaybackRequested = false,
+            ),
+        )
     }
 }

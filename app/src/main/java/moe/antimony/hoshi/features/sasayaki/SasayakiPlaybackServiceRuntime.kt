@@ -136,8 +136,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         onClearCue: () -> Unit,
         onLoadChapter: (Int) -> Unit,
     ): SasayakiPlaybackControllerContract {
-        val serviceConnection = ensurePlaybackServiceConnection()
-
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
             matchData = request.matchData,
@@ -182,13 +180,12 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             playbackPreparer = ServiceOwnedSasayakiPlaybackPreparer(
                 playerProvider = ::requirePlayer,
             ),
-            onPlaybackStartRequested = ::ensurePlaybackServiceConnection,
+            onPlaybackStartRequested = ::ensurePlaybackServiceReady,
             onForegroundPlaybackRequestedChanged = ::setForegroundPlaybackRequested,
             restoreAudioOnCreate = false,
         )
         activeKey = requestedKey
         activeController = controller
-        restoreAudioWhenServiceReady(controller, serviceConnection)
         return controller
     }
 
@@ -267,15 +264,12 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         foregroundPlaybackRequested = requested
     }
 
-    private fun restoreAudioWhenServiceReady(
-        controller: SasayakiPlaybackController,
-        serviceConnection: ListenableFuture<MediaController>,
-    ) {
+    private fun ensurePlaybackServiceReady(onReady: () -> Unit) {
+        val serviceConnection = ensurePlaybackServiceConnection()
         serviceConnection.addListener(
             {
-                if (activeController !== controller) return@addListener
                 runCatching { Futures.getDone(serviceConnection) }.getOrNull() ?: return@addListener
-                controller.restoreAudio()
+                onReady()
             },
             mainExecutor,
         )

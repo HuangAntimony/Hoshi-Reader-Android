@@ -85,10 +85,6 @@ internal class SasayakiPlaybackNotificationProvider(
             context.getString(R.string.sasayaki_title),
         )
 
-    fun cancel() {
-        notificationManager.cancel(SasayakiPlaybackNotificationId)
-    }
-
     @OptIn(UnstableApi::class)
     fun buildNotification(session: MediaSession): Notification {
         ensureChannel()

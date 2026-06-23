@@ -120,18 +120,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
-  ExoPlayer and MediaSession; Reader load paths can connect to the service but
-  do not create the player or session directly. The service runtime owns the
-  active Sasayaki playback controller and active book id. Reader UI
-  attaches/detaches cue sinks and sends explicit stop on reader exit; Android
-  media controls and notification return actions route through the same
-  service-owned session. Until Reader UI is fully MediaController-based, the
-  runtime keeps one process-local controller connection after entering the
-  MediaSessionService lifecycle, releases that internal connection before
-  stopping non-ongoing playback on task removal, and otherwise follows
-  Media3's ongoing-playback service semantics. Playback persistence uses the
-  application scope with the injected IO dispatcher rather than Reader's
-  Compose scope, and saves are serialized with latest-snapshot conflation.
+  ExoPlayer and MediaSession, but Reader load paths do not connect to the
+  service or restore media into the player. The first explicit playback request
+  connects to the `MediaSessionService`, restores the active audio source into
+  the service player, and then starts playback so Reader restoration cannot
+  leave a paused system media notification. The service runtime owns the active
+  Sasayaki playback controller and active book id. Reader UI attaches/detaches
+  cue sinks and sends explicit stop on reader exit; Android media controls and
+  notification return actions route through the same service-owned session.
+  Until Reader UI is fully MediaController-based, the runtime keeps one
+  process-local controller connection after entering the MediaSessionService
+  lifecycle, uses Sasayaki's foreground playback request state to distinguish
+  user-paused task removal from ongoing background playback, clears the active
+  service player before stopping paused playback on task removal, and otherwise
+  follows Media3's ongoing-playback service semantics. Playback persistence
+  uses the application scope with the
+  injected IO dispatcher rather than Reader's Compose scope, and saves are
+  serialized with latest-snapshot conflation.
   Background playback uses Android's `mediaPlayback` foreground-service path
   inside the Media3 `MediaSessionService`; Media3 owns foreground-service
   start/stop and Sasayaki does not call `startForegroundService()`,
@@ -139,7 +144,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   directly for this lifecycle. Sasayaki customizes notification rendering
   through a Media3 `MediaNotification.Provider` using the service MediaSession
   token and Media3 player-command PendingIntents for transport controls, and
-  the ExoPlayer uses local wake mode for long-running playback.
+  the ExoPlayer uses local wake mode for long-running playback. Explicit
+  Reader exit requests stop playback and clear the service player so a stopped
+  session or notification cannot outlive the user-visible Reader playback
+  session.
   If Android reports `ActivityManager.isBackgroundRestricted()` for the app,
   the platform treats background work as user-restricted; this can prevent
   media foreground-service startup after the Reader activity leaves the

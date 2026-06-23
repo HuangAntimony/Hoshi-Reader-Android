@@ -37,14 +37,15 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing())) {
-            runtime.releasePlaybackServiceConnection()
+        if (sasayakiShouldStopPlaybackOnTaskRemoved(runtime.isForegroundPlaybackRequested())) {
+            runtime.stopPlayback()
+            pauseAllPlayersAndStopSelf()
+        } else {
+            super.onTaskRemoved(rootIntent)
         }
-        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
-        notificationProvider.cancel()
         runtime.release()
         super.onDestroy()
     }
@@ -54,8 +55,10 @@ class SasayakiPlaybackService : MediaSessionService() {
     }
 }
 
-internal fun sasayakiShouldReleaseInternalControllerOnTaskRemoved(isPlaybackOngoing: Boolean): Boolean =
-    !isPlaybackOngoing
+internal fun sasayakiShouldStopPlaybackOnTaskRemoved(
+    isForegroundPlaybackRequested: Boolean,
+): Boolean =
+    !isForegroundPlaybackRequested
 
 internal fun sasayakiShouldRunPlaybackServiceInForeground(player: Player): Boolean =
     sasayakiShouldRunPlaybackServiceInForeground(
