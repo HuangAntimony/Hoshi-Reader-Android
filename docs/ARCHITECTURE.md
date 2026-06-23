@@ -121,11 +121,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
   ExoPlayer and MediaSession, but Reader load paths do not connect to the
-  service or restore media into the player. The first explicit playback request
-  connects to the `MediaSessionService`, restores the active audio source into
-  the service player, and then starts playback so Reader restoration cannot
-  leave a paused system media notification. The service runtime owns the active
-  Sasayaki playback controller and active book id. Reader UI attaches/detaches
+  service or restore media into the player. The first explicit audio control
+  request connects to the `MediaSessionService`, restores the active audio
+  source into the service player, and then runs the requested command so Reader
+  restoration cannot leave a paused system media notification. The service
+  runtime owns the active Sasayaki playback controller and active book id.
+  Reader UI attaches/detaches
   cue sinks and sends explicit stop on reader exit; Android media controls and
   notification return actions route through the same service-owned session.
   Until Reader UI is fully MediaController-based, the runtime keeps one

@@ -5,26 +5,26 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class SasayakiDeferredPlaybackStartTest {
+class SasayakiDeferredPlaybackCommandTest {
     @Test
-    fun startWithoutPreparedEngineDefersUntilPlaybackEnvironmentIsReady() {
-        val gate = SasayakiDeferredPlaybackStart()
+    fun commandWithoutPreparedEngineDefersUntilPlaybackEnvironmentIsReady() {
+        val gate = SasayakiDeferredPlaybackCommand()
         val events = mutableListOf<String>()
         var ready: (() -> Unit)? = null
 
-        val startedImmediately = gate.start(
+        val ranImmediately = gate.run(
             hasPreparedEngine = false,
             requestPlaybackEnvironment = { onReady ->
                 events += "prepare"
                 ready = onReady
             },
-            startPreparedPlayback = {
+            runPreparedCommand = {
                 events += "start"
                 true
             },
         )
 
-        assertFalse(startedImmediately)
+        assertFalse(ranImmediately)
         assertEquals(listOf("prepare"), events)
 
         ready?.invoke()
@@ -33,19 +33,19 @@ class SasayakiDeferredPlaybackStartTest {
     }
 
     @Test
-    fun duplicateStartWhilePrepareIsPendingDoesNotRequestEnvironmentTwice() {
-        val gate = SasayakiDeferredPlaybackStart()
+    fun duplicateCommandWhilePrepareIsPendingDoesNotRequestEnvironmentTwice() {
+        val gate = SasayakiDeferredPlaybackCommand()
         val events = mutableListOf<String>()
         var ready: (() -> Unit)? = null
 
         repeat(2) {
-            gate.start(
+            gate.run(
                 hasPreparedEngine = false,
                 requestPlaybackEnvironment = { onReady ->
                     events += "prepare"
                     ready = onReady
                 },
-                startPreparedPlayback = {
+                runPreparedCommand = {
                     events += "start"
                     true
                 },
@@ -58,18 +58,18 @@ class SasayakiDeferredPlaybackStartTest {
     }
 
     @Test
-    fun cancelDropsPendingStartWhenOldControllerIsReleased() {
-        val gate = SasayakiDeferredPlaybackStart()
+    fun cancelDropsPendingCommandWhenOldControllerIsReleased() {
+        val gate = SasayakiDeferredPlaybackCommand()
         val events = mutableListOf<String>()
         var ready: (() -> Unit)? = null
 
-        gate.start(
+        gate.run(
             hasPreparedEngine = false,
             requestPlaybackEnvironment = { onReady ->
                 events += "prepare"
                 ready = onReady
             },
-            startPreparedPlayback = {
+            runPreparedCommand = {
                 events += "start"
                 true
             },
@@ -82,20 +82,20 @@ class SasayakiDeferredPlaybackStartTest {
     }
 
     @Test
-    fun preparedEngineStartsImmediately() {
-        val gate = SasayakiDeferredPlaybackStart()
+    fun preparedEngineRunsCommandImmediately() {
+        val gate = SasayakiDeferredPlaybackCommand()
         val events = mutableListOf<String>()
 
-        val started = gate.start(
+        val ran = gate.run(
             hasPreparedEngine = true,
             requestPlaybackEnvironment = { events += "prepare" },
-            startPreparedPlayback = {
+            runPreparedCommand = {
                 events += "start"
                 true
             },
         )
 
-        assertTrue(started)
+        assertTrue(ran)
         assertEquals(listOf("start"), events)
     }
 }
