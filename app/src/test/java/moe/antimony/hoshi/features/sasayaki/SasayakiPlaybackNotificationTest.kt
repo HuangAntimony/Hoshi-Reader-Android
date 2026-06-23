@@ -19,11 +19,12 @@ class SasayakiPlaybackNotificationTest {
         )
         assertEquals(CommandButton.SLOT_BACK, specs[0].slot)
         assertEquals(
-            "The right system media button must use standard next so platform controls route through Player.",
-            Player.COMMAND_SEEK_TO_NEXT,
+            "The right system media button must use standard fast-forward, not next-media-item.",
+            Player.COMMAND_SEEK_FORWARD,
             specs[1].playerCommand,
         )
         assertEquals(CommandButton.SLOT_FORWARD, specs[1].slot)
+        assertEquals(CommandButton.ICON_FAST_FORWARD, specs[1].icon)
     }
 
     @Test
@@ -60,10 +61,10 @@ class SasayakiPlaybackNotificationTest {
     }
 
     @Test
-    fun standardNextSeekCommandDispatchesNextCue() {
+    fun standardSeekForwardCommandDispatchesNextCuePath() {
         val commands = mutableListOf<String>()
         dispatchSasayakiServicePlayerSeekCommand(
-            seekCommand = Player.COMMAND_SEEK_TO_NEXT,
+            seekCommand = Player.COMMAND_SEEK_FORWARD,
             positionMs = 5_000L,
             previousCue = { commands += "previous" },
             nextCue = { commands += "next" },

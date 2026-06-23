@@ -295,6 +295,7 @@ private class SasayakiPlaybackServiceSessionCallback(
             .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
             .add(Player.COMMAND_SEEK_TO_NEXT)
             .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .add(Player.COMMAND_SEEK_FORWARD)
             .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_GET_TIMELINE)
             .add(Player.COMMAND_GET_METADATA)
@@ -356,6 +357,7 @@ internal fun dispatchSasayakiServicePlayerSeekCommand(
 
         Player.COMMAND_SEEK_TO_NEXT,
         Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+        Player.COMMAND_SEEK_FORWARD,
         -> nextCue()
 
         else -> seekTo(positionMs)
@@ -379,10 +381,10 @@ internal fun sasayakiServiceMediaButtonSpecs(): List<SasayakiServiceMediaButtonS
             playerCommand = Player.COMMAND_SEEK_TO_PREVIOUS,
         ),
         SasayakiServiceMediaButtonSpec(
-            icon = CommandButton.ICON_NEXT,
-            displayNameResId = R.string.sasayaki_next_cue,
+            icon = CommandButton.ICON_FAST_FORWARD,
+            displayNameResId = R.string.sasayaki_fast_forward,
             slot = CommandButton.SLOT_FORWARD,
-            playerCommand = Player.COMMAND_SEEK_TO_NEXT,
+            playerCommand = Player.COMMAND_SEEK_FORWARD,
         ),
     )
 
