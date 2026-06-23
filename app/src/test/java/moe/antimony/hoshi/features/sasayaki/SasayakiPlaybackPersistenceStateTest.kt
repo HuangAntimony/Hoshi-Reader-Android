@@ -3,7 +3,9 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -107,6 +109,29 @@ class SasayakiPlaybackPersistenceStateTest {
         assertEquals(listOf(1.0, 3.0), repository.saved.map { it.lastPosition })
     }
 
+    @Test
+    fun startsNewWorkerAfterSaveFailure() {
+        val repository = FailingOncePlaybackRepository()
+        val errors = mutableListOf<Throwable>()
+        val state = SasayakiPlaybackPersistenceState(
+            playbackRepository = repository,
+            audioSourceRepository = SasayakiAudioRepository(File("book-root")),
+            initialPlayback = SasayakiPlaybackData(lastPosition = 0.0),
+            persistenceScope = CoroutineScope(
+                SupervisorJob() +
+                    Dispatchers.Unconfined +
+                    CoroutineExceptionHandler { _, error -> errors += error },
+            ),
+            persistenceDispatcher = Dispatchers.Unconfined,
+        )
+
+        state.savePosition(1.0)
+        state.savePosition(2.0)
+
+        assertEquals(listOf(1.0, 2.0), repository.attempted.map { it.lastPosition })
+        assertEquals(1, errors.size)
+    }
+
     private class FakePlaybackRepository(
         val initial: SasayakiPlaybackData?,
     ) : SasayakiPlaybackRepository {
@@ -137,6 +162,19 @@ class SasayakiPlaybackPersistenceStateTest {
         fun completeFirstSave() {
             firstSaveContinuation?.resume(Unit)
             firstSaveContinuation = null
+        }
+    }
+
+    private class FailingOncePlaybackRepository : SasayakiPlaybackRepository {
+        val attempted = mutableListOf<SasayakiPlaybackData>()
+
+        override suspend fun load(): SasayakiPlaybackData? = null
+
+        override suspend fun save(playback: SasayakiPlaybackData) {
+            attempted += playback
+            if (attempted.size == 1) {
+                error("first save fails")
+            }
         }
     }
 }

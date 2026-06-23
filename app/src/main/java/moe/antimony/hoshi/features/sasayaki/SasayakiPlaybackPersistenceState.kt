@@ -79,27 +79,34 @@ class SasayakiPlaybackPersistenceState(
     }
 
     private suspend fun drainSaves() {
-        while (true) {
-            val snapshot = synchronized(saveLock) {
-                pendingSave.also {
-                    pendingSave = null
-                }
-            }
-            if (snapshot == null) {
-                val shouldContinue = synchronized(saveLock) {
-                    if (pendingSave == null) {
-                        saveWorkerRunning = false
-                        false
-                    } else {
-                        true
+        try {
+            while (true) {
+                val snapshot = synchronized(saveLock) {
+                    pendingSave.also {
+                        pendingSave = null
                     }
                 }
-                if (!shouldContinue) return
-                continue
+                if (snapshot == null) {
+                    val shouldContinue = synchronized(saveLock) {
+                        if (pendingSave == null) {
+                            saveWorkerRunning = false
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    if (!shouldContinue) return
+                    continue
+                }
+                withContext(NonCancellable + persistenceDispatcher) {
+                    playbackRepository.save(snapshot)
+                }
             }
-            withContext(NonCancellable + persistenceDispatcher) {
-                playbackRepository.save(snapshot)
+        } catch (error: Throwable) {
+            synchronized(saveLock) {
+                saveWorkerRunning = false
             }
+            throw error
         }
     }
 }
