@@ -16,8 +16,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
@@ -82,6 +84,8 @@ import moe.antimony.hoshi.ui.asString
 
 internal val SasayakiSpeedSliderRange = 0.5f..2.0f
 internal const val SasayakiSpeedSliderSteps = 29
+internal const val SasayakiAudiobookCoverWidthDp = 48
+internal const val SasayakiAudiobookCoverHeightDp = 68
 
 @Composable
 internal fun SasayakiSheet(
@@ -295,39 +299,6 @@ private fun SasayakiPlaybackHeader(
                 }
             }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                enabled = player.hasAudio,
-                onClick = player::previousCue,
-            ) {
-                Icon(Icons.Rounded.FastRewind, contentDescription = stringResource(R.string.sasayaki_previous_cue))
-            }
-            IconButton(
-                enabled = player.hasAudio,
-                onClick = player::togglePlayback,
-            ) {
-                Icon(
-                    if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (player.isPlaying) {
-                        stringResource(R.string.sasayaki_pause)
-                    } else {
-                        stringResource(R.string.sasayaki_play)
-                    },
-                )
-            }
-            IconButton(
-                enabled = player.hasAudio,
-                onClick = player::nextCue,
-            ) {
-                Icon(Icons.Rounded.FastForward, contentDescription = stringResource(R.string.sasayaki_next_cue))
-            }
-        }
         SasayakiPlaybackProgress(player = player)
     }
 }
@@ -340,7 +311,8 @@ private fun SasayakiAudiobookCover(
     val coverBitmap = rememberSasayakiCoverBitmap(metadata, fallbackCoverFile)
     Box(
         modifier = Modifier
-            .size(58.dp)
+            .width(SasayakiAudiobookCoverWidthDp.dp)
+            .height(SasayakiAudiobookCoverHeightDp.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
@@ -396,7 +368,11 @@ private fun SasayakiPlaybackProgress(player: SasayakiPlayer) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
         Slider(
             value = sliderValue.coerceIn(0f, rangeEnd),
             enabled = canSeek,
@@ -414,17 +390,53 @@ private fun SasayakiPlaybackProgress(player: SasayakiPlayer) {
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = formatDuration(if (isScrubbing) sliderValue.toDouble() else currentTime),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
             )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    enabled = player.hasAudio,
+                    onClick = player::previousCue,
+                ) {
+                    Icon(Icons.Rounded.FastRewind, contentDescription = stringResource(R.string.sasayaki_previous_cue))
+                }
+                IconButton(
+                    enabled = player.hasAudio,
+                    onClick = player::togglePlayback,
+                ) {
+                    Icon(
+                        if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (player.isPlaying) {
+                            stringResource(R.string.sasayaki_pause)
+                        } else {
+                            stringResource(R.string.sasayaki_play)
+                        },
+                    )
+                }
+                IconButton(
+                    enabled = player.hasAudio,
+                    onClick = player::nextCue,
+                ) {
+                    Icon(Icons.Rounded.FastForward, contentDescription = stringResource(R.string.sasayaki_next_cue))
+                }
+            }
             Text(
                 text = formatDuration(duration),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
             )
         }
     }

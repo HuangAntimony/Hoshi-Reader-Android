@@ -56,6 +56,17 @@ class SasayakiSheetTest {
     }
 
     @Test
+    fun audiobookCoverUsesReaderStylePortraitRatio() {
+        assertEquals(48, SasayakiAudiobookCoverWidthDp)
+        assertEquals(68, SasayakiAudiobookCoverHeightDp)
+        assertEquals(
+            48.0 / 68.0,
+            SasayakiAudiobookCoverWidthDp.toDouble() / SasayakiAudiobookCoverHeightDp.toDouble(),
+            0.0001,
+        )
+    }
+
+    @Test
     fun playbackHeaderInfoUsesAudiobookMetadataAndCurrentChapter() {
         val info = sasayakiPlaybackHeaderInfo(
             playback = SasayakiPlaybackData(
