@@ -8,7 +8,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Add a tabbed Sasayaki reader menu with draggable playback progress, audiobook resources, M4B chapter viewing and chapter jumps, and subtitle matching access from inside Reader.
+- Add a tabbed Sasayaki reader menu with draggable playback progress, audiobook resources, current subtitle match rate, in-place subtitle matching, M4B chapter viewing, and chapter jumps.
 - Allow Sasayaki audiobooks to be loaded and played without subtitle match data.
 
 ### Fixed

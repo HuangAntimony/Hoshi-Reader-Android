@@ -577,7 +577,6 @@
     <string name="sasayaki_storage_linked">Linked to the external audiobook file. Keep the original file available.</string>
     <string name="sasayaki_storage_select_audio">Select an .mp3 or .m4b audiobook</string>
     <string name="sasayaki_subtitle_match">Subtitle Match</string>
-    <string name="sasayaki_subtitle_match_ready">Matched subtitles are available.</string>
     <string name="sasayaki_subtitle_match_optional">Optional. Playback works without subtitles.</string>
     <string name="sasayaki_no_chapters">No chapters found in this audiobook.</string>
     <string name="sasayaki_unknown_chapter">Chapter</string>

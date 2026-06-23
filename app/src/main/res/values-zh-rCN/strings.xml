@@ -575,7 +575,6 @@
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
     <string name="sasayaki_storage_select_audio">选择 .mp3 或 .m4b 有声书</string>
     <string name="sasayaki_subtitle_match">字幕匹配</string>
-    <string name="sasayaki_subtitle_match_ready">已存在匹配字幕。</string>
     <string name="sasayaki_subtitle_match_optional">可选；没有字幕也可以播放。</string>
     <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
     <string name="sasayaki_unknown_chapter">章节</string>

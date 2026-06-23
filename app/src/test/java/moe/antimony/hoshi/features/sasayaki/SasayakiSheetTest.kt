@@ -1,6 +1,9 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.epub.SasayakiMatch
+import moe.antimony.hoshi.epub.SasayakiMatchData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SasayakiSheetTest {
@@ -28,5 +31,26 @@ class SasayakiSheetTest {
             SasayakiSheetTab.Chapters,
             sasayakiDefaultSheetTab(hasAudio = true, hasChapters = true),
         )
+    }
+
+    @Test
+    fun subtitleMatchSummaryShowsCurrentMatchRateWhenMatchDataExists() {
+        val matchData = SasayakiMatchData(
+            matches = listOf(
+                SasayakiMatch("a", 0.0, 1.0, "a", 0, 0, 1),
+                SasayakiMatch("b", 1.0, 2.0, "b", 0, 1, 1),
+            ),
+            unmatched = 1,
+        )
+
+        assertEquals(
+            "2/3 (66.7%)",
+            sasayakiSubtitleMatchSummary(matchData),
+        )
+    }
+
+    @Test
+    fun subtitleMatchSummaryIsAbsentWithoutMatchData() {
+        assertNull(sasayakiSubtitleMatchSummary(null))
     }
 }

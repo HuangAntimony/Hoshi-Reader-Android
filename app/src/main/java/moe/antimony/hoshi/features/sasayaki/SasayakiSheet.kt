@@ -56,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
@@ -77,9 +78,10 @@ internal fun SasayakiSheet(
     player: SasayakiPlayer,
     audioRepository: SasayakiAudioRepository,
     settings: SasayakiSettings,
-    hasSubtitleMatch: Boolean,
+    subtitleMatchData: SasayakiMatchData?,
+    matchWindowDependencies: SasayakiMatchWindowDependencies?,
     chapters: List<SasayakiAudiobookChapter>,
-    onMatchSubtitles: (() -> Unit)?,
+    onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
     onSettingsChange: (SasayakiSettings) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -91,6 +93,7 @@ internal fun SasayakiSheet(
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
     var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
+    var showMatchWindow by remember { mutableStateOf(false) }
     val defaultTab = sasayakiDefaultSheetTab(
         hasAudio = player.hasAudio,
         hasChapters = chapters.isNotEmpty(),
@@ -168,7 +171,7 @@ internal fun SasayakiSheet(
                     SasayakiSheetTab.Resources -> SasayakiResourcesTab(
                         player = player,
                         settings = settings,
-                        hasSubtitleMatch = hasSubtitleMatch,
+                        subtitleMatchData = subtitleMatchData,
                         importError = importError,
                         isImporting = isImporting,
                         onAudioAction = {
@@ -179,7 +182,8 @@ internal fun SasayakiSheet(
                             }
                         },
                         onSettingsChange = onSettingsChange,
-                        onMatchSubtitles = onMatchSubtitles,
+                        matchEnabled = matchWindowDependencies != null,
+                        onMatchSubtitles = { showMatchWindow = true },
                         modifier = Modifier.weight(1f),
                     )
                     SasayakiSheetTab.Chapters -> SasayakiChaptersTab(
@@ -217,6 +221,13 @@ internal fun SasayakiSheet(
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },
+        )
+    }
+    if (showMatchWindow && matchWindowDependencies != null) {
+        SasayakiMatchDialog(
+            dependencies = matchWindowDependencies,
+            onDismiss = { showMatchWindow = false },
+            onMatchUpdated = onSubtitleMatchUpdated,
         )
     }
 }
@@ -374,11 +385,12 @@ private fun SasayakiSheetTabs(
 private fun SasayakiResourcesTab(
     player: SasayakiPlayer,
     settings: SasayakiSettings,
-    hasSubtitleMatch: Boolean,
+    subtitleMatchData: SasayakiMatchData?,
     importError: String?,
     isImporting: Boolean,
     onAudioAction: () -> Unit,
     onSettingsChange: (SasayakiSettings) -> Unit,
+    matchEnabled: Boolean,
     onMatchSubtitles: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -415,13 +427,10 @@ private fun SasayakiResourcesTab(
         HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
         SasayakiResourceRow(
             title = stringResource(R.string.sasayaki_subtitle_match),
-            summary = if (hasSubtitleMatch) {
-                stringResource(R.string.sasayaki_subtitle_match_ready)
-            } else {
-                stringResource(R.string.sasayaki_subtitle_match_optional)
-            },
+            summary = sasayakiSubtitleMatchSummary(subtitleMatchData)
+                ?: stringResource(R.string.sasayaki_subtitle_match_optional),
             action = stringResource(R.string.sasayaki_match_title),
-            actionEnabled = onMatchSubtitles != null,
+            actionEnabled = matchEnabled,
             onAction = { onMatchSubtitles?.invoke() },
         )
     }

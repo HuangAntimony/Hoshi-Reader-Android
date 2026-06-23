@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.content.ContentLanguageProfile
+import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.HighlightColor
 import moe.antimony.hoshi.epub.ReadingStatistics
@@ -77,6 +78,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
+import moe.antimony.hoshi.features.sasayaki.SasayakiMatchWindowDependencies
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,6 +86,7 @@ import kotlin.math.roundToInt
 fun ReaderWebView(
     bookId: String,
     book: EpubBook,
+    bookEntry: BookEntry? = null,
     bookRoot: File? = null,
     bookCoverFile: File? = null,
     initialChapterIndex: Int = 0,
@@ -94,7 +97,6 @@ fun ReaderWebView(
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
     onFlushAutoSyncExport: () -> Unit = {},
     onForegroundAutoSyncImport: () -> Unit = {},
-    onOpenSasayakiMatch: (() -> Unit)? = null,
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
     contentLanguageProfile: ContentLanguageProfile = ContentLanguageProfile.Default,
     onClose: () -> Unit,
@@ -116,8 +118,11 @@ fun ReaderWebView(
     val bookRepository = appContainer.bookRepository
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
     var sasayakiMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
+    var sasayakiSheetMatchData by remember(bookRoot) { mutableStateOf<SasayakiMatchData?>(null) }
     LaunchedEffect(bookRoot, bookRepository) {
-        sasayakiMatchData = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
+        val loadedMatch = bookRoot?.let { bookRepository.loadSasayakiMatch(it) }
+        sasayakiMatchData = loadedMatch
+        sasayakiSheetMatchData = loadedMatch
     }
     var highlights by remember(bookRoot) {
         mutableStateOf<List<ReaderHighlight>?>(if (bookRoot == null) emptyList() else null)
@@ -1449,9 +1454,16 @@ fun ReaderWebView(
                 player = requireNotNull(sasayakiPlayer),
                 audioRepository = sasayakiAudioRepository,
                 settings = sasayakiSettings,
-                hasSubtitleMatch = sasayakiMatchData != null,
+                subtitleMatchData = sasayakiSheetMatchData,
+                matchWindowDependencies = bookEntry?.let { entry ->
+                    SasayakiMatchWindowDependencies(
+                        bookEntry = entry,
+                        bookRepository = bookRepository,
+                        epubBookParser = appContainer.epubBookParser,
+                    )
+                },
                 chapters = sasayakiAudiobookChapters,
-                onMatchSubtitles = onOpenSasayakiMatch,
+                onSubtitleMatchUpdated = { matchData -> sasayakiSheetMatchData = matchData },
                 onSettingsChange = ::updateSasayakiSettings,
                 onDismiss = stateHolder::dismissSasayaki,
             )

@@ -1,7 +1,5 @@
 package moe.antimony.hoshi.features.sasayaki
 
-import moe.antimony.hoshi.epub.SasayakiMatchData
-
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -46,12 +45,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -67,6 +69,97 @@ fun SasayakiMatchView(
     bookRepository: SasayakiSidecarRepository,
     epubBookParser: EpubBookParser,
     onClose: () -> Unit,
+    onMatchUpdated: (SasayakiMatchData) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onClose)
+    val colorScheme = MaterialTheme.colorScheme
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colorScheme.background,
+                    scrolledContainerColor = colorScheme.background,
+                ),
+                title = { Text(stringResource(R.string.sasayaki_match_title), fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    TextButton(onClick = onClose) {
+                        Text(stringResource(R.string.action_done))
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        SasayakiMatchContent(
+            bookEntry = bookEntry,
+            bookRepository = bookRepository,
+            epubBookParser = epubBookParser,
+            onMatchUpdated = onMatchUpdated,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+        )
+    }
+}
+
+@Composable
+internal fun SasayakiMatchDialog(
+    dependencies: SasayakiMatchWindowDependencies,
+    onDismiss: () -> Unit,
+    onMatchUpdated: (SasayakiMatchData) -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.86f)
+                .padding(24.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, top = 12.dp, end = 12.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.sasayaki_match_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.action_done))
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SasayakiMatchContent(
+                    bookEntry = dependencies.bookEntry,
+                    bookRepository = dependencies.bookRepository,
+                    epubBookParser = dependencies.epubBookParser,
+                    onMatchUpdated = onMatchUpdated,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SasayakiMatchContent(
+    bookEntry: BookEntry,
+    bookRepository: SasayakiSidecarRepository,
+    epubBookParser: EpubBookParser,
+    onMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -78,6 +171,7 @@ fun SasayakiMatchView(
     var isMatching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var currentMatch by remember(bookEntry.root) { mutableStateOf<SasayakiMatchData?>(null) }
+    val colorScheme = MaterialTheme.colorScheme
     val selectSrtMessage = stringResource(R.string.sasayaki_select_srt_file)
     val selectedSrtFallback = stringResource(R.string.sasayaki_selected_srt)
     val matchFailedMessage = stringResource(R.string.sasayaki_match_failed)
@@ -119,6 +213,7 @@ fun SasayakiMatchView(
                 }
             }.onSuccess { nextMatch ->
                 currentMatch = nextMatch
+                onMatchUpdated(nextMatch)
             }.onFailure { error ->
                 errorMessage = error.localizedMessage ?: matchFailedMessage
             }
@@ -126,150 +221,126 @@ fun SasayakiMatchView(
         }
     }
 
-    BackHandler(onBack = onClose)
-    val colorScheme = MaterialTheme.colorScheme
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = colorScheme.background,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colorScheme.background,
-                    scrolledContainerColor = colorScheme.background,
-                ),
-                title = { Text(stringResource(R.string.sasayaki_match_title), fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    TextButton(onClick = onClose) {
-                        Text(stringResource(R.string.action_done))
+    LazyColumn(
+        modifier = modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item {
+            MatchSectionHeader(stringResource(R.string.sasayaki_file))
+            MatchCard {
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = {
+                        Text(
+                            text = selectedSrtName ?: stringResource(R.string.sasayaki_no_file_selected),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    trailingContent = {
+                        TextButton(
+                            enabled = !isMatching,
+                            onClick = {
+                                importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes)
+                            },
+                        ) {
+                            Text(stringResource(R.string.action_open))
+                        }
+                    },
+                )
+            }
+        }
+
+        item {
+            MatchCard {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.sasayaki_search_window),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "${searchWindow.roundToInt()}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
-                },
-            )
-        },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            item {
-                MatchSectionHeader(stringResource(R.string.sasayaki_file))
-                MatchCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = {
-                            Text(
-                                text = selectedSrtName ?: stringResource(R.string.sasayaki_no_file_selected),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        trailingContent = {
-                            TextButton(
-                                enabled = !isMatching,
-                                onClick = {
-                                    importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes)
-                                },
-                            ) {
-                                Text(stringResource(R.string.action_open))
-                            }
-                        },
+                    Slider(
+                        value = searchWindow,
+                        onValueChange = { searchWindow = it },
+                        valueRange = 50f..1000f,
+                        steps = 18,
+                        enabled = !isMatching,
                     )
                 }
-            }
-
-            item {
-                MatchCard {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = colorScheme.outlineVariant,
+                )
+                ListItem(
+                    modifier = Modifier.clickable(
+                        enabled = selectedSrtUri != null && !isMatching,
+                        onClick = ::matchSelectedFile,
+                    ),
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    headlineContent = {
+                        if (isMatching) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Text(stringResource(R.string.sasayaki_matching))
+                            }
+                        } else {
                             Text(
-                                text = stringResource(R.string.sasayaki_search_window),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = "${searchWindow.roundToInt()}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                text = stringResource(R.string.sasayaki_match_title),
+                                color = if (selectedSrtUri == null) {
+                                    colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                } else {
+                                    colorScheme.primary
+                                },
                             )
                         }
-                        Slider(
-                            value = searchWindow,
-                            onValueChange = { searchWindow = it },
-                            valueRange = 50f..1000f,
-                            steps = 18,
-                            enabled = !isMatching,
-                        )
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = colorScheme.outlineVariant,
-                    )
+                    },
+                )
+            }
+            errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                )
+            }
+        }
+
+        currentMatch?.let { match ->
+            item {
+                MatchSectionHeader(stringResource(R.string.sasayaki_current_match))
+                MatchCard {
                     ListItem(
-                        modifier = Modifier.clickable(
-                            enabled = selectedSrtUri != null && !isMatching,
-                            onClick = ::matchSelectedFile,
-                        ),
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = {
-                            if (isMatching) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                    Text(stringResource(R.string.sasayaki_matching))
-                                }
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.sasayaki_match_title),
-                                    color = if (selectedSrtUri == null) {
-                                        colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                                    } else {
-                                        colorScheme.primary
-                                    },
-                                )
-                            }
+                        headlineContent = { Text(stringResource(R.string.sasayaki_match_rate)) },
+                        trailingContent = {
+                            Text(
+                                text = match.matchRateText(),
+                                color = colorScheme.onSurfaceVariant,
+                            )
                         },
                     )
-                }
-                errorMessage?.let { message ->
-                    Text(
-                        text = message,
-                        color = colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                    )
-                }
-            }
-
-            currentMatch?.let { match ->
-                item {
-                    MatchSectionHeader(stringResource(R.string.sasayaki_current_match))
-                    MatchCard {
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.sasayaki_match_rate)) },
-                            trailingContent = {
-                                Text(
-                                    text = match.matchRateText(),
-                                    color = colorScheme.onSurfaceVariant,
-                                )
-                            },
-                        )
-                    }
                 }
             }
         }
