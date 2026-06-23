@@ -360,50 +360,12 @@ private class SasayakiServiceSessionPlayer(
         onSkipToNext()
     }
 
-    override fun seekToPrevious() {
-        onSkipToPrevious()
-    }
-
-    override fun seekToPreviousMediaItem() {
-        onSkipToPrevious()
-    }
-
-    override fun seekToNext() {
-        onSkipToNext()
-    }
-
-    override fun seekToNextMediaItem() {
-        onSkipToNext()
-    }
-
     override fun seekTo(positionMs: Long) {
         onSeekTo(positionMs)
     }
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
         onSeekTo(positionMs)
-    }
-}
-
-internal fun dispatchSasayakiServicePlayerSeekCommand(
-    seekCommand: Int,
-    positionMs: Long,
-    previousCue: () -> Unit,
-    nextCue: () -> Unit,
-    seekTo: (Long) -> Unit,
-) {
-    when (seekCommand) {
-        Player.COMMAND_SEEK_BACK,
-        Player.COMMAND_SEEK_TO_PREVIOUS,
-        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-        -> previousCue()
-
-        Player.COMMAND_SEEK_TO_NEXT,
-        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-        Player.COMMAND_SEEK_FORWARD,
-        -> nextCue()
-
-        else -> seekTo(positionMs)
     }
 }
 
