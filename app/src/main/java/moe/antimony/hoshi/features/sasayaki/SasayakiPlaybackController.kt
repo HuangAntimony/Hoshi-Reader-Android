@@ -124,6 +124,7 @@ internal class SasayakiPlaybackController(
         initialHasAudio = audioSourceRepository.playbackSource(playbackPersistence.playback) != null,
     )
     private val cuePresentation = SasayakiCuePresentationState()
+    private val hasCues = matchData?.matches?.isNotEmpty() == true
 
     override val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     override val currentTime: Double get() = playbackState.currentTime
@@ -192,7 +193,7 @@ internal class SasayakiPlaybackController(
 
     override fun nextCue() {
         withPreparedPlayback {
-            val seconds = readerSkipButtonAction.seconds
+            val seconds = readerSkipButtonAction.seconds ?: SasayakiCueFallbackSkipSeconds.takeUnless { hasCues }
             if (seconds == null) {
                 playbackCommands.nextCue(
                     currentTime = currentTime,
@@ -213,7 +214,7 @@ internal class SasayakiPlaybackController(
 
     override fun previousCue() {
         withPreparedPlayback {
-            val seconds = readerSkipButtonAction.seconds
+            val seconds = readerSkipButtonAction.seconds ?: SasayakiCueFallbackSkipSeconds.takeUnless { hasCues }
             if (seconds == null) {
                 playbackCommands.previousCue(
                     currentTime = currentTime,
@@ -458,6 +459,10 @@ internal class SasayakiPlaybackController(
         playbackLifecycle.releaseEngine()
         audioAvailability.markAudioUnavailable()
         if (clearCue) applyCueDisplayAction(cueDisplay.clear())
+    }
+
+    private companion object {
+        const val SasayakiCueFallbackSkipSeconds = 15
     }
 }
 

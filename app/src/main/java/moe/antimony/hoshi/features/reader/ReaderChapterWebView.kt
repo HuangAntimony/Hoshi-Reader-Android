@@ -552,8 +552,7 @@ private val readerHeadOpenTagRegex = Regex("""(?is)<head\b[^>]*>""")
 internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: SasayakiSettings): Boolean =
     settings.enabled &&
         settings.showReaderToggle &&
-        bookRoot?.resolve(ReaderSasayakiMatchFileName)?.isFile == true &&
-        bookRoot.resolve(ReaderSasayakiPlaybackFileName).isFile
+        bookRoot?.resolve(ReaderSasayakiPlaybackFileName)?.isFile == true
 
 internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
     settings.normalized().scanLength

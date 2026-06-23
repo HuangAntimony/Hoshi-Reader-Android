@@ -565,11 +565,21 @@
     <string name="sasayaki_auto_scroll">自动翻页</string>
     <string name="sasayaki_auto_pause_on_lookup">查词时自动暂停</string>
     <string name="sasayaki_importing_audio">正在导入音频...</string>
+    <string name="sasayaki_tab_resources">资源</string>
+    <string name="sasayaki_tab_chapters">M4B 章节</string>
+    <string name="sasayaki_tab_settings" comment="Sasayaki sheet tab label, intentionally matching settings page titles.">设置</string>
     <string name="sasayaki_load_audio">载入音频</string>
+    <string name="sasayaki_audiobook_resource">有声书</string>
     <string name="sasayaki_remove_audio">移除</string>
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
     <string name="sasayaki_storage_select_audio">选择 .mp3 或 .m4b 有声书</string>
+    <string name="sasayaki_subtitle_match">字幕匹配</string>
+    <string name="sasayaki_subtitle_match_ready">已存在匹配字幕。</string>
+    <string name="sasayaki_subtitle_match_optional">可选；没有字幕也可以播放。</string>
+    <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
+    <string name="sasayaki_unknown_chapter">章节</string>
+    <string name="sasayaki_current_chapter">当前章节</string>
     <string name="sasayaki_skip_cue">1 句</string>
     <string name="sasayaki_skip_seconds_format">%1$d 秒</string>
     <string name="sasayaki_settings_description">有声书会与阅读器文本同步。长按一本书并选择“匹配有声书”，选择对应的 .srt 文件，然后打开阅读器并载入 .mp3 或 .m4b 有声书。</string>

@@ -5,10 +5,15 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.channels.NonWritableChannelException
+import java.nio.channels.SeekableByteChannel
 
 class SasayakiAudioRepository(private val bookRoot: File) {
     fun importedPlayback(
@@ -25,6 +30,30 @@ class SasayakiAudioRepository(private val bookRoot: File) {
         playback.audioUri?.let { return SasayakiPlaybackSource.ExternalUri(Uri.parse(it)) }
         return audioFile(playback)?.let { SasayakiPlaybackSource.PrivateFile(it) }
     }
+
+    internal fun audiobookChapters(
+        playback: SasayakiPlaybackData,
+        contentResolver: ContentResolver,
+    ): List<SasayakiAudiobookChapter> =
+        audiobookChapters(
+            playback = playback,
+            openExternalAudio = { uriString -> contentResolver.openSeekableAudioChannel(Uri.parse(uriString)) },
+        )
+
+    internal fun audiobookChapters(
+        playback: SasayakiPlaybackData,
+        openExternalAudio: (String) -> SeekableByteChannel? = { null },
+    ): List<SasayakiAudiobookChapter> =
+        try {
+            playback.audioUri?.let { uriString ->
+                openExternalAudio(uriString)?.use { channel ->
+                    return SasayakiAudiobookChapters.parse(channel)
+                }
+            }
+            audioFile(playback)?.let(SasayakiAudiobookChapters::parse).orEmpty()
+        } catch (_: Exception) {
+            emptyList()
+        }
 
     fun clearAudioSource(playback: SasayakiPlaybackData, contentResolver: ContentResolver) {
         deleteAudio(playback)
@@ -84,3 +113,40 @@ private fun ContentResolver.displayName(uri: Uri): String =
             null
         }
     } ?: uri.lastPathSegment.orEmpty()
+
+private fun ContentResolver.openSeekableAudioChannel(uri: Uri): SeekableByteChannel? {
+    val descriptor = openFileDescriptor(uri, "r") ?: return null
+    return ParcelFileDescriptorSeekableByteChannel(descriptor)
+}
+
+private class ParcelFileDescriptorSeekableByteChannel(
+    private val descriptor: ParcelFileDescriptor,
+) : SeekableByteChannel {
+    private val channel = FileInputStream(descriptor.fileDescriptor).channel
+
+    override fun read(dst: ByteBuffer): Int = channel.read(dst)
+
+    override fun write(src: ByteBuffer): Int {
+        throw NonWritableChannelException()
+    }
+
+    override fun position(): Long = channel.position()
+
+    override fun position(newPosition: Long): SeekableByteChannel {
+        channel.position(newPosition)
+        return this
+    }
+
+    override fun size(): Long = channel.size()
+
+    override fun truncate(size: Long): SeekableByteChannel {
+        throw NonWritableChannelException()
+    }
+
+    override fun isOpen(): Boolean = channel.isOpen
+
+    override fun close() {
+        runCatching { channel.close() }
+        descriptor.close()
+    }
+}

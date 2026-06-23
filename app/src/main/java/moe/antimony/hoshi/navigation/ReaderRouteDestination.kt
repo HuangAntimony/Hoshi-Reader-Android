@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
+import moe.antimony.hoshi.features.bookshelf.SasayakiMatchRequest
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
@@ -40,6 +41,7 @@ internal fun ReaderRouteDestination(
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit,
     onBookmarkSaved: () -> Unit,
+    onOpenSasayakiMatch: (SasayakiMatchRequest) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -196,6 +198,9 @@ internal fun ReaderRouteDestination(
                 },
                 onFlushAutoSyncExport = ::flushExport,
                 onForegroundAutoSyncImport = { importOnForeground(readyState.entry) },
+                onOpenSasayakiMatch = {
+                    onOpenSasayakiMatch(SasayakiMatchRequest(readyState.entry.metadata.id, readyState.entry))
+                },
                 contentLanguageProfile = state.contentLanguageProfile,
                 onClose = onClose,
                 modifier = modifier.fillMaxSize(),

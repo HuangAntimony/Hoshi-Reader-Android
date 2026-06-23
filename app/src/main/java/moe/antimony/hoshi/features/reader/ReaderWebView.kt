@@ -72,6 +72,7 @@ import moe.antimony.hoshi.features.dictionary.openPopupExternalLink
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
+import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookChapter
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
@@ -93,6 +94,7 @@ fun ReaderWebView(
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
     onFlushAutoSyncExport: () -> Unit = {},
     onForegroundAutoSyncImport: () -> Unit = {},
+    onOpenSasayakiMatch: (() -> Unit)? = null,
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
     contentLanguageProfile: ContentLanguageProfile = ContentLanguageProfile.Default,
     onClose: () -> Unit,
@@ -135,6 +137,9 @@ fun ReaderWebView(
         isSasayakiPlaybackLoaded = true
     }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
+    var sasayakiAudiobookChapters by remember(bookRoot) {
+        mutableStateOf<List<SasayakiAudiobookChapter>>(emptyList())
+    }
     val sasayakiCoverFile = remember(bookCoverFile) {
         bookCoverFile?.takeIf { it.isFile }
     }
@@ -899,7 +904,7 @@ fun ReaderWebView(
     }
     LaunchedEffect(bookRoot, sasayakiMatchData, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         sasayakiPlayer?.release()
-        sasayakiPlayer = if (bookRoot != null && sasayakiMatchData != null && isSasayakiPlaybackLoaded) {
+        sasayakiPlayer = if (bookRoot != null && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
                 bookId = bookId,
                 bookRoot = bookRoot,
@@ -927,6 +932,22 @@ fun ReaderWebView(
             )
         } else {
             null
+        }
+    }
+    val currentSasayakiPlayback = sasayakiPlayer?.playback ?: sasayakiPlaybackData
+    LaunchedEffect(
+        sasayakiAudioRepository,
+        currentSasayakiPlayback?.audioUri,
+        currentSasayakiPlayback?.audioFileName,
+    ) {
+        val repository = sasayakiAudioRepository
+        val playback = currentSasayakiPlayback
+        sasayakiAudiobookChapters = if (repository != null && playback != null) {
+            withContext(Dispatchers.IO) {
+                repository.audiobookChapters(playback, context.contentResolver)
+            }
+        } else {
+            emptyList()
         }
     }
     DisposableEffect(Unit) {
@@ -1104,7 +1125,6 @@ fun ReaderWebView(
     }
     val showSasayakiTopToggle = sasayakiSettings.enabled &&
         sasayakiSettings.showReaderToggle &&
-        sasayakiMatchData != null &&
         (sasayakiPlayer?.hasAudio == true || sasayakiPlaybackData.hasStoredAudioSource())
     val reserveSasayakiTopToggle = remember(bookRoot, sasayakiSettings) {
         readerShouldReserveSasayakiTopToggle(bookRoot, sasayakiSettings)
@@ -1370,7 +1390,7 @@ fun ReaderWebView(
             } else {
                 null
             },
-            onSasayaki = if (sasayakiSettings.enabled && sasayakiMatchData != null) {
+            onSasayaki = if (sasayakiSettings.enabled && bookRoot != null) {
                 stateHolder::openSasayakiFromMenu
             } else {
                 null
@@ -1429,6 +1449,9 @@ fun ReaderWebView(
                 player = requireNotNull(sasayakiPlayer),
                 audioRepository = sasayakiAudioRepository,
                 settings = sasayakiSettings,
+                hasSubtitleMatch = sasayakiMatchData != null,
+                chapters = sasayakiAudiobookChapters,
+                onMatchSubtitles = onOpenSasayakiMatch,
                 onSettingsChange = ::updateSasayakiSettings,
                 onDismiss = stateHolder::dismissSasayaki,
             )

@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.nio.file.Files
 
 class SasayakiAudioRepositoryTest {
     @get:Rule
@@ -59,6 +60,54 @@ class SasayakiAudioRepositoryTest {
             "Select an .mp3 or .m4b audiobook",
             repository.storageSummary(playback()),
         )
+    }
+
+    @Test
+    fun audiobookChaptersReadsPrivateCopiedAudio() {
+        val bookRoot = temporaryFolder.newFolder("chapters-book")
+        val repository = SasayakiAudioRepository(bookRoot)
+        val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.m4b")
+        audioFile.parentFile!!.mkdirs()
+        audioFile.writeBytes(
+            minimalMp4WithChpl(
+                durationSeconds = 20.0,
+                chapters = listOf(
+                    SasayakiChapterFixture(startSeconds = 0.0, title = "Opening"),
+                    SasayakiChapterFixture(startSeconds = 10.0, title = "Ending"),
+                ),
+            ),
+        )
+
+        val chapters = repository.audiobookChapters(playback(audioFileName = "sasayaki_audio.m4b"))
+
+        assertEquals(listOf("Opening", "Ending"), chapters.map { it.title })
+    }
+
+    @Test
+    fun audiobookChaptersReadsExternalUriThroughChannelProvider() {
+        val repository = SasayakiAudioRepository(temporaryFolder.newFolder("external-chapters-book"))
+        val externalFile = temporaryFolder.newFile("external.m4b").also { file ->
+            file.writeBytes(
+                minimalMp4WithChpl(
+                    durationSeconds = 20.0,
+                    chapters = listOf(
+                        SasayakiChapterFixture(startSeconds = 0.0, title = "External Opening"),
+                    ),
+                ),
+            )
+        }
+
+        var openedUri: String? = null
+        val chapters = repository.audiobookChapters(
+            playback(audioUri = "content://audio/external.m4b"),
+            openExternalAudio = { uriString ->
+                openedUri = uriString
+                Files.newByteChannel(externalFile.toPath())
+            },
+        )
+
+        assertEquals("content://audio/external.m4b", openedUri)
+        assertEquals(listOf("External Opening"), chapters.map { it.title })
     }
 
     private fun playback(

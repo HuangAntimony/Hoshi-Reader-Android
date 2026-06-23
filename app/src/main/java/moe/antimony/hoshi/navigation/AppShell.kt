@@ -300,6 +300,7 @@ fun AppShell(
                         onReaderSettingsChange = currentOnReaderSettingsChange,
                         onReaderKeyEventHandlerChange = currentOnReaderKeyEventHandlerChange,
                         onBookmarkSaved = readerBookmarkRefreshState::markDirty,
+                        onOpenSasayakiMatch = ::openSasayakiMatch,
                         onClose = ::closeReaderRoute,
                         modifier = Modifier.fillMaxSize(),
                     )
