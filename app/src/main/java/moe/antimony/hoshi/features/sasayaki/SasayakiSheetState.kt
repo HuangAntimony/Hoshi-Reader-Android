@@ -23,6 +23,9 @@ internal fun sasayakiDefaultSheetTab(
         SasayakiSheetTab.Resources
     }
 
+internal fun sasayakiShouldShowPlaybackHeader(hasAudio: Boolean): Boolean =
+    hasAudio
+
 internal data class SasayakiMatchDependencies(
     val bookEntry: BookEntry,
     val bookRepository: SasayakiSidecarRepository,

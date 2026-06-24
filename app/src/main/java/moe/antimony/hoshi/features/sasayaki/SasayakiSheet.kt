@@ -169,14 +169,16 @@ internal fun SasayakiSheet(
                 .weight(1f),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                SasayakiPlaybackHeader(
-                    player = player,
-                    bookTitle = bookTitle,
-                    bookCoverFile = bookCoverFile,
-                    audiobookMetadata = audiobookMetadata,
-                    currentChapter = currentChapter,
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-                )
+                if (sasayakiShouldShowPlaybackHeader(player.hasAudio)) {
+                    SasayakiPlaybackHeader(
+                        player = player,
+                        bookTitle = bookTitle,
+                        bookCoverFile = bookCoverFile,
+                        audiobookMetadata = audiobookMetadata,
+                        currentChapter = currentChapter,
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+                    )
+                }
                 SasayakiSheetTabs(
                     selectedTab = selectedTab,
                     onSelectedTabChange = { tab ->

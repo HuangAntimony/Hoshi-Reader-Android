@@ -4,7 +4,9 @@ import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SasayakiSheetTest {
@@ -32,6 +34,12 @@ class SasayakiSheetTest {
             SasayakiSheetTab.Chapters,
             sasayakiDefaultSheetTab(hasAudio = true, hasChapters = true),
         )
+    }
+
+    @Test
+    fun playbackHeaderIsHiddenUntilAudiobookIsAvailable() {
+        assertFalse(sasayakiShouldShowPlaybackHeader(hasAudio = false))
+        assertTrue(sasayakiShouldShowPlaybackHeader(hasAudio = true))
     }
 
     @Test
