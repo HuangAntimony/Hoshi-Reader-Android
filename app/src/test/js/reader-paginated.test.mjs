@@ -825,6 +825,22 @@ test('continuous Sasayaki media stop plan uses scroll targets for the current im
     assert.equal(document.documentElement.scrollTop, 0);
 });
 
+test('continuous vertical Sasayaki chapter-end media stop plan follows forward scroll direction', () => {
+    const body = new TestElement('body');
+    body.appendChild(imgAt(0, 500, 120, 420));
+    body.appendChild(imgAt(0, 500, -520, -220));
+    const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'vertical-rl' });
+    document.documentElement.scrollWidth = 3_000;
+    document.documentElement.scrollLeft = -480;
+
+    const stops = reader.sasayakiMediaStopsToChapterEnd();
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.scroll),
+        [-540, -1_180],
+    );
+});
+
 test('paginated Sasayaki media stop chapter-end plan includes an image-only first page', () => {
     const body = new TestElement('body');
     body.scrollHeight = 800;

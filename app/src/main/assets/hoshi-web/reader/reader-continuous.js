@@ -241,10 +241,10 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   },
   sasayakiMediaStopsToChapterEnd: function() {
     var root = document.scrollingElement || document.documentElement;
-    var maxScroll = this.isVertical()
-      ? Math.max(0, root.scrollWidth - window.innerWidth)
+    var endScroll = this.isVertical()
+      ? -Math.max(0, root.scrollWidth - window.innerWidth)
       : Math.max(0, root.scrollHeight - window.innerHeight);
-    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), maxScroll, true, true);
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), endScroll, true, true);
   },
   showSasayakiMediaStop: function(stop) {
     var scroll = Number(stop && stop.scroll);
