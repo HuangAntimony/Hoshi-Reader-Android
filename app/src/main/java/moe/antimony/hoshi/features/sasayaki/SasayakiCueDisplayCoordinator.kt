@@ -6,7 +6,9 @@ sealed interface SasayakiCueDisplayAction {
     data object None : SasayakiCueDisplayAction
     data object Clear : SasayakiCueDisplayAction
     data class Display(val cue: SasayakiMatch, val reveal: Boolean) : SasayakiCueDisplayAction
-    data class ClearAndLoadChapter(val chapterIndex: Int) : SasayakiCueDisplayAction
+    data class ClearAndLoadChapter(val cue: SasayakiMatch, val reveal: Boolean) : SasayakiCueDisplayAction {
+        val chapterIndex: Int get() = cue.chapterIndex
+    }
 }
 
 class SasayakiCueDisplayCoordinator {
@@ -30,7 +32,7 @@ class SasayakiCueDisplayCoordinator {
         }
         return if (autoScroll && hasPlayedOnce) {
             currentCue = null
-            SasayakiCueDisplayAction.ClearAndLoadChapter(cue.chapterIndex)
+            SasayakiCueDisplayAction.ClearAndLoadChapter(cue = cue, reveal = true)
         } else {
             clear()
         }

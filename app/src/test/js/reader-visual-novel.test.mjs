@@ -774,6 +774,9 @@ test('visual novel reader asset defines the expected public surface', () => {
         'isMatchableChar',
         'applySasayakiCues',
         'highlightSasayakiCue',
+        'sasayakiMediaStopsBeforeCue',
+        'sasayakiMediaStopsToChapterEnd',
+        'showSasayakiMediaStop',
         'clearSasayakiCue',
         'refreshSasayakiCuePresentation',
         'setNativeSelectionActive',
@@ -1247,6 +1250,53 @@ test('visual novel Sasayaki reveal jumps to a later screen and returns progress'
     assert.equal(currentScreen(reader).querySelectorAll('[data-hoshi-visual-novel-unrevealed]').length, 0);
     assert.equal(sasayakiWrappers(reader)[0].textContent, '二三');
     assert.equal(sasayakiWrappers(reader)[0].classList.contains('hoshi-sasayaki-active'), true);
+});
+
+test('visual novel Sasayaki media stop plan includes every standalone image screen before target cue', async () => {
+    const cue = { id: 'cue', start: 1, length: 2 };
+    const { reader } = await initializeReader(
+        bodyWith(
+            p('一。'),
+            imageBlock('images/first.jpg', { id: 'first-image' }),
+            imageBlock('images/second.jpg', { id: 'second-image' }),
+            p('二三。'),
+        ),
+        {
+            mode: 'sentences',
+            sentencesPerScreen: 1,
+            revealSpeed: 0,
+        },
+    );
+
+    reader.applySasayakiCues([cue]);
+    const stops = reader.sasayakiMediaStopsBeforeCue(cue);
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.screenIndex),
+        [1, 2],
+    );
+    assert.equal(reader.showSasayakiMediaStop(stops[0]), 1 / 3);
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/first.jpg');
+    assert.equal(reader.showSasayakiMediaStop(stops[1]), 1 / 3);
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/second.jpg');
+});
+
+test('visual novel Sasayaki chapter-end media stops include an image-only current screen', async () => {
+    const { reader } = await initializeReader(
+        bodyWith(imageBlock('images/cover.jpg', { id: 'cover' })),
+        {
+            mode: 'sentences',
+            sentencesPerScreen: 1,
+            revealSpeed: 0,
+        },
+    );
+
+    const stops = reader.sasayakiMediaStopsToChapterEnd();
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.screenIndex),
+        [0],
+    );
 });
 
 test('visual novel Sasayaki reveal jumps to the visible split screen inside an oversized block', async () => {

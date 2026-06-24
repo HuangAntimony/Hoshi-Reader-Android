@@ -190,8 +190,18 @@ class TestElement extends TestNode {
     }
 
     querySelectorAll(selector) {
-        if (selector !== 'ruby') return [];
-        return queryRuby(this);
+        if (selector === 'ruby') return queryRuby(this);
+        const tagSelector = queryTagSelectorList(selector);
+        if (tagSelector) return queryByTags(this, tagSelector);
+        return [];
+    }
+
+    getClientRects() {
+        return [this.getBoundingClientRect()];
+    }
+
+    getBoundingClientRect() {
+        return this.rect ?? { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
     }
 
     get textContent() {
@@ -319,14 +329,24 @@ function queryRuby(root) {
 }
 
 function queryByTag(root, tagName) {
+    return queryByTags(root, [tagName]);
+}
+
+function queryByTags(root, tagNames) {
     const result = [];
-    const normalizedTag = tagName.toUpperCase();
+    const normalizedTags = new Set(tagNames.map((tagName) => tagName.toUpperCase()));
     const visit = (node) => {
-        if (node.nodeType === 1 && node.tagName === normalizedTag) result.push(node);
+        if (node.nodeType === 1 && normalizedTags.has(node.tagName)) result.push(node);
         if (node.childNodes) node.childNodes.forEach(visit);
     };
     visit(root);
     return result;
+}
+
+function queryTagSelectorList(selector) {
+    const tags = selector.split(',').map((item) => item.trim()).filter(Boolean);
+    if (!tags.length) return null;
+    return tags.every((tag) => /^[a-z]+$/i.test(tag)) ? tags : null;
 }
 
 function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
@@ -373,7 +393,8 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         },
         querySelectorAll(selector) {
             if (selector === 'ruby') return queryRuby(body);
-            if (selector === 'img') return queryByTag(body, 'img');
+            const tagSelector = queryTagSelectorList(selector);
+            if (tagSelector) return queryByTags(body, tagSelector);
             return [];
         },
         getElementsByTagName(tagName) {
@@ -432,6 +453,12 @@ function rubyParagraphWithWhitespaceTextNodes() {
     ruby.insertBefore(new TestText('\n  '), ruby.firstChild);
     ruby.appendChild(new TestText(' \n'));
     return { paragraph, ruby };
+}
+
+function imgAt(top, bottom, left = 0, right = 20) {
+    const img = new TestElement('img');
+    img.rect = testRect(top, bottom, left, right);
+    return img;
 }
 
 function textRunAfter(node) {
@@ -704,6 +731,69 @@ test('e-ink Sasayaki chapter load keeps geometry available for id-only highlight
         assert.equal(reader.activeCueId, 'cue');
         assert.equal(overlayRendered, 2);
     }
+});
+
+test('paginated Sasayaki media stop plan lists every image page before target cue', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 4_000;
+    body.scrollWidth = 480;
+    body.scrollTop = 0;
+    body.scrollLeft = 0;
+    body.appendChild(new TestText('一'));
+    body.appendChild(imgAt(900, 1_300));
+    body.appendChild(imgAt(1_720, 2_100));
+    const target = new TestText('二三');
+    target.rects = [testRect(2_500, 2_530)];
+    body.appendChild(target);
+    const { reader } = loadReader(body, readerPaginatedUrl);
+    reader.pageHeight = 800;
+
+    const stops = reader.sasayakiMediaStopsBeforeCue({ id: 'cue', start: 1, length: 2 });
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.scroll),
+        [800, 1_600],
+    );
+});
+
+test('paginated Sasayaki media stop command moves to the image page and reports progress', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 2_400;
+    body.scrollWidth = 480;
+    body.scrollTop = 0;
+    body.scrollLeft = 0;
+    const first = new TestText('一');
+    first.rects = [testRect(0, 20)];
+    body.appendChild(first);
+    body.appendChild(imgAt(900, 1_200));
+    const second = new TestText('二');
+    second.rects = [testRect(1_700, 1_720)];
+    body.appendChild(second);
+    const { reader } = loadReader(body, readerPaginatedUrl);
+    reader.pageHeight = 800;
+
+    const progress = reader.showSasayakiMediaStop({ scroll: 800 });
+
+    assert.equal(body.scrollTop, 800);
+    assert.equal(typeof progress, 'number');
+});
+
+test('paginated Sasayaki media stop chapter-end plan includes an image-only first page', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 800;
+    body.scrollWidth = 480;
+    body.scrollTop = 0;
+    body.scrollLeft = 0;
+    body.appendChild(imgAt(120, 620));
+    const { reader } = loadReader(body, readerPaginatedUrl);
+    reader.pageHeight = 800;
+
+    const stops = reader.sasayakiMediaStopsToChapterEnd();
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.scroll),
+        [0],
+    );
 });
 
 test('active non e-ink Sasayaki cue can refresh into e-ink overlay', () => {

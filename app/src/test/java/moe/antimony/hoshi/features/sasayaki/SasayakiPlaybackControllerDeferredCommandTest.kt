@@ -120,7 +120,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
-            onLoadChapter = {},
+            onLoadChapter = { _, _ -> },
             playbackPreparer = preparer,
             onPlaybackStartRequested = { onReady -> onReady() },
             restoreAudioOnCreate = false,

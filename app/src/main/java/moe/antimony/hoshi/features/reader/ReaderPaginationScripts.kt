@@ -30,6 +30,15 @@ internal object ReaderPaginationScripts {
     fun highlightSasayakiCueInvocation(cue: SasayakiCueRange, reveal: Boolean): String =
         "window.hoshiReader.highlightSasayakiCue(${cue.toJavaScriptObjectLiteral()}, $reveal)"
 
+    fun sasayakiMediaStopsBeforeCueInvocation(cue: SasayakiCueRange): String =
+        "window.hoshiReader.sasayakiMediaStopsBeforeCue(${cue.toJavaScriptObjectLiteral()})"
+
+    fun sasayakiMediaStopsToChapterEndInvocation(): String =
+        "window.hoshiReader.sasayakiMediaStopsToChapterEnd()"
+
+    fun showSasayakiMediaStopInvocation(stopJson: String): String =
+        "window.hoshiReader.showSasayakiMediaStop($stopJson)"
+
     fun clearSasayakiCueInvocation(): String =
         "window.hoshiReader.clearSasayakiCue()"
 

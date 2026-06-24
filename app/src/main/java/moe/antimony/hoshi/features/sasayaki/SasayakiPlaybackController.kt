@@ -33,6 +33,8 @@ internal interface SasayakiPlaybackControllerContract {
     fun clearAudio()
     fun togglePlayback()
     fun pausePlayback(restoreTemporaryPosition: Boolean)
+    fun pauseForAutoPageHold(): Boolean
+    fun resumeAfterAutoPageHold()
     fun nextCue()
     fun previousCue()
     fun skipForward(seconds: Int)
@@ -57,7 +59,7 @@ internal class SasayakiPlaybackController(
     private val getCurrentChapterIndex: () -> Int,
     onCue: (SasayakiMatch, Boolean) -> Unit,
     onClearCue: () -> Unit,
-    onLoadChapter: (Int) -> Unit,
+    onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     playbackPreparer: SasayakiPlaybackPreparer,
     persistenceDispatcher: CoroutineDispatcher,
     private val onPlaybackStartRequested: (() -> Unit) -> Unit = { onReady -> onReady() },
@@ -190,6 +192,19 @@ internal class SasayakiPlaybackController(
             restoreTemporaryPosition = restoreTemporaryPosition,
             restoreTemporaryPositionIfNeeded = ::restoreTemporaryPlaybackPositionIfNeeded,
         )
+    }
+
+    override fun pauseForAutoPageHold(): Boolean {
+        if (!isPlaying) return false
+        playbackLifecycle.pause(
+            restoreTemporaryPosition = false,
+            restoreTemporaryPositionIfNeeded = {},
+        )
+        return true
+    }
+
+    override fun resumeAfterAutoPageHold() {
+        startPlayback()
     }
 
     override fun nextCue() {

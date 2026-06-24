@@ -370,6 +370,97 @@ window.hoshiReader = {
        this.applyInlineSasayakiCue(this.activeCueId);
      }
    },
+  sasayakiScrollForTarget: function(target) {
+    var context = this.getScrollContext();
+    if (context.pageSize <= 0 || !target) return null;
+    var rect = this.getRect(target);
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    var currentScroll = this.getPagePosition(context);
+    var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll;
+    return this.alignToPage(context, anchor);
+  },
+  sasayakiCueTargetScroll: function(cue) {
+    var cueId = typeof cue === 'string' ? cue : cue.id;
+    if (!cueId) return null;
+    if (this.isEInkMode()) {
+      this.ensureSasayakiCueGeometry(cue);
+      var geometryTarget = (this.cueGeometryRanges.get(cueId) || [])[0];
+      return this.sasayakiScrollForTarget(geometryTarget);
+    }
+    var targets = this.sasayakiInlineTargetsForCue(cueId);
+    if (!targets.length && typeof cue !== 'string') {
+      this.wrapSasayakiCue(cue);
+      targets = this.sasayakiInlineTargetsForCue(cueId);
+    }
+    if (!targets.length) return null;
+    var range = document.createRange();
+    var target = targets[0];
+    if (target && target.nodeType === Node.ELEMENT_NODE && target.classList.contains('hoshi-sasayaki-cue')) {
+      range.selectNodeContents(target);
+      var rangeScroll = this.sasayakiScrollForTarget(range);
+      if (rangeScroll !== null && rangeScroll !== undefined) return rangeScroll;
+      return this.sasayakiScrollForTarget((this.cueGeometryRanges.get(cueId) || [])[0]);
+    }
+    var targetScroll = this.sasayakiScrollForTarget(target);
+    if (targetScroll !== null && targetScroll !== undefined) return targetScroll;
+    return this.sasayakiScrollForTarget((this.cueGeometryRanges.get(cueId) || [])[0]);
+  },
+  sasayakiMediaElements: function() {
+    return Array.from(document.body.querySelectorAll('img, svg, image, video, canvas, picture, table, iframe, object, embed')).filter(function(element) {
+      var tag = String(element.tagName || '').toLowerCase();
+      if (tag === 'img' && (element.classList.contains('gaiji') || element.classList.contains('gaiji-line'))) return false;
+      var rect = element.getBoundingClientRect();
+      return rect && rect.width > 0 && rect.height > 0;
+    });
+  },
+  sasayakiMediaScrollForElement: function(element, context) {
+    var rect = element.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    var currentScroll = this.getPagePosition(context);
+    var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll;
+    return this.alignToPage(context, anchor);
+  },
+  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeBoundaries) {
+    var context = this.getScrollContext();
+    var low = Math.min(startScroll, endScroll);
+    var high = Math.max(startScroll, endScroll);
+    var seen = new Set();
+    var stops = [];
+    var elements = this.sasayakiMediaElements();
+    for (var i = 0; i < elements.length; i++) {
+      var scroll = this.sasayakiMediaScrollForElement(elements[i], context);
+      if (scroll === null || scroll === undefined) continue;
+      if (includeBoundaries) {
+        if (scroll < low - 0.5 || scroll > high + 0.5) continue;
+      } else if (scroll <= low + 0.5 || scroll >= high - 0.5) {
+        continue;
+      }
+      var key = String(scroll);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      stops.push({ scroll: scroll });
+    }
+    stops.sort(function(a, b) { return a.scroll - b.scroll; });
+    if (startScroll > endScroll) stops.reverse();
+    return stops;
+  },
+  sasayakiMediaStopsBeforeCue: function(cue) {
+    var context = this.getScrollContext();
+    var targetScroll = this.sasayakiCueTargetScroll(cue);
+    if (targetScroll === null || targetScroll === undefined) return [];
+    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), targetScroll, false);
+  },
+  sasayakiMediaStopsToChapterEnd: function() {
+    var context = this.getScrollContext();
+    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), this.contentLastPageScroll(context), true);
+  },
+  showSasayakiMediaStop: function(stop) {
+    var scroll = Number(stop && stop.scroll);
+    if (!Number.isFinite(scroll)) return null;
+    var context = this.getScrollContext();
+    this.setPagePosition(context, scroll);
+    return this.calculateProgress();
+  },
   highlightSasayakiCue: function(cue, reveal) {
     this.clearSasayakiCue();
     var cueId = typeof cue === 'string' ? cue : cue.id;

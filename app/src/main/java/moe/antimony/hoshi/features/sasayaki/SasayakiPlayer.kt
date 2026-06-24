@@ -24,7 +24,7 @@ class SasayakiPlayer private constructor(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (Int) -> Unit,
+        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
         playbackServiceRuntime: SasayakiPlaybackRuntime,
     ) : this(
         createControllerBundle(
@@ -96,6 +96,13 @@ class SasayakiPlayer private constructor(
         controller.pausePlayback(restoreTemporaryPosition = restoreTemporaryPosition)
     }
 
+    fun pauseForAutoPageHold(): Boolean =
+        controller.pauseForAutoPageHold()
+
+    fun resumeAfterAutoPageHold() {
+        controller.resumeAfterAutoPageHold()
+    }
+
     fun nextCue() {
         controller.nextCue()
     }
@@ -156,7 +163,7 @@ class SasayakiPlayer private constructor(
             getCurrentChapterIndex: () -> Int,
             onCue: (SasayakiMatch, Boolean) -> Unit,
             onClearCue: () -> Unit,
-            onLoadChapter: (Int) -> Unit,
+            onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
             playbackServiceRuntime: SasayakiPlaybackRuntime,
         ): SasayakiPlaybackControllerBundle {
             val controller = playbackServiceRuntime.load(

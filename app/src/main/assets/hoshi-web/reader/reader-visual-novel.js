@@ -387,6 +387,7 @@ window.hoshiReader = {
       }, last.endRawCount),
       ids: ids,
       splittable: true,
+      mediaStop: parts.some(function(screen) { return !!screen.mediaStop; }),
       render: () => {
         var fragment = document.createDocumentFragment();
         parts.forEach(function(screen) {
@@ -605,6 +606,7 @@ window.hoshiReader = {
       }, first.chapterRawStart),
       ids: ids,
       splittable: false,
+      mediaStop: false,
       render: () => this.cloneRangesWithOffsets(ranges)
     };
   },
@@ -616,6 +618,7 @@ window.hoshiReader = {
     for (var i = 0; i < sources.length; i++) {
       let child = sources[i].node;
       var stats = this.statsForSourceNode(child);
+      var hasStandaloneMedia = this.containsStandaloneMedia(child);
       var start = stats.hasText ? stats.startChar : runningEnd;
       var end = stats.hasText ? stats.endChar : start;
       var rawStart = stats.hasText ? stats.startRaw : runningRawEnd;
@@ -628,7 +631,8 @@ window.hoshiReader = {
         startRawCount: rawStart,
         endRawCount: rawEnd,
         ids: this.collectIdsForNode(child, sources[i].extraIds),
-        splittable: stats.hasText && !this.containsStandaloneMedia(child),
+        splittable: stats.hasText && !hasStandaloneMedia,
+        mediaStop: hasStandaloneMedia,
         render: () => {
           var fragment = document.createDocumentFragment();
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
@@ -794,6 +798,7 @@ window.hoshiReader = {
       endRawCount: lastUnit.endRawCount,
       ids: ids,
       splittable: true,
+      mediaStop: groupedUnits.some(function(unit) { return !!unit.mediaStop; }),
       render: () => this.cloneRangesWithOffsets(ranges)
     };
   },
@@ -819,6 +824,7 @@ window.hoshiReader = {
       var atomic = this.sentenceAtomicRoots && this.sentenceAtomicRoots.has(child);
       if (!atomic && stats.hasText) continue;
       var position = stats.hasText ? stats : this.sourcePositionForTopLevelNode(i);
+      var hasStandaloneMedia = child.nodeType === Node.ELEMENT_NODE && this.containsStandaloneMedia(child);
       units.push({
         standalone: true,
         order: i,
@@ -828,6 +834,7 @@ window.hoshiReader = {
         endRawCount: position.endRaw,
         ids: this.collectIdsForNode(child),
         splittable: false,
+        mediaStop: hasStandaloneMedia,
         render: () => {
           var fragment = document.createDocumentFragment();
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
@@ -1742,6 +1749,43 @@ window.hoshiReader = {
     }
     this.buildNodeOffsets();
     if (this.activeCueId) this.refreshSasayakiCuePresentation();
+  },
+  sasayakiMediaStopsBetweenScreens: function(startIndex, endIndex) {
+    if (!this.screens || !this.screens.length) return [];
+    var low = Math.min(startIndex, endIndex);
+    var high = Math.max(startIndex, endIndex);
+    var stops = [];
+    for (var i = low + 1; i < high; i++) {
+      if (this.screens[i] && this.screens[i].mediaStop) {
+        stops.push({ screenIndex: i });
+      }
+    }
+    if (startIndex > endIndex) stops.reverse();
+    return stops;
+  },
+  sasayakiMediaStopsBeforeCue: function(cue) {
+    var cueObject = this.sasayakiCueForInput(cue);
+    var targetIndex = this.screenIndexForSasayakiCue(cueObject);
+    if (targetIndex < 0) return [];
+    return this.sasayakiMediaStopsBetweenScreens(this.currentScreenIndex, targetIndex);
+  },
+  sasayakiMediaStopsToChapterEnd: function() {
+    if (!this.screens || !this.screens.length) return [];
+    var stops = [];
+    for (var i = this.currentScreenIndex; i < this.screens.length; i++) {
+      if (this.screens[i] && this.screens[i].mediaStop) {
+        stops.push({ screenIndex: i });
+      }
+    }
+    return stops;
+  },
+  showSasayakiMediaStop: function(stop) {
+    var index = Number(stop && stop.screenIndex);
+    if (!Number.isFinite(index) || !this.screens || !this.screens.length) return null;
+    var safeIndex = Math.min(Math.max(0, Math.floor(index)), this.screens.length - 1);
+    if (!this.screens[safeIndex].mediaStop) return null;
+    this.renderScreen(safeIndex, true);
+    return this.calculateProgress();
   },
   highlightSasayakiCue: function(cue, reveal) {
     var cueObject = this.sasayakiCueForInput(cue);

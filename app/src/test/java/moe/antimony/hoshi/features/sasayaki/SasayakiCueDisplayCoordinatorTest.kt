@@ -73,7 +73,10 @@ class SasayakiCueDisplayCoordinatorTest {
         )
 
         assertTrue(action is SasayakiCueDisplayAction.ClearAndLoadChapter)
-        assertEquals(1, (action as SasayakiCueDisplayAction.ClearAndLoadChapter).chapterIndex)
+        action as SasayakiCueDisplayAction.ClearAndLoadChapter
+        assertSame(otherChapterCue, action.cue)
+        assertEquals(1, action.chapterIndex)
+        assertEquals(true, action.reveal)
         assertNull(coordinator.currentCueStartTime)
     }
 

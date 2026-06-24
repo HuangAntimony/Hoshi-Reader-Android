@@ -404,6 +404,90 @@
        this.applyInlineSasayakiCue(this.activeCueId);
      }
    },
+  sasayakiScrollPosition: function() {
+    var root = document.scrollingElement || document.documentElement;
+    if (this.isVertical()) {
+      var left = window.scrollX;
+      if (left === 0 && root.scrollLeft !== 0) left = root.scrollLeft;
+      return left;
+    }
+    var top = root.scrollTop;
+    if (top === 0 && window.scrollY !== 0) top = window.scrollY;
+    return top;
+  },
+  sasayakiScrollTargetForRect: function(rect) {
+    var current = this.sasayakiScrollPosition();
+    if (this.isVertical()) {
+      return current + rect.right - window.innerWidth;
+    }
+    return current + rect.top;
+  },
+  sasayakiCueScrollTarget: function(cue) {
+    var cueId = typeof cue === 'string' ? cue : cue.id;
+    if (!cueId) return null;
+    var target = null;
+    if (this.isEInkMode()) {
+      this.ensureSasayakiCueGeometry(cue);
+      target = (this.cueGeometryRanges.get(cueId) || [])[0];
+    } else {
+      var targets = this.sasayakiInlineTargetsForCue(cueId);
+      if (!targets.length && typeof cue !== 'string') {
+        this.wrapSasayakiCue(cue);
+        targets = this.sasayakiInlineTargetsForCue(cueId);
+      }
+      target = targets[0];
+    }
+    if (!target) return null;
+    var rect = this.getRect(target);
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return this.sasayakiScrollTargetForRect(rect);
+  },
+  sasayakiMediaElements: function() {
+    return Array.from(document.body.querySelectorAll('img, svg, image, video, canvas, picture, table, iframe, object, embed')).filter(function(element) {
+      var tag = String(element.tagName || '').toLowerCase();
+      if (tag === 'img' && (element.classList.contains('gaiji') || element.classList.contains('gaiji-line'))) return false;
+      var rect = element.getBoundingClientRect();
+      return rect && rect.width > 0 && rect.height > 0;
+    });
+  },
+  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeBoundaries) {
+    var low = Math.min(startScroll, endScroll);
+    var high = Math.max(startScroll, endScroll);
+    var elements = this.sasayakiMediaElements();
+    var stops = [];
+    for (var i = 0; i < elements.length; i++) {
+      var rect = elements[i].getBoundingClientRect();
+      var scroll = this.sasayakiScrollTargetForRect(rect);
+      if (includeBoundaries) {
+        if (scroll < low - 0.5 || scroll > high + 0.5) continue;
+      } else if (scroll <= low + 0.5 || scroll >= high - 0.5) {
+        continue;
+      }
+      stops.push({ screenIndex: i });
+    }
+    if (startScroll > endScroll) stops.reverse();
+    return stops;
+  },
+  sasayakiMediaStopsBeforeCue: function(cue) {
+    var targetScroll = this.sasayakiCueScrollTarget(cue);
+    if (targetScroll === null || targetScroll === undefined) return [];
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, false);
+  },
+  sasayakiMediaStopsToChapterEnd: function() {
+    var root = document.scrollingElement || document.documentElement;
+    var maxScroll = this.isVertical()
+      ? Math.max(0, root.scrollWidth - window.innerWidth)
+      : Math.max(0, root.scrollHeight - window.innerHeight);
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), maxScroll, true);
+  },
+  showSasayakiMediaStop: function(stop) {
+    var index = Number(stop && stop.screenIndex);
+    if (!Number.isFinite(index)) return null;
+    var element = this.sasayakiMediaElements()[Math.floor(index)];
+    if (!element) return null;
+    this.scrollToTarget(element);
+    return this.calculateProgress();
+  },
   highlightSasayakiCue: function(cue, reveal) {
     this.clearSasayakiCue();
     var cueId = typeof cue === 'string' ? cue : cue.id;

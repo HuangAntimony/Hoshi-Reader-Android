@@ -50,6 +50,8 @@ class SasayakiPlayerFacadeTest {
         player.togglePlayback()
         player.pausePlayback()
         player.pausePlayback(restoreTemporaryPosition = false)
+        assertTrue(player.pauseForAutoPageHold())
+        player.resumeAfterAutoPageHold()
         player.nextCue()
         player.previousCue()
         player.skipForward(10)
@@ -68,6 +70,8 @@ class SasayakiPlayerFacadeTest {
                 "togglePlayback",
                 "pausePlayback:true",
                 "pausePlayback:false",
+                "pauseForAutoPageHold",
+                "resumeAfterAutoPageHold",
                 "nextCue",
                 "previousCue",
                 "skipForward:10",
@@ -97,7 +101,7 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
-            onLoadChapter = {},
+            onLoadChapter = { _, _ -> },
             playbackServiceRuntime = runtime,
         )
 
@@ -120,7 +124,7 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
-            onLoadChapter = {},
+            onLoadChapter = { _, _ -> },
             playbackServiceRuntime = FakeSasayakiPlaybackRuntime(controller),
         )
 
@@ -140,7 +144,7 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex: () -> Int,
             onCue: (SasayakiMatch, Boolean) -> Unit,
             onClearCue: () -> Unit,
-            onLoadChapter: (Int) -> Unit,
+            onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
         ): SasayakiPlaybackControllerContract {
             commands += "load"
             return controller
@@ -191,6 +195,15 @@ class SasayakiPlayerFacadeTest {
 
         override fun pausePlayback(restoreTemporaryPosition: Boolean) {
             commands += "pausePlayback:$restoreTemporaryPosition"
+        }
+
+        override fun pauseForAutoPageHold(): Boolean {
+            commands += "pauseForAutoPageHold"
+            return true
+        }
+
+        override fun resumeAfterAutoPageHold() {
+            commands += "resumeAfterAutoPageHold"
         }
 
         override fun nextCue() {

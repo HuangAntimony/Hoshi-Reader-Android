@@ -53,7 +53,7 @@ internal interface SasayakiPlaybackRuntime {
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (Int) -> Unit,
+        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     ): SasayakiPlaybackControllerContract
 
     fun detachReader()
@@ -134,7 +134,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (Int) -> Unit,
+        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     ): SasayakiPlaybackControllerContract {
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),

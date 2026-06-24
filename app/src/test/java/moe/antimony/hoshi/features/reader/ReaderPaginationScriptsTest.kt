@@ -382,6 +382,24 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun sasayakiMediaStopCommandsUseReaderPublicApi() {
+        val cue = SasayakiCueRange(id = "cue\"1", start = 42, length = 7)
+
+        assertEquals(
+            """window.hoshiReader.sasayakiMediaStopsBeforeCue({id:"cue\"1",start:42,length:7})""",
+            ReaderPaginationScripts.sasayakiMediaStopsBeforeCueInvocation(cue),
+        )
+        assertEquals(
+            "window.hoshiReader.sasayakiMediaStopsToChapterEnd()",
+            ReaderPaginationScripts.sasayakiMediaStopsToChapterEndInvocation(),
+        )
+        assertEquals(
+            """window.hoshiReader.showSasayakiMediaStop({"scroll":800})""",
+            ReaderPaginationScripts.showSasayakiMediaStopInvocation("""{"scroll":800}"""),
+        )
+    }
+
+    @Test
     fun sasayakiRevealScrollsToRangeCenterLikeIos() {
         val script = ReaderPaginationScripts.shellScript()
         val scrollToRange = script.substringAfter("scrollToRange: function(range)")

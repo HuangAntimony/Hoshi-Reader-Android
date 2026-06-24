@@ -6,13 +6,13 @@ internal class SasayakiReaderAttachment {
     private var getCurrentChapterIndex: (() -> Int)? = null
     private var onCue: ((SasayakiMatch, Boolean) -> Unit)? = null
     private var onClearCue: (() -> Unit)? = null
-    private var onLoadChapter: ((Int) -> Unit)? = null
+    private var onLoadChapter: ((SasayakiMatch, Boolean) -> Unit)? = null
 
     fun attach(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (Int) -> Unit,
+        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     ) {
         this.getCurrentChapterIndex = getCurrentChapterIndex
         this.onCue = onCue
@@ -38,7 +38,7 @@ internal class SasayakiReaderAttachment {
         onClearCue?.invoke()
     }
 
-    fun loadChapter(chapterIndex: Int) {
-        onLoadChapter?.invoke(chapterIndex)
+    fun loadChapter(cue: SasayakiMatch, reveal: Boolean) {
+        onLoadChapter?.invoke(cue, reveal)
     }
 }
