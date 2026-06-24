@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.reader
 import androidx.compose.ui.unit.IntSize
 import kotlin.io.path.createTempDirectory
 import moe.antimony.hoshi.content.ContentLanguageProfile
+import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupState
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
@@ -165,7 +166,7 @@ class ReaderWebViewStateHolderTest {
 
         assertEquals(0, restoreCompletedCount)
 
-        afterVisible()
+        afterVisible { true }
 
         assertEquals(1, restoreCompletedCount)
     }
@@ -186,9 +187,91 @@ class ReaderWebViewStateHolderTest {
 
         assertTrue(events.isEmpty())
 
-        afterVisible()
+        afterVisible {
+            events += "visible"
+            true
+        }
 
-        assertEquals(listOf("evaluate", "save 0.42", "restored"), events)
+        assertEquals(listOf("visible", "evaluate", "save 0.42", "restored"), events)
+    }
+
+    @Test
+    fun restoreCompletionCanRunSasayakiLandingBeforeWebViewIsVisible() {
+        val events = mutableListOf<String>()
+
+        val completion = readerRestoreCompletionAfterVisibleAction(
+            chapterFragment = null,
+            evaluateProgress = { error("Progress should not be evaluated without a fragment") },
+            onSaveProgress = { error("Progress should not be saved without a fragment") },
+            onRestoreCompleted = { events += "restored" },
+            beforeVisible = { show, completeAfterVisible ->
+                events += "sasayaki"
+                if (show()) {
+                    events += "save"
+                    completeAfterVisible()
+                }
+            },
+        )
+
+        completion {
+            events += "visible"
+            true
+        }
+
+        assertEquals(listOf("sasayaki", "visible", "save", "restored"), events)
+    }
+
+    @Test
+    fun staleRestoreCompletionDoesNotMarkReaderRestoredWhenShowIsRejected() {
+        val events = mutableListOf<String>()
+
+        val completion = readerRestoreCompletionAfterVisibleAction(
+            chapterFragment = null,
+            evaluateProgress = { error("Progress should not be evaluated without a fragment") },
+            onSaveProgress = { error("Progress should not be saved without a fragment") },
+            onRestoreCompleted = { events += "restored" },
+            beforeVisible = { show, completeAfterVisible ->
+                events += "sasayaki"
+                if (show()) {
+                    events += "save"
+                    completeAfterVisible()
+                }
+            },
+        )
+
+        completion {
+            events += "stale"
+            false
+        }
+
+        assertEquals(listOf("sasayaki", "stale"), events)
+    }
+
+    @Test
+    fun sasayakiChapterLoadResetsStatisticsBaselineAfterSavingHiddenJumpTarget() {
+        val events = mutableListOf<String>()
+        val statistics = listOf(ReadingStatistics(title = "Book", dateKey = "2026-06-24", charactersRead = 12))
+        val target = ReaderChapterPosition(index = 3, progress = 0.0)
+
+        val saved = readerSasayakiChapterLoadPosition(
+            saveStatistics = {
+                events += "flush"
+                statistics
+            },
+            jumpToChapterStart = {
+                events += "jump"
+                target
+            },
+            resetStatisticsBaseline = {
+                events += "reset"
+            },
+            saveReaderPosition = { position, savedStatistics ->
+                events += "save ${position.index}:${position.progress} ${savedStatistics?.single()?.charactersRead}"
+            },
+        )
+
+        assertEquals(target, saved)
+        assertEquals(listOf("flush", "jump", "save 3:0.0 12", "reset"), events)
     }
 
     @Test

@@ -94,6 +94,7 @@ internal fun ChapterWebView(
     readerPopupFrames: List<ReaderLookupPopupFramePayload>,
     fontManager: ReaderFontManager,
     systemDark: Boolean,
+    onBeforeRestoreVisible: (WebView) -> ReaderRestoreBeforeVisibleAction? = { null },
     modifier: Modifier = Modifier,
 ) {
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
@@ -114,6 +115,7 @@ internal fun ChapterWebView(
     val currentWebViewRestoreEpoch = rememberUpdatedState(webViewRestoreEpoch)
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
+    val currentOnBeforeRestoreVisible = rememberUpdatedState(onBeforeRestoreVisible)
     val context = LocalContext.current
     val readerWebAssets = remember(context) { ReaderWebAssets.load(context) }
     val viewportDensity = context.resources.displayMetrics.density.coerceAtLeast(1f)
@@ -201,7 +203,7 @@ internal fun ChapterWebView(
             assets = readerWebAssets,
         )
     }
-    val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> (() -> Unit)?> { restoredWebView, reportedRestoreToken ->
+    val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> ReaderRestoreCompletionAction?> { restoredWebView, reportedRestoreToken ->
         if (reportedRestoreToken != restoreToken) return@rememberUpdatedState null
         readerRestoreCompletionAfterVisibleAction(
             chapterFragment = chapterFragment,
@@ -210,6 +212,7 @@ internal fun ChapterWebView(
             },
             onSaveProgress = currentOnSaveBookmark.value,
             onRestoreCompleted = currentOnRestoreCompleted.value,
+            beforeVisible = currentOnBeforeRestoreVisible.value(restoredWebView),
         )
     }
     LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, isWebViewRestoring) {
@@ -467,16 +470,29 @@ internal fun readerRestoreCompletionAfterVisibleAction(
     evaluateProgress: (((String?) -> Unit) -> Unit),
     onSaveProgress: (Double) -> Unit,
     onRestoreCompleted: () -> Unit,
-): () -> Unit = {
-    if (chapterFragment != null) {
-        evaluateProgress { progressResult ->
-            ReaderPaginationScripts.doubleResult(progressResult)?.let(onSaveProgress)
+    beforeVisible: ReaderRestoreBeforeVisibleAction? = null,
+): ReaderRestoreCompletionAction = { show ->
+    fun completeAfterVisible() {
+        if (chapterFragment != null) {
+            evaluateProgress { progressResult ->
+                ReaderPaginationScripts.doubleResult(progressResult)?.let(onSaveProgress)
+                onRestoreCompleted()
+            }
+        } else {
             onRestoreCompleted()
         }
-    } else {
-        onRestoreCompleted()
+    }
+
+    if (beforeVisible != null) {
+        beforeVisible(show, ::completeAfterVisible)
+    } else if (show()) {
+        completeAfterVisible()
     }
 }
+
+internal typealias ReaderRestoreShowAction = () -> Boolean
+internal typealias ReaderRestoreCompletionAction = (ReaderRestoreShowAction) -> Unit
+internal typealias ReaderRestoreBeforeVisibleAction = (ReaderRestoreShowAction, () -> Unit) -> Unit
 
 internal data class ReaderWebViewSetupReloadKey(
     val initialProgress: Double,
@@ -1258,13 +1274,13 @@ internal class ReaderContinuousScrollFocusTracker {
 
 private class ReaderRestoreBridge(
     private val webView: WebView,
-    private val onRestoreAccepted: (WebView, String) -> (() -> Unit)?,
+    private val onRestoreAccepted: (WebView, String) -> ReaderRestoreCompletionAction?,
 ) {
     @JavascriptInterface
     fun postMessage(message: String) {
         webView.post {
-            val afterVisible = onRestoreAccepted(webView, message) ?: return@post
-            webView.showAfterReaderRestore(afterVisible)
+            val restoreCompletion = onRestoreAccepted(webView, message) ?: return@post
+            webView.showAfterReaderRestore(restoreCompletion)
         }
     }
 }
@@ -1287,7 +1303,7 @@ private fun WebView.hideForReaderRestore() {
     alpha = 0f
 }
 
-private fun WebView.showAfterReaderRestore(onVisible: () -> Unit) {
+private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompletionAction) {
     animate().cancel()
     val generation = readerRestoreGenerations[this] ?: 0L
     postVisualStateCallback(
@@ -1296,9 +1312,15 @@ private fun WebView.showAfterReaderRestore(onVisible: () -> Unit) {
             override fun onComplete(requestId: Long) {
                 post {
                     if (readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
-                        animate().cancel()
-                        alpha = 1f
-                        onVisible()
+                        restoreCompletion {
+                            if (readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
+                                animate().cancel()
+                                alpha = 1f
+                                true
+                            } else {
+                                false
+                            }
+                        }
                     }
                 }
             }
