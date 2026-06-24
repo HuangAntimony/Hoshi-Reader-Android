@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import androidx.compose.ui.semantics.Role
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
@@ -40,6 +41,11 @@ class SasayakiSheetTest {
     fun playbackHeaderIsHiddenUntilAudiobookIsAvailable() {
         assertFalse(sasayakiShouldShowPlaybackHeader(hasAudio = false))
         assertTrue(sasayakiShouldShowPlaybackHeader(hasAudio = true))
+    }
+
+    @Test
+    fun sheetTabsUseTabSelectionSemantics() {
+        assertEquals(Role.Tab, SasayakiSheetTabRole)
     }
 
     @Test

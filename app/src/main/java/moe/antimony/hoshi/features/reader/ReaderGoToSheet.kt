@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -49,6 +51,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -75,6 +78,8 @@ internal enum class ReaderGoToTab {
     Chapters,
     Highlights,
 }
+
+internal val ReaderGoToTabRole = Role.Tab
 
 @Composable
 internal fun ReaderGoToSheet(
@@ -217,6 +222,7 @@ private fun ReaderGoToTabs(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .selectableGroup()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -235,7 +241,11 @@ private fun ReaderGoToTabs(
                         color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
                         shape = RoundedCornerShape(10.dp),
                     )
-                    .clickable { onSelectedTabChange(tab) }
+                    .selectable(
+                        selected = selected,
+                        role = ReaderGoToTabRole,
+                        onClick = { onSelectedTabChange(tab) },
+                    )
                     .padding(vertical = 7.dp),
                 contentAlignment = Alignment.Center,
             ) {

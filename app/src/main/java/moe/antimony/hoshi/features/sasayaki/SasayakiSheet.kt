@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -57,6 +59,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +88,7 @@ internal val SasayakiSpeedSliderRange = 0.5f..2.0f
 internal const val SasayakiSpeedSliderSteps = 29
 internal const val SasayakiAudiobookCoverWidthDp = 48
 internal const val SasayakiAudiobookCoverHeightDp = 68
+internal val SasayakiSheetTabRole = Role.Tab
 
 @Composable
 internal fun SasayakiSheet(
@@ -452,6 +456,7 @@ private fun SasayakiSheetTabs(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .selectableGroup()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -465,7 +470,11 @@ private fun SasayakiSheetTabs(
                         color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
                         shape = RoundedCornerShape(10.dp),
                     )
-                    .clickable { onSelectedTabChange(tab) }
+                    .selectable(
+                        selected = selected,
+                        role = SasayakiSheetTabRole,
+                        onClick = { onSelectedTabChange(tab) },
+                    )
                     .padding(vertical = 7.dp),
                 contentAlignment = Alignment.Center,
             ) {
