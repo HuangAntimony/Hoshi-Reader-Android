@@ -51,7 +51,7 @@ internal interface SasayakiPlaybackRuntime {
     fun load(
         request: SasayakiPlaybackRuntimeLoadRequest,
         getCurrentChapterIndex: () -> Int,
-        onCue: (SasayakiMatch, Boolean) -> Unit,
+        onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
         onClearCue: () -> Unit,
     ): SasayakiPlaybackControllerContract
 
@@ -131,7 +131,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     override fun load(
         request: SasayakiPlaybackRuntimeLoadRequest,
         getCurrentChapterIndex: () -> Int,
-        onCue: (SasayakiMatch, Boolean) -> Unit,
+        onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
         onClearCue: () -> Unit,
     ): SasayakiPlaybackControllerContract {
         val requestedKey = ActivePlaybackKey(

@@ -22,7 +22,7 @@ class SasayakiPlayer private constructor(
         matchData: SasayakiMatchData?,
         initialPlayback: SasayakiPlaybackData?,
         getCurrentChapterIndex: () -> Int,
-        onCue: (SasayakiMatch, Boolean) -> Unit,
+        onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
         onClearCue: () -> Unit,
         playbackServiceRuntime: SasayakiPlaybackRuntime,
     ) : this(
@@ -159,7 +159,7 @@ class SasayakiPlayer private constructor(
             matchData: SasayakiMatchData?,
             initialPlayback: SasayakiPlaybackData?,
             getCurrentChapterIndex: () -> Int,
-            onCue: (SasayakiMatch, Boolean) -> Unit,
+            onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
             onClearCue: () -> Unit,
             playbackServiceRuntime: SasayakiPlaybackRuntime,
         ): SasayakiPlaybackControllerBundle {

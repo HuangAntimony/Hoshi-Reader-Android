@@ -56,6 +56,46 @@ class SasayakiPlaybackEventCoordinatorTest {
         display as SasayakiCueDisplayAction.Display
         assertSame(targetCue, display.cue)
         assertTrue(display.reveal)
+        assertEquals(SasayakiCueRevealSource.DirectJump, display.source)
+    }
+
+    @Test
+    fun naturalPlaybackTickMarksCrossChapterCueAsNaturalPlayback() {
+        val targetCue = SasayakiMatch("target", 12.0, 13.5, "target", 1, 0, 6)
+        val coordinator = SasayakiPlaybackEventCoordinator(
+            playbackState = SasayakiPlaybackStateCoordinator(initialPosition = 0.0),
+            playbackPersistence = SasayakiPlaybackPersistenceState(
+                playbackRepository = NoopPlaybackRepository,
+                audioSourceRepository = SasayakiAudioRepository(File("book-root")),
+                initialPlayback = null,
+                persistenceScope = CoroutineScope(Dispatchers.Unconfined),
+            ),
+            cueNavigation = SasayakiCueNavigationController(
+                SasayakiMatchData(matches = listOf(targetCue), unmatched = 0),
+            ),
+            cueDisplay = SasayakiCueDisplayCoordinator(),
+        )
+        val actions = mutableListOf<SasayakiCueDisplayAction>()
+
+        coordinator.updateCue(
+            hasAudio = true,
+            hasMatch = true,
+            time = targetCue.startTime,
+            delay = 0.0,
+            currentChapterIndex = 0,
+            autoScroll = true,
+            hasPlayedOnce = true,
+            source = SasayakiCueRevealSource.NaturalPlayback,
+            applyCueDisplayAction = { actions += it },
+        )
+
+        assertEquals(1, actions.size)
+        val display = actions.single()
+        assertTrue(display is SasayakiCueDisplayAction.ClearAndDisplay)
+        display as SasayakiCueDisplayAction.ClearAndDisplay
+        assertSame(targetCue, display.cue)
+        assertTrue(display.reveal)
+        assertEquals(SasayakiCueRevealSource.NaturalPlayback, display.source)
     }
 
     private object NoopPlaybackRepository : SasayakiPlaybackRepository {

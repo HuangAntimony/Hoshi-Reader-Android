@@ -99,7 +99,7 @@ class SasayakiPlayerFacadeTest {
             matchData = null,
             initialPlayback = null,
             getCurrentChapterIndex = { 0 },
-            onCue = { _, _ -> },
+            onCue = { _, _, _ -> },
             onClearCue = {},
             playbackServiceRuntime = runtime,
         )
@@ -121,7 +121,7 @@ class SasayakiPlayerFacadeTest {
             matchData = null,
             initialPlayback = null,
             getCurrentChapterIndex = { 0 },
-            onCue = { _, _ -> },
+            onCue = { _, _, _ -> },
             onClearCue = {},
             playbackServiceRuntime = FakeSasayakiPlaybackRuntime(controller),
         )
@@ -140,7 +140,7 @@ class SasayakiPlayerFacadeTest {
         override fun load(
             request: SasayakiPlaybackRuntimeLoadRequest,
             getCurrentChapterIndex: () -> Int,
-            onCue: (SasayakiMatch, Boolean) -> Unit,
+            onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
             onClearCue: () -> Unit,
         ): SasayakiPlaybackControllerContract {
             commands += "load"

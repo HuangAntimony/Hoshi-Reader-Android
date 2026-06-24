@@ -100,7 +100,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         val harness = controllerHarness(
             matchData = SasayakiMatchData(matches = listOf(cue), unmatched = 0),
             initialPosition = 3.5,
-            onCue = { match, reveal -> displayedCues += "${match.id}:$reveal" },
+            onCue = { match, reveal, _ -> displayedCues += "${match.id}:$reveal" },
         )
         harness.controller.togglePlayback()
         displayedCues.clear()
@@ -163,7 +163,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
     private fun controllerHarness(
         matchData: SasayakiMatchData? = null,
         initialPosition: Double = 3.5,
-        onCue: (SasayakiMatch, Boolean) -> Unit = { _, _ -> },
+        onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit = { _, _, _ -> },
     ): ControllerHarness {
         val bookRoot = temporaryFolder.newFolder("book")
         val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.m4b").also { file ->

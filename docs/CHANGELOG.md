@@ -16,7 +16,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Expose Go to and Sasayaki reader-menu tabs with proper selected-tab semantics for accessibility services.
 - Keep Sasayaki playback owned by a service-backed MediaSession so background playback uses Android's media foreground-service path when permitted, system notification controls stay visible and routed through the media session, Reader restore does not leave a paused media notification, skip/seek controls work before first playback, reader exit stops playback without leaving a stale notification, and notification or launcher return opens the active reader.
 - Keep the Sasayaki notification's rewind and fast-forward controls visually consistent and working from system media controls.
-- Pause Sasayaki auto-scroll on skipped image pages for one second, including multiple image pages, image-only chapters, vertical continuous reading, fullscreen image interruptions, and cue or progress seeks, without leaving playback paused when the hold is interrupted.
+- Pause Sasayaki auto-scroll during natural playback on skipped image pages for one second, including multiple image pages, image-only chapters, vertical continuous reading, and fullscreen image interruptions, while cue or progress seeks jump directly without leaving playback paused.
 - Keep Sasayaki cross-chapter cue jumps from briefly showing the chapter start, counting the hidden restore landing in reading statistics, or applying cue jumps before slow chapter restores finish.
 
 ## [v1.2.2] - 2026-06-21

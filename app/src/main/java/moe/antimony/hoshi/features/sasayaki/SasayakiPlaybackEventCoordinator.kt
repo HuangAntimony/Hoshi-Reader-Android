@@ -30,6 +30,7 @@ class SasayakiPlaybackEventCoordinator(
                 currentChapterIndex = currentChapterIndex,
                 autoScroll = autoScroll,
                 hasPlayedOnce = shouldRevealCue,
+                source = SasayakiCueRevealSource.DirectJump,
                 forceDisplay = false,
                 applyCueDisplayAction = applyCueDisplayAction,
             )
@@ -54,6 +55,7 @@ class SasayakiPlaybackEventCoordinator(
         currentChapterIndex: Int,
         autoScroll: Boolean,
         hasPlayedOnce: Boolean,
+        source: SasayakiCueRevealSource = SasayakiCueRevealSource.DirectJump,
         forceDisplay: Boolean = false,
         applyCueDisplayAction: (SasayakiCueDisplayAction) -> Unit,
     ) {
@@ -65,6 +67,7 @@ class SasayakiPlaybackEventCoordinator(
                 currentChapterIndex = currentChapterIndex,
                 autoScroll = autoScroll,
                 hasPlayedOnce = hasPlayedOnce,
+                source = source,
                 forceDisplay = forceDisplay,
             ),
         )

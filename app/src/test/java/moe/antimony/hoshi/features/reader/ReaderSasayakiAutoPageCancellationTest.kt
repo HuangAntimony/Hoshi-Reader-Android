@@ -2,7 +2,9 @@ package moe.antimony.hoshi.features.reader
 
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -68,5 +70,55 @@ class ReaderSasayakiAutoPageCancellationTest {
 
         assertEquals(false, ready)
         assertEquals(3, delayCount)
+    }
+
+    @Test
+    fun naturalPlaybackHoldsSameChapterMediaStops() {
+        assertTrue(
+            readerSasayakiShouldHoldMediaStopsBeforeCue(
+                currentChapterIndex = 2,
+                cueChapterIndex = 2,
+                source = SasayakiCueRevealSource.NaturalPlayback,
+            ),
+        )
+    }
+
+    @Test
+    fun directJumpDoesNotHoldSameChapterMediaStops() {
+        assertFalse(
+            readerSasayakiShouldHoldMediaStopsBeforeCue(
+                currentChapterIndex = 2,
+                cueChapterIndex = 2,
+                source = SasayakiCueRevealSource.DirectJump,
+            ),
+        )
+    }
+
+    @Test
+    fun naturalPlaybackForwardJumpsInspectTargetChapterMediaStopsWithoutPreHold() {
+        assertEquals(
+            ReaderSasayakiTargetChapterMediaPolicy.InspectStopsWithoutPreHold,
+            readerSasayakiTargetChapterMediaPolicy(
+                currentChapterIndex = 2,
+                cueChapterIndex = 3,
+                source = SasayakiCueRevealSource.NaturalPlayback,
+            ),
+        )
+        assertEquals(
+            ReaderSasayakiTargetChapterMediaPolicy.DirectRestore,
+            readerSasayakiTargetChapterMediaPolicy(
+                currentChapterIndex = 2,
+                cueChapterIndex = 3,
+                source = SasayakiCueRevealSource.DirectJump,
+            ),
+        )
+        assertEquals(
+            ReaderSasayakiTargetChapterMediaPolicy.DirectRestore,
+            readerSasayakiTargetChapterMediaPolicy(
+                currentChapterIndex = 3,
+                cueChapterIndex = 2,
+                source = SasayakiCueRevealSource.NaturalPlayback,
+            ),
+        )
     }
 }

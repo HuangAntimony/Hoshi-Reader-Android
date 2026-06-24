@@ -57,7 +57,7 @@ internal class SasayakiPlaybackController(
     initialPlayback: SasayakiPlaybackData?,
     persistenceScope: CoroutineScope,
     private val getCurrentChapterIndex: () -> Int,
-    onCue: (SasayakiMatch, Boolean) -> Unit,
+    onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
     onClearCue: () -> Unit,
     playbackPreparer: SasayakiPlaybackPreparer,
     persistenceDispatcher: CoroutineDispatcher,
@@ -461,6 +461,7 @@ internal class SasayakiPlaybackController(
             currentChapterIndex = getCurrentChapterIndex(),
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
+            source = SasayakiCueRevealSource.NaturalPlayback,
             applyCueDisplayAction = ::applyCueDisplayAction,
         )
     }

@@ -4,12 +4,12 @@ import moe.antimony.hoshi.epub.SasayakiMatch
 
 internal class SasayakiReaderAttachment {
     private var getCurrentChapterIndex: (() -> Int)? = null
-    private var onCue: ((SasayakiMatch, Boolean) -> Unit)? = null
+    private var onCue: ((SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit)? = null
     private var onClearCue: (() -> Unit)? = null
 
     fun attach(
         getCurrentChapterIndex: () -> Int,
-        onCue: (SasayakiMatch, Boolean) -> Unit,
+        onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
         onClearCue: () -> Unit,
     ) {
         this.getCurrentChapterIndex = getCurrentChapterIndex
@@ -26,8 +26,8 @@ internal class SasayakiReaderAttachment {
     fun currentChapterIndex(): Int =
         getCurrentChapterIndex?.invoke() ?: 0
 
-    fun cue(cue: SasayakiMatch, reveal: Boolean) {
-        onCue?.invoke(cue, reveal)
+    fun cue(cue: SasayakiMatch, reveal: Boolean, source: SasayakiCueRevealSource) {
+        onCue?.invoke(cue, reveal, source)
     }
 
     fun clearCue() {

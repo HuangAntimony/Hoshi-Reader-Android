@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.reader
 
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 
 internal fun cancelReaderSasayakiAutoPage(
     job: Job?,
@@ -40,3 +41,30 @@ internal suspend fun awaitReaderSasayakiChapterReady(
     }
     return isChapterReady()
 }
+
+internal fun readerSasayakiShouldHoldMediaStopsBeforeCue(
+    currentChapterIndex: Int,
+    cueChapterIndex: Int,
+    source: SasayakiCueRevealSource,
+): Boolean =
+    source == SasayakiCueRevealSource.NaturalPlayback &&
+        currentChapterIndex == cueChapterIndex
+
+internal enum class ReaderSasayakiTargetChapterMediaPolicy {
+    DirectRestore,
+    InspectStopsWithoutPreHold,
+}
+
+internal fun readerSasayakiTargetChapterMediaPolicy(
+    currentChapterIndex: Int,
+    cueChapterIndex: Int,
+    source: SasayakiCueRevealSource,
+): ReaderSasayakiTargetChapterMediaPolicy =
+    if (
+        source == SasayakiCueRevealSource.NaturalPlayback &&
+        cueChapterIndex > currentChapterIndex
+    ) {
+        ReaderSasayakiTargetChapterMediaPolicy.InspectStopsWithoutPreHold
+    } else {
+        ReaderSasayakiTargetChapterMediaPolicy.DirectRestore
+    }
