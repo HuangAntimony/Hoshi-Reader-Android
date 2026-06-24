@@ -37,13 +37,21 @@ internal class ReaderSasayakiAutoPageCoordinator(
             return driver.revealCue(cue, reveal = false)
         }
 
-        if (cue.chapterIndex <= driver.currentChapterIndex) {
+        if (cue.chapterIndex == driver.currentChapterIndex) {
             val stops = driver.mediaStopsBeforeCue(cue)
             if (stops.isEmpty()) {
                 return driver.revealCue(cue, reveal = true)
             }
             return holdPlaybackWhile(driver) {
                 showStops(driver = driver, stops = stops)
+                driver.revealCue(cue, reveal = true)
+            }
+        }
+
+        if (cue.chapterIndex < driver.currentChapterIndex) {
+            return holdPlaybackWhile(driver) {
+                driver.loadChapter(cue.chapterIndex)
+                showStops(driver, driver.mediaStopsBeforeCue(cue))
                 driver.revealCue(cue, reveal = true)
             }
         }

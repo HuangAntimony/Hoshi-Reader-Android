@@ -81,6 +81,35 @@ class ReaderSasayakiAutoPageCoordinatorTest {
     }
 
     @Test
+    fun loadsPreviousChapterBeforeHoldingItsImageStops() = runBlocking {
+        val cue = SasayakiMatch("target", 10.0, 11.0, "target", chapterIndex = 2, start = 0, length = 6)
+        val events = mutableListOf<String>()
+        val coordinator = ReaderSasayakiAutoPageCoordinator(
+            holdMillis = 1_000L,
+            delay = { millis -> events += "delay:$millis" },
+        )
+        val driver = FakeAutoPageDriver(
+            initialChapterIndex = 3,
+            mediaStopsByChapter = mapOf(2 to listOf(ReaderSasayakiMediaStop(scroll = 800.0))),
+            events = events,
+        )
+
+        coordinator.revealCueWithMediaStops(cue = cue, reveal = true, driver = driver)
+
+        assertEquals(
+            listOf(
+                "pause-hold",
+                "load:2",
+                "show:2:800.0",
+                "delay:1000",
+                "reveal:target:true",
+                "resume-hold",
+            ),
+            events,
+        )
+    }
+
+    @Test
     fun cancellationDoesNotResumeAutoPageHold() = runBlocking {
         val cue = SasayakiMatch("target", 10.0, 11.0, "target", chapterIndex = 0, start = 0, length = 6)
         val events = mutableListOf<String>()
