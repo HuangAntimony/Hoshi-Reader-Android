@@ -107,7 +107,7 @@ internal fun ReaderChapterCover(
         Image(
             bitmap = coverBitmap,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = modifier.clip(RoundedCornerShape(2.dp)),
         )
     } else {

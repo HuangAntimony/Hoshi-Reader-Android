@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -86,7 +86,7 @@ import moe.antimony.hoshi.ui.asString
 
 internal val SasayakiSpeedSliderRange = 0.5f..2.0f
 internal const val SasayakiSpeedSliderSteps = 29
-internal const val SasayakiAudiobookCoverWidthDp = 48
+internal const val SasayakiAudiobookCoverWidthDp = 68
 internal const val SasayakiAudiobookCoverHeightDp = 68
 internal val SasayakiSheetTabRole = Role.Tab
 
@@ -314,12 +314,18 @@ private fun SasayakiAudiobookCover(
     fallbackCoverFile: File?,
 ) {
     val coverBitmap = rememberSasayakiCoverBitmap(metadata, fallbackCoverFile)
+    val frameModifier = Modifier
+        .size(
+            width = SasayakiAudiobookCoverWidthDp.dp,
+            height = SasayakiAudiobookCoverHeightDp.dp,
+        )
+        .clip(RoundedCornerShape(8.dp))
     Box(
-        modifier = Modifier
-            .width(SasayakiAudiobookCoverWidthDp.dp)
-            .height(SasayakiAudiobookCoverHeightDp.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = if (coverBitmap == null) {
+            frameModifier.background(MaterialTheme.colorScheme.surfaceVariant)
+        } else {
+            frameModifier
+        },
         contentAlignment = Alignment.Center,
     ) {
         if (coverBitmap != null) {
@@ -327,7 +333,7 @@ private fun SasayakiAudiobookCover(
                 bitmap = coverBitmap.asImageBitmap(),
                 contentDescription = stringResource(R.string.sasayaki_audiobook_cover),
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
             )
         } else {
             Icon(
