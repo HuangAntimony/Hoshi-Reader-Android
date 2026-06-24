@@ -39,11 +39,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.io.File
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -366,9 +364,12 @@ fun ReaderWebView(
         saveReaderPosition(stateHolder.readerPosition.displayedPosition)
     }
     fun cancelSasayakiAutoPage() {
-        sasayakiAutoPageJob?.cancel()
-        sasayakiAutoPageJob = null
-        pendingSasayakiRestoreCue = null
+        cancelReaderSasayakiAutoPage(
+            job = sasayakiAutoPageJob,
+            clearAutoPageJob = { sasayakiAutoPageJob = null },
+            clearPendingRestoreCue = { pendingSasayakiRestoreCue = null },
+            resumeAfterAutoPageHold = { sasayakiPlayer?.resumeAfterAutoPageHold() },
+        )
     }
     fun jumpToPositionWithHistory(position: ReaderChapterPosition, fragment: String? = null) {
         cancelSasayakiAutoPage()
@@ -1043,9 +1044,7 @@ fun ReaderWebView(
                 countStatistics = countFinalStatistics,
             )
         } finally {
-            if (shouldResume && currentCoroutineContext().isActive) {
-                sasayakiPlayer?.resumeAfterAutoPageHold()
-            }
+            if (shouldResume) sasayakiPlayer?.resumeAfterAutoPageHold()
         }
     }
     fun dispatchSasayakiCueToReader(cue: SasayakiMatch, reveal: Boolean) {
