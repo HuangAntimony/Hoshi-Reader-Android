@@ -127,6 +127,39 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         assertFalse(harness.controller.isPlaying)
     }
 
+    @Test
+    fun nextCueDuringAutoPageHoldContinuesPlaybackAfterSeek() {
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(
+                matches = listOf(
+                    SasayakiMatch("next", 10.0, 12.0, "next", 0, 0, 4),
+                ),
+                unmatched = 0,
+            ),
+        )
+        harness.controller.togglePlayback()
+        harness.engine.events.clear()
+
+        assertTrue(harness.controller.pauseForAutoPageHold())
+        harness.controller.nextCue()
+
+        assertEquals(listOf("pause", "seek:10000", "start:1.0"), harness.engine.events)
+        assertTrue(harness.controller.isPlaying)
+    }
+
+    @Test
+    fun progressSeekDuringAutoPageHoldContinuesPlaybackAfterSeek() {
+        val harness = controllerHarness()
+        harness.controller.togglePlayback()
+        harness.engine.events.clear()
+
+        assertTrue(harness.controller.pauseForAutoPageHold())
+        harness.controller.seekTo(21.0)
+
+        assertEquals(listOf("pause", "seek:21000", "start:1.0"), harness.engine.events)
+        assertTrue(harness.controller.isPlaying)
+    }
+
     private fun controllerHarness(
         matchData: SasayakiMatchData? = null,
         initialPosition: Double = 3.5,
@@ -204,6 +237,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         ): SasayakiPreparedPlayback {
             prepared = true
             engine.currentPositionMs = startPositionMs
+            engine.callbacks = callbacks
             callbacks.onPrepared(engine.durationMs)
             return SasayakiPreparedPlayback(engine = engine, durationMs = engine.durationMs)
         }
@@ -213,6 +247,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         val events = mutableListOf<String>()
         override var durationMs: Int = 30_000
         override var currentPositionMs: Int = 0
+        var callbacks: SasayakiAudioRestoreCallbacks? = null
 
         override fun start(rate: Float) {
             events += "start:$rate"
@@ -229,6 +264,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         override fun seekTo(positionMs: Int) {
             currentPositionMs = positionMs
             events += "seek:$positionMs"
+            callbacks?.onSeekComplete()
         }
 
         override fun release() {

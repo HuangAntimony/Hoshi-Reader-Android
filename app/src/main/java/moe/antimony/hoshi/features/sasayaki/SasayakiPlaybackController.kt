@@ -214,82 +214,72 @@ internal class SasayakiPlaybackController(
     }
 
     override fun nextCue() {
-        clearAutoPageHoldResume()
-        withPreparedPlayback {
+        runPlaybackPositionCommand { continuePlayback ->
             val seconds = readerSkipButtonAction.seconds ?: SasayakiCueFallbackSkipSeconds.takeUnless { hasCues }
             if (seconds == null) {
                 playbackCommands.nextCue(
                     currentTime = currentTime,
                     delay = delay,
-                    isPlaying = isPlaying,
+                    isPlaying = continuePlayback,
                 )
             } else {
                 playbackCommands.skipForward(
                     currentTime = currentTime,
                     duration = duration,
                     seconds = seconds,
-                    isPlaying = isPlaying,
+                    isPlaying = continuePlayback,
                 )
             }
-            true
         }
     }
 
     override fun previousCue() {
-        clearAutoPageHoldResume()
-        withPreparedPlayback {
+        runPlaybackPositionCommand { continuePlayback ->
             val seconds = readerSkipButtonAction.seconds ?: SasayakiCueFallbackSkipSeconds.takeUnless { hasCues }
             if (seconds == null) {
                 playbackCommands.previousCue(
                     currentTime = currentTime,
                     delay = delay,
-                    isPlaying = isPlaying,
+                    isPlaying = continuePlayback,
                 )
             } else {
                 playbackCommands.skipBackward(
                     currentTime = currentTime,
                     seconds = seconds,
-                    isPlaying = isPlaying,
+                    isPlaying = continuePlayback,
                 )
             }
-            true
         }
     }
 
     override fun skipForward(seconds: Int) {
-        clearAutoPageHoldResume()
-        withPreparedPlayback {
+        runPlaybackPositionCommand { continuePlayback ->
             playbackCommands.skipForward(
                 currentTime = currentTime,
                 duration = duration,
                 seconds = seconds,
-                isPlaying = isPlaying,
+                isPlaying = continuePlayback,
             )
-            true
         }
     }
 
     override fun skipBackward(seconds: Int) {
-        clearAutoPageHoldResume()
-        withPreparedPlayback {
+        runPlaybackPositionCommand { continuePlayback ->
             playbackCommands.skipBackward(
                 currentTime = currentTime,
                 seconds = seconds,
-                isPlaying = isPlaying,
+                isPlaying = continuePlayback,
             )
-            true
         }
     }
 
     override fun seekTo(seconds: Double) {
-        clearAutoPageHoldResume()
-        withPreparedPlayback {
+        runPlaybackPositionCommand { continuePlayback ->
             playbackCommands.seekTo(
                 seconds = seconds,
                 duration = duration,
-                isPlaying = isPlaying,
+                isPlaying = continuePlayback,
             )
-            true
         }
     }
 
@@ -342,6 +332,24 @@ internal class SasayakiPlaybackController(
 
     private fun clearAutoPageHoldResume() {
         autoPageHoldResumePending = false
+    }
+
+    private fun consumeAutoPageHoldResumePending(): Boolean {
+        val pending = autoPageHoldResumePending
+        autoPageHoldResumePending = false
+        return pending
+    }
+
+    private fun runPlaybackPositionCommand(runCommand: (continuePlayback: Boolean) -> Boolean) {
+        val resumeHeldPlayback = consumeAutoPageHoldResumePending()
+        val continuePlayback = isPlaying || resumeHeldPlayback
+        withPreparedPlayback {
+            val commandStarted = runCommand(continuePlayback)
+            if (!commandStarted && resumeHeldPlayback) {
+                startPreparedPlayback(updateCueAfterStart = false)
+            }
+            true
+        }
     }
 
     private fun startPlayback() {
