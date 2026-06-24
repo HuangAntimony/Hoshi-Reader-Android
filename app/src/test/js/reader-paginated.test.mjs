@@ -714,6 +714,22 @@ test('non e-ink Sasayaki chapter load keeps iOS-style wrappers without e-ink geo
     }
 });
 
+test('Sasayaki cue includes punctuation between text nodes inside the same cue', () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('古都'));
+        body.appendChild(new TestText('。'));
+        body.appendChild(new TestText('３年生'));
+        const { reader } = loadReader(body, sourceUrl);
+        reader.isEInkMode = () => false;
+
+        reader.applySasayakiCues([{ id: 'cue', start: 0, length: 5 }]);
+
+        const wrappers = reader.cueWrappers.get('cue') ?? [];
+        assert.equal(wrappers.map((wrapper) => wrapper.textContent).join(''), '古都。３年生');
+    }
+});
+
 test('e-ink Sasayaki chapter load keeps geometry available for id-only highlights', () => {
     for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         const body = new TestElement('body');
