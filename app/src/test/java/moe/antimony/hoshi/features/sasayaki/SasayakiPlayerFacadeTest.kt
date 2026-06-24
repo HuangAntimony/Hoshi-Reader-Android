@@ -101,7 +101,6 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
-            onLoadChapter = { _, _ -> },
             playbackServiceRuntime = runtime,
         )
 
@@ -124,7 +123,6 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex = { 0 },
             onCue = { _, _ -> },
             onClearCue = {},
-            onLoadChapter = { _, _ -> },
             playbackServiceRuntime = FakeSasayakiPlaybackRuntime(controller),
         )
 
@@ -144,7 +142,6 @@ class SasayakiPlayerFacadeTest {
             getCurrentChapterIndex: () -> Int,
             onCue: (SasayakiMatch, Boolean) -> Unit,
             onClearCue: () -> Unit,
-            onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
         ): SasayakiPlaybackControllerContract {
             commands += "load"
             return controller

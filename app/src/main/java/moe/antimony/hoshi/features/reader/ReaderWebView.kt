@@ -363,19 +363,26 @@ fun ReaderWebView(
     fun saveCurrentDisplayedPosition() {
         saveReaderPosition(stateHolder.readerPosition.displayedPosition)
     }
+    fun cancelSasayakiAutoPage() {
+        sasayakiAutoPageJob?.cancel()
+        sasayakiAutoPageJob = null
+    }
     fun jumpToPositionWithHistory(position: ReaderChapterPosition, fragment: String? = null) {
+        cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.jumpToWithHistory(position, fragment)
         resetStatisticsBaseline()
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpBack() {
+        cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.navigateBackInJumpHistory() ?: return
         resetStatisticsBaseline()
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpForward() {
+        cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.navigateForwardInJumpHistory() ?: return
         resetStatisticsBaseline()
@@ -524,7 +531,7 @@ fun ReaderWebView(
         if (plan.flushAutoSyncExport) {
             onFlushAutoSyncExport()
         }
-        sasayakiAutoPageJob?.cancel()
+        cancelSasayakiAutoPage()
         sasayakiPlayer?.stopPlayback()
         sasayakiPlayer = null
         onClose()
@@ -584,6 +591,7 @@ fun ReaderWebView(
     }
     fun goToNextChapter(): Boolean {
         if (!stateHolder.canAcceptReaderNavigationInput()) return false
+        cancelSasayakiAutoPage()
         startStatisticsForProgressChangeIfNeeded()
         val next = stateHolder.goToNextChapter(book.chapters.lastIndex)
         if (next != null) {
@@ -596,6 +604,7 @@ fun ReaderWebView(
     }
     fun goToPreviousChapter(): Boolean {
         if (!stateHolder.canAcceptReaderNavigationInput()) return false
+        cancelSasayakiAutoPage()
         startStatisticsForProgressChangeIfNeeded()
         val previous = stateHolder.goToPreviousChapter()
         if (previous != null) {
@@ -637,6 +646,7 @@ fun ReaderWebView(
     fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean {
         val currentWebView = webView ?: return false
         if (!stateHolder.beginReaderNavigationInput()) return false
+        cancelSasayakiAutoPage()
         closeLookupPopupsAndSelection()
         val onLimit = when (direction) {
             ReaderNavigationDirection.Forward -> ::goToNextChapter
@@ -655,6 +665,10 @@ fun ReaderWebView(
         ) {
             player?.pausePlayback()
         }
+    }
+    fun handleReaderInteraction() {
+        cancelSasayakiAutoPage()
+        stateHolder.enterFocusModeForReaderInteraction()
     }
     fun replyReaderPopupMessage(popupId: String, messageId: String, bodyJson: String) {
         webView?.evaluateJavascript(
@@ -812,6 +826,7 @@ fun ReaderWebView(
     }
     readerPopupBridgeHolder.callbacks = ReaderLookupPopupBridgeCallbacks(::handleReaderPopupBridgeMessage)
     val handleTextSelected: (ReaderSelectionData, (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit = { selection, selectionRects ->
+        cancelSasayakiAutoPage()
         stateHolder.enterFocusModeForReaderInteraction()
         rootSelectionHighlight = null
         setLookupPopups(emptyList())
@@ -861,6 +876,7 @@ fun ReaderWebView(
         }
     }
     fun handleReaderTapOutside() {
+        cancelSasayakiAutoPage()
         if (stateHolder.lookupPopups.isEmpty()) {
             rootSelectionHighlight = null
             clearReaderSelection {
@@ -984,7 +1000,7 @@ fun ReaderWebView(
             return
         }
         pendingSasayakiCue = null
-        sasayakiAutoPageJob?.cancel()
+        cancelSasayakiAutoPage()
         sasayakiAutoPageJob = scope.launch {
             val progress = sasayakiAutoPageCoordinator.revealCueWithMediaStops(
                 cue = cue,
@@ -1009,7 +1025,7 @@ fun ReaderWebView(
         dispatchSasayakiCueToReader(pending.cue, pending.reveal)
     }
     LaunchedEffect(bookRoot, isSasayakiMatchLoaded, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
-        sasayakiAutoPageJob?.cancel()
+        cancelSasayakiAutoPage()
         sasayakiPlayer?.release()
         sasayakiPlayer = if (bookRoot != null && isSasayakiMatchLoaded && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
@@ -1025,12 +1041,9 @@ fun ReaderWebView(
                     dispatchSasayakiCueToReader(cue, reveal)
                 },
                 onClearCue = {
-                    sasayakiAutoPageJob?.cancel()
+                    cancelSasayakiAutoPage()
                     pendingSasayakiCue = null
                     webView?.evaluateJavascript(ReaderPaginationScripts.clearSasayakiCueInvocation(), null)
-                },
-                onLoadChapter = { cue, reveal ->
-                    dispatchSasayakiCueToReader(cue, reveal)
                 },
                 playbackServiceRuntime = sasayakiPlaybackServiceRuntime,
             )
@@ -1408,7 +1421,7 @@ fun ReaderWebView(
                         onTextSelected = handleTextSelected,
                         onClearLookupPopup = ::closeLookupPopupsAndSelection,
                         onReaderTapOutside = ::handleReaderTapOutside,
-                        onReaderInteraction = stateHolder::enterFocusModeForReaderInteraction,
+                        onReaderInteraction = ::handleReaderInteraction,
                         onImageTapped = ::openFullscreenImage,
                         onHighlightCreated = ::addHighlight,
                         readerPopupBridgeHolder = readerPopupBridgeHolder,

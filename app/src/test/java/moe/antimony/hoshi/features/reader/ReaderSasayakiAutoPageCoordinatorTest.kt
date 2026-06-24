@@ -98,12 +98,38 @@ class ReaderSasayakiAutoPageCoordinatorTest {
 
         assertEquals(
             listOf(
-                "pause-hold",
                 "load:2",
+                "pause-hold",
                 "show:2:800.0",
                 "delay:1000",
                 "reveal:target:true",
                 "resume-hold",
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun loadsCrossChapterCueWithoutPausingWhenNoImageStopsAreSkipped() = runBlocking {
+        val cue = SasayakiMatch("target", 10.0, 11.0, "target", chapterIndex = 2, start = 0, length = 6)
+        val events = mutableListOf<String>()
+        val coordinator = ReaderSasayakiAutoPageCoordinator(
+            holdMillis = 1_000L,
+            delay = { millis -> events += "delay:$millis" },
+        )
+        val driver = FakeAutoPageDriver(
+            initialChapterIndex = 0,
+            mediaStopsByChapter = emptyMap(),
+            events = events,
+        )
+
+        coordinator.revealCueWithMediaStops(cue = cue, reveal = true, driver = driver)
+
+        assertEquals(
+            listOf(
+                "load:1",
+                "load:2",
+                "reveal:target:true",
             ),
             events,
         )

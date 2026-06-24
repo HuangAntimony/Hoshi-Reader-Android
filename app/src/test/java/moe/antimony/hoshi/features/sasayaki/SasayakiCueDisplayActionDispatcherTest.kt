@@ -11,7 +11,6 @@ class SasayakiCueDisplayActionDispatcherTest {
     private val dispatcher = SasayakiCueDisplayActionDispatcher(
         onCue = { cue, reveal -> events += "cue:${cue.id}:$reveal" },
         onClearCue = { events += "clear" },
-        onLoadChapter = { cue, reveal -> events += "load:${cue.chapterIndex}:${cue.id}:$reveal" },
     )
 
     @Test
@@ -36,9 +35,9 @@ class SasayakiCueDisplayActionDispatcherTest {
     }
 
     @Test
-    fun clearAndLoadChapterClearsCueBeforeLoadingChapter() {
-        dispatcher.apply(SasayakiCueDisplayAction.ClearAndLoadChapter(cue = cue, reveal = true))
+    fun clearAndDisplayClearsCueBeforeDispatchingCue() {
+        dispatcher.apply(SasayakiCueDisplayAction.ClearAndDisplay(cue = cue, reveal = true))
 
-        assertEquals(listOf("clear", "load:1:a:true"), events)
+        assertEquals(listOf("clear", "cue:a:true"), events)
     }
 }

@@ -42,56 +42,71 @@ internal class ReaderSasayakiAutoPageCoordinator(
             if (stops.isEmpty()) {
                 return driver.revealCue(cue, reveal = true)
             }
-            return holdPlaybackWhile(driver) {
-                showStops(driver = driver, stops = stops)
+            return withPlaybackHold(driver) { hold ->
+                hold.showStops(stops)
                 driver.revealCue(cue, reveal = true)
             }
         }
 
         if (cue.chapterIndex < driver.currentChapterIndex) {
-            return holdPlaybackWhile(driver) {
+            return withPlaybackHold(driver) { hold ->
                 driver.loadChapter(cue.chapterIndex)
-                showStops(driver, driver.mediaStopsBeforeCue(cue))
+                hold.showStops(driver.mediaStopsBeforeCue(cue))
                 driver.revealCue(cue, reveal = true)
             }
         }
 
-        return holdPlaybackWhile(driver) {
+        return withPlaybackHold(driver) { hold ->
             val startChapter = driver.currentChapterIndex
-            showStops(driver, driver.mediaStopsToChapterEnd())
+            hold.showStops(driver.mediaStopsToChapterEnd())
             for (chapterIndex in (startChapter + 1) until cue.chapterIndex) {
                 driver.loadChapter(chapterIndex)
-                showStops(driver, driver.mediaStopsToChapterEnd())
+                hold.showStops(driver.mediaStopsToChapterEnd())
             }
             driver.loadChapter(cue.chapterIndex)
-            showStops(driver, driver.mediaStopsBeforeCue(cue))
+            hold.showStops(driver.mediaStopsBeforeCue(cue))
             driver.revealCue(cue, reveal = true)
         }
     }
 
-    private suspend fun holdPlaybackWhile(
+    private suspend fun withPlaybackHold(
         driver: ReaderSasayakiAutoPageDriver,
-        block: suspend () -> Double?,
+        block: suspend (PlaybackHold) -> Double?,
     ): Double? {
-        val shouldResume = driver.pauseForAutoPageHold()
+        val hold = PlaybackHold(driver)
         return try {
-            block()
+            block(hold)
         } finally {
+            hold.resumeIfNeeded()
+        }
+    }
+
+    private inner class PlaybackHold(
+        private val driver: ReaderSasayakiAutoPageDriver,
+    ) {
+        private var started = false
+        private var shouldResume = false
+
+        suspend fun showStops(stops: List<ReaderSasayakiMediaStop>) {
+            if (stops.isEmpty()) return
+            pauseIfNeeded()
+            for (stop in stops) {
+                driver.showMediaStop(stop)
+                delay(holdMillis)
+            }
+        }
+
+        suspend fun resumeIfNeeded() {
             if (shouldResume && currentCoroutineContext().isActive) {
                 driver.resumeAfterAutoPageHold()
             }
         }
-    }
 
-    private suspend fun showStops(
-        driver: ReaderSasayakiAutoPageDriver,
-        stops: List<ReaderSasayakiMediaStop>,
-    ): Boolean {
-        for (stop in stops) {
-            driver.showMediaStop(stop)
-            delay(holdMillis)
+        private fun pauseIfNeeded() {
+            if (started) return
+            started = true
+            shouldResume = driver.pauseForAutoPageHold()
         }
-        return stops.isNotEmpty()
     }
 
     private companion object {

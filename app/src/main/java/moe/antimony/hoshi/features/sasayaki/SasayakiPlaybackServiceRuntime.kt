@@ -53,7 +53,6 @@ internal interface SasayakiPlaybackRuntime {
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     ): SasayakiPlaybackControllerContract
 
     fun detachReader()
@@ -134,7 +133,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
     ): SasayakiPlaybackControllerContract {
         val requestedKey = ActivePlaybackKey(
             bookRoot = request.bookRoot.stableIdentity(),
@@ -147,7 +145,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
                     getCurrentChapterIndex = getCurrentChapterIndex,
                     onCue = onCue,
                     onClearCue = onClearCue,
-                    onLoadChapter = onLoadChapter,
                 )
                 controller.updateMatchData(request.matchData)
                 return controller
@@ -159,7 +156,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             getCurrentChapterIndex = getCurrentChapterIndex,
             onCue = onCue,
             onClearCue = onClearCue,
-            onLoadChapter = onLoadChapter,
         )
         activeBookId = request.bookId
         session?.setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, request.bookId))
@@ -176,7 +172,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             getCurrentChapterIndex = readerAttachment::currentChapterIndex,
             onCue = readerAttachment::cue,
             onClearCue = readerAttachment::clearCue,
-            onLoadChapter = readerAttachment::loadChapter,
             playbackPreparer = ServiceOwnedSasayakiPlaybackPreparer(
                 playerProvider = ::requirePlayer,
             ),

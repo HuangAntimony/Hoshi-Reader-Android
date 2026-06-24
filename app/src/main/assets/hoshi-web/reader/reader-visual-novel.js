@@ -1752,15 +1752,14 @@ window.hoshiReader = {
   },
   sasayakiMediaStopsBetweenScreens: function(startIndex, endIndex) {
     if (!this.screens || !this.screens.length) return [];
-    var low = Math.min(startIndex, endIndex);
-    var high = Math.max(startIndex, endIndex);
+    if (startIndex === endIndex) return [];
+    var step = startIndex < endIndex ? 1 : -1;
     var stops = [];
-    for (var i = low + 1; i < high; i++) {
+    for (var i = startIndex; i !== endIndex; i += step) {
       if (this.screens[i] && this.screens[i].mediaStop) {
         stops.push({ screenIndex: i });
       }
     }
-    if (startIndex > endIndex) stops.reverse();
     return stops;
   },
   sasayakiMediaStopsBeforeCue: function(cue) {

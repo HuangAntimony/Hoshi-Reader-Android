@@ -410,7 +410,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         scrollY: 0,
         scrollTo() {},
         getComputedStyle() {
-            return { writingMode: 'vertical-rl', getPropertyValue: () => '' };
+            return { writingMode: options.writingMode ?? 'vertical-rl', getPropertyValue: () => '' };
         },
     };
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
@@ -756,6 +756,27 @@ test('paginated Sasayaki media stop plan lists every image page before target cu
     );
 });
 
+test('paginated Sasayaki media stop plan includes the current image page before target cue', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 2_400;
+    body.scrollWidth = 480;
+    body.scrollTop = 0;
+    body.scrollLeft = 0;
+    body.appendChild(imgAt(120, 620));
+    const target = new TestText('二三');
+    target.rects = [testRect(900, 930)];
+    body.appendChild(target);
+    const { reader } = loadReader(body, readerPaginatedUrl);
+    reader.pageHeight = 800;
+
+    const stops = reader.sasayakiMediaStopsBeforeCue({ id: 'cue', start: 0, length: 2 });
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.scroll),
+        [0],
+    );
+});
+
 test('paginated Sasayaki media stop command moves to the image page and reports progress', () => {
     const body = new TestElement('body');
     body.scrollHeight = 2_400;
@@ -776,6 +797,29 @@ test('paginated Sasayaki media stop command moves to the image page and reports 
 
     assert.equal(body.scrollTop, 800);
     assert.equal(typeof progress, 'number');
+});
+
+test('continuous Sasayaki media stop plan uses scroll targets for the current image before cue', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 2_400;
+    body.scrollWidth = 480;
+    body.appendChild(imgAt(0, 500));
+    const target = new TestText('二三');
+    target.rects = [testRect(900, 930)];
+    body.appendChild(target);
+    const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'horizontal-tb' });
+    document.documentElement.scrollTop = 0;
+
+    reader.applySasayakiCues([{ id: 'cue', start: 0, length: 2 }]);
+    reader.cueWrappers.get('cue')[0].rect = testRect(900, 930);
+    const stops = reader.sasayakiMediaStopsBeforeCue({ id: 'cue', start: 0, length: 2 });
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.scroll),
+        [0],
+    );
+    assert.equal(reader.showSasayakiMediaStop(stops[0]), reader.calculateProgress());
+    assert.equal(document.documentElement.scrollTop, 0);
 });
 
 test('paginated Sasayaki media stop chapter-end plan includes an image-only first page', () => {

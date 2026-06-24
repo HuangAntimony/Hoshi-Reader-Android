@@ -24,7 +24,6 @@ class SasayakiPlayer private constructor(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean) -> Unit,
         onClearCue: () -> Unit,
-        onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
         playbackServiceRuntime: SasayakiPlaybackRuntime,
     ) : this(
         createControllerBundle(
@@ -38,7 +37,6 @@ class SasayakiPlayer private constructor(
             getCurrentChapterIndex = getCurrentChapterIndex,
             onCue = onCue,
             onClearCue = onClearCue,
-            onLoadChapter = onLoadChapter,
             playbackServiceRuntime = playbackServiceRuntime,
         ),
     )
@@ -163,7 +161,6 @@ class SasayakiPlayer private constructor(
             getCurrentChapterIndex: () -> Int,
             onCue: (SasayakiMatch, Boolean) -> Unit,
             onClearCue: () -> Unit,
-            onLoadChapter: (SasayakiMatch, Boolean) -> Unit,
             playbackServiceRuntime: SasayakiPlaybackRuntime,
         ): SasayakiPlaybackControllerBundle {
             val controller = playbackServiceRuntime.load(
@@ -179,7 +176,6 @@ class SasayakiPlayer private constructor(
                 getCurrentChapterIndex = getCurrentChapterIndex,
                 onCue = onCue,
                 onClearCue = onClearCue,
-                onLoadChapter = onLoadChapter,
             )
             return SasayakiPlaybackControllerBundle(
                 controller = controller,

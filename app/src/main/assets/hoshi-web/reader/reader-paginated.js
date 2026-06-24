@@ -420,20 +420,22 @@ window.hoshiReader = {
     var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll;
     return this.alignToPage(context, anchor);
   },
-  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeBoundaries) {
+  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeStartBoundary, includeEndBoundary) {
+    if (includeEndBoundary === undefined) includeEndBoundary = includeStartBoundary;
     var context = this.getScrollContext();
-    var low = Math.min(startScroll, endScroll);
-    var high = Math.max(startScroll, endScroll);
+    var forward = startScroll <= endScroll;
     var seen = new Set();
     var stops = [];
     var elements = this.sasayakiMediaElements();
     for (var i = 0; i < elements.length; i++) {
       var scroll = this.sasayakiMediaScrollForElement(elements[i], context);
       if (scroll === null || scroll === undefined) continue;
-      if (includeBoundaries) {
-        if (scroll < low - 0.5 || scroll > high + 0.5) continue;
-      } else if (scroll <= low + 0.5 || scroll >= high - 0.5) {
-        continue;
+      if (forward) {
+        if (includeStartBoundary ? scroll < startScroll - 0.5 : scroll <= startScroll + 0.5) continue;
+        if (includeEndBoundary ? scroll > endScroll + 0.5 : scroll >= endScroll - 0.5) continue;
+      } else {
+        if (includeStartBoundary ? scroll > startScroll + 0.5 : scroll >= startScroll - 0.5) continue;
+        if (includeEndBoundary ? scroll < endScroll - 0.5 : scroll <= endScroll + 0.5) continue;
       }
       var key = String(scroll);
       if (seen.has(key)) continue;
@@ -448,11 +450,11 @@ window.hoshiReader = {
     var context = this.getScrollContext();
     var targetScroll = this.sasayakiCueTargetScroll(cue);
     if (targetScroll === null || targetScroll === undefined) return [];
-    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), targetScroll, false);
+    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), targetScroll, true, false);
   },
   sasayakiMediaStopsToChapterEnd: function() {
     var context = this.getScrollContext();
-    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), this.contentLastPageScroll(context), true);
+    return this.sasayakiMediaStopsBetween(this.getPagePosition(context), this.contentLastPageScroll(context), true, true);
   },
   showSasayakiMediaStop: function(stop) {
     var scroll = Number(stop && stop.scroll);

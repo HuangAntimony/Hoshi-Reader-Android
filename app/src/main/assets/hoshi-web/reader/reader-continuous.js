@@ -438,8 +438,23 @@
       target = targets[0];
     }
     if (!target) return null;
+    if (target.nodeType === Node.ELEMENT_NODE && target.classList.contains('hoshi-sasayaki-cue')) {
+      var range = document.createRange();
+      range.selectNodeContents(target);
+      var rangeRect = this.getRect(range);
+      if (rangeRect && rangeRect.width > 0 && rangeRect.height > 0) {
+        return this.sasayakiScrollTargetForRect(rangeRect);
+      }
+    }
     var rect = this.getRect(target);
-    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      this.ensureSasayakiCueGeometry(cue);
+      var geometryTarget = (this.cueGeometryRanges.get(cueId) || [])[0];
+      if (!geometryTarget) return null;
+      var geometryRect = this.getRect(geometryTarget);
+      if (!geometryRect || geometryRect.width <= 0 || geometryRect.height <= 0) return null;
+      return this.sasayakiScrollTargetForRect(geometryRect);
+    }
     return this.sasayakiScrollTargetForRect(rect);
   },
   sasayakiMediaElements: function() {
@@ -450,42 +465,59 @@
       return rect && rect.width > 0 && rect.height > 0;
     });
   },
-  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeBoundaries) {
-    var low = Math.min(startScroll, endScroll);
-    var high = Math.max(startScroll, endScroll);
+  sasayakiMediaScrollForElement: function(element) {
+    var rect = element.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return this.sasayakiScrollTargetForRect(rect);
+  },
+  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeStartBoundary, includeEndBoundary) {
+    if (includeEndBoundary === undefined) includeEndBoundary = includeStartBoundary;
+    var forward = startScroll <= endScroll;
     var elements = this.sasayakiMediaElements();
+    var seen = new Set();
     var stops = [];
     for (var i = 0; i < elements.length; i++) {
-      var rect = elements[i].getBoundingClientRect();
-      var scroll = this.sasayakiScrollTargetForRect(rect);
-      if (includeBoundaries) {
-        if (scroll < low - 0.5 || scroll > high + 0.5) continue;
-      } else if (scroll <= low + 0.5 || scroll >= high - 0.5) {
-        continue;
+      var scroll = this.sasayakiMediaScrollForElement(elements[i]);
+      if (scroll === null || scroll === undefined) continue;
+      if (forward) {
+        if (includeStartBoundary ? scroll < startScroll - 0.5 : scroll <= startScroll + 0.5) continue;
+        if (includeEndBoundary ? scroll > endScroll + 0.5 : scroll >= endScroll - 0.5) continue;
+      } else {
+        if (includeStartBoundary ? scroll > startScroll + 0.5 : scroll >= startScroll - 0.5) continue;
+        if (includeEndBoundary ? scroll < endScroll - 0.5 : scroll <= endScroll + 0.5) continue;
       }
-      stops.push({ screenIndex: i });
+      var key = String(scroll);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      stops.push({ scroll: scroll });
     }
+    stops.sort(function(a, b) { return a.scroll - b.scroll; });
     if (startScroll > endScroll) stops.reverse();
     return stops;
   },
   sasayakiMediaStopsBeforeCue: function(cue) {
     var targetScroll = this.sasayakiCueScrollTarget(cue);
     if (targetScroll === null || targetScroll === undefined) return [];
-    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, false);
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, true, false);
   },
   sasayakiMediaStopsToChapterEnd: function() {
     var root = document.scrollingElement || document.documentElement;
     var maxScroll = this.isVertical()
       ? Math.max(0, root.scrollWidth - window.innerWidth)
       : Math.max(0, root.scrollHeight - window.innerHeight);
-    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), maxScroll, true);
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), maxScroll, true, true);
   },
   showSasayakiMediaStop: function(stop) {
-    var index = Number(stop && stop.screenIndex);
-    if (!Number.isFinite(index)) return null;
-    var element = this.sasayakiMediaElements()[Math.floor(index)];
-    if (!element) return null;
-    this.scrollToTarget(element);
+    var scroll = Number(stop && stop.scroll);
+    if (!Number.isFinite(scroll)) return null;
+    var root = document.scrollingElement || document.documentElement;
+    if (this.isVertical()) {
+      window.scrollTo({ left: scroll, top: window.scrollY, behavior: 'instant' });
+      root.scrollLeft = scroll;
+    } else {
+      window.scrollTo({ left: window.scrollX, top: scroll, behavior: 'instant' });
+      root.scrollTop = scroll;
+    }
     return this.calculateProgress();
   },
   highlightSasayakiCue: function(cue, reveal) {

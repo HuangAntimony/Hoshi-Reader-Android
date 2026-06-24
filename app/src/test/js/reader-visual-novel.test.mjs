@@ -1281,6 +1281,31 @@ test('visual novel Sasayaki media stop plan includes every standalone image scre
     assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/second.jpg');
 });
 
+test('visual novel Sasayaki media stop plan includes current image screen before target cue', async () => {
+    const cue = { id: 'cue', start: 0, length: 2 };
+    const { reader } = await initializeReader(
+        bodyWith(
+            imageBlock('images/opening.jpg', { id: 'opening-image' }),
+            p('二三。'),
+        ),
+        {
+            mode: 'sentences',
+            sentencesPerScreen: 1,
+            revealSpeed: 0,
+        },
+    );
+
+    reader.applySasayakiCues([cue]);
+    const stops = reader.sasayakiMediaStopsBeforeCue(cue);
+
+    assert.deepEqual(
+        Array.from(stops, (stop) => stop.screenIndex),
+        [0],
+    );
+    assert.equal(reader.showSasayakiMediaStop(stops[0]), 0);
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/opening.jpg');
+});
+
 test('visual novel Sasayaki chapter-end media stops include an image-only current screen', async () => {
     const { reader } = await initializeReader(
         bodyWith(imageBlock('images/cover.jpg', { id: 'cover' })),
