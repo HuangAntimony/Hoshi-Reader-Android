@@ -11,6 +11,7 @@ internal data class ReaderWebAssets(
     val readerPaginatedJs: String,
     val readerContinuousJs: String,
     val readerVisualNovelJs: String,
+    val readerSasayakiJs: String,
     val highlightsJs: String,
     val readerCss: String,
 ) {
@@ -32,6 +33,7 @@ internal data class ReaderWebAssets(
                 readerPaginatedJs = context.readAsset("hoshi-web/reader/reader-paginated.js"),
                 readerContinuousJs = context.readAsset("hoshi-web/reader/reader-continuous.js"),
                 readerVisualNovelJs = context.readAsset("hoshi-web/reader/reader-visual-novel.js"),
+                readerSasayakiJs = context.readAsset("hoshi-web/reader/reader-sasayaki.js"),
                 highlightsJs = context.readAsset("hoshi-web/reader/highlights.js"),
                 readerCss = context.readAsset("hoshi-web/reader/reader.css"),
             )

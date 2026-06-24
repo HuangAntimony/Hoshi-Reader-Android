@@ -39,9 +39,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.io.File
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -162,7 +164,6 @@ fun ReaderWebView(
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
     var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
-    val sasayakiAutoPageCoordinator = remember { ReaderSasayakiAutoPageCoordinator() }
     val sasayakiMediaStopJson = remember { Json { ignoreUnknownKeys = true } }
     var sasayakiAutoPageJob by remember(book) { mutableStateOf<Job?>(null) }
     val view = LocalView.current
@@ -941,58 +942,79 @@ fun ReaderWebView(
             delay(16L)
         }
     }
-    fun sasayakiAutoPageDriver(): ReaderSasayakiAutoPageDriver =
-        object : ReaderSasayakiAutoPageDriver {
-            override val currentChapterIndex: Int
-                get() = stateHolder.readerPosition.displayedPosition.index
-
-            override suspend fun mediaStopsToChapterEnd(): List<ReaderSasayakiMediaStop> =
-                decodeSasayakiMediaStops(
-                    evaluateReaderJavascript(ReaderPaginationScripts.sasayakiMediaStopsToChapterEndInvocation()),
-                )
-
-            override suspend fun mediaStopsBeforeCue(cue: SasayakiMatch): List<ReaderSasayakiMediaStop> =
-                decodeSasayakiMediaStops(
-                    evaluateReaderJavascript(
-                        ReaderPaginationScripts.sasayakiMediaStopsBeforeCueInvocation(cue.toCueRange()),
-                    ),
-                )
-
-            override suspend fun showMediaStop(stop: ReaderSasayakiMediaStop): Double? {
-                val progress = ReaderPaginationScripts.doubleResult(
-                    evaluateReaderJavascript(
-                        ReaderPaginationScripts.showSasayakiMediaStopInvocation(
-                            sasayakiMediaStopJson.encodeToString(ReaderSasayakiMediaStop.serializer(), stop),
-                        ),
-                    ),
-                )
-                progress?.let(::recordSasayakiDisplayedProgress)
-                return progress
+    suspend fun sasayakiMediaStopsToChapterEnd(): List<ReaderSasayakiMediaStop> =
+        decodeSasayakiMediaStops(
+            evaluateReaderJavascript(ReaderPaginationScripts.sasayakiMediaStopsToChapterEndInvocation()),
+        )
+    suspend fun sasayakiMediaStopsBeforeCue(cue: SasayakiMatch): List<ReaderSasayakiMediaStop> =
+        decodeSasayakiMediaStops(
+            evaluateReaderJavascript(
+                ReaderPaginationScripts.sasayakiMediaStopsBeforeCueInvocation(cue.toCueRange()),
+            ),
+        )
+    suspend fun showSasayakiMediaStop(stop: ReaderSasayakiMediaStop): Double? {
+        val progress = ReaderPaginationScripts.doubleResult(
+            evaluateReaderJavascript(
+                ReaderPaginationScripts.showSasayakiMediaStopInvocation(
+                    sasayakiMediaStopJson.encodeToString(ReaderSasayakiMediaStop.serializer(), stop),
+                ),
+            ),
+        )
+        progress?.let(::recordSasayakiDisplayedProgress)
+        return progress
+    }
+    suspend fun revealSasayakiCue(cue: SasayakiMatch, reveal: Boolean): Double? =
+        ReaderPaginationScripts.doubleResult(
+            evaluateReaderJavascript(
+                ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
+            ),
+        )
+    suspend fun loadSasayakiChapter(chapterIndex: Int) {
+        statisticsForSave()
+        val target = ReaderChapterPosition(index = chapterIndex, progress = 0.0)
+        val savedPosition = stateHolder.jumpTo(target)
+        resetStatisticsBaseline()
+        saveReaderPosition(savedPosition, statisticsTracker?.statisticsForPersistenceOrNull())
+        awaitReaderChapterReady(chapterIndex)
+    }
+    suspend fun revealSasayakiCueWithMediaStops(cue: SasayakiMatch, reveal: Boolean): Double? {
+        if (!reveal) return revealSasayakiCue(cue, reveal = false)
+        var holdStarted = false
+        var shouldResume = false
+        suspend fun showStops(stops: List<ReaderSasayakiMediaStop>) {
+            if (stops.isEmpty()) return
+            if (!holdStarted) {
+                holdStarted = true
+                shouldResume = sasayakiPlayer?.pauseForAutoPageHold() == true
             }
-
-            override suspend fun revealCue(cue: SasayakiMatch, reveal: Boolean): Double? =
-                ReaderPaginationScripts.doubleResult(
-                    evaluateReaderJavascript(
-                        ReaderPaginationScripts.highlightSasayakiCueInvocation(cue.toCueRange(), reveal),
-                    ),
-                )
-
-            override suspend fun loadChapter(chapterIndex: Int) {
-                statisticsForSave()
-                val target = ReaderChapterPosition(index = chapterIndex, progress = 0.0)
-                val savedPosition = stateHolder.jumpTo(target)
-                resetStatisticsBaseline()
-                saveReaderPosition(savedPosition, statisticsTracker?.statisticsForPersistenceOrNull())
-                awaitReaderChapterReady(chapterIndex)
+            stops.forEach { stop ->
+                showSasayakiMediaStop(stop)
+                delay(SasayakiMediaHoldMillis)
             }
-
-            override fun pauseForAutoPageHold(): Boolean =
-                sasayakiPlayer?.pauseForAutoPageHold() == true
-
-            override fun resumeAfterAutoPageHold() {
+        }
+        return try {
+            val currentChapterIndex = stateHolder.readerPosition.displayedPosition.index
+            if (cue.chapterIndex == currentChapterIndex) {
+                showStops(sasayakiMediaStopsBeforeCue(cue))
+            } else if (cue.chapterIndex < currentChapterIndex) {
+                loadSasayakiChapter(cue.chapterIndex)
+                showStops(sasayakiMediaStopsBeforeCue(cue))
+            } else {
+                showStops(sasayakiMediaStopsToChapterEnd())
+                for (chapterIndex in (currentChapterIndex + 1) until cue.chapterIndex) {
+                    loadSasayakiChapter(chapterIndex)
+                    showStops(sasayakiMediaStopsToChapterEnd())
+                }
+                loadSasayakiChapter(cue.chapterIndex)
+                showStops(sasayakiMediaStopsBeforeCue(cue))
+            }
+            revealSasayakiCue(cue, reveal = true)
+        } finally {
+            if (shouldResume && currentCoroutineContext().isActive) {
                 sasayakiPlayer?.resumeAfterAutoPageHold()
             }
         }
+    }
     fun dispatchSasayakiCueToReader(cue: SasayakiMatch, reveal: Boolean) {
         val targetWebView = webView
         if (targetWebView == null || stateHolder.isWebViewRestoring) {
@@ -1002,10 +1024,9 @@ fun ReaderWebView(
         pendingSasayakiCue = null
         cancelSasayakiAutoPage()
         sasayakiAutoPageJob = scope.launch {
-            val progress = sasayakiAutoPageCoordinator.revealCueWithMediaStops(
+            val progress = revealSasayakiCueWithMediaStops(
                 cue = cue,
                 reveal = reveal,
-                driver = sasayakiAutoPageDriver(),
             )
             progress?.let(::recordSasayakiDisplayedProgress)
         }
@@ -1633,6 +1654,8 @@ private data class PendingSasayakiCue(
     val cue: SasayakiMatch,
     val reveal: Boolean,
 )
+
+private const val SasayakiMediaHoldMillis = 1_000L
 
 private fun SasayakiPlaybackData?.hasStoredAudioSource(): Boolean =
     this?.audioUri?.isNotBlank() == true || this?.audioFileName?.isNotBlank() == true

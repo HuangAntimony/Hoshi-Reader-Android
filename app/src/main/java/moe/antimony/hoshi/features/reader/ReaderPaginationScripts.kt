@@ -1,7 +1,14 @@
 package moe.antimony.hoshi.features.reader
 
 import java.io.File
+import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
+
+@Serializable
+internal data class ReaderSasayakiMediaStop(
+    val scroll: Double? = null,
+    val screenIndex: Int? = null,
+)
 
 internal enum class ReaderNavigationDirection(val jsValue: String) {
     Forward("forward"),
@@ -101,6 +108,7 @@ internal object ReaderPaginationScripts {
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         val body = template
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
+            .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
             .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
             .replace("__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__", settings.visualNovelRevealSpeed.coerceIn(0, 120).toString())
             .replace("__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__", settings.visualNovelScreenMode.rawValue.javaScriptStringLiteral())
@@ -138,6 +146,7 @@ private data class ReaderPaginationAssetSource(
     val paginated: String,
     val continuous: String,
     val visualNovel: String,
+    val readerSasayaki: String,
     val highlights: String,
 ) {
     companion object {
@@ -147,6 +156,7 @@ private data class ReaderPaginationAssetSource(
                     paginated = assets.readerPaginatedJs,
                     continuous = assets.readerContinuousJs,
                     visualNovel = assets.readerVisualNovelJs,
+                    readerSasayaki = assets.readerSasayakiJs,
                     highlights = assets.highlightsJs,
                 )
             }
@@ -161,6 +171,7 @@ private object SourceTreeReaderPaginationAssets {
             paginated = readSourceAsset("hoshi-web/reader/reader-paginated.js"),
             continuous = readSourceAsset("hoshi-web/reader/reader-continuous.js"),
             visualNovel = readSourceAsset("hoshi-web/reader/reader-visual-novel.js"),
+            readerSasayaki = readSourceAsset("hoshi-web/reader/reader-sasayaki.js"),
             highlights = readSourceAsset("hoshi-web/reader/highlights.js"),
         )
     }
