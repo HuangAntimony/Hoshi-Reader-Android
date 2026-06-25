@@ -1,4 +1,5 @@
 __HOSHI_READER_CONTENT_STREAM_SCRIPT__
+__HOSHI_READER_RANGE_MAP_SCRIPT__
 
 window.hoshiReader = {
   revealSpeed: __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__,
@@ -26,6 +27,7 @@ window.hoshiReader = {
   sourceOrderIndexes: new WeakMap(),
   sourcePreorderIndexes: new WeakMap(),
   contentStream: null,
+  rangeMap: null,
   cloneTextOffsets: new WeakMap(),
   cloneTextRawOffsets: new WeakMap(),
   ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
@@ -215,7 +217,12 @@ window.hoshiReader = {
     if (!contentStreamFactory) {
       throw new Error('hoshiReaderContentStream is required for visual novel reader');
     }
+    var rangeMapFactory = window.hoshiReaderRangeMap && window.hoshiReaderRangeMap.create;
+    if (!rangeMapFactory) {
+      throw new Error('hoshiReaderRangeMap is required for visual novel reader');
+    }
     this.contentStream = contentStreamFactory(this.sourceRoot);
+    this.rangeMap = rangeMapFactory(this);
     this.sourceTextOffsets = this.contentStream.sourceTextOffsets;
     this.sourceTextRawOffsets = this.contentStream.sourceTextRawOffsets;
     this.sourceNodeStats = this.contentStream.sourceNodeStats;
@@ -1537,39 +1544,7 @@ window.hoshiReader = {
     highlights.hoshiVisualNovelPatched = true;
   },
   highlightSegmentsForChapterRawRange: function(offset, length) {
-    var start = Number(offset) || 0;
-    var end = start + Math.max(0, Number(length) || 0);
-    var segments = [];
-    var walker = this.createWalker();
-    var node;
-    while (node = walker.nextNode()) {
-      var nodeStart = this.nodeStartRawOffsets.get(node);
-      if (nodeStart === undefined) continue;
-      var text = node.textContent || '';
-      var rawCursor = nodeStart;
-      var i = 0;
-      var segment = null;
-      var flushSegment = function() {
-        if (!segment) return;
-        segments.push(segment);
-        segment = null;
-      };
-      while (i < text.length && rawCursor < end) {
-        var char = String.fromCodePoint(text.codePointAt(i));
-        var next = i + char.length;
-        if (rawCursor >= start) {
-          if (!segment) {
-            segment = { node: node, start: i, end: next };
-          } else {
-            segment.end = next;
-          }
-        }
-        rawCursor += 1;
-        i = next;
-      }
-      flushSegment();
-    }
-    return segments;
+    return this.rangeMap.collectRawSegments(offset, length);
   },
   rememberCreatedHighlight: function(id, color, result) {
     var highlights = Array.isArray(this.initialHighlights) ? this.initialHighlights.slice() : [];
@@ -1718,58 +1693,19 @@ window.hoshiReader = {
     return -1;
   },
   collectSasayakiCueRanges: function(cues) {
-    var result = [];
+    var normalized = [];
     for (var i = 0; i < cues.length; i++) {
       var cue = this.sasayakiCueForInput(cues[i]);
       if (!cue || !cue.id) continue;
-      result.push({ id: cue.id, ranges: this.currentScreenRangesForSasayakiCue(cue) });
+      var start = this.sasayakiCueStart(cue);
+      normalized.push({ id: cue.id, start: start, length: this.sasayakiCueEnd(cue) - start });
     }
-    return result;
+    return this.rangeMap.collectMatchableCueRanges(normalized);
   },
   currentScreenRangesForSasayakiCue: function(cue) {
     var start = this.sasayakiCueStart(cue);
     var end = this.sasayakiCueEnd(cue);
-    var ranges = [];
-    if (end <= start) return ranges;
-    var walker = this.createWalker();
-    var node;
-    while (node = walker.nextNode()) {
-      var nodeStart = this.nodeStartOffsets.get(node);
-      if (nodeStart === undefined) continue;
-      var text = node.textContent || '';
-      var cursor = nodeStart;
-      var offset = 0;
-      var segment = null;
-      var flushSegment = function() {
-        if (!segment) return;
-        ranges.push(segment);
-        segment = null;
-      };
-      while (offset < text.length && cursor < end) {
-        var char = String.fromCodePoint(text.codePointAt(offset));
-        var next = offset + char.length;
-        if (this.isMatchableChar(char)) {
-          if (cursor >= start && cursor < end) {
-            if (!segment) {
-              segment = { node: node, start: offset, end: next };
-            } else {
-              segment.end = next;
-            }
-          } else {
-            flushSegment();
-          }
-          cursor += 1;
-          if (cursor === end) flushSegment();
-        } else if (segment) {
-          segment.end = next;
-        } else if (cursor > start && cursor < end) {
-          segment = { node: node, start: offset, end: next };
-        }
-        offset = next;
-      }
-      flushSegment();
-    }
-    return ranges;
+    return this.rangeMap.collectMatchableSegments(start, end);
   },
   rememberSasayakiCueSources: function(cueRanges) {
     for (var i = 0; i < cueRanges.length; i++) {

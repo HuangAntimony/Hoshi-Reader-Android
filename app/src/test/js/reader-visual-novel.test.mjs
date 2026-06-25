@@ -5,14 +5,25 @@ import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
 const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
+const readerRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-range-map.js', import.meta.url);
+const readerHighlightsUrl = new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url);
 
 function readerContentStreamSource() {
     return fs.readFileSync(readerContentStreamUrl, 'utf8');
 }
 
+function readerRangeMapSource() {
+    return fs.readFileSync(readerRangeMapUrl, 'utf8');
+}
+
+function readerHighlightsSource() {
+    return fs.readFileSync(readerHighlightsUrl, 'utf8');
+}
+
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', readerContentStreamSource())
+        .replaceAll('__HOSHI_READER_RANGE_MAP_SCRIPT__', readerRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', '0')
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify('block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', '1')
@@ -30,6 +41,7 @@ function readerSource() {
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerContentStreamSource())
+        .replaceAll('__HOSHI_READER_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', String(options.revealSpeed ?? 0))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify(options.mode ?? 'block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', String(options.sentencesPerScreen ?? 1))
@@ -826,6 +838,12 @@ test('visual novel reader requires the shared content stream asset', async () =>
     await assert.rejects(() => reader.initialize(), /hoshiReaderContentStream/);
 });
 
+test('visual novel reader requires the shared range map asset', async () => {
+    const { reader } = loadReader(bodyWith(p('本文。')), { rangeMapScript: '' });
+
+    await assert.rejects(() => reader.initialize(), /hoshiReaderRangeMap/);
+});
+
 test('block mode renders one top-level block per screen without cloning the entire chapter', async () => {
     const body = bodyWith(p('第一段落。'), p('第二段落。'));
     const { reader } = await initializeReader(body, { mode: 'block', revealSpeed: 0 });
@@ -1413,6 +1431,27 @@ test('visual novel highlight segments use chapter-level raw offsets on later scr
     assert.equal(segments[0].end, 2);
 });
 
+test('visual novel persisted highlights wrap only the visible raw range on each screen', async () => {
+    const highlight = { id: 'h1', color: 'yellow', offset: 2, text: 'いう' };
+    const { reader, window } = await initializeReader(bodyWith(p('あ、い'), p('うえ')), {
+        revealSpeed: 0,
+        highlightsScript: readerHighlightsSource(),
+        initialHighlights: [highlight],
+    });
+
+    assert.deepEqual(
+        currentScreen(reader).querySelectorAll('.hoshi-highlight').map((node) => node.textContent),
+        ['い'],
+    );
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.deepEqual(
+        currentScreen(reader).querySelectorAll('.hoshi-highlight').map((node) => node.textContent),
+        ['う'],
+    );
+    assert.equal(window.hoshiHighlights.wrappers.get('h1').length, 1);
+});
+
 test('visible node offsets remain chapter-level after rendering later screens', async () => {
     const body = bodyWith(p('あ、い'), p('うえ'));
     const { reader } = await initializeReader(body, { revealSpeed: 0 });
@@ -1453,6 +1492,17 @@ test('visual novel Sasayaki wraps and activates a cue on the current screen', as
     assert.equal(wrappers[0].textContent, '蒸し暑い');
     assert.equal(reader.cueWrappers.get('cue')[0], wrappers[0]);
     assert.equal(reader.nodeStartOffsets.get(collectTextNodes(wrappers[0])[0]), 0);
+});
+
+test('visual novel Sasayaki range map normalizes string cue offsets', async () => {
+    const cue = { id: 'cue', start: '1', length: '2' };
+    const { reader } = await initializeReader(bodyWith(p('一二三四。')), { revealSpeed: 0 });
+
+    reader.applySasayakiCues([cue]);
+    reader.highlightSasayakiCue(cue, false);
+
+    assert.equal(sasayakiWrappers(reader).length, 1);
+    assert.equal(sasayakiWrappers(reader)[0].textContent, '二三');
 });
 
 test('visual novel Sasayaki cue includes punctuation between text nodes inside the same cue', async () => {
@@ -1681,6 +1731,27 @@ test('visual novel Sasayaki highlights only the visible part of a cross-screen c
     assert.equal(reader.paginate('forward'), 'scrolled');
     assert.equal(sasayakiWrappers(reader).length, 1);
     assert.equal(sasayakiWrappers(reader)[0].textContent, '三四');
+});
+
+test('visual novel Sasayaki e-ink cross-screen cue uses only visible geometry', async () => {
+    const cue = { id: 'cue', start: 1, length: 3 };
+    const { reader } = await initializeReader(bodyWith(p('一二。'), p('三四。')), { revealSpeed: 0 });
+    reader.isEInkMode = () => true;
+
+    reader.applySasayakiCues([cue]);
+    reader.highlightSasayakiCue(cue, false);
+    let ranges = reader.cueGeometryRanges.get('cue') ?? [];
+    assert.equal(ranges.length, 1);
+    assert.equal(ranges[0].startNode.textContent, '一二。');
+    assert.equal(ranges[0].startOffset, 1);
+    assert.equal(ranges[0].endOffset, 3);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    ranges = reader.cueGeometryRanges.get('cue') ?? [];
+    assert.equal(ranges.length, 1);
+    assert.equal(ranges[0].startNode.textContent, '三四。');
+    assert.equal(ranges[0].startOffset, 0);
+    assert.equal(ranges[0].endOffset, 2);
 });
 
 test('visual novel Sasayaki merge setting combines block screens intersecting a cross-screen cue', async () => {
