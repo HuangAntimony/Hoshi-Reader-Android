@@ -245,6 +245,7 @@ window.hoshiReader = {
       }));
     }
     this.screens = this.fitScreensToViewport(this.screens);
+    this.assignScreenProgressAnchors();
   },
   screenDescriptor: function(options) {
     var source = options || {};
@@ -263,6 +264,7 @@ window.hoshiReader = {
       endCharCount: endChar,
       startRawCount: startRaw,
       endRawCount: endRaw,
+      progressAnchor: Number.isFinite(Number(source.progressAnchor)) ? Number(source.progressAnchor) : null,
       ids: source.ids instanceof Set ? new Set(source.ids) : new Set(source.ids || []),
       splittable: !!source.splittable,
       mediaStop: !!source.mediaStop,
@@ -307,9 +309,83 @@ window.hoshiReader = {
     var clamped = Math.min(1, Math.max(0, Number(progress) || 0));
     return Math.ceil(this.totalChapterChars * clamped);
   },
-  progressForScreen: function(screen) {
+  assignScreenProgressAnchors: function() {
+    if (!this.screens || !this.screens.length) return;
+    if (!this.totalChapterChars) {
+      var denominator = Math.max(1, this.screens.length - 1);
+      for (var emptyIndex = 0; emptyIndex < this.screens.length; emptyIndex++) {
+        this.screens[emptyIndex].progressAnchor = this.screens.length === 1 ? 0 : emptyIndex / denominator;
+      }
+      return;
+    }
+    var index = 0;
+    var previousAnchor = 0;
+    var hasPreviousAnchor = false;
+    while (index < this.screens.length) {
+      var runStart = index;
+      var endChar = this.screenEndCharCount(this.screens[index]);
+      index += 1;
+      while (index < this.screens.length && this.screenEndCharCount(this.screens[index]) === endChar) {
+        index += 1;
+      }
+      var runEnd = index;
+      var count = runEnd - runStart;
+      var baseProgress = this.progressForCharCount(endChar);
+      var nextProgress = runEnd < this.screens.length
+        ? this.progressForCharCount(this.screenEndCharCount(this.screens[runEnd]))
+        : 1;
+      var previous = hasPreviousAnchor ? previousAnchor : 0;
+      var anchors = this.progressAnchorsForScreenRun(
+        count,
+        baseProgress,
+        previous,
+        nextProgress,
+        runStart === 0,
+      );
+      for (var runIndex = 0; runIndex < count; runIndex++) {
+        var anchor = Math.min(1, Math.max(0, anchors[runIndex]));
+        this.screens[runStart + runIndex].progressAnchor = anchor;
+        previousAnchor = anchor;
+        hasPreviousAnchor = true;
+      }
+    }
+  },
+  progressForCharCount: function(charCount) {
     if (!this.totalChapterChars) return 0;
-    return Math.min(1, Math.max(0, this.screenEndCharCount(screen) / this.totalChapterChars));
+    return Math.min(1, Math.max(0, this.normalizedScreenCount(charCount, 0) / this.totalChapterChars));
+  },
+  progressAnchorsForScreenRun: function(count, baseProgress, previousProgress, nextProgress, startsChapter) {
+    if (count <= 1) return [baseProgress];
+    var anchors = [];
+    if (nextProgress <= baseProgress && baseProgress > previousProgress) {
+      var trailingStep = (baseProgress - previousProgress) / count;
+      for (var trailingIndex = 0; trailingIndex < count; trailingIndex++) {
+        anchors.push(previousProgress + trailingStep * (trailingIndex + 1));
+      }
+      return anchors;
+    }
+    if (baseProgress > previousProgress || startsChapter) {
+      anchors.push(baseProgress);
+      var gap = Math.max(0, nextProgress - baseProgress);
+      var step = gap / count;
+      for (var afterBaseIndex = 1; afterBaseIndex < count; afterBaseIndex++) {
+        anchors.push(baseProgress + step * afterBaseIndex);
+      }
+      return anchors;
+    }
+    var duplicateStep = Math.max(0, nextProgress - previousProgress) / (count + 1);
+    for (var duplicateIndex = 0; duplicateIndex < count; duplicateIndex++) {
+      anchors.push(previousProgress + duplicateStep * (duplicateIndex + 1));
+    }
+    return anchors;
+  },
+  screenProgressAnchor: function(screen) {
+    var anchor = Number(screen && screen.progressAnchor);
+    if (Number.isFinite(anchor)) return Math.min(1, Math.max(0, anchor));
+    return this.progressForCharCount(this.screenEndCharCount(screen));
+  },
+  progressForScreen: function(screen) {
+    return this.screenProgressAnchor(screen);
   },
   mergeSasayakiCrossScreenScreens: function(screens) {
     if (!this.mergeCrossScreenSasayakiCues || !Array.isArray(screens) || screens.length < 2) return screens || [];
@@ -1581,14 +1657,14 @@ window.hoshiReader = {
     return "scrolled";
   },
   calculateProgress: function() {
-    if (!this.totalChapterChars || !this.screens.length) return 0;
+    if (!this.screens.length) return 0;
     return this.progressForScreen(this.screens[this.currentScreenIndex]);
   },
   screenIndexForProgress: function(progress) {
     if (!this.screens.length) return 0;
-    var target = this.progressTargetCharCount(progress);
+    var target = Math.min(1, Math.max(0, Number(progress) || 0));
     for (var i = 0; i < this.screens.length; i++) {
-      if (this.screenEndCharCount(this.screens[i]) >= target) return i;
+      if (this.screenProgressAnchor(this.screens[i]) + 1e-9 >= target) return i;
     }
     return this.screens.length - 1;
   },

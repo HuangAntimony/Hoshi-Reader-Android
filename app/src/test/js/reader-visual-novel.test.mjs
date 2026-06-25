@@ -1219,6 +1219,63 @@ test('sentence mode keeps consecutive media-only images ordered between text scr
     assert.equal(currentScreen(reader).textContent, '二。');
 });
 
+test('visual novel restore keeps distinct progress for consecutive media screens', async () => {
+    const gallery = element('p', {}, [
+        image('images/one.jpg', { id: 'one' }),
+        image('images/two.jpg', { id: 'two' }),
+    ]);
+    const body = bodyWith(gallery, p('後。'));
+    const { reader } = await initializeReader(body, {
+        mode: 'sentences',
+        sentencesPerScreen: 1,
+        revealSpeed: 0,
+    });
+
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    const firstImageProgress = reader.calculateProgress();
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    const secondImageProgress = reader.calculateProgress();
+    assert.notEqual(secondImageProgress, firstImageProgress);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '後。');
+    assert.equal(reader.paginate('backward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+
+    await reader.restoreProgress(secondImageProgress);
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    await reader.restoreProgress(firstImageProgress);
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+});
+
+test('visual novel restoreProgress one lands on the last screen in an image-only chapter', async () => {
+    const gallery = element('div', { class: 'main' }, [
+        element('div', { class: 'align-center' }, [
+            element('p', {}, [image('images/one.jpg', { id: 'one' })]),
+        ]),
+        element('div', { class: 'align-center' }, [
+            element('p', {}, [image('images/two.jpg', { id: 'two' })]),
+        ]),
+    ]);
+    const { reader } = await initializeReader(bodyWith(gallery), {
+        mode: 'block',
+        revealSpeed: 0,
+    });
+
+    assert.equal(reader.totalChapterChars, 0);
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    assert.equal(reader.calculateProgress(), 0);
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    assert.equal(reader.calculateProgress(), 1);
+    assert.equal(reader.screenIndexForProgress(reader.calculateProgress()), 1);
+
+    await reader.restoreProgress(1);
+
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+});
+
 test('sentence mode splits nested chapter wrapper text and consecutive media screens', async () => {
     const chapter = element('section', { id: 'chapter' }, [
         p('一。'),
@@ -1596,9 +1653,17 @@ test('visual novel Sasayaki media stop plan includes every standalone image scre
         Array.from(stops, (stop) => stop.screenIndex),
         [1, 2],
     );
-    assert.equal(reader.showSasayakiMediaStop(stops[0]), 1 / 3);
+    const firstStopProgress = reader.showSasayakiMediaStop(stops[0]);
     assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/first.jpg');
-    assert.equal(reader.showSasayakiMediaStop(stops[1]), 1 / 3);
+    const secondStopProgress = reader.showSasayakiMediaStop(stops[1]);
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/second.jpg');
+    assert.equal(firstStopProgress > 1 / 3, true);
+    assert.equal(secondStopProgress > firstStopProgress, true);
+    assert.equal(secondStopProgress < 1, true);
+
+    await reader.restoreProgress(firstStopProgress);
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/first.jpg');
+    await reader.restoreProgress(secondStopProgress);
     assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/second.jpg');
 });
 
