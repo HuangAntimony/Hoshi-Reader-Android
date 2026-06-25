@@ -288,6 +288,40 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun restoreLoadingOverlayIgnoresShortRestoresAndShowsForLongRestores() {
+        val holder = stateHolder(initialIndex = 2)
+
+        assertFalse(
+            readerRestoreLoadingVisible(
+                isWebViewRestoring = holder.isWebViewRestoring,
+                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis - 1,
+            ),
+        )
+        assertTrue(
+            readerRestoreLoadingVisible(
+                isWebViewRestoring = holder.isWebViewRestoring,
+                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis,
+            ),
+        )
+
+        holder.markWebViewRestored()
+        assertFalse(
+            readerRestoreLoadingVisible(
+                isWebViewRestoring = holder.isWebViewRestoring,
+                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis,
+            ),
+        )
+
+        holder.goToNextChapter(lastIndex = 3)
+        assertFalse(
+            readerRestoreLoadingVisible(
+                isWebViewRestoring = holder.isWebViewRestoring,
+                restoringForMillis = 0,
+            ),
+        )
+    }
+
+    @Test
     fun staleContinuousScrollProgressFromPreviousRestoreEpochIsIgnored() {
         val holder = stateHolder(initialIndex = 2)
         holder.markWebViewRestored()

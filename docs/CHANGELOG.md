@@ -20,6 +20,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Pause Sasayaki auto-scroll during natural playback on skipped image pages for one second, including multiple image pages, image-only chapters, vertical continuous reading, and fullscreen image interruptions, while cue or progress seeks jump directly without leaving playback paused.
 - Keep Sasayaki cross-chapter cue jumps from briefly showing the chapter start, counting the hidden restore landing in reading statistics, or applying cue jumps before slow chapter restores finish.
 - Keep Sasayaki cue highlights from dropping punctuation split across EPUB text nodes.
+- Show a loading overlay while Reader chapters restore so long VN preparation does not appear as a blank EPUB page.
 - Keep VN screens from dropping ruby/furigana annotations.
 - Keep VN vertical text screens from clipping the leftmost line when EPUB styling makes the rendered text wider than the VN content box.
 - Keep VN text blocks with small inline images from being treated as unsplittable media screens, preventing vertical text from overflowing off-screen.
