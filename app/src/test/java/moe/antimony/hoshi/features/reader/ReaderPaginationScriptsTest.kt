@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.reader
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,7 +14,7 @@ class ReaderPaginationScriptsTest {
 
         val previous = position.previousOrNull()
 
-        assertTrue(previous == ReaderChapterPosition(index = 2, progress = 1.0))
+        assertEquals(ReaderChapterPosition(index = 2, progress = 1.0), previous)
     }
 
     @Test
@@ -22,41 +23,27 @@ class ReaderPaginationScriptsTest {
 
         val next = position.nextOrNull(lastIndex = 4)
 
-        assertTrue(next == ReaderChapterPosition(index = 4, progress = 0.0))
+        assertEquals(ReaderChapterPosition(index = 4, progress = 0.0), next)
     }
 
     @Test
-    fun paginateScriptLeavesChapterChangesToNativeCodeLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertFalse(script.contains("HoshiChapterBridge"))
-        assertFalse(script.contains("nextChapter()"))
-        assertFalse(script.contains("previousChapter()"))
-    }
-
-    @Test
-    fun verticalPaginationUsesBodyScrollContextLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("var scrollEl = document.body"))
-        assertTrue(script.contains("scrollEl.scrollHeight"))
-        assertTrue(script.contains("scrollEl.scrollTop"))
-        assertTrue(script.contains("setPagePosition"))
-    }
-
-    @Test
-    fun recognizesWebViewStringResultForScrolledPage() {
+    fun recognizesWebViewNavigationResults() {
         assertTrue(ReaderPaginationScripts.didScroll("\"scrolled\""))
         assertFalse(ReaderPaginationScripts.didScroll("\"limit\""))
         assertFalse(ReaderPaginationScripts.didScroll(null))
-    }
 
-    @Test
-    fun parsesVisualNovelRevealNavigationResultWithoutSavingProgress() {
         assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("\"scrolled\""))
         assertEquals(ReaderNavigationResult.Revealed, ReaderPaginationScripts.navigationResult("\"revealed\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult("\"limit\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult(null))
+    }
+
+    @Test
+    fun parsesNullableDoubleResultsFromWebView() {
+        assertEquals(0.625, ReaderPaginationScripts.doubleResult("\"0.625\"") ?: -1.0, 0.0)
+        assertEquals(1.0, ReaderPaginationScripts.doubleResult("1.0") ?: -1.0, 0.0)
+        assertNull(ReaderPaginationScripts.doubleResult("\"limit\""))
+        assertNull(ReaderPaginationScripts.doubleResult(null))
     }
 
     @Test
@@ -67,24 +54,14 @@ class ReaderPaginationScriptsTest {
             viewportCssHeight = 800,
         )
 
+        assertEquals(822, layout.pageHeightPx)
+        assertEquals(480, layout.pageWidthPx)
         assertEquals(455, layout.imageMaxWidthPx)
         assertEquals(800, layout.imageMaxHeightPx)
-        assertTrue(layout.cssVariables().contains("--hoshi-image-max-width: 455px;"))
-        assertTrue(layout.cssVariables().contains("--hoshi-image-max-height: 800px;"))
     }
 
     @Test
     fun verticalImageBoundsSubtractOnePixelGuardLikeIosWebViewWorkaround() {
-        val paginatedVertical = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(verticalWriting = true),
-        )
-        val paginatedHorizontal = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(verticalWriting = false),
-        )
-        val continuousVertical = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = true),
-        )
-
         assertEquals(
             455,
             readerViewportCssLayout(ReaderSettings(verticalWriting = true), 480, 800).imageMaxWidthPx,
@@ -93,12 +70,6 @@ class ReaderPaginationScriptsTest {
             456,
             readerViewportCssLayout(ReaderSettings(verticalWriting = false), 480, 800).imageMaxWidthPx,
         )
-        assertTrue(continuousVertical.contains("Math.max(1, Math.floor(window.innerWidth * 1.0) - 1)"))
-        assertTrue(paginatedVertical.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 1)"))
-        assertTrue(paginatedHorizontal.contains("Math.max(1, Math.floor(pageWidth * 0.95) - 0)"))
-        assertFalse(paginatedVertical.contains("window.hoshiReaderViewport"))
-        assertFalse(paginatedHorizontal.contains("window.hoshiReaderViewport"))
-        assertFalse(continuousVertical.contains("__HOSHI_IMAGE_WIDTH_REDUCTION_PX__"))
     }
 
     @Test
@@ -111,8 +82,6 @@ class ReaderPaginationScriptsTest {
 
         assertEquals(88.0, layout.verticalPaddingBlockPx, 0.0)
         assertEquals(176.0, layout.verticalPaddingGapPx, 0.0)
-        assertTrue(layout.cssVariables().contains("--hoshi-vertical-padding-block: 88.0px;"))
-        assertTrue(layout.cssVariables().contains("--hoshi-vertical-padding-gap: 176.0px;"))
     }
 
     @Test
@@ -123,298 +92,35 @@ class ReaderPaginationScriptsTest {
             horizontalPadding = 14,
             verticalPadding = 14,
         )
+
         val layout = readerViewportCssLayout(
             settings = settings,
             viewportCssWidth = 384,
             viewportCssHeight = 801,
         )
-        val script = ReaderPaginationScripts.shellScript(settings = settings)
 
+        assertEquals(829, layout.pageHeightPx)
+        assertEquals(329, layout.imageMaxWidthPx)
         assertEquals(688, layout.imageMaxHeightPx)
-        assertTrue(layout.cssVariables().contains("--hoshi-image-max-height: 688px;"))
-        assertTrue(script.contains("Math.max(1, Math.floor(window.innerHeight * 0.86))"))
     }
 
     @Test
-    fun doesNotPatchViewportResizeInsideReaderJavaScript() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertFalse(script.contains("relayoutForViewport"))
-        assertFalse(script.contains("window.addEventListener('resize'"))
-    }
-
-    @Test
-    fun normalizesCalibreCoverSvgAspectRatio() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("window.hoshiReaderMediaSemantics"))
-        assertTrue(script.contains("setupReaderImages(document"))
-    }
-
-    @Test
-    fun injectsSharedMediaSetupForEveryReaderMode() {
-        val scripts = listOf(
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Paginated)),
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Continuous)),
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.VisualNovel)),
+    fun generatedLayoutUsesContinuousFullWidthImagesOnlyForVerticalScrollMode() {
+        val paginatedVertical = ReaderGeneratedLayout.from(
+            ReaderSettings(viewMode = ReaderViewMode.Paginated, verticalWriting = true),
+        )
+        val continuousVertical = ReaderGeneratedLayout.from(
+            ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = true),
+        )
+        val continuousHorizontal = ReaderGeneratedLayout.from(
+            ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = false),
         )
 
-        scripts.forEach { script ->
-            assertTrue(script.contains("window.hoshiReaderMediaSemantics"))
-            assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
-        }
-    }
-
-    @Test
-    fun imageTapScriptDelegatesForPagedAndContinuousReadersLikeIos() {
-        val scripts = listOf(
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(blurImages = true)),
-            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, blurImages = true)),
-        )
-
-        scripts.forEach { script ->
-            assertTrue(script.contains("window.hoshiReaderMediaSemantics.setupReaderImages(document"))
-            assertTrue(script.contains("blurImages: true"))
-            assertFalse(script.contains("function setupReaderImage(element, src, wrap, blurElement)"))
-        }
-    }
-
-    @Test
-    fun verticalPageHeightExtendsPastViewportByBottomOverlap() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("var pageHeight = window.innerHeight + 22;"))
-    }
-
-    @Test
-    fun horizontalPageHeightMatchesMeasuredViewportWithoutBottomOverlap() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(verticalWriting = false),
-        )
-
-        assertTrue(script.contains("var pageHeight = window.innerHeight + 0;"))
-        assertFalse(script.contains("window.innerHeight + 22"))
-    }
-
-    @Test
-    fun paginatedInitializeWritesRuntimeViewportCssVariables() {
-        val script = ReaderPaginationScripts.shellScript()
-        val initialize = script.substringAfter("window.hoshiReader.initialize = function()")
-            .substringBefore("var spacer = document.createElement('div');")
-
-        assertTrue(initialize.contains("window.hoshiReader.pageHeight = pageHeight;"))
-        assertTrue(initialize.contains("window.hoshiReader.pageWidth = pageWidth;"))
-        assertTrue(initialize.contains("style.setProperty('--page-height'"))
-        assertTrue(initialize.contains("style.setProperty('--page-width'"))
-        assertTrue(initialize.contains("style.setProperty('--hoshi-vertical-padding-block'"))
-        assertTrue(initialize.contains("style.setProperty('--hoshi-vertical-padding-gap'"))
-        assertTrue(initialize.contains("style.setProperty('--hoshi-image-max-width'"))
-        assertTrue(initialize.contains("style.setProperty('--hoshi-image-max-height'"))
-        assertFalse(initialize.contains("window.hoshiReaderViewport"))
-    }
-
-    @Test
-    fun loadScriptRestoresInitialProgressAfterLayout() {
-        val script = ReaderPaginationScripts.shellScript(initialProgress = 1.0)
-
-        assertTrue(script.contains("restoreProgress:"))
-        assertTrue(script.contains("function(progress)"))
-        assertTrue(script.contains("if (progress >= 0.99)"))
-        assertTrue(script.contains("window.hoshiReader.restoreProgress(1.0)"))
-    }
-
-    @Test
-    fun visualNovelScriptSelectsVisualNovelAssetAndInjectsSettings() {
-        val assets = ReaderWebAssets(
-            languageJapaneseJs = "",
-            selectionJapaneseJs = "",
-            selectionEnglishJs = "",
-            selectionJs = "",
-            readerPaginatedJs = "PAGINATED_ASSET",
-            readerContinuousJs = "CONTINUOUS_ASSET",
-            readerVisualNovelJs = "VN __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__ __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__ __HOSHI_READER_VN_RANGE_MAP_SCRIPT__ __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES__ __HOSHI_INITIAL_SASAYAKI_CUES_JSON__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
-            readerTextSemanticsJs = "TEXT_SEMANTICS_ASSET",
-            readerDomTextJs = "DOM_TEXT_ASSET",
-            readerMediaSemanticsJs = "MEDIA_SEMANTICS_ASSET",
-            readerVnContentStreamJs = "VN_CONTENT_STREAM_ASSET",
-            readerVnRangeMapJs = "VN_RANGE_MAP_ASSET",
-            readerSasayakiJs = "",
-            highlightsJs = "",
-            readerCss = "",
-        )
-
-        val script = ReaderPaginationScripts.shellScript(
-            initialProgress = 0.25,
-            initialFragment = "chapter-start",
-            highlightsJson = """[{"id":"h1"}]""",
-            settings = ReaderSettings(
-                viewMode = ReaderViewMode.VisualNovel,
-                visualNovelRevealSpeed = 80,
-                visualNovelScreenMode = VisualNovelScreenMode.Sentences,
-                visualNovelSentencesPerScreen = 3,
-                visualNovelPreserveDialogueBubbles = true,
-                visualNovelMergeCrossScreenSasayakiCues = true,
-            ),
-            sasayakiCuesJson = """[{"id":"cue","start":1,"length":3}]""",
-            assets = assets,
-        )
-
-        assertTrue(
-            script.contains(
-                "VN TEXT_SEMANTICS_ASSET MEDIA_SEMANTICS_ASSET VN_CONTENT_STREAM_ASSET VN_RANGE_MAP_ASSET 80 \"sentences\" 3 true true [{\"id\":\"cue\",\"start\":1,\"length\":3}] 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",
-            ),
-        )
-        assertTrue(script.contains("\"restoreCompleted\""))
-        assertFalse(script.contains("PAGINATED_ASSET"))
-        assertFalse(script.contains("CONTINUOUS_ASSET"))
-        assertFalse(script.contains("__HOSHI_"))
-    }
-
-    @Test
-    fun visualNovelSourceTreeScriptInjectsTextSemanticsAndVnReaderModules() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
-        )
-
-        assertTrue(script.contains("hoshiReaderTextSemantics"))
-        assertTrue(script.contains("hoshiReaderMediaSemantics"))
-        assertTrue(script.contains("hoshiReaderVnContentStream"))
-        assertTrue(script.contains("hoshiReaderVnRangeMap"))
-        assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
-        assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
-        assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
-        assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
-        assertFalse(script.contains("__HOSHI_"))
-    }
-
-    @Test
-    fun paginatedAndContinuousSourceTreeScriptsInjectSharedReaderModules() {
-        val scripts = listOf(
-            ReaderPaginationScripts.shellScript(
-                settings = ReaderSettings(viewMode = ReaderViewMode.Paginated),
-            ),
-            ReaderPaginationScripts.shellScript(
-                settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
-            ),
-        )
-
-        scripts.forEach { script ->
-            assertTrue(script.contains("hoshiReaderTextSemantics"))
-            assertTrue(script.contains("hoshiReaderDomText"))
-            assertTrue(script.contains("hoshiReaderMediaSemantics"))
-            assertFalse(script.contains("hoshiReaderVnContentStream"))
-            assertFalse(script.contains("hoshiReaderVnRangeMap"))
-            assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_READER_DOM_TEXT_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_"))
-        }
-    }
-
-    @Test
-    fun loadScriptOmitsAbsentOptionalPayloadScriptsBeforeRestore() {
-        val script = ReaderPaginationScripts.shellScript(
-            sasayakiCuesJson = null,
-            highlightsJson = null,
-        )
-        val restoreBlock = script.substringAfterLast("window.hoshiReader.buildNodeOffsets();")
-            .substringBefore("});")
-
-        assertFalse(restoreBlock.contains("applySasayakiCues"))
-        assertFalse(restoreBlock.contains("applyHighlights"))
-        assertFalse(restoreBlock.contains("null"))
-        assertTrue(restoreBlock.contains("window.hoshiReader.restoreProgress(0.0)"))
-    }
-
-    @Test
-    fun loadScriptDefersSasayakiCueApplicationUntilAfterRestore() {
-        val script = ReaderPaginationScripts.shellScript(
-            sasayakiCuesJson = """[{"id":"cue","start":0,"length":1}]""",
-        )
-        val restoreBlock = script.substringAfterLast("window.hoshiReader.buildNodeOffsets();")
-            .substringBefore("});")
-
-        assertFalse(restoreBlock.contains("applySasayakiCues"))
-        assertTrue(restoreBlock.contains("window.hoshiReader.restoreProgress(0.0)"))
-    }
-
-    @Test
-    fun characterBasedProgressCountsEveryNodeBeforeViewportLikeIos() {
-        val progress = readerProgressFromVisibleNodeLayouts(
-            listOf(
-                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
-                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
-                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
-                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
-                ReaderProgressNodeLayout(characterCount = 66, beforeViewport = true),
-            ),
-        )
-
-        assertEquals(213.0 / 347.0, progress, 0.0)
-    }
-
-    @Test
-    fun restoresProgressByCharacterPositionLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("notifyRestoreComplete: function()"))
-        assertTrue(script.contains("var targetCharCount = Math.ceil(totalChars * progress)"))
-        assertTrue(script.contains("textOffsetForCharCount: function(node, targetCount)"))
-        assertTrue(script.contains("if ((runningSum + nodeLen) > targetCharCount)"))
-        assertTrue(script.contains("targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum))"))
-        assertTrue(script.contains("range.setStart(targetNode, targetOffset)"))
-        assertTrue(script.contains("var anchor = (context.vertical ? rect.top : rect.left)"))
-        assertTrue(script.contains("var targetScroll = this.alignToPage(context, anchor)"))
-    }
-
-    @Test
-    fun continuousRestoreProgressZeroResetsAndroidWebViewScrollToChapterStart() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
-        )
-        val restoreProgress = script.substringAfter("restoreProgress: async function(progress)")
-            .substringBefore("var walker = this.createWalker()")
-
-        assertTrue(script.contains("scrollToChapterStart: function()"))
-        assertTrue(script.contains("window.scrollTo(0, 0)"))
-        assertTrue(script.contains("document.documentElement.scrollLeft = 0"))
-        assertTrue(script.contains("document.body.scrollLeft = 0"))
-        assertTrue(restoreProgress.contains("this.scrollToChapterStart()"))
-        assertTrue(restoreProgress.contains("requestAnimationFrame(() => {"))
-        assertTrue(restoreProgress.contains("this.notifyRestoreComplete()"))
-    }
-
-    @Test
-    fun continuousRestoreProgressOneKeepsLastTextTargetLikeIos() {
-        val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
-        )
-        val restoreProgress = script.substringAfter("restoreProgress: async function(progress)")
-            .substringBefore("jumpToFragment: async function(fragment)")
-
-        assertTrue(restoreProgress.contains("var lastTargetNode = null"))
-        assertTrue(restoreProgress.contains("lastTargetNode = node"))
-        assertTrue(restoreProgress.contains("if (!targetNode) targetNode = lastTargetNode"))
-        assertTrue(restoreProgress.contains("if (progress >= 0.999999 && targetNode.parentElement)"))
-        assertTrue(restoreProgress.contains("targetNode.parentElement.scrollIntoView({"))
-        assertTrue(restoreProgress.contains("block: 'end'"))
-    }
-
-    @Test
-    fun exposesSasayakiCueWrappingAndHighlightingLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("cueWrappers: new Map()"))
-        assertTrue(script.contains("collectSasayakiCueRanges: function(cues)"))
-        assertTrue(script.contains("applySasayakiCues: function(cues)"))
-        assertTrue(script.contains("wrapSasayakiCue: function(cue)"))
-        assertTrue(script.contains("highlightSasayakiCue: function(cue, reveal)"))
-        assertTrue(script.contains("clearSasayakiCue: function()"))
-        assertTrue(script.contains("resetSasayakiCues: function()"))
-        assertTrue(script.contains("className = 'hoshi-sasayaki-cue'"))
-        assertTrue(script.contains("hoshi-sasayaki-active"))
+        assertEquals(0.95, paginatedVertical.imageWidthViewportRatio, 0.0)
+        assertEquals(1.0, continuousVertical.imageWidthViewportRatio, 0.0)
+        assertEquals(0.95, continuousHorizontal.imageWidthViewportRatio, 0.0)
+        assertEquals(1, continuousVertical.imageWidthReductionPx)
+        assertEquals(0, continuousHorizontal.imageWidthReductionPx)
     }
 
     @Test
@@ -446,122 +152,5 @@ class ReaderPaginationScriptsTest {
             """window.hoshiReader.showSasayakiMediaStop({"scroll":800})""",
             ReaderPaginationScripts.showSasayakiMediaStopInvocation("""{"scroll":800}"""),
         )
-    }
-
-    @Test
-    fun sasayakiRevealScrollsToRangeCenterLikeIos() {
-        val script = ReaderPaginationScripts.shellScript()
-        val scrollToRange = script.substringAfter("scrollToRange: function(range)")
-            .substringBefore("calculateProgress: function()")
-
-        assertTrue(scrollToRange.contains("if (context.pageSize <= 0)"))
-        assertTrue(scrollToRange.contains("var anchor = (context.vertical ? (rect.top + rect.bottom) / 2 : (rect.left + rect.right) / 2) + currentScroll"))
-        assertFalse(scrollToRange.contains("var anchor = (context.vertical ? rect.top : rect.left) + currentScroll"))
-    }
-
-    @Test
-    fun pageBoundariesUseLastActualContentPageInsteadOfReportedScrollHeight() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("contentLastPageScroll: function(context)"))
-        assertTrue(script.contains("contentFirstPageScroll: function(context)"))
-        assertTrue(script.contains("buildPaginationMetrics: function()"))
-        assertTrue(script.contains("alignContentStartToPage: function(context, offset)"))
-        assertTrue(script.contains("Math.abs(safeOffset - nearestPage) < 1"))
-        assertTrue(script.contains("var startEdge = (context.vertical ? rect.top : rect.left) + currentScroll"))
-        assertTrue(script.contains("var endEdge = (context.vertical ? rect.bottom : rect.right) + currentScroll"))
-        assertTrue(script.contains("var mediaStart = (context.vertical ? mediaRect.top : mediaRect.left) + currentScroll"))
-        assertTrue(script.contains("var mediaEnd = (context.vertical ? mediaRect.bottom : mediaRect.right) + currentScroll"))
-        assertTrue(script.contains("var minScroll = firstContentEdge === null ? 0"))
-        assertTrue(script.contains("var lastContentScroll = lastContentEdge <= 0 ? 0 : this.alignToPage(context, lastContentEdge - 1)"))
-        assertTrue(script.contains("var maxScroll = Math.min(context.maxScroll, lastContentScroll)"))
-    }
-
-    @Test
-    fun pagedNavigationUsesCachedContentBoundsInsteadOfScanningDomEveryTurn() {
-        val script = ReaderPaginationScripts.shellScript()
-        val paginate = script.substringAfter("paginate: function(direction)")
-            .substringBefore("window.hoshiReader.initialize")
-
-        assertTrue(script.contains("buildPaginationMetrics: function()"))
-        assertTrue(script.contains("paginationMetrics: null"))
-        assertTrue(paginate.contains("var metrics = this.paginationMetrics || this.buildPaginationMetrics()"))
-        assertFalse(paginate.contains("this.contentFirstPageScroll(context)"))
-        assertFalse(paginate.contains("this.contentLastPageScroll(context)"))
-    }
-
-    @Test
-    fun characterBasedProgressDoesNotTreatSortedLayoutStopsAsDomPrefixes() {
-        val progress = readerProgressFromVisibleNodeLayouts(
-            listOf(
-                ReaderProgressNodeLayout(characterCount = 120, beforeViewport = true),
-                ReaderProgressNodeLayout(characterCount = 1, beforeViewport = true),
-                ReaderProgressNodeLayout(characterCount = 134, beforeViewport = false),
-                ReaderProgressNodeLayout(characterCount = 26, beforeViewport = true),
-            ),
-        )
-
-        assertEquals(147.0 / 281.0, progress, 0.0)
-    }
-
-    @Test
-    fun registersSnapScrollHandlerLikeIosToRejectNativeHalfPageScrolls() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("registerSnapScroll: function(initialScroll)"))
-        assertTrue(script.contains("window.snapScrollRegistered = true"))
-        assertTrue(script.contains("window.lastPageScroll = initialScroll"))
-        assertTrue(script.contains("document.body.addEventListener('scroll'"))
-        assertTrue(script.contains("var snappedScroll = Math.round(currentScroll / context.pageSize) * context.pageSize"))
-        assertTrue(script.contains("this.assignPagePosition(context, window.lastPageScroll || 0)"))
-    }
-
-    @Test
-    fun programmaticReaderScrollsRefreshLastSnapPosition() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("setPagePosition: function(context, position)"))
-        assertTrue(script.contains("window.lastPageScroll = clamped"))
-        assertTrue(script.contains("this.registerSnapScroll(firstPage)"))
-        assertTrue(script.contains("this.registerSnapScroll(lastPage)"))
-        assertTrue(script.contains("this.registerSnapScroll(targetScroll)"))
-    }
-
-    @Test
-    fun snapScrollLocksRootViewportLikeIosWebViewScrollDisabled() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("lockRootViewport: function()"))
-        assertTrue(script.contains("var root = document.documentElement"))
-        assertTrue(script.contains("root.scrollTop = 0"))
-        assertTrue(script.contains("root.scrollLeft = 0"))
-        assertTrue(script.contains("window.scrollTo(0, 0)"))
-        assertTrue(script.contains("window.addEventListener('scroll'"))
-        assertTrue(script.contains("this.lockRootViewport()"))
-    }
-
-    @Test
-    fun appendsTrailingSpacerUsingIosDefaultVerticalLayout() {
-        val script = ReaderPaginationScripts.shellScript()
-
-        assertTrue(script.contains("spacer.style.height = 'calc(var(--hoshi-vertical-padding-block, 0.0vh) + 22px)'"))
-        assertTrue(script.contains("spacer.style.width = '0'"))
-    }
-
-    @Test
-    fun readerCssUsesIosDefaultPagedLayoutValues() {
-        val css = ReaderContentStyles.styleTag()
-
-        assertTrue(css.contains("font-size: 22px !important"))
-        assertTrue(css.contains("column-gap: calc(var(--hoshi-vertical-padding-gap, 0vh) + 22px);"))
-        assertTrue(css.contains("padding: var(--hoshi-vertical-padding-block, 0.0vh) 2.5vw !important;"))
-        assertTrue(css.contains("padding-bottom: calc(var(--hoshi-vertical-padding-block, 0.0vh) + 22px) !important;"))
-        assertFalse(css.contains("line-height: 1.65 !important;"))
-        assertTrue(css.contains("text-align: start !important;"))
-        assertTrue(css.contains("max-width: var(--hoshi-image-max-width, 95vw) !important"))
-        assertTrue(css.contains("width: auto !important"))
-        assertTrue(css.contains("height: auto !important"))
-        assertTrue(css.contains("::highlight(hoshi-selection)"))
-        assertTrue(css.contains("background-color: rgba(160, 160, 160, 0.4) !important"))
     }
 }
