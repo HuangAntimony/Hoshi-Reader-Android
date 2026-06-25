@@ -256,6 +256,31 @@ test('content stream keeps figure media as the render root', () => {
     );
 });
 
+test('content stream keeps sibling media ids isolated inside a shared wrapper', () => {
+    const root = el('section', {}, [
+        el('p', { id: 'gallery' }, [
+            el('img', { id: 'one', src: 'one.jpg' }),
+            el('img', { id: 'two', src: 'two.jpg' }),
+        ]),
+    ]);
+
+    const stream = loadContentStreamModule().create(root);
+
+    assert.deepEqual(
+        plain(
+            stream.mediaUnits().map((unit) => ({
+                mediaTagName: unit.mediaTagName,
+                renderRootTagName: unit.renderRootTagName,
+                ids: [...unit.ids].sort(),
+            })),
+        ),
+        [
+            { mediaTagName: 'img', renderRootTagName: 'p', ids: ['gallery', 'one'] },
+            { mediaTagName: 'img', renderRootTagName: 'p', ids: ['gallery', 'two'] },
+        ],
+    );
+});
+
 test('content stream treats gaiji images as inline glyphs for media and offset indexing', () => {
     const gaiji = el('img', { class: 'gaiji', alt: '外字' });
     const paragraph = el('p', {}, ['前', gaiji, '後']);

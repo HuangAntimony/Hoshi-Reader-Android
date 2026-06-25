@@ -83,6 +83,19 @@
     return current;
   }
 
+  function nearestMediaRenderRoot(root, node) {
+    var current = node;
+    var candidate = node;
+    while (current && current.parentNode && current.parentNode !== root) {
+      var parent = current.parentNode;
+      if (parent.nodeType === ELEMENT_NODE && !mediaTags.has(tagName(parent))) {
+        candidate = parent;
+      }
+      current = parent;
+    }
+    return candidate || node;
+  }
+
   function closestAncestor(node, root, targetTag) {
     var current = node && node.nodeType === TEXT_NODE ? node.parentNode : node;
     while (current && current !== root) {
@@ -230,6 +243,18 @@
       return ids;
     },
 
+    idsForMediaUnit: function(renderRoot, mediaNode) {
+      if (renderRoot === mediaNode) return this.idsForNode(renderRoot);
+      var ids = this.idsForNode(mediaNode);
+      var current = mediaNode ? mediaNode.parentNode : null;
+      while (current) {
+        mergeIds(ids, ownIdsForNode(current));
+        if (current === renderRoot || current === this.root) break;
+        current = current.parentNode;
+      }
+      return ids;
+    },
+
     textItems: function() {
       var items = [];
       for (var e = 0; e < this.textEntries.length; e++) {
@@ -291,7 +316,7 @@
             endChar: position.endChar,
             startRaw: position.startRaw,
             endRaw: position.endRaw,
-            ids: this.idsForNode(renderRoot)
+            ids: this.idsForMediaUnit(renderRoot, node)
           });
           return;
         }
@@ -305,8 +330,7 @@
     },
 
     renderRootForMediaNode: function(node) {
-      var topLevel = topLevelNodeFor(this.root, node);
-      return topLevel || node;
+      return nearestMediaRenderRoot(this.root, node);
     },
 
     sourceOrderForNode: function(node) {

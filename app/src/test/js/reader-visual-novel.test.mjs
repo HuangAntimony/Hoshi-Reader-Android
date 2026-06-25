@@ -762,6 +762,14 @@ function image(src, attributes = {}) {
     return img;
 }
 
+function svgImage(src, attributes = {}) {
+    const svg = element('svg', attributes, [element('image', {}, [])]);
+    const inner = svg.querySelector('image');
+    inner.setAttribute('href', src);
+    inner.href = { baseVal: src };
+    return svg;
+}
+
 function imageBlock(src, attributes = {}) {
     const paragraph = new TestElement('p');
     Object.entries(attributes).forEach(([key, value]) => paragraph.setAttribute(key, value));
@@ -1093,6 +1101,124 @@ test('sentence mode keeps media-only blocks as standalone visual novel screens',
     assert.equal(reader.screenIndexForFragment('cover'), 1);
     assert.equal(reader.paginate('forward'), 'scrolled');
     assert.equal(currentScreen(reader).textContent, '二。');
+});
+
+test('block mode splits consecutive media in one media-only block into independent screens', async () => {
+    const gallery = element('p', { id: 'gallery' }, [
+        '\n  ',
+        image('images/one.jpg', { id: 'one' }),
+        '\n  ',
+        image('images/two.jpg', { id: 'two' }),
+        '\n',
+    ]);
+    const { reader } = await initializeReader(bodyWith(gallery), { mode: 'block', revealSpeed: 0 });
+
+    assert.equal(currentScreen(reader).querySelectorAll('img').length, 1);
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    assert.equal(reader.screenIndexForFragment('gallery'), 0);
+    assert.equal(reader.screenIndexForFragment('one'), 0);
+    assert.equal(reader.screenIndexForFragment('two'), 1);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelectorAll('img').length, 1);
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    assert.equal(reader.paginate('forward'), 'limit');
+});
+
+test('block mode keeps nested media-only block wrappers without cloning sibling chapter text', async () => {
+    const gallery = element('p', { id: 'gallery', class: 'gallery' }, [
+        image('images/one.jpg', { id: 'one' }),
+        image('images/two.jpg', { id: 'two' }),
+    ]);
+    const chapter = element('section', { id: 'chapter' }, [
+        p('前。'),
+        gallery,
+        p('後。'),
+    ]);
+    const { reader } = await initializeReader(bodyWith(chapter), { mode: 'block', revealSpeed: 0 });
+
+    assert.equal(currentScreen(reader).textContent, '前。');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '');
+    assert.notEqual(currentScreen(reader).querySelector('.gallery'), null);
+    assert.equal(currentScreen(reader).querySelectorAll('img').length, 1);
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    assert.equal(currentScreen(reader).querySelector('#two'), null);
+    assert.equal(reader.screenIndexForFragment('chapter'), 0);
+    assert.equal(reader.screenIndexForFragment('gallery'), 1);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    assert.equal(currentScreen(reader).querySelector('#one'), null);
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '後。');
+});
+
+test('sentence mode keeps consecutive media-only images ordered between text screens', async () => {
+    const gallery = element('p', {}, [
+        image('images/one.jpg', { id: 'one' }),
+        image('images/two.jpg', { id: 'two' }),
+    ]);
+    const body = bodyWith(p('一。'), gallery, p('二。'));
+    const { reader } = await initializeReader(body, {
+        mode: 'sentences',
+        sentencesPerScreen: 1,
+        revealSpeed: 0,
+    });
+
+    assert.equal(currentScreen(reader).textContent, '一。');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '二。');
+});
+
+test('sentence mode splits nested chapter wrapper text and consecutive media screens', async () => {
+    const chapter = element('section', { id: 'chapter' }, [
+        p('一。'),
+        element('p', {}, [
+            '\n',
+            image('images/one.jpg', { id: 'one' }),
+            '\n',
+            image('images/two.jpg', { id: 'two' }),
+            '\n',
+        ]),
+        p('二。'),
+    ]);
+    const { reader } = await initializeReader(bodyWith(chapter), {
+        mode: 'sentences',
+        sentencesPerScreen: 1,
+        revealSpeed: 0,
+    });
+
+    assert.equal(currentScreen(reader).textContent, '一。');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#one').getAttribute('src'), 'images/one.jpg');
+    assert.equal(currentScreen(reader).textContent.trim(), '');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#two').getAttribute('src'), 'images/two.jpg');
+    assert.equal(currentScreen(reader).textContent.trim(), '');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '二。');
+});
+
+test('visual novel media stream keeps svg as media and gaiji inline', async () => {
+    const body = bodyWith(
+        paragraphWith('一', image('images/gaiji.png', { class: 'gaiji', id: 'gaiji' }), '二。'),
+        element('p', { id: 'svg-block' }, [svgImage('images/plate.jpg', { id: 'plate' })]),
+        p('三。'),
+    );
+    const { reader } = await initializeReader(body, { mode: 'block', revealSpeed: 0 });
+
+    assert.equal(currentScreen(reader).textContent, '一二。');
+    assert.equal(currentScreen(reader).querySelector('#gaiji').getAttribute('src'), 'images/gaiji.png');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).querySelector('#plate').tagName, 'SVG');
+    assert.equal(reader.screenIndexForFragment('svg-block'), 1);
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '三。');
 });
 
 test('sentence mode can preserve Japanese dialogue bracket bubbles', async () => {

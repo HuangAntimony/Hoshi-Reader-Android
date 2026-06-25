@@ -636,6 +636,13 @@ window.hoshiReader = {
       let child = sources[i].node;
       var stats = this.statsForSourceNode(child);
       var hasStandaloneMedia = this.containsStandaloneMedia(child);
+      if (hasStandaloneMedia && this.isMediaOnlySource(child)) {
+        var mediaScreens = this.mediaScreensForSourceNode(child, sources[i].extraIds);
+        if (mediaScreens.length) {
+          screens = screens.concat(mediaScreens);
+          continue;
+        }
+      }
       var start = stats.hasText ? stats.startChar : runningEnd;
       var end = stats.hasText ? stats.endChar : start;
       var rawStart = stats.hasText ? stats.startRaw : runningRawEnd;
@@ -776,7 +783,8 @@ window.hoshiReader = {
       .concat(this.buildStandaloneSentenceUnits())
       .sort(function(a, b) {
         if (a.order !== b.order) return a.order - b.order;
-        return a.startRawCount - b.startRawCount;
+        if (a.startRawCount !== b.startRawCount) return a.startRawCount - b.startRawCount;
+        return (a.preorder || 0) - (b.preorder || 0);
       });
     var groupSize = this.clampSentenceCount(this.sentencesPerScreen);
     var screens = [];
@@ -821,35 +829,43 @@ window.hoshiReader = {
   },
   buildSentenceAtomicRoots: function() {
     var roots = new WeakSet();
-    var children = Array.from(this.sourceRoot.childNodes);
-    for (var i = 0; i < children.length; i++) {
-      var child = children[i];
-      if (child.nodeType === Node.TEXT_NODE && !(child.textContent || '').trim()) continue;
-      if (child.nodeType === Node.ELEMENT_NODE && this.isIgnoredElement(child)) continue;
-      if (child.nodeType === Node.ELEMENT_NODE && this.containsStandaloneMedia(child)) roots.add(child);
+    var sources = this.collectBlockScreenSources(this.sourceRoot);
+    for (var i = 0; i < sources.length; i++) {
+      var source = sources[i].node;
+      if (source && source.nodeType === Node.ELEMENT_NODE && this.containsStandaloneMedia(source)) {
+        roots.add(source);
+      }
     }
     return roots;
   },
   buildStandaloneSentenceUnits: function() {
     var units = [];
-    var children = Array.from(this.sourceRoot.childNodes);
-    for (var i = 0; i < children.length; i++) {
-      let child = children[i];
+    var sources = this.collectBlockScreenSources(this.sourceRoot);
+    for (var i = 0; i < sources.length; i++) {
+      let child = sources[i].node;
       if (child.nodeType === Node.TEXT_NODE && !(child.textContent || '').trim()) continue;
       if (child.nodeType === Node.ELEMENT_NODE && this.isIgnoredElement(child)) continue;
       var stats = this.statsForSourceNode(child);
       var atomic = this.sentenceAtomicRoots && this.sentenceAtomicRoots.has(child);
       if (!atomic && stats.hasText) continue;
-      var position = stats.hasText ? stats : this.sourcePositionForTopLevelNode(i);
+      if (atomic && this.isMediaOnlySource(child)) {
+        var mediaUnits = this.mediaScreensForSourceNode(child, sources[i].extraIds);
+        if (mediaUnits.length) {
+          units = units.concat(mediaUnits);
+          continue;
+        }
+      }
+      var position = stats.hasText ? stats : this.sourcePositionForNode(child, i);
       var hasStandaloneMedia = child.nodeType === Node.ELEMENT_NODE && this.containsStandaloneMedia(child);
       units.push({
         standalone: true,
-        order: i,
+        order: this.sourceOrderForNode(child),
+        preorder: this.sourcePreorderForNode(child),
         startCharCount: position.startChar,
         endCharCount: position.endChar,
         startRawCount: position.startRaw,
         endRawCount: position.endRaw,
-        ids: this.collectIdsForNode(child),
+        ids: this.collectIdsForNode(child, sources[i].extraIds),
         splittable: false,
         mediaStop: hasStandaloneMedia,
         render: () => {
@@ -881,7 +897,18 @@ window.hoshiReader = {
     var raw = previous ? previous.endRaw : 0;
     return { hasText: false, startChar: char, endChar: char, startRaw: raw, endRaw: raw };
   },
+  sourcePositionForNode: function(node, fallbackOrder) {
+    var stats = this.statsForSourceNode(node);
+    if (stats.hasText) return stats;
+    if (this.contentStream && typeof this.contentStream.sourcePositionForNode === 'function') {
+      return this.contentStream.sourcePositionForNode(node);
+    }
+    return this.sourcePositionForTopLevelNode(fallbackOrder);
+  },
   containsStandaloneMedia: function(root) {
+    if (this.contentStream && typeof this.contentStream.containsStandaloneMedia === 'function') {
+      return this.contentStream.containsStandaloneMedia(root);
+    }
     if (!root || root.nodeType !== Node.ELEMENT_NODE) return false;
     var tag = String(root.tagName || '').toLowerCase();
     if (this.isStandaloneMediaTag(tag)) return true;
@@ -901,6 +928,79 @@ window.hoshiReader = {
       'object',
       'embed'
     ].indexOf(tag) >= 0;
+  },
+  isMediaOnlySource: function(root) {
+    return this.containsStandaloneMedia(root) && !(root && String(root.textContent || '').trim());
+  },
+  mediaUnitsForSourceNode: function(root) {
+    if (!this.contentStream || typeof this.contentStream.mediaUnits !== 'function') return [];
+    return this.contentStream.mediaUnits().filter((unit) => this.isDescendantOf(unit.mediaNode || unit.node, root));
+  },
+  mediaScreensForSourceNode: function(root, extraIds) {
+    var units = this.mediaUnitsForSourceNode(root);
+    var result = [];
+    for (var i = 0; i < units.length; i++) {
+      result.push(this.screenFromMediaUnit(units[i], extraIds));
+    }
+    return result;
+  },
+  screenFromMediaUnit: function(unit, extraIds) {
+    var ids = this.mergeIds(extraIds || new Set(), unit.ids || new Set());
+    return {
+      standalone: true,
+      order: unit.sourceOrder,
+      preorder: unit.preorder,
+      startCharCount: unit.startChar,
+      endCharCount: unit.endChar,
+      startRawCount: unit.startRaw,
+      endRawCount: unit.endRaw,
+      ids: ids,
+      splittable: false,
+      mediaStop: true,
+      render: () => {
+        var fragment = document.createDocumentFragment();
+        fragment.appendChild(this.cloneMediaUnit(unit));
+        return fragment;
+      }
+    };
+  },
+  cloneMediaUnit: function(unit) {
+    var renderSource = this.renderSourceForMediaUnit(unit);
+    if (!unit || renderSource === unit.renderRoot) {
+      return this.cloneSourceNodeWithOffsets(renderSource);
+    }
+    var renderRoot = unit.renderRoot;
+    var mediaNode = unit.mediaNode || unit.node;
+    var path = [];
+    var current = mediaNode;
+    while (current && current !== renderRoot) {
+      path.unshift(current);
+      current = current.parentNode;
+    }
+    if (!renderRoot || current !== renderRoot) return this.cloneSourceNodeWithOffsets(mediaNode);
+    var rootClone = renderRoot.cloneNode ? renderRoot.cloneNode(false) : document.createElement(renderRoot.tagName.toLowerCase());
+    var parentClone = rootClone;
+    for (var i = 0; i < path.length; i++) {
+      var source = path[i];
+      if (source === mediaNode) {
+        parentClone.appendChild(this.cloneSourceNodeWithOffsets(source));
+      } else {
+        var clone = source.cloneNode ? source.cloneNode(false) : document.createElement(source.tagName.toLowerCase());
+        parentClone.appendChild(clone);
+        parentClone = clone;
+      }
+    }
+    return rootClone;
+  },
+  renderSourceForMediaUnit: function(unit) {
+    if (!unit || unit.renderRoot === unit.mediaNode) return unit && unit.renderRoot;
+    var units = this.contentStream && typeof this.contentStream.mediaUnits === 'function'
+      ? this.contentStream.mediaUnits()
+      : [];
+    var sharedRootCount = units.filter(function(candidate) {
+      return candidate.renderRoot === unit.renderRoot;
+    }).length;
+    return sharedRootCount <= 1 ? unit.renderRoot : unit.mediaNode;
   },
   buildSentenceUnits: function() {
     var items = this.buildTextItems();
@@ -1026,8 +1126,27 @@ window.hoshiReader = {
   },
   isSentenceAtomicTextNode: function(node) {
     if (!this.sentenceAtomicRoots) return false;
+    var current = node;
+    while (current && current !== this.sourceRoot) {
+      if (this.sentenceAtomicRoots.has(current)) return true;
+      current = current.parentNode;
+    }
+    return false;
+  },
+  sourceOrderForNode: function(node) {
+    if (this.contentStream && typeof this.contentStream.sourceOrderForNode === 'function') {
+      return this.contentStream.sourceOrderForNode(node);
+    }
     var root = this.topLevelSourceNode(node);
-    return !!(root && this.sentenceAtomicRoots.has(root));
+    var order = this.sourceOrderIndexes && this.sourceOrderIndexes.get(root);
+    if (order !== undefined) return order;
+    return Array.from(this.sourceRoot.childNodes).indexOf(root);
+  },
+  sourcePreorderForNode: function(node) {
+    if (this.contentStream && typeof this.contentStream.sourcePreorderForNode === 'function') {
+      return this.contentStream.sourcePreorderForNode(node);
+    }
+    return 0;
   },
   rangesFromItems: function(items) {
     var ranges = [];

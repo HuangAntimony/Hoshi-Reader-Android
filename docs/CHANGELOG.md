@@ -21,6 +21,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep Sasayaki cross-chapter cue jumps from briefly showing the chapter start, counting the hidden restore landing in reading statistics, or applying cue jumps before slow chapter restores finish.
 - Keep Sasayaki cue highlights from dropping punctuation split across EPUB text nodes.
 - Keep VN screens from dropping ruby/furigana annotations.
+- Keep consecutive media-only images in VN from collapsing into one screen.
 
 ## [v1.2.2] - 2026-06-21
 
