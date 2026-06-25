@@ -230,9 +230,10 @@ class ReaderPaginationScriptsTest {
             selectionJs = "",
             readerPaginatedJs = "PAGINATED_ASSET",
             readerContinuousJs = "CONTINUOUS_ASSET",
-            readerVisualNovelJs = "VN __HOSHI_READER_CONTENT_STREAM_SCRIPT__ __HOSHI_READER_RANGE_MAP_SCRIPT__ __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES__ __HOSHI_INITIAL_SASAYAKI_CUES_JSON__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
-            readerContentStreamJs = "CONTENT_STREAM_ASSET",
-            readerRangeMapJs = "RANGE_MAP_ASSET",
+            readerVisualNovelJs = "VN __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__ __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__ __HOSHI_READER_VN_RANGE_MAP_SCRIPT__ __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES__ __HOSHI_INITIAL_SASAYAKI_CUES_JSON__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
+            readerTextSemanticsJs = "TEXT_SEMANTICS_ASSET",
+            readerVnContentStreamJs = "VN_CONTENT_STREAM_ASSET",
+            readerVnRangeMapJs = "VN_RANGE_MAP_ASSET",
             readerSasayakiJs = "",
             highlightsJs = "",
             readerCss = "",
@@ -256,7 +257,7 @@ class ReaderPaginationScriptsTest {
 
         assertTrue(
             script.contains(
-                "VN CONTENT_STREAM_ASSET RANGE_MAP_ASSET 80 \"sentences\" 3 true true [{\"id\":\"cue\",\"start\":1,\"length\":3}] 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",
+                "VN TEXT_SEMANTICS_ASSET VN_CONTENT_STREAM_ASSET VN_RANGE_MAP_ASSET 80 \"sentences\" 3 true true [{\"id\":\"cue\",\"start\":1,\"length\":3}] 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",
             ),
         )
         assertTrue(script.contains("\"restoreCompleted\""))
@@ -266,20 +267,22 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
-    fun visualNovelSourceTreeScriptInjectsSharedReaderModules() {
+    fun visualNovelSourceTreeScriptInjectsTextSemanticsAndVnReaderModules() {
         val script = ReaderPaginationScripts.shellScript(
             settings = ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
         )
 
-        assertTrue(script.contains("hoshiReaderContentStream"))
-        assertTrue(script.contains("hoshiReaderRangeMap"))
-        assertFalse(script.contains("__HOSHI_READER_CONTENT_STREAM_SCRIPT__"))
-        assertFalse(script.contains("__HOSHI_READER_RANGE_MAP_SCRIPT__"))
+        assertTrue(script.contains("hoshiReaderTextSemantics"))
+        assertTrue(script.contains("hoshiReaderVnContentStream"))
+        assertTrue(script.contains("hoshiReaderVnRangeMap"))
+        assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
+        assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
+        assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
         assertFalse(script.contains("__HOSHI_"))
     }
 
     @Test
-    fun paginatedAndContinuousSourceTreeScriptsInjectSharedTextSemanticsOnly() {
+    fun paginatedAndContinuousSourceTreeScriptsInjectTextSemanticsOnly() {
         val scripts = listOf(
             ReaderPaginationScripts.shellScript(
                 settings = ReaderSettings(viewMode = ReaderViewMode.Paginated),
@@ -290,10 +293,12 @@ class ReaderPaginationScriptsTest {
         )
 
         scripts.forEach { script ->
-            assertTrue(script.contains("hoshiReaderContentStream"))
-            assertFalse(script.contains("hoshiReaderRangeMap"))
-            assertFalse(script.contains("__HOSHI_READER_CONTENT_STREAM_SCRIPT__"))
-            assertFalse(script.contains("__HOSHI_READER_RANGE_MAP_SCRIPT__"))
+            assertTrue(script.contains("hoshiReaderTextSemantics"))
+            assertFalse(script.contains("hoshiReaderVnContentStream"))
+            assertFalse(script.contains("hoshiReaderVnRangeMap"))
+            assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
+            assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
+            assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
             assertFalse(script.contains("__HOSHI_"))
         }
     }

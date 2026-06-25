@@ -49,8 +49,8 @@ accepted as shared reader core.
 Use these rules before adding, naming, or keeping a shared reader-web module.
 
 - A file named as shared reader core, such as `reader-*-semantics.js`,
-  `reader-*-range*.js`, or `reader-content-stream.js`, must have production
-  callers from at least two reader modes in the same implementation phase.
+  `reader-*-range*.js`, or `reader-*-stream.js`, must have production callers
+  from at least two reader modes in the same implementation phase.
 - If a module is only consumed by VN, keep it inside
   `reader-visual-novel.js` or name it explicitly as VN-specific until a second
   mode consumes it.
@@ -113,8 +113,7 @@ reader content rather than reader navigation:
 The exact file names may change during implementation, but each shared file must
 meet the admission rules above.
 
-- `app/src/main/assets/hoshi-web/reader/reader-text-semantics.js`
-  or the pure export portion of `reader-content-stream.js`:
+- `app/src/main/assets/hoshi-web/reader/reader-text-semantics.js`:
   normalization, raw counting, matchable counting, and matchable character
   checks. Production consumers: paginated, continuous, and VN.
 - `app/src/main/assets/hoshi-web/reader/reader-dom-text.js`:
@@ -134,10 +133,11 @@ meet the admission rules above.
   cue normalization, cue intersection, punctuation inclusion, and conversion
   from cue offsets to rendered ranges. Production consumers:
   `reader-sasayaki.js` for paginated/continuous and VN's Sasayaki integration.
-- `app/src/main/assets/hoshi-web/reader/reader-content-stream.js`:
-  keep this name only if it becomes a real cross-mode chapter stream. If only VN
-  consumes stateful stream instances, split the mode-neutral helpers out and
-  rename the remaining stream to VN-specific ownership.
+- `app/src/main/assets/hoshi-web/reader/reader-vn-content-stream.js` and
+  `app/src/main/assets/hoshi-web/reader/reader-vn-range-map.js`:
+  VN-specific runtime primitives. They are allowed only when their names and
+  callers make the VN ownership explicit; do not describe them as shared reader
+  core until a second mode consumes a mode-neutral API with tests.
 
 ## Data Flow
 
@@ -166,8 +166,9 @@ VN-specific.
 **Files:**
 
 - Modify: `docs/VN_READER_PAGINATION_REFACTOR.md`
-- Inspect: `app/src/main/assets/hoshi-web/reader/reader-content-stream.js`
-- Inspect: `app/src/main/assets/hoshi-web/reader/reader-range-map.js`
+- Inspect: `app/src/main/assets/hoshi-web/reader/reader-text-semantics.js`
+- Inspect: `app/src/main/assets/hoshi-web/reader/reader-vn-content-stream.js`
+- Inspect: `app/src/main/assets/hoshi-web/reader/reader-vn-range-map.js`
 - Inspect: `app/src/main/assets/hoshi-web/reader/reader-visual-novel.js`
 - Inspect: `app/src/main/assets/hoshi-web/reader/reader-paginated.js`
 - Inspect: `app/src/main/assets/hoshi-web/reader/reader-continuous.js`
@@ -203,8 +204,6 @@ raw counting, matchable counting, and matchable character checks.
 - Modify: `app/src/main/assets/hoshi-web/reader/reader-visual-novel.js`
 - Modify/Create:
   `app/src/main/assets/hoshi-web/reader/reader-text-semantics.js`
-  or the pure helper section of
-  `app/src/main/assets/hoshi-web/reader/reader-content-stream.js`
 - Modify: `app/src/test/js/reader-paginated.test.mjs`
 - Modify: `app/src/test/js/reader-visual-novel.test.mjs`
 - Modify/Create: `app/src/test/js/reader-text-semantics.test.mjs`

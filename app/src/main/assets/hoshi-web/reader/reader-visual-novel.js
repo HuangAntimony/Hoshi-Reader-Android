@@ -1,5 +1,6 @@
-__HOSHI_READER_CONTENT_STREAM_SCRIPT__
-__HOSHI_READER_RANGE_MAP_SCRIPT__
+__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
+__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__
+__HOSHI_READER_VN_RANGE_MAP_SCRIPT__
 
 window.hoshiReader = {
   revealSpeed: __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__,
@@ -79,10 +80,10 @@ window.hoshiReader = {
     return !!(el && el.closest('[data-hoshi-visual-novel-unrevealed]'));
   },
   textSemantics: function() {
-    if (!window.hoshiReaderContentStream) {
-      throw new Error('hoshiReaderContentStream is required for reader text semantics');
+    if (!window.hoshiReaderTextSemantics) {
+      throw new Error('hoshiReaderTextSemantics is required for reader text semantics');
     }
-    return window.hoshiReaderContentStream;
+    return window.hoshiReaderTextSemantics;
   },
   normalizeText: function(text) {
     return this.textSemantics().normalizeText(text);
@@ -210,13 +211,13 @@ window.hoshiReader = {
     document.body.appendChild(this.stage);
   },
   buildSourceIndexes: function() {
-    var contentStreamFactory = window.hoshiReaderContentStream && window.hoshiReaderContentStream.create;
+    var contentStreamFactory = window.hoshiReaderVnContentStream && window.hoshiReaderVnContentStream.create;
     if (!contentStreamFactory) {
-      throw new Error('hoshiReaderContentStream is required for visual novel reader');
+      throw new Error('hoshiReaderVnContentStream is required for visual novel reader');
     }
-    var rangeMapFactory = window.hoshiReaderRangeMap && window.hoshiReaderRangeMap.create;
+    var rangeMapFactory = window.hoshiReaderVnRangeMap && window.hoshiReaderVnRangeMap.create;
     if (!rangeMapFactory) {
-      throw new Error('hoshiReaderRangeMap is required for visual novel reader');
+      throw new Error('hoshiReaderVnRangeMap is required for visual novel reader');
     }
     this.contentStream = contentStreamFactory(this.sourceRoot);
     this.rangeMap = rangeMapFactory(this);

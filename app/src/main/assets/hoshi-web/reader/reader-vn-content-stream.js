@@ -6,8 +6,6 @@
   var DOCUMENT_FRAGMENT_NODE = 11;
   var ignoredTags = new Set(['rt', 'rp', 'script', 'style']);
   var mediaTags = new Set(['img', 'svg', 'image', 'video', 'canvas', 'audio', 'picture', 'figure', 'table', 'iframe', 'object', 'embed']);
-  var ttuRegexNegated = /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu;
-  var ttuRegex = /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu;
 
   function tagName(node) {
     return node && node.nodeType === ELEMENT_NODE ? String(node.tagName || '').toLowerCase() : '';
@@ -17,20 +15,27 @@
     return Array.from(node && node.childNodes ? node.childNodes : []);
   }
 
-  function normalizeText(text) {
-    return String(text || '').replace(ttuRegexNegated, '');
+  function textSemantics() {
+    if (!global.hoshiReaderTextSemantics) {
+      throw new Error('hoshiReaderTextSemantics is required for VN content stream');
+    }
+    return global.hoshiReaderTextSemantics;
   }
 
-  function isMatchableChar(char) {
-    return ttuRegex.test(char || '');
+  function normalizeText(text) {
+    return textSemantics().normalizeText(text);
   }
 
   function countChars(text) {
-    return Array.from(normalizeText(text)).length;
+    return textSemantics().countChars(text);
   }
 
   function countRawChars(text) {
-    return Array.from(text || '').length;
+    return textSemantics().countRawChars(text);
+  }
+
+  function isMatchableChar(char) {
+    return textSemantics().isMatchableChar(char);
   }
 
   function ownIdsForNode(node) {
@@ -105,7 +110,7 @@
     return current && current.nodeType === ELEMENT_NODE && tagName(current) === targetTag ? current : null;
   }
 
-  function ReaderContentStream(root, options) {
+  function ReaderVnContentStream(root, options) {
     this.root = root;
     this.options = options || {};
     this.textEntries = [];
@@ -119,7 +124,7 @@
     this.rebuild();
   }
 
-  ReaderContentStream.prototype = {
+  ReaderVnContentStream.prototype = {
     normalizeText: normalizeText,
     isMatchableChar: isMatchableChar,
     countChars: countChars,
@@ -385,13 +390,9 @@
     }
   };
 
-  global.hoshiReaderContentStream = {
+  global.hoshiReaderVnContentStream = {
     create: function(root, options) {
-      return new ReaderContentStream(root, options);
-    },
-    normalizeText: normalizeText,
-    isMatchableChar: isMatchableChar,
-    countChars: countChars,
-    countRawChars: countRawChars
+      return new ReaderVnContentStream(root, options);
+    }
   };
 })(window);

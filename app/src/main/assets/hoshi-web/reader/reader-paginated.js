@@ -1,4 +1,4 @@
-__HOSHI_READER_CONTENT_STREAM_SCRIPT__
+__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 
 window.hoshiReader = {
   pageHeight: 0,
@@ -26,10 +26,10 @@ window.hoshiReader = {
     return !!(el && el.closest('rt, rp'));
   },
   textSemantics: function() {
-    if (!window.hoshiReaderContentStream) {
-      throw new Error('hoshiReaderContentStream is required for reader text semantics');
+    if (!window.hoshiReaderTextSemantics) {
+      throw new Error('hoshiReaderTextSemantics is required for reader text semantics');
     }
-    return window.hoshiReaderContentStream;
+    return window.hoshiReaderTextSemantics;
   },
   normalizeText: function(text) {
     return this.textSemantics().normalizeText(text);

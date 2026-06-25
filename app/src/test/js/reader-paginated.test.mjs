@@ -6,10 +6,10 @@ import vm from 'node:vm';
 const readerPaginatedUrl = new URL('../../main/assets/hoshi-web/reader/reader-paginated.js', import.meta.url);
 const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-continuous.js', import.meta.url);
 const readerSasayakiUrl = new URL('../../main/assets/hoshi-web/reader/reader-sasayaki.js', import.meta.url);
-const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
+const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
 
-function readerContentStreamSource() {
-    return fs.readFileSync(readerContentStreamUrl, 'utf8');
+function readerTextSemanticsSource() {
+    return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
 }
 
 function readerSource(url, options = {}) {
@@ -17,7 +17,7 @@ function readerSource(url, options = {}) {
     return fs.readFileSync(url, 'utf8')
         .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', '')
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
-        .replace('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerContentStreamSource())
+        .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
@@ -522,14 +522,14 @@ test('paginated reader removes ruby whitespace text nodes and wraps base text no
     assertRubyTextNodesAreNormalized(readerPaginatedUrl);
 });
 
-test('paged and continuous readers use shared content stream text semantics', () => {
+test('paged and continuous readers use shared text semantics', () => {
     [readerPaginatedUrl, readerContinuousUrl].forEach((sourceUrl) => {
         const body = new TestElement('body');
         body.appendChild(new TestText('本文。'));
         const { reader, window } = loadReader(body, sourceUrl);
-        const originalCountChars = window.hoshiReaderContentStream.countChars;
+        const originalCountChars = window.hoshiReaderTextSemantics.countChars;
         let countCalls = 0;
-        window.hoshiReaderContentStream.countChars = (text) => {
+        window.hoshiReaderTextSemantics.countChars = (text) => {
             countCalls += 1;
             return originalCountChars(text);
         };

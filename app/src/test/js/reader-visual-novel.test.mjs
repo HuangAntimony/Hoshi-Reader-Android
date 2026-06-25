@@ -4,16 +4,21 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
-const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
-const readerRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-range-map.js', import.meta.url);
+const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
+const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
+const readerVnRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-range-map.js', import.meta.url);
 const readerHighlightsUrl = new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url);
 
-function readerContentStreamSource() {
-    return fs.readFileSync(readerContentStreamUrl, 'utf8');
+function readerTextSemanticsSource() {
+    return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
 }
 
-function readerRangeMapSource() {
-    return fs.readFileSync(readerRangeMapUrl, 'utf8');
+function readerVnContentStreamSource() {
+    return fs.readFileSync(readerVnContentStreamUrl, 'utf8');
+}
+
+function readerVnRangeMapSource() {
+    return fs.readFileSync(readerVnRangeMapUrl, 'utf8');
 }
 
 function readerHighlightsSource() {
@@ -22,8 +27,9 @@ function readerHighlightsSource() {
 
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
-        .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', readerContentStreamSource())
-        .replaceAll('__HOSHI_READER_RANGE_MAP_SCRIPT__', readerRangeMapSource())
+        .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', readerVnContentStreamSource())
+        .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', readerVnRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', '0')
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify('block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', '1')
@@ -40,8 +46,9 @@ function readerSource() {
 
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
-        .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerContentStreamSource())
-        .replaceAll('__HOSHI_READER_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerRangeMapSource())
+        .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerVnContentStreamSource())
+        .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerVnRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', String(options.revealSpeed ?? 0))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify(options.mode ?? 'block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', String(options.sentencesPerScreen ?? 1))
@@ -832,16 +839,22 @@ test('visual novel reader asset defines the expected public surface', () => {
     assert.equal(typeof reader.nodeStartRawOffsets.get, 'function');
 });
 
-test('visual novel reader requires the shared content stream asset', async () => {
-    const { reader } = loadReader(bodyWith(p('本文。')), { contentStreamScript: '' });
+test('visual novel reader requires the shared text semantics asset', async () => {
+    const { reader } = loadReader(bodyWith(p('本文。')), { textSemanticsScript: '' });
 
-    await assert.rejects(() => reader.initialize(), /hoshiReaderContentStream/);
+    await assert.rejects(() => reader.initialize(), /hoshiReaderTextSemantics/);
 });
 
-test('visual novel reader requires the shared range map asset', async () => {
+test('visual novel reader requires the VN content stream asset', async () => {
+    const { reader } = loadReader(bodyWith(p('本文。')), { contentStreamScript: '' });
+
+    await assert.rejects(() => reader.initialize(), /hoshiReaderVnContentStream/);
+});
+
+test('visual novel reader requires the VN range map asset', async () => {
     const { reader } = loadReader(bodyWith(p('本文。')), { rangeMapScript: '' });
 
-    await assert.rejects(() => reader.initialize(), /hoshiReaderRangeMap/);
+    await assert.rejects(() => reader.initialize(), /hoshiReaderVnRangeMap/);
 });
 
 test('block mode renders one top-level block per screen without cloning the entire chapter', async () => {

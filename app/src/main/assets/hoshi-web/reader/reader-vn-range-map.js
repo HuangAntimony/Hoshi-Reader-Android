@@ -1,13 +1,13 @@
 (function(global) {
   'use strict';
 
-  function ReaderRangeMap(reader) {
+  function ReaderVnRangeMap(reader) {
     this.reader = reader;
     this.cloneTextOffsets = new WeakMap();
     this.cloneTextRawOffsets = new WeakMap();
   }
 
-  ReaderRangeMap.prototype = {
+  ReaderVnRangeMap.prototype = {
     registerCloneTextOffset: function(node, charOffset, rawOffset) {
       this.cloneTextOffsets.set(node, charOffset === undefined ? 0 : charOffset);
       this.cloneTextRawOffsets.set(node, rawOffset === undefined ? 0 : rawOffset);
@@ -119,9 +119,9 @@
     }
   };
 
-  global.hoshiReaderRangeMap = {
+  global.hoshiReaderVnRangeMap = {
     create: function(reader) {
-      return new ReaderRangeMap(reader);
+      return new ReaderVnRangeMap(reader);
     }
   };
 })(window);

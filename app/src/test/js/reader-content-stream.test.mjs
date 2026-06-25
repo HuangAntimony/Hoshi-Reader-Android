@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
+const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
+const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
 
 class TestNode {
     constructor(nodeType) {
@@ -76,10 +77,13 @@ function text(value) {
 }
 
 function loadContentStreamModule() {
-    const source = fs.readFileSync(readerContentStreamUrl, 'utf8');
+    const source = [
+        fs.readFileSync(readerTextSemanticsUrl, 'utf8'),
+        fs.readFileSync(readerVnContentStreamUrl, 'utf8'),
+    ].join('\n');
     const window = {};
     vm.runInNewContext(source, { window });
-    return window.hoshiReaderContentStream;
+    return window.hoshiReaderVnContentStream;
 }
 
 function plain(value) {
