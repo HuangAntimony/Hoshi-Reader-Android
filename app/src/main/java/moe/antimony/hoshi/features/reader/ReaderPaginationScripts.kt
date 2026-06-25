@@ -109,6 +109,7 @@ internal object ReaderPaginationScripts {
         val body = template
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
             .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
+            .replace("__HOSHI_READER_CONTENT_STREAM_SCRIPT__", source.readerContentStream)
             .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
             .replace("__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__", settings.visualNovelRevealSpeed.coerceIn(0, 120).toString())
             .replace("__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__", settings.visualNovelScreenMode.rawValue.javaScriptStringLiteral())
@@ -147,6 +148,7 @@ private data class ReaderPaginationAssetSource(
     val continuous: String,
     val visualNovel: String,
     val readerSasayaki: String,
+    val readerContentStream: String,
     val highlights: String,
 ) {
     companion object {
@@ -157,6 +159,7 @@ private data class ReaderPaginationAssetSource(
                     continuous = assets.readerContinuousJs,
                     visualNovel = assets.readerVisualNovelJs,
                     readerSasayaki = assets.readerSasayakiJs,
+                    readerContentStream = assets.readerContentStreamJs,
                     highlights = assets.highlightsJs,
                 )
             }
@@ -172,6 +175,7 @@ private object SourceTreeReaderPaginationAssets {
             continuous = readSourceAsset("hoshi-web/reader/reader-continuous.js"),
             visualNovel = readSourceAsset("hoshi-web/reader/reader-visual-novel.js"),
             readerSasayaki = readSourceAsset("hoshi-web/reader/reader-sasayaki.js"),
+            readerContentStream = readSourceAsset("hoshi-web/reader/reader-content-stream.js"),
             highlights = readSourceAsset("hoshi-web/reader/highlights.js"),
         )
     }

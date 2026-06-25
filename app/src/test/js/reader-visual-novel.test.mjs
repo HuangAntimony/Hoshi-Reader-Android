@@ -4,9 +4,15 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
+const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
+
+function readerContentStreamSource() {
+    return fs.readFileSync(readerContentStreamUrl, 'utf8');
+}
 
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
+        .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', readerContentStreamSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', '0')
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify('block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', '1')
@@ -23,6 +29,7 @@ function readerSource() {
 
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
+        .replaceAll('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerContentStreamSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', String(options.revealSpeed ?? 0))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify(options.mode ?? 'block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', String(options.sentencesPerScreen ?? 1))
@@ -725,6 +732,24 @@ function p(text, attributes = {}) {
     return paragraph;
 }
 
+function element(tagName, attributes = {}, children = []) {
+    const node = new TestElement(tagName);
+    Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, value));
+    children.forEach((child) => node.appendChild(typeof child === 'string' ? new TestText(child) : child));
+    return node;
+}
+
+function paragraphWith(...children) {
+    return element('p', {}, children);
+}
+
+function rubyText(base, annotation) {
+    return element('ruby', {}, [
+        base,
+        element('rt', {}, [annotation]),
+    ]);
+}
+
 function image(src, attributes = {}) {
     const img = new TestElement('img');
     img.setAttribute('src', src);
@@ -787,6 +812,12 @@ test('visual novel reader asset defines the expected public surface', () => {
     assert.equal(typeof reader.nodeStartRawOffsets.get, 'function');
 });
 
+test('visual novel reader requires the shared content stream asset', async () => {
+    const { reader } = loadReader(bodyWith(p('本文。')), { contentStreamScript: '' });
+
+    await assert.rejects(() => reader.initialize(), /hoshiReaderContentStream/);
+});
+
 test('block mode renders one top-level block per screen without cloning the entire chapter', async () => {
     const body = bodyWith(p('第一段落。'), p('第二段落。'));
     const { reader } = await initializeReader(body, { mode: 'block', revealSpeed: 0 });
@@ -796,6 +827,22 @@ test('block mode renders one top-level block per screen without cloning the enti
     assert.equal(reader.paginate('forward'), 'scrolled');
     assert.equal(currentScreen(reader).textContent, '第二段落。');
     assert.equal(currentScreen(reader).textContent.includes('第一段落。'), false);
+});
+
+test('block mode preserves ruby annotations while indexing only base text', async () => {
+    const body = bodyWith(paragraphWith('夜', rubyText('星', 'ほし'), '。'));
+    const { reader } = await initializeReader(body, { mode: 'block', revealSpeed: 0 });
+    const screen = currentScreen(reader);
+    const ruby = screen.querySelector('ruby');
+    const rt = screen.querySelector('rt');
+
+    assert.notEqual(ruby, null);
+    assert.notEqual(rt, null);
+    const rubyTextNodes = collectTextNodes(ruby);
+    assert.equal(rt.textContent, 'ほし');
+    assert.equal(reader.totalChapterChars, 2);
+    assert.equal(reader.nodeStartOffsets.get(rubyTextNodes.find((node) => node.textContent === '星')), 1);
+    assert.equal(reader.nodeStartOffsets.get(rubyTextNodes.find((node) => node.textContent === 'ほし')), undefined);
 });
 
 test('block mode builds source positions without scanning every text entry for every block', async () => {
@@ -924,6 +971,35 @@ test('block mode splits oversized text blocks to keep every part reachable', asy
     assert.equal(currentScreen(reader).textContent, '次段落。');
 });
 
+test('viewport fitting keeps ruby roots atomic when splitting oversized VN screens', async () => {
+    const body = bodyWith(paragraphWith('一', rubyText('二三', 'にさん'), '四五'));
+    const { reader } = await initializeReader(body, {
+        mode: 'block',
+        revealSpeed: 0,
+        charactersPerScreen: 2,
+    });
+
+    assert.equal(reader.totalChapterChars, 5);
+    assert.equal(currentScreen(reader).textContent, '一');
+    assert.equal(currentScreen(reader).querySelectorAll('ruby').length, 0);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    const rubyScreen = currentScreen(reader);
+    const ruby = rubyScreen.querySelector('ruby');
+    assert.equal(rubyScreen.querySelectorAll('ruby').length, 1);
+    assert.deepEqual(collectTextNodes(ruby).map((node) => node.textContent), ['二三', 'にさん']);
+    assert.equal(rubyScreen.querySelector('rt').textContent, 'にさん');
+    assert.equal(reader.calculateProgress(), 3 / 5);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '四五');
+    assert.equal(currentScreen(reader).querySelectorAll('ruby').length, 0);
+
+    await reader.restoreProgress(2 / reader.totalChapterChars);
+    assert.equal(currentScreen(reader).querySelectorAll('ruby').length, 1);
+    assert.deepEqual(collectTextNodes(currentScreen(reader).querySelector('ruby')).map((node) => node.textContent), ['二三', 'にさん']);
+});
+
 test('block mode splits oversized vertical writing blocks against the VN content bounds', async () => {
     const body = bodyWith(p('一二三四五六'));
     const { reader } = await initializeReader(body, {
@@ -982,6 +1058,24 @@ test('sentence mode groups sentences by configured count', async () => {
 
     assert.equal(reader.paginate('forward'), 'scrolled');
     assert.equal(currentScreen(reader).textContent, '三？四。');
+});
+
+test('sentence mode preserves ruby annotations after reveal completion', async () => {
+    const body = bodyWith(paragraphWith(rubyText('星', 'ほし'), '。次。'));
+    const { reader } = await initializeReader(body, {
+        mode: 'sentences',
+        sentencesPerScreen: 1,
+        revealSpeed: 10,
+    });
+
+    assert.equal(reader.totalChapterChars, 2);
+    assert.equal(reader.calculateProgress(), 1 / 2);
+    assert.equal(reader.paginate('forward'), 'revealed');
+    assert.equal(currentScreen(reader).querySelector('rt').textContent, 'ほし');
+    assert.equal(currentScreen(reader).querySelectorAll('[data-hoshi-visual-novel-unrevealed]').length, 0);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '次。');
 });
 
 test('sentence mode keeps media-only blocks as standalone visual novel screens', async () => {

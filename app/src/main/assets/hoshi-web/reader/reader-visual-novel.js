@@ -1,3 +1,5 @@
+__HOSHI_READER_CONTENT_STREAM_SCRIPT__
+
 window.hoshiReader = {
   revealSpeed: __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__,
   screenMode: __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__,
@@ -22,6 +24,8 @@ window.hoshiReader = {
   sourceTextRawOffsets: new WeakMap(),
   sourceNodeStats: new WeakMap(),
   sourceOrderIndexes: new WeakMap(),
+  sourcePreorderIndexes: new WeakMap(),
+  contentStream: null,
   cloneTextOffsets: new WeakMap(),
   cloneTextRawOffsets: new WeakMap(),
   ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
@@ -72,6 +76,10 @@ window.hoshiReader = {
   isIgnoredElement: function(node) {
     var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
     return !!(el && el.closest('rt, rp, script, style'));
+  },
+  isDiscardedCloneElement: function(node) {
+    var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    return !!(el && el.closest('script, style'));
   },
   isUnrevealed: function(node) {
     var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
@@ -203,36 +211,18 @@ window.hoshiReader = {
     document.body.appendChild(this.stage);
   },
   buildSourceIndexes: function() {
-    this.sourceTextOffsets = new WeakMap();
-    this.sourceTextRawOffsets = new WeakMap();
-    this.sourceNodeStats = new WeakMap();
-    this.sourceOrderIndexes = new WeakMap();
-    this.sourceEntries = [];
-    var topLevelNodes = Array.from(this.sourceRoot.childNodes || []);
-    for (var order = 0; order < topLevelNodes.length; order++) {
-      this.sourceOrderIndexes.set(topLevelNodes[order], order);
+    var contentStreamFactory = window.hoshiReaderContentStream && window.hoshiReaderContentStream.create;
+    if (!contentStreamFactory) {
+      throw new Error('hoshiReaderContentStream is required for visual novel reader');
     }
-    var walker = this.createWalker(this.sourceRoot);
-    var count = 0;
-    var rawCount = 0;
-    var node;
-    while (node = walker.nextNode()) {
-      this.sourceTextOffsets.set(node, count);
-      this.sourceTextRawOffsets.set(node, rawCount);
-      var entry = {
-        node: node,
-        startChar: count,
-        startRaw: rawCount,
-        text: node.textContent || ''
-      };
-      count += this.countChars(entry.text);
-      rawCount += this.countRawChars(entry.text);
-      entry.endChar = count;
-      entry.endRaw = rawCount;
-      this.sourceEntries.push(entry);
-      this.updateSourceNodeStats(node, entry);
-    }
-    this.totalChapterChars = count;
+    this.contentStream = contentStreamFactory(this.sourceRoot);
+    this.sourceTextOffsets = this.contentStream.sourceTextOffsets;
+    this.sourceTextRawOffsets = this.contentStream.sourceTextRawOffsets;
+    this.sourceNodeStats = this.contentStream.sourceNodeStats;
+    this.sourceOrderIndexes = this.contentStream.sourceOrderIndexes;
+    this.sourcePreorderIndexes = this.contentStream.sourcePreorderIndexes;
+    this.sourceEntries = this.contentStream.textEntries;
+    this.totalChapterChars = this.contentStream.totalMatchableChars;
   },
   updateSourceNodeStats: function(node, entry) {
     var current = node;
@@ -538,15 +528,18 @@ window.hoshiReader = {
   splitScreenToViewport: function(screen, measurement) {
     var items = this.textItemsForScreen(screen);
     if (!items.length) return [];
+    var units = this.viewportSplitUnitsForItems(items);
+    if (!units.length) return [];
     var result = [];
     var start = 0;
-    while (start < items.length) {
+    while (start < units.length) {
       var low = start + 1;
-      var high = items.length;
+      var high = units.length;
       var best = -1;
       while (low <= high) {
         var mid = Math.floor((low + high) / 2);
-        var candidate = this.screenFromTextItems(items, start, mid, screen.ids);
+        var candidateItems = this.textItemsFromViewportUnits(units, start, mid);
+        var candidate = this.screenFromTextItems(candidateItems, 0, candidateItems.length, screen.ids);
         if (this.measureScreenFits(candidate, measurement)) {
           best = mid;
           low = mid + 1;
@@ -555,8 +548,32 @@ window.hoshiReader = {
         }
       }
       if (best <= start) best = start + 1;
-      result.push(this.screenFromTextItems(items, start, best, screen.ids));
+      var splitItems = this.textItemsFromViewportUnits(units, start, best);
+      result.push(this.screenFromTextItems(splitItems, 0, splitItems.length, screen.ids));
       start = best;
+    }
+    return result;
+  },
+  viewportSplitUnitsForItems: function(items) {
+    var units = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var rubyRoot = item.rubyRoot || (this.contentStream && this.contentStream.rubyRootForTextNode
+        ? this.contentStream.rubyRootForTextNode(item.node)
+        : null);
+      var last = units[units.length - 1];
+      if (rubyRoot && last && last.rubyRoot === rubyRoot) {
+        last.items.push(item);
+      } else {
+        units.push({ rubyRoot: rubyRoot, items: [item] });
+      }
+    }
+    return units;
+  },
+  textItemsFromViewportUnits: function(units, start, end) {
+    var result = [];
+    for (var i = start; i < end; i++) {
+      Array.prototype.push.apply(result, units[i].items);
     }
     return result;
   },
@@ -957,6 +974,10 @@ window.hoshiReader = {
     });
   },
   buildTextItems: function() {
+    if (this.contentStream && typeof this.contentStream.textItems === 'function') {
+      var streamItems = this.contentStream.textItems();
+      return streamItems.filter((item) => !this.isSentenceAtomicTextNode(item.node));
+    }
     var items = [];
     for (var e = 0; e < this.sourceEntries.length; e++) {
       var entry = this.sourceEntries[e];
@@ -988,6 +1009,9 @@ window.hoshiReader = {
     return items;
   },
   sourceOrderForTextNode: function(node) {
+    if (this.contentStream && typeof this.contentStream.sourceOrderForTextNode === 'function') {
+      return this.contentStream.sourceOrderForTextNode(node);
+    }
     var root = this.topLevelSourceNode(node);
     var order = this.sourceOrderIndexes && this.sourceOrderIndexes.get(root);
     if (order !== undefined) return order;
@@ -1009,6 +1033,31 @@ window.hoshiReader = {
     var ranges = [];
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
+      var rubyRoot = item.rubyRoot || (this.contentStream && this.contentStream.rubyRootForTextNode
+        ? this.contentStream.rubyRootForTextNode(item.node)
+        : null);
+      if (rubyRoot) {
+        var rubyStats = this.statsForSourceNode(rubyRoot);
+        var lastRuby = ranges[ranges.length - 1];
+        if (lastRuby && lastRuby.rubyRoot === rubyRoot) {
+          lastRuby.end = item.end;
+          lastRuby.endCharCount = rubyStats.hasText ? rubyStats.endChar : Math.max(lastRuby.endCharCount, item.chapterCharEnd);
+          lastRuby.chapterRawEnd = rubyStats.hasText ? rubyStats.endRaw : Math.max(lastRuby.chapterRawEnd, item.chapterRawEnd);
+          continue;
+        }
+        ranges.push({
+          node: item.node,
+          rubyRoot: rubyRoot,
+          order: item.order,
+          start: item.start,
+          end: item.end,
+          chapterCharStart: rubyStats.hasText ? rubyStats.startChar : item.chapterCharStart,
+          chapterRawStart: rubyStats.hasText ? rubyStats.startRaw : item.chapterRawStart,
+          chapterRawEnd: rubyStats.hasText ? rubyStats.endRaw : item.chapterRawEnd,
+          endCharCount: rubyStats.hasText ? rubyStats.endChar : item.chapterCharEnd
+        });
+        continue;
+      }
       var last = ranges[ranges.length - 1];
       if (last && last.node === item.node && last.end === item.start) {
         last.end = item.end;
@@ -1077,13 +1126,17 @@ window.hoshiReader = {
   cloneSourceNodeWithOffsets: function(sourceNode) {
     if (sourceNode.nodeType === Node.TEXT_NODE) {
       var cloneText = document.createTextNode(sourceNode.textContent || '');
-      this.registerCloneTextOffset(cloneText, this.sourceTextOffsets.get(sourceNode), this.sourceTextRawOffsets.get(sourceNode));
+      var charOffset = this.sourceTextOffsets.get(sourceNode);
+      var rawOffset = this.sourceTextRawOffsets.get(sourceNode);
+      if (charOffset !== undefined || rawOffset !== undefined) {
+        this.registerCloneTextOffset(cloneText, charOffset, rawOffset);
+      }
       return cloneText;
     }
     if (sourceNode.nodeType !== Node.ELEMENT_NODE && sourceNode.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
       return sourceNode.cloneNode ? sourceNode.cloneNode(true) : document.createTextNode('');
     }
-    if (sourceNode.nodeType === Node.ELEMENT_NODE && this.isIgnoredElement(sourceNode)) {
+    if (sourceNode.nodeType === Node.ELEMENT_NODE && this.isDiscardedCloneElement(sourceNode)) {
       return document.createDocumentFragment();
     }
     var clone = sourceNode.cloneNode ? sourceNode.cloneNode(false) : document.createElement(sourceNode.tagName.toLowerCase());
@@ -1096,6 +1149,7 @@ window.hoshiReader = {
   cloneRangesWithOffsets: function(ranges) {
     var fragment = document.createDocumentFragment();
     var cloneMap = new WeakMap();
+    var clonedRubyRoots = new WeakSet();
     var ensureElementClone = (sourceElement) => {
       if (cloneMap.has(sourceElement)) return cloneMap.get(sourceElement);
       var clone = sourceElement.cloneNode ? sourceElement.cloneNode(false) : document.createElement(sourceElement.tagName.toLowerCase());
@@ -1108,8 +1162,22 @@ window.hoshiReader = {
       }
       return clone;
     };
+    var appendCloneUnderSourceParent = (sourceNode, cloneNode) => {
+      var parent = sourceNode.parentNode;
+      if (!parent || parent === this.sourceRoot) {
+        fragment.appendChild(cloneNode);
+      } else {
+        ensureElementClone(parent).appendChild(cloneNode);
+      }
+    };
     for (var i = 0; i < ranges.length; i++) {
       var range = ranges[i];
+      if (range.rubyRoot) {
+        if (clonedRubyRoots.has(range.rubyRoot)) continue;
+        clonedRubyRoots.add(range.rubyRoot);
+        appendCloneUnderSourceParent(range.rubyRoot, this.cloneSourceNodeWithOffsets(range.rubyRoot));
+        continue;
+      }
       var text = (range.node.textContent || '').slice(range.start, range.end);
       if (!text) continue;
       var cloneText = document.createTextNode(text);
