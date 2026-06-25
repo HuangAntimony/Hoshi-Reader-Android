@@ -983,6 +983,51 @@ test('viewport fitting skips precise range layout when scroll bounds already fit
     assert.equal(preciseRangeChecks, 0);
 });
 
+test('viewport fitting rejects vertical screens that overflow the content clipping box', () => {
+    const { reader, document } = loadReader(bodyWith(p('seed')), {
+        mode: 'block',
+        revealSpeed: 0,
+        vnWritingMode: 'vertical-rl',
+    });
+    const root = document.createElement('div');
+    root.className = 'hoshi-vn-screen';
+    const content = document.createElement('div');
+    content.className = 'hoshi-vn-content';
+    root.appendChild(content);
+    Object.defineProperties(root, {
+        clientWidth: { value: 384 },
+        clientHeight: { value: 834 },
+        scrollWidth: { value: 400 },
+        scrollHeight: { value: 834 },
+    });
+    Object.defineProperties(content, {
+        clientWidth: { value: 353 },
+        clientHeight: { value: 768 },
+        scrollWidth: { value: 385 },
+        scrollHeight: { value: 768 },
+    });
+    let preciseRangeChecks = 0;
+    reader.renderedTextFitsBounds = () => {
+        preciseRangeChecks += 1;
+        return false;
+    };
+    const screen = reader.screenDescriptor({
+        startCharCount: 0,
+        endCharCount: 4,
+        startRawCount: 0,
+        endRawCount: 4,
+        splittable: true,
+        render: () => {
+            const fragment = new TestFragment();
+            fragment.appendChild(new TestText('本文'));
+            return fragment;
+        },
+    });
+
+    assert.equal(reader.measureScreenFits(screen, { root, content }), false);
+    assert.equal(preciseRangeChecks, 1);
+});
+
 test('block mode splits a chapter wrapper into child block screens', async () => {
     const wrapper = new TestElement('section');
     wrapper.setAttribute('id', 'chapter');

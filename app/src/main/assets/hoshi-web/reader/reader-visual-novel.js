@@ -568,8 +568,12 @@ window.hoshiReader = {
     var root = measurement && measurement.root;
     var content = measurement && measurement.content;
     if (!root || !content) return false;
-    var width = Number(root.clientWidth) || Number(root.offsetWidth) || 0;
-    var height = Number(root.clientHeight) || Number(root.offsetHeight) || 0;
+    var rootWidth = Number(root.clientWidth) || Number(root.offsetWidth) || 0;
+    var rootHeight = Number(root.clientHeight) || Number(root.offsetHeight) || 0;
+    var contentWidth = Number(content.clientWidth) || Number(content.offsetWidth) || rootWidth;
+    var contentHeight = Number(content.clientHeight) || Number(content.offsetHeight) || rootHeight;
+    var width = rootWidth && contentWidth ? Math.min(rootWidth, contentWidth) : rootWidth || contentWidth;
+    var height = rootHeight && contentHeight ? Math.min(rootHeight, contentHeight) : rootHeight || contentHeight;
     var scrollWidth = Number(content.scrollWidth) || 0;
     var scrollHeight = Number(content.scrollHeight) || 0;
     if (!width || !height || !scrollWidth || !scrollHeight) return false;
