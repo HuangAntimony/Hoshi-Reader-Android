@@ -14,6 +14,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Fixed
 
 - Expose Go to and Sasayaki reader-menu tabs with proper selected-tab semantics for accessibility services.
+- Show Hoshi as an EPUB open target for file managers that send the non-standard `application/epub` MIME type.
 - Keep Sasayaki playback owned by a service-backed MediaSession so background playback uses Android's media foreground-service path when permitted, system notification controls stay visible and routed through the media session, Reader restore does not leave a paused media notification, skip/seek controls work before first playback, reader exit stops playback without leaving a stale notification, and notification or launcher return opens the active reader.
 - Keep the Sasayaki notification's rewind and fast-forward controls visually consistent and working from system media controls.
 - Pause Sasayaki auto-scroll during natural playback on skipped image pages for one second, including multiple image pages, image-only chapters, vertical continuous reading, and fullscreen image interruptions, while cue or progress seeks jump directly without leaving playback paused.

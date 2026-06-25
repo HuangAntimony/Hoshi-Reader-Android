@@ -83,6 +83,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/epub" />
                 <data android:scheme="content" />
                 <data android:scheme="file" />
             </intent-filter>

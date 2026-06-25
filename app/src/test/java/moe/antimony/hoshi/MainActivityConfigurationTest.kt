@@ -116,6 +116,26 @@ class MainActivityConfigurationTest {
     }
 
     @Test
+    fun mainActivityAcceptsStandardAndLegacyEpubMimeTypes() {
+        val activity = mainActivityManifestElement()
+
+        assertTrue(
+            "External EPUB opens must support the standard EPUB MIME type.",
+            activity.hasIntentFilter(
+                actionName = "android.intent.action.VIEW",
+                mimeType = "application/epub+zip",
+            ),
+        )
+        assertTrue(
+            "External EPUB opens must support vendor file managers that send the non-standard application/epub MIME type.",
+            activity.hasIntentFilter(
+                actionName = "android.intent.action.VIEW",
+                mimeType = "application/epub",
+            ),
+        )
+    }
+
+    @Test
     fun processTextLookupActivityAppearsInAndroidSelectedTextProcessMenu() {
         val activity = processTextLookupActivityManifestElement()
 
