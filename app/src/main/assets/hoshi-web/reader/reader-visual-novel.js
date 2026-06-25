@@ -23,10 +23,6 @@ window.hoshiReader = {
   nodeStartRawOffsets: new WeakMap(),
   contentStream: null,
   rangeMap: null,
-  cloneTextOffsets: new WeakMap(),
-  cloneTextRawOffsets: new WeakMap(),
-  ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
-  ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
   sentenceDelimiters: '。！？.!?',
   totalChapterChars: 0,
   currentScreenIndex: 0,
@@ -82,17 +78,23 @@ window.hoshiReader = {
     var el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
     return !!(el && el.closest('[data-hoshi-visual-novel-unrevealed]'));
   },
+  textSemantics: function() {
+    if (!window.hoshiReaderContentStream) {
+      throw new Error('hoshiReaderContentStream is required for reader text semantics');
+    }
+    return window.hoshiReaderContentStream;
+  },
   normalizeText: function(text) {
-    return (text || '').replace(this.ttuRegexNegated, '');
+    return this.textSemantics().normalizeText(text);
   },
   countChars: function(text) {
-    return Array.from(this.normalizeText(text)).length;
+    return this.textSemantics().countChars(text);
   },
   countRawChars: function(text) {
-    return Array.from(text || '').length;
+    return this.textSemantics().countRawChars(text);
   },
   isMatchableChar: function(char) {
-    return this.ttuRegex.test(char || '');
+    return this.textSemantics().isMatchableChar(char);
   },
   textOffsetForCharCount: function(node, targetCount) {
     var text = node.textContent || '';
@@ -137,8 +139,8 @@ window.hoshiReader = {
     var fallbackRawCount = currentScreen ? this.screenStartRawCount(currentScreen) : 0;
     var node;
     while (node = walker.nextNode()) {
-      var mappedCount = this.cloneTextOffsets.get(node);
-      var mappedRawCount = this.cloneTextRawOffsets.get(node);
+      var mappedCount = this.rangeMap.cloneTextOffsetForNode(node);
+      var mappedRawCount = this.rangeMap.cloneTextRawOffsetForNode(node);
       var startCount = mappedCount !== undefined ? mappedCount : fallbackCount;
       var startRawCount = mappedRawCount !== undefined ? mappedRawCount : fallbackRawCount;
       offsets.set(node, startCount);
@@ -1230,7 +1232,7 @@ window.hoshiReader = {
       var charOffset = this.sourceTextOffsetForNode(sourceNode);
       var rawOffset = this.sourceTextRawOffsetForNode(sourceNode);
       if (charOffset !== undefined || rawOffset !== undefined) {
-        this.registerCloneTextOffset(cloneText, charOffset, rawOffset);
+        this.rangeMap.registerCloneTextOffset(cloneText, charOffset, rawOffset);
       }
       return cloneText;
     }
@@ -1290,7 +1292,7 @@ window.hoshiReader = {
       var text = (range.node.textContent || '').slice(range.start, range.end);
       if (!text) continue;
       var cloneText = document.createTextNode(text);
-      this.registerCloneTextOffset(cloneText, range.chapterCharStart, range.chapterRawStart);
+      this.rangeMap.registerCloneTextOffset(cloneText, range.chapterCharStart, range.chapterRawStart);
       var parent = range.node.parentNode;
       if (!parent || parent === this.sourceRoot) {
         fragment.appendChild(cloneText);
@@ -1299,10 +1301,6 @@ window.hoshiReader = {
       }
     }
     return fragment;
-  },
-  registerCloneTextOffset: function(node, charOffset, rawOffset) {
-    this.cloneTextOffsets.set(node, charOffset === undefined ? 0 : charOffset);
-    this.cloneTextRawOffsets.set(node, rawOffset === undefined ? 0 : rawOffset);
   },
   setupReaderImage: function(element, src, wrap, blurElement) {
     if (!element || !src || element.hoshiReaderImageSetup) return;
@@ -1419,8 +1417,8 @@ window.hoshiReader = {
     if (!parent) return;
     var text = node.textContent || '';
     if (!text) return;
-    var charOffset = this.cloneTextOffsets.get(node);
-    var rawOffset = this.cloneTextRawOffsets.get(node);
+    var charOffset = this.rangeMap.cloneTextOffsetForNode(node);
+    var rawOffset = this.rangeMap.cloneTextRawOffsetForNode(node);
     var visible = document.createTextNode('');
     var hidden = document.createElement('span');
     hidden.setAttribute('data-hoshi-visual-novel-unrevealed', '');
@@ -1429,7 +1427,7 @@ window.hoshiReader = {
     parent.insertBefore(visible, node);
     parent.insertBefore(hidden, node);
     parent.removeChild(node);
-    this.registerCloneTextOffset(visible, charOffset, rawOffset);
+    this.rangeMap.registerCloneTextOffset(visible, charOffset, rawOffset);
     this.revealSegments.push({
       visible: visible,
       hidden: hidden,

@@ -1,3 +1,5 @@
+__HOSHI_READER_CONTENT_STREAM_SCRIPT__
+
 window.hoshiReader = {
   pageHeight: 0,
   pageWidth: 0,
@@ -7,8 +9,6 @@ window.hoshiReader = {
   cueSourceRanges: new Map(),
   cueGeometryRanges: new Map(),
   activeCueId: null,
-  ttuRegexNegated: /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
-  ttuRegex: /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu,
   nodeStartOffsets: new WeakMap(),
   nodeStartRawOffsets: new WeakMap(),
   paginationMetrics: null,
@@ -25,17 +25,23 @@ window.hoshiReader = {
     var el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
     return !!(el && el.closest('rt, rp'));
   },
+  textSemantics: function() {
+    if (!window.hoshiReaderContentStream) {
+      throw new Error('hoshiReaderContentStream is required for reader text semantics');
+    }
+    return window.hoshiReaderContentStream;
+  },
   normalizeText: function(text) {
-    return (text || '').replace(this.ttuRegexNegated, '');
+    return this.textSemantics().normalizeText(text);
   },
   countChars: function(text) {
-    return Array.from(this.normalizeText(text)).length;
+    return this.textSemantics().countChars(text);
   },
   countRawChars: function(text) {
-    return Array.from(text || '').length;
+    return this.textSemantics().countRawChars(text);
   },
   isMatchableChar: function(char) {
-    return this.ttuRegex.test(char || '');
+    return this.textSemantics().isMatchableChar(char);
   },
   textOffsetForCharCount: function(node, targetCount) {
     var text = node.textContent || '';

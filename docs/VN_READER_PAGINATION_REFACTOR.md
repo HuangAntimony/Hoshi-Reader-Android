@@ -19,8 +19,10 @@ issues.
 
 The desired direction is to keep VN's unique pagination and reveal behavior,
 but move shared reader semantics into mode-independent primitives. The first
-runtime consumer should be VN only, so paginated and continuous remain stable
-while VN is brought back toward the same content model.
+stateful content stream and range-map runtime consumer should be VN only, so
+paginated and continuous remain stable while VN is brought back toward the same
+content model. Low-risk pure helpers may be reused by all reader modes when
+they do not change page, scroll, restore, or range-mapping data flow.
 
 ## Goals
 
@@ -28,8 +30,8 @@ while VN is brought back toward the same content model.
   reader modes, not as a separate chapter renderer.
 - Preserve WebView-based reading, single-tap lookup, existing Reader bridge
   commands, and iOS-aligned visible behavior.
-- Lower regression risk for paginated and continuous by leaving their production
-  runtime paths unchanged during the initial VN refactor.
+- Lower regression risk for paginated and continuous by leaving their
+  page/scroll production runtime paths unchanged during the initial VN refactor.
 - Extract shared pure JavaScript primitives for chapter text/media semantics,
   raw and matchable offsets, source-to-rendered range mapping, ruby-aware text
   handling, and Sasayaki/highlight range construction.
@@ -57,8 +59,10 @@ while VN is brought back toward the same content model.
 
 Create shared pure reader-web modules for chapter semantics and range mapping.
 Use paginated and continuous legacy behavior as a test oracle, but do not wire
-those two modes to the new modules at runtime. Migrate VN onto the shared
-modules slice by slice.
+those two modes to stateful content stream instances or the range map at
+runtime. Migrate VN onto the shared modules slice by slice. After VN is covered,
+paginated and continuous can reuse low-risk pure helpers from the shared modules
+when tests prove the semantics are identical.
 
 This gives VN the same logic foundation while keeping the two already-working
 modes out of the initial blast radius. The cost is that some duplication remains
@@ -137,9 +141,10 @@ or trailing punctuation exactly outside the cue boundary remains excluded.
 
 ### VN Paginator
 
-Add a VN paginator module, tentatively
-`app/src/main/assets/hoshi-web/reader/reader-vn-paginator.js`, that consumes the
-content stream and emits VN screen descriptors.
+Keep VN paginator responsibilities as a bounded part of
+`app/src/main/assets/hoshi-web/reader/reader-visual-novel.js` unless a later
+split is justified by file size or ownership pressure. The paginator routines
+consume the content stream and emit VN screen descriptors.
 
 VN-specific responsibilities stay here:
 
@@ -163,7 +168,7 @@ but reduce it to orchestration:
 
 - initialize and detach the source chapter.
 - create the VN stage and current screen.
-- call the shared content stream and VN paginator.
+- call the shared content stream and VN paginator routines.
 - render one screen descriptor at a time.
 - own reveal timers and reveal completion.
 - forward bridge commands for pagination, restore, fragments, Sasayaki, and
@@ -188,9 +193,10 @@ offsets, and media classification.
 7. Progress and fragment restore use the screen descriptors' semantic offsets
    and IDs, not ad hoc DOM scans.
 
-Paginated and continuous keep their existing runtime data flow during the first
-phases. Their current behavior should be covered by characterization tests and
-used to validate shared semantic decisions before any future runtime adoption.
+Paginated and continuous keep their existing page/scroll runtime data flow
+during the first phases. Their current behavior should be covered by
+characterization tests and used to validate shared semantic decisions before any
+future stateful runtime adoption.
 
 ## Migration Plan
 
@@ -260,9 +266,16 @@ the paginator. Remove duplicate source-node stats and offset maps from
 
 ### Phase 6: Consider Optional Adoption By Paginated And Continuous
 
-Only after VN is stable and covered should paginated or continuous runtime paths
-be considered for migration. That should be a separate design or implementation
-plan because their page/scroll mechanics are already working and higher risk.
+After VN is stable and covered, adopt only low-risk shared helpers in paginated
+and continuous. The approved scope is pure text semantics: normalization,
+matchable character counting, raw character counting, and matchable-character
+checks can delegate to `reader-content-stream.js`.
+
+Do not migrate paginated or continuous page metrics, scroll restore, DOM
+rendering, Sasayaki range collection, or highlight range mapping to content
+stream instances or the range map in this phase. Those mechanics are already
+working and higher risk, so any future stateful adoption should get its own
+design and implementation plan.
 
 ## Testing Strategy
 
@@ -296,7 +309,7 @@ boundaries, vertical and horizontal writing, and Sasayaki cue behavior.
 - If the shared stream cannot index a node shape, tests should force an explicit
   decision: ignore it, preserve it as media/structure, or add a semantic unit.
 - Keep runtime changes narrow enough that a failed phase can be reverted without
-  affecting paginated and continuous.
+  affecting paginated and continuous page/scroll mechanics.
 - Preserve safe WebView resource loading. This refactor only changes reader
   asset logic and must not broaden file URL access.
 
@@ -313,5 +326,6 @@ The VN refactor target is complete when:
   stops.
 - Sasayaki cue highlighting, e-ink overlays, lookup, persisted highlights,
   fragment restore, and progress restore remain covered by automated tests.
-- Paginated and continuous production paths are unchanged unless a later
-  approved plan explicitly migrates them.
+- Paginated and continuous production page/scroll paths are unchanged. They may
+  reuse the shared content stream's pure text semantic helpers when covered by
+  parity tests.

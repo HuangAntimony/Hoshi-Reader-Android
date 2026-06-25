@@ -6,12 +6,18 @@ import vm from 'node:vm';
 const readerPaginatedUrl = new URL('../../main/assets/hoshi-web/reader/reader-paginated.js', import.meta.url);
 const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-continuous.js', import.meta.url);
 const readerSasayakiUrl = new URL('../../main/assets/hoshi-web/reader/reader-sasayaki.js', import.meta.url);
+const readerContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-content-stream.js', import.meta.url);
 
-function readerSource(url) {
+function readerContentStreamSource() {
+    return fs.readFileSync(readerContentStreamUrl, 'utf8');
+}
+
+function readerSource(url, options = {}) {
     const readerSasayaki = fs.readFileSync(readerSasayakiUrl, 'utf8');
     return fs.readFileSync(url, 'utf8')
         .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', '')
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
+        .replace('__HOSHI_READER_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerContentStreamSource())
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
@@ -417,7 +423,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         },
     };
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
-    vm.runInNewContext(readerSource(sourceUrl), {
+    vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
         document,
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
@@ -432,7 +438,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         },
         window,
     });
-    return { reader: window.hoshiReader, document, head };
+    return { reader: window.hoshiReader, document, head, window };
 }
 
 function rubyParagraph() {
@@ -514,6 +520,23 @@ test('paginated reader-specific text normalization keeps ruby-adjacent text stab
 
 test('paginated reader removes ruby whitespace text nodes and wraps base text nodes', () => {
     assertRubyTextNodesAreNormalized(readerPaginatedUrl);
+});
+
+test('paged and continuous readers use shared content stream text semantics', () => {
+    [readerPaginatedUrl, readerContinuousUrl].forEach((sourceUrl) => {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('本文。'));
+        const { reader, window } = loadReader(body, sourceUrl);
+        const originalCountChars = window.hoshiReaderContentStream.countChars;
+        let countCalls = 0;
+        window.hoshiReaderContentStream.countChars = (text) => {
+            countCalls += 1;
+            return originalCountChars(text);
+        };
+
+        assert.equal(reader.countChars('一、二'), 2);
+        assert.equal(countCalls, 1);
+    });
 });
 
 test('paginated restoreProgress at chapter start avoids eager pagination metrics', async () => {

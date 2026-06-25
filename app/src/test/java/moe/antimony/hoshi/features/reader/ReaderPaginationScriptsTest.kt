@@ -279,6 +279,26 @@ class ReaderPaginationScriptsTest {
     }
 
     @Test
+    fun paginatedAndContinuousSourceTreeScriptsInjectSharedTextSemanticsOnly() {
+        val scripts = listOf(
+            ReaderPaginationScripts.shellScript(
+                settings = ReaderSettings(viewMode = ReaderViewMode.Paginated),
+            ),
+            ReaderPaginationScripts.shellScript(
+                settings = ReaderSettings(viewMode = ReaderViewMode.Continuous),
+            ),
+        )
+
+        scripts.forEach { script ->
+            assertTrue(script.contains("hoshiReaderContentStream"))
+            assertFalse(script.contains("hoshiReaderRangeMap"))
+            assertFalse(script.contains("__HOSHI_READER_CONTENT_STREAM_SCRIPT__"))
+            assertFalse(script.contains("__HOSHI_READER_RANGE_MAP_SCRIPT__"))
+            assertFalse(script.contains("__HOSHI_"))
+        }
+    }
+
+    @Test
     fun loadScriptOmitsAbsentOptionalPayloadScriptsBeforeRestore() {
         val script = ReaderPaginationScripts.shellScript(
             sasayakiCuesJson = null,

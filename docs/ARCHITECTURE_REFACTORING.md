@@ -333,49 +333,6 @@ Exit criteria:
 - Background playback, notification controls, and explicit reader-exit stop
   remain covered by tests and manual validation.
 
-## Target 11: Rebase VN Reader On Shared Pagination Semantics
-
-Priority: high
-
-VN reader mode is a special pagination mode: it uses the same chapter DOM as
-paginated and continuous, but chooses screen boundaries by block or sentence and
-can reveal text progressively. Its current JavaScript path duplicates chapter
-text indexing, raw and matchable offsets, source cloning, media classification,
-Sasayaki ranges, highlight ranges, progress restore, and fragment restore. This
-has made VN diverge from the other reader modes and caused fixes in shared
-reader behavior to miss VN.
-
-Target shape:
-
-- Detailed design: `docs/VN_READER_PAGINATION_REFACTOR.md`.
-- Introduce shared reader-web primitives for chapter content streams, raw and
-  matchable offsets, source-to-rendered range mapping, ruby-preserving clones,
-  standalone media units, and Sasayaki/highlight range construction.
-- Treat VN as a paginator over those primitives. VN keeps only its mode-specific
-  block/sentence screen rules, reveal behavior, cross-screen Sasayaki merge,
-  viewport fitting, and current-screen rendering.
-- Reduce regression risk by migrating VN first. Paginated and continuous should
-  keep their production runtime paths unchanged during the initial VN refactor
-  and serve as behavior oracles in tests where their semantics are already
-  correct.
-- Use behavior tests for ruby preservation, consecutive media screens,
-  Sasayaki cue ranges, e-ink cue geometry, lookup/highlight raw ranges,
-  progress restore, fragment restore, and chapter-boundary navigation before
-  removing duplicate VN logic.
-
-Exit criteria:
-
-- VN no longer owns private implementations for chapter text offsets, raw
-  offsets, matchable offsets, source clone offset registration, Sasayaki cue
-  range collection, highlight raw range collection, or media classification.
-- VN furigana survives block and sentence screens, including reveal.
-- Consecutive standalone images render in source order and remain navigable
-  media stops.
-- Sasayaki, lookup, highlights, progress restore, and fragment restore use the
-  shared reader-web semantic primitives in VN.
-- Paginated and continuous production paths are unchanged unless a later
-  approved plan explicitly migrates them.
-
 ## Recommended Sequence
 
 1. Continue dispatcher/scope injection in the next repository or ViewModel slice
@@ -383,15 +340,13 @@ Exit criteria:
 2. Reduce Composable business orchestration while touching screen state flows.
 3. Split reader WebView command families with behavior tests or manual
    validation after each slice.
-4. Rebase VN reader mode on shared reader-web pagination semantics while
-   leaving paginated and continuous production paths stable.
-5. Stabilize sidecar/model contracts.
-6. Extract long reader JavaScript/CSS out of Kotlin string script files.
-7. Characterize and split Rust/native build logic.
-8. Finish the Sasayaki MediaController boundary after service-owned playback is
+4. Stabilize sidecar/model contracts.
+5. Extract long reader JavaScript/CSS out of Kotlin string script files.
+6. Characterize and split Rust/native build logic.
+7. Finish the Sasayaki MediaController boundary after service-owned playback is
    stable on device.
-9. Add baseline profile and macrobenchmark entry points.
-10. Modularize only after the Hilt graph and model, reader, and build boundaries
+8. Add baseline profile and macrobenchmark entry points.
+9. Modularize only after the Hilt graph and model, reader, and build boundaries
    are stable.
 
 Every slice must preserve iOS-aligned user-visible behavior unless it explicitly

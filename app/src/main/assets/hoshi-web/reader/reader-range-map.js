@@ -3,9 +3,24 @@
 
   function ReaderRangeMap(reader) {
     this.reader = reader;
+    this.cloneTextOffsets = new WeakMap();
+    this.cloneTextRawOffsets = new WeakMap();
   }
 
   ReaderRangeMap.prototype = {
+    registerCloneTextOffset: function(node, charOffset, rawOffset) {
+      this.cloneTextOffsets.set(node, charOffset === undefined ? 0 : charOffset);
+      this.cloneTextRawOffsets.set(node, rawOffset === undefined ? 0 : rawOffset);
+    },
+
+    cloneTextOffsetForNode: function(node) {
+      return this.cloneTextOffsets.get(node);
+    },
+
+    cloneTextRawOffsetForNode: function(node) {
+      return this.cloneTextRawOffsets.get(node);
+    },
+
     collectRawSegments: function(offset, length) {
       var start = Number(offset) || 0;
       var end = start + Math.max(0, Number(length) || 0);
