@@ -5,7 +5,7 @@
   var ELEMENT_NODE = 1;
   var DOCUMENT_FRAGMENT_NODE = 11;
   var ignoredTags = new Set(['rt', 'rp', 'script', 'style']);
-  var mediaTags = new Set(['img', 'svg', 'image', 'video', 'canvas', 'audio', 'picture', 'table', 'iframe', 'object', 'embed']);
+  var mediaTags = new Set(['img', 'svg', 'image', 'video', 'canvas', 'audio', 'picture', 'figure', 'table', 'iframe', 'object', 'embed']);
   var ttuRegexNegated = /[^0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu;
   var ttuRegex = /[0-9A-Za-z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚａ-ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu;
 
@@ -49,6 +49,19 @@
     return into;
   }
 
+  function hasClass(node, className) {
+    if (!node || node.nodeType !== ELEMENT_NODE) return false;
+    if (node.classList && node.classList.contains) return node.classList.contains(className);
+    var value = node.getAttribute && node.getAttribute('class');
+    return String(value || '').split(/\s+/).indexOf(className) >= 0;
+  }
+
+  function isStandaloneMediaNode(node) {
+    var tag = tagName(node);
+    if (tag === 'img' && (hasClass(node, 'gaiji') || hasClass(node, 'gaiji-line'))) return false;
+    return mediaTags.has(tag);
+  }
+
   function isIgnoredNode(node, root) {
     var current = node && node.nodeType === TEXT_NODE ? node.parentNode : node;
     while (current && current !== root) {
@@ -70,6 +83,15 @@
     return current;
   }
 
+  function closestAncestor(node, root, targetTag) {
+    var current = node && node.nodeType === TEXT_NODE ? node.parentNode : node;
+    while (current && current !== root) {
+      if (current.nodeType === ELEMENT_NODE && tagName(current) === targetTag) return current;
+      current = current.parentNode;
+    }
+    return current && current.nodeType === ELEMENT_NODE && tagName(current) === targetTag ? current : null;
+  }
+
   function ReaderContentStream(root, options) {
     this.root = root;
     this.options = options || {};
@@ -80,6 +102,7 @@
     this.sourceTextRawOffsets = new WeakMap();
     this.sourceNodeStats = new WeakMap();
     this.sourceOrderIndexes = new WeakMap();
+    this.sourcePreorderIndexes = new WeakMap();
     this.rebuild();
   }
 
@@ -95,6 +118,8 @@
       this.sourceTextRawOffsets = new WeakMap();
       this.sourceNodeStats = new WeakMap();
       this.sourceOrderIndexes = new WeakMap();
+      this.sourcePreorderIndexes = new WeakMap();
+      this.indexSourcePreorder();
 
       var topLevelNodes = childrenOf(this.root);
       for (var order = 0; order < topLevelNodes.length; order++) {
@@ -109,6 +134,8 @@
         var entry = {
           node: node,
           order: this.sourceOrderForTextNode(node),
+          preorder: this.sourcePreorderForNode(node),
+          rubyRoot: this.rubyRootForTextNode(node),
           startChar: count,
           startRaw: rawCount,
           text: node.textContent || ''
@@ -123,6 +150,17 @@
 
       this.totalMatchableChars = count;
       this.totalRawChars = rawCount;
+    },
+
+    indexSourcePreorder: function() {
+      var index = 0;
+      var visit = (function(node) {
+        if (!node) return;
+        this.sourcePreorderIndexes.set(node, index);
+        index += 1;
+        childrenOf(node).forEach(visit);
+      }).bind(this);
+      visit(this.root);
     },
 
     walkTextNodes: function(root, visit) {
@@ -207,6 +245,8 @@
           items.push({
             node: entry.node,
             order: entry.order,
+            preorder: entry.preorder,
+            rubyRoot: entry.rubyRoot,
             char: char,
             start: offset,
             end: next,
@@ -225,7 +265,7 @@
 
     containsStandaloneMedia: function(root) {
       if (!root || isIgnoredNode(root, this.root)) return false;
-      if (root.nodeType === ELEMENT_NODE && mediaTags.has(tagName(root))) return true;
+      if (root.nodeType === ELEMENT_NODE && isStandaloneMediaNode(root)) return true;
       return childrenOf(root).some((function(child) {
         return this.containsStandaloneMedia(child);
       }).bind(this));
@@ -235,12 +275,23 @@
       var result = [];
       var visit = (function(node) {
         if (!node || isIgnoredNode(node, this.root)) return;
-        if (node.nodeType === ELEMENT_NODE && mediaTags.has(tagName(node))) {
+        if (node.nodeType === ELEMENT_NODE && isStandaloneMediaNode(node)) {
+          var renderRoot = this.renderRootForMediaNode(node);
+          var position = this.sourcePositionForNode(renderRoot);
           result.push({
-            node: node,
+            node: renderRoot,
+            mediaNode: node,
+            renderRoot: renderRoot,
             tagName: tagName(node),
-            sourceOrder: this.sourceOrderForNode(node),
-            ids: this.idsForNode(node)
+            mediaTagName: tagName(node),
+            renderRootTagName: tagName(renderRoot),
+            sourceOrder: this.sourceOrderForNode(renderRoot),
+            preorder: this.sourcePreorderForNode(node),
+            startChar: position.startChar,
+            endChar: position.endChar,
+            startRaw: position.startRaw,
+            endRaw: position.endRaw,
+            ids: this.idsForNode(renderRoot)
           });
           return;
         }
@@ -248,15 +299,65 @@
       }).bind(this);
       visit(this.root);
       result.sort(function(a, b) {
-        return a.sourceOrder - b.sourceOrder;
+        return a.preorder - b.preorder;
       });
       return result;
+    },
+
+    renderRootForMediaNode: function(node) {
+      var topLevel = topLevelNodeFor(this.root, node);
+      return topLevel || node;
     },
 
     sourceOrderForNode: function(node) {
       var root = topLevelNodeFor(this.root, node);
       var order = this.sourceOrderIndexes.get(root);
       return order === undefined ? 0 : order;
+    },
+
+    sourcePreorderForNode: function(node) {
+      var order = this.sourcePreorderIndexes.get(node);
+      return order === undefined ? 0 : order;
+    },
+
+    sourcePositionForNode: function(node) {
+      var stats = this.statsForNode(node);
+      if (stats.hasText) return stats;
+      var preorder = this.sourcePreorderForNode(node);
+      var previous = null;
+      for (var i = 0; i < this.textEntries.length; i++) {
+        var entry = this.textEntries[i];
+        if (entry.preorder > preorder) {
+          return {
+            hasText: false,
+            startChar: entry.startChar,
+            endChar: entry.startChar,
+            startRaw: entry.startRaw,
+            endRaw: entry.startRaw
+          };
+        }
+        if (entry.preorder < preorder) previous = entry;
+      }
+      var char = previous ? previous.endChar : 0;
+      var raw = previous ? previous.endRaw : 0;
+      return { hasText: false, startChar: char, endChar: char, startRaw: raw, endRaw: raw };
+    },
+
+    rubyRootForTextNode: function(node) {
+      return closestAncestor(node, this.root, 'ruby');
+    },
+
+    rubyRoots: function() {
+      var roots = [];
+      var seen = new WeakSet();
+      for (var i = 0; i < this.textEntries.length; i++) {
+        var root = this.textEntries[i].rubyRoot;
+        if (root && !seen.has(root)) {
+          seen.add(root);
+          roots.push(root);
+        }
+      }
+      return roots;
     }
   };
 

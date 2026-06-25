@@ -90,12 +90,13 @@ test('content stream indexes raw and matchable chapter offsets while ignoring ru
     const base = text('古');
     const punctuation = text('。');
     const tail = text('都');
+    const ruby = el('ruby', {}, [
+        base,
+        el('rt', {}, ['ふる']),
+    ]);
     const paragraph = el('p', { id: 'line' }, [
         '始',
-        el('ruby', {}, [
-            base,
-            el('rt', {}, ['ふる']),
-        ]),
+        ruby,
         punctuation,
         el('span', { name: 'tail' }, [tail]),
         el('script', {}, ['無視']),
@@ -141,6 +142,11 @@ test('content stream indexes raw and matchable chapter offsets while ignoring ru
     );
 
     assert.deepEqual([...stream.idsForTextNode(tail)].sort(), ['line', 'tail']);
+    assert.equal(stream.rubyRootForTextNode(base), ruby);
+    assert.equal(stream.rubyRootForTextNode(tail), null);
+    assert.equal(stream.rubyRoots().length, 1);
+    assert.equal(stream.rubyRoots()[0], ruby);
+    assert.equal(stream.textItems().find((item) => item.char === '古').rubyRoot, ruby);
     assert.deepEqual(plain(stream.statsForNode(paragraph)), {
         hasText: true,
         startChar: 0,
@@ -167,13 +173,110 @@ test('content stream records standalone media units in source order', () => {
         plain(
             stream.mediaUnits().map((unit) => ({
                 tagName: unit.tagName,
+                mediaTagName: unit.mediaTagName,
+                renderRootTagName: unit.renderRootTagName,
                 sourceOrder: unit.sourceOrder,
+                preorder: unit.preorder,
+                startChar: unit.startChar,
+                endChar: unit.endChar,
+                startRaw: unit.startRaw,
+                endRaw: unit.endRaw,
                 ids: [...unit.ids].sort(),
             })),
         ),
         [
-            { tagName: 'img', sourceOrder: 1, ids: ['cover'] },
-            { tagName: 'svg', sourceOrder: 2, ids: ['plate'] },
+            {
+                tagName: 'img',
+                mediaTagName: 'img',
+                renderRootTagName: 'img',
+                sourceOrder: 1,
+                preorder: 3,
+                startChar: 1,
+                endChar: 1,
+                startRaw: 1,
+                endRaw: 1,
+                ids: ['cover'],
+            },
+            {
+                tagName: 'svg',
+                mediaTagName: 'svg',
+                renderRootTagName: 'svg',
+                sourceOrder: 2,
+                preorder: 4,
+                startChar: 1,
+                endChar: 1,
+                startRaw: 1,
+                endRaw: 1,
+                ids: ['plate'],
+            },
+        ],
+    );
+});
+
+test('content stream keeps figure media as the render root', () => {
+    const image = el('img', { id: 'inner', src: 'plate.jpg' });
+    const figure = el('figure', { id: 'fig' }, [image]);
+    const root = el('section', {}, [
+        el('p', {}, ['前']),
+        figure,
+        el('p', {}, ['後']),
+    ]);
+
+    const stream = loadContentStreamModule().create(root);
+    const units = stream.mediaUnits();
+
+    assert.equal(units.length, 1);
+    assert.equal(units[0].mediaNode, figure);
+    assert.equal(units[0].renderRoot, figure);
+    assert.deepEqual(
+        plain({
+            tagName: units[0].tagName,
+            mediaTagName: units[0].mediaTagName,
+            renderRootTagName: units[0].renderRootTagName,
+            sourceOrder: units[0].sourceOrder,
+            preorder: units[0].preorder,
+            startChar: units[0].startChar,
+            endChar: units[0].endChar,
+            startRaw: units[0].startRaw,
+            endRaw: units[0].endRaw,
+            ids: [...units[0].ids].sort(),
+        }),
+        {
+            tagName: 'figure',
+            mediaTagName: 'figure',
+            renderRootTagName: 'figure',
+            sourceOrder: 1,
+            preorder: 3,
+            startChar: 1,
+            endChar: 1,
+            startRaw: 1,
+            endRaw: 1,
+            ids: ['fig', 'inner'],
+        },
+    );
+});
+
+test('content stream treats gaiji images as inline glyphs for media and offset indexing', () => {
+    const gaiji = el('img', { class: 'gaiji', alt: '外字' });
+    const paragraph = el('p', {}, ['前', gaiji, '後']);
+
+    const stream = loadContentStreamModule().create(paragraph);
+
+    assert.equal(stream.containsStandaloneMedia(paragraph), false);
+    assert.equal(stream.mediaUnits().length, 0);
+    assert.deepEqual(
+        plain(
+            stream.textEntries.map((entry) => ({
+                text: entry.text,
+                startChar: entry.startChar,
+                endChar: entry.endChar,
+                startRaw: entry.startRaw,
+                endRaw: entry.endRaw,
+            })),
+        ),
+        [
+            { text: '前', startChar: 0, endChar: 1, startRaw: 0, endRaw: 1 },
+            { text: '後', startChar: 1, endChar: 2, startRaw: 1, endRaw: 2 },
         ],
     );
 });
