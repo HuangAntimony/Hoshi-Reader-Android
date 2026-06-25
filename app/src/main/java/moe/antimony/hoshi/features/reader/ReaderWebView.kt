@@ -1734,6 +1734,12 @@ fun ReaderWebView(
                 )
             }
         }
+        if (restoreLoadingPresentation == ReaderRestoreLoadingPresentation.BehindChromeStaticSpinner) {
+            ReaderLoadingPage(
+                backgroundColor = Color(effectiveSettings.backgroundColor(systemDarkTheme)),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         ReaderTopInfo(
             state = chromeState,
             settings = effectiveSettings,
@@ -1812,12 +1818,6 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-        if (restoreLoadingPresentation == ReaderRestoreLoadingPresentation.StaticSpinner) {
-            ReaderLoadingPage(
-                backgroundColor = Color(effectiveSettings.backgroundColor(systemDarkTheme)),
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
         if (showAppearance) {
             ReaderAppearanceSheet(
                 settings = effectiveSettings,
@@ -1917,13 +1917,13 @@ fun ReaderWebView(
 }
 
 internal enum class ReaderRestoreLoadingPresentation {
-    StaticSpinner,
+    BehindChromeStaticSpinner,
 }
 
 internal fun readerRestoreLoadingPresentation(
     isWebViewRestoring: Boolean,
 ): ReaderRestoreLoadingPresentation? =
-    if (isWebViewRestoring) ReaderRestoreLoadingPresentation.StaticSpinner else null
+    if (isWebViewRestoring) ReaderRestoreLoadingPresentation.BehindChromeStaticSpinner else null
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

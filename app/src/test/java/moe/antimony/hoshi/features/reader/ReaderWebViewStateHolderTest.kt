@@ -288,11 +288,11 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun restoreLoadingUsesStaticSpinnerImmediatelyWhileRestoring() {
+    fun restoreLoadingUsesBehindChromeStaticSpinnerImmediatelyWhileRestoring() {
         val holder = stateHolder(initialIndex = 2)
 
         assertEquals(
-            ReaderRestoreLoadingPresentation.StaticSpinner,
+            ReaderRestoreLoadingPresentation.BehindChromeStaticSpinner,
             readerRestoreLoadingPresentation(
                 isWebViewRestoring = holder.isWebViewRestoring,
             ),
@@ -307,7 +307,7 @@ class ReaderWebViewStateHolderTest {
 
         holder.goToNextChapter(lastIndex = 3)
         assertEquals(
-            ReaderRestoreLoadingPresentation.StaticSpinner,
+            ReaderRestoreLoadingPresentation.BehindChromeStaticSpinner,
             readerRestoreLoadingPresentation(
                 isWebViewRestoring = holder.isWebViewRestoring,
             ),
