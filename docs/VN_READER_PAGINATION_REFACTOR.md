@@ -22,6 +22,23 @@ file is not sufficient.
 `app/src/main/java/moe/antimony/hoshi/features/reader`, JavaScript unit tests
 under `app/src/test/js`, and JVM tests under `app/src/test/java`.
 
+**Current Branch Baseline (2026-06-25):**
+
+- `reader-text-semantics.js` is production-shared by paginated, continuous, and
+  VN for text normalization and raw/matchable character semantics.
+- `reader-dom-text.js` is production-shared by paginated and continuous for
+  live DOM ruby/text normalization. VN keeps its own rendered-screen cloning
+  path and is protected by VN furigana preservation tests instead of being
+  forced onto live-DOM helpers that do not match its renderer.
+- `reader-media-semantics.js` is production-shared by paginated, continuous,
+  and VN for image setup, SVG image aspect-ratio handling, blur wrapping, image
+  tap bridging, scoped setup, and load/failure waiting where a mode opts in.
+- `reader-vn-content-stream.js` and `reader-vn-range-map.js` are explicitly
+  VN-specific runtime primitives, not shared reader core.
+- `ReaderPaginationScriptsTest` no longer asserts production JavaScript source
+  strings. Paginated/continuous restore and progress behavior is covered by
+  JavaScript behavior tests that execute the reader assets.
+
 ---
 
 ## Problem Statement
@@ -176,16 +193,16 @@ VN-specific.
 - Inspect: `app/src/main/assets/hoshi-web/reader/reader-paginated.js`
 - Inspect: `app/src/main/assets/hoshi-web/reader/reader-continuous.js`
 
-- [ ] Run the production/test/doc diff audit command from
+- [x] Run the production/test/doc diff audit command from
   `Shared-Core Admission Rules`.
-- [ ] List every new shared-looking module and its production consumers:
+- [x] List every new shared-looking module and its production consumers:
   paginated, continuous, VN, or none.
-- [ ] For every VN-only shared-looking module, choose one correction:
+- [x] For every VN-only shared-looking module, choose one correction:
   make a second mode consume the mode-neutral part, split the mode-neutral part
   into a smaller shared module, or rename the remaining module as VN-specific.
-- [ ] Do not proceed to later phases while a VN-only module is documented as
+- [x] Do not proceed to later phases while a VN-only module is documented as
   shared reader core.
-- [ ] Commit only the document and naming/splitting corrections for this phase.
+- [x] Keep VN-only primitives named as VN-specific modules.
 
 Verification:
 
@@ -211,14 +228,13 @@ raw counting, matchable counting, and matchable character checks.
 - Modify: `app/src/test/js/reader-visual-novel.test.mjs`
 - Modify/Create: `app/src/test/js/reader-text-semantics.test.mjs`
 
-- [ ] Add tests that call the shared text API directly for normal text,
+- [x] Add tests that call the shared text API directly for normal text,
   punctuation, whitespace, ruby markup, and gaiji-like inline images.
-- [ ] Add mode tests proving paginated, continuous, and VN delegate to the same
+- [x] Add mode tests proving paginated, continuous, and VN delegate to the same
   API instead of local copies.
-- [ ] Remove local duplicate text semantic helpers from mode files, keeping only
+- [x] Remove local duplicate text semantic helpers from mode files, keeping only
   thin delegating methods when external bridge code expects those method names.
-- [ ] Keep page/scroll/screen navigation unchanged.
-- [ ] Commit this phase separately.
+- [x] Keep page/scroll/screen navigation unchanged.
 
 Verification:
 
@@ -243,15 +259,16 @@ only the parts that are identical for rendered screen DOM.
 - Modify: `app/src/test/js/reader-paginated.test.mjs`
 - Modify: `app/src/test/js/reader-visual-novel.test.mjs`
 
-- [ ] Characterize current paginated and continuous behavior for
+- [x] Characterize current paginated and continuous behavior for
   `normalizeRubyTextNodes`, `stabilizeRubyAdjacentTextNodes`, and readable text
   walker filtering.
-- [ ] Extract the identical implementation into `reader-dom-text.js`.
-- [ ] Replace paginated and continuous local copies with calls to the shared
+- [x] Extract the identical implementation into `reader-dom-text.js`.
+- [x] Replace paginated and continuous local copies with calls to the shared
   module in the same phase.
-- [ ] Add a VN test for furigana preservation after render and reveal. Wire VN
-  to the shared helper only if the same helper preserves VN behavior.
-- [ ] Remove any displaced local implementation in the same commit.
+- [x] Add VN tests for furigana preservation after render and reveal. VN is not
+  wired to the live-DOM helper because its rendered-screen cloning behavior is
+  not identical.
+- [x] Remove displaced paginated/continuous local implementations.
 
 Verification:
 
@@ -287,6 +304,8 @@ without creating a VN-only media module.
 - [x] Keep mode-specific media-stop navigation in each mode.
 - [x] Add VN tests for consecutive standalone images and SVG image containers.
 - [x] Remove old duplicated local image setup functions.
+- [x] Replace former source-string checks for image setup injection with JS
+  behavior tests that execute the reader assets.
 - [ ] Extract deeper media classification and standalone-versus-inline
   decisions only after the shared API can replace production callers in at
   least two modes in the same phase.
@@ -377,13 +396,20 @@ this progress mean" while preserving each mode's own visible landing behavior.
 - Modify: `app/src/test/js/reader-paginated.test.mjs`
 - Modify: `app/src/test/js/reader-visual-novel.test.mjs`
 
+- [x] Add baseline behavior tests for existing paginated/continuous restore and
+  progress behavior before extracting the shared helper: paginated
+  chapter-start restore, paginated mid-node restore, continuous chapter-start
+  restore, continuous exact-end restore, initialization restore ordering after
+  image setup, and paginated/continuous matchable progress counting before the
+  viewport.
 - [ ] Extract only mode-neutral helpers: clamping progress, converting progress
   to target character count, and finding the nearest text position for a target
   count.
 - [ ] Keep paginated page snapping, continuous scroll landing, and VN screen
   selection in their existing mode files.
-- [ ] Add tests for chapter start, near-zero progress, mid-node restore,
-  near-end restore, and exact end restore.
+- [ ] Add or keep tests for chapter start, near-zero progress, mid-node
+  restore, near-end restore, exact-end restore, and VN screen restore parity
+  after the shared helper is introduced.
 - [ ] Remove duplicate target-count math where the shared helper replaces it.
 
 Verification:
@@ -446,8 +472,11 @@ Prefer behavior tests over source-string assertions.
   screens, Sasayaki punctuation, cross-screen cues, raw highlights, lookup
   ranges, fragment restore, and progress restore.
 - Paginated/continuous tests must cover parity for any helper they adopt.
-- Kotlin tests should verify asset injection order and bridge command assembly
-  only where behavior cannot be tested directly in JavaScript.
+- Kotlin tests must not assert production JavaScript source text. Keep them to
+  typed command serialization, layout calculations, WebView result parsing, and
+  other Kotlin-side API behavior. Asset injection and reader runtime behavior
+  should be protected by executing the JavaScript assets in JS tests or, where
+  necessary, WebView instrumentation tests.
 
 Required commands before claiming the refactor complete:
 
