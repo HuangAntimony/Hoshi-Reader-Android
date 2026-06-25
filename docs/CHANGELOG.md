@@ -21,6 +21,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep Sasayaki cross-chapter cue jumps from briefly showing the chapter start, counting the hidden restore landing in reading statistics, or applying cue jumps before slow chapter restores finish.
 - Keep Sasayaki cue highlights from dropping punctuation split across EPUB text nodes.
 - Show a loading overlay while Reader chapters restore so long VN preparation does not appear as a blank EPUB page.
+- Speed up VN restore for ruby-heavy chapters by avoiding repeated full source-tree scans while fitting split screens.
 - Keep VN screens from dropping ruby/furigana annotations.
 - Keep VN vertical text screens from clipping the leftmost line when EPUB styling makes the rendered text wider than the VN content box.
 - Keep VN text blocks with small inline images from being treated as unsplittable media screens, preventing vertical text from overflowing off-screen.

@@ -343,3 +343,29 @@ test('content stream treats gaiji images as inline glyphs for media and offset i
         ],
     );
 });
+
+test('content stream indexes media nodes separately from standalone media units', () => {
+    const inline = el('img', { class: 'gaiji', alt: '外字' });
+    const standalone = el('img', { id: 'cover', src: 'cover.jpg' });
+    const root = el('section', {}, [
+        el('p', {}, ['前', inline, '後']),
+        standalone,
+    ]);
+
+    const stream = loadContentStreamModule().create(root);
+
+    assert.deepEqual(
+        plain(
+            stream.mediaNodes().map((entry) => ({
+                tagName: entry.node.tagName.toLowerCase(),
+                preorder: entry.preorder,
+            })),
+        ),
+        [
+            { tagName: 'img', preorder: 3 },
+            { tagName: 'img', preorder: 5 },
+        ],
+    );
+    assert.equal(stream.mediaUnits().length, 1);
+    assert.equal(stream.mediaUnits()[0].mediaNode, standalone);
+});

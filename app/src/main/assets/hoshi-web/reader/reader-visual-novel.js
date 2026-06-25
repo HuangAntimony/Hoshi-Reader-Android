@@ -1346,6 +1346,7 @@ window.hoshiReader = {
     var clonedRubyRoots = new WeakSet();
     var insertedInlineMedia = new WeakSet();
     var boundsByRoot = [];
+    var mediaNodeEntries = null;
     var topLevelSourceNodeFor = (sourceNode) => {
       var current = sourceNode;
       while (current && current.parentNode && current.parentNode !== this.sourceRoot) {
@@ -1421,6 +1422,9 @@ window.hoshiReader = {
       appendCloneUnderSourceParent(sourceNode, this.cloneSourceNodeWithOffsets(sourceNode));
     };
     var hasVisibleTextBetweenPreorder = (root, start, end) => {
+      if (this.contentStream && typeof this.contentStream.hasVisibleTextBetweenPreorder === 'function') {
+        return this.contentStream.hasVisibleTextBetweenPreorder(root, start, end);
+      }
       var found = false;
       var visit = (sourceNode) => {
         if (found || !sourceNode) return;
@@ -1437,6 +1441,19 @@ window.hoshiReader = {
       visit(root);
       return found;
     };
+    var mediaNodesForRangeClone = () => {
+      if (mediaNodeEntries !== null) return mediaNodeEntries;
+      mediaNodeEntries = this.contentStream && typeof this.contentStream.mediaNodes === 'function'
+        ? this.contentStream.mediaNodes()
+        : [];
+      return mediaNodeEntries;
+    };
+    var mediaNodeForEntry = (entry) => entry && entry.node ? entry.node : entry;
+    var mediaPreorderForEntry = (entry) => {
+      var value = Number(entry && entry.preorder);
+      if (Number.isFinite(value)) return value;
+      return this.sourcePreorderForNode(mediaNodeForEntry(entry));
+    };
     var rangeStartsAtSourceBoundary = (bounds) => {
       return bounds.ranges.some((range) => {
         var sourceNode = range.rubyRoot || range.node;
@@ -1450,24 +1467,28 @@ window.hoshiReader = {
         return this.sourcePreorderForNode(sourceNode) === bounds.max && (range.rubyRoot || range.end >= textLength);
       });
     };
-    var visitInlineMedia = (sourceNode, bounds) => {
-      if (!sourceNode || (sourceNode.nodeType !== Node.ELEMENT_NODE && sourceNode.nodeType !== Node.DOCUMENT_FRAGMENT_NODE)) return;
-      if (sourceNode.nodeType === Node.ELEMENT_NODE) {
-        var preorder = this.sourcePreorderForNode(sourceNode);
+    var appendInlineMediaForBounds = (bounds) => {
+      var entries = mediaNodesForRangeClone();
+      if (!entries.length) return;
+      var startsAtBoundary = rangeStartsAtSourceBoundary(bounds);
+      var endsAtBoundary = rangeEndsAtSourceBoundary(bounds);
+      for (var i = 0; i < entries.length; i++) {
+        var sourceNode = mediaNodeForEntry(entries[i]);
+        if (!sourceNode || !this.isDescendantOf(sourceNode, bounds.root)) continue;
+        var preorder = mediaPreorderForEntry(entries[i]);
         var insideRange = preorder > bounds.min && preorder < bounds.max;
-        var leadingBoundary = preorder < bounds.min && rangeStartsAtSourceBoundary(bounds) && !hasVisibleTextBetweenPreorder(bounds.root, preorder, bounds.min);
-        var trailingBoundary = preorder > bounds.max && rangeEndsAtSourceBoundary(bounds) && !hasVisibleTextBetweenPreorder(bounds.root, bounds.max, preorder);
+        var leadingBoundary = startsAtBoundary &&
+          preorder < bounds.min &&
+          !hasVisibleTextBetweenPreorder(bounds.root, preorder, bounds.min);
+        var trailingBoundary = endsAtBoundary &&
+          preorder > bounds.max &&
+          !hasVisibleTextBetweenPreorder(bounds.root, bounds.max, preorder);
         if (
           (insideRange || leadingBoundary || trailingBoundary) &&
           isInlineMediaNodeForRangeClone(sourceNode, bounds.root)
         ) {
           appendInlineMediaClone(sourceNode);
-          return;
         }
-      }
-      var children = Array.from(sourceNode.childNodes || []);
-      for (var i = 0; i < children.length; i++) {
-        visitInlineMedia(children[i], bounds);
       }
     };
     for (var i = 0; i < ranges.length; i++) {
@@ -1491,7 +1512,7 @@ window.hoshiReader = {
     }
     boundsByRoot.forEach((bounds) => {
       if (Number.isFinite(bounds.min) && Number.isFinite(bounds.max)) {
-        visitInlineMedia(bounds.root, bounds);
+        appendInlineMediaForBounds(bounds);
       }
     });
     return fragment;

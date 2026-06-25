@@ -215,6 +215,7 @@
     this.sourceNodeStats = new WeakMap();
     this.sourceOrderIndexes = new WeakMap();
     this.sourcePreorderIndexes = new WeakMap();
+    this.mediaNodeEntries = [];
     this.rebuild();
   }
 
@@ -231,6 +232,7 @@
       this.sourceNodeStats = new WeakMap();
       this.sourceOrderIndexes = new WeakMap();
       this.sourcePreorderIndexes = new WeakMap();
+      this.mediaNodeEntries = [];
       this.indexSourcePreorder();
 
       var topLevelNodes = childrenOf(this.root);
@@ -262,6 +264,7 @@
 
       this.totalMatchableChars = count;
       this.totalRawChars = rawCount;
+      this.mediaNodeEntries = this.collectMediaNodeEntries();
     },
 
     indexSourcePreorder: function() {
@@ -406,6 +409,41 @@
         mediaTags.has(tagName(node)) &&
         !isStandaloneMediaNode(node, contextRoot || this.root)
       );
+    },
+
+    collectMediaNodeEntries: function() {
+      var result = [];
+      var visit = (function(node) {
+        if (!node || isIgnoredNode(node, this.root)) return;
+        if (node.nodeType === ELEMENT_NODE && mediaTags.has(tagName(node))) {
+          result.push({
+            node: node,
+            preorder: this.sourcePreorderForNode(node)
+          });
+          return;
+        }
+        childrenOf(node).forEach(visit);
+      }).bind(this);
+      visit(this.root);
+      result.sort(function(a, b) {
+        return a.preorder - b.preorder;
+      });
+      return result;
+    },
+
+    mediaNodes: function() {
+      return this.mediaNodeEntries || [];
+    },
+
+    hasVisibleTextBetweenPreorder: function(_root, start, end) {
+      if (end <= start) return false;
+      for (var i = 0; i < this.textEntries.length; i++) {
+        var entry = this.textEntries[i];
+        if (entry.preorder <= start) continue;
+        if (entry.preorder >= end) break;
+        if (String(entry.text || '').trim()) return true;
+      }
+      return false;
     },
 
     mediaUnits: function() {

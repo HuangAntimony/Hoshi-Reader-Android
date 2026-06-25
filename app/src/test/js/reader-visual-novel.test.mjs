@@ -1121,6 +1121,33 @@ test('block mode keeps leading inline images with the first split text screen', 
     assert.equal(currentScreen(reader).querySelector('#marker'), null);
 });
 
+test('block mode fitting avoids source tree scans for ruby-only split blocks', async () => {
+    const children = [];
+    for (let i = 0; i < 80; i += 1) {
+        children.push(rubyText('漢', 'かん'));
+        if (i % 20 === 19) children.push('。');
+    }
+    const { reader } = loadReader(bodyWith(element('p', { id: 'long' }, children)), {
+        mode: 'block',
+        revealSpeed: 0,
+        charactersPerScreen: 40,
+    });
+    let preorderLookups = 0;
+    const originalSourcePreorderForNode = reader.sourcePreorderForNode;
+    reader.sourcePreorderForNode = function(node) {
+        preorderLookups += 1;
+        return originalSourcePreorderForNode.call(this, node);
+    };
+
+    await reader.initialize();
+
+    assert.equal(reader.screens.length, 6);
+    assert.ok(
+        preorderLookups < 12000,
+        `expected bounded preorder lookups while fitting ruby-only blocks, got ${preorderLookups}`,
+    );
+});
+
 test('viewport fitting keeps ruby roots atomic when splitting oversized VN screens', async () => {
     const body = bodyWith(paragraphWith('一', rubyText('二三', 'にさん'), '四五'));
     const { reader } = await initializeReader(body, {
