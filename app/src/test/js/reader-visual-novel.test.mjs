@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
+const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
 const readerVnRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-range-map.js', import.meta.url);
 const readerHighlightsUrl = new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url);
@@ -21,6 +22,10 @@ function readerVnRangeMapSource() {
     return fs.readFileSync(readerVnRangeMapUrl, 'utf8');
 }
 
+function readerMediaSemanticsSource() {
+    return fs.readFileSync(readerMediaSemanticsUrl, 'utf8');
+}
+
 function readerHighlightsSource() {
     return fs.readFileSync(readerHighlightsUrl, 'utf8');
 }
@@ -28,6 +33,7 @@ function readerHighlightsSource() {
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', readerVnRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', '0')
@@ -47,6 +53,7 @@ function readerSource() {
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerVnRangeMapSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', String(options.revealSpeed ?? 0))
@@ -555,10 +562,17 @@ function matchesSelector(node, selector) {
 }
 
 function querySelectorAll(root, selector) {
+    const svgImageSelector = selector.trim() === 'svg image';
     const selectors = selector.split(',').map((item) => item.trim());
     const result = [];
     const visit = (node) => {
-        if (node.nodeType === 1 && selectors.some((item) => matchesSelector(node, item))) {
+        if (
+            node.nodeType === 1 &&
+            (
+                (svgImageSelector && node.tagName === 'IMAGE' && closestElement(node, 'svg')) ||
+                selectors.some((item) => matchesSelector(node, item))
+            )
+        ) {
             result.push(node);
         }
         node.childNodes?.forEach(visit);
@@ -1500,6 +1514,28 @@ test('visual novel image setup preserves blur and native image tap behavior', as
 
     img.dispatchEvent(click);
     assert.equal(JSON.stringify(imageMessages), JSON.stringify(['https://example.invalid/images/pic.jpg']));
+});
+
+test('visual novel SVG image setup preserves aspect ratio and native image tap behavior', async () => {
+    const body = bodyWith(element('p', {}, [
+        svgImage('images/plate.jpg', { id: 'plate', preserveAspectRatio: 'none' }),
+    ]));
+    const { reader, imageMessages } = await initializeReader(body, {
+        mode: 'block',
+        revealSpeed: 0,
+    });
+    const svg = currentScreen(reader).querySelector('#plate');
+    const innerImage = svg.querySelector('image');
+
+    assert.equal(svg.getAttribute('preserveAspectRatio'), 'xMidYMid meet');
+
+    innerImage.dispatchEvent({
+        type: 'click',
+        preventDefault() {},
+        stopPropagation() {},
+    });
+
+    assert.equal(JSON.stringify(imageMessages), JSON.stringify(['https://example.invalid/images/plate.jpg']));
 });
 
 test('forward and backward pagination report limits at chapter edges', async () => {

@@ -1,4 +1,5 @@
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
+__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__
 __HOSHI_READER_VN_RANGE_MAP_SCRIPT__
 
@@ -1496,59 +1497,19 @@ window.hoshiReader = {
     return fragment;
   },
   setupReaderImage: function(element, src, wrap, blurElement) {
-    if (!element || !src || element.hoshiReaderImageSetup) return;
-    element.hoshiReaderImageSetup = true;
-    blurElement = blurElement || element;
-    if (__HOSHI_BLUR_IMAGES__) {
-      blurElement.classList.add('blurred');
-      if (wrap && !(blurElement.parentElement && blurElement.parentElement.classList.contains('blur-wrapper'))) {
-        var target = document.createElement('span');
-        target.className = 'blur-wrapper';
-        blurElement.parentNode.insertBefore(target, blurElement);
-        target.appendChild(blurElement);
-      }
-    }
-    element.addEventListener('click', function(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      if (blurElement.classList.contains('blurred')) {
-        blurElement.classList.remove('blurred');
-        return;
-      }
-      if (window.HoshiReaderImage && window.HoshiReaderImage.postMessage) {
-        window.HoshiReaderImage.postMessage(new URL(src, document.baseURI).href);
-      }
+    return window.hoshiReaderMediaSemantics.setupReaderImage(element, src, {
+      blurImages: __HOSHI_BLUR_IMAGES__,
+      imageBridge: window.HoshiReaderImage,
+      wrap: wrap,
+      blurElement: blurElement
     });
   },
   setupReaderImages: function(root) {
     var scope = root || this.screen;
-    if (!scope || !scope.querySelectorAll) return;
-    var svgImages = Array.from(scope.querySelectorAll('svg image'));
-    svgImages.forEach((svgImage) => {
-      var svg = svgImage.closest('svg');
-      if (!svg) return;
-      if (svg.getAttribute('preserveAspectRatio') === 'none') {
-        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-      }
-      var svgImageSrc = svgImage.href && svgImage.href.baseVal
-        ? svgImage.href.baseVal
-        : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
-      this.setupReaderImage(svgImage, svgImageSrc, false, svg);
-    });
-    var images = Array.from(scope.querySelectorAll('img'));
-    images.forEach((img) => {
-      var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
-      var mark = () => {
-        if (!isGaiji && (img.naturalWidth > 256 || img.naturalHeight > 256)) {
-          img.classList.add('block-img');
-          this.setupReaderImage(img, img.currentSrc || img.src || img.getAttribute('src'), true);
-        }
-      };
-      if (img.complete) {
-        if ((img.naturalWidth || 0) > 0) mark();
-      } else {
-        img.onload = mark;
-      }
+    return window.hoshiReaderMediaSemantics.setupReaderImages(scope, {
+      blurImages: __HOSHI_BLUR_IMAGES__,
+      imageBridge: window.HoshiReaderImage,
+      waitForImages: false
     });
   },
   renderInitialScreen: function() {

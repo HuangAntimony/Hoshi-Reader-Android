@@ -122,8 +122,11 @@ meet the admission rules above.
   paginated and continuous first; VN only where screen rendering needs the same
   DOM operation.
 - `app/src/main/assets/hoshi-web/reader/reader-media-semantics.js`:
-  media tag classification, standalone-versus-inline decisions, and shared
-  image setup primitives. Production consumers: paginated, continuous, and VN.
+  shared image setup primitives, including SVG image setup, large image block
+  marking, blur wrappers, and native image tap bridge. Production consumers:
+  paginated, continuous, and VN. Deeper media tag classification and
+  standalone-versus-inline decisions may move here only when the shared API
+  replaces production callers in at least two modes in the same phase.
 - `app/src/main/assets/hoshi-web/reader/reader-rendered-range-index.js`:
   generic raw/matchable range lookup over rendered text. It should accept a
   mode adapter for "which rendered root is visible" and "how source offsets map
@@ -274,14 +277,19 @@ without creating a VN-only media module.
 - Modify: `app/src/test/js/reader-visual-novel.test.mjs`
 - Modify: `app/src/test/java/moe/antimony/hoshi/features/reader/ReaderPaginationScriptsTest.kt`
 
-- [ ] Characterize current paginated/continuous image setup for plain `img`,
+- [x] Characterize current paginated/continuous image setup for plain `img`,
   SVG `image`, wrapped images, blur backgrounds, tap handling, and inline gaiji.
-- [ ] Extract shared media tag classification and `setupReaderImage` behavior.
-- [ ] Replace paginated, continuous, and VN local image setup code with the
+- [x] Extract shared image setup behavior into `reader-media-semantics.js`,
+  including SVG image handling, large-image block marking, blur wrappers, and
+  native image tap bridge.
+- [x] Replace paginated, continuous, and VN local image setup code with the
   shared API.
-- [ ] Keep mode-specific media-stop navigation in each mode.
-- [ ] Add VN tests for consecutive standalone images and SVG image containers.
-- [ ] Remove old duplicated local image setup functions.
+- [x] Keep mode-specific media-stop navigation in each mode.
+- [x] Add VN tests for consecutive standalone images and SVG image containers.
+- [x] Remove old duplicated local image setup functions.
+- [ ] Extract deeper media classification and standalone-versus-inline
+  decisions only after the shared API can replace production callers in at
+  least two modes in the same phase.
 
 Verification:
 

@@ -1,5 +1,6 @@
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_DOM_TEXT_SCRIPT__
+__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 
 window.hoshiReader = {
   pageHeight: 0,
@@ -638,62 +639,11 @@ window.hoshiReader.initialize = function() {
   document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(window.innerHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
   window.hoshiReader.pageHeight = pageHeight;
   window.hoshiReader.pageWidth = pageWidth;
-  function setupReaderImage(element, src, wrap, blurElement) {
-  if (!element || !src) return;
-  blurElement = blurElement || element;
-  if (__HOSHI_BLUR_IMAGES__) {
-    blurElement.classList.add('blurred');
-    if (wrap && !blurElement.parentElement?.classList.contains('blur-wrapper')) {
-      var target = document.createElement('span');
-      target.className = 'blur-wrapper';
-      blurElement.parentNode.insertBefore(target, blurElement);
-      target.appendChild(blurElement);
-    }
-  }
-  element.addEventListener('click', function(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (blurElement.classList.contains('blurred')) {
-      blurElement.classList.remove('blurred');
-      return;
-    }
-    if (window.HoshiReaderImage && window.HoshiReaderImage.postMessage) {
-      HoshiReaderImage.postMessage(new URL(src, document.baseURI).href);
-    }
-  });
-}
-  var svgImages = Array.from(document.querySelectorAll('svg image'));
-  svgImages.forEach(function(svgImage) {
-    var svg = svgImage.closest('svg');
-    if (!svg) return;
-    if (svg.getAttribute('preserveAspectRatio') === 'none') {
-      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    }
-    var svgImageSrc = svgImage.href && svgImage.href.baseVal ? svgImage.href.baseVal : (svgImage.getAttribute('href') || svgImage.getAttribute('xlink:href'));
-    setupReaderImage(svgImage, svgImageSrc, false, svg);
-  });
   var images = Array.from(document.querySelectorAll('img'));
-  var imagePromises = images.map(function(img) {
-    return new Promise(function(resolve) {
-      var isGaiji = img.classList.contains('gaiji') || img.classList.contains('gaiji-line');
-      var mark = function() {
-        if (!isGaiji && (img.naturalWidth > 256 || img.naturalHeight > 256)) {
-          img.classList.add('block-img');
-          setupReaderImage(img, img.currentSrc || img.src, true);
-        }
-        resolve();
-      };
-      if (img.complete) {
-        if (img.naturalWidth > 0) {
-          mark();
-        } else {
-          resolve();
-        }
-      } else {
-        img.onload = mark;
-        img.onerror = function() { resolve(); };
-      }
-    });
+  var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
+    blurImages: __HOSHI_BLUR_IMAGES__,
+    imageBridge: window.HoshiReaderImage,
+    waitForImages: true
   });
   var spacer = document.createElement('div');
   spacer.style.height = __HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__;
@@ -703,7 +653,7 @@ window.hoshiReader.initialize = function() {
   document.body.appendChild(spacer);
   window.hoshiReader.normalizeRubyTextNodes();
   window.hoshiReader.stabilizeRubyAdjacentTextNodes();
-  Promise.all(imagePromises).then(function() {
+  imageSetupPromise.then(function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {

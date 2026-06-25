@@ -147,33 +147,35 @@ class ReaderPaginationScriptsTest {
     fun normalizesCalibreCoverSvgAspectRatio() {
         val script = ReaderPaginationScripts.shellScript()
 
-        assertTrue(script.contains("document.querySelectorAll('svg image')"))
-        assertTrue(script.contains("var svg = svgImage.closest('svg');"))
-        assertTrue(script.contains("svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')"))
+        assertTrue(script.contains("window.hoshiReaderMediaSemantics"))
+        assertTrue(script.contains("setupReaderImages(document"))
     }
 
     @Test
-    fun imageTapScriptRunsForPagedAndContinuousReadersLikeIos() {
+    fun injectsSharedMediaSetupForEveryReaderMode() {
+        val scripts = listOf(
+            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Paginated)),
+            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Continuous)),
+            ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.VisualNovel)),
+        )
+
+        scripts.forEach { script ->
+            assertTrue(script.contains("window.hoshiReaderMediaSemantics"))
+            assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
+        }
+    }
+
+    @Test
+    fun imageTapScriptDelegatesForPagedAndContinuousReadersLikeIos() {
         val scripts = listOf(
             ReaderPaginationScripts.shellScript(settings = ReaderSettings(blurImages = true)),
             ReaderPaginationScripts.shellScript(settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, blurImages = true)),
         )
 
         scripts.forEach { script ->
-            assertTrue(script.contains("function setupReaderImage(element, src, wrap, blurElement)"))
-            assertTrue(script.contains("blurElement.classList.add('blurred');"))
-            assertTrue(script.contains("target.className = 'blur-wrapper';"))
-            assertTrue(script.contains("event.preventDefault();"))
-            assertTrue(script.contains("event.stopPropagation();"))
-            assertTrue(script.contains("blurElement.classList.remove('blurred');"))
-            assertTrue(script.contains("HoshiReaderImage.postMessage(new URL(src, document.baseURI).href);"))
-            assertTrue(script.contains("if (true) {"))
-            assertTrue(script.contains("var svgImages = Array.from(document.querySelectorAll('svg image'));"))
-            assertTrue(script.contains("svgImages.forEach(function(svgImage)"))
-            assertTrue(script.contains("svgImage.href && svgImage.href.baseVal"))
-            assertTrue(script.contains("setupReaderImage(svgImage, svgImageSrc, false, svg);"))
-            assertTrue(script.contains("img.classList.add('block-img');"))
-            assertTrue(script.contains("setupReaderImage(img, img.currentSrc || img.src, true);"))
+            assertTrue(script.contains("window.hoshiReaderMediaSemantics.setupReaderImages(document"))
+            assertTrue(script.contains("blurImages: true"))
+            assertFalse(script.contains("function setupReaderImage(element, src, wrap, blurElement)"))
         }
     }
 
@@ -198,7 +200,7 @@ class ReaderPaginationScriptsTest {
     fun paginatedInitializeWritesRuntimeViewportCssVariables() {
         val script = ReaderPaginationScripts.shellScript()
         val initialize = script.substringAfter("window.hoshiReader.initialize = function()")
-            .substringBefore("function setupReaderImage")
+            .substringBefore("var spacer = document.createElement('div');")
 
         assertTrue(initialize.contains("window.hoshiReader.pageHeight = pageHeight;"))
         assertTrue(initialize.contains("window.hoshiReader.pageWidth = pageWidth;"))
@@ -230,9 +232,10 @@ class ReaderPaginationScriptsTest {
             selectionJs = "",
             readerPaginatedJs = "PAGINATED_ASSET",
             readerContinuousJs = "CONTINUOUS_ASSET",
-            readerVisualNovelJs = "VN __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__ __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__ __HOSHI_READER_VN_RANGE_MAP_SCRIPT__ __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES__ __HOSHI_INITIAL_SASAYAKI_CUES_JSON__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
+            readerVisualNovelJs = "VN __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__ __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__ __HOSHI_READER_VN_RANGE_MAP_SCRIPT__ __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__ __HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__ __HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__ __HOSHI_VISUAL_NOVEL_PRESERVE_DIALOGUE__ __HOSHI_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES__ __HOSHI_INITIAL_SASAYAKI_CUES_JSON__ __HOSHI_INITIAL_PROGRESS__ __HOSHI_INITIAL_FRAGMENT_LITERAL__ __HOSHI_INITIAL_HIGHLIGHTS_JSON__ __HOSHI_RESTORE_TOKEN_LITERAL__",
             readerTextSemanticsJs = "TEXT_SEMANTICS_ASSET",
             readerDomTextJs = "DOM_TEXT_ASSET",
+            readerMediaSemanticsJs = "MEDIA_SEMANTICS_ASSET",
             readerVnContentStreamJs = "VN_CONTENT_STREAM_ASSET",
             readerVnRangeMapJs = "VN_RANGE_MAP_ASSET",
             readerSasayakiJs = "",
@@ -258,7 +261,7 @@ class ReaderPaginationScriptsTest {
 
         assertTrue(
             script.contains(
-                "VN TEXT_SEMANTICS_ASSET VN_CONTENT_STREAM_ASSET VN_RANGE_MAP_ASSET 80 \"sentences\" 3 true true [{\"id\":\"cue\",\"start\":1,\"length\":3}] 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",
+                "VN TEXT_SEMANTICS_ASSET MEDIA_SEMANTICS_ASSET VN_CONTENT_STREAM_ASSET VN_RANGE_MAP_ASSET 80 \"sentences\" 3 true true [{\"id\":\"cue\",\"start\":1,\"length\":3}] 0.25 \"chapter-start\" [{\"id\":\"h1\"}]",
             ),
         )
         assertTrue(script.contains("\"restoreCompleted\""))
@@ -274,16 +277,18 @@ class ReaderPaginationScriptsTest {
         )
 
         assertTrue(script.contains("hoshiReaderTextSemantics"))
+        assertTrue(script.contains("hoshiReaderMediaSemantics"))
         assertTrue(script.contains("hoshiReaderVnContentStream"))
         assertTrue(script.contains("hoshiReaderVnRangeMap"))
         assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
+        assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
         assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
         assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
         assertFalse(script.contains("__HOSHI_"))
     }
 
     @Test
-    fun paginatedAndContinuousSourceTreeScriptsInjectTextSemanticsOnly() {
+    fun paginatedAndContinuousSourceTreeScriptsInjectSharedReaderModules() {
         val scripts = listOf(
             ReaderPaginationScripts.shellScript(
                 settings = ReaderSettings(viewMode = ReaderViewMode.Paginated),
@@ -296,10 +301,12 @@ class ReaderPaginationScriptsTest {
         scripts.forEach { script ->
             assertTrue(script.contains("hoshiReaderTextSemantics"))
             assertTrue(script.contains("hoshiReaderDomText"))
+            assertTrue(script.contains("hoshiReaderMediaSemantics"))
             assertFalse(script.contains("hoshiReaderVnContentStream"))
             assertFalse(script.contains("hoshiReaderVnRangeMap"))
             assertFalse(script.contains("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__"))
             assertFalse(script.contains("__HOSHI_READER_DOM_TEXT_SCRIPT__"))
+            assertFalse(script.contains("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__"))
             assertFalse(script.contains("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__"))
             assertFalse(script.contains("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__"))
             assertFalse(script.contains("__HOSHI_"))
@@ -312,8 +319,7 @@ class ReaderPaginationScriptsTest {
             sasayakiCuesJson = null,
             highlightsJson = null,
         )
-        val restoreBlock = script.substringAfter("Promise.all(imagePromises).then(function()")
-            .substringAfter("window.hoshiReader.buildNodeOffsets();")
+        val restoreBlock = script.substringAfterLast("window.hoshiReader.buildNodeOffsets();")
             .substringBefore("});")
 
         assertFalse(restoreBlock.contains("applySasayakiCues"))
@@ -327,8 +333,7 @@ class ReaderPaginationScriptsTest {
         val script = ReaderPaginationScripts.shellScript(
             sasayakiCuesJson = """[{"id":"cue","start":0,"length":1}]""",
         )
-        val restoreBlock = script.substringAfter("Promise.all(imagePromises).then(function()")
-            .substringAfter("window.hoshiReader.buildNodeOffsets();")
+        val restoreBlock = script.substringAfterLast("window.hoshiReader.buildNodeOffsets();")
             .substringBefore("});")
 
         assertFalse(restoreBlock.contains("applySasayakiCues"))

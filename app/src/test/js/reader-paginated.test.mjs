@@ -8,6 +8,7 @@ const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-c
 const readerSasayakiUrl = new URL('../../main/assets/hoshi-web/reader/reader-sasayaki.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
 const readerDomTextUrl = new URL('../../main/assets/hoshi-web/reader/reader-dom-text.js', import.meta.url);
+const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 
 function readerTextSemanticsSource() {
     return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
@@ -17,6 +18,10 @@ function readerDomTextSource() {
     return fs.readFileSync(readerDomTextUrl, 'utf8');
 }
 
+function readerMediaSemanticsSource() {
+    return fs.readFileSync(readerMediaSemanticsUrl, 'utf8');
+}
+
 function readerSource(url, options = {}) {
     const readerSasayaki = fs.readFileSync(readerSasayakiUrl, 'utf8');
     return fs.readFileSync(url, 'utf8')
@@ -24,6 +29,7 @@ function readerSource(url, options = {}) {
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
         .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replace('__HOSHI_READER_DOM_TEXT_SCRIPT__', options.domTextScript ?? readerDomTextSource())
+        .replace('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
@@ -565,6 +571,36 @@ test('paged and continuous readers use shared DOM text normalization', () => {
         assert.equal(normalizeCalls, 1);
         assert.equal(paragraph.textContent, '進藤歩あゆむ。それ');
         assert.ok(textRunAfter(ruby).includes('。'));
+    });
+});
+
+test('paged and continuous readers use shared media setup', () => {
+    [readerPaginatedUrl, readerContinuousUrl].forEach((sourceUrl) => {
+        const body = new TestElement('body');
+        const mediaSemanticsScript = `
+          window.__mediaSetupCalls = [];
+          window.hoshiReaderMediaSemantics = {
+            setupReaderImages: function(scope, options) {
+              window.__mediaSetupCalls.push({
+                documentScope: scope === document,
+                blurImages: options.blurImages,
+                hasImageBridge: options.imageBridge === window.HoshiReaderImage,
+                waitForImages: options.waitForImages
+              });
+              return Promise.resolve();
+            }
+          };
+        `;
+        const { reader, window } = loadReader(body, sourceUrl, { mediaSemanticsScript });
+        window.HoshiReaderImage = { postMessage() {} };
+
+        reader.initialize();
+
+        assert.equal(window.__mediaSetupCalls.length, 1);
+        assert.equal(window.__mediaSetupCalls[0].documentScope, true);
+        assert.equal(window.__mediaSetupCalls[0].blurImages, false);
+        assert.equal(window.__mediaSetupCalls[0].hasImageBridge, true);
+        assert.equal(window.__mediaSetupCalls[0].waitForImages, true);
     });
 });
 

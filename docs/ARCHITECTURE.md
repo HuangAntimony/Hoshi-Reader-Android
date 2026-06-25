@@ -91,6 +91,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Paginated and continuous share live DOM ruby/text normalization through
   `reader-dom-text.js`; the mode assets keep thin public wrapper methods so
   existing reader commands and tests continue to call the same surface.
+- Reader image setup semantics live in `reader-media-semantics.js` and are
+  consumed by paginated, continuous, and VN assets for SVG image aspect-ratio
+  correction, large image block marking, blur wrappers, native image tap
+  bridging, and scoped setup. Paginated and continuous apply it to the chapter
+  document and wait for image load/failure before restore; VN applies it to the
+  current rendered screen without blocking screen rendering on image load.
 - VN reading uses VN-specific reader-web runtime primitives for chapter content
   streams and rendered range mapping. `reader-vn-content-stream.js` owns source
   text/raw offsets, matchable offsets, ruby-aware text entries, structural IDs,
