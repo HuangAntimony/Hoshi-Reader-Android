@@ -1515,7 +1515,7 @@ fun ReaderWebView(
         }
     }
 
-    val bottomChromeMetrics = readerBottomChromeMetrics()
+    val bottomChromeMetrics = readerBottomChromeMetrics(effectiveSettings.bottomSafeAreaDp)
     val currentStatusBarPadding = rememberCurrentStatusBarPadding()
     val stableStatusBarPadding = rememberStableStatusBarPadding()
     val stableNavigationBarPadding = rememberStableNavigationBarPadding()

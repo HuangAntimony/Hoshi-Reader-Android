@@ -316,6 +316,7 @@
     <string name="reader_appearance_chapter_swipe_distance">Chapter Swipe Distance</string>
     <string name="reader_appearance_horizontal_padding">Horizontal Padding</string>
     <string name="reader_appearance_vertical_padding">Vertical Padding</string>
+    <string name="reader_appearance_bottom_safe_area">Bottom Safe Area</string>
     <string name="reader_appearance_avoid_page_break">Avoid Page Break</string>
     <string name="reader_appearance_justify_text">Justify Text</string>
     <string name="reader_appearance_blur_images">Blur Images</string>

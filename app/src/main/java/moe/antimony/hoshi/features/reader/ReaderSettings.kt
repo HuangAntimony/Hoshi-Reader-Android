@@ -34,9 +34,21 @@ internal const val ReaderPopupScaleMin = 0.8
 internal const val ReaderPopupScaleMax = 2.0
 internal const val ReaderPopupScaleStep = 0.05
 internal const val ReaderPopupScaleSliderSteps = 23
+internal const val ReaderBottomSafeAreaDefaultDp = 18
+internal const val ReaderBottomSafeAreaMinDp = ReaderBottomSafeAreaDefaultDp
+internal const val ReaderBottomSafeAreaMaxDp = 72
+internal const val ReaderBottomSafeAreaStepDp = 2
 
 internal fun Double.coerceReaderPopupScale(): Double =
     coerceIn(ReaderPopupScaleMin, ReaderPopupScaleMax)
+
+internal fun Int.coerceReaderBottomSafeAreaDp(): Int {
+    val clamped = coerceIn(ReaderBottomSafeAreaMinDp, ReaderBottomSafeAreaMaxDp)
+    val offset = clamped - ReaderBottomSafeAreaMinDp
+    val lower = ReaderBottomSafeAreaMinDp + (offset / ReaderBottomSafeAreaStepDp) * ReaderBottomSafeAreaStepDp
+    val upper = (lower + ReaderBottomSafeAreaStepDp).coerceAtMost(ReaderBottomSafeAreaMaxDp)
+    return if (clamped - lower < upper - clamped) lower else upper
+}
 
 data class ReaderSettings(
     val theme: ReaderTheme = ReaderTheme.System,
@@ -68,6 +80,7 @@ data class ReaderSettings(
     val chapterSwipeDistance: Int = 20,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
+    val bottomSafeAreaDp: Int = ReaderBottomSafeAreaDefaultDp,
     val avoidPageBreak: Boolean = false,
     val justifyText: Boolean = false,
     val blurImages: Boolean = false,
@@ -321,6 +334,8 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         chapterSwipeDistance = preferences.getInt("chapterSwipeDistance", 20).coerceIn(10, 60),
         horizontalPadding = preferences.getInt("layoutHorizontalPadding", 5),
         verticalPadding = preferences.getInt("layoutVerticalPadding", 0),
+        bottomSafeAreaDp = preferences.getInt("readerBottomSafeAreaDp", ReaderBottomSafeAreaDefaultDp)
+            .coerceReaderBottomSafeAreaDp(),
         avoidPageBreak = preferences.getBoolean("avoidPageBreak", false),
         justifyText = preferences.getBoolean("justifyText", false),
         blurImages = preferences.getBoolean("blurImages", false),
@@ -384,6 +399,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putInt("chapterSwipeDistance", settings.chapterSwipeDistance)
             .putInt("layoutHorizontalPadding", settings.horizontalPadding)
             .putInt("layoutVerticalPadding", settings.verticalPadding)
+            .putInt("readerBottomSafeAreaDp", settings.bottomSafeAreaDp.coerceReaderBottomSafeAreaDp())
             .putBoolean("avoidPageBreak", settings.avoidPageBreak)
             .putBoolean("justifyText", settings.justifyText)
             .putBoolean("blurImages", settings.blurImages)
@@ -525,6 +541,8 @@ class ReaderSettingsRepository(
             chapterSwipeDistance = (this[KEY_CHAPTER_SWIPE_DISTANCE] ?: 20).coerceIn(10, 60),
             horizontalPadding = this[KEY_HORIZONTAL_PADDING] ?: 5,
             verticalPadding = this[KEY_VERTICAL_PADDING] ?: 0,
+            bottomSafeAreaDp = (this[KEY_BOTTOM_SAFE_AREA_DP] ?: ReaderBottomSafeAreaDefaultDp)
+                .coerceReaderBottomSafeAreaDp(),
             avoidPageBreak = this[KEY_AVOID_PAGE_BREAK] ?: false,
             justifyText = this[KEY_JUSTIFY_TEXT] ?: false,
             blurImages = this[KEY_BLUR_IMAGES] ?: false,
@@ -587,6 +605,7 @@ class ReaderSettingsRepository(
         this[KEY_CHAPTER_SWIPE_DISTANCE] = settings.chapterSwipeDistance
         this[KEY_HORIZONTAL_PADDING] = settings.horizontalPadding
         this[KEY_VERTICAL_PADDING] = settings.verticalPadding
+        this[KEY_BOTTOM_SAFE_AREA_DP] = settings.bottomSafeAreaDp.coerceReaderBottomSafeAreaDp()
         this[KEY_AVOID_PAGE_BREAK] = settings.avoidPageBreak
         this[KEY_JUSTIFY_TEXT] = settings.justifyText
         this[KEY_BLUR_IMAGES] = settings.blurImages
@@ -697,6 +716,7 @@ class ReaderSettingsRepository(
         private val KEY_CHAPTER_SWIPE_DISTANCE = intPreferencesKey("chapterSwipeDistance")
         private val KEY_HORIZONTAL_PADDING = intPreferencesKey("layoutHorizontalPadding")
         private val KEY_VERTICAL_PADDING = intPreferencesKey("layoutVerticalPadding")
+        private val KEY_BOTTOM_SAFE_AREA_DP = intPreferencesKey("readerBottomSafeAreaDp")
         private val KEY_AVOID_PAGE_BREAK = booleanPreferencesKey("avoidPageBreak")
         private val KEY_JUSTIFY_TEXT = booleanPreferencesKey("justifyText")
         private val KEY_BLUR_IMAGES = booleanPreferencesKey("blurImages")
@@ -763,6 +783,7 @@ private data class ProfileReaderAppearanceSettings(
     val chapterSwipeDistance: Int = 20,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
+    val bottomSafeAreaDp: Int = ReaderBottomSafeAreaDefaultDp,
     val avoidPageBreak: Boolean = false,
     val justifyText: Boolean = false,
     val blurImages: Boolean = false,
@@ -816,6 +837,7 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         chapterSwipeDistance = chapterSwipeDistance,
         horizontalPadding = horizontalPadding,
         verticalPadding = verticalPadding,
+        bottomSafeAreaDp = bottomSafeAreaDp.coerceReaderBottomSafeAreaDp(),
         avoidPageBreak = avoidPageBreak,
         justifyText = justifyText,
         blurImages = blurImages,
@@ -872,6 +894,7 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         chapterSwipeDistance = appearance.chapterSwipeDistance.coerceIn(10, 60),
         horizontalPadding = appearance.horizontalPadding,
         verticalPadding = appearance.verticalPadding,
+        bottomSafeAreaDp = appearance.bottomSafeAreaDp.coerceReaderBottomSafeAreaDp(),
         avoidPageBreak = appearance.avoidPageBreak,
         justifyText = appearance.justifyText,
         blurImages = appearance.blurImages,

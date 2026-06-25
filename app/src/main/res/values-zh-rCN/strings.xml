@@ -314,6 +314,7 @@
     <string name="reader_appearance_chapter_swipe_distance">章节滑动距离</string>
     <string name="reader_appearance_horizontal_padding">水平边距</string>
     <string name="reader_appearance_vertical_padding">垂直边距</string>
+    <string name="reader_appearance_bottom_safe_area">底部安全区</string>
     <string name="reader_appearance_avoid_page_break">避免分页断开</string>
     <string name="reader_appearance_justify_text">两端对齐</string>
     <string name="reader_appearance_blur_images">模糊图片</string>

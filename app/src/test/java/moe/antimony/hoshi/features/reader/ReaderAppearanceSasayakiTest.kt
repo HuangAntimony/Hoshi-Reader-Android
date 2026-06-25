@@ -83,4 +83,14 @@ class ReaderAppearanceSasayakiTest {
         )
         assertTrue(readerAppearanceCustomColorRows(ReaderSettings(theme = ReaderTheme.Light)).isEmpty())
     }
+
+    @Test
+    fun bottomSafeAreaSliderUsesTwoDpSteps() {
+        assertEquals(26, readerAppearanceBottomSafeAreaSliderSteps())
+        assertEquals(18, readerAppearanceBottomSafeAreaFromSlider(17.2f))
+        assertEquals(18, readerAppearanceBottomSafeAreaFromSlider(18f))
+        assertEquals(40, readerAppearanceBottomSafeAreaFromSlider(39.2f))
+        assertEquals(40, readerAppearanceBottomSafeAreaFromSlider(40.8f))
+        assertEquals(72, readerAppearanceBottomSafeAreaFromSlider(100f))
+    }
 }

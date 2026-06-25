@@ -466,6 +466,19 @@ private fun ReaderAppearanceContent(
                         onIncrease = { onSettingsChange(settings.copy(verticalPadding = (settings.verticalPadding + 1).coerceAtMost(50))) },
                         palette = palette,
                     )
+                    AppearanceDivider(palette)
+                    SliderRow(
+                        label = stringResource(R.string.reader_appearance_bottom_safe_area),
+                        value = "${settings.bottomSafeAreaDp.coerceReaderBottomSafeAreaDp()}dp",
+                        sliderValue = settings.bottomSafeAreaDp.coerceReaderBottomSafeAreaDp().toFloat(),
+                        valueRange = ReaderBottomSafeAreaMinDp.toFloat()..ReaderBottomSafeAreaMaxDp.toFloat(),
+                        steps = readerAppearanceBottomSafeAreaSliderSteps(),
+                        onValueChange = { value ->
+                            onSettingsChange(
+                                settings.copy(bottomSafeAreaDp = readerAppearanceBottomSafeAreaFromSlider(value)),
+                            )
+                        },
+                    )
                     if (settings.viewMode != ReaderViewMode.VisualNovel) {
                         AppearanceDivider(palette)
                         SwitchRow(
@@ -776,6 +789,14 @@ internal fun readerAppearanceShowsAlwaysShowProgress(settings: ReaderSettings): 
 
 internal fun readerAppearanceShowsProgressPosition(settings: ReaderSettings): Boolean =
     readerAppearanceShowsAlwaysShowProgress(settings) && !settings.alwaysShowProgress
+
+internal fun readerAppearanceBottomSafeAreaSliderSteps(): Int =
+    ((ReaderBottomSafeAreaMaxDp - ReaderBottomSafeAreaMinDp) / ReaderBottomSafeAreaStepDp) - 1
+
+internal fun readerAppearanceBottomSafeAreaFromSlider(value: Float): Int =
+    (round(value / ReaderBottomSafeAreaStepDp) * ReaderBottomSafeAreaStepDp)
+        .toInt()
+        .coerceReaderBottomSafeAreaDp()
 
 internal fun readerAppearanceStatisticsRows(settings: ReaderSettings): List<ReaderAppearanceStatisticsRow> =
     if (settings.enableStatistics) {

@@ -148,6 +148,10 @@ class ReaderChromeTest {
 
         assertEquals(ReaderContentChromeInsets(topDp = 34, bottomDp = 18), readerContentChromeInsets())
         assertEquals(
+            ReaderContentChromeInsets(topDp = 34, bottomDp = 40),
+            readerContentChromeInsets(settings = ReaderSettings(bottomSafeAreaDp = 40)),
+        )
+        assertEquals(
             ReaderContentChromeInsets(topDp = 34, bottomDp = 18),
             readerContentChromeInsets(
                 state = state,
@@ -533,15 +537,25 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun bottomSafeAreaSettingControlsBottomChromeMetricsAndOffsets() {
+        val defaultMetrics = readerBottomChromeMetrics()
+        val customMetrics = readerBottomChromeMetrics(bottomSafeAreaDp = 40)
+
+        assertEquals(18, defaultMetrics.bottomSafeAreaDp)
+        assertEquals(40, customMetrics.bottomSafeAreaDp)
+        assertEquals(defaultMetrics.menuBottomOffsetDp + 22, customMetrics.menuBottomOffsetDp)
+    }
+
+    @Test
     fun sasayakiBottomPlaybackControlsStayInsideBottomSafeAreaWhenEnabled() {
-        val metrics = readerBottomChromeMetrics()
+        val metrics = readerBottomChromeMetrics(bottomSafeAreaDp = 40)
 
         assertEquals(
             ReaderSasayakiBottomPlaybackControls(
                 visible = true,
                 rowHeightDp = metrics.bottomSafeAreaDp,
-                buttonWidthDp = 40,
-                iconSizeDp = 14,
+                buttonWidthDp = 52,
+                iconSizeDp = 20,
                 horizontalPaddingDp = 18,
             ),
             readerSasayakiBottomPlaybackControls(
@@ -569,6 +583,38 @@ class ReaderChromeTest {
             hasAudio = true,
             metrics = metrics,
         ).rowHeightDp <= metrics.bottomSafeAreaDp)
+    }
+
+    @Test
+    fun sasayakiBottomPlaybackControlsScaleHitboxAndIconWithSafeAreaHeight() {
+        assertEquals(
+            ReaderSasayakiBottomPlaybackControls(
+                visible = true,
+                rowHeightDp = 18,
+                buttonWidthDp = 40,
+                iconSizeDp = 14,
+                horizontalPaddingDp = 18,
+            ),
+            readerSasayakiBottomPlaybackControls(
+                settings = SasayakiSettings(showReaderBottomPlaybackControls = true),
+                hasAudio = true,
+                metrics = readerBottomChromeMetrics(bottomSafeAreaDp = 18),
+            ),
+        )
+        assertEquals(
+            ReaderSasayakiBottomPlaybackControls(
+                visible = true,
+                rowHeightDp = 72,
+                buttonWidthDp = 72,
+                iconSizeDp = 28,
+                horizontalPaddingDp = 18,
+            ),
+            readerSasayakiBottomPlaybackControls(
+                settings = SasayakiSettings(showReaderBottomPlaybackControls = true),
+                hasAudio = true,
+                metrics = readerBottomChromeMetrics(bottomSafeAreaDp = 72),
+            ),
+        )
     }
 
     @Test

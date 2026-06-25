@@ -17,6 +17,7 @@ class ReaderSettingsTest {
         assertEquals(22, settings.fontSize)
         assertEquals(5, settings.horizontalPadding)
         assertEquals(0, settings.verticalPadding)
+        assertEquals(18, settings.bottomSafeAreaDp)
         assertEquals(1.65, settings.lineHeight, 0.0)
         assertEquals(0.0, settings.paragraphSpacing, 0.0)
         assertEquals("Noto Serif CJK JP", settings.selectedFont)

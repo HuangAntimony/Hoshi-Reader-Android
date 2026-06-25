@@ -11,6 +11,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Add a tabbed Sasayaki reader menu with a player-style audiobook header, draggable playback progress, audiobook resources, reader-menu subtitle matching that replaces the old bookshelf match entry, current subtitle match rate, M4B chapter viewing, and chapter jumps.
 - Allow Sasayaki audiobooks to be loaded and played without subtitle match data.
 - Add a Sasayaki image hold slider with 0.5-second steps from off to five seconds, defaulting to one second.
+- Add a Reader Appearance setting for bottom safe-area height so bottom progress, Sasayaki controls, and the reader text area can be adjusted together.
 
 ### Fixed
 
