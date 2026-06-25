@@ -41,7 +41,7 @@ private fun sanitizeEpubPrivateCss(css: String): String =
 
 private val calibreRuleRegex =
     Regex(
-        """^(\s*\.(?:calibre\d*|body|c\d*|p\d+)\s*)\{(.*?)\}""",
+        """^(\s*\.(?:calibre(?:_?\d+)?|body|c\d*|p\d+)\s*)\{(.*?)\}""",
         setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL),
     )
 

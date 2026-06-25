@@ -90,4 +90,28 @@ class ReaderResourceSanitizerTest {
         assertTrue(sanitized.contains("text-indent: 2em"))
         assertTrue(sanitized.endsWith("\nbody { line-height: 1.65; }\n"))
     }
+
+    @Test
+    fun cssSanitizerRemovesUnderscoreCalibreLayoutDeclarationsThatOverrideReaderLayout() {
+        val css = """
+            .calibre_45 {
+              writing-mode: vertical-rl;
+              line-height: 1.2;
+              height: 100%;
+              text-indent: 2em;
+            }
+            .calibre_46 {
+              text-indent: -1em;
+            }
+        """.trimIndent()
+
+        val sanitized = sanitizeReaderCss(css)
+
+        assertFalse(sanitized, sanitized.contains("writing-mode: vertical-rl"))
+        assertFalse(sanitized, sanitized.contains("line-height: 1.2"))
+        assertFalse(sanitized, sanitized.contains("height: 100%"))
+        assertTrue(sanitized.contains(" text-indent: 0"))
+        assertTrue(sanitized.contains("text-indent: -1em"))
+        assertTrue(sanitized.endsWith("\nbody { line-height: 1.65; }\n"))
+    }
 }

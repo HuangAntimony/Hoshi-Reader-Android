@@ -24,6 +24,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep VN vertical text screens from clipping the leftmost line when EPUB styling makes the rendered text wider than the VN content box.
 - Keep VN text blocks with small inline images from being treated as unsplittable media screens, preventing vertical text from overflowing off-screen.
 - Keep consecutive media-only images in VN from collapsing into one screen or being skipped when reverse-turning into an image-only chapter.
+- Clean EPUB `.calibre_12`-style publisher CSS classes so layout-breaking writing mode, line height, height, and positive indentation rules cannot bypass reader CSS sanitization.
 
 ## [v1.2.2] - 2026-06-21
 
