@@ -857,6 +857,19 @@ test('visual novel reader requires the VN range map asset', async () => {
     await assert.rejects(() => reader.initialize(), /hoshiReaderVnRangeMap/);
 });
 
+test('visual novel reader uses shared text semantics', () => {
+    const { reader, window } = loadReader(bodyWith(p('本文。')));
+    const originalCountChars = window.hoshiReaderTextSemantics.countChars;
+    let countCalls = 0;
+    window.hoshiReaderTextSemantics.countChars = (text) => {
+        countCalls += 1;
+        return originalCountChars(text);
+    };
+
+    assert.equal(reader.countChars('一、二'), 2);
+    assert.equal(countCalls, 1);
+});
+
 test('block mode renders one top-level block per screen without cloning the entire chapter', async () => {
     const body = bodyWith(p('第一段落。'), p('第二段落。'));
     const { reader } = await initializeReader(body, { mode: 'block', revealSpeed: 0 });
