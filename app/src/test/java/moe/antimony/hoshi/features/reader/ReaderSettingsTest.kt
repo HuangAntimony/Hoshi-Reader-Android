@@ -582,6 +582,16 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun visualNovelReaderCssResetsNestedColumnCounts() {
+        val visualNovelCss = ReaderContentStyles.styleTag(
+            ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
+        )
+
+        assertTrue(Regex("""\.hoshi-vn-content \* \{\s+column-count: auto !important;""").containsMatchIn(visualNovelCss))
+        assertTrue(visualNovelCss.contains("-webkit-column-count: auto !important;"))
+    }
+
+    @Test
     fun visualNovelReaderCssCentersCurrentScreenContent() {
         val css = ReaderContentStyles.styleTag(
             ReaderSettings(

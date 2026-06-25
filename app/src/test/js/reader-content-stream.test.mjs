@@ -285,6 +285,40 @@ test('content stream keeps sibling media ids isolated inside a shared wrapper', 
     );
 });
 
+test('content stream treats small images embedded in text as inline content', () => {
+    const marker = el('img', { id: 'marker', src: 'marker.png' });
+    marker.naturalWidth = 48;
+    marker.naturalHeight = 48;
+    const paragraph = el('p', { id: 'quote' }, ['前', marker, '後']);
+
+    const stream = loadContentStreamModule().create(paragraph);
+
+    assert.equal(stream.containsStandaloneMedia(paragraph), false);
+    assert.deepEqual(plain(stream.mediaUnits()), []);
+});
+
+test('content stream keeps small image-only blocks as standalone media', () => {
+    const marker = el('img', { id: 'marker', src: 'marker.png' });
+    marker.naturalWidth = 48;
+    marker.naturalHeight = 48;
+    const paragraph = el('p', { id: 'ornament' }, [marker]);
+    const root = el('section', {}, [paragraph]);
+
+    const stream = loadContentStreamModule().create(root);
+
+    assert.equal(stream.containsStandaloneMedia(paragraph), true);
+    assert.deepEqual(
+        plain(
+            stream.mediaUnits().map((unit) => ({
+                mediaTagName: unit.mediaTagName,
+                renderRootTagName: unit.renderRootTagName,
+                ids: [...unit.ids].sort(),
+            })),
+        ),
+        [{ mediaTagName: 'img', renderRootTagName: 'p', ids: ['marker', 'ornament'] }],
+    );
+});
+
 test('content stream treats gaiji images as inline glyphs for media and offset indexing', () => {
     const gaiji = el('img', { class: 'gaiji', alt: '外字' });
     const paragraph = el('p', {}, ['前', gaiji, '後']);

@@ -22,6 +22,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep Sasayaki cue highlights from dropping punctuation split across EPUB text nodes.
 - Keep VN screens from dropping ruby/furigana annotations.
 - Keep VN vertical text screens from clipping the leftmost line when EPUB styling makes the rendered text wider than the VN content box.
+- Keep VN text blocks with small inline images from being treated as unsplittable media screens, preventing vertical text from overflowing off-screen.
 - Keep consecutive media-only images in VN from collapsing into one screen or being skipped when reverse-turning into an image-only chapter.
 
 ## [v1.2.2] - 2026-06-21

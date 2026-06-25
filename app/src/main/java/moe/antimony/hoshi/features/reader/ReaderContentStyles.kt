@@ -258,6 +258,10 @@ internal object ReaderContentStyles {
                     overflow: visible !important;
                     hanging-punctuation: none !important;
                 }
+                .hoshi-vn-content * {
+                    column-count: auto !important;
+                    -webkit-column-count: auto !important;
+                }
                 .hoshi-vn-content svg {
                     width: var(--hoshi-image-max-width, ${settings.imageMaxWidthFallbackCss}) !important;
                     height: var(--hoshi-image-max-height, ${settings.imageMaxHeightFallbackCss}) !important;

@@ -61,9 +61,103 @@
     return String(value || '').split(/\s+/).indexOf(className) >= 0;
   }
 
-  function isStandaloneMediaNode(node) {
+  function hasMeaningfulText(node) {
+    return !!String(node && node.textContent || '').trim();
+  }
+
+  function hasOwnMeaningfulText(node) {
+    return childrenOf(node).some(function(child) {
+      return child.nodeType === TEXT_NODE && !!String(child.textContent || '').trim();
+    });
+  }
+
+  function isTextMediaContextRoot(node) {
     var tag = tagName(node);
-    if (tag === 'img' && (hasClass(node, 'gaiji') || hasClass(node, 'gaiji-line'))) return false;
+    return [
+      'address',
+      'blockquote',
+      'dd',
+      'dt',
+      'figcaption',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'li',
+      'p',
+      'pre',
+      'td',
+      'th'
+    ].indexOf(tag) >= 0 || hasOwnMeaningfulText(node);
+  }
+
+  function mediaTextContextRoot(node, stopRoot) {
+    var current = node;
+    var candidate = node;
+    while (current && current.parentNode) {
+      var parent = current.parentNode;
+      if (parent === stopRoot) {
+        if (
+          candidate === node &&
+          parent.nodeType === ELEMENT_NODE &&
+          !mediaTags.has(tagName(parent)) &&
+          isTextMediaContextRoot(parent)
+        ) {
+          candidate = parent;
+        }
+        break;
+      }
+      if (parent.nodeType === ELEMENT_NODE && !mediaTags.has(tagName(parent))) {
+        candidate = parent;
+      }
+      current = parent;
+    }
+    return candidate || node;
+  }
+
+  function computedDisplay(node) {
+    if (!global.getComputedStyle) return '';
+    try {
+      return String(global.getComputedStyle(node).display || '').toLowerCase();
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function isBlockDisplay(display) {
+    return [
+      'block',
+      'flex',
+      'grid',
+      'list-item',
+      'table',
+      'table-caption',
+      'flow-root'
+    ].indexOf(display) >= 0;
+  }
+
+  function isLargeImage(node) {
+    return Number(node && node.naturalWidth || 0) > 256 || Number(node && node.naturalHeight || 0) > 256;
+  }
+
+  function isInlineGlyphImage(node) {
+    return hasClass(node, 'gaiji') || hasClass(node, 'gaiji-line');
+  }
+
+  function isStandaloneImageNode(node, contextRoot) {
+    if (isInlineGlyphImage(node)) return false;
+    var textContext = mediaTextContextRoot(node, contextRoot);
+    if (!hasMeaningfulText(textContext)) return true;
+    if (isLargeImage(node)) return true;
+    if (hasClass(node, 'block-img')) return true;
+    return isBlockDisplay(computedDisplay(node));
+  }
+
+  function isStandaloneMediaNode(node, contextRoot) {
+    var tag = tagName(node);
+    if (tag === 'img') return isStandaloneImageNode(node, contextRoot || node);
     return mediaTags.has(tag);
   }
 
@@ -294,18 +388,31 @@
     },
 
     containsStandaloneMedia: function(root) {
+      return this.containsStandaloneMediaInContext(root, root);
+    },
+
+    containsStandaloneMediaInContext: function(root, contextRoot) {
       if (!root || isIgnoredNode(root, this.root)) return false;
-      if (root.nodeType === ELEMENT_NODE && isStandaloneMediaNode(root)) return true;
+      if (root.nodeType === ELEMENT_NODE && isStandaloneMediaNode(root, contextRoot || root)) return true;
       return childrenOf(root).some((function(child) {
-        return this.containsStandaloneMedia(child);
+        return this.containsStandaloneMediaInContext(child, contextRoot || root);
       }).bind(this));
+    },
+
+    isInlineMediaNode: function(node, contextRoot) {
+      return !!(
+        node &&
+        node.nodeType === ELEMENT_NODE &&
+        mediaTags.has(tagName(node)) &&
+        !isStandaloneMediaNode(node, contextRoot || this.root)
+      );
     },
 
     mediaUnits: function() {
       var result = [];
       var visit = (function(node) {
         if (!node || isIgnoredNode(node, this.root)) return;
-        if (node.nodeType === ELEMENT_NODE && isStandaloneMediaNode(node)) {
+        if (node.nodeType === ELEMENT_NODE && isStandaloneMediaNode(node, this.root)) {
           var renderRoot = this.renderRootForMediaNode(node);
           var position = this.sourcePositionForNode(renderRoot);
           result.push({

@@ -1068,6 +1068,45 @@ test('block mode splits oversized text blocks to keep every part reachable', asy
     assert.equal(currentScreen(reader).textContent, '次段落。');
 });
 
+test('block mode splits oversized text blocks that contain inline images', async () => {
+    const marker = image('images/marker.png', { id: 'marker' });
+    marker.naturalWidth = 48;
+    marker.naturalHeight = 48;
+    const body = bodyWith(element('blockquote', { id: 'quote' }, ['一二', marker, '三四五六']));
+    const { reader } = await initializeReader(body, {
+        mode: 'block',
+        revealSpeed: 0,
+        charactersPerScreen: 4,
+    });
+
+    assert.equal(currentScreen(reader).textContent, '一二三四');
+    assert.equal(currentScreen(reader).querySelector('#marker').getAttribute('src'), 'images/marker.png');
+    assert.equal(reader.screenIndexForFragment('quote'), 0);
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '五六');
+    assert.equal(currentScreen(reader).querySelector('#marker'), null);
+});
+
+test('block mode keeps leading inline images with the first split text screen', async () => {
+    const marker = image('images/marker.png', { id: 'marker' });
+    marker.naturalWidth = 48;
+    marker.naturalHeight = 48;
+    const body = bodyWith(element('blockquote', { id: 'quote' }, [marker, '一二三四五六']));
+    const { reader } = await initializeReader(body, {
+        mode: 'block',
+        revealSpeed: 0,
+        charactersPerScreen: 4,
+    });
+
+    assert.equal(currentScreen(reader).textContent, '一二三四');
+    assert.equal(currentScreen(reader).querySelector('#marker').getAttribute('src'), 'images/marker.png');
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '五六');
+    assert.equal(currentScreen(reader).querySelector('#marker'), null);
+});
+
 test('viewport fitting keeps ruby roots atomic when splitting oversized VN screens', async () => {
     const body = bodyWith(paragraphWith('一', rubyText('二三', 'にさん'), '四五'));
     const { reader } = await initializeReader(body, {

@@ -1341,25 +1341,132 @@ window.hoshiReader = {
   cloneRangesWithOffsets: function(ranges) {
     var fragment = document.createDocumentFragment();
     var cloneMap = new WeakMap();
+    var clonePreorder = new WeakMap();
     var clonedRubyRoots = new WeakSet();
+    var insertedInlineMedia = new WeakSet();
+    var boundsByRoot = [];
+    var topLevelSourceNodeFor = (sourceNode) => {
+      var current = sourceNode;
+      while (current && current.parentNode && current.parentNode !== this.sourceRoot) {
+        current = current.parentNode;
+      }
+      return current || sourceNode;
+    };
+    var boundsForRoot = (root) => {
+      for (var i = 0; i < boundsByRoot.length; i++) {
+        if (boundsByRoot[i].root === root) return boundsByRoot[i];
+      }
+      var bounds = { root: root, min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY, ranges: [] };
+      boundsByRoot.push(bounds);
+      return bounds;
+    };
+    var recordRangeBounds = (range) => {
+      var sourceNode = range.rubyRoot || range.node;
+      if (!sourceNode) return;
+      var root = topLevelSourceNodeFor(sourceNode);
+      var preorder = this.sourcePreorderForNode(sourceNode);
+      var bounds = boundsForRoot(root);
+      bounds.min = Math.min(bounds.min, preorder);
+      bounds.max = Math.max(bounds.max, preorder);
+      bounds.ranges.push(range);
+    };
+    ranges.forEach(recordRangeBounds);
+    var appendCloneInSourceOrder = (parentClone, cloneNode, preorder) => {
+      clonePreorder.set(cloneNode, preorder);
+      if (parentClone && parentClone.childNodes && parentClone.insertBefore) {
+        var children = Array.from(parentClone.childNodes);
+        for (var i = 0; i < children.length; i++) {
+          var childPreorder = clonePreorder.get(children[i]);
+          if (childPreorder !== undefined && childPreorder > preorder) {
+            parentClone.insertBefore(cloneNode, children[i]);
+            return;
+          }
+        }
+      }
+      parentClone.appendChild(cloneNode);
+    };
     var ensureElementClone = (sourceElement) => {
       if (cloneMap.has(sourceElement)) return cloneMap.get(sourceElement);
       var clone = sourceElement.cloneNode ? sourceElement.cloneNode(false) : document.createElement(sourceElement.tagName.toLowerCase());
       cloneMap.set(sourceElement, clone);
+      var preorder = this.sourcePreorderForNode(sourceElement);
       var parent = sourceElement.parentNode;
       if (!parent || parent === this.sourceRoot) {
-        fragment.appendChild(clone);
+        appendCloneInSourceOrder(fragment, clone, preorder);
       } else {
-        ensureElementClone(parent).appendChild(clone);
+        appendCloneInSourceOrder(ensureElementClone(parent), clone, preorder);
       }
       return clone;
     };
     var appendCloneUnderSourceParent = (sourceNode, cloneNode) => {
       var parent = sourceNode.parentNode;
+      var preorder = this.sourcePreorderForNode(sourceNode);
       if (!parent || parent === this.sourceRoot) {
-        fragment.appendChild(cloneNode);
+        appendCloneInSourceOrder(fragment, cloneNode, preorder);
       } else {
-        ensureElementClone(parent).appendChild(cloneNode);
+        appendCloneInSourceOrder(ensureElementClone(parent), cloneNode, preorder);
+      }
+    };
+    var isInlineMediaNodeForRangeClone = (sourceNode, contextRoot) => {
+      return !!(
+        this.contentStream &&
+        typeof this.contentStream.isInlineMediaNode === 'function' &&
+        this.contentStream.isInlineMediaNode(sourceNode, contextRoot)
+      );
+    };
+    var appendInlineMediaClone = (sourceNode) => {
+      if (insertedInlineMedia.has(sourceNode)) return;
+      insertedInlineMedia.add(sourceNode);
+      appendCloneUnderSourceParent(sourceNode, this.cloneSourceNodeWithOffsets(sourceNode));
+    };
+    var hasVisibleTextBetweenPreorder = (root, start, end) => {
+      var found = false;
+      var visit = (sourceNode) => {
+        if (found || !sourceNode) return;
+        if (sourceNode.nodeType === Node.TEXT_NODE) {
+          var preorder = this.sourcePreorderForNode(sourceNode);
+          if (preorder > start && preorder < end && !this.isIgnoredElement(sourceNode) && String(sourceNode.textContent || '').trim()) {
+            found = true;
+          }
+          return;
+        }
+        var children = Array.from(sourceNode.childNodes || []);
+        for (var i = 0; i < children.length; i++) visit(children[i]);
+      };
+      visit(root);
+      return found;
+    };
+    var rangeStartsAtSourceBoundary = (bounds) => {
+      return bounds.ranges.some((range) => {
+        var sourceNode = range.rubyRoot || range.node;
+        return this.sourcePreorderForNode(sourceNode) === bounds.min && (range.rubyRoot || range.start <= 0);
+      });
+    };
+    var rangeEndsAtSourceBoundary = (bounds) => {
+      return bounds.ranges.some((range) => {
+        var sourceNode = range.rubyRoot || range.node;
+        var textLength = range.node && range.node.textContent ? range.node.textContent.length : 0;
+        return this.sourcePreorderForNode(sourceNode) === bounds.max && (range.rubyRoot || range.end >= textLength);
+      });
+    };
+    var visitInlineMedia = (sourceNode, bounds) => {
+      if (!sourceNode || (sourceNode.nodeType !== Node.ELEMENT_NODE && sourceNode.nodeType !== Node.DOCUMENT_FRAGMENT_NODE)) return;
+      if (sourceNode.nodeType === Node.ELEMENT_NODE) {
+        var preorder = this.sourcePreorderForNode(sourceNode);
+        var insideRange = preorder > bounds.min && preorder < bounds.max;
+        var leadingBoundary = preorder < bounds.min && rangeStartsAtSourceBoundary(bounds) && !hasVisibleTextBetweenPreorder(bounds.root, preorder, bounds.min);
+        var trailingBoundary = preorder > bounds.max && rangeEndsAtSourceBoundary(bounds) && !hasVisibleTextBetweenPreorder(bounds.root, bounds.max, preorder);
+        if (
+          (insideRange || leadingBoundary || trailingBoundary) &&
+          isInlineMediaNodeForRangeClone(sourceNode, bounds.root)
+        ) {
+          appendInlineMediaClone(sourceNode);
+          return;
+        }
+      }
+      var children = Array.from(sourceNode.childNodes || []);
+      for (var i = 0; i < children.length; i++) {
+        visitInlineMedia(children[i], bounds);
       }
     };
     for (var i = 0; i < ranges.length; i++) {
@@ -1376,11 +1483,16 @@ window.hoshiReader = {
       this.rangeMap.registerCloneTextOffset(cloneText, range.chapterCharStart, range.chapterRawStart);
       var parent = range.node.parentNode;
       if (!parent || parent === this.sourceRoot) {
-        fragment.appendChild(cloneText);
+        appendCloneInSourceOrder(fragment, cloneText, this.sourcePreorderForNode(range.node));
       } else {
-        ensureElementClone(parent).appendChild(cloneText);
+        appendCloneInSourceOrder(ensureElementClone(parent), cloneText, this.sourcePreorderForNode(range.node));
       }
     }
+    boundsByRoot.forEach((bounds) => {
+      if (Number.isFinite(bounds.min) && Number.isFinite(bounds.max)) {
+        visitInlineMedia(bounds.root, bounds);
+      }
+    });
     return fragment;
   },
   setupReaderImage: function(element, src, wrap, blurElement) {
