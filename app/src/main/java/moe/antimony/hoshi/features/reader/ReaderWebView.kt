@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -50,7 +49,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiUiDependencies
-import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBook
@@ -88,7 +86,6 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchDependencies
-import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 
@@ -1585,17 +1582,7 @@ fun ReaderWebView(
                 stableStatusBarInsetDp = stableStatusBarPaddingDp,
             ),
     )
-    var showRestoreLoadingOverlay by remember { mutableStateOf(false) }
-    LaunchedEffect(stateHolder.isWebViewRestoring, stateHolder.webViewRestoreEpoch) {
-        showRestoreLoadingOverlay = false
-        if (stateHolder.isWebViewRestoring) {
-            delay(ReaderRestoreLoadingOverlayDelayMillis)
-            showRestoreLoadingOverlay = readerRestoreLoadingVisible(
-                isWebViewRestoring = stateHolder.isWebViewRestoring,
-                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis,
-            )
-        }
-    }
+    val restoreLoadingPresentation = readerRestoreLoadingPresentation(stateHolder.isWebViewRestoring)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1825,9 +1812,9 @@ fun ReaderWebView(
             metrics = bottomChromeMetrics,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
-        if (showRestoreLoadingOverlay) {
-            HoshiBlockingProgressOverlay(
-                message = stringResource(R.string.loading),
+        if (restoreLoadingPresentation == ReaderRestoreLoadingPresentation.StaticSpinner) {
+            ReaderLoadingPage(
+                backgroundColor = Color(effectiveSettings.backgroundColor(systemDarkTheme)),
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -1929,14 +1916,14 @@ fun ReaderWebView(
     }
 }
 
-internal const val ReaderRestoreLoadingOverlayDelayMillis = 700L
+internal enum class ReaderRestoreLoadingPresentation {
+    StaticSpinner,
+}
 
-internal fun readerRestoreLoadingVisible(
+internal fun readerRestoreLoadingPresentation(
     isWebViewRestoring: Boolean,
-    restoringForMillis: Long,
-): Boolean =
-    isWebViewRestoring &&
-        restoringForMillis >= ReaderRestoreLoadingOverlayDelayMillis
+): ReaderRestoreLoadingPresentation? =
+    if (isWebViewRestoring) ReaderRestoreLoadingPresentation.StaticSpinner else null
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

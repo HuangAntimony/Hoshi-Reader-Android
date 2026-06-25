@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import moe.antimony.hoshi.content.ContentLanguageProfile
+import moe.antimony.hoshi.features.reader.ReaderLoadingPage
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
 import kotlinx.coroutines.launch
@@ -143,14 +143,10 @@ internal fun ReaderRouteDestination(
     }
 
     when (val state = routeState) {
-        ReaderRouteRenderState.Loading -> Box(
-            modifier = modifier
-                .fillMaxSize()
-                .then(readerLoadingBackground),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator()
-        }
+        ReaderRouteRenderState.Loading -> ReaderLoadingPage(
+            backgroundColor = Color(readerSettings.backgroundColor(systemDarkTheme)),
+            modifier = modifier.fillMaxSize(),
+        )
         is ReaderRouteRenderState.Error -> Box(
             modifier = modifier
                 .fillMaxSize()

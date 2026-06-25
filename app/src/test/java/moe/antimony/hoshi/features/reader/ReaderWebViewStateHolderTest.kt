@@ -288,35 +288,28 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun restoreLoadingOverlayIgnoresShortRestoresAndShowsForLongRestores() {
+    fun restoreLoadingUsesStaticSpinnerImmediatelyWhileRestoring() {
         val holder = stateHolder(initialIndex = 2)
 
-        assertFalse(
-            readerRestoreLoadingVisible(
+        assertEquals(
+            ReaderRestoreLoadingPresentation.StaticSpinner,
+            readerRestoreLoadingPresentation(
                 isWebViewRestoring = holder.isWebViewRestoring,
-                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis - 1,
-            ),
-        )
-        assertTrue(
-            readerRestoreLoadingVisible(
-                isWebViewRestoring = holder.isWebViewRestoring,
-                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis,
             ),
         )
 
         holder.markWebViewRestored()
-        assertFalse(
-            readerRestoreLoadingVisible(
+        assertNull(
+            readerRestoreLoadingPresentation(
                 isWebViewRestoring = holder.isWebViewRestoring,
-                restoringForMillis = ReaderRestoreLoadingOverlayDelayMillis,
             ),
         )
 
         holder.goToNextChapter(lastIndex = 3)
-        assertFalse(
-            readerRestoreLoadingVisible(
+        assertEquals(
+            ReaderRestoreLoadingPresentation.StaticSpinner,
+            readerRestoreLoadingPresentation(
                 isWebViewRestoring = holder.isWebViewRestoring,
-                restoringForMillis = 0,
             ),
         )
     }
