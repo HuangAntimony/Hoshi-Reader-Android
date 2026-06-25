@@ -110,6 +110,7 @@ internal object ReaderPaginationScripts {
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
             .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
             .replace("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__", source.readerTextSemantics)
+            .replace("__HOSHI_READER_DOM_TEXT_SCRIPT__", source.readerDomText)
             .replace("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__", source.readerVnContentStream)
             .replace("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__", source.readerVnRangeMap)
             .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
@@ -151,6 +152,7 @@ private data class ReaderPaginationAssetSource(
     val visualNovel: String,
     val readerSasayaki: String,
     val readerTextSemantics: String,
+    val readerDomText: String,
     val readerVnContentStream: String,
     val readerVnRangeMap: String,
     val highlights: String,
@@ -164,6 +166,7 @@ private data class ReaderPaginationAssetSource(
                     visualNovel = assets.readerVisualNovelJs,
                     readerSasayaki = assets.readerSasayakiJs,
                     readerTextSemantics = assets.readerTextSemanticsJs,
+                    readerDomText = assets.readerDomTextJs,
                     readerVnContentStream = assets.readerVnContentStreamJs,
                     readerVnRangeMap = assets.readerVnRangeMapJs,
                     highlights = assets.highlightsJs,
@@ -182,6 +185,7 @@ private object SourceTreeReaderPaginationAssets {
             visualNovel = readSourceAsset("hoshi-web/reader/reader-visual-novel.js"),
             readerSasayaki = readSourceAsset("hoshi-web/reader/reader-sasayaki.js"),
             readerTextSemantics = readSourceAsset("hoshi-web/reader/reader-text-semantics.js"),
+            readerDomText = readSourceAsset("hoshi-web/reader/reader-dom-text.js"),
             readerVnContentStream = readSourceAsset("hoshi-web/reader/reader-vn-content-stream.js"),
             readerVnRangeMap = readSourceAsset("hoshi-web/reader/reader-vn-range-map.js"),
             highlights = readSourceAsset("hoshi-web/reader/highlights.js"),

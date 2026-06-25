@@ -88,6 +88,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader text semantics live in `reader-text-semantics.js` and are consumed by
   paginated, continuous, and VN assets for normalization, matchable character
   counting, raw character counting, and matchable-character checks.
+- Paginated and continuous share live DOM ruby/text normalization through
+  `reader-dom-text.js`; the mode assets keep thin public wrapper methods so
+  existing reader commands and tests continue to call the same surface.
 - VN reading uses VN-specific reader-web runtime primitives for chapter content
   streams and rendered range mapping. `reader-vn-content-stream.js` owns source
   text/raw offsets, matchable offsets, ruby-aware text entries, structural IDs,

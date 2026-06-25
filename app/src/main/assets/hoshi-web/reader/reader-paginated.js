@@ -1,4 +1,5 @@
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
+__HOSHI_READER_DOM_TEXT_SCRIPT__
 
 window.hoshiReader = {
   pageHeight: 0,
@@ -42,6 +43,12 @@ window.hoshiReader = {
   },
   isMatchableChar: function(char) {
     return this.textSemantics().isMatchableChar(char);
+  },
+  domText: function() {
+    if (!window.hoshiReaderDomText) {
+      throw new Error('hoshiReaderDomText is required for reader DOM text normalization');
+    }
+    return window.hoshiReaderDomText;
   },
   textOffsetForCharCount: function(node, targetCount) {
     var text = node.textContent || '';
@@ -260,80 +267,16 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     parents.forEach(function(parent) { self.normalizeReaderText(parent); });
   },
   normalizeReaderText: function(parent) {
-    if (!parent) return;
-    this.normalizeRubyTextNodes(parent);
-    parent.normalize();
-    this.stabilizeRubyAdjacentTextNodes(parent);
+    this.domText().normalizeReaderText(this, parent);
   },
   normalizeRubyTextNodes: function(root) {
-    var rubyNodes = new Set();
-    if (root && root.nodeType === Node.ELEMENT_NODE && String(root.tagName).toLowerCase() === 'ruby') {
-      rubyNodes.add(root);
-    }
-    var scope = root && root.querySelectorAll ? root : document;
-    Array.from(scope.querySelectorAll('ruby')).forEach(function(ruby) {
-      rubyNodes.add(ruby);
-    });
-    rubyNodes.forEach(function(ruby) {
-      Array.from(ruby.childNodes).forEach(function(node) {
-        if (node.nodeType !== Node.TEXT_NODE) return;
-        if (!node.nodeValue.trim()) {
-          ruby.removeChild(node);
-          return;
-        }
-        var wrapper = document.createElement('span');
-        ruby.insertBefore(wrapper, node);
-        wrapper.appendChild(node);
-      });
-    });
+    this.domText().normalizeRubyTextNodes(root);
   },
   isJapaneseBreakCharacter: function(text) {
-    var code = (text || '').codePointAt(0);
-    return (code >= 0x3000 && code <= 0x303f) ||
-      (code >= 0x3040 && code <= 0x30ff) ||
-      (code >= 0x3400 && code <= 0x9fff) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0xff00 && code <= 0xffef);
+    return this.domText().isJapaneseBreakCharacter(text);
   },
   stabilizeRubyAdjacentTextNodes: function(root) {
-    if (!this.isVertical()) return;
-    var self = this;
-    var splitLimit = 64;
-    var scope = root && root.querySelectorAll ? root : document;
-    var rubies = Array.from(scope.querySelectorAll('ruby'));
-    if (root && root.tagName && root.tagName.toLowerCase() === 'ruby') {
-      rubies.unshift(root);
-    }
-    rubies.forEach(function(ruby) {
-      if (ruby.closest('rt, rp')) return;
-      var node = ruby.nextSibling;
-      while (node && node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) {
-        node = node.nextSibling;
-      }
-      if (!node || node.nodeType !== Node.TEXT_NODE || !node.nodeValue) return;
-      var chars = Array.from(node.nodeValue);
-      if (chars.length <= 1) return;
-      var fragment = document.createDocumentFragment();
-      var pending = '';
-      var splitCount = 0;
-      var flush = function() {
-        if (!pending) return;
-        fragment.appendChild(document.createTextNode(pending));
-        pending = '';
-      };
-      chars.forEach(function(char) {
-        if (splitCount < splitLimit && self.isJapaneseBreakCharacter(char)) {
-          flush();
-          fragment.appendChild(document.createTextNode(char));
-          splitCount += 1;
-        } else {
-          pending += char;
-        }
-      });
-      if (splitCount === 0) return;
-      flush();
-      node.replaceWith(fragment);
-    });
+    this.domText().stabilizeRubyAdjacentTextNodes(this, root);
   },
   getScrollContext: function() {
     var vertical = this.isVertical();

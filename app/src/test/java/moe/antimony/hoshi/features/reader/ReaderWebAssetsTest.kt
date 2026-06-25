@@ -17,6 +17,7 @@ class ReaderWebAssetsTest {
             "hoshi-web/reader/reader-continuous.js",
             "hoshi-web/reader/reader-visual-novel.js",
             "hoshi-web/reader/reader-text-semantics.js",
+            "hoshi-web/reader/reader-dom-text.js",
             "hoshi-web/reader/reader-vn-content-stream.js",
             "hoshi-web/reader/reader-vn-range-map.js",
             "hoshi-web/reader/highlights.js",

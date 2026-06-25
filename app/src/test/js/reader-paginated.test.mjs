@@ -7,9 +7,14 @@ const readerPaginatedUrl = new URL('../../main/assets/hoshi-web/reader/reader-pa
 const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-continuous.js', import.meta.url);
 const readerSasayakiUrl = new URL('../../main/assets/hoshi-web/reader/reader-sasayaki.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
+const readerDomTextUrl = new URL('../../main/assets/hoshi-web/reader/reader-dom-text.js', import.meta.url);
 
 function readerTextSemanticsSource() {
     return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
+}
+
+function readerDomTextSource() {
+    return fs.readFileSync(readerDomTextUrl, 'utf8');
 }
 
 function readerSource(url, options = {}) {
@@ -18,6 +23,7 @@ function readerSource(url, options = {}) {
         .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', '')
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
         .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
+        .replace('__HOSHI_READER_DOM_TEXT_SCRIPT__', options.domTextScript ?? readerDomTextSource())
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
@@ -536,6 +542,29 @@ test('paged and continuous readers use shared text semantics', () => {
 
         assert.equal(reader.countChars('一、二'), 2);
         assert.equal(countCalls, 1);
+    });
+});
+
+test('paged and continuous readers use shared DOM text normalization', () => {
+    [readerPaginatedUrl, readerContinuousUrl].forEach((sourceUrl) => {
+        const body = new TestElement('body');
+        const { paragraph, ruby } = rubyParagraphWithWhitespaceTextNodes();
+        body.appendChild(paragraph);
+
+        const { reader, window } = loadReader(body, sourceUrl);
+        reader.isVertical = () => true;
+        const originalNormalizeReaderText = window.hoshiReaderDomText.normalizeReaderText;
+        let normalizeCalls = 0;
+        window.hoshiReaderDomText.normalizeReaderText = (context, parent) => {
+            normalizeCalls += 1;
+            return originalNormalizeReaderText(context, parent);
+        };
+
+        reader.normalizeReaderText(paragraph);
+
+        assert.equal(normalizeCalls, 1);
+        assert.equal(paragraph.textContent, '進藤歩あゆむ。それ');
+        assert.ok(textRunAfter(ruby).includes('。'));
     });
 });
 
