@@ -1382,6 +1382,17 @@ test('jumpToFragment lands on the screen containing a matching id and renders it
     assert.equal(currentScreen(reader).querySelectorAll('[data-hoshi-visual-novel-unrevealed]').length, 0);
 });
 
+test('jumpToFragment lands on a media-only visual novel screen', async () => {
+    const body = bodyWith(p('序。'), imageBlock('images/cover.jpg', { id: 'cover' }), p('本文。'));
+    const { reader } = await initializeReader(body, { revealSpeed: 10 });
+
+    assert.equal(await reader.jumpToFragment('cover'), true);
+
+    assert.equal(currentScreen(reader).querySelector('#cover').id, 'cover');
+    assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/cover.jpg');
+    assert.equal(currentScreen(reader).querySelectorAll('[data-hoshi-visual-novel-unrevealed]').length, 0);
+});
+
 test('initial fragment on the first visual novel screen renders fully', async () => {
     const body = bodyWith(p('序。', { id: 'intro' }), p('次。'));
     const { reader } = await initializeReader(body, {

@@ -21,11 +21,6 @@ window.hoshiReader = {
   cueGeometryRanges: new Map(),
   nodeStartOffsets: new WeakMap(),
   nodeStartRawOffsets: new WeakMap(),
-  sourceTextOffsets: new WeakMap(),
-  sourceTextRawOffsets: new WeakMap(),
-  sourceNodeStats: new WeakMap(),
-  sourceOrderIndexes: new WeakMap(),
-  sourcePreorderIndexes: new WeakMap(),
   contentStream: null,
   rangeMap: null,
   cloneTextOffsets: new WeakMap(),
@@ -138,8 +133,8 @@ window.hoshiReader = {
     var rawOffsets = new WeakMap();
     var walker = this.createWalker();
     var currentScreen = this.screens && this.screens[this.currentScreenIndex];
-    var fallbackCount = currentScreen ? (currentScreen.startCharCount || 0) : 0;
-    var fallbackRawCount = currentScreen ? (currentScreen.startRawCount || 0) : 0;
+    var fallbackCount = currentScreen ? this.screenStartCharCount(currentScreen) : 0;
+    var fallbackRawCount = currentScreen ? this.screenStartRawCount(currentScreen) : 0;
     var node;
     while (node = walker.nextNode()) {
       var mappedCount = this.cloneTextOffsets.get(node);
@@ -223,34 +218,7 @@ window.hoshiReader = {
     }
     this.contentStream = contentStreamFactory(this.sourceRoot);
     this.rangeMap = rangeMapFactory(this);
-    this.sourceTextOffsets = this.contentStream.sourceTextOffsets;
-    this.sourceTextRawOffsets = this.contentStream.sourceTextRawOffsets;
-    this.sourceNodeStats = this.contentStream.sourceNodeStats;
-    this.sourceOrderIndexes = this.contentStream.sourceOrderIndexes;
-    this.sourcePreorderIndexes = this.contentStream.sourcePreorderIndexes;
-    this.sourceEntries = this.contentStream.textEntries;
     this.totalChapterChars = this.contentStream.totalMatchableChars;
-  },
-  updateSourceNodeStats: function(node, entry) {
-    var current = node;
-    while (current && current !== this.sourceRoot) {
-      var stats = this.sourceNodeStats.get(current);
-      if (!stats) {
-        this.sourceNodeStats.set(current, {
-          hasText: true,
-          startChar: entry.startChar,
-          endChar: entry.endChar,
-          startRaw: entry.startRaw,
-          endRaw: entry.endRaw
-        });
-      } else {
-        stats.startChar = Math.min(stats.startChar, entry.startChar);
-        stats.endChar = Math.max(stats.endChar, entry.endChar);
-        stats.startRaw = Math.min(stats.startRaw, entry.startRaw);
-        stats.endRaw = Math.max(stats.endRaw, entry.endRaw);
-      }
-      current = current.parentNode;
-    }
   },
   buildScreens: function() {
     var mode = String(this.screenMode || '').toLowerCase();
@@ -263,7 +231,7 @@ window.hoshiReader = {
     this.baseScreens = baseScreens;
     this.screens = this.mergeSasayakiCrossScreenScreens(baseScreens);
     if (!this.screens.length) {
-      this.screens.push({
+      this.screens.push(this.screenDescriptor({
         startCharCount: 0,
         endCharCount: 0,
         startRawCount: 0,
@@ -271,9 +239,74 @@ window.hoshiReader = {
         ids: new Set(),
         splittable: false,
         render: () => document.createDocumentFragment()
-      });
+      }));
     }
     this.screens = this.fitScreensToViewport(this.screens);
+  },
+  screenDescriptor: function(options) {
+    var source = options || {};
+    var startChar = this.normalizedScreenCount(source.startCharCount, 0);
+    var endChar = Math.max(startChar, this.normalizedScreenCount(source.endCharCount, startChar));
+    var startRaw = this.normalizedScreenCount(source.startRawCount, 0);
+    var endRaw = Math.max(startRaw, this.normalizedScreenCount(source.endRawCount, startRaw));
+    var render = typeof source.render === 'function'
+      ? source.render
+      : function() { return document.createDocumentFragment(); };
+    return {
+      standalone: !!source.standalone,
+      order: source.order,
+      preorder: source.preorder,
+      startCharCount: startChar,
+      endCharCount: endChar,
+      startRawCount: startRaw,
+      endRawCount: endRaw,
+      ids: source.ids instanceof Set ? new Set(source.ids) : new Set(source.ids || []),
+      splittable: !!source.splittable,
+      mediaStop: !!source.mediaStop,
+      render: render
+    };
+  },
+  normalizedScreenCount: function(value, fallback) {
+    var parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(0, parsed);
+  },
+  screenStartCharCount: function(screen) {
+    return this.normalizedScreenCount(screen && screen.startCharCount, 0);
+  },
+  screenEndCharCount: function(screen) {
+    return Math.max(this.screenStartCharCount(screen), this.normalizedScreenCount(screen && screen.endCharCount, this.screenStartCharCount(screen)));
+  },
+  screenStartRawCount: function(screen) {
+    return this.normalizedScreenCount(screen && screen.startRawCount, 0);
+  },
+  screenEndRawCount: function(screen) {
+    return Math.max(this.screenStartRawCount(screen), this.normalizedScreenCount(screen && screen.endRawCount, this.screenStartRawCount(screen)));
+  },
+  screenIds: function(screen) {
+    return screen && screen.ids instanceof Set ? screen.ids : new Set();
+  },
+  screenContainsFragment: function(screen, fragment) {
+    return this.screenIds(screen).has(fragment);
+  },
+  screenContainsCharOffset: function(screen, offset) {
+    var start = this.screenStartCharCount(screen);
+    var end = this.screenEndCharCount(screen);
+    return offset >= start && offset < end;
+  },
+  screenIntersectsCharRange: function(screen, start, end) {
+    var screenStart = this.screenStartCharCount(screen);
+    var screenEnd = this.screenEndCharCount(screen);
+    if (end <= start) return start >= screenStart && start <= screenEnd;
+    return end > screenStart && start < screenEnd;
+  },
+  progressTargetCharCount: function(progress) {
+    var clamped = Math.min(1, Math.max(0, Number(progress) || 0));
+    return Math.ceil(this.totalChapterChars * clamped);
+  },
+  progressForScreen: function(screen) {
+    if (!this.totalChapterChars) return 0;
+    return Math.min(1, Math.max(0, this.screenEndCharCount(screen) / this.totalChapterChars));
   },
   mergeSasayakiCrossScreenScreens: function(screens) {
     if (!this.mergeCrossScreenSasayakiCues || !Array.isArray(screens) || screens.length < 2) return screens || [];
@@ -299,18 +332,18 @@ window.hoshiReader = {
       var cueEnd = this.sasayakiCueEnd(cue);
       var zeroLengthCue = cueEnd <= cueStart;
       while (searchStart < screens.length) {
-        var screenEnd = Number(screens[searchStart].endCharCount) || 0;
+        var screenEnd = this.screenEndCharCount(screens[searchStart]);
         if (zeroLengthCue) {
           if (cueStart <= screenEnd) break;
-        } else if (cueEnd > (Number(screens[searchStart].startCharCount) || 0)) {
+        } else if (cueEnd > this.screenStartCharCount(screens[searchStart])) {
           if (cueStart < screenEnd) break;
         }
         searchStart += 1;
       }
       for (var screenIndex = searchStart; screenIndex < screens.length; screenIndex++) {
         var screen = screens[screenIndex];
-        var screenStart = Number(screen.startCharCount) || 0;
-        var screenEnd = Number(screen.endCharCount) || 0;
+        var screenStart = this.screenStartCharCount(screen);
+        var screenEnd = this.screenEndCharCount(screen);
         if (!this.sasayakiCueIntersectsScreen(cue, screen)) {
           if (zeroLengthCue ? cueStart < screenStart : cueEnd <= screenStart) break;
           continue;
@@ -373,15 +406,15 @@ window.hoshiReader = {
     });
     var first = parts[0];
     var last = parts[parts.length - 1];
-    return {
-      startCharCount: first.startCharCount,
+    return this.screenDescriptor({
+      startCharCount: this.screenStartCharCount(first),
       endCharCount: parts.reduce(function(max, screen) {
-        return Math.max(max, screen.endCharCount);
-      }, first.endCharCount),
-      startRawCount: first.startRawCount,
+        return Math.max(max, this.screenEndCharCount(screen));
+      }.bind(this), this.screenEndCharCount(first)),
+      startRawCount: this.screenStartRawCount(first),
       endRawCount: parts.reduce(function(max, screen) {
-        return Math.max(max, screen.endRawCount);
-      }, last.endRawCount),
+        return Math.max(max, this.screenEndRawCount(screen));
+      }.bind(this), this.screenEndRawCount(last)),
       ids: ids,
       splittable: true,
       mediaStop: parts.some(function(screen) { return !!screen.mediaStop; }),
@@ -392,7 +425,7 @@ window.hoshiReader = {
         });
         return fragment;
       }
-    };
+    });
   },
   fitScreensToViewport: function(screens) {
     if (!screens || !screens.length || !this.stage || !this.screen) return screens || [];
@@ -586,8 +619,8 @@ window.hoshiReader = {
   },
   textItemsForScreen: function(screen) {
     if (!this.viewportFitTextItems) this.viewportFitTextItems = this.buildTextItems();
-    var startRaw = Number(screen.startRawCount) || 0;
-    var endRaw = Number(screen.endRawCount) || startRaw;
+    var startRaw = this.screenStartRawCount(screen);
+    var endRaw = this.screenEndRawCount(screen);
     var items = this.viewportFitTextItems;
     var startIndex = this.lowerBoundTextItemsByRawStart(items, startRaw);
     var result = [];
@@ -619,7 +652,7 @@ window.hoshiReader = {
       this.collectIdsForTextNode(range.node).forEach((id) => ids.add(id));
     });
     var first = slice[0];
-    return {
+    return this.screenDescriptor({
       startCharCount: first.chapterCharStart,
       endCharCount: slice.reduce(function(max, item) {
         return Math.max(max, item.chapterCharEnd);
@@ -632,7 +665,7 @@ window.hoshiReader = {
       splittable: false,
       mediaStop: false,
       render: () => this.cloneRangesWithOffsets(ranges)
-    };
+    });
   },
   buildBlockScreens: function() {
     var screens = [];
@@ -656,7 +689,7 @@ window.hoshiReader = {
       var rawEnd = stats.hasText ? stats.endRaw : rawStart;
       runningEnd = end;
       runningRawEnd = rawEnd;
-      screens.push({
+      screens.push(this.screenDescriptor({
         startCharCount: start,
         endCharCount: end,
         startRawCount: rawStart,
@@ -669,7 +702,7 @@ window.hoshiReader = {
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
           return fragment;
         }
-      });
+      }));
     }
     return screens;
   },
@@ -823,7 +856,7 @@ window.hoshiReader = {
     });
     let firstUnit = groupedUnits[0];
     let lastUnit = groupedUnits[groupedUnits.length - 1];
-    return {
+    return this.screenDescriptor({
       startCharCount: firstUnit.startCharCount,
       endCharCount: lastUnit.endCharCount,
       startRawCount: firstUnit.startRawCount,
@@ -832,7 +865,7 @@ window.hoshiReader = {
       splittable: true,
       mediaStop: groupedUnits.some(function(unit) { return !!unit.mediaStop; }),
       render: () => this.cloneRangesWithOffsets(ranges)
-    };
+    });
   },
   buildSentenceAtomicRoots: function() {
     var roots = new WeakSet();
@@ -864,7 +897,7 @@ window.hoshiReader = {
       }
       var position = stats.hasText ? stats : this.sourcePositionForNode(child, i);
       var hasStandaloneMedia = child.nodeType === Node.ELEMENT_NODE && this.containsStandaloneMedia(child);
-      units.push({
+      units.push(this.screenDescriptor({
         standalone: true,
         order: this.sourceOrderForNode(child),
         preorder: this.sourcePreorderForNode(child),
@@ -880,29 +913,9 @@ window.hoshiReader = {
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
           return fragment;
         }
-      });
+      }));
     }
     return units;
-  },
-  sourcePositionForTopLevelNode: function(order) {
-    var previous = null;
-    for (var i = 0; i < this.sourceEntries.length; i++) {
-      var entry = this.sourceEntries[i];
-      var entryOrder = this.sourceOrderForTextNode(entry.node);
-      if (entryOrder > order) {
-        return {
-          hasText: false,
-          startChar: entry.startChar,
-          endChar: entry.startChar,
-          startRaw: entry.startRaw,
-          endRaw: entry.startRaw
-        };
-      }
-      if (entryOrder < order) previous = entry;
-    }
-    var char = previous ? previous.endChar : 0;
-    var raw = previous ? previous.endRaw : 0;
-    return { hasText: false, startChar: char, endChar: char, startRaw: raw, endRaw: raw };
   },
   sourcePositionForNode: function(node, fallbackOrder) {
     var stats = this.statsForSourceNode(node);
@@ -910,7 +923,7 @@ window.hoshiReader = {
     if (this.contentStream && typeof this.contentStream.sourcePositionForNode === 'function') {
       return this.contentStream.sourcePositionForNode(node);
     }
-    return this.sourcePositionForTopLevelNode(fallbackOrder);
+    return { hasText: false, startChar: 0, endChar: 0, startRaw: 0, endRaw: 0 };
   },
   containsStandaloneMedia: function(root) {
     if (this.contentStream && typeof this.contentStream.containsStandaloneMedia === 'function') {
@@ -953,7 +966,7 @@ window.hoshiReader = {
   },
   screenFromMediaUnit: function(unit, extraIds) {
     var ids = this.mergeIds(extraIds || new Set(), unit.ids || new Set());
-    return {
+    return this.screenDescriptor({
       standalone: true,
       order: unit.sourceOrder,
       preorder: unit.preorder,
@@ -969,7 +982,7 @@ window.hoshiReader = {
         fragment.appendChild(this.cloneMediaUnit(unit));
         return fragment;
       }
-    };
+    });
   },
   cloneMediaUnit: function(unit) {
     var renderSource = this.renderSourceForMediaUnit(unit);
@@ -1085,51 +1098,13 @@ window.hoshiReader = {
       var streamItems = this.contentStream.textItems();
       return streamItems.filter((item) => !this.isSentenceAtomicTextNode(item.node));
     }
-    var items = [];
-    for (var e = 0; e < this.sourceEntries.length; e++) {
-      var entry = this.sourceEntries[e];
-      if (this.isSentenceAtomicTextNode(entry.node)) continue;
-      var text = entry.text;
-      var offset = 0;
-      var rawOffset = 0;
-      var matchableOffset = 0;
-      while (offset < text.length) {
-        var char = String.fromCodePoint(text.codePointAt(offset));
-        var next = offset + char.length;
-        var isMatchable = this.isMatchableChar(char);
-        items.push({
-          node: entry.node,
-          order: this.sourceOrderForTextNode(entry.node),
-          char: char,
-          start: offset,
-          end: next,
-          chapterRawStart: entry.startRaw + rawOffset,
-          chapterRawEnd: entry.startRaw + rawOffset + 1,
-          chapterCharStart: entry.startChar + matchableOffset,
-          chapterCharEnd: entry.startChar + matchableOffset + (isMatchable ? 1 : 0)
-        });
-        if (isMatchable) matchableOffset += 1;
-        rawOffset += 1;
-        offset = next;
-      }
-    }
-    return items;
+    return [];
   },
   sourceOrderForTextNode: function(node) {
     if (this.contentStream && typeof this.contentStream.sourceOrderForTextNode === 'function') {
       return this.contentStream.sourceOrderForTextNode(node);
     }
-    var root = this.topLevelSourceNode(node);
-    var order = this.sourceOrderIndexes && this.sourceOrderIndexes.get(root);
-    if (order !== undefined) return order;
-    return Array.from(this.sourceRoot.childNodes).indexOf(root);
-  },
-  topLevelSourceNode: function(node) {
-    var current = node;
-    while (current && current.parentNode && current.parentNode !== this.sourceRoot) {
-      current = current.parentNode;
-    }
-    return current;
+    return 0;
   },
   isSentenceAtomicTextNode: function(node) {
     if (!this.sentenceAtomicRoots) return false;
@@ -1144,10 +1119,7 @@ window.hoshiReader = {
     if (this.contentStream && typeof this.contentStream.sourceOrderForNode === 'function') {
       return this.contentStream.sourceOrderForNode(node);
     }
-    var root = this.topLevelSourceNode(node);
-    var order = this.sourceOrderIndexes && this.sourceOrderIndexes.get(root);
-    if (order !== undefined) return order;
-    return Array.from(this.sourceRoot.childNodes).indexOf(root);
+    return 0;
   },
   sourcePreorderForNode: function(node) {
     if (this.contentStream && typeof this.contentStream.sourcePreorderForNode === 'function') {
@@ -1210,7 +1182,10 @@ window.hoshiReader = {
     return Math.min(12, Math.max(1, Math.floor(parsed)));
   },
   statsForSourceNode: function(root) {
-    return this.sourceNodeStats.get(root) || { hasText: false, startChar: 0, endChar: 0, startRaw: 0, endRaw: 0 };
+    if (this.contentStream && typeof this.contentStream.statsForNode === 'function') {
+      return this.contentStream.statsForNode(root);
+    }
+    return { hasText: false, startChar: 0, endChar: 0, startRaw: 0, endRaw: 0 };
   },
   isDescendantOf: function(node, root) {
     var current = node;
@@ -1252,8 +1227,8 @@ window.hoshiReader = {
   cloneSourceNodeWithOffsets: function(sourceNode) {
     if (sourceNode.nodeType === Node.TEXT_NODE) {
       var cloneText = document.createTextNode(sourceNode.textContent || '');
-      var charOffset = this.sourceTextOffsets.get(sourceNode);
-      var rawOffset = this.sourceTextRawOffsets.get(sourceNode);
+      var charOffset = this.sourceTextOffsetForNode(sourceNode);
+      var rawOffset = this.sourceTextRawOffsetForNode(sourceNode);
       if (charOffset !== undefined || rawOffset !== undefined) {
         this.registerCloneTextOffset(cloneText, charOffset, rawOffset);
       }
@@ -1271,6 +1246,14 @@ window.hoshiReader = {
       clone.appendChild(this.cloneSourceNodeWithOffsets(children[i]));
     }
     return clone;
+  },
+  sourceTextOffsetForNode: function(node) {
+    if (!this.contentStream || !this.contentStream.sourceTextOffsets) return undefined;
+    return this.contentStream.sourceTextOffsets.get(node);
+  },
+  sourceTextRawOffsetForNode: function(node) {
+    if (!this.contentStream || !this.contentStream.sourceTextRawOffsets) return undefined;
+    return this.contentStream.sourceTextRawOffsets.get(node);
   },
   cloneRangesWithOffsets: function(ranges) {
     var fragment = document.createDocumentFragment();
@@ -1600,14 +1583,13 @@ window.hoshiReader = {
   },
   calculateProgress: function() {
     if (!this.totalChapterChars || !this.screens.length) return 0;
-    var screen = this.screens[this.currentScreenIndex];
-    return Math.min(1, Math.max(0, screen.endCharCount / this.totalChapterChars));
+    return this.progressForScreen(this.screens[this.currentScreenIndex]);
   },
   screenIndexForProgress: function(progress) {
     if (!this.screens.length) return 0;
-    var target = Math.ceil(this.totalChapterChars * Math.min(1, Math.max(0, Number(progress) || 0)));
+    var target = this.progressTargetCharCount(progress);
     for (var i = 0; i < this.screens.length; i++) {
-      if (this.screens[i].endCharCount >= target) return i;
+      if (this.screenEndCharCount(this.screens[i]) >= target) return i;
     }
     return this.screens.length - 1;
   },
@@ -1620,7 +1602,7 @@ window.hoshiReader = {
     var raw = (fragment || '').trim();
     if (!raw) return -1;
     for (var i = 0; i < this.screens.length; i++) {
-      if (this.screens[i].ids.has(raw)) return i;
+      if (this.screenContainsFragment(this.screens[i], raw)) return i;
     }
     return -1;
   },
@@ -1677,15 +1659,13 @@ window.hoshiReader = {
     if (!cue || !screen) return false;
     var start = this.sasayakiCueStart(cue);
     var end = this.sasayakiCueEnd(cue);
-    if (end <= start) return start >= screen.startCharCount && start <= screen.endCharCount;
-    return end > screen.startCharCount && start < screen.endCharCount;
+    return this.screenIntersectsCharRange(screen, start, end);
   },
   screenIndexForSasayakiCue: function(cue) {
     if (!cue || !this.screens || !this.screens.length) return -1;
     var start = this.sasayakiCueStart(cue);
     for (var i = 0; i < this.screens.length; i++) {
-      var screen = this.screens[i];
-      if (start >= screen.startCharCount && start < screen.endCharCount) return i;
+      if (this.screenContainsCharOffset(this.screens[i], start)) return i;
     }
     for (var j = 0; j < this.screens.length; j++) {
       if (this.sasayakiCueIntersectsScreen(cue, this.screens[j])) return j;
