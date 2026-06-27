@@ -1733,8 +1733,8 @@ window.hoshiReader = {
   },
   applyCurrentScreenHighlights: function() {
     var highlights = Array.isArray(this.initialHighlights) ? this.initialHighlights : [];
-    if (!highlights.length || !window.hoshiHighlights || typeof window.hoshiHighlights.applyHighlights !== 'function') return;
     this.patchHighlightsForVisualNovel();
+    if (!highlights.length || !window.hoshiHighlights || typeof window.hoshiHighlights.applyHighlights !== 'function') return;
     this.clearCurrentHighlightWrappers();
     window.hoshiHighlights.applyHighlights(highlights);
   },

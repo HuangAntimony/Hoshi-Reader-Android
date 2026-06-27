@@ -412,6 +412,10 @@ class TestFragment extends TestNode {
         return clone;
     }
 
+    querySelectorAll(selector) {
+        return querySelectorAll(this, selector);
+    }
+
     get textContent() {
         return this.childNodes.map((child) => child.textContent).join('');
     }
@@ -446,6 +450,25 @@ class TestRange {
     setEnd(node, offset = node.textContent?.length ?? 0) {
         this.endNode = node;
         this.endOffset = offset;
+    }
+
+    get startContainer() {
+        return this.startNode;
+    }
+
+    get endContainer() {
+        return this.endNode;
+    }
+
+    get collapsed() {
+        return this.startNode === this.endNode && this.startOffset === this.endOffset;
+    }
+
+    cloneContents() {
+        const fragment = new TestFragment();
+        if (this.startNode !== this.endNode || this.startNode?.nodeType !== 3) return fragment;
+        fragment.appendChild(new TestText(this.startNode.nodeValue.slice(this.startOffset, this.endOffset)));
+        return fragment;
     }
 
     extractContents() {
@@ -1691,6 +1714,39 @@ test('visual novel highlight segments use chapter-level raw offsets on later scr
     assert.equal(segments[0].node.textContent, 'うえ');
     assert.equal(segments[0].start, 0);
     assert.equal(segments[0].end, 2);
+});
+
+test('visual novel first created highlight wraps the current screen immediately', async () => {
+    const { reader, document, window } = await initializeReader(bodyWith(p('あ、い'), p('うえ')), {
+        revealSpeed: 0,
+        highlightsScript: readerHighlightsSource(),
+    });
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    const textNode = collectTextNodes(currentScreen(reader))[0];
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 2);
+    window.getSelection = () => ({
+        rangeCount: 1,
+        getRangeAt: () => range,
+        removeAllRanges() {},
+    });
+
+    const result = window.hoshiHighlights.createHighlight('pink', 'first');
+
+    assert.equal(result.start, 2);
+    assert.equal(result.offset, 3);
+    assert.equal(result.text, 'うえ');
+    assert.deepEqual(
+        currentScreen(reader).querySelectorAll('.hoshi-highlight').map((node) => node.textContent),
+        ['うえ'],
+    );
+    assert.equal(window.hoshiHighlights.wrappers.get('first').length, 1);
+    assert.equal(
+        JSON.stringify(reader.initialHighlights),
+        JSON.stringify([{ id: 'first', color: 'pink', offset: 3, text: 'うえ' }]),
+    );
 });
 
 test('visual novel persisted highlights wrap only the visible raw range on each screen', async () => {
