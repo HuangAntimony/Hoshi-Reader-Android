@@ -34,6 +34,21 @@ class AudioSourceResolverTest {
     }
 
     @Test
+    fun localAudioPrefersExactTermAndReadingBeforeReadingFallbackAcrossSources() {
+        val match = LocalAudioResolver.resolve(
+            term = "食べる",
+            reading = "たべる",
+            sourceOrder = listOf("forvo", "nhk16"),
+            rows = listOf(
+                LocalAudioEntry(source = "forvo", expression = "食べない", reading = "たべる", file = "audio/reading.mp3"),
+                LocalAudioEntry(source = "nhk16", expression = "食べる", reading = "たべる", file = "audio/exact.mp3"),
+            ),
+        )
+
+        assertEquals(LocalAudioEntry(source = "nhk16", expression = "食べる", reading = "たべる", file = "audio/exact.mp3"), match)
+    }
+
+    @Test
     fun localAudioFallsBackToDefaultSourceOrder() {
         val match = LocalAudioResolver.resolve(
             term = "お冷や",

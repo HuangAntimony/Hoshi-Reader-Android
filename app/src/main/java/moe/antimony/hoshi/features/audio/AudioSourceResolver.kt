@@ -40,7 +40,7 @@ object LocalAudioResolver {
             .filter { isSupportedAudioFile(it.file) }
             .sortedWith(
                 compareBy<LocalAudioEntry> {
-                    if (normalizedReading.isNotBlank() && it.reading == normalizedReading) 0 else 1
+                    it.localAudioMatchRank(term, normalizedReading)
                 }.thenBy {
                     sourceRank[it.source] ?: Int.MAX_VALUE
                 }.thenBy {
@@ -76,6 +76,17 @@ object LocalAudioResolver {
             "opus", "ogg" -> "audio/ogg"
             else -> "application/octet-stream"
         }
+
+    private fun LocalAudioEntry.localAudioMatchRank(term: String, normalizedReading: String): Int {
+        val readingMatches = normalizedReading.isNotBlank() && reading == normalizedReading
+        val expressionMatches = expression == term
+        return when {
+            readingMatches && expressionMatches -> 0
+            readingMatches -> 1
+            expressionMatches -> 2
+            else -> 3
+        }
+    }
 
     fun katakanaToHiragana(text: String): String {
         val builder = StringBuilder()
