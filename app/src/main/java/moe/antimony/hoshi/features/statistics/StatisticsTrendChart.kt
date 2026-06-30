@@ -161,8 +161,38 @@ private fun DrawScope.drawTrendChart(
     axisLabels: TrendAxisLabels,
 ) {
     if (points.size < 2) return
-    val marginLeft = 32.dp.toPx()
-    val marginRight = 38.dp.toPx()
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = labelColor.toArgb()
+        textSize = 10.dp.toPx()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    val durationPaint = Paint(labelPaint).apply { color = durationColor.toArgb() }
+    val characterPaint = Paint(labelPaint).apply {
+        color = characterColor.toArgb()
+        textAlign = Paint.Align.RIGHT
+    }
+    val xLabelPaint = Paint(labelPaint).apply {
+        color = labelColor.toArgb()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+    val axisMargins = trendChartAxisMargins(
+        leftLabelWidthsPx = listOf(
+            durationPaint.measureText(axisLabels.durationTop),
+            labelPaint.measureText(axisLabels.durationMiddle),
+            labelPaint.measureText(axisLabels.durationBottom),
+        ),
+        rightLabelWidthsPx = listOf(
+            characterPaint.measureText(axisLabels.charactersTop),
+            characterPaint.measureText(axisLabels.charactersMiddle),
+            characterPaint.measureText(axisLabels.charactersBottom),
+        ),
+        minLeftPx = 32.dp.toPx(),
+        minRightPx = 38.dp.toPx(),
+        labelPaddingPx = 6.dp.toPx(),
+    )
+    val marginLeft = axisMargins.leftPx
+    val marginRight = axisMargins.rightPx
     val marginTop = 16.dp.toPx()
     val marginBottom = 28.dp.toPx()
     val plotLeft = marginLeft
@@ -204,21 +234,6 @@ private fun DrawScope.drawTrendChart(
     durationOffsets.forEach { offset -> drawCircle(durationColor, pointRadius, offset) }
     characterOffsets.forEach { offset -> drawCircle(characterColor, pointRadius, offset) }
 
-    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = labelColor.toArgb()
-        textSize = 10.dp.toPx()
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    }
-    val durationPaint = Paint(labelPaint).apply { color = durationColor.toArgb() }
-    val characterPaint = Paint(labelPaint).apply {
-        color = characterColor.toArgb()
-        textAlign = Paint.Align.RIGHT
-    }
-    val xLabelPaint = Paint(labelPaint).apply {
-        color = labelColor.toArgb()
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        textAlign = Paint.Align.CENTER
-    }
     drawIntoCanvas { canvas ->
         val nativeCanvas = canvas.nativeCanvas
         val middleY = plotTop + plotHeight / 2f + 3.dp.toPx()
@@ -240,6 +255,23 @@ private fun DrawScope.drawTrendChart(
         }
     }
 }
+
+internal data class TrendChartAxisMargins(
+    val leftPx: Float,
+    val rightPx: Float,
+)
+
+internal fun trendChartAxisMargins(
+    leftLabelWidthsPx: List<Float>,
+    rightLabelWidthsPx: List<Float>,
+    minLeftPx: Float,
+    minRightPx: Float,
+    labelPaddingPx: Float,
+): TrendChartAxisMargins =
+    TrendChartAxisMargins(
+        leftPx = max(minLeftPx, leftLabelWidthsPx.maxOrNull().orZero() + labelPaddingPx),
+        rightPx = max(minRightPx, rightLabelWidthsPx.maxOrNull().orZero() + labelPaddingPx),
+    )
 
 private fun DrawScope.drawTrendPath(
     offsets: List<Offset>,
@@ -287,3 +319,5 @@ private data class TrendAxisLabels(
     val charactersMiddle: String,
     val charactersBottom: String,
 )
+
+private fun Float?.orZero(): Float = this ?: 0f
