@@ -7,6 +7,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.di.DefaultDispatcher
 
 internal interface StatisticsClock {
     fun today(): LocalDate
@@ -31,6 +34,7 @@ internal class StatisticsViewModel internal constructor(
     private val settings: Flow<StatisticsTargetSettings>,
     private val updateSettings: suspend ((StatisticsTargetSettings) -> StatisticsTargetSettings) -> Unit,
     private val clock: StatisticsClock,
+    private val calculationDispatcher: CoroutineDispatcher,
     private val coroutineScope: CoroutineScope?,
 ) : ViewModel() {
     @Inject
@@ -38,11 +42,13 @@ internal class StatisticsViewModel internal constructor(
         repository: StatisticsRepository,
         settingsRepository: StatisticsSettingsRepository,
         clock: StatisticsClock,
+        @DefaultDispatcher calculationDispatcher: CoroutineDispatcher,
     ) : this(
         repository = repository,
         settings = settingsRepository.settings,
         updateSettings = settingsRepository::update,
         clock = clock,
+        calculationDispatcher = calculationDispatcher,
         coroutineScope = null,
     )
 
@@ -67,13 +73,15 @@ internal class StatisticsViewModel internal constructor(
     init {
         scope.launch {
             combine(snapshot, settings, selection) { snapshot, settings, selection ->
-                buildStatisticsUiState(
-                    snapshot = snapshot,
-                    settings = settings,
-                    selection = selection,
-                    today = clock.today(),
-                    isLoading = false,
-                )
+                withContext(calculationDispatcher) {
+                    buildStatisticsUiState(
+                        snapshot = snapshot,
+                        settings = settings,
+                        selection = selection,
+                        today = clock.today(),
+                        isLoading = false,
+                    )
+                }
             }.collect { state ->
                 _uiState.value = state
             }
@@ -193,6 +201,11 @@ private fun buildStatisticsUiState(
                 StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, year)
             }
     val rangeSummary = aggregateRange(rangeDays, settings)
+    val distributionRows = if (currentTab == CurrentRangeTab.Distribution) {
+        distributionRows(rangeDays, settings)
+    } else {
+        emptyList()
+    }
     return StatisticsUiState(
         isLoading = isLoading,
         today = todaySummary(daysByDate, today, settings),
@@ -229,7 +242,7 @@ private fun buildStatisticsUiState(
             title = selectedRange.title(rangeMode, windowSelection),
             summary = rangeSummary,
             trendPoints = trendPoints(rangeMode, selectedRange, rangeDays),
-            distributionRows = distributionRows(rangeDays, settings),
+            distributionRows = distributionRows,
         ),
         emptyState = StatisticsEmptyState(
             hasAnyStatistics = snapshot.days.isNotEmpty(),

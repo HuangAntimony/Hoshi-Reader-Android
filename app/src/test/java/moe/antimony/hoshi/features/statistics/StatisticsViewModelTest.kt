@@ -200,6 +200,7 @@ class StatisticsViewModelTest {
             viewModel.reload()
 
             assertEquals(100, viewModel.uiState.value.today.targetPercent)
+            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Distribution))
             assertEquals(listOf("Fast", "Slow"), viewModel.uiState.value.currentRange.distributionRows.map { it.title })
 
             viewModel.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
@@ -210,6 +211,37 @@ class StatisticsViewModelTest {
             assertEquals(1, state.week.metTargetDays)
             assertEquals(1, state.currentRange.summary.targetDays)
             assertEquals(listOf("Slow", "Fast"), state.currentRange.distributionRows.map { it.title })
+        }
+    }
+
+    @Test
+    fun distributionRowsAreOnlyBuiltForDistributionTab() = runBlocking {
+        viewModel(
+            snapshot = snapshot(
+                day(
+                    "2026-06-30",
+                    contributions = listOf(
+                        contribution("fast", "Fast", characters = 4_000, seconds = 600.0),
+                        contribution("slow", "Slow", characters = 1_000, seconds = 1_800.0),
+                    ),
+                ),
+            ),
+        ).use { viewModel ->
+            viewModel.reload()
+
+            assertEquals(CurrentRangeTab.Overview, viewModel.uiState.value.currentRange.selectedTab)
+            assertEquals(emptyList<BookDistributionRow>(), viewModel.uiState.value.currentRange.distributionRows)
+
+            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Distribution))
+
+            assertEquals(
+                listOf("Fast", "Slow"),
+                viewModel.uiState.value.currentRange.distributionRows.map { it.title },
+            )
+
+            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Overview))
+
+            assertEquals(emptyList<BookDistributionRow>(), viewModel.uiState.value.currentRange.distributionRows)
         }
     }
 
@@ -289,6 +321,7 @@ class StatisticsViewModelTest {
                 settings = settingsFlow,
                 updateSettings = { transform -> settingsFlow.value = transform(settingsFlow.value) },
                 clock = FakeStatisticsClock(LocalDate.parse("2026-06-30")),
+                calculationDispatcher = Dispatchers.Unconfined,
                 coroutineScope = scope,
             ),
             scope,
