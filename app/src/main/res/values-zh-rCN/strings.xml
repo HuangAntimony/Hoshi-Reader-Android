@@ -336,6 +336,7 @@
     <string name="reader_statistics_words_read">已读单词：</string>
     <string name="reader_statistics_reading_speed">阅读速度：</string>
     <string name="reader_statistics_reading_time">阅读时间：</string>
+    <string name="reader_statistics_show_tab">显示统计标签页</string>
     <string name="reader_statistics_autostart">自动开始</string>
     <string name="reader_statistics_autostart_off" comment="Reader statistics autostart setting value; intentionally matches other off labels.">关闭</string>
     <string name="reader_statistics_autostart_page_turn">翻页时</string>

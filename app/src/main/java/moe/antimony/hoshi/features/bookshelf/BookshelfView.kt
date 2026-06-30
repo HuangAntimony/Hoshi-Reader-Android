@@ -519,6 +519,7 @@ fun BookshelfView(
 internal fun HoshiMainShell(
     selectedTab: MainTab,
     onSelectedTabChange: (MainTab) -> Unit,
+    visibleTabs: List<MainTab> = MainTab.entries,
     modifier: Modifier = Modifier,
     content: @Composable (Modifier, MainShellLayoutSpec) -> Unit,
 ) {
@@ -534,6 +535,7 @@ internal fun HoshiMainShell(
                     HoshiCompactBottomNavigation(
                         selectedTab = selectedTab,
                         onSelectedTabChange = onSelectedTabChange,
+                        visibleTabs = visibleTabs,
                         layoutSpec = layoutSpec,
                     )
                 },
@@ -558,7 +560,7 @@ internal fun HoshiMainShell(
                 modifier = Modifier.fillMaxSize(),
                 layoutType = layoutSpec.toNavigationSuiteType(),
                 navigationSuiteItems = {
-                    MainTab.entries.forEach { tab ->
+                    visibleTabs.forEach { tab ->
                         item(
                             selected = tab == selectedTab,
                             onClick = { onSelectedTabChange(tab) },
@@ -586,6 +588,7 @@ internal const val ShelfManagementShelfListTag = "shelf-management-shelf-list"
 private fun HoshiCompactBottomNavigation(
     selectedTab: MainTab,
     onSelectedTabChange: (MainTab) -> Unit,
+    visibleTabs: List<MainTab>,
     layoutSpec: MainShellLayoutSpec,
 ) {
     val containerColor = MaterialTheme.colorScheme.background
@@ -607,7 +610,7 @@ private fun HoshiCompactBottomNavigation(
                 tonalElevation = 0.dp,
                 windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
             ) {
-                MainTab.entries.forEach { tab ->
+                visibleTabs.forEach { tab ->
                     NavigationBarItem(
                         selected = tab == selectedTab,
                         onClick = { onSelectedTabChange(tab) },

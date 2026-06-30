@@ -8,7 +8,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Add a full-library Statistics tab with habit summaries, calendar range selection, trends, distribution, and target settings.
+- Add a full-library Statistics tab with habit summaries, calendar range selection, trends, distribution, target settings, and an Advanced Statistics visibility switch.
 
 ### Changed
 

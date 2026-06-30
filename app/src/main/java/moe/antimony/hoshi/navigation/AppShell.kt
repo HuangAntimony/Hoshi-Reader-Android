@@ -103,6 +103,17 @@ fun AppShell(
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
     var dictionaryFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
+    val visibleMainTabs = appShellVisibleMainTabs(readerSettings)
+    val effectiveSelectedTab = coerceAvailableMainTab(
+        requestedTab = selectedTab,
+        visibleTabs = visibleMainTabs,
+    )
+
+    LaunchedEffect(selectedTab, effectiveSelectedTab) {
+        if (selectedTab != effectiveSelectedTab) {
+            selectedTab = effectiveSelectedTab
+        }
+    }
 
     LaunchedEffect(sasayakiSettingsRepository) {
         sasayakiSettingsRepository.settings.collect { settings ->
@@ -117,7 +128,7 @@ fun AppShell(
         }
     }
 
-    fun selectedBackStack(): MutableList<NavKey> = when (selectedTab) {
+    fun selectedBackStack(): MutableList<NavKey> = when (effectiveSelectedTab) {
         MainTab.Books -> booksBackStack
         MainTab.Dictionary -> dictionaryBackStack
         MainTab.Statistics -> statisticsBackStack
@@ -125,16 +136,23 @@ fun AppShell(
     }
 
     fun selectTopLevelRoute(route: AppRoute) {
-        selectedTab = route.toMainTab()
+        selectedTab = coerceAvailableMainTab(
+            requestedTab = route.toMainTab(),
+            visibleTabs = visibleMainTabs,
+        )
     }
 
     fun selectMainTab(tab: MainTab) {
-        dictionaryFocusRequestKey = nextDictionaryFocusRequestKey(
-            selectedTab = selectedTab,
+        val availableTab = coerceAvailableMainTab(
             requestedTab = tab,
+            visibleTabs = visibleMainTabs,
+        )
+        dictionaryFocusRequestKey = nextDictionaryFocusRequestKey(
+            selectedTab = effectiveSelectedTab,
+            requestedTab = availableTab,
             currentKey = dictionaryFocusRequestKey,
         )
-        selectedTab = tab
+        selectedTab = availableTab
     }
 
     fun clearLoadedReaderProfile() {
@@ -239,6 +257,7 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    visibleTabs = visibleMainTabs,
                     onSelectedTabChange = ::selectMainTab,
                 )
                 AppRoute.DictionaryRoute -> TopLevelRouteContent(
@@ -250,6 +269,7 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    visibleTabs = visibleMainTabs,
                     onSelectedTabChange = ::selectMainTab,
                 )
                 AppRoute.StatisticsRoute -> TopLevelRouteContent(
@@ -261,6 +281,7 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    visibleTabs = visibleMainTabs,
                     onSelectedTabChange = ::selectMainTab,
                 )
                 AppRoute.SettingsRoute -> TopLevelRouteContent(
@@ -272,6 +293,7 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    visibleTabs = visibleMainTabs,
                     onSelectedTabChange = ::selectMainTab,
                     onSettingsDestination = { destination ->
                         when (destination) {
@@ -318,6 +340,7 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    visibleTabs = visibleMainTabs,
                     onSelectedTabChange = ::selectMainTab,
                 )
             }
@@ -343,7 +366,7 @@ fun AppShell(
         entryDecorators = rememberAppNavEntryDecorators(),
         entryProvider = entryProvider,
     )
-    val currentEntries = when (selectedTab) {
+    val currentEntries = when (effectiveSelectedTab) {
         MainTab.Books -> booksEntries
         MainTab.Dictionary -> dictionaryEntries
         MainTab.Statistics -> statisticsEntries
@@ -390,12 +413,14 @@ private fun TopLevelRouteContent(
     onOpenReader: (String) -> Unit,
     bookshelfRefreshKey: Int,
     dictionaryFocusRequestKey: Int,
+    visibleTabs: List<MainTab>,
     onSelectedTabChange: (MainTab) -> Unit,
     onSettingsDestination: (SettingsDestination) -> Unit = {},
 ) {
     HoshiMainShell(
         selectedTab = selectedTab,
         onSelectedTabChange = onSelectedTabChange,
+        visibleTabs = visibleTabs,
     ) { contentModifier, layoutSpec ->
         when (selectedTab) {
             MainTab.Books -> BookshelfView(
@@ -498,6 +523,21 @@ internal fun nextDictionaryFocusRequestKey(
         currentKey + 1
     } else {
         currentKey
+    }
+
+internal fun appShellVisibleMainTabs(readerSettings: ReaderSettings): List<MainTab> =
+    MainTab.entries.filter { tab ->
+        tab != MainTab.Statistics || readerSettings.enableStatistics && readerSettings.showStatisticsTab
+    }
+
+internal fun coerceAvailableMainTab(
+    requestedTab: MainTab,
+    visibleTabs: List<MainTab>,
+): MainTab =
+    if (requestedTab in visibleTabs) {
+        requestedTab
+    } else {
+        MainTab.Books
     }
 
 private fun AppRoute.toMainTab(): MainTab = when (this) {

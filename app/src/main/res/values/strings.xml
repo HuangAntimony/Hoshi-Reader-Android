@@ -338,6 +338,7 @@
     <string name="reader_statistics_words_read">Words Read:</string>
     <string name="reader_statistics_reading_speed">Reading Speed:</string>
     <string name="reader_statistics_reading_time">Reading Time:</string>
+    <string name="reader_statistics_show_tab">Show Statistics tab</string>
     <string name="reader_statistics_autostart">Autostart</string>
     <string name="reader_statistics_autostart_off" comment="Reader statistics autostart setting value; intentionally matches other off labels.">Off</string>
     <string name="reader_statistics_autostart_page_turn">Page Turn</string>

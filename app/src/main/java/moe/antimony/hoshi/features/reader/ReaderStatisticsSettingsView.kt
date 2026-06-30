@@ -99,6 +99,19 @@ fun ReaderStatisticsSettingsView(
                         StatisticsSettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.reader_statistics_show_tab)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = settings.showStatisticsTab,
+                                    onCheckedChange = {
+                                        onSettingsChange(settings.copy(showStatisticsTab = it))
+                                    },
+                                )
+                            },
+                        )
+                        StatisticsSettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             headlineContent = { Text(stringResource(R.string.reader_statistics_autostart)) },
                             trailingContent = {
                                 Box {
