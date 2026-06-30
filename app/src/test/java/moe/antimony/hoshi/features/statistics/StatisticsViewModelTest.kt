@@ -200,7 +200,7 @@ class StatisticsViewModelTest {
             viewModel.reload()
 
             assertEquals(100, viewModel.uiState.value.today.targetPercent)
-            assertEquals(listOf("fast", "slow"), viewModel.uiState.value.currentRange.distributionRows.map { it.bookId })
+            assertEquals(listOf("Fast", "Slow"), viewModel.uiState.value.currentRange.distributionRows.map { it.title })
 
             viewModel.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
             viewModel.onEvent(StatisticsEvent.UpdateDailyDurationTargetMinutes(30))
@@ -209,7 +209,7 @@ class StatisticsViewModelTest {
             assertEquals(133, state.today.targetPercent)
             assertEquals(1, state.week.metTargetDays)
             assertEquals(1, state.currentRange.summary.targetDays)
-            assertEquals(listOf("slow", "fast"), state.currentRange.distributionRows.map { it.bookId })
+            assertEquals(listOf("Slow", "Fast"), state.currentRange.distributionRows.map { it.title })
         }
     }
 

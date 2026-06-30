@@ -253,9 +253,9 @@ class StatisticsCalculationsTest {
             StatisticsTargetSettings(dailyTargetType = DailyTargetType.Duration),
         )
 
-        assertEquals(listOf("fast", "slow"), byCharacters.map { it.bookId })
+        assertEquals(listOf("Fast", "Slow"), byCharacters.map { it.title })
         assertEquals(80, byCharacters.first().percent)
-        assertEquals(listOf("slow", "fast"), byDuration.map { it.bookId })
+        assertEquals(listOf("Slow", "Fast"), byDuration.map { it.title })
         assertEquals(75, byDuration.first().percent)
     }
 

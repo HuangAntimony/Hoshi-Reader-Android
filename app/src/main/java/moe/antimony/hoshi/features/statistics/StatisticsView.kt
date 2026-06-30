@@ -139,7 +139,6 @@ internal fun StatisticsView(
                 }
                 items(
                     items = uiState.currentRange.distributionRows,
-                    key = { row -> row.bookId ?: row.title },
                 ) { row ->
                     CenteredStatisticsColumn(layoutSpec = layoutSpec) {
                         StatisticsDistributionRowCard(

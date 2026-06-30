@@ -282,7 +282,6 @@ internal fun distributionRows(
                 DailyTargetType.Duration -> contribution.readingSeconds
             }
             BookDistributionRow(
-                bookId = contribution.bookId,
                 title = contribution.title,
                 coverPath = contribution.coverPath,
                 characters = contribution.characters,
