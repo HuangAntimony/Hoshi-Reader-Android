@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.statistics
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,12 +55,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeoutOrNull
 import moe.antimony.hoshi.R
 
 @Composable
 internal fun StatisticsCalendarSection(
     calendar: StatisticsCalendarUi,
+    heatmapScrollState: ScrollState,
+    heatmapAutoScrolledWindowKey: String?,
+    onHeatmapAutoScrolled: (String) -> Unit,
     onEvent: (StatisticsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -83,6 +86,9 @@ internal fun StatisticsCalendarSection(
         Spacer(Modifier.height(16.dp))
         CalendarHeatmap(
             calendar = calendar,
+            scrollState = heatmapScrollState,
+            autoScrolledWindowKey = heatmapAutoScrolledWindowKey,
+            onAutoScrolled = onHeatmapAutoScrolled,
             onDateClick = { date -> onEvent(StatisticsEvent.SelectCalendarDate(date)) },
         )
         Spacer(Modifier.height(12.dp))
@@ -194,6 +200,9 @@ private fun RangeModeSegmentedButtons(
 @Composable
 private fun CalendarHeatmap(
     calendar: StatisticsCalendarUi,
+    scrollState: ScrollState,
+    autoScrolledWindowKey: String?,
+    onAutoScrolled: (String) -> Unit,
     onDateClick: (LocalDate) -> Unit,
 ) {
     val dayByDate = remember(calendar.days) { calendar.days.associateBy { it.date } }
@@ -203,13 +212,17 @@ private fun CalendarHeatmap(
             .takeWhile { weekStart -> !weekStart.isAfter(calendar.windowRange.end) }
             .toList()
     }
-    val scrollState = rememberScrollState()
     val canvasWidth = heatmapCanvasWidth(weekStarts.size)
-    LaunchedEffect(calendar.windowRange, weekStarts.size) {
-        val maxScroll = withTimeoutOrNull(1_000L) {
-            snapshotFlow { scrollState.maxValue }.first { maxValue -> maxValue > 0 }
-        } ?: scrollState.maxValue
+    val autoScrollKey = heatmapAutoScrollKey(calendar.windowRange, weekStarts.size)
+    val currentOnAutoScrolled by rememberUpdatedState(onAutoScrolled)
+    LaunchedEffect(autoScrollKey, autoScrolledWindowKey) {
+        if (!shouldAutoScrollHeatmap(autoScrolledWindowKey, autoScrollKey)) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        val maxScroll = snapshotFlow { scrollState.maxValue }.first { maxValue -> maxValue > 0 }
         scrollState.scrollTo(maxScroll)
+        currentOnAutoScrolled(autoScrollKey)
     }
     val density = LocalDensity.current
     val currentOnDateClick by rememberUpdatedState(onDateClick)
@@ -494,6 +507,16 @@ internal fun heatmapDateForCanvasPosition(
         cellSizePx = cellSizePx,
         spacingPx = spacingPx,
     )
+
+internal fun heatmapAutoScrollKey(
+    window: StatisticsDateRange,
+    weekCount: Int,
+): String = "${window.start}|${window.end}|$weekCount"
+
+internal fun shouldAutoScrollHeatmap(
+    autoScrolledWindowKey: String?,
+    currentWindowKey: String,
+): Boolean = autoScrolledWindowKey != currentWindowKey
 
 internal data class HeatmapSelectionDecoration(
     val hasHalo: Boolean = false,

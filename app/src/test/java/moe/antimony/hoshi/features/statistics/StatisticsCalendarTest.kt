@@ -122,4 +122,22 @@ class StatisticsCalendarTest {
             ),
         )
     }
+
+    @Test
+    fun heatmapAutoScrollRunsOncePerWindow() {
+        val firstWindow = StatisticsDateRange(
+            start = LocalDate.parse("2026-01-01"),
+            end = LocalDate.parse("2026-12-31"),
+        )
+        val secondWindow = StatisticsDateRange(
+            start = LocalDate.parse("2025-01-01"),
+            end = LocalDate.parse("2025-12-31"),
+        )
+        val firstKey = heatmapAutoScrollKey(firstWindow, weekCount = 53)
+        val secondKey = heatmapAutoScrollKey(secondWindow, weekCount = 53)
+
+        assertEquals(true, shouldAutoScrollHeatmap(autoScrolledWindowKey = null, currentWindowKey = firstKey))
+        assertEquals(false, shouldAutoScrollHeatmap(autoScrolledWindowKey = firstKey, currentWindowKey = firstKey))
+        assertEquals(true, shouldAutoScrollHeatmap(autoScrolledWindowKey = firstKey, currentWindowKey = secondKey))
+    }
 }
