@@ -44,26 +44,6 @@ internal fun StatisticsRangeSection(
 }
 
 @Composable
-internal fun StatisticsRangeHeaderSection(
-    currentRange: CurrentRangeStatisticsUi,
-    calendar: StatisticsCalendarUi,
-    onEvent: (StatisticsEvent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    StatisticsSection(
-        title = stringResource(R.string.statistics_current_range),
-        trailing = rangeTitle(calendar),
-        modifier = modifier,
-    ) {
-        RangeTabRow(
-            selected = currentRange.selectedTab,
-            mode = currentRange.mode,
-            onSelect = { tab -> onEvent(StatisticsEvent.SelectCurrentRangeTab(tab)) },
-        )
-    }
-}
-
-@Composable
 private fun RangeTabRow(
     selected: CurrentRangeTab,
     mode: StatisticsRangeMode,

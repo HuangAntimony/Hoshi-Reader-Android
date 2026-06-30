@@ -165,6 +165,15 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun statisticsCurrentRangeTitleNamesSelectedRange() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals("Selected Range", defaultResources.strings.getValue("statistics_current_range").value)
+        assertEquals("所选范围", zhResources.strings.getValue("statistics_current_range").value)
+    }
+
+    @Test
     fun statisticsStandaloneEnglishDayAndWeekCountsUsePlurals() {
         val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
 

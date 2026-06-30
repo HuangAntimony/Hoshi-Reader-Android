@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -124,37 +123,13 @@ internal fun StatisticsView(
                     )
                 }
             }
-            if (
-                uiState.currentRange.selectedTab == CurrentRangeTab.Distribution &&
-                uiState.currentRange.distributionRows.isNotEmpty()
-            ) {
-                item {
-                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                        StatisticsRangeHeaderSection(
-                            currentRange = uiState.currentRange,
-                            calendar = uiState.calendar,
-                            onEvent = viewModel::onEvent,
-                        )
-                    }
-                }
-                items(
-                    items = uiState.currentRange.distributionRows,
-                ) { row ->
-                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                        StatisticsDistributionRowCard(
-                            row = row,
-                        )
-                    }
-                }
-            } else {
-                item {
-                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                        StatisticsRangeSection(
-                            currentRange = uiState.currentRange,
-                            calendar = uiState.calendar,
-                            onEvent = viewModel::onEvent,
-                        )
-                    }
+            item {
+                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                    StatisticsRangeSection(
+                        currentRange = uiState.currentRange,
+                        calendar = uiState.calendar,
+                        onEvent = viewModel::onEvent,
+                    )
                 }
             }
         }

@@ -68,7 +68,7 @@
     <string name="statistics_range_week">周</string>
     <string name="statistics_range_day">日</string>
     <string name="statistics_selected_range_format">已选择：%1$s</string>
-    <string name="statistics_current_range">范围</string>
+    <string name="statistics_current_range">所选范围</string>
     <string name="statistics_tab_overview">概览</string>
     <string name="statistics_tab_trend">趋势</string>
     <string name="statistics_tab_distribution">分布</string>

@@ -68,7 +68,7 @@
     <string name="statistics_range_week">Week</string>
     <string name="statistics_range_day">Day</string>
     <string name="statistics_selected_range_format">Selected: %1$s</string>
-    <string name="statistics_current_range">Range</string>
+    <string name="statistics_current_range">Selected Range</string>
     <string name="statistics_tab_overview">Overview</string>
     <string name="statistics_tab_trend">Trend</string>
     <string name="statistics_tab_distribution">By Book</string>
