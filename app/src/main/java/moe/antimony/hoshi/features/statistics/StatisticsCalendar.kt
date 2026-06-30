@@ -40,7 +40,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -201,7 +204,7 @@ private fun CalendarHeatmap(
             .toList()
     }
     val scrollState = rememberScrollState()
-    val gridWidth = heatmapGridWidth(weekStarts.size)
+    val canvasWidth = heatmapCanvasWidth(weekStarts.size)
     LaunchedEffect(calendar.windowRange, weekStarts.size) {
         val maxScroll = withTimeoutOrNull(1_000L) {
             snapshotFlow { scrollState.maxValue }.first { maxValue -> maxValue > 0 }
@@ -212,14 +215,15 @@ private fun CalendarHeatmap(
     val currentOnDateClick by rememberUpdatedState(onDateClick)
     val heatmapContentDescription = stringResource(R.string.statistics_calendar_heatmap_semantics)
     val heatColors = statisticsHeatColors()
-    val primaryBorderColor = MaterialTheme.colorScheme.primary
-    val selectedBorderColor = MaterialTheme.colorScheme.tertiary
+    val rangeOutlineColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+    val anchorOuterStrokeColor = MaterialTheme.colorScheme.onSurface
+    val selectionInset = CalendarHeatmapSelectionInset
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(CalendarDayCellSpacing),
     ) {
         Column(
-            modifier = Modifier.padding(top = CalendarMonthLabelHeight),
+            modifier = Modifier.padding(top = CalendarMonthLabelHeight + selectionInset),
             verticalArrangement = Arrangement.spacedBy(CalendarDayCellSpacing),
         ) {
             statisticsWeekdayLabels().forEach { label ->
@@ -242,11 +246,14 @@ private fun CalendarHeatmap(
         ) {
             Row(
                 modifier = Modifier
-                    .width(gridWidth)
+                    .width(canvasWidth)
                     .height(CalendarMonthLabelHeight),
-                horizontalArrangement = Arrangement.spacedBy(CalendarDayCellSpacing),
             ) {
-                weekStarts.forEach { weekStart ->
+                Spacer(modifier = Modifier.width(selectionInset))
+                weekStarts.forEachIndexed { index, weekStart ->
+                    if (index > 0) {
+                        Spacer(modifier = Modifier.width(CalendarDayCellSpacing))
+                    }
                     Box(modifier = Modifier.width(CalendarDayCellSize)) {
                         val label = monthLabelForWeek(weekStart, calendar.windowRange)
                         if (label.isNotEmpty()) {
@@ -258,28 +265,27 @@ private fun CalendarHeatmap(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.width(selectionInset))
             }
             Canvas(
                 modifier = Modifier
-                    .width(gridWidth)
-                    .height(CalendarHeatmapGridHeight)
+                    .width(canvasWidth)
+                    .height(CalendarHeatmapCanvasHeight)
                     .pointerInput(calendar.windowRange, weekStarts, dayByDate) {
                         detectTapGestures { offset ->
                             val cellSizePx = with(density) { CalendarDayCellSize.toPx() }
                             val spacingPx = with(density) { CalendarDayCellSpacing.toPx() }
-                            val pitch = cellSizePx + spacingPx
-                            val weekIndex = (offset.x / pitch).toInt()
-                            val dayIndex = (offset.y / pitch).toInt()
-                            val inCellX = offset.x - (weekIndex * pitch) <= cellSizePx
-                            val inCellY = offset.y - (dayIndex * pitch) <= cellSizePx
-                            val date = weekStarts.getOrNull(weekIndex)?.plusDays(dayIndex.toLong())
-                            if (
-                                dayIndex in 0..6 &&
-                                inCellX &&
-                                inCellY &&
-                                date != null &&
-                                calendar.windowRange.contains(date)
-                            ) {
+                            val selectionInsetPx = with(density) { CalendarHeatmapSelectionInset.toPx() }
+                            val date = heatmapDateForCanvasPosition(
+                                offsetX = offset.x,
+                                offsetY = offset.y,
+                                selectionInsetPx = selectionInsetPx,
+                                weekStarts = weekStarts,
+                                window = calendar.windowRange,
+                                cellSizePx = cellSizePx,
+                                spacingPx = spacingPx,
+                            )
+                            if (date != null) {
                                 currentOnDateClick(date)
                             }
                         }
@@ -288,8 +294,10 @@ private fun CalendarHeatmap(
             ) {
                 val cellSize = CalendarDayCellSize.toPx()
                 val spacing = CalendarDayCellSpacing.toPx()
+                val selectionInsetPx = CalendarHeatmapSelectionInset.toPx()
                 val cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                val borderWidth = 1.dp.toPx()
+                val selectedCells = mutableListOf<HeatmapCell>()
+                val anchorCells = mutableListOf<Pair<Offset, HeatmapSelectionDecoration>>()
                 weekStarts.forEachIndexed { weekIndex, weekStart ->
                     repeat(7) { dayIndex ->
                         val date = weekStart.plusDays(dayIndex.toLong())
@@ -298,29 +306,58 @@ private fun CalendarHeatmap(
                         }
                         val day = dayByDate[date] ?: return@repeat
                         val topLeft = Offset(
-                            x = weekIndex * (cellSize + spacing),
-                            y = dayIndex * (cellSize + spacing),
+                            x = selectionInsetPx + weekIndex * (cellSize + spacing),
+                            y = selectionInsetPx + dayIndex * (cellSize + spacing),
                         )
+                        val selection = heatmapSelectionDecoration(
+                            isAnchor = day.isAnchor,
+                            inSelectedRange = day.inSelectedRange,
+                        )
+                        if (day.inSelectedRange) {
+                            selectedCells += HeatmapCell(weekIndex, dayIndex)
+                        }
+                        if (day.isAnchor) {
+                            anchorCells += topLeft to selection
+                        }
                         drawRoundRect(
                             color = heatColors[day.heatLevel.coerceIn(heatColors.indices)],
                             topLeft = topLeft,
                             size = Size(cellSize, cellSize),
                             cornerRadius = cornerRadius,
                         )
-                        val borderColor = when {
-                            day.isAnchor -> primaryBorderColor
-                            day.inSelectedRange -> selectedBorderColor
-                            else -> Color.Transparent
-                        }
-                        if (borderColor != Color.Transparent) {
-                            drawRoundRect(
-                                color = borderColor,
-                                topLeft = topLeft,
-                                size = Size(cellSize, cellSize),
-                                cornerRadius = cornerRadius,
-                                style = Stroke(width = borderWidth),
-                            )
-                        }
+                    }
+                }
+                if (shouldDrawHeatmapRangeOutline(calendar.rangeMode, selectedCells.size)) {
+                    val rangeSelection = heatmapSelectionDecoration(isAnchor = false, inSelectedRange = true)
+                    val rangePath = heatmapRangeOutlinePath(
+                        selectedCells = selectedCells,
+                        selectionInsetPx = selectionInsetPx,
+                        cellSizePx = cellSize,
+                        spacingPx = spacing,
+                        outlinePaddingPx = rangeSelection.rangeOutlinePaddingDp.dp.toPx(),
+                    )
+                    if (rangePath != null && rangeSelection.rangeOutlineStrokeWidthDp > 0f) {
+                        drawPath(
+                            path = rangePath,
+                            color = rangeOutlineColor,
+                            style = Stroke(
+                                width = rangeSelection.rangeOutlineStrokeWidthDp.dp.toPx(),
+                                join = StrokeJoin.Round,
+                            ),
+                        )
+                    }
+                }
+                anchorCells.forEach { (topLeft, selection) ->
+                    if (selection.anchorOuterStrokeWidthDp > 0f) {
+                        val outerStrokeWidth = selection.anchorOuterStrokeWidthDp.dp.toPx()
+                        val outerPadding = selection.anchorOuterStrokePaddingDp.dp.toPx()
+                        drawRoundRect(
+                            color = anchorOuterStrokeColor,
+                            topLeft = topLeft - Offset(outerPadding, outerPadding),
+                            size = Size(cellSize + outerPadding * 2f, cellSize + outerPadding * 2f),
+                            cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
+                            style = Stroke(width = outerStrokeWidth),
+                        )
                     }
                 }
             }
@@ -330,14 +367,17 @@ private fun CalendarHeatmap(
 
 @Composable
 private fun statisticsHeatColors(): List<Color> {
+    val empty = MaterialTheme.colorScheme.surfaceContainerLow
     val primary = MaterialTheme.colorScheme.primary
     return listOf(
-        MaterialTheme.colorScheme.surfaceContainerLow,
-        primary.copy(alpha = 0.18f),
-        primary.copy(alpha = 0.30f),
-        primary.copy(alpha = 0.46f),
-        primary.copy(alpha = 0.64f),
-        primary.copy(alpha = 0.82f),
+        empty,
+        lerp(empty, primary, 0.18f),
+        lerp(empty, primary, 0.30f),
+        lerp(empty, primary, 0.42f),
+        lerp(empty, primary, 0.55f),
+        lerp(empty, primary, 0.68f),
+        lerp(empty, primary, 0.84f),
+        primary,
     )
 }
 
@@ -396,23 +436,194 @@ internal fun rangeModeLabel(mode: StatisticsRangeMode): String =
         StatisticsRangeMode.Day -> stringResource(R.string.statistics_range_day)
     }
 
-private fun monthLabelForWeek(
+internal fun monthLabelForWeek(
     weekStart: LocalDate,
     window: StatisticsDateRange,
 ): String {
-    val weekEnd = weekStart.plusDays(6)
-    val firstVisibleDay = maxOf(weekStart, window.start)
-    return if (firstVisibleDay.dayOfMonth <= 7 || weekStart == mondayStartOfWeek(window.start) || weekEnd.month != weekStart.month) {
-        firstVisibleDay.monthValue.toString()
-    } else {
-        ""
+    val monthStart = (0L..6L)
+        .map { offset -> weekStart.plusDays(offset) }
+        .firstOrNull { date -> window.contains(date) && date.dayOfMonth == 1 }
+    return monthStart?.monthValue?.toString().orEmpty()
+}
+
+internal fun heatmapDateForPosition(
+    offsetX: Float,
+    offsetY: Float,
+    weekStarts: List<LocalDate>,
+    window: StatisticsDateRange,
+    cellSizePx: Float,
+    spacingPx: Float,
+): LocalDate? {
+    if (offsetX < 0f || offsetY < 0f || cellSizePx <= 0f) {
+        return null
     }
+    val pitch = cellSizePx + spacingPx.coerceAtLeast(0f)
+    val hitExpansion = spacingPx.coerceAtLeast(0f) / 2f
+    val weekIndex = ((offsetX + hitExpansion) / pitch).toInt()
+    val dayIndex = ((offsetY + hitExpansion) / pitch).toInt()
+    if (dayIndex !in 0..6) {
+        return null
+    }
+    val cellLeft = weekIndex * pitch
+    val cellTop = dayIndex * pitch
+    val hitLeft = cellLeft - hitExpansion
+    val hitTop = cellTop - hitExpansion
+    val hitRight = cellLeft + cellSizePx + hitExpansion
+    val hitBottom = cellTop + cellSizePx + hitExpansion
+    if (offsetX < hitLeft || offsetX > hitRight || offsetY < hitTop || offsetY > hitBottom) {
+        return null
+    }
+    val date = weekStarts.getOrNull(weekIndex)?.plusDays(dayIndex.toLong()) ?: return null
+    return date.takeIf(window::contains)
+}
+
+internal fun heatmapDateForCanvasPosition(
+    offsetX: Float,
+    offsetY: Float,
+    selectionInsetPx: Float,
+    weekStarts: List<LocalDate>,
+    window: StatisticsDateRange,
+    cellSizePx: Float,
+    spacingPx: Float,
+): LocalDate? =
+    heatmapDateForPosition(
+        offsetX = offsetX - selectionInsetPx,
+        offsetY = offsetY - selectionInsetPx,
+        weekStarts = weekStarts,
+        window = window,
+        cellSizePx = cellSizePx,
+        spacingPx = spacingPx,
+    )
+
+internal data class HeatmapSelectionDecoration(
+    val hasHalo: Boolean = false,
+    val haloPaddingDp: Float = 0f,
+    val rangeOutlineStrokeWidthDp: Float = 0f,
+    val rangeOutlinePaddingDp: Float = 0f,
+    val anchorOuterStrokeWidthDp: Float = 0f,
+    val anchorOuterStrokePaddingDp: Float = 0f,
+    val anchorInnerStrokeWidthDp: Float = 0f,
+    val anchorInnerStrokePaddingDp: Float = 0f,
+)
+
+internal fun heatmapSelectionDecoration(
+    isAnchor: Boolean,
+    inSelectedRange: Boolean,
+): HeatmapSelectionDecoration =
+    when {
+        isAnchor -> HeatmapSelectionDecoration(
+            anchorOuterStrokeWidthDp = 3f,
+            anchorOuterStrokePaddingDp = 2f,
+        )
+        inSelectedRange -> HeatmapSelectionDecoration(
+            rangeOutlineStrokeWidthDp = 2f,
+            rangeOutlinePaddingDp = CalendarDayCellSpacing.value / 2f,
+        )
+        else -> HeatmapSelectionDecoration()
+    }
+
+internal fun HeatmapSelectionDecoration.outwardPaddingDp(): Float =
+    maxOf(
+        haloPaddingDp,
+        rangeOutlinePaddingDp + (rangeOutlineStrokeWidthDp / 2f),
+        anchorOuterStrokePaddingDp + (anchorOuterStrokeWidthDp / 2f),
+        anchorInnerStrokePaddingDp + (anchorInnerStrokeWidthDp / 2f),
+    )
+
+internal fun heatmapSelectionInsetDp(): Float =
+    maxOf(
+        heatmapSelectionDecoration(isAnchor = false, inSelectedRange = true).outwardPaddingDp(),
+        heatmapSelectionDecoration(isAnchor = true, inSelectedRange = true).outwardPaddingDp(),
+    )
+
+internal fun shouldDrawHeatmapRangeOutline(
+    rangeMode: StatisticsRangeMode,
+    selectedCellCount: Int,
+): Boolean =
+    selectedCellCount > 0 && rangeMode != StatisticsRangeMode.Year && rangeMode != StatisticsRangeMode.Day
+
+internal data class HeatmapCell(
+    val weekIndex: Int,
+    val dayIndex: Int,
+)
+
+private data class HeatmapGridPoint(
+    val x: Int,
+    val y: Int,
+)
+
+private fun heatmapRangeOutlinePath(
+    selectedCells: List<HeatmapCell>,
+    selectionInsetPx: Float,
+    cellSizePx: Float,
+    spacingPx: Float,
+    outlinePaddingPx: Float,
+): Path? {
+    if (selectedCells.isEmpty()) {
+        return null
+    }
+    val selected = selectedCells.toSet()
+    val edges = linkedMapOf<HeatmapGridPoint, HeatmapGridPoint>()
+    fun hasCell(weekIndex: Int, dayIndex: Int): Boolean =
+        HeatmapCell(weekIndex, dayIndex) in selected
+    fun addEdge(startX: Int, startY: Int, endX: Int, endY: Int) {
+        edges[HeatmapGridPoint(startX, startY)] = HeatmapGridPoint(endX, endY)
+    }
+    selected.forEach { cell ->
+        val weekIndex = cell.weekIndex
+        val dayIndex = cell.dayIndex
+        if (!hasCell(weekIndex, dayIndex - 1)) {
+            addEdge(weekIndex, dayIndex, weekIndex + 1, dayIndex)
+        }
+        if (!hasCell(weekIndex + 1, dayIndex)) {
+            addEdge(weekIndex + 1, dayIndex, weekIndex + 1, dayIndex + 1)
+        }
+        if (!hasCell(weekIndex, dayIndex + 1)) {
+            addEdge(weekIndex + 1, dayIndex + 1, weekIndex, dayIndex + 1)
+        }
+        if (!hasCell(weekIndex - 1, dayIndex)) {
+            addEdge(weekIndex, dayIndex + 1, weekIndex, dayIndex)
+        }
+    }
+    if (edges.isEmpty()) {
+        return null
+    }
+    val pitch = cellSizePx + spacingPx
+    fun pointOffset(point: HeatmapGridPoint): Offset =
+        Offset(
+            x = selectionInsetPx + point.x * pitch - outlinePaddingPx,
+            y = selectionInsetPx + point.y * pitch - outlinePaddingPx,
+        )
+    val path = Path()
+    var guard = edges.size + 1
+    while (edges.isNotEmpty() && guard > 0) {
+        val start = edges.keys.first()
+        var current = start
+        val firstOffset = pointOffset(start)
+        path.moveTo(firstOffset.x, firstOffset.y)
+        do {
+            val next = edges.remove(current) ?: break
+            val nextOffset = pointOffset(next)
+            path.lineTo(nextOffset.x, nextOffset.y)
+            current = next
+            guard -= 1
+        } while (current != start && guard > 0)
+        path.close()
+    }
+    return path
 }
 
 private val CalendarDayCellSize = 18.dp
 private val CalendarDayCellSpacing = 4.dp
 private val CalendarMonthLabelHeight = 18.dp
 private val CalendarHeatmapGridHeight = ((CalendarDayCellSize.value * 7) + (CalendarDayCellSpacing.value * 6)).dp
+private val CalendarHeatmapSelectionInset = heatmapSelectionInsetDp().dp
+private val CalendarHeatmapCanvasHeight = (
+    CalendarHeatmapGridHeight.value + (CalendarHeatmapSelectionInset.value * 2f)
+).dp
 
 private fun heatmapGridWidth(weekCount: Int) =
     ((CalendarDayCellSize.value * weekCount) + (CalendarDayCellSpacing.value * (weekCount - 1).coerceAtLeast(0))).dp
+
+private fun heatmapCanvasWidth(weekCount: Int) =
+    (heatmapGridWidth(weekCount).value + (CalendarHeatmapSelectionInset.value * 2f)).dp

@@ -137,6 +137,29 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun calendarHeatLevelsUseWindowWhenShortRangeIsSelected() = runBlocking {
+        viewModel(
+            snapshot = snapshot(
+                day("2026-06-01", characters = 6_000),
+                day("2026-06-15", characters = 7_000),
+                day("2026-06-29", characters = 8_000),
+            ),
+        ).use { viewModel ->
+            viewModel.reload()
+            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Week))
+
+            val state = viewModel.uiState.value
+            val daysByDate = state.calendar.days.associateBy { it.date }
+
+            assertEquals(StatisticsRangeMode.Week, state.calendar.rangeMode)
+            assertEquals(false, daysByDate.getValue(LocalDate.parse("2026-06-01")).inSelectedRange)
+            assertEquals(1, daysByDate.getValue(LocalDate.parse("2026-06-01")).heatLevel)
+            assertEquals(4, daysByDate.getValue(LocalDate.parse("2026-06-15")).heatLevel)
+            assertEquals(7, daysByDate.getValue(LocalDate.parse("2026-06-29")).heatLevel)
+        }
+    }
+
+    @Test
     fun clickingDateFromTrendYearModeSwitchesToDayAndReturnsToOverview() = runBlocking {
         viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
             viewModel.reload()

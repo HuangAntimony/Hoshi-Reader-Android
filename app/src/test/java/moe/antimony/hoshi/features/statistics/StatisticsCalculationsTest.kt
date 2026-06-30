@@ -98,13 +98,84 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun readingHeatLevelsFollowCharacterBuckets() {
-        assertEquals(0, readingHeatLevel(0))
-        assertEquals(1, readingHeatLevel(999))
-        assertEquals(2, readingHeatLevel(1_000))
-        assertEquals(3, readingHeatLevel(2_000))
-        assertEquals(4, readingHeatLevel(4_000))
-        assertEquals(5, readingHeatLevel(6_000))
+    fun readingHeatLevelsSpreadActiveDaysAcrossTheVisibleWindow() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 6_000),
+                day("2026-06-03", characters = 7_000),
+                day("2026-06-04", characters = 8_000),
+                day("2026-06-05", characters = 9_000),
+                day("2026-06-06", characters = 10_000),
+                day("2026-06-07", characters = 11_000),
+                day("2026-06-08", characters = 12_000),
+            ),
+        )
+
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(2, levels.getValue(LocalDate.parse("2026-06-03")))
+        assertEquals(3, levels.getValue(LocalDate.parse("2026-06-04")))
+        assertEquals(4, levels.getValue(LocalDate.parse("2026-06-05")))
+        assertEquals(5, levels.getValue(LocalDate.parse("2026-06-06")))
+        assertEquals(6, levels.getValue(LocalDate.parse("2026-06-07")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-08")))
+    }
+
+    @Test
+    fun readingHeatLevelsKeepEmptyDaysAtZero() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 0),
+            ),
+        )
+
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-02")))
+    }
+
+    @Test
+    fun readingHeatLevelsKeepRepeatedCharacterCountsTogether() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 1_000),
+                day("2026-06-02", characters = 1_000),
+                day("2026-06-03", characters = 2_000),
+            ),
+        )
+
+        assertEquals(levels.getValue(LocalDate.parse("2026-06-01")), levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
+    }
+
+    @Test
+    fun readingHeatLevelsUseStrongestLevelForSingleActiveCharacterCount() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 4_000),
+                day("2026-06-03", characters = 4_000),
+            ),
+        )
+
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
+    }
+
+    @Test
+    fun readingHeatLevelsStayWithinRangeForSparseDistinctCounts() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 100),
+                day("2026-06-02", characters = 10_000),
+                day("2026-06-03", characters = 50_000),
+            ),
+        )
+
+        assertEquals(listOf(1, 4, 7), levels.values.toList())
     }
 
     @Test

@@ -183,6 +183,8 @@ private fun buildStatisticsUiState(
     val selectedRange = selectedStatisticsRange(rangeMode, anchor, windowRange)
     val currentTab = selection.currentRangeTab.availableFor(rangeMode)
     val rangeDays = datesInRange(selectedRange).map { date -> daysByDate[date] ?: emptyDayAggregate(date) }
+    val windowDays = datesInRange(windowRange).map { date -> daysByDate[date] ?: emptyDayAggregate(date) }
+    val heatLevelsByDate = readingHeatLevels(windowDays)
     val availableWindows = listOf(StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.RecentYear)) +
         snapshot.availableYears
             .distinct()
@@ -207,18 +209,17 @@ private fun buildStatisticsUiState(
             anchorDate = anchor,
             selectedRange = selectedRange,
             selectedRangeTitle = selectedRange.title(rangeMode, windowSelection),
-            days = datesInRange(windowRange).map { date ->
-                val aggregate = daysByDate[date] ?: emptyDayAggregate(date)
+            days = windowDays.map { aggregate ->
                 val ratio = aggregate.targetRatio(settings)
                 StatisticsCalendarDayUi(
-                    date = date,
-                    heatLevel = readingHeatLevel(aggregate.totalCharacters),
+                    date = aggregate.date,
+                    heatLevel = heatLevelsByDate[aggregate.date] ?: 0,
                     characters = aggregate.totalCharacters,
                     readingSeconds = aggregate.readingSeconds,
                     targetPercent = (ratio * 100.0).toInt(),
                     targetMet = ratio >= 1.0,
-                    inSelectedRange = rangeMode != StatisticsRangeMode.Year && selectedRange.contains(date),
-                    isAnchor = rangeMode != StatisticsRangeMode.Year && date == anchor,
+                    inSelectedRange = rangeMode != StatisticsRangeMode.Year && selectedRange.contains(aggregate.date),
+                    isAnchor = rangeMode != StatisticsRangeMode.Year && aggregate.date == anchor,
                 )
             },
         ),

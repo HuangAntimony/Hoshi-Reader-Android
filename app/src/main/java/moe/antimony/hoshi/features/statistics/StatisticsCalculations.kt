@@ -60,13 +60,33 @@ internal fun StatisticsDayAggregate.targetRatio(settings: StatisticsTargetSettin
 internal fun StatisticsDayAggregate.isActiveReadingDay(): Boolean =
     totalCharacters > 0 || readingSeconds > 0.0
 
-internal fun readingHeatLevel(characters: Int): Int = when {
-    characters <= 0 -> 0
-    characters < 1_000 -> 1
-    characters < 2_000 -> 2
-    characters < 4_000 -> 3
-    characters < 6_000 -> 4
-    else -> 5
+internal const val ReadingHeatActiveLevelCount = 7
+
+internal fun readingHeatLevels(days: List<StatisticsDayAggregate>): Map<LocalDate, Int> {
+    val activeCharacterValues = days
+        .map { day -> day.totalCharacters }
+        .filter { characters -> characters > 0 }
+        .distinct()
+        .sorted()
+    val levelByCharacters = activeCharacterValues.adaptiveHeatLevels()
+    return days.associate { day ->
+        day.date to (levelByCharacters[day.totalCharacters] ?: 0)
+    }
+}
+
+private fun List<Int>.adaptiveHeatLevels(): Map<Int, Int> {
+    if (isEmpty()) {
+        return emptyMap()
+    }
+    if (size == 1) {
+        return mapOf(single() to ReadingHeatActiveLevelCount)
+    }
+    val maxIndex = lastIndex.toDouble()
+    return mapIndexed { index, characters ->
+        val normalizedRank = index.toDouble() / maxIndex
+        val level = 1 + (normalizedRank * (ReadingHeatActiveLevelCount - 1)).roundToInt()
+        characters to level.coerceIn(1, ReadingHeatActiveLevelCount)
+    }.toMap()
 }
 
 internal fun aggregateRange(
