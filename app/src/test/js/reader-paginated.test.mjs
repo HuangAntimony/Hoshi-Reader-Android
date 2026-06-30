@@ -1143,6 +1143,20 @@ test('continuous Sasayaki media stop plan uses scroll targets for the current im
     assert.equal(document.documentElement.scrollTop, 0);
 });
 
+test('continuous Sasayaki media stop plan skips a visible image when the target cue is already visible', () => {
+    const body = new TestElement('body');
+    body.appendChild(imgAt(0, 800, 320, 480));
+    body.appendChild(new TestText('二三'));
+    const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'vertical-rl' });
+    document.documentElement.scrollLeft = 0.35;
+
+    reader.applySasayakiCues([{ id: 'cue', start: 0, length: 2 }]);
+    reader.cueWrappers.get('cue')[0].rect = testRect(120, 150, 160, 190);
+    const stops = reader.sasayakiMediaStopsBeforeCue({ id: 'cue', start: 0, length: 2 });
+
+    assert.deepEqual(Array.from(stops), []);
+});
+
 test('continuous vertical Sasayaki chapter-end media stop plan follows forward scroll direction', () => {
     const body = new TestElement('body');
     body.appendChild(imgAt(0, 500, 120, 420));

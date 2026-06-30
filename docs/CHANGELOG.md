@@ -25,6 +25,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep VN vertical lookup and Sasayaki e-ink highlight boxes aligned with the highlighted text.
 - Prevent reader lookups from crashing on words that begin with supplementary-plane kanji such as 𠮟.
 - Keep Sasayaki image hold active while opening and viewing the Reader fullscreen image overlay.
+- Prevent continuous Reader Sasayaki image hold from repeatedly pausing on the same visible inline image when the target cue is already visible.
 
 ## [v1.2.3] - 2026-06-25
 
