@@ -52,7 +52,6 @@
     <string name="statistics_today" comment="Statistics dashboard section title, intentionally matching reader statistics today label.">Today</string>
     <string name="statistics_this_week">This Week</string>
     <string name="statistics_target_format">Goal: %1$s</string>
-    <string name="statistics_week_target_format">Goal: %1$d days</string>
     <string name="statistics_reading_duration" comment="Dashboard metric label, intentionally matching the duration legend and target type label.">Duration</string>
     <string name="statistics_characters_read" comment="Dashboard metric label, intentionally matching the characters legend and target type label.">Characters</string>
     <string name="statistics_average_speed" comment="Dashboard metric label, intentionally matching the Sasayaki speed setting noun.">Speed</string>
@@ -69,7 +68,6 @@
     <string name="statistics_range_week">Week</string>
     <string name="statistics_range_day">Day</string>
     <string name="statistics_selected_range_format">Selected: %1$s</string>
-    <string name="statistics_days_count_format" comment="Selected range day-count label, intentionally matching generic statistics day value format.">%1$d days</string>
     <string name="statistics_current_range">Range</string>
     <string name="statistics_tab_overview">Overview</string>
     <string name="statistics_tab_trend">Trend</string>
@@ -83,7 +81,6 @@
     <string name="statistics_current_target">Current Goal</string>
     <string name="statistics_weekly_target">Weekly Goal</string>
     <string name="statistics_week_status">Reading Days</string>
-    <string name="statistics_days_per_week_format" comment="Weekly goal editor value, intentionally matching the selected range day-count format.">%1$d days</string>
     <string name="statistics_target_type_characters" comment="Daily target type option, intentionally matching statistics characters legend label.">Characters</string>
     <string name="statistics_target_type_duration" comment="Daily target type option, intentionally matching statistics duration legend label.">Duration</string>
     <string name="statistics_no_reading_records">No reading records</string>

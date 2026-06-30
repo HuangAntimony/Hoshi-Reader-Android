@@ -165,6 +165,20 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun statisticsStandaloneEnglishDayAndWeekCountsUsePlurals() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+
+        val fixedCounts = defaultResources.strings
+            .filterValues { string ->
+                StandaloneEnglishDayOrWeekCountPattern.containsMatchIn(string.value)
+            }
+            .keys
+            .toList()
+
+        assertEquals(emptyList<String>(), fixedCounts)
+    }
+
+    @Test
     fun statisticsSyncModeLabelsAreLocalized() {
         val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
         val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
@@ -253,5 +267,6 @@ class LocalizationResourceTest {
 
     private companion object {
         val FormatArgumentPattern = Regex("%\\d+\\$[sdDfFeEgG]")
+        val StandaloneEnglishDayOrWeekCountPattern = Regex("""%\d+[$]d (days|weeks)""")
     }
 }

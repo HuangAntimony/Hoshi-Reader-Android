@@ -52,7 +52,6 @@
     <string name="statistics_today" comment="Statistics dashboard section title, intentionally matching reader statistics today label.">今天</string>
     <string name="statistics_this_week">本周</string>
     <string name="statistics_target_format">目标 %1$s</string>
-    <string name="statistics_week_target_format">目标 %1$d 天</string>
     <string name="statistics_reading_duration" comment="Dashboard metric label, intentionally matching the duration legend and target type label.">时长</string>
     <string name="statistics_characters_read" comment="Dashboard metric label, intentionally matching the characters legend and target type label.">字数</string>
     <string name="statistics_average_speed" comment="Dashboard metric label, intentionally matching the Sasayaki speed setting noun.">速度</string>
@@ -69,7 +68,6 @@
     <string name="statistics_range_week">周</string>
     <string name="statistics_range_day">日</string>
     <string name="statistics_selected_range_format">已选择：%1$s</string>
-    <string name="statistics_days_count_format" comment="Selected range day-count label, intentionally matching generic statistics day value format.">%1$d 天</string>
     <string name="statistics_current_range">范围</string>
     <string name="statistics_tab_overview">概览</string>
     <string name="statistics_tab_trend">趋势</string>
@@ -83,7 +81,6 @@
     <string name="statistics_current_target">当前目标</string>
     <string name="statistics_weekly_target">每周目标</string>
     <string name="statistics_week_status">阅读天数</string>
-    <string name="statistics_days_per_week_format" comment="Weekly goal editor value, intentionally matching the selected range day-count format.">%1$d 天</string>
     <string name="statistics_target_type_characters" comment="Daily target type option, intentionally matching statistics characters legend label.">字</string>
     <string name="statistics_target_type_duration" comment="Daily target type option, intentionally matching statistics duration legend label.">时长</string>
     <string name="statistics_no_reading_records">暂无阅读记录</string>

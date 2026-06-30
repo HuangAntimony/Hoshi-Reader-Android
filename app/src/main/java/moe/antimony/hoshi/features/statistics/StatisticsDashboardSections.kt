@@ -164,7 +164,7 @@ internal fun WeekStatisticsSection(
         modifier = modifier,
         trailingContent = {
             TargetGoalText(
-                text = stringResource(R.string.statistics_week_target_format, week.targetDays),
+                text = stringResource(R.string.statistics_target_format, formatStatisticsDays(week.targetDays)),
                 onClick = onToggleTargetSettings,
             )
         },
@@ -302,7 +302,7 @@ private fun WeeklyTargetSettingsSection(
         )
         StepperRow(
             label = stringResource(R.string.statistics_week_status),
-            value = stringResource(R.string.statistics_days_per_week_format, settings.weeklyTargetDays),
+            value = formatStatisticsDays(settings.weeklyTargetDays),
             canDecrease = settings.weeklyTargetDays > StatisticsTargetDefaults.MinWeeklyTargetDays,
             canIncrease = settings.weeklyTargetDays < StatisticsTargetDefaults.MaxWeeklyTargetDays,
             onDecrease = { onEvent(StatisticsEvent.UpdateWeeklyTargetDays(settings.weeklyTargetDays - 1)) },

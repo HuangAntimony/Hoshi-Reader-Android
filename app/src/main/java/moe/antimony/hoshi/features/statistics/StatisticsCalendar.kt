@@ -109,7 +109,7 @@ internal fun StatisticsCalendarSection(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = stringResource(R.string.statistics_days_count_format, calendar.selectedRange.dayCount),
+                    text = formatStatisticsDays(calendar.selectedRange.dayCount),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.SemiBold,
