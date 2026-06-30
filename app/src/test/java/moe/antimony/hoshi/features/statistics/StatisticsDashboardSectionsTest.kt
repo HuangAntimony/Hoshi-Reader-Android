@@ -6,6 +6,23 @@ import org.junit.Test
 
 class StatisticsDashboardSectionsTest {
     @Test
+    fun weekStatisticsMetricsPlaceAverageFirstOnSecondRow() {
+        val metrics = weekStatisticsMetricsInDisplayOrder(
+            durationMetric = StatisticMetric(label = "Duration", value = "1h"),
+            charactersMetric = StatisticMetric(label = "Characters", value = "1000"),
+            speedMetric = StatisticMetric(label = "Speed", value = "2000/h"),
+            targetDaysMetric = StatisticMetric(label = "Days Met", value = "1 day"),
+            streakMetric = StatisticMetric(label = "Streak", value = "1 week"),
+            averageMetric = StatisticMetric(label = "Avg Characters", value = "500"),
+        )
+
+        assertEquals(
+            listOf("Duration", "Characters", "Speed", "Avg Characters", "Days Met", "Streak"),
+            metrics.map { it.label },
+        )
+    }
+
+    @Test
     fun statisticsIntegerFormatterDoesNotUseGroupingSeparators() {
         assertEquals("1234567", formatInteger(1_234_567))
     }

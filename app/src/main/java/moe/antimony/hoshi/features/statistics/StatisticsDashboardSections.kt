@@ -170,28 +170,28 @@ internal fun WeekStatisticsSection(
         },
     ) {
         MetricGrid(
-            metrics = listOf(
-                StatisticMetric(
+            metrics = weekStatisticsMetricsInDisplayOrder(
+                durationMetric = StatisticMetric(
                     label = stringResource(R.string.statistics_reading_duration),
                     value = formatStatisticsDuration(week.readingSeconds),
                 ),
-                StatisticMetric(
+                charactersMetric = StatisticMetric(
                     label = stringResource(R.string.statistics_characters_read),
                     value = formatStatisticsCharacterCount(week.totalCharacters),
                 ),
-                StatisticMetric(
+                speedMetric = StatisticMetric(
                     label = stringResource(R.string.statistics_average_speed),
                     value = formatStatisticsSpeed(week.averageSpeedPerHour),
                 ),
-                StatisticMetric(
+                targetDaysMetric = StatisticMetric(
                     label = stringResource(R.string.statistics_target_days),
                     value = formatStatisticsDays(week.metTargetDays),
                 ),
-                StatisticMetric(
+                streakMetric = StatisticMetric(
                     label = stringResource(R.string.statistics_streak),
                     value = formatStatisticsWeeks(week.weeklyStreakWeeks),
                 ),
-                averageMetric,
+                averageMetric = averageMetric,
             ),
             columns = 3,
         )
@@ -395,6 +395,23 @@ internal data class StatisticMetric(
     val label: String,
     val value: String,
 )
+
+internal fun weekStatisticsMetricsInDisplayOrder(
+    durationMetric: StatisticMetric,
+    charactersMetric: StatisticMetric,
+    speedMetric: StatisticMetric,
+    targetDaysMetric: StatisticMetric,
+    streakMetric: StatisticMetric,
+    averageMetric: StatisticMetric,
+): List<StatisticMetric> =
+    listOf(
+        durationMetric,
+        charactersMetric,
+        speedMetric,
+        averageMetric,
+        targetDaysMetric,
+        streakMetric,
+    )
 
 internal data class MetricCardTextSpec(
     val valueFontSizeSp: Int,
