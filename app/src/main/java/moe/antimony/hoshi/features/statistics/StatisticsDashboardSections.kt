@@ -50,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.NumberFormat
 import kotlin.math.roundToInt
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.bookshelf.MainShellLayoutSpec
@@ -733,9 +732,8 @@ private fun StepperRow(
     }
 }
 
-@Composable
 internal fun formatInteger(value: Int): String =
-    NumberFormat.getIntegerInstance().format(value)
+    value.toString()
 
 @Composable
 internal fun formatStatisticsDuration(seconds: Double): String {

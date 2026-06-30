@@ -8,7 +8,7 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Add a full-library Statistics tab with habit summaries, calendar range selection, trends, distribution, target settings, compact metric cards with full day/week units, 5,000-character or 30-minute default daily goals, and an Advanced Statistics visibility switch.
+- Add a full-library Statistics tab with habit summaries, calendar range selection, trends, distribution, target settings, reader-aligned number formatting, compact metric cards with full day/week units, 5,000-character or 30-minute default daily goals, and an Advanced Statistics visibility switch.
 
 ### Changed
 
