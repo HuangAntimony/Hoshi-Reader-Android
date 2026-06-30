@@ -48,6 +48,7 @@ import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.profiles.ProfilesView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.settings.AdvancedSettingsView
+import moe.antimony.hoshi.features.statistics.StatisticsView
 import moe.antimony.hoshi.features.update.AboutScreen
 import kotlinx.coroutines.launch
 
@@ -81,6 +82,7 @@ fun AppShell(
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.Books) }
     val booksBackStack = rememberNavBackStack(AppRoute.BooksRoute)
     val dictionaryBackStack = rememberNavBackStack(AppRoute.DictionaryRoute)
+    val statisticsBackStack = rememberNavBackStack(AppRoute.StatisticsRoute)
     val settingsBackStack = rememberNavBackStack(AppRoute.SettingsRoute)
     val bookRepository = appContainer.bookRepository
     val epubBookParser = appContainer.epubBookParser
@@ -118,6 +120,7 @@ fun AppShell(
     fun selectedBackStack(): MutableList<NavKey> = when (selectedTab) {
         MainTab.Books -> booksBackStack
         MainTab.Dictionary -> dictionaryBackStack
+        MainTab.Statistics -> statisticsBackStack
         MainTab.Settings -> settingsBackStack
     }
 
@@ -136,6 +139,10 @@ fun AppShell(
 
     fun clearLoadedReaderProfile() {
         appContainer.profileActivationService.clearLoadedProfile()
+    }
+
+    fun clearReaderRoutesOutsideBooks() {
+        statisticsBackStack.removeReaderRoutes(onReaderRouteRemoved = ::clearLoadedReaderProfile)
     }
 
     LaunchedEffect(dictionarySettingsRepository) {
@@ -157,6 +164,7 @@ fun AppShell(
             )?.let { route ->
                 when (route) {
                     is AppRoute.ReaderRoute -> {
+                        clearReaderRoutesOutsideBooks()
                         selectedTab = MainTab.Books
                         booksBackStack.openReaderRoute(route.bookId)
                     }
@@ -167,18 +175,14 @@ fun AppShell(
     }
 
     fun popRoute() {
-        if (selectedTab == MainTab.Books) {
-            booksBackStack.popAppRoute(onReaderRouteRemoved = ::clearLoadedReaderProfile)
-        } else {
-            selectedBackStack().popAppRoute()
-        }
+        selectedBackStack().popAppRoute(onReaderRouteRemoved = ::clearLoadedReaderProfile)
     }
 
     fun closeReaderRoute() {
         if (readerBookmarkRefreshState.consumeDirty()) {
             bookshelfRefreshKey += 1
         }
-        booksBackStack.popAppRoute(onReaderRouteRemoved = ::clearLoadedReaderProfile)
+        selectedBackStack().popAppRoute(onReaderRouteRemoved = ::clearLoadedReaderProfile)
     }
 
     fun openSettingsDetail(section: SettingsDetailSection) {
@@ -187,11 +191,13 @@ fun AppShell(
     }
 
     fun openReader(bookId: String) {
+        clearReaderRoutesOutsideBooks()
         selectedTab = MainTab.Books
         booksBackStack.openReaderRoute(bookId)
     }
 
     fun returnToSasayakiReader(bookId: String) {
+        clearReaderRoutesOutsideBooks()
         selectedTab = MainTab.Books
         booksBackStack.returnFromMediaSession(
             bookId = bookId,
@@ -201,6 +207,9 @@ fun AppShell(
 
     LaunchedEffect(pendingImportUri) {
         val hasPendingImport = pendingImportUri != null
+        if (hasPendingImport) {
+            clearReaderRoutesOutsideBooks()
+        }
         pendingImportRouteCoordinator.routePendingImport(
             hasPendingImport = hasPendingImport,
             backStack = booksBackStack,
@@ -234,6 +243,17 @@ fun AppShell(
                 )
                 AppRoute.DictionaryRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Dictionary,
+                    pendingImportUri = currentPendingImportUri,
+                    onPendingImportConsumed = currentOnPendingImportConsumed,
+                    readerSettings = currentReaderSettings,
+                    onReaderSettingsChange = currentOnReaderSettingsChange,
+                    onOpenReader = ::openReader,
+                    bookshelfRefreshKey = bookshelfRefreshKey,
+                    dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    onSelectedTabChange = ::selectMainTab,
+                )
+                AppRoute.StatisticsRoute -> TopLevelRouteContent(
+                    selectedTab = MainTab.Statistics,
                     pendingImportUri = currentPendingImportUri,
                     onPendingImportConsumed = currentOnPendingImportConsumed,
                     readerSettings = currentReaderSettings,
@@ -318,9 +338,15 @@ fun AppShell(
         entryDecorators = rememberAppNavEntryDecorators(),
         entryProvider = entryProvider,
     )
+    val statisticsEntries = rememberDecoratedNavEntries(
+        backStack = statisticsBackStack,
+        entryDecorators = rememberAppNavEntryDecorators(),
+        entryProvider = entryProvider,
+    )
     val currentEntries = when (selectedTab) {
         MainTab.Books -> booksEntries
         MainTab.Dictionary -> dictionaryEntries
+        MainTab.Statistics -> statisticsEntries
         MainTab.Settings -> settingsEntries
     }
 
@@ -384,6 +410,10 @@ private fun TopLevelRouteContent(
                 readerSettings = readerSettings,
                 focusRequestKey = dictionaryFocusRequestKey,
                 modifier = contentModifier.fillMaxSize(),
+            )
+            MainTab.Statistics -> StatisticsView(
+                layoutSpec = layoutSpec,
+                modifier = contentModifier,
             )
             MainTab.Settings -> SettingsTab(
                 modifier = contentModifier,
@@ -455,6 +485,7 @@ private fun SettingsDetailDestination(
 private fun MainTab.toRoute(): AppRoute = when (this) {
     MainTab.Books -> AppRoute.BooksRoute
     MainTab.Dictionary -> AppRoute.DictionaryRoute
+    MainTab.Statistics -> AppRoute.StatisticsRoute
     MainTab.Settings -> AppRoute.SettingsRoute
 }
 
@@ -472,6 +503,7 @@ internal fun nextDictionaryFocusRequestKey(
 private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.MainRoute, AppRoute.BooksRoute -> MainTab.Books
     AppRoute.DictionaryRoute -> MainTab.Dictionary
+    AppRoute.StatisticsRoute -> MainTab.Statistics
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
     is AppRoute.SettingsDetailRoute -> MainTab.Settings

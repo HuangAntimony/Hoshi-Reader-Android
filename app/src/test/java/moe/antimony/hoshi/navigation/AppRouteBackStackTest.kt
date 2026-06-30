@@ -35,6 +35,20 @@ class AppRouteBackStackTest {
     }
 
     @Test
+    fun removingReaderRoutesKeepsStatisticsTopLevelRoute() {
+        val backStack = mutableListOf<NavKey>(
+            AppRoute.StatisticsRoute,
+            AppRoute.ReaderRoute("book-a"),
+        )
+        var readerRouteRemoved = false
+
+        backStack.removeReaderRoutes(onReaderRouteRemoved = { readerRouteRemoved = true })
+
+        assertEquals(listOf(AppRoute.StatisticsRoute), backStack)
+        assertEquals(true, readerRouteRemoved)
+    }
+
+    @Test
     fun backPopClearsReaderProfileWhenReaderRouteIsRemoved() {
         val backStack = mutableListOf<NavKey>(
             AppRoute.BooksRoute,

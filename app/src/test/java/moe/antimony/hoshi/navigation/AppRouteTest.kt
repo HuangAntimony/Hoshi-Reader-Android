@@ -16,6 +16,7 @@ class AppRouteTest {
             "MainRoute",
             "BooksRoute",
             "DictionaryRoute",
+            "StatisticsRoute",
             "SettingsRoute",
             "SettingsDetailRoute",
             "ReaderRoute",

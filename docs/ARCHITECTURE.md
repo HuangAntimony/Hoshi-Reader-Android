@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-06-25
+Date: 2026-06-30
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -11,8 +11,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - The app is a single Android application module under `app`.
 - UI is Jetpack Compose + Material 3.
 - Navigation uses Navigation3 typed route keys, `AppShell`, and `NavDisplay`.
-  Top-level Books, Dictionary, and Settings tabs each own an independent Nav3
-  back stack with its own saveable entry state and per-entry ViewModel stores.
+  Top-level Books, Dictionary, Statistics, and Settings tabs each own an
+  independent Nav3 back stack with its own saveable entry state and per-entry
+  ViewModel stores.
 - Production dependency injection is Hilt-backed. `HoshiApplication` owns the
   app component through `@HiltAndroidApp`, and Android entry points receive
   dependencies from the Hilt graph.
@@ -45,6 +46,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   controlled app cache/temp directories when they need the EPUB tree.
 - Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
   are persisted through book sidecar repositories and models.
+- The Statistics dashboard aggregates local book `statistics.json` sidecars
+  through a Hilt-backed repository and exposes dashboard state through a
+  Hilt-backed ViewModel.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.
@@ -68,6 +72,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader Appearance settings are stored per active/effective profile in
   `Profiles/<profileId>/reader_settings.json`; Reader Behavior and statistics
   sync settings remain global DataStore settings.
+- Statistics dashboard target settings are global DataStore settings behind a
+  repository.
 - Profile-scoped Reader Appearance, Dictionary, and Anki settings JSON reads and
   writes use injected IO dispatchers and repository-owned serialization locks.
 - Frequency and pitch dictionaries are type-specific and are not treated as term

@@ -6,6 +6,10 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add a full-library Statistics tab with habit summaries, calendar range selection, trends, distribution, and target settings.
+
 ### Changed
 
 - Open the Reader Go to panel on Chapters by default, order its tabs as Chapters, Highlights, Search, and focus the search field when Search is selected.

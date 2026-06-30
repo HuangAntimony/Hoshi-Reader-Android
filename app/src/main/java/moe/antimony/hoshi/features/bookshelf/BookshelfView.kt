@@ -45,6 +45,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -1505,7 +1506,7 @@ private fun BookCoverCard(
     }
 }
 
-private object BookCoverBitmapCache {
+internal object BookCoverBitmapCache {
     private const val MaxCoverDimensionPx = 768
     private val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
@@ -1563,7 +1564,7 @@ internal fun coverThumbnailSize(width: Int, height: Int, maxDimensionPx: Int): C
     )
 }
 
-private fun decodeSampledCoverBitmap(file: File, maxDimensionPx: Int): Bitmap? {
+internal fun decodeSampledCoverBitmap(file: File, maxDimensionPx: Int): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     val options = BitmapFactory.Options().apply {
@@ -2288,6 +2289,7 @@ private fun BottomTabGlyph(tab: MainTab, modifier: Modifier = Modifier) {
     val icon = when (tab) {
         MainTab.Books -> Icons.AutoMirrored.Rounded.MenuBook
         MainTab.Dictionary -> Icons.Rounded.Translate
+        MainTab.Statistics -> Icons.AutoMirrored.Rounded.ShowChart
         MainTab.Settings -> Icons.Rounded.Settings
     }
     Icon(
