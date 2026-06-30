@@ -57,7 +57,12 @@ class StatisticsCalculationsTest {
 
         assertEquals(
             1.5,
-            aggregate.targetRatio(StatisticsTargetSettings(dailyTargetType = DailyTargetType.Characters)),
+            aggregate.targetRatio(
+                StatisticsTargetSettings(
+                    dailyTargetType = DailyTargetType.Characters,
+                    dailyCharacterTarget = 2_000,
+                ),
+            ),
             0.0,
         )
         assertEquals(
@@ -77,7 +82,10 @@ class StatisticsCalculationsTest {
             day("2026-06-30", characters = 1_000),
         ).associateBy { it.date }
 
-        assertEquals(3, dailyGoalStreak(days, today, StatisticsTargetSettings()))
+        assertEquals(
+            3,
+            dailyGoalStreak(days, today, StatisticsTargetSettings(dailyCharacterTarget = 2_000)),
+        )
     }
 
     @Test

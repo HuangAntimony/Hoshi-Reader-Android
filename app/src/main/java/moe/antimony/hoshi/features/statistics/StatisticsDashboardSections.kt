@@ -43,11 +43,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
 import kotlin.math.roundToInt
 import moe.antimony.hoshi.R
@@ -121,7 +123,7 @@ internal fun TodayStatisticsSection(
                     ),
                     StatisticMetric(
                         label = stringResource(R.string.statistics_streak),
-                        value = stringResource(R.string.statistics_days_value_format, today.dailyStreakDays),
+                        value = formatStatisticsDays(today.dailyStreakDays),
                     ),
                 ),
                 columns = 2,
@@ -184,11 +186,11 @@ internal fun WeekStatisticsSection(
                 ),
                 StatisticMetric(
                     label = stringResource(R.string.statistics_target_days),
-                    value = stringResource(R.string.statistics_days_value_format, week.metTargetDays),
+                    value = formatStatisticsDays(week.metTargetDays),
                 ),
                 StatisticMetric(
                     label = stringResource(R.string.statistics_streak),
-                    value = stringResource(R.string.statistics_weeks_value_format, week.weeklyStreakWeeks),
+                    value = formatStatisticsWeeks(week.weeklyStreakWeeks),
                 ),
                 averageMetric,
             ),
@@ -395,6 +397,37 @@ internal data class StatisticMetric(
     val value: String,
 )
 
+internal data class MetricCardTextSpec(
+    val valueFontSizeSp: Int,
+    val valueLineHeightSp: Int,
+    val labelFontSizeSp: Int,
+    val labelLineHeightSp: Int,
+    val labelMaxLines: Int,
+)
+
+internal fun metricCardTextSpec(
+    metric: StatisticMetric,
+    columns: Int,
+): MetricCardTextSpec {
+    val longValue = metric.value.length >= 7
+    val denseGrid = columns >= 3
+    return MetricCardTextSpec(
+        valueFontSizeSp = when {
+            longValue -> 20
+            denseGrid -> 21
+            else -> 22
+        },
+        valueLineHeightSp = when {
+            longValue -> 23
+            denseGrid -> 24
+            else -> 26
+        },
+        labelFontSizeSp = if (denseGrid || metric.label.length >= 12) 12 else 13,
+        labelLineHeightSp = 14,
+        labelMaxLines = 2,
+    )
+}
+
 @Composable
 internal fun MetricGrid(
     metrics: List<StatisticMetric>,
@@ -411,7 +444,7 @@ internal fun MetricGrid(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 rowMetrics.forEach { metric ->
-                    MetricCard(metric = metric, modifier = Modifier.weight(1f))
+                    MetricCard(metric = metric, columns = columns, modifier = Modifier.weight(1f))
                 }
                 repeat(columns - rowMetrics.size) {
                     Spacer(Modifier.weight(1f))
@@ -424,8 +457,10 @@ internal fun MetricGrid(
 @Composable
 private fun MetricCard(
     metric: StatisticMetric,
+    columns: Int,
     modifier: Modifier = Modifier,
 ) {
+    val textSpec = metricCardTextSpec(metric = metric, columns = columns)
     Surface(
         modifier = modifier
             .height(68.dp)
@@ -436,12 +471,16 @@ private fun MetricCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 9.dp, vertical = 7.dp),
+                .padding(horizontal = 7.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = metric.value,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = textSpec.valueFontSizeSp.sp,
+                    lineHeight = textSpec.valueLineHeightSp.sp,
+                    letterSpacing = 0.sp,
+                ),
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -449,10 +488,14 @@ private fun MetricCard(
             Spacer(Modifier.height(1.dp))
             Text(
                 text = metric.label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = textSpec.labelFontSizeSp.sp,
+                    lineHeight = textSpec.labelLineHeightSp.sp,
+                    letterSpacing = 0.sp,
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
+                maxLines = textSpec.labelMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -713,6 +756,14 @@ internal fun formatStatisticsCharacters(characters: Int): String =
 @Composable
 internal fun formatStatisticsCharacterCount(characters: Int): String =
     formatInteger(characters)
+
+@Composable
+internal fun formatStatisticsDays(days: Int): String =
+    pluralStringResource(R.plurals.statistics_days_value, days, days)
+
+@Composable
+internal fun formatStatisticsWeeks(weeks: Int): String =
+    pluralStringResource(R.plurals.statistics_weeks_value, weeks, weeks)
 
 @Composable
 internal fun formatStatisticsSpeed(speedPerHour: Int): String =

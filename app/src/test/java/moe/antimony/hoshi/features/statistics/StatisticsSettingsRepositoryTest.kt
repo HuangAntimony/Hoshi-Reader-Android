@@ -1,6 +1,11 @@
 package moe.antimony.hoshi.features.statistics
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,7 +24,37 @@ class StatisticsSettingsRepositoryTest {
     @Test
     fun emitsDashboardTargetDefaults() = runBlocking {
         repository().use { repository ->
-            assertEquals(StatisticsTargetSettings(), repository.settings.first())
+            assertEquals(
+                StatisticsTargetSettings(
+                    dailyCharacterTarget = 5_000,
+                    dailyDurationTargetMinutes = 30,
+                ),
+                repository.settings.first(),
+            )
+        }
+    }
+
+    @Test
+    fun readsStoredTargetsAheadOfDefaults() = runBlocking {
+        repository().use { repository ->
+            repository.writeStoredTargetSettings(
+                StatisticsTargetSettings(
+                    dailyTargetType = DailyTargetType.Duration,
+                    dailyCharacterTarget = 2_000,
+                    dailyDurationTargetMinutes = 15,
+                    weeklyTargetDays = 3,
+                ),
+            )
+
+            assertEquals(
+                StatisticsTargetSettings(
+                    dailyTargetType = DailyTargetType.Duration,
+                    dailyCharacterTarget = 2_000,
+                    dailyDurationTargetMinutes = 15,
+                    weeklyTargetDays = 3,
+                ),
+                repository.settings.first(),
+            )
         }
     }
 
@@ -75,17 +110,28 @@ class StatisticsSettingsRepositoryTest {
             scope = scope,
             produceFile = { tempFolder.newFile("statistics-settings.preferences_pb") },
         )
-        return RepositoryHandle(StatisticsSettingsRepository(dataStore), scope)
+        return RepositoryHandle(StatisticsSettingsRepository(dataStore), dataStore, scope)
     }
 
     private class RepositoryHandle(
         private val repository: StatisticsSettingsRepository,
+        private val dataStore: DataStore<Preferences>,
         private val scope: CoroutineScope,
     ) : AutoCloseable {
         val settings = repository.settings
 
         suspend fun update(transform: (StatisticsTargetSettings) -> StatisticsTargetSettings) {
             repository.update(transform)
+        }
+
+        suspend fun writeStoredTargetSettings(settings: StatisticsTargetSettings) {
+            dataStore.edit { preferences ->
+                preferences[stringPreferencesKey("statisticsDailyTargetType")] = settings.dailyTargetType.name
+                preferences[intPreferencesKey("statisticsDailyCharacterTarget")] = settings.dailyCharacterTarget
+                preferences[intPreferencesKey("statisticsDailyDurationTargetMinutes")] =
+                    settings.dailyDurationTargetMinutes
+                preferences[intPreferencesKey("statisticsWeeklyTargetDays")] = settings.weeklyTargetDays
+            }
         }
 
         override fun close() {

@@ -174,7 +174,7 @@ class StatisticsViewModelTest {
 
     @Test
     fun dayRangeSummaryKeepsTargetProgressForOverviewMetric() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_500))).use { viewModel ->
+        viewModel(snapshot = snapshot(day("2026-06-29", characters = 6_250))).use { viewModel ->
             viewModel.reload()
             viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
 
@@ -199,7 +199,7 @@ class StatisticsViewModelTest {
         ).use { viewModel ->
             viewModel.reload()
 
-            assertEquals(250, viewModel.uiState.value.today.targetPercent)
+            assertEquals(100, viewModel.uiState.value.today.targetPercent)
             assertEquals(listOf("fast", "slow"), viewModel.uiState.value.currentRange.distributionRows.map { it.bookId })
 
             viewModel.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
@@ -217,8 +217,8 @@ class StatisticsViewModelTest {
     fun weeklyTargetChangesRecomputeCurrentWeekGoal() = runBlocking {
         viewModel(
             snapshot = snapshot(
-                day("2026-06-29", characters = 2_000),
-                day("2026-06-30", characters = 2_000),
+                day("2026-06-29", characters = 5_000),
+                day("2026-06-30", characters = 5_000),
             ),
         ).use { viewModel ->
             viewModel.reload()

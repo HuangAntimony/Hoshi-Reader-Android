@@ -96,7 +96,7 @@ private fun CurrentRangeOverview(
     } else {
         StatisticMetric(
             label = stringResource(R.string.statistics_target_days),
-            value = stringResource(R.string.statistics_days_value_format, summary.targetDays),
+            value = formatStatisticsDays(summary.targetDays),
         )
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

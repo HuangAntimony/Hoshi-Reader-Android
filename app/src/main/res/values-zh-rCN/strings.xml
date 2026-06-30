@@ -99,8 +99,6 @@
     <string name="statistics_characters_value_format" comment="Generic character metric value, intentionally matching daily character target value.">%1$s 字</string>
     <string name="statistics_speed_value_format">%1$s/h</string>
     <string name="statistics_percent_format">%1$d%%</string>
-    <string name="statistics_days_value_format" comment="Generic day metric value, intentionally matching selected range day-count label.">%1$d 天</string>
-    <string name="statistics_weeks_value_format">%1$d 周</string>
     <string name="statistics_duration_minutes_format">%1$dm</string>
     <string name="statistics_duration_hours_format">%1$dh</string>
     <string name="statistics_duration_hours_minutes_format">%1$dh %2$dm</string>
@@ -124,6 +122,14 @@
     <string name="statistics_weekday_friday">星期五</string>
     <string name="statistics_weekday_saturday">星期六</string>
     <string name="statistics_weekday_sunday">星期日</string>
+    <plurals name="statistics_days_value">
+        <item quantity="one">%1$d 天</item>
+        <item quantity="other">%1$d 天</item>
+    </plurals>
+    <plurals name="statistics_weeks_value">
+        <item quantity="one">%1$d 周</item>
+        <item quantity="other">%1$d 周</item>
+    </plurals>
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">辞典</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profile</string>
