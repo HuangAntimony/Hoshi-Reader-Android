@@ -348,6 +348,8 @@
     <string name="reader_statistics_autostart_page_turn">翻页时</string>
     <string name="reader_statistics_autostart_on">开启</string>
     <string name="reader_statistics_sync_behaviour">同步行为</string>
+    <string name="reader_statistics_sync_mode_merge">合并</string>
+    <string name="reader_statistics_sync_mode_replace">替换</string>
     <string name="reader_statistics_settings_hint">可从阅读器菜单访问统计。</string>
     <string name="reader_appearance_theme">主题</string>
     <string name="reader_appearance_text">文本</string>

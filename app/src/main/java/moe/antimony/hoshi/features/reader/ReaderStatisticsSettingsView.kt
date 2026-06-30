@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -156,7 +157,7 @@ fun ReaderStatisticsSettingsView(
                                 trailingContent = {
                                     Box {
                                         TextButton(onClick = { syncModeMenuExpanded = true }) {
-                                            Text(settings.statisticsSyncMode.rawValue)
+                                            Text(stringResource(settings.statisticsSyncMode.labelRes))
                                         }
                                         DropdownMenu(
                                             expanded = syncModeMenuExpanded,
@@ -164,7 +165,7 @@ fun ReaderStatisticsSettingsView(
                                         ) {
                                             StatisticsSyncMode.entries.forEach { mode ->
                                                 DropdownMenuItem(
-                                                    text = { Text(mode.rawValue) },
+                                                    text = { Text(stringResource(mode.labelRes)) },
                                                     onClick = {
                                                         syncModeMenuExpanded = false
                                                         onSettingsChange(settings.copy(statisticsSyncMode = mode))
@@ -209,3 +210,10 @@ private fun StatisticsSettingsDivider() {
         color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
+
+@get:StringRes
+private val StatisticsSyncMode.labelRes: Int
+    get() = when (this) {
+        StatisticsSyncMode.Merge -> R.string.reader_statistics_sync_mode_merge
+        StatisticsSyncMode.Replace -> R.string.reader_statistics_sync_mode_replace
+    }

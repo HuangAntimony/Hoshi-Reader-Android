@@ -165,6 +165,17 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun statisticsSyncModeLabelsAreLocalized() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals("Merge", defaultResources.strings["reader_statistics_sync_mode_merge"]?.value)
+        assertEquals("Replace", defaultResources.strings["reader_statistics_sync_mode_replace"]?.value)
+        assertEquals("合并", zhResources.strings["reader_statistics_sync_mode_merge"]?.value)
+        assertEquals("替换", zhResources.strings["reader_statistics_sync_mode_replace"]?.value)
+    }
+
+    @Test
     fun defaultLocaleIsDeclaredForGeneratedLocaleConfig() {
         val properties = File(resDir, "resources.properties")
 
