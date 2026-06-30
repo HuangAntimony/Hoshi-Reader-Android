@@ -502,8 +502,6 @@ internal data class HeatmapSelectionDecoration(
     val rangeOutlinePaddingDp: Float = 0f,
     val anchorOuterStrokeWidthDp: Float = 0f,
     val anchorOuterStrokePaddingDp: Float = 0f,
-    val anchorInnerStrokeWidthDp: Float = 0f,
-    val anchorInnerStrokePaddingDp: Float = 0f,
 )
 
 internal fun heatmapSelectionDecoration(
@@ -512,7 +510,7 @@ internal fun heatmapSelectionDecoration(
 ): HeatmapSelectionDecoration =
     when {
         isAnchor -> HeatmapSelectionDecoration(
-            anchorOuterStrokeWidthDp = 3f,
+            anchorOuterStrokeWidthDp = 2f,
             anchorOuterStrokePaddingDp = 2f,
         )
         inSelectedRange -> HeatmapSelectionDecoration(
@@ -527,7 +525,6 @@ internal fun HeatmapSelectionDecoration.outwardPaddingDp(): Float =
         haloPaddingDp,
         rangeOutlinePaddingDp + (rangeOutlineStrokeWidthDp / 2f),
         anchorOuterStrokePaddingDp + (anchorOuterStrokeWidthDp / 2f),
-        anchorInnerStrokePaddingDp + (anchorInnerStrokeWidthDp / 2f),
     )
 
 internal fun heatmapSelectionInsetDp(): Float =

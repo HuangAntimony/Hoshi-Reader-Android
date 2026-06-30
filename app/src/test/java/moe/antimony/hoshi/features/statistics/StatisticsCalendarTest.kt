@@ -64,8 +64,7 @@ class StatisticsCalendarTest {
         assertEquals(false, range.hasHalo)
         assertTrue(range.rangeOutlineStrokeWidthDp > 0f)
         assertEquals(false, anchor.hasHalo)
-        assertTrue(anchor.anchorOuterStrokeWidthDp > range.rangeOutlineStrokeWidthDp)
-        assertEquals(0f, anchor.anchorInnerStrokeWidthDp, 0f)
+        assertTrue(anchor.anchorOuterStrokeWidthDp <= range.rangeOutlineStrokeWidthDp)
     }
 
     @Test
