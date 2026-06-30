@@ -17,7 +17,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
@@ -45,15 +45,8 @@ internal fun StatisticsView(
     val heatmapScrollState = rememberScrollState()
     var heatmapAutoScrolledWindowKey by rememberSaveable { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(viewModel) {
-        viewModel.reload()
-    }
     DisposableEffect(lifecycleOwner, viewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.reload()
-            }
-        }
+        val observer = StatisticsLifecycleReloader(viewModel::reload)
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -148,6 +141,16 @@ internal fun StatisticsView(
 }
 
 internal fun statisticsListBottomPaddingDp(): Int = 24
+
+internal class StatisticsLifecycleReloader(
+    private val reload: () -> Unit,
+) : LifecycleEventObserver {
+    override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+        if (event == Lifecycle.Event.ON_RESUME) {
+            reload()
+        }
+    }
+}
 
 @Composable
 private fun CenteredStatisticsColumn(
