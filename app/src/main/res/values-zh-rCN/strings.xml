@@ -46,7 +46,87 @@
     <string name="import_select_font">请选择 .ttf、.otf、.woff 或 .woff2 字体文件。</string>
     <string name="main_tab_books" comment="Main navigation tab label, intentionally matching the backup Books section.">书库</string>
     <string name="main_tab_dictionary">查词</string>
+    <string name="main_tab_statistics" comment="Main navigation tab label, intentionally matching statistics page titles.">统计</string>
     <string name="main_tab_settings" comment="Main navigation tab label, intentionally matching settings page titles.">设置</string>
+    <string name="statistics_title" comment="Statistics page title, intentionally matching the main tab label.">统计</string>
+    <string name="statistics_today" comment="Statistics dashboard section title, intentionally matching reader statistics today label.">今天</string>
+    <string name="statistics_this_week">本周</string>
+    <string name="statistics_target_format">目标 %1$s</string>
+    <string name="statistics_reading_duration" comment="Dashboard metric label, intentionally matching the duration legend and target type label.">时长</string>
+    <string name="statistics_characters_read" comment="Dashboard metric label, intentionally matching the characters legend and target type label.">字数</string>
+    <string name="statistics_average_speed" comment="Dashboard metric label, intentionally matching the Sasayaki speed setting noun.">速度</string>
+    <string name="statistics_streak">连续</string>
+    <string name="statistics_target_days">达标天数</string>
+    <string name="statistics_daily_average_characters">日均字数</string>
+    <string name="statistics_daily_average_duration">日均时长</string>
+    <string name="statistics_week_goal_days" comment="Weekly dashboard section label, intentionally matching the current-range goal progress metric.">目标进度</string>
+    <string name="statistics_week_status_format">本周 %1$d/7</string>
+    <string name="statistics_reading_calendar">阅读日历</string>
+    <string name="statistics_recent_year">最近一年</string>
+    <string name="statistics_range_year">年</string>
+    <string name="statistics_range_month">月</string>
+    <string name="statistics_range_week">周</string>
+    <string name="statistics_range_day">日</string>
+    <string name="statistics_selected_range_format">已选择：%1$s</string>
+    <string name="statistics_current_range">所选范围</string>
+    <string name="statistics_tab_overview">概览</string>
+    <string name="statistics_tab_trend">趋势</string>
+    <string name="statistics_tab_distribution">分布</string>
+    <string name="statistics_target_progress" comment="Current-range metric label, intentionally matching the weekly dashboard goal progress label.">目标进度</string>
+    <string name="statistics_monthly_trend">每月趋势</string>
+    <string name="statistics_daily_trend">每日趋势</string>
+    <string name="statistics_duration" comment="Trend legend label, intentionally matching duration target type label.">时长</string>
+    <string name="statistics_characters" comment="Trend legend label, intentionally matching characters target type label.">字数</string>
+    <string name="statistics_daily_target">每日目标</string>
+    <string name="statistics_current_target">当前目标</string>
+    <string name="statistics_weekly_target">每周目标</string>
+    <string name="statistics_week_status">阅读天数</string>
+    <string name="statistics_target_type_characters" comment="Daily target type option, intentionally matching statistics characters legend label.">字</string>
+    <string name="statistics_target_type_duration" comment="Daily target type option, intentionally matching statistics duration legend label.">时长</string>
+    <string name="statistics_no_reading_records">暂无阅读记录</string>
+    <string name="statistics_no_trend_data">暂无趋势数据</string>
+    <string name="statistics_partial_unavailable">部分统计数据暂时无法读取。</string>
+    <string name="statistics_target_met">已达标</string>
+    <string name="statistics_target_not_met">未达标</string>
+    <string name="statistics_calendar_heatmap_semantics">阅读日历热力图</string>
+    <string name="statistics_empty_goal_value">-</string>
+    <string name="statistics_trend_legend_format">%1$s / %2$s</string>
+    <string name="statistics_character_target_format" comment="Daily character target value, intentionally matching generic statistics character value format.">%1$s 字</string>
+    <string name="statistics_duration_target_format">%1$s</string>
+    <string name="statistics_characters_value_format" comment="Generic character metric value, intentionally matching daily character target value.">%1$s 字</string>
+    <string name="statistics_speed_value_format">%1$s/h</string>
+    <string name="statistics_percent_format">%1$d%%</string>
+    <string name="statistics_duration_minutes_format">%1$dm</string>
+    <string name="statistics_duration_hours_format">%1$dh</string>
+    <string name="statistics_duration_hours_minutes_format">%1$dh %2$dm</string>
+    <string name="statistics_range_fixed_year_format">%1$d 年</string>
+    <string name="statistics_range_month_title_format">%1$d 年 %2$d 月</string>
+    <string name="statistics_range_week_title_format">%1$d月%2$d日-%3$d月%4$d日</string>
+    <string name="statistics_range_day_title_format">%1$d月%2$d日 %3$s</string>
+    <string name="statistics_distribution_meta_format">%1$s · %2$s</string>
+    <string name="statistics_distribution_cover_placeholder">书籍封面占位</string>
+    <string name="statistics_weekday_monday_short">一</string>
+    <string name="statistics_weekday_tuesday_short" comment="Single-character Tuesday label.">二</string>
+    <string name="statistics_weekday_wednesday_short">三</string>
+    <string name="statistics_weekday_thursday_short" comment="Single-character Thursday label.">四</string>
+    <string name="statistics_weekday_friday_short">五</string>
+    <string name="statistics_weekday_saturday_short" comment="Single-character Saturday label.">六</string>
+    <string name="statistics_weekday_sunday_short" comment="Single-character Sunday label.">日</string>
+    <string name="statistics_weekday_monday">星期一</string>
+    <string name="statistics_weekday_tuesday">星期二</string>
+    <string name="statistics_weekday_wednesday">星期三</string>
+    <string name="statistics_weekday_thursday">星期四</string>
+    <string name="statistics_weekday_friday">星期五</string>
+    <string name="statistics_weekday_saturday">星期六</string>
+    <string name="statistics_weekday_sunday">星期日</string>
+    <plurals name="statistics_days_value">
+        <item quantity="one">%1$d 天</item>
+        <item quantity="other">%1$d 天</item>
+    </plurals>
+    <plurals name="statistics_weeks_value">
+        <item quantity="one">%1$d 周</item>
+        <item quantity="other">%1$d 周</item>
+    </plurals>
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">辞典</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profile</string>
@@ -251,7 +331,7 @@
     <string name="reader_delete_highlight">删除标注</string>
     <string name="reader_highlight_action">标注</string>
     <string name="reader_statistics_session">本次</string>
-    <string name="reader_statistics_today">今天</string>
+    <string name="reader_statistics_today" comment="Reader statistics section title, intentionally matching dashboard today label.">今天</string>
     <string name="reader_statistics_all_time">全部</string>
     <string name="reader_statistics_time_to_finish_book">读完本书还需：</string>
     <string name="reader_statistics_time_to_finish_chapter">读完本章还需：</string>
@@ -259,11 +339,14 @@
     <string name="reader_statistics_words_read">已读单词：</string>
     <string name="reader_statistics_reading_speed">阅读速度：</string>
     <string name="reader_statistics_reading_time">阅读时间：</string>
+    <string name="reader_statistics_show_tab">显示统计标签页</string>
     <string name="reader_statistics_autostart">自动开始</string>
     <string name="reader_statistics_autostart_off" comment="Reader statistics autostart setting value; intentionally matches other off labels.">关闭</string>
     <string name="reader_statistics_autostart_page_turn">翻页时</string>
     <string name="reader_statistics_autostart_on">开启</string>
     <string name="reader_statistics_sync_behaviour">同步行为</string>
+    <string name="reader_statistics_sync_mode_merge">合并</string>
+    <string name="reader_statistics_sync_mode_replace">替换</string>
     <string name="reader_statistics_settings_hint">可从阅读器菜单访问统计。</string>
     <string name="reader_appearance_theme">主题</string>
     <string name="reader_appearance_text">文本</string>
@@ -552,7 +635,7 @@
     <string name="sasayaki_copy_audiobook_to_storage">复制有声书到应用存储</string>
     <string name="sasayaki_copy_audiobook_to_storage_help">保留私有副本，而不是链接到所选外部媒体文件</string>
     <string name="sasayaki_delay">延迟</string>
-    <string name="sasayaki_speed">速度</string>
+    <string name="sasayaki_speed" comment="Sasayaki setting label, intentionally matching the statistics speed metric noun.">速度</string>
     <string name="sasayaki_reader_controls">阅读器控制</string>
     <string name="sasayaki_show_bottom_playback_controls">固定播放控制到底部安全区</string>
     <string name="sasayaki_show_bottom_playback_controls_help">在底部安全区显示后退、播放或暂停和快进控制。</string>

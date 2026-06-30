@@ -45,6 +45,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -518,6 +519,7 @@ fun BookshelfView(
 internal fun HoshiMainShell(
     selectedTab: MainTab,
     onSelectedTabChange: (MainTab) -> Unit,
+    visibleTabs: List<MainTab> = MainTab.entries,
     modifier: Modifier = Modifier,
     content: @Composable (Modifier, MainShellLayoutSpec) -> Unit,
 ) {
@@ -533,6 +535,7 @@ internal fun HoshiMainShell(
                     HoshiCompactBottomNavigation(
                         selectedTab = selectedTab,
                         onSelectedTabChange = onSelectedTabChange,
+                        visibleTabs = visibleTabs,
                         layoutSpec = layoutSpec,
                     )
                 },
@@ -557,7 +560,7 @@ internal fun HoshiMainShell(
                 modifier = Modifier.fillMaxSize(),
                 layoutType = layoutSpec.toNavigationSuiteType(),
                 navigationSuiteItems = {
-                    MainTab.entries.forEach { tab ->
+                    visibleTabs.forEach { tab ->
                         item(
                             selected = tab == selectedTab,
                             onClick = { onSelectedTabChange(tab) },
@@ -585,6 +588,7 @@ internal const val ShelfManagementShelfListTag = "shelf-management-shelf-list"
 private fun HoshiCompactBottomNavigation(
     selectedTab: MainTab,
     onSelectedTabChange: (MainTab) -> Unit,
+    visibleTabs: List<MainTab>,
     layoutSpec: MainShellLayoutSpec,
 ) {
     val containerColor = MaterialTheme.colorScheme.background
@@ -606,7 +610,7 @@ private fun HoshiCompactBottomNavigation(
                 tonalElevation = 0.dp,
                 windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
             ) {
-                MainTab.entries.forEach { tab ->
+                visibleTabs.forEach { tab ->
                     NavigationBarItem(
                         selected = tab == selectedTab,
                         onClick = { onSelectedTabChange(tab) },
@@ -1505,7 +1509,7 @@ private fun BookCoverCard(
     }
 }
 
-private object BookCoverBitmapCache {
+internal object BookCoverBitmapCache {
     private const val MaxCoverDimensionPx = 768
     private val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
@@ -1563,7 +1567,7 @@ internal fun coverThumbnailSize(width: Int, height: Int, maxDimensionPx: Int): C
     )
 }
 
-private fun decodeSampledCoverBitmap(file: File, maxDimensionPx: Int): Bitmap? {
+internal fun decodeSampledCoverBitmap(file: File, maxDimensionPx: Int): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.absolutePath, bounds)
     val options = BitmapFactory.Options().apply {
@@ -2288,6 +2292,7 @@ private fun BottomTabGlyph(tab: MainTab, modifier: Modifier = Modifier) {
     val icon = when (tab) {
         MainTab.Books -> Icons.AutoMirrored.Rounded.MenuBook
         MainTab.Dictionary -> Icons.Rounded.Translate
+        MainTab.Statistics -> Icons.AutoMirrored.Rounded.ShowChart
         MainTab.Settings -> Icons.Rounded.Settings
     }
     Icon(

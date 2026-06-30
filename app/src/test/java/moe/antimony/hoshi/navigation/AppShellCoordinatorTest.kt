@@ -2,13 +2,48 @@ package moe.antimony.hoshi.navigation
 
 import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.runBlocking
+import moe.antimony.hoshi.features.bookshelf.MainTab
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppShellCoordinatorTest {
+    @Test
+    fun visibleMainTabsRequireStatisticsAndStatisticsTabSwitch() {
+        assertFalse(
+            appShellVisibleMainTabs(
+                ReaderSettings(enableStatistics = false, showStatisticsTab = true),
+            ).contains(MainTab.Statistics),
+        )
+        assertFalse(
+            appShellVisibleMainTabs(
+                ReaderSettings(enableStatistics = true, showStatisticsTab = false),
+            ).contains(MainTab.Statistics),
+        )
+        assertTrue(
+            appShellVisibleMainTabs(
+                ReaderSettings(enableStatistics = true, showStatisticsTab = true),
+            ).contains(MainTab.Statistics),
+        )
+    }
+
+    @Test
+    fun hiddenSelectedStatisticsTabFallsBackToBooks() {
+        assertEquals(
+            MainTab.Books,
+            coerceAvailableMainTab(
+                requestedTab = MainTab.Statistics,
+                visibleTabs = appShellVisibleMainTabs(
+                    ReaderSettings(enableStatistics = true, showStatisticsTab = false),
+                ),
+            ),
+        )
+    }
+
     @Test
     fun dictionaryDefaultRouteAppliesOnceOnlyFromInitialBooksRoute() = runBlocking {
         val stateHolder = AppLaunchRouteStateHolder()

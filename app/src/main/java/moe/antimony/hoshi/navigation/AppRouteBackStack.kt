@@ -30,6 +30,14 @@ internal fun MutableList<NavKey>.openReaderRoute(bookId: String) {
     add(AppRoute.ReaderRoute(bookId))
 }
 
+internal fun MutableList<NavKey>.removeReaderRoutes(
+    onReaderRouteRemoved: () -> Unit = {},
+) {
+    val hadReaderRoute = containsReaderRoute()
+    removeAll { route -> route is AppRoute.ReaderRoute }
+    notifyReaderRouteRemoved(hadReaderRoute, onReaderRouteRemoved)
+}
+
 internal fun MutableList<NavKey>.routeExternalBookImport(
     onReaderRouteRemoved: () -> Unit = {},
 ) {

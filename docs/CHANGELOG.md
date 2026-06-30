@@ -6,6 +6,10 @@ Historical release notes before v1.1.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add a full-library Statistics tab with habit summaries, calendar range selection, stable non-stretch scrolling with less bottom whitespace, a stable heatmap position while browsing long distribution lists, a clearer selected-range section for overview, trends, and per-book distribution, target settings, reader-aligned number formatting, compact metric cards with correctly pluralized full day/week units and refined weekly metric ordering, 5,000-character or 30-minute default daily goals, and an Advanced Statistics visibility switch.
+
 ### Changed
 
 - Open the Reader Go to panel on Chapters by default, order its tabs as Chapters, Highlights, Search, and focus the search field when Search is selected.

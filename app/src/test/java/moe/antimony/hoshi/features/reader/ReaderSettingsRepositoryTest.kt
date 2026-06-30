@@ -69,6 +69,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.visualNovelMergeCrossScreenSasayakiCues)
             assertFalse(settings.blurImages)
             assertFalse(settings.enableStatistics)
+            assertTrue(settings.showStatisticsTab)
             assertEquals(StatisticsAutostartMode.Off, settings.statisticsAutostartMode)
             assertFalse(settings.showStatisticsToggle)
             assertFalse(settings.showReadingSpeed)
@@ -186,6 +187,7 @@ class ReaderSettingsRepositoryTest {
                     visualNovelMergeCrossScreenSasayakiCues = true,
                     blurImages = true,
                     enableStatistics = true,
+                    showStatisticsTab = false,
                     statisticsAutostartMode = StatisticsAutostartMode.PageTurn,
                     showStatisticsToggle = true,
                     showReadingSpeed = true,
@@ -245,6 +247,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.visualNovelMergeCrossScreenSasayakiCues)
             assertTrue(saved.blurImages)
             assertTrue(saved.enableStatistics)
+            assertFalse(saved.showStatisticsTab)
             assertEquals(StatisticsAutostartMode.PageTurn, saved.statisticsAutostartMode)
             assertTrue(saved.showStatisticsToggle)
             assertTrue(saved.showReadingSpeed)
@@ -324,6 +327,7 @@ class ReaderSettingsRepositoryTest {
                     popupWidth = 440,
                     bottomSafeAreaDp = 44,
                     visualNovelMergeCrossScreenSasayakiCues = true,
+                    showStatisticsTab = false,
                     volumeKeysTurnPages = true,
                     lockCurrentOrientation = true,
                     openLastReadBookOnLaunch = true,
@@ -338,6 +342,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(440, inherited.popupWidth)
             assertEquals(44, inherited.bottomSafeAreaDp)
             assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
+            assertFalse(inherited.showStatisticsTab)
             assertTrue(inherited.volumeKeysTurnPages)
             assertTrue(inherited.lockCurrentOrientation)
             assertTrue(inherited.openLastReadBookOnLaunch)
@@ -349,6 +354,7 @@ class ReaderSettingsRepositoryTest {
                     popupWidth = 280,
                     bottomSafeAreaDp = 60,
                     visualNovelMergeCrossScreenSasayakiCues = false,
+                    showStatisticsTab = true,
                     volumeKeysTurnPages = false,
                     lockCurrentOrientation = false,
                     openLastReadBookOnLaunch = false,
@@ -362,6 +368,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(440, japanese.popupWidth)
             assertEquals(44, japanese.bottomSafeAreaDp)
             assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)
+            assertTrue(japanese.showStatisticsTab)
             assertFalse(japanese.volumeKeysTurnPages)
             assertFalse(japanese.lockCurrentOrientation)
             assertFalse(japanese.openLastReadBookOnLaunch)

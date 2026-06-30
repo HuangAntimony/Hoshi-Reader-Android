@@ -30,6 +30,7 @@ class ReaderSettingsTest {
         assertFalse(settings.continuousMode)
         assertFalse(settings.blurImages)
         assertFalse(settings.enableStatistics)
+        assertTrue(settings.showStatisticsTab)
         assertEquals(StatisticsAutostartMode.Off, settings.statisticsAutostartMode)
         assertFalse(settings.showStatisticsToggle)
         assertFalse(settings.showReadingSpeed)
@@ -79,6 +80,19 @@ class ReaderSettingsTest {
         assertFalse(enabled.showStatisticsToggle)
         assertFalse(enabled.showReadingSpeed)
         assertFalse(enabled.showReadingTime)
+    }
+
+    @Test
+    fun statisticsTabVisibilityRemainsUserControlledWhenEnablingStatistics() {
+        val settings = ReaderSettings(
+            enableStatistics = false,
+            showStatisticsTab = false,
+        )
+
+        val enabled = settings.withStatisticsEnabled(true)
+
+        assertTrue(enabled.enableStatistics)
+        assertFalse(enabled.showStatisticsTab)
     }
 
     @Test

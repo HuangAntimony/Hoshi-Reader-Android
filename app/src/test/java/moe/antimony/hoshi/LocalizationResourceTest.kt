@@ -150,6 +150,55 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun statisticsDurationUnitsUseFullWords() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals("%1\$d day", defaultResources.plurals.getValue("statistics_days_value").items.getValue("one"))
+        assertEquals("%1\$d days", defaultResources.plurals.getValue("statistics_days_value").items.getValue("other"))
+        assertEquals("%1\$d week", defaultResources.plurals.getValue("statistics_weeks_value").items.getValue("one"))
+        assertEquals("%1\$d weeks", defaultResources.plurals.getValue("statistics_weeks_value").items.getValue("other"))
+        assertEquals("%1\$d 天", zhResources.plurals.getValue("statistics_days_value").items.getValue("one"))
+        assertEquals("%1\$d 天", zhResources.plurals.getValue("statistics_days_value").items.getValue("other"))
+        assertEquals("%1\$d 周", zhResources.plurals.getValue("statistics_weeks_value").items.getValue("one"))
+        assertEquals("%1\$d 周", zhResources.plurals.getValue("statistics_weeks_value").items.getValue("other"))
+    }
+
+    @Test
+    fun statisticsCurrentRangeTitleNamesSelectedRange() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals("Selected Range", defaultResources.strings.getValue("statistics_current_range").value)
+        assertEquals("所选范围", zhResources.strings.getValue("statistics_current_range").value)
+    }
+
+    @Test
+    fun statisticsStandaloneEnglishDayAndWeekCountsUsePlurals() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+
+        val fixedCounts = defaultResources.strings
+            .filterValues { string ->
+                StandaloneEnglishDayOrWeekCountPattern.containsMatchIn(string.value)
+            }
+            .keys
+            .toList()
+
+        assertEquals(emptyList<String>(), fixedCounts)
+    }
+
+    @Test
+    fun statisticsSyncModeLabelsAreLocalized() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals("Merge", defaultResources.strings["reader_statistics_sync_mode_merge"]?.value)
+        assertEquals("Replace", defaultResources.strings["reader_statistics_sync_mode_replace"]?.value)
+        assertEquals("合并", zhResources.strings["reader_statistics_sync_mode_merge"]?.value)
+        assertEquals("替换", zhResources.strings["reader_statistics_sync_mode_replace"]?.value)
+    }
+
+    @Test
     fun defaultLocaleIsDeclaredForGeneratedLocaleConfig() {
         val properties = File(resDir, "resources.properties")
 
@@ -227,5 +276,6 @@ class LocalizationResourceTest {
 
     private companion object {
         val FormatArgumentPattern = Regex("%\\d+\\$[sdDfFeEgG]")
+        val StandaloneEnglishDayOrWeekCountPattern = Regex("""%\d+[$]d (days|weeks)""")
     }
 }
