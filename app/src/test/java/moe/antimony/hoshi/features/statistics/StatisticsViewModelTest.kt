@@ -300,6 +300,31 @@ class StatisticsViewModelTest {
         }
     }
 
+    @Test
+    fun loadingStaysTrueWhenSelectionAndSettingsChangeDuringReload() = runBlocking {
+        val pendingLoad = CompletableDeferred<StatisticsSnapshot>()
+        viewModel(
+            repository = DeferredStatisticsRepository(pendingLoad),
+        ).use { viewModel ->
+            viewModel.reload()
+            yield()
+            assertEquals(true, viewModel.uiState.value.isLoading)
+
+            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            yield()
+            assertEquals(true, viewModel.uiState.value.isLoading)
+
+            viewModel.onEvent(StatisticsEvent.UpdateWeeklyTargetDays(2))
+            yield()
+            assertEquals(true, viewModel.uiState.value.isLoading)
+
+            pendingLoad.complete(snapshot(day("2026-06-30", characters = 2_000)))
+            yield()
+
+            assertEquals(false, viewModel.uiState.value.isLoading)
+        }
+    }
+
     private fun viewModel(
         snapshot: StatisticsSnapshot,
         settings: StatisticsTargetSettings = StatisticsTargetSettings(),

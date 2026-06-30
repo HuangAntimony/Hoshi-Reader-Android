@@ -57,6 +57,7 @@ internal class StatisticsViewModel internal constructor(
 
     private val snapshot = MutableStateFlow(StatisticsSnapshot(days = emptyList(), availableYears = emptyList()))
     private val selection = MutableStateFlow(StatisticsSelectionState())
+    private val isLoading = MutableStateFlow(true)
     private val _uiState = MutableStateFlow(
         buildStatisticsUiState(
             snapshot = snapshot.value,
@@ -72,14 +73,14 @@ internal class StatisticsViewModel internal constructor(
 
     init {
         scope.launch {
-            combine(snapshot, settings, selection) { snapshot, settings, selection ->
+            combine(snapshot, settings, selection, isLoading) { snapshot, settings, selection, isLoading ->
                 withContext(calculationDispatcher) {
                     buildStatisticsUiState(
                         snapshot = snapshot,
                         settings = settings,
                         selection = selection,
                         today = clock.today(),
-                        isLoading = false,
+                        isLoading = isLoading,
                     )
                 }
             }.collect { state ->
@@ -92,13 +93,15 @@ internal class StatisticsViewModel internal constructor(
         val generation = ++reloadGeneration
         reloadJob?.cancel()
         reloadJob = scope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val loaded = repository.loadSnapshot()
-            if (generation == reloadGeneration) {
-                val previous = snapshot.value
-                snapshot.value = loaded
-                if (loaded == previous) {
-                    _uiState.update { it.copy(isLoading = false) }
+            isLoading.value = true
+            try {
+                val loaded = repository.loadSnapshot()
+                if (generation == reloadGeneration) {
+                    snapshot.value = loaded
+                }
+            } finally {
+                if (generation == reloadGeneration) {
+                    isLoading.value = false
                 }
             }
         }
