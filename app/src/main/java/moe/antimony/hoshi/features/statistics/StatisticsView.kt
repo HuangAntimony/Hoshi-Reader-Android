@@ -60,90 +60,94 @@ internal fun StatisticsView(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-        topBar = { StatisticsHeader() },
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = layoutSpec.pageHorizontalPaddingDp.dp,
-                end = layoutSpec.pageHorizontalPaddingDp.dp,
-                top = 16.dp,
-                bottom = (layoutSpec.compactNavigationHeightDp + 24).dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            if (uiState.emptyState?.hasPartialReadError == true) {
+    StatisticsOverscrollDisabled {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+            topBar = { StatisticsHeader() },
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(
+                    start = layoutSpec.pageHorizontalPaddingDp.dp,
+                    end = layoutSpec.pageHorizontalPaddingDp.dp,
+                    top = 16.dp,
+                    bottom = statisticsListBottomPaddingDp().dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (uiState.emptyState?.hasPartialReadError == true) {
+                    item {
+                        CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                            Text(
+                                text = stringResource(R.string.statistics_partial_unavailable),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
                 item {
                     CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                        Text(
-                            text = stringResource(R.string.statistics_partial_unavailable),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
+                        TodayStatisticsSection(
+                            today = uiState.today,
+                            settings = uiState.settings.values,
+                            layoutSpec = layoutSpec,
+                            targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Daily,
+                            onToggleTargetSettings = {
+                                viewModel.onEvent(
+                                    StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Daily),
+                                )
+                            },
+                            onEvent = viewModel::onEvent,
                         )
                     }
                 }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    TodayStatisticsSection(
-                        today = uiState.today,
-                        settings = uiState.settings.values,
-                        layoutSpec = layoutSpec,
-                        targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Daily,
-                        onToggleTargetSettings = {
-                            viewModel.onEvent(
-                                StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Daily),
-                            )
-                        },
-                        onEvent = viewModel::onEvent,
-                    )
+                item {
+                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                        WeekStatisticsSection(
+                            week = uiState.week,
+                            settings = uiState.settings.values,
+                            targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Weekly,
+                            onToggleTargetSettings = {
+                                viewModel.onEvent(
+                                    StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Weekly),
+                                )
+                            },
+                            onEvent = viewModel::onEvent,
+                        )
+                    }
                 }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    WeekStatisticsSection(
-                        week = uiState.week,
-                        settings = uiState.settings.values,
-                        targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Weekly,
-                        onToggleTargetSettings = {
-                            viewModel.onEvent(
-                                StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Weekly),
-                            )
-                        },
-                        onEvent = viewModel::onEvent,
-                    )
+                item {
+                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                        StatisticsCalendarSection(
+                            calendar = uiState.calendar,
+                            heatmapScrollState = heatmapScrollState,
+                            heatmapAutoScrolledWindowKey = heatmapAutoScrolledWindowKey,
+                            onHeatmapAutoScrolled = { key -> heatmapAutoScrolledWindowKey = key },
+                            onEvent = viewModel::onEvent,
+                        )
+                    }
                 }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    StatisticsCalendarSection(
-                        calendar = uiState.calendar,
-                        heatmapScrollState = heatmapScrollState,
-                        heatmapAutoScrolledWindowKey = heatmapAutoScrolledWindowKey,
-                        onHeatmapAutoScrolled = { key -> heatmapAutoScrolledWindowKey = key },
-                        onEvent = viewModel::onEvent,
-                    )
-                }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    StatisticsRangeSection(
-                        currentRange = uiState.currentRange,
-                        calendar = uiState.calendar,
-                        onEvent = viewModel::onEvent,
-                    )
+                item {
+                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                        StatisticsRangeSection(
+                            currentRange = uiState.currentRange,
+                            calendar = uiState.calendar,
+                            onEvent = viewModel::onEvent,
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+internal fun statisticsListBottomPaddingDp(): Int = 24
 
 @Composable
 private fun CenteredStatisticsColumn(
