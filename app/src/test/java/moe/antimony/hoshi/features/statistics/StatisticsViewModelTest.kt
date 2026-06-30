@@ -246,6 +246,45 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun trendPointsAreOnlyBuiltForTrendTab() = runBlocking {
+        viewModel(
+            snapshot = snapshot(
+                day("2026-06-01", characters = 1_000, seconds = 600.0),
+                day("2026-06-30", characters = 2_000, seconds = 900.0),
+            ),
+        ).use { viewModel ->
+            viewModel.reload()
+
+            assertEquals(CurrentRangeTab.Overview, viewModel.uiState.value.currentRange.selectedTab)
+            assertEquals(emptyList<StatisticsTrendPoint>(), viewModel.uiState.value.currentRange.trendPoints)
+
+            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Trend))
+
+            assertEquals(
+                listOf(
+                    "2025-07",
+                    "2025-08",
+                    "2025-09",
+                    "2025-10",
+                    "2025-11",
+                    "2025-12",
+                    "2026-01",
+                    "2026-02",
+                    "2026-03",
+                    "2026-04",
+                    "2026-05",
+                    "2026-06",
+                ),
+                viewModel.uiState.value.currentRange.trendPoints.map { it.key },
+            )
+
+            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Overview))
+
+            assertEquals(emptyList<StatisticsTrendPoint>(), viewModel.uiState.value.currentRange.trendPoints)
+        }
+    }
+
+    @Test
     fun weeklyTargetChangesRecomputeCurrentWeekGoal() = runBlocking {
         viewModel(
             snapshot = snapshot(

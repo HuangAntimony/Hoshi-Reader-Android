@@ -204,6 +204,11 @@ private fun buildStatisticsUiState(
                 StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, year)
             }
     val rangeSummary = aggregateRange(rangeDays, settings)
+    val trendPoints = if (currentTab == CurrentRangeTab.Trend) {
+        trendPoints(rangeMode, selectedRange, rangeDays)
+    } else {
+        emptyList()
+    }
     val distributionRows = if (currentTab == CurrentRangeTab.Distribution) {
         distributionRows(rangeDays, settings)
     } else {
@@ -244,7 +249,7 @@ private fun buildStatisticsUiState(
             selectedTab = currentTab,
             title = selectedRange.title(rangeMode, windowSelection),
             summary = rangeSummary,
-            trendPoints = trendPoints(rangeMode, selectedRange, rangeDays),
+            trendPoints = trendPoints,
             distributionRows = distributionRows,
         ),
         emptyState = StatisticsEmptyState(
