@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -51,7 +52,9 @@ internal fun StatisticsDistributionList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         rows.forEach { row ->
-            DistributionRow(row = row)
+            key(row.bookId) {
+                DistributionRow(row = row)
+            }
         }
     }
 }
@@ -117,6 +120,7 @@ private fun DistributionCover(row: BookDistributionRow) {
         BookCoverBitmapCache.get(coverSource)
     }
     val bitmap by produceState(initialValue = cachedBitmap, key1 = coverSource) {
+        value = cachedBitmap
         if (cachedBitmap == null) {
             value = BookCoverBitmapCache.load(coverSource)
         }

@@ -13,6 +13,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Fixed
 
 - Keep the Statistics tab visible after enabling it and switching away from Settings.
+- Refresh Statistics by-book covers when changing calendar ranges.
 
 ## [v1.3.0] - 2026-07-01
 

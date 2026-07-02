@@ -141,6 +141,7 @@ internal data class StatisticsTrendPoint(
 )
 
 internal data class BookDistributionRow(
+    val bookId: String,
     val title: String,
     val coverPath: String?,
     val characters: Int,

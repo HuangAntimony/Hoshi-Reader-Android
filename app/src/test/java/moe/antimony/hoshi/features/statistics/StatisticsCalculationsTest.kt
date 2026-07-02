@@ -259,6 +259,24 @@ class StatisticsCalculationsTest {
         assertEquals(75, byDuration.first().percent)
     }
 
+    @Test
+    fun distributionRowsCarryBookIdsForStableUiKeys() {
+        val rows = distributionRows(
+            listOf(
+                day(
+                    "2026-06-30",
+                    contributions = listOf(
+                        contribution(bookId = "alpha-id", title = "Same Title", characters = 2_000, seconds = 600.0),
+                        contribution(bookId = "beta-id", title = "Same Title", characters = 1_000, seconds = 300.0),
+                    ),
+                ),
+            ),
+            StatisticsTargetSettings(),
+        )
+
+        assertEquals(listOf("alpha-id", "beta-id"), rows.map { it.bookId })
+    }
+
     private fun day(
         date: String,
         characters: Int = 0,
