@@ -744,13 +744,17 @@ fun ReaderWebView(
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val popup = popupById(message.popupId) ?: return
                 val messageId = message.messageId ?: return
-                val ankiContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
-                    popup.state.ankiContext.copy(
-                        sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
-                    )
-                } ?: popup.state.ankiContext
-                ankiViewModel.mineEntryAsync(message.payloadJson, ankiContext) { mined ->
-                    replyReaderPopupMessage(message.popupId, messageId, mined.toString())
+                scope.launch(Dispatchers.IO) {
+                    val ankiContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
+                        popup.state.ankiContext.copy(
+                            sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
+                        )
+                    } ?: popup.state.ankiContext
+                    withContext(Dispatchers.Main) {
+                        ankiViewModel.mineEntryAsync(message.payloadJson, ankiContext) { mined ->
+                            replyReaderPopupMessage(message.popupId, messageId, mined.toString())
+                        }
+                    }
                 }
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
