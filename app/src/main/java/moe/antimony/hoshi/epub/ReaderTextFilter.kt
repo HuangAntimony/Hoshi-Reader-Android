@@ -16,6 +16,7 @@ internal fun String.visibleReaderText(): String {
     text = text.replace(Regex("(?s)<rt[^>]*>.*?</rt>"), "")
     text = text.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
     text = text.replace(Regex("<[^>]+>"), "")
+    text = text.replace(Regex("&#[xX]?[0-9A-Fa-f]+;"), "")
     return text
         .replace("&nbsp;", " ")
         .replace("&amp;", "&")
