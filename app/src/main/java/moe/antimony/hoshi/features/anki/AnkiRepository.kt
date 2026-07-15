@@ -14,6 +14,7 @@ import moe.antimony.hoshi.features.audio.LocalAudioResolver
 import moe.antimony.hoshi.ui.UiText
 import java.io.File
 import java.net.URL
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -193,10 +194,10 @@ internal class AnkiRepository(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.takeIf { needsCover }?.let {
-                addMediaFile(it, "hoshi_cover_${File(it).name}", mimeTypeForPath(it), activeBackend, settings.backendKind)
+                addHashedMediaFile(it, "hoshi_cover", activeBackend, settings.backendKind)
             },
             sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
-                addMediaFile(it, File(it).name, mimeTypeForPath(it), activeBackend, settings.backendKind)
+                addHashedMediaFile(it, "hoshi_sasayaki", activeBackend, settings.backendKind)
             },
             sentenceOffset = context.sentenceOffset,
         )
@@ -275,12 +276,23 @@ internal class AnkiRepository(
     private fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
         runCatching {
             val data = loadDictionaryMedia(media) ?: return null
-            val file = mediaCacheFile("hoshi_dict_${data.contentHashCode()}.${media.path.substringAfterLast('.', "bin")}")
+            val file = mediaCacheFile("hoshi_dict_${sha1Hex(data)}.${media.path.substringAfterLast('.', "bin")}")
             file.writeBytes(data)
             addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path), activeBackend, backendKind)
                 ?.let(::ankiInlineMediaReference)
         }.onFailure { Log.w(TAG, "Failed to add dictionary media ${media.path}", it) }
             .getOrNull()
+
+    private fun addHashedMediaFile(
+        path: String,
+        prefix: String,
+        activeBackend: AnkiBackend,
+        backendKind: AnkiBackendKind,
+    ): String? {
+        val file = File(path).takeIf { it.isFile } ?: return null
+        val name = "${prefix}_${sha1Hex(file.readBytes())}.${file.extension}"
+        return addMediaFile(path, name, mimeTypeForPath(path), activeBackend, backendKind)
+    }
 
     private fun addMediaFile(
         path: String,
@@ -337,7 +349,7 @@ internal data class AnkiAudioMediaFile(
 
 internal fun ankiAudioMediaFile(url: String, data: ByteArray): AnkiAudioMediaFile {
     val extension = ankiAudioExtension(url)
-    val preferredName = "hoshi_audio_${data.contentHashCode()}.$extension"
+    val preferredName = "hoshi_audio_${sha1Hex(data)}.$extension"
     return AnkiAudioMediaFile(
         preferredName = preferredName,
         mimeType = mimeTypeForPath(preferredName),
@@ -360,6 +372,9 @@ private fun ankiAudioExtension(url: String): String {
 
 private fun isSupportedAnkiAudioExtension(extension: String): Boolean =
     extension in setOf("mp3", "opus", "ogg", "aac", "m4a", "wav")
+
+private fun sha1Hex(data: ByteArray): String =
+    MessageDigest.getInstance("SHA-1").digest(data).joinToString("") { "%02x".format(it) }
 
 private const val TAG = "AnkiRepository"
 

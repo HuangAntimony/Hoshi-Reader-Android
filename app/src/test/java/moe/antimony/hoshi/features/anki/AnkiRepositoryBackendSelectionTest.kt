@@ -317,7 +317,7 @@ class AnkiRepositoryBackendSelectionTest {
 
         assertEquals(1, ankiConnect.addMediaFromBytesCalls)
         assertEquals(byteArrayOf(1, 2, 3).toList(), ankiConnect.lastMediaBytes.toList())
-        assertEquals("<img src=\"hoshi_cover_${cover.fileName}\">", ankiConnect.lastFields["Cover"])
+        assertEquals("<img src=\"hoshi_cover_7037807198c22a7d2b0807371d763779a84fdfcf.png\">", ankiConnect.lastFields["Cover"])
     }
 
     @Test
@@ -480,7 +480,7 @@ class AnkiRepositoryBackendSelectionTest {
 
         assertEquals(2, ankiConnect.addMediaFromBytesCalls)
         assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_audio_"))
-        assertTrue(ankiConnect.lastFields.getValue("Media").contains(sasayaki.fileName.toString()))
+        assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_sasayaki_c4ea21bb365bbeeaf5f2c654883e56d11e43c44e.m4a"))
     }
 
     @Test
