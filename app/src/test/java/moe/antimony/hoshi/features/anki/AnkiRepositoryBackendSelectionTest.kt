@@ -406,7 +406,7 @@ class AnkiRepositoryBackendSelectionTest {
         val noteType = AnkiNoteType(20L, "Basic", listOf("Expression"))
         val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
         val cover = Files.createTempFile("hoshi-cover", ".png").also { Files.write(it, byteArrayOf(1)) }
-        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".m4a").also { Files.write(it, byteArrayOf(2)) }
+        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".aac").also { Files.write(it, byteArrayOf(2)) }
         val wordAudio = Files.createTempFile("hoshi-word", ".mp3").also { Files.write(it, byteArrayOf(3)) }
         val repository = repository(
             settingsRepository = InMemoryAnkiSettingsRepository(
@@ -447,7 +447,7 @@ class AnkiRepositoryBackendSelectionTest {
         val deck = AnkiDeck(10L, "Mining")
         val noteType = AnkiNoteType(20L, "Basic", listOf("Media"))
         val ankiConnect = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType))
-        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".m4a").also { Files.write(it, byteArrayOf(2)) }
+        val sasayaki = Files.createTempFile("hoshi-sasayaki", ".aac").also { Files.write(it, byteArrayOf(2)) }
         val wordAudio = Files.createTempFile("hoshi-word", ".mp3").also { Files.write(it, byteArrayOf(3)) }
         val repository = repository(
             settingsRepository = InMemoryAnkiSettingsRepository(
@@ -480,7 +480,7 @@ class AnkiRepositoryBackendSelectionTest {
 
         assertEquals(2, ankiConnect.addMediaFromBytesCalls)
         assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_audio_"))
-        assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_sasayaki_c4ea21bb365bbeeaf5f2c654883e56d11e43c44e.m4a"))
+        assertTrue(ankiConnect.lastFields.getValue("Media").contains("hoshi_sasayaki_c4ea21bb365bbeeaf5f2c654883e56d11e43c44e.aac"))
     }
 
     @Test
