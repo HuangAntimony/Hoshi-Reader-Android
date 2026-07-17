@@ -679,4 +679,17 @@
     <string name="sasayaki_no_file_selected">未选择文件</string>
     <string name="sasayaki_search_window">搜索窗口</string>
     <string name="sasayaki_matching">正在匹配...</string>
+    <string name="settings_book_cover_wallpaper">书籍封面锁屏</string>
+    <string name="settings_book_cover_wallpaper_subtitle">锁屏或休眠时显示当前书籍封面</string>
+    <string name="book_cover_wallpaper_lock_screen">更新锁屏壁纸</string>
+    <string name="book_cover_wallpaper_lock_screen_summary">每次打开书籍时，将当前封面设为 Android 锁屏壁纸。</string>
+    <string name="book_cover_wallpaper_not_supported">此设备不支持锁屏壁纸。</string>
+    <string name="book_cover_wallpaper_not_allowed">设备策略不允许此应用更改壁纸。</string>
+    <string name="book_cover_wallpaper_export">导出固定封面图片</string>
+    <string name="book_cover_wallpaper_export_summary">每次打开书籍时覆盖同一个 PNG 文件。请在阅读器的休眠屏幕设置中选择该文件。</string>
+    <string name="book_cover_wallpaper_export_file">导出文件</string>
+    <string name="book_cover_wallpaper_export_file_none">未选择封面文件</string>
+    <string name="book_cover_wallpaper_export_file_failed">无法获得所选文件的写入权限，请选择其他文件。</string>
+    <string name="book_cover_wallpaper_change_file">更改文件</string>
+    <string name="book_cover_wallpaper_publish_failed">书籍已打开，但无法发布当前书籍封面。</string>
 </resources>

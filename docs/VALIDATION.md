@@ -110,6 +110,15 @@ Manual reader validation should cover:
   revealing chrome before closing, bottom progress band, title/back-button
   settings, compact bottom buttons, and progress indicators hidden from the text
   area when configured.
+- current-book cover publishing when enabled: opening two different books
+  updates only the lock-screen wallpaper in sequence; fixed-file export keeps
+  the same SAF document URI while replacing its PNG contents; missing covers,
+  revoked URI grants, and device wallpaper restrictions leave Reader usable and
+  report a localized failure. On compatible E-ink hardware, select the exported
+  file in the vendor sleep-screen tool and confirm the next suspend rereads it.
+  Also switch books rapidly while a wallpaper update is in flight and verify
+  the newest cover wins; verify portrait, landscape, and split-screen launches
+  still produce an uncropped screen-aspect-ratio image.
 
 For reader pagination bugs, inspect WebView metrics such as `scrollTop`,
 `scrollHeight`, and `clientHeight`. If a page can still scroll but native

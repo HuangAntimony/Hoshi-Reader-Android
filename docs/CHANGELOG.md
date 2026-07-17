@@ -6,6 +6,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add optional current-book cover publishing for the Android lock screen and a
+  fixed PNG file used by compatible E-ink sleep-screen tools.
+
 ### Fixed
 
 - Keep dictionary definitions in the configured dictionary order when an

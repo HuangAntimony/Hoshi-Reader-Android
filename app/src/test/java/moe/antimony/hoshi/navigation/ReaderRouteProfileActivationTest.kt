@@ -54,11 +54,13 @@ class ReaderRouteProfileActivationTest {
             loadReaderSettings = {
                 ReaderSettings(fontSize = if (activeProfileId == "book-ja") 28 else 12)
             },
+            loadGeneration = 7,
         )
 
         val ready = renderState as ReaderRouteRenderState.Ready
         assertEquals(28, ready.readerSettings.fontSize)
         assertEquals(ContentLanguageProfile.Japanese, ready.contentLanguageProfile)
+        assertEquals(7, ready.loadGeneration)
     }
 
     private fun readerReadyState(profileId: String): ReaderRouteLoadState.Ready {

@@ -138,6 +138,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 ## Integrations
 
+- Current-book cover publishing is an opt-in global platform integration backed
+  by DataStore. After a Reader route finishes loading, a Hilt-backed publisher
+  reuses the extracted book cover, renders it once onto a white screen-sized PNG
+  canvas, and independently updates the Android lock-screen wallpaper and/or a
+  persisted Storage Access Framework document URI. Publishing failures do not
+  block Reader loading, and the integration does not request broad storage
+  access.
 - Anki work stays behind the Anki backend/repository boundary.
 - Anki settings are stored per active profile in
   `Profiles/<profileId>/anki_config.json`; duplicate checks and note creation

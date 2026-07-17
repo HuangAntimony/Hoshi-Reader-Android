@@ -36,6 +36,16 @@ import moe.antimony.hoshi.features.update.UpdateDownloadStore
 import moe.antimony.hoshi.features.update.UpdateSettingsRepository
 import moe.antimony.hoshi.features.update.updateDownloadStore
 import moe.antimony.hoshi.features.update.updateSettingsRepository
+import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverExportTarget
+import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverImageRenderer
+import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverLockScreenTarget
+import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverScreenSizeProvider
+import moe.antimony.hoshi.features.wallpaper.BookCoverPublisher
+import moe.antimony.hoshi.features.wallpaper.BookCoverScreenSizeProvider
+import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperCapabilityProvider
+import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsRepository
+import moe.antimony.hoshi.features.wallpaper.DefaultBookCoverPublisher
+import moe.antimony.hoshi.features.wallpaper.bookCoverWallpaperSettingsRepository
 import moe.antimony.hoshi.profiles.ProfileRepository
 
 @Module
@@ -139,6 +149,36 @@ internal object HoshiAppModule {
     @Singleton
     fun provideUpdateSettingsRepository(@ApplicationContext context: Context): UpdateSettingsRepository =
         context.updateSettingsRepository()
+
+    @Provides
+    @Singleton
+    fun provideBookCoverWallpaperSettingsRepository(
+        @ApplicationContext context: Context,
+    ): BookCoverWallpaperSettingsRepository = context.bookCoverWallpaperSettingsRepository()
+
+    @Provides
+    @Singleton
+    fun provideBookCoverPublisher(
+        settingsRepository: BookCoverWallpaperSettingsRepository,
+        renderer: AndroidBookCoverImageRenderer,
+        lockScreenTarget: AndroidBookCoverLockScreenTarget,
+        exportTarget: AndroidBookCoverExportTarget,
+    ): BookCoverPublisher = DefaultBookCoverPublisher(
+        settings = settingsRepository.settings,
+        renderer = renderer,
+        lockScreenTarget = lockScreenTarget,
+        exportTarget = exportTarget,
+    )
+
+    @Provides
+    fun provideBookCoverWallpaperCapabilityProvider(
+        target: AndroidBookCoverLockScreenTarget,
+    ): BookCoverWallpaperCapabilityProvider = target
+
+    @Provides
+    fun provideBookCoverScreenSizeProvider(
+        provider: AndroidBookCoverScreenSizeProvider,
+    ): BookCoverScreenSizeProvider = provider
 
     @Provides
     @Singleton
