@@ -692,4 +692,11 @@
     <string name="book_cover_wallpaper_export_file_failed">无法获得所选文件的写入权限，请选择其他文件。</string>
     <string name="book_cover_wallpaper_change_file">更改文件</string>
     <string name="book_cover_wallpaper_publish_failed">书籍已打开，但无法发布当前书籍封面。</string>
+    <string name="book_cover_scale_mode">封面缩放</string>
+    <string name="book_cover_scale_fit">适应</string>
+    <string name="book_cover_scale_fit_summary">完整显示封面，未使用的区域填充为白色。</string>
+    <string name="book_cover_scale_fill">填充</string>
+    <string name="book_cover_scale_fill_summary">保持原始比例填满屏幕，并裁切超出的部分。</string>
+    <string name="book_cover_scale_stretch">拉伸</string>
+    <string name="book_cover_scale_stretch_summary">不保持封面原始比例，直接填满屏幕。</string>
 </resources>

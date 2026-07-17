@@ -15,19 +15,26 @@ data class PixelRect(
     val height: Int,
 )
 
-internal fun fitCenterRect(
+internal fun coverDestinationRect(
+    mode: BookCoverScaleMode,
     sourceWidth: Int,
     sourceHeight: Int,
     targetWidth: Int,
     targetHeight: Int,
 ): PixelRect {
     require(sourceWidth > 0 && sourceHeight > 0 && targetWidth > 0 && targetHeight > 0)
-    val scale = minOf(
-        targetWidth.toDouble() / sourceWidth,
-        targetHeight.toDouble() / sourceHeight,
-    )
-    val width = (sourceWidth * scale).roundToInt().coerceIn(1, targetWidth)
-    val height = (sourceHeight * scale).roundToInt().coerceIn(1, targetHeight)
+    if (mode == BookCoverScaleMode.Stretch) {
+        return PixelRect(left = 0, top = 0, width = targetWidth, height = targetHeight)
+    }
+    val widthScale = targetWidth.toDouble() / sourceWidth
+    val heightScale = targetHeight.toDouble() / sourceHeight
+    val scale = when (mode) {
+        BookCoverScaleMode.Fit -> minOf(widthScale, heightScale)
+        BookCoverScaleMode.Fill -> maxOf(widthScale, heightScale)
+        BookCoverScaleMode.Stretch -> error("Handled above")
+    }
+    val width = (sourceWidth * scale).roundToInt().coerceAtLeast(1)
+    val height = (sourceHeight * scale).roundToInt().coerceAtLeast(1)
     return PixelRect(
         left = (targetWidth - width) / 2,
         top = (targetHeight - height) / 2,
@@ -37,12 +44,13 @@ internal fun fitCenterRect(
 }
 
 internal fun coverDecodeSampleSize(
+    mode: BookCoverScaleMode,
     sourceWidth: Int,
     sourceHeight: Int,
     targetWidth: Int,
     targetHeight: Int,
 ): Int {
-    val destination = fitCenterRect(sourceWidth, sourceHeight, targetWidth, targetHeight)
+    val destination = coverDestinationRect(mode, sourceWidth, sourceHeight, targetWidth, targetHeight)
     var sample = 1
     while (
         sourceWidth / (sample * 2) >= destination.width &&
@@ -88,7 +96,7 @@ data class BookCoverPublishResult(
 }
 
 fun interface BookCoverImageRenderer {
-    suspend fun render(source: File): File
+    suspend fun render(source: File, scaleMode: BookCoverScaleMode): File
 }
 
 fun interface BookCoverLockScreenTarget {
@@ -135,7 +143,7 @@ class DefaultBookCoverPublisher(
         }
 
         val rendered = try {
-            renderer.render(coverFile)
+            renderer.render(coverFile, current.scaleMode)
         } catch (exception: CancellationException) {
             throw exception
         } catch (_: Exception) {

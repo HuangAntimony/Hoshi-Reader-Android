@@ -31,6 +31,7 @@ class BookCoverWallpaperSettingsRepositoryTest {
                     updateLockScreen = true,
                     exportEnabled = true,
                     exportTargetUri = "content://documents/cover",
+                    scaleMode = BookCoverScaleMode.Fill,
                 )
             }
 
@@ -39,9 +40,20 @@ class BookCoverWallpaperSettingsRepositoryTest {
                     updateLockScreen = true,
                     exportEnabled = true,
                     exportTargetUri = "content://documents/cover",
+                    scaleMode = BookCoverScaleMode.Fill,
                 ),
                 handle.repository.settings.first(),
             )
+        }
+    }
+
+    @Test
+    fun scaleModeRoundTripsForEveryMode() = runBlocking {
+        repository().use { handle ->
+            BookCoverScaleMode.entries.forEach { mode ->
+                handle.repository.update { it.copy(scaleMode = mode) }
+                assertEquals(mode, handle.repository.settings.first().scaleMode)
+            }
         }
     }
 

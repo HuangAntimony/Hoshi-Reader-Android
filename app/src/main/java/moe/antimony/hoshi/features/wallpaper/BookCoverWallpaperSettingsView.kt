@@ -6,12 +6,14 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -92,6 +94,33 @@ internal fun BookCoverWallpaperSettingsView(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
+            item {
+                GroupCard {
+                    Text(
+                        text = stringResource(R.string.book_cover_scale_mode),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                    bookCoverScaleModeOptions().forEachIndexed { index, option ->
+                        if (index > 0) GroupDivider()
+                        ListItem(
+                            modifier = Modifier.clickable(enabled = settings != null) {
+                                viewModel.setScaleMode(option.mode)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(option.titleRes)) },
+                            supportingContent = { Text(stringResource(option.summaryRes)) },
+                            leadingContent = {
+                                RadioButton(
+                                    selected = settings?.scaleMode == option.mode,
+                                    enabled = settings != null,
+                                    onClick = { viewModel.setScaleMode(option.mode) },
+                                )
+                            },
+                        )
+                    }
+                }
+            }
             item {
                 GroupCard {
                     ListItem(
@@ -190,3 +219,27 @@ internal fun hasPersistedWritePermission(
 ): Boolean = rawUri != null && rawUri in grantedWriteUris
 
 private const val DefaultExportFileName = "hoshi-current-cover.png"
+
+internal data class BookCoverScaleModeOption(
+    val mode: BookCoverScaleMode,
+    val titleRes: Int,
+    val summaryRes: Int,
+)
+
+internal fun bookCoverScaleModeOptions(): List<BookCoverScaleModeOption> = listOf(
+    BookCoverScaleModeOption(
+        mode = BookCoverScaleMode.Fit,
+        titleRes = R.string.book_cover_scale_fit,
+        summaryRes = R.string.book_cover_scale_fit_summary,
+    ),
+    BookCoverScaleModeOption(
+        mode = BookCoverScaleMode.Fill,
+        titleRes = R.string.book_cover_scale_fill,
+        summaryRes = R.string.book_cover_scale_fill_summary,
+    ),
+    BookCoverScaleModeOption(
+        mode = BookCoverScaleMode.Stretch,
+        titleRes = R.string.book_cover_scale_stretch,
+        summaryRes = R.string.book_cover_scale_stretch_summary,
+    ),
+)

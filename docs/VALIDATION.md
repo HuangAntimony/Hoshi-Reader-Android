@@ -117,8 +117,10 @@ Manual reader validation should cover:
   report a localized failure. On compatible E-ink hardware, select the exported
   file in the vendor sleep-screen tool and confirm the next suspend rereads it.
   Also switch books rapidly while a wallpaper update is in flight and verify
-  the newest cover wins; verify portrait, landscape, and split-screen launches
-  still produce an uncropped screen-aspect-ratio image.
+  the newest cover wins. With portrait, landscape, very wide, and very tall
+  covers, verify Fit shows the full cover with white padding, Fill preserves
+  proportions while center-cropping, and Stretch fills the screen without
+  preserving proportions; repeat in portrait, landscape, and split-screen.
 
 For reader pagination bugs, inspect WebView metrics such as `scrollTop`,
 `scrollHeight`, and `clientHeight`. If a page can still scroll but native

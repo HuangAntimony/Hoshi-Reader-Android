@@ -49,6 +49,12 @@ internal class BookCoverWallpaperViewModel internal constructor(
         }
     }
 
+    fun setScaleMode(scaleMode: BookCoverScaleMode) {
+        scope.launch {
+            updateSettings { it.copy(scaleMode = scaleMode) }
+        }
+    }
+
     fun setExportTarget(uri: String, onUpdated: () -> Unit = {}) {
         scope.launch {
             updateSettings { it.copy(exportEnabled = true, exportTargetUri = uri) }

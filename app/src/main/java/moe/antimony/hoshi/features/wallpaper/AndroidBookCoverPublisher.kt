@@ -67,7 +67,10 @@ class AndroidBookCoverImageRenderer @Inject constructor(
     @param:CacheDir private val cacheDir: File,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : BookCoverImageRenderer {
-    override suspend fun render(source: File): File = withContext(ioDispatcher) {
+    override suspend fun render(
+        source: File,
+        scaleMode: BookCoverScaleMode,
+    ): File = withContext(ioDispatcher) {
         require(source.isFile) { "Cover file is missing." }
         val screenSize = screenSizeProvider.screenSize()
         val targetWidth = screenSize.width.coerceAtLeast(1)
@@ -79,6 +82,7 @@ class AndroidBookCoverImageRenderer @Inject constructor(
             source.absolutePath,
             BitmapFactory.Options().apply {
                 inSampleSize = coverDecodeSampleSize(
+                    mode = scaleMode,
                     sourceWidth = bounds.outWidth,
                     sourceHeight = bounds.outHeight,
                     targetWidth = targetWidth,
@@ -91,7 +95,13 @@ class AndroidBookCoverImageRenderer @Inject constructor(
         try {
             val canvas = Canvas(canvasBitmap)
             canvas.drawColor(Color.WHITE)
-            val destination = fitCenterRect(decoded.width, decoded.height, targetWidth, targetHeight)
+            val destination = coverDestinationRect(
+                mode = scaleMode,
+                sourceWidth = decoded.width,
+                sourceHeight = decoded.height,
+                targetWidth = targetWidth,
+                targetHeight = targetHeight,
+            )
             canvas.drawBitmap(
                 decoded,
                 null,

@@ -10,10 +10,17 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+enum class BookCoverScaleMode {
+    Fit,
+    Fill,
+    Stretch,
+}
+
 data class BookCoverWallpaperSettings(
     val updateLockScreen: Boolean = false,
     val exportEnabled: Boolean = false,
     val exportTargetUri: String? = null,
+    val scaleMode: BookCoverScaleMode = BookCoverScaleMode.Fit,
 )
 
 class BookCoverWallpaperSettingsRepository(
@@ -24,6 +31,7 @@ class BookCoverWallpaperSettingsRepository(
             updateLockScreen = preferences[KeyUpdateLockScreen] ?: false,
             exportEnabled = preferences[KeyExportEnabled] ?: false,
             exportTargetUri = preferences[KeyExportTargetUri],
+            scaleMode = preferences[KeyScaleMode].toBookCoverScaleMode(),
         )
     }
 
@@ -33,10 +41,12 @@ class BookCoverWallpaperSettingsRepository(
                 updateLockScreen = preferences[KeyUpdateLockScreen] ?: false,
                 exportEnabled = preferences[KeyExportEnabled] ?: false,
                 exportTargetUri = preferences[KeyExportTargetUri],
+                scaleMode = preferences[KeyScaleMode].toBookCoverScaleMode(),
             )
             val updated = transform(current)
             preferences[KeyUpdateLockScreen] = updated.updateLockScreen
             preferences[KeyExportEnabled] = updated.exportEnabled
+            preferences[KeyScaleMode] = updated.scaleMode.name
             if (updated.exportTargetUri == null) {
                 preferences.remove(KeyExportTargetUri)
             } else {
@@ -51,6 +61,7 @@ class BookCoverWallpaperSettingsRepository(
         private val KeyUpdateLockScreen = booleanPreferencesKey("updateLockScreen")
         private val KeyExportEnabled = booleanPreferencesKey("exportEnabled")
         private val KeyExportTargetUri = stringPreferencesKey("exportTargetUri")
+        private val KeyScaleMode = stringPreferencesKey("scaleMode")
     }
 }
 
@@ -60,3 +71,6 @@ private val Context.bookCoverWallpaperSettingsDataStore by preferencesDataStore(
 
 fun Context.bookCoverWallpaperSettingsRepository(): BookCoverWallpaperSettingsRepository =
     BookCoverWallpaperSettingsRepository(bookCoverWallpaperSettingsDataStore)
+
+private fun String?.toBookCoverScaleMode(): BookCoverScaleMode =
+    BookCoverScaleMode.entries.firstOrNull { it.name == this } ?: BookCoverScaleMode.Fit

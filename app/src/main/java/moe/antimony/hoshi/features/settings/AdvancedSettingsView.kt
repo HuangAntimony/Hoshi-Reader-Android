@@ -225,6 +225,10 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     icon = AdvancedSettingsIcon.Wallpaper,
                     subtitleRes = R.string.settings_book_cover_wallpaper_subtitle,
                 ),
+            ),
+        ),
+        AdvancedSettingsSection(
+            rows = listOf(
                 AdvancedSettingsRow(
                     titleRes = R.string.settings_backup,
                     destination = AdvancedDestination.Backup,

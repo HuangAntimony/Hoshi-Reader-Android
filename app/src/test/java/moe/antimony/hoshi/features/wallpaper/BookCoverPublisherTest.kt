@@ -26,7 +26,13 @@ class BookCoverPublisherTest {
     fun fitCenterPreservesPortraitCoverInsideLandscapeCanvas() {
         assertEquals(
             PixelRect(left = 400, top = 0, width = 400, height = 800),
-            fitCenterRect(sourceWidth = 600, sourceHeight = 1200, targetWidth = 1200, targetHeight = 800),
+            coverDestinationRect(
+                mode = BookCoverScaleMode.Fit,
+                sourceWidth = 600,
+                sourceHeight = 1200,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
         )
     }
 
@@ -34,14 +40,76 @@ class BookCoverPublisherTest {
     fun fitCenterPreservesLandscapeCoverInsidePortraitCanvas() {
         assertEquals(
             PixelRect(left = 0, top = 750, width = 1200, height = 600),
-            fitCenterRect(sourceWidth = 1600, sourceHeight = 800, targetWidth = 1200, targetHeight = 2100),
+            coverDestinationRect(
+                mode = BookCoverScaleMode.Fit,
+                sourceWidth = 1600,
+                sourceHeight = 800,
+                targetWidth = 1200,
+                targetHeight = 2100,
+            ),
+        )
+    }
+
+    @Test
+    fun fillPreservesAspectRatioAndCentersOverflowForCropping() {
+        assertEquals(
+            PixelRect(left = 0, top = -800, width = 1200, height = 2400),
+            coverDestinationRect(
+                mode = BookCoverScaleMode.Fill,
+                sourceWidth = 600,
+                sourceHeight = 1200,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
+        )
+    }
+
+    @Test
+    fun stretchUsesTheWholeCanvasWithoutPreservingAspectRatio() {
+        assertEquals(
+            PixelRect(left = 0, top = 0, width = 1200, height = 800),
+            coverDestinationRect(
+                mode = BookCoverScaleMode.Stretch,
+                sourceWidth = 600,
+                sourceHeight = 1200,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
         )
     }
 
     @Test
     fun decodeSampleKeepsEnoughPixelsForRenderedDestination() {
-        assertEquals(4, coverDecodeSampleSize(sourceWidth = 4800, sourceHeight = 6400, targetWidth = 1200, targetHeight = 2000))
-        assertEquals(1, coverDecodeSampleSize(sourceWidth = 600, sourceHeight = 800, targetWidth = 1200, targetHeight = 2000))
+        assertEquals(
+            8,
+            coverDecodeSampleSize(
+                mode = BookCoverScaleMode.Fit,
+                sourceWidth = 4800,
+                sourceHeight = 9600,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
+        )
+        assertEquals(
+            4,
+            coverDecodeSampleSize(
+                mode = BookCoverScaleMode.Fill,
+                sourceWidth = 4800,
+                sourceHeight = 9600,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
+        )
+        assertEquals(
+            4,
+            coverDecodeSampleSize(
+                mode = BookCoverScaleMode.Stretch,
+                sourceWidth = 4800,
+                sourceHeight = 9600,
+                targetWidth = 1200,
+                targetHeight = 800,
+            ),
+        )
     }
 
     @Test
@@ -70,6 +138,7 @@ class BookCoverPublisherTest {
         assertEquals(BookCoverTargetResult.Success, result.lockScreen)
         assertEquals(BookCoverTargetResult.Success, result.export)
         assertEquals(1, fixture.renderer.renderCount)
+        assertEquals(listOf(BookCoverScaleMode.Fit), fixture.renderer.modes)
         assertEquals(listOf(fixture.renderer.output), fixture.lockTarget.files)
         assertEquals(listOf(fixture.renderer.output to "content://documents/cover"), fixture.exportTarget.files)
     }
@@ -179,7 +248,12 @@ class BookCoverPublisherTest {
         val renderer = BlockingRenderer()
         val lockTarget = FakeLockTarget(null, false)
         val publisher = DefaultBookCoverPublisher(
-            settings = MutableStateFlow(BookCoverWallpaperSettings(updateLockScreen = true)),
+            settings = MutableStateFlow(
+                BookCoverWallpaperSettings(
+                    updateLockScreen = true,
+                    scaleMode = BookCoverScaleMode.Fill,
+                ),
+            ),
             renderer = renderer,
             lockScreenTarget = lockTarget,
             exportTarget = FakeExportTarget(),
@@ -197,13 +271,14 @@ class BookCoverPublisherTest {
 
         assertEquals(1, renderer.maxActive.get())
         assertEquals(listOf(first, second), lockTarget.files)
+        assertEquals(listOf(BookCoverScaleMode.Fill, BookCoverScaleMode.Fill), renderer.modes)
     }
 
     @Test
     fun cancellationIsNotConvertedIntoAnOperationalFailure() = runBlocking {
         val publisher = DefaultBookCoverPublisher(
             settings = MutableStateFlow(BookCoverWallpaperSettings(updateLockScreen = true)),
-            renderer = BookCoverImageRenderer { throw CancellationException("reader closed") },
+            renderer = BookCoverImageRenderer { _, _ -> throw CancellationException("reader closed") },
             lockScreenTarget = FakeLockTarget(null, false),
             exportTarget = FakeExportTarget(),
         )
@@ -268,9 +343,11 @@ class BookCoverPublisherTest {
         private val throws: Boolean = false,
     ) : BookCoverImageRenderer {
         var renderCount = 0
+        val modes = mutableListOf<BookCoverScaleMode>()
 
-        override suspend fun render(source: File): File {
+        override suspend fun render(source: File, scaleMode: BookCoverScaleMode): File {
             renderCount += 1
+            modes += scaleMode
             if (throws) error("render failed")
             return output
         }
@@ -281,10 +358,12 @@ class BookCoverPublisherTest {
         val secondEntered = CompletableDeferred<Unit>()
         val releaseFirst = CompletableDeferred<Unit>()
         val maxActive = AtomicInteger()
+        val modes = mutableListOf<BookCoverScaleMode>()
         private val active = AtomicInteger()
         private val callCount = AtomicInteger()
 
-        override suspend fun render(source: File): File {
+        override suspend fun render(source: File, scaleMode: BookCoverScaleMode): File {
+            modes += scaleMode
             val call = callCount.incrementAndGet()
             val activeNow = active.incrementAndGet()
             maxActive.updateAndGet { maxOf(it, activeNow) }

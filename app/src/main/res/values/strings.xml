@@ -694,4 +694,11 @@
     <string name="book_cover_wallpaper_export_file_failed">The selected file could not be authorized. Choose another file.</string>
     <string name="book_cover_wallpaper_change_file">Change file</string>
     <string name="book_cover_wallpaper_publish_failed">The book opened, but its current cover could not be published.</string>
+    <string name="book_cover_scale_mode">Cover scaling</string>
+    <string name="book_cover_scale_fit">Fit</string>
+    <string name="book_cover_scale_fit_summary">Show the complete cover and fill unused space with white.</string>
+    <string name="book_cover_scale_fill">Fill</string>
+    <string name="book_cover_scale_fill_summary">Fill the screen while preserving proportions, cropping overflow.</string>
+    <string name="book_cover_scale_stretch">Stretch</string>
+    <string name="book_cover_scale_stretch_summary">Fill the screen without preserving the cover’s proportions.</string>
 </resources>
