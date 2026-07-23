@@ -687,8 +687,9 @@
     <string name="book_cover_wallpaper_not_allowed">设备策略不允许此应用更改壁纸。</string>
     <string name="book_cover_wallpaper_ireader">更新 iReader 书籍封面屏保</string>
     <string name="book_cover_wallpaper_ireader_summary">每次打开书籍时，更新 iReader 内建的“书籍封面”屏保。</string>
-    <string name="book_cover_wallpaper_ireader_select_system_option">请先在设备的屏保设置中选择“书籍封面”，之后 Hoshi 会持续更新封面。</string>
+    <string name="book_cover_wallpaper_ireader_select_system_option">请先用 iReader 内建阅读器打开任意书籍，再到设备的屏保设置中选择“书籍封面”并点击“应用”，然后返回 Hoshi。</string>
     <string name="book_cover_wallpaper_ireader_not_supported">此设备或固件不支持 iReader 私有屏保集成。</string>
+    <string name="book_cover_wallpaper_ireader_not_selected_error">无法更新 iReader 屏保。请先用内建阅读器打开任意书籍，再到设备的屏保设置中选择“书籍封面”并点击“应用”。</string>
     <string name="book_cover_wallpaper_vendor_integrations">墨水屏厂商适配</string>
     <string name="book_cover_wallpaper_vendor_integrations_summary">这里的选项专门适配部分墨水屏厂商，后续可能增加更多厂商。</string>
     <string name="book_cover_wallpaper_export">导出固定封面图片</string>

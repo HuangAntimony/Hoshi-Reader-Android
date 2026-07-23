@@ -53,6 +53,8 @@ internal fun ReaderRouteDestination(
     val bookCoverWallpaperViewModel: BookCoverWallpaperViewModel = hiltViewModel()
     val bookCoverSnackbarHostState = remember { SnackbarHostState() }
     val bookCoverPublishFailedMessage = stringResource(R.string.book_cover_wallpaper_publish_failed)
+    val iReaderNotSelectedMessage =
+        stringResource(R.string.book_cover_wallpaper_ireader_not_selected_error)
     val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
     val sasayakiSettings = appContainer.sasayakiSettingsRepository.settings.collectAsLoadedSettings()
     val autoSyncState = ReaderRouteAutoSyncState(
@@ -120,7 +122,12 @@ internal fun ReaderRouteDestination(
         if (readyState != null && bookCoverPublicationCoordinator.shouldPublish(bookCoverPublicationEvent)) {
             val result = bookCoverWallpaperViewModel.publishCurrentCover(readyState.bookCoverFile)
             if (result.hasFailures) {
-                bookCoverSnackbarHostState.showSnackbar(bookCoverPublishFailedMessage)
+                val message = when (bookCoverPublishFailureMessageRes(result)) {
+                    R.string.book_cover_wallpaper_ireader_not_selected_error ->
+                        iReaderNotSelectedMessage
+                    else -> bookCoverPublishFailedMessage
+                }
+                bookCoverSnackbarHostState.showSnackbar(message)
             }
         } else if (readyState == null) {
             bookCoverPublicationCoordinator.shouldPublish(ReaderBookCoverPublicationEvent.NotReady)
