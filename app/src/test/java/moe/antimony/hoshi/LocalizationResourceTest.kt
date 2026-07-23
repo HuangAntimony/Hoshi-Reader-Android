@@ -153,6 +153,29 @@ class LocalizationResourceTest {
     }
 
     @Test
+    fun bookCoverVendorIntegrationSectionIsLocalized() {
+        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
+        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+
+        assertEquals(
+            "E-Ink Device Integrations",
+            defaultResources.strings.getValue("book_cover_wallpaper_vendor_integrations").value,
+        )
+        assertEquals(
+            "Options tailored to selected E-Ink device manufacturers. More integrations may be added here.",
+            defaultResources.strings.getValue("book_cover_wallpaper_vendor_integrations_summary").value,
+        )
+        assertEquals(
+            "墨水屏厂商适配",
+            zhResources.strings.getValue("book_cover_wallpaper_vendor_integrations").value,
+        )
+        assertEquals(
+            "这里的选项专门适配部分墨水屏厂商，后续可能增加更多厂商。",
+            zhResources.strings.getValue("book_cover_wallpaper_vendor_integrations_summary").value,
+        )
+    }
+
+    @Test
     fun statisticsDurationUnitsUseFullWords() {
         val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
         val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))

@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
+import moe.antimony.hoshi.features.settings.SectionTitle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 
@@ -144,26 +146,6 @@ internal fun BookCoverWallpaperSettingsView(
                 GroupCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = {
-                            Text(stringResource(R.string.book_cover_wallpaper_ireader))
-                        },
-                        supportingContent = {
-                            Text(stringResource(iReaderBookCoverSummaryRes(iReaderCapability)))
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = settings?.updateIReaderBookCover == true,
-                                enabled = settings != null && iReaderCapability.isSupported,
-                                onCheckedChange = viewModel::setUpdateIReaderBookCover,
-                            )
-                        },
-                    )
-                }
-            }
-            item {
-                GroupCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text(stringResource(R.string.book_cover_wallpaper_lock_screen)) },
                         supportingContent = {
                             val summary = when {
@@ -239,6 +221,43 @@ internal fun BookCoverWallpaperSettingsView(
                             }
                         },
                     )
+                }
+            }
+            item {
+                Column {
+                    SectionTitle(
+                        stringResource(R.string.book_cover_wallpaper_vendor_integrations),
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.book_cover_wallpaper_vendor_integrations_summary,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = 12.dp,
+                        ),
+                    )
+                    GroupCard {
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = {
+                                Text(stringResource(R.string.book_cover_wallpaper_ireader))
+                            },
+                            supportingContent = {
+                                Text(stringResource(iReaderBookCoverSummaryRes(iReaderCapability)))
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = settings?.updateIReaderBookCover == true,
+                                    enabled = settings != null && iReaderCapability.isSupported,
+                                    onCheckedChange = viewModel::setUpdateIReaderBookCover,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
