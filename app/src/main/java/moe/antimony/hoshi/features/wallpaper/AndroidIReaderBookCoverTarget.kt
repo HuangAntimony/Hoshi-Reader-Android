@@ -67,9 +67,13 @@ class AndroidIReaderBookCoverTarget @Inject constructor(
         }.getOrNull()
 }
 
-internal fun isIReaderDeviceBrand(manufacturer: String, brand: String): Boolean =
-    manufacturer.lowercase(Locale.ROOT) == IReaderBrand ||
-        brand.lowercase(Locale.ROOT) == IReaderBrand
+internal fun isIReaderDeviceBrand(manufacturer: String, brand: String): Boolean {
+    val normalizedManufacturer = manufacturer.lowercase(Locale.ROOT)
+    val normalizedBrand = brand.lowercase(Locale.ROOT)
+    return normalizedManufacturer == IReaderBrand ||
+        normalizedBrand == IReaderBrand ||
+        (normalizedManufacturer == MusnapManufacturer && normalizedBrand == MusnapBrand)
+}
 
 internal fun isIReaderBookCoverScreenSaverSelected(rawSetting: String?): Boolean =
     rawSetting
@@ -103,6 +107,8 @@ private object AndroidIReaderRawBitmapEncoder : IReaderRawBitmapEncoder {
 }
 
 private const val IReaderBrand = "ireader"
+private const val MusnapManufacturer = "chitech"
+private const val MusnapBrand = "byybuo"
 private const val IReaderLogoDirectory = "/data/zhangyue/logo"
 private const val IReaderBookDirectoryName = "book"
 private const val IReaderBookWallpaperType = 2

@@ -27,6 +27,14 @@ class IReaderBookCoverTargetTest {
     }
 
     @Test
+    fun detectsMusnapOverseasBrandCombinationCaseInsensitively() {
+        assertTrue(isIReaderDeviceBrand(manufacturer = "Chitech", brand = "Byybuo"))
+        assertTrue(isIReaderDeviceBrand(manufacturer = "CHITECH", brand = "BYYBUO"))
+        assertFalse(isIReaderDeviceBrand(manufacturer = "Chitech", brand = "other"))
+        assertFalse(isIReaderDeviceBrand(manufacturer = "other", brand = "Byybuo"))
+    }
+
+    @Test
     fun onlyDedicatedBookCoverWallpaperTypeIsAccepted() {
         assertTrue(isIReaderBookCoverScreenSaverSelected("2,0"))
         assertFalse(isIReaderBookCoverScreenSaverSelected("10,0"))

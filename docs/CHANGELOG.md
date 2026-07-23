@@ -11,7 +11,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Add optional current-book cover publishing for the Android lock screen and a
   fixed PNG file used by compatible E-ink sleep-screen tools, plus direct
   integration with iReader’s built-in Book Cover screen saver on compatible
-  firmware, with Fit, Fill, and Stretch scaling modes.
+  domestic and Musnap overseas firmware, with Fit, Fill, and Stretch scaling
+  modes.
 
 ### Fixed
 
