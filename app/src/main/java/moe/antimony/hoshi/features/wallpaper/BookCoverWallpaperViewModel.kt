@@ -16,6 +16,7 @@ internal class BookCoverWallpaperViewModel internal constructor(
     val settings: Flow<BookCoverWallpaperSettings>,
     private val updateSettings: suspend ((BookCoverWallpaperSettings) -> BookCoverWallpaperSettings) -> Unit,
     private val capabilityProvider: BookCoverWallpaperCapabilityProvider,
+    private val iReaderCapabilityProvider: IReaderBookCoverCapabilityProvider,
     private val publisher: BookCoverPublisher,
     private val coroutineScope: CoroutineScope?,
 ) : ViewModel() {
@@ -23,11 +24,13 @@ internal class BookCoverWallpaperViewModel internal constructor(
     constructor(
         settingsRepository: BookCoverWallpaperSettingsRepository,
         capabilityProvider: BookCoverWallpaperCapabilityProvider,
+        iReaderCapabilityProvider: IReaderBookCoverCapabilityProvider,
         publisher: BookCoverPublisher,
     ) : this(
         settings = settingsRepository.settings,
         updateSettings = settingsRepository::update,
         capabilityProvider = capabilityProvider,
+        iReaderCapabilityProvider = iReaderCapabilityProvider,
         publisher = publisher,
         coroutineScope = null,
     )
@@ -36,6 +39,8 @@ internal class BookCoverWallpaperViewModel internal constructor(
         get() = coroutineScope ?: viewModelScope
 
     fun capability(): BookCoverWallpaperCapability = capabilityProvider.capability()
+
+    fun iReaderCapability(): IReaderBookCoverCapability = iReaderCapabilityProvider.capability()
 
     fun setUpdateLockScreen(enabled: Boolean) {
         scope.launch {
@@ -46,6 +51,12 @@ internal class BookCoverWallpaperViewModel internal constructor(
     fun setExportEnabled(enabled: Boolean) {
         scope.launch {
             updateSettings { it.copy(exportEnabled = enabled) }
+        }
+    }
+
+    fun setUpdateIReaderBookCover(enabled: Boolean) {
+        scope.launch {
+            updateSettings { it.copy(updateIReaderBookCover = enabled) }
         }
     }
 
@@ -69,7 +80,7 @@ internal class BookCoverWallpaperViewModel internal constructor(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (_: Exception) {
-                BookCoverPublishResult.failedForBoth(BookCoverPublishFailure.UnexpectedFailure)
+                BookCoverPublishResult.failedForAll(BookCoverPublishFailure.UnexpectedFailure)
             }
         }
         val current = try {
@@ -77,13 +88,16 @@ internal class BookCoverWallpaperViewModel internal constructor(
         } catch (exception: CancellationException) {
             throw exception
         } catch (_: Exception) {
-            return BookCoverPublishResult.failedForBoth(BookCoverPublishFailure.SettingsUnavailable)
+            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable)
         }
-        if (!current.updateLockScreen && !current.exportEnabled) return BookCoverPublishResult.Skipped
+        if (!current.updateLockScreen && !current.updateIReaderBookCover && !current.exportEnabled) {
+            return BookCoverPublishResult.Skipped
+        }
         val missing = BookCoverTargetResult.Failed(BookCoverPublishFailure.MissingCover)
         return BookCoverPublishResult(
             lockScreen = if (current.updateLockScreen) missing else BookCoverTargetResult.Skipped,
             export = if (current.exportEnabled) missing else BookCoverTargetResult.Skipped,
+            iReader = if (current.updateIReaderBookCover) missing else BookCoverTargetResult.Skipped,
         )
     }
 }

@@ -40,11 +40,13 @@ import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverExportTarget
 import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverImageRenderer
 import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverLockScreenTarget
 import moe.antimony.hoshi.features.wallpaper.AndroidBookCoverScreenSizeProvider
+import moe.antimony.hoshi.features.wallpaper.AndroidIReaderBookCoverTarget
 import moe.antimony.hoshi.features.wallpaper.BookCoverPublisher
 import moe.antimony.hoshi.features.wallpaper.BookCoverScreenSizeProvider
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperCapabilityProvider
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsRepository
 import moe.antimony.hoshi.features.wallpaper.DefaultBookCoverPublisher
+import moe.antimony.hoshi.features.wallpaper.IReaderBookCoverCapabilityProvider
 import moe.antimony.hoshi.features.wallpaper.bookCoverWallpaperSettingsRepository
 import moe.antimony.hoshi.profiles.ProfileRepository
 
@@ -163,17 +165,24 @@ internal object HoshiAppModule {
         renderer: AndroidBookCoverImageRenderer,
         lockScreenTarget: AndroidBookCoverLockScreenTarget,
         exportTarget: AndroidBookCoverExportTarget,
+        iReaderTarget: AndroidIReaderBookCoverTarget,
     ): BookCoverPublisher = DefaultBookCoverPublisher(
         settings = settingsRepository.settings,
         renderer = renderer,
         lockScreenTarget = lockScreenTarget,
         exportTarget = exportTarget,
+        iReaderTarget = iReaderTarget,
     )
 
     @Provides
     fun provideBookCoverWallpaperCapabilityProvider(
         target: AndroidBookCoverLockScreenTarget,
     ): BookCoverWallpaperCapabilityProvider = target
+
+    @Provides
+    fun provideIReaderBookCoverCapabilityProvider(
+        target: AndroidIReaderBookCoverTarget,
+    ): IReaderBookCoverCapabilityProvider = target
 
     @Provides
     fun provideBookCoverScreenSizeProvider(

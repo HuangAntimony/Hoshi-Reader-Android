@@ -685,6 +685,10 @@
     <string name="book_cover_wallpaper_lock_screen_summary">每次打开书籍时，将当前封面设为 Android 锁屏壁纸。部分墨水屏设备可能不生效。</string>
     <string name="book_cover_wallpaper_not_supported">此设备不支持锁屏壁纸。</string>
     <string name="book_cover_wallpaper_not_allowed">设备策略不允许此应用更改壁纸。</string>
+    <string name="book_cover_wallpaper_ireader">更新 iReader 书籍封面屏保</string>
+    <string name="book_cover_wallpaper_ireader_summary">每次打开书籍时，更新 iReader 内建的“书籍封面”屏保。</string>
+    <string name="book_cover_wallpaper_ireader_select_system_option">请先在设备的屏保设置中选择“书籍封面”，之后 Hoshi 会持续更新封面。</string>
+    <string name="book_cover_wallpaper_ireader_not_supported">此设备或固件不支持 iReader 私有屏保集成。</string>
     <string name="book_cover_wallpaper_export">导出固定封面图片</string>
     <string name="book_cover_wallpaper_export_summary">每次打开书籍时覆盖同一个 PNG 文件。请在阅读器的休眠屏幕设置中选择该文件。</string>
     <string name="book_cover_wallpaper_export_file">导出文件</string>

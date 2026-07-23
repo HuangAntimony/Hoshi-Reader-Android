@@ -70,6 +70,10 @@ enum class BookCoverPublishFailure {
     ExportTargetMissing,
     ExportPermissionLost,
     ExportWriteFailed,
+    IReaderUnsupported,
+    IReaderBookScreenSaverNotSelected,
+    IReaderWriteFailed,
+    IReaderRefreshFailed,
     SettingsUnavailable,
     UnexpectedFailure,
 }
@@ -83,14 +87,18 @@ sealed interface BookCoverTargetResult {
 data class BookCoverPublishResult(
     val lockScreen: BookCoverTargetResult,
     val export: BookCoverTargetResult,
+    val iReader: BookCoverTargetResult = BookCoverTargetResult.Skipped,
 ) {
     val hasFailures: Boolean
-        get() = lockScreen is BookCoverTargetResult.Failed || export is BookCoverTargetResult.Failed
+        get() = lockScreen is BookCoverTargetResult.Failed ||
+            export is BookCoverTargetResult.Failed ||
+            iReader is BookCoverTargetResult.Failed
 
     companion object {
         val Skipped = BookCoverPublishResult(
             lockScreen = BookCoverTargetResult.Skipped,
             export = BookCoverTargetResult.Skipped,
+            iReader = BookCoverTargetResult.Skipped,
         )
     }
 }
@@ -107,6 +115,10 @@ fun interface BookCoverExportTarget {
     suspend fun publish(image: File, targetUri: String): BookCoverPublishFailure?
 }
 
+fun interface BookCoverIReaderTarget {
+    suspend fun publish(image: File): BookCoverPublishFailure?
+}
+
 interface BookCoverPublisher {
     suspend fun publish(coverFile: File): BookCoverPublishResult
 }
@@ -116,6 +128,7 @@ class DefaultBookCoverPublisher(
     private val renderer: BookCoverImageRenderer,
     private val lockScreenTarget: BookCoverLockScreenTarget,
     private val exportTarget: BookCoverExportTarget,
+    private val iReaderTarget: BookCoverIReaderTarget,
 ) : BookCoverPublisher {
     private val publishMutex = Mutex()
 
@@ -129,16 +142,18 @@ class DefaultBookCoverPublisher(
         } catch (exception: CancellationException) {
             throw exception
         } catch (_: Exception) {
-            return BookCoverPublishResult.failedForBoth(BookCoverPublishFailure.SettingsUnavailable)
+            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable)
         }
         val lockEnabled = current.updateLockScreen
+        val iReaderEnabled = current.updateIReaderBookCover
         val exportUri = current.exportTargetUri?.takeIf { current.exportEnabled && it.isNotBlank() }
         val exportMissing = current.exportEnabled && exportUri == null
-        if (!lockEnabled && !current.exportEnabled) return BookCoverPublishResult.Skipped
-        if (!lockEnabled && exportMissing) {
+        if (!lockEnabled && !iReaderEnabled && !current.exportEnabled) return BookCoverPublishResult.Skipped
+        if (!lockEnabled && !iReaderEnabled && exportMissing) {
             return BookCoverPublishResult(
                 lockScreen = BookCoverTargetResult.Skipped,
                 export = BookCoverTargetResult.Failed(BookCoverPublishFailure.ExportTargetMissing),
+                iReader = BookCoverTargetResult.Skipped,
             )
         }
 
@@ -155,6 +170,7 @@ class DefaultBookCoverPublisher(
                     exportUri != null -> failed
                     else -> BookCoverTargetResult.Skipped
                 },
+                iReader = if (iReaderEnabled) failed else BookCoverTargetResult.Skipped,
             )
         }
         val lockResult = if (lockEnabled) {
@@ -164,6 +180,17 @@ class DefaultBookCoverPublisher(
                 throw exception
             } catch (_: Exception) {
                 BookCoverTargetResult.Failed(BookCoverPublishFailure.WallpaperUpdateFailed)
+            }
+        } else {
+            BookCoverTargetResult.Skipped
+        }
+        val iReaderResult = if (iReaderEnabled) {
+            try {
+                iReaderTarget.publish(rendered).toTargetResult()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                BookCoverTargetResult.Failed(BookCoverPublishFailure.IReaderWriteFailed)
             }
         } else {
             BookCoverTargetResult.Skipped
@@ -179,15 +206,19 @@ class DefaultBookCoverPublisher(
             }
             else -> BookCoverTargetResult.Skipped
         }
-        return BookCoverPublishResult(lockScreen = lockResult, export = exportResult)
+        return BookCoverPublishResult(
+            lockScreen = lockResult,
+            export = exportResult,
+            iReader = iReaderResult,
+        )
     }
 }
 
-internal fun BookCoverPublishResult.Companion.failedForBoth(
+internal fun BookCoverPublishResult.Companion.failedForAll(
     reason: BookCoverPublishFailure,
 ): BookCoverPublishResult {
     val failure = BookCoverTargetResult.Failed(reason)
-    return BookCoverPublishResult(lockScreen = failure, export = failure)
+    return BookCoverPublishResult(lockScreen = failure, export = failure, iReader = failure)
 }
 
 private fun BookCoverPublishFailure?.toTargetResult(): BookCoverTargetResult =

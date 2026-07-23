@@ -120,7 +120,14 @@ Manual reader validation should cover:
   the newest cover wins. With portrait, landscape, very wide, and very tall
   covers, verify Fit shows the full cover with white padding, Fill preserves
   proportions while center-cropping, and Stretch fills the screen without
-  preserving proportions; repeat in portrait, landscape, and split-screen.
+  preserving proportions; repeat in portrait, landscape, and split-screen. On
+  compatible iReader firmware, select the system Book Cover screen saver,
+  enable Hoshi’s iReader integration, and open two books. Confirm
+  `/data/zhangyue/logo/book` contains one newly named `.rmb` after each open and
+  that the visible sleep screen changes without reapplying it in system
+  settings. Repeat once with SELinux enforcing when the firmware supports it;
+  vendor directory permissions or policy denial must leave Reader usable and
+  report a localized failure.
 
 For reader pagination bugs, inspect WebView metrics such as `scrollTop`,
 `scrollHeight`, and `clientHeight`. If a page can still scroll but native

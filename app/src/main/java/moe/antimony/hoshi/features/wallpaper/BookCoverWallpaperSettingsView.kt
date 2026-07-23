@@ -18,6 +18,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -29,6 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
@@ -44,9 +48,24 @@ internal fun BookCoverWallpaperSettingsView(
     viewModel: BookCoverWallpaperViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val settings = viewModel.settings.collectAsLoadedSettings()
     val capability = viewModel.capability()
+    var iReaderCapability by remember(viewModel) {
+        mutableStateOf(viewModel.iReaderCapability())
+    }
     var targetSelectionFailed by remember { mutableStateOf(false) }
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                iReaderCapability = viewModel.iReaderCapability()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val targetLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("image/png"),
     ) { uri ->
@@ -119,6 +138,26 @@ internal fun BookCoverWallpaperSettingsView(
                             },
                         )
                     }
+                }
+            }
+            item {
+                GroupCard {
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = {
+                            Text(stringResource(R.string.book_cover_wallpaper_ireader))
+                        },
+                        supportingContent = {
+                            Text(stringResource(iReaderBookCoverSummaryRes(iReaderCapability)))
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = settings?.updateIReaderBookCover == true,
+                                enabled = settings != null && iReaderCapability.isSupported,
+                                onCheckedChange = viewModel::setUpdateIReaderBookCover,
+                            )
+                        },
+                    )
                 }
             }
             item {
@@ -217,6 +256,13 @@ internal fun hasPersistedWritePermission(
     grantedWriteUris: Set<String>,
     rawUri: String?,
 ): Boolean = rawUri != null && rawUri in grantedWriteUris
+
+internal fun iReaderBookCoverSummaryRes(capability: IReaderBookCoverCapability): Int = when {
+    !capability.isSupported -> R.string.book_cover_wallpaper_ireader_not_supported
+    !capability.isBookCoverScreenSaverSelected ->
+        R.string.book_cover_wallpaper_ireader_select_system_option
+    else -> R.string.book_cover_wallpaper_ireader_summary
+}
 
 private const val DefaultExportFileName = "hoshi-current-cover.png"
 

@@ -18,6 +18,7 @@ enum class BookCoverScaleMode {
 
 data class BookCoverWallpaperSettings(
     val updateLockScreen: Boolean = false,
+    val updateIReaderBookCover: Boolean = false,
     val exportEnabled: Boolean = false,
     val exportTargetUri: String? = null,
     val scaleMode: BookCoverScaleMode = BookCoverScaleMode.Fit,
@@ -29,6 +30,7 @@ class BookCoverWallpaperSettingsRepository(
     val settings: Flow<BookCoverWallpaperSettings> = dataStore.data.map { preferences ->
         BookCoverWallpaperSettings(
             updateLockScreen = preferences[KeyUpdateLockScreen] ?: false,
+            updateIReaderBookCover = preferences[KeyUpdateIReaderBookCover] ?: false,
             exportEnabled = preferences[KeyExportEnabled] ?: false,
             exportTargetUri = preferences[KeyExportTargetUri],
             scaleMode = preferences[KeyScaleMode].toBookCoverScaleMode(),
@@ -39,12 +41,14 @@ class BookCoverWallpaperSettingsRepository(
         dataStore.edit { preferences ->
             val current = BookCoverWallpaperSettings(
                 updateLockScreen = preferences[KeyUpdateLockScreen] ?: false,
+                updateIReaderBookCover = preferences[KeyUpdateIReaderBookCover] ?: false,
                 exportEnabled = preferences[KeyExportEnabled] ?: false,
                 exportTargetUri = preferences[KeyExportTargetUri],
                 scaleMode = preferences[KeyScaleMode].toBookCoverScaleMode(),
             )
             val updated = transform(current)
             preferences[KeyUpdateLockScreen] = updated.updateLockScreen
+            preferences[KeyUpdateIReaderBookCover] = updated.updateIReaderBookCover
             preferences[KeyExportEnabled] = updated.exportEnabled
             preferences[KeyScaleMode] = updated.scaleMode.name
             if (updated.exportTargetUri == null) {
@@ -59,6 +63,7 @@ class BookCoverWallpaperSettingsRepository(
         const val DataStoreName = "book-cover-wallpaper-settings"
 
         private val KeyUpdateLockScreen = booleanPreferencesKey("updateLockScreen")
+        private val KeyUpdateIReaderBookCover = booleanPreferencesKey("updateIReaderBookCover")
         private val KeyExportEnabled = booleanPreferencesKey("exportEnabled")
         private val KeyExportTargetUri = stringPreferencesKey("exportTargetUri")
         private val KeyScaleMode = stringPreferencesKey("scaleMode")

@@ -12,6 +12,21 @@ import org.junit.Test
 
 class BookCoverWallpaperViewModelTest {
     @Test
+    fun exposesIReaderCapabilityForSettingsUi() {
+        val capability = IReaderBookCoverCapability(
+            isSupported = true,
+            isBookCoverScreenSaverSelected = false,
+        )
+        val viewModel = viewModel(
+            BookCoverWallpaperSettings(),
+            FakePublisher(),
+            iReaderCapability = capability,
+        )
+
+        assertEquals(capability, viewModel.iReaderCapability())
+    }
+
+    @Test
     fun missingCoverIsSkippedWhenFeatureIsDisabled() = runBlocking {
         val publisher = FakePublisher()
         val viewModel = viewModel(BookCoverWallpaperSettings(), publisher)
@@ -26,7 +41,11 @@ class BookCoverWallpaperViewModelTest {
     fun missingCoverFailsOnlyEnabledTargets() = runBlocking {
         val publisher = FakePublisher()
         val viewModel = viewModel(
-            BookCoverWallpaperSettings(updateLockScreen = true, exportEnabled = true),
+            BookCoverWallpaperSettings(
+                updateLockScreen = true,
+                updateIReaderBookCover = true,
+                exportEnabled = true,
+            ),
             publisher,
         )
 
@@ -39,6 +58,10 @@ class BookCoverWallpaperViewModelTest {
         assertEquals(
             BookCoverTargetResult.Failed(BookCoverPublishFailure.MissingCover),
             result.export,
+        )
+        assertEquals(
+            BookCoverTargetResult.Failed(BookCoverPublishFailure.MissingCover),
+            result.iReader,
         )
         assertTrue(result.hasFailures)
         assertEquals(0, publisher.callCount)
@@ -69,6 +92,7 @@ class BookCoverWallpaperViewModelTest {
         val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.UnexpectedFailure)
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
+        assertEquals(failure, result.iReader)
     }
 
     @Test
@@ -79,6 +103,12 @@ class BookCoverWallpaperViewModelTest {
             capabilityProvider = BookCoverWallpaperCapabilityProvider {
                 BookCoverWallpaperCapability(isSupported = true, isSetAllowed = true)
             },
+            iReaderCapabilityProvider = IReaderBookCoverCapabilityProvider {
+                IReaderBookCoverCapability(
+                    isSupported = true,
+                    isBookCoverScreenSaverSelected = true,
+                )
+            },
             publisher = FakePublisher(),
             coroutineScope = null,
         )
@@ -88,6 +118,7 @@ class BookCoverWallpaperViewModelTest {
         val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.SettingsUnavailable)
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
+        assertEquals(failure, result.iReader)
     }
 
     @Test
@@ -108,12 +139,17 @@ class BookCoverWallpaperViewModelTest {
     private fun viewModel(
         settings: BookCoverWallpaperSettings,
         publisher: BookCoverPublisher,
+        iReaderCapability: IReaderBookCoverCapability = IReaderBookCoverCapability(
+            isSupported = true,
+            isBookCoverScreenSaverSelected = true,
+        ),
     ): BookCoverWallpaperViewModel = BookCoverWallpaperViewModel(
         settings = MutableStateFlow(settings),
         updateSettings = {},
         capabilityProvider = BookCoverWallpaperCapabilityProvider {
             BookCoverWallpaperCapability(isSupported = true, isSetAllowed = true)
         },
+        iReaderCapabilityProvider = IReaderBookCoverCapabilityProvider { iReaderCapability },
         publisher = publisher,
         coroutineScope = null,
     )

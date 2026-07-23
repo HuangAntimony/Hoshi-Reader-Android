@@ -687,6 +687,10 @@
     <string name="book_cover_wallpaper_lock_screen_summary">Set the current book cover as the Android lock screen wallpaper whenever a book opens. This may not work on some e-ink devices.</string>
     <string name="book_cover_wallpaper_not_supported">Lock screen wallpapers are not supported on this device.</string>
     <string name="book_cover_wallpaper_not_allowed">Device policy does not allow this app to change the wallpaper.</string>
+    <string name="book_cover_wallpaper_ireader">Update iReader book cover screen saver</string>
+    <string name="book_cover_wallpaper_ireader_summary">Update iReader’s built-in Book Cover screen saver whenever a book opens.</string>
+    <string name="book_cover_wallpaper_ireader_select_system_option">First select Book Cover in the device’s screen saver settings. Hoshi will then keep it updated.</string>
+    <string name="book_cover_wallpaper_ireader_not_supported">This private iReader screen saver integration is not available on this device or firmware.</string>
     <string name="book_cover_wallpaper_export">Export fixed cover image</string>
     <string name="book_cover_wallpaper_export_summary">Overwrite one PNG file whenever a book opens. Select that file in your e-reader’s sleep screen settings.</string>
     <string name="book_cover_wallpaper_export_file">Export file</string>

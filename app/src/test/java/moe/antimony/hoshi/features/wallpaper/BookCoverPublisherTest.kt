@@ -144,6 +144,24 @@ class BookCoverPublisherTest {
     }
 
     @Test
+    fun iReaderBackendSharesTheRenderedFileWithOtherTargets() = runBlocking {
+        val fixture = fixture(
+            BookCoverWallpaperSettings(
+                updateLockScreen = true,
+                updateIReaderBookCover = true,
+                exportEnabled = true,
+                exportTargetUri = "content://documents/cover",
+            ),
+        )
+
+        val result = fixture.publisher.publish(fixture.source)
+
+        assertEquals(BookCoverTargetResult.Success, result.iReader)
+        assertEquals(1, fixture.renderer.renderCount)
+        assertEquals(listOf(fixture.renderer.output), fixture.iReaderTarget.files)
+    }
+
+    @Test
     fun oneBackendFailureDoesNotPreventTheOtherBackend() = runBlocking {
         val fixture = fixture(
             settings = BookCoverWallpaperSettings(
@@ -231,6 +249,7 @@ class BookCoverPublisherTest {
             renderer = renderer,
             lockScreenTarget = FakeLockTarget(null, false),
             exportTarget = FakeExportTarget(),
+            iReaderTarget = FakeIReaderTarget(),
         )
 
         val result = publisher.publish(tempFolder.newFile("source.jpg"))
@@ -238,6 +257,7 @@ class BookCoverPublisherTest {
         val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.SettingsUnavailable)
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
+        assertEquals(failure, result.iReader)
         assertEquals(0, renderer.renderCount)
     }
 
@@ -257,6 +277,7 @@ class BookCoverPublisherTest {
             renderer = renderer,
             lockScreenTarget = lockTarget,
             exportTarget = FakeExportTarget(),
+            iReaderTarget = FakeIReaderTarget(),
         )
 
         val firstPublish = async { publisher.publish(first) }
@@ -281,6 +302,7 @@ class BookCoverPublisherTest {
             renderer = BookCoverImageRenderer { _, _ -> throw CancellationException("reader closed") },
             lockScreenTarget = FakeLockTarget(null, false),
             exportTarget = FakeExportTarget(),
+            iReaderTarget = FakeIReaderTarget(),
         )
 
         try {
@@ -316,16 +338,19 @@ class BookCoverPublisherTest {
         val renderer = FakeRenderer(tempFolder.newFile("rendered.png"), renderThrows)
         val lockTarget = FakeLockTarget(lockFailure, lockThrows)
         val exportTarget = FakeExportTarget(exportFailure)
+        val iReaderTarget = FakeIReaderTarget()
         return Fixture(
             source = source,
             renderer = renderer,
             lockTarget = lockTarget,
             exportTarget = exportTarget,
+            iReaderTarget = iReaderTarget,
             publisher = DefaultBookCoverPublisher(
                 settings = MutableStateFlow(settings),
                 renderer = renderer,
                 lockScreenTarget = lockTarget,
                 exportTarget = exportTarget,
+                iReaderTarget = iReaderTarget,
             ),
         )
     }
@@ -335,6 +360,7 @@ class BookCoverPublisherTest {
         val renderer: FakeRenderer,
         val lockTarget: FakeLockTarget,
         val exportTarget: FakeExportTarget,
+        val iReaderTarget: FakeIReaderTarget,
         val publisher: BookCoverPublisher,
     )
 
@@ -402,6 +428,17 @@ class BookCoverPublisherTest {
 
         override suspend fun publish(image: File, targetUri: String): BookCoverPublishFailure? {
             files += image to targetUri
+            return failure
+        }
+    }
+
+    private class FakeIReaderTarget(
+        private val failure: BookCoverPublishFailure? = null,
+    ) : BookCoverIReaderTarget {
+        val files = mutableListOf<File>()
+
+        override suspend fun publish(image: File): BookCoverPublishFailure? {
+            files += image
             return failure
         }
     }

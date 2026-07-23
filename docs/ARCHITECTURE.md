@@ -143,8 +143,14 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   reuses the extracted book cover and renders it once onto a screen-sized PNG
   using the persisted Fit, Fill, or Stretch mode. The publisher independently
   updates the Android lock-screen wallpaper and/or a persisted Storage Access
-  Framework document URI. Publishing failures do not block Reader loading, and
-  the integration does not request broad storage access.
+  Framework document URI. On compatible iReader firmware, a third target
+  encodes the rendered bitmap into the vendor RAW bitmap format, atomically
+  replaces the contents of `/data/zhangyue/logo/book` with a uniquely named
+  file, and explicitly notifies iReader SystemUI’s `BOOK` screen-saver backend.
+  The target only publishes while the system `wallpaper_lock_screen_info`
+  setting selects type `2`; it does not write that system setting or impersonate
+  the built-in reader provider. Publishing failures do not block Reader
+  loading, and the integration does not request broad storage access.
 - Anki work stays behind the Anki backend/repository boundary.
 - Anki settings are stored per active profile in
   `Profiles/<profileId>/anki_config.json`; duplicate checks and note creation

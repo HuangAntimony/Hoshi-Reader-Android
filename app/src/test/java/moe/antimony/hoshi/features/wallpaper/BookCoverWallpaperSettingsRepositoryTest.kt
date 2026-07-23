@@ -24,11 +24,12 @@ class BookCoverWallpaperSettingsRepositoryTest {
     }
 
     @Test
-    fun updatePersistsBothBackendsAndExportUri() = runBlocking {
+    fun updatePersistsAllBackendsAndExportUri() = runBlocking {
         repository().use { handle ->
             handle.repository.update {
                 it.copy(
                     updateLockScreen = true,
+                    updateIReaderBookCover = true,
                     exportEnabled = true,
                     exportTargetUri = "content://documents/cover",
                     scaleMode = BookCoverScaleMode.Fill,
@@ -38,6 +39,7 @@ class BookCoverWallpaperSettingsRepositoryTest {
             assertEquals(
                 BookCoverWallpaperSettings(
                     updateLockScreen = true,
+                    updateIReaderBookCover = true,
                     exportEnabled = true,
                     exportTargetUri = "content://documents/cover",
                     scaleMode = BookCoverScaleMode.Fill,
