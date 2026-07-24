@@ -2,49 +2,19 @@ package moe.antimony.hoshi.features.wallpaper
 
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
-fun interface IReaderRawBitmapEncoder {
-    fun encode(source: File, output: File)
-}
-
 fun interface IReaderBookCoverNotifier {
     fun notifyChanged()
-}
-
-internal fun writeIReaderRawBitmap(
-    output: File,
-    width: Int,
-    height: Int,
-    configOrdinal: Int,
-    pixels: ByteBuffer,
-) {
-    require(width > 0 && height > 0)
-    val header = ByteBuffer.allocate(IReaderRawBitmapHeaderSize)
-        .order(ByteOrder.LITTLE_ENDIAN)
-        .putInt(IReaderRawBitmapMagic)
-        .putInt(width)
-        .putInt(height)
-        .putInt(configOrdinal)
-        .flip() as ByteBuffer
-    FileOutputStream(output).use { stream ->
-        val channel = stream.channel
-        while (header.hasRemaining()) channel.write(header)
-        while (pixels.hasRemaining()) channel.write(pixels)
-        stream.fd.sync()
-    }
 }
 
 class IReaderBookCoverFileTarget(
     private val directory: File,
     private val isBookCoverScreenSaverSelected: () -> Boolean,
-    private val encoder: IReaderRawBitmapEncoder,
     private val notifier: IReaderBookCoverNotifier,
     private val outputName: () -> String,
     private val ioDispatcher: CoroutineDispatcher,
@@ -63,8 +33,13 @@ class IReaderBookCoverFileTarget(
         val finalFile = directory.resolve(outputName())
         val temporary = directory.resolve("${finalFile.name}.tmp")
         try {
-            encoder.encode(image, temporary)
-            check(temporary.isFile && temporary.length() > IReaderRawBitmapHeaderSize)
+            image.inputStream().use { input ->
+                FileOutputStream(temporary).use { output ->
+                    input.copyTo(output)
+                    output.fd.sync()
+                }
+            }
+            check(temporary.isFile && temporary.length() > 0)
             check(setSharedReadOwnerWritePermissions(temporary))
             runCatching {
                 Files.move(
@@ -116,6 +91,3 @@ private fun setSharedReadOwnerWritePermissions(
     if (!file.setWritable(false, false) || !file.setWritable(true, true)) return false
     return !executable || file.setExecutable(true, false)
 }
-
-private const val IReaderRawBitmapMagic = 1_380_013_890
-private const val IReaderRawBitmapHeaderSize = 16

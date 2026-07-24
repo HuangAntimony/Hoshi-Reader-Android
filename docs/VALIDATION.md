@@ -124,7 +124,7 @@ Manual reader validation should cover:
   compatible iReader firmware, first open any book in iReader’s built-in
   reader, then select the system Book Cover screen saver and tap Apply. Enable
   Hoshi’s iReader integration and open two books. Confirm
-  `/data/zhangyue/logo/book` contains one newly named `.rmb` after each open and
+  `/data/zhangyue/logo/book` contains one newly named `.png` after each open and
   that the visible sleep screen changes without reapplying it in system
   settings. Repeat once with SELinux enforcing when the firmware supports it;
   vendor directory permissions or policy denial must leave Reader usable and

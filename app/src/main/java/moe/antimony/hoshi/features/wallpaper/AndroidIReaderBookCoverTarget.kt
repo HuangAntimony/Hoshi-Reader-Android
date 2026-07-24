@@ -2,13 +2,10 @@ package moe.antimony.hoshi.features.wallpaper
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Build
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -48,7 +45,6 @@ class AndroidIReaderBookCoverTarget @Inject constructor(
         isBookCoverScreenSaverSelected = {
             isIReaderBookCoverScreenSaverSelected(wallpaperSetting())
         },
-        encoder = AndroidIReaderRawBitmapEncoder,
         notifier = IReaderBookCoverNotifier {
             context.sendBroadcast(
                 Intent(IReaderWallpaperChangedAction)
@@ -57,7 +53,7 @@ class AndroidIReaderBookCoverTarget @Inject constructor(
                     .putExtra(IReaderOrderTypeExtra, IReaderCarouselOrderName),
             )
         },
-        outputName = { "hoshi-${UUID.randomUUID()}.rmb" },
+        outputName = { "hoshi-${UUID.randomUUID()}.png" },
         ioDispatcher = ioDispatcher,
     )
 
@@ -80,31 +76,6 @@ internal fun isIReaderBookCoverScreenSaverSelected(rawSetting: String?): Boolean
         ?.substringBefore(',')
         ?.trim()
         ?.toIntOrNull() == IReaderBookWallpaperType
-
-private object AndroidIReaderRawBitmapEncoder : IReaderRawBitmapEncoder {
-    override fun encode(source: File, output: File) {
-        val bitmap = BitmapFactory.decodeFile(
-            source.absolutePath,
-            BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            },
-        ) ?: error("Rendered cover cannot be decoded.")
-        try {
-            val pixels = ByteBuffer.allocate(bitmap.byteCount)
-            bitmap.copyPixelsToBuffer(pixels)
-            pixels.flip()
-            writeIReaderRawBitmap(
-                output = output,
-                width = bitmap.width,
-                height = bitmap.height,
-                configOrdinal = bitmap.config?.ordinal ?: Bitmap.Config.ARGB_8888.ordinal,
-                pixels = pixels,
-            )
-        } finally {
-            bitmap.recycle()
-        }
-    }
-}
 
 private const val IReaderBrand = "ireader"
 private const val MusnapManufacturer = "chitech"
