@@ -40,9 +40,9 @@ class IReaderBookCoverTargetTest {
     }
 
     @Test
-    fun successfulPublishCopiesPngRemovesOldRawFileThenNotifiesSystemUi() = runBlocking {
+    fun successfulPublishCopiesPngRemovesPreviousCoverThenNotifiesSystemUi() = runBlocking {
         val directory = tempFolder.newFolder("book")
-        val old = directory.resolve("old.rmb").apply { writeText("old") }
+        val previous = directory.resolve("previous.png").apply { writeText("old") }
         val rendered = tempFolder.newFile("rendered.png").apply {
             writeBytes(PngBytes)
         }
@@ -58,7 +58,7 @@ class IReaderBookCoverTargetTest {
         val failure = target.publish(rendered)
 
         assertEquals(null, failure)
-        assertFalse(old.exists())
+        assertFalse(previous.exists())
         val published = directory.resolve("hoshi-new.png")
         assertTrue(PngBytes.contentEquals(published.readBytes()))
         val permissions = Files.getPosixFilePermissions(published.toPath())
@@ -70,7 +70,7 @@ class IReaderBookCoverTargetTest {
     @Test
     fun copyFailurePreservesPreviousSuccessfulCover() = runBlocking {
         val directory = tempFolder.newFolder("book")
-        val old = directory.resolve("old.rmb").apply { writeText("old") }
+        val previous = directory.resolve("previous.png").apply { writeText("old") }
         var notifications = 0
         val target = IReaderBookCoverFileTarget(
             directory = directory,
@@ -83,8 +83,8 @@ class IReaderBookCoverTargetTest {
         val failure = target.publish(File(tempFolder.root, "missing.png"))
 
         assertEquals(BookCoverPublishFailure.IReaderWriteFailed, failure)
-        assertTrue(old.exists())
-        assertEquals(listOf("old.rmb"), directory.list()?.toList())
+        assertTrue(previous.exists())
+        assertEquals(listOf("previous.png"), directory.list()?.toList())
         assertEquals(0, notifications)
     }
 
@@ -92,7 +92,7 @@ class IReaderBookCoverTargetTest {
     fun staleEntryThatCannotBeRemovedPreventsRefresh() = runBlocking {
         val directory = tempFolder.newFolder("book")
         directory.resolve("stale").mkdir()
-        directory.resolve("stale/cover.rmb").writeText("old")
+        directory.resolve("stale/cover.png").writeText("old")
         var notifications = 0
         val target = IReaderBookCoverFileTarget(
             directory = directory,
