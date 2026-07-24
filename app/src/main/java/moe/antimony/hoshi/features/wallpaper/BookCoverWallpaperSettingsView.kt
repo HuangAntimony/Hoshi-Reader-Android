@@ -158,7 +158,7 @@ internal fun BookCoverWallpaperSettingsView(
                         trailingContent = {
                             Switch(
                                 checked = settings?.updateLockScreen == true,
-                                enabled = settings != null && capability.canUpdateLockScreen,
+                                enabled = isLockScreenSwitchEnabled(settings, capability),
                                 onCheckedChange = viewModel::setUpdateLockScreen,
                             )
                         },
@@ -275,6 +275,11 @@ internal fun hasPersistedWritePermission(
     grantedWriteUris: Set<String>,
     rawUri: String?,
 ): Boolean = rawUri != null && rawUri in grantedWriteUris
+
+internal fun isLockScreenSwitchEnabled(
+    settings: BookCoverWallpaperSettings?,
+    capability: BookCoverWallpaperCapability,
+): Boolean = settings != null && (capability.canUpdateLockScreen || settings.updateLockScreen)
 
 internal fun iReaderBookCoverSummaryRes(capability: IReaderBookCoverCapability): Int = when {
     !capability.isSupported -> R.string.book_cover_wallpaper_ireader_not_supported

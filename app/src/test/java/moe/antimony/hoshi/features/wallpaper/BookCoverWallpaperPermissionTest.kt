@@ -6,6 +6,27 @@ import org.junit.Test
 
 class BookCoverWallpaperPermissionTest {
     @Test
+    fun lockScreenSwitchAllowsOnlyDisablingWhenCapabilityIsBlocked() {
+        val blockedCapability = BookCoverWallpaperCapability(
+            isSupported = true,
+            isSetAllowed = false,
+        )
+
+        assertFalse(
+            isLockScreenSwitchEnabled(
+                settings = BookCoverWallpaperSettings(updateLockScreen = false),
+                capability = blockedCapability,
+            ),
+        )
+        assertTrue(
+            isLockScreenSwitchEnabled(
+                settings = BookCoverWallpaperSettings(updateLockScreen = true),
+                capability = blockedCapability,
+            ),
+        )
+    }
+
+    @Test
     fun exportCanBeReenabledOnlyForThePersistedWriteTarget() {
         val grantedWriteUris = setOf("content://documents/current-cover")
 
