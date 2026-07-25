@@ -38,6 +38,32 @@
     return textSemantics().isMatchableChar(char);
   }
 
+  function codePointStartOffset(text, utf16Offset) {
+    var bounded = Math.max(0, Math.min(text.length, Number(utf16Offset) || 0));
+    if (
+      bounded > 0 &&
+      bounded < text.length &&
+      text.charCodeAt(bounded) >= 0xdc00 &&
+      text.charCodeAt(bounded) <= 0xdfff &&
+      text.charCodeAt(bounded - 1) >= 0xd800 &&
+      text.charCodeAt(bounded - 1) <= 0xdbff
+    ) {
+      return bounded - 1;
+    }
+    return bounded;
+  }
+
+  function utf16OffsetForRawCount(text, rawCount) {
+    var offset = 0;
+    var count = 0;
+    while (offset < text.length && count < rawCount) {
+      var codePoint = text.codePointAt(offset);
+      offset += codePoint > 0xffff ? 2 : 1;
+      count += 1;
+    }
+    return offset;
+  }
+
   function ownIdsForNode(node) {
     var ids = new Set();
     if (node && node.nodeType === ELEMENT_NODE) {
@@ -522,6 +548,45 @@
       var char = previous ? previous.endChar : 0;
       var raw = previous ? previous.endRaw : 0;
       return { hasText: false, startChar: char, endChar: char, startRaw: raw, endRaw: raw };
+    },
+
+    sourcePositionForRawOffset: function(rawOffset) {
+      var target = Number(rawOffset);
+      if (!Number.isFinite(target) || target < 0 || target >= this.totalRawChars) return null;
+
+      var low = 0;
+      var high = this.textEntries.length;
+      while (low < high) {
+        var middle = Math.floor((low + high) / 2);
+        if (this.textEntries[middle].endRaw <= target) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+
+      var entry = this.textEntries[low];
+      if (!entry || target < entry.startRaw || target >= entry.endRaw) return null;
+      return {
+        node: entry.node,
+        offset: utf16OffsetForRawCount(entry.text, target - entry.startRaw)
+      };
+    },
+
+    rawOffsetForSourcePosition: function(node, utf16Offset) {
+      var base = this.sourceTextRawOffsets.get(node);
+      if (base === undefined || !node) return null;
+      var text = String(node.nodeValue || node.textContent || '');
+      var offset = codePointStartOffset(text, utf16Offset);
+      return base + countRawChars(text.slice(0, offset));
+    },
+
+    matchableOffsetForSourcePosition: function(node, utf16Offset) {
+      var base = this.sourceTextOffsets.get(node);
+      if (base === undefined || !node) return null;
+      var text = String(node.nodeValue || node.textContent || '');
+      var offset = codePointStartOffset(text, utf16Offset);
+      return base + countChars(text.slice(0, offset));
     },
 
     rubyRootForTextNode: function(node) {

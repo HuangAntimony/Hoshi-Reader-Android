@@ -295,6 +295,37 @@ test('shared selection fails closed when a configured text projection cannot map
     assert.equal(selection.selection, null);
 });
 
+test('english selection can start before the visible clone fragment and continue in source text', () => {
+    const sourceText = 'A difficult resistance.';
+    const { document, selection, textNode: sourceNode, window } = loadSelection(sourceText);
+    const renderedNode = {
+        nodeType: 3,
+        textContent: 'A diff',
+        parentElement: null,
+    };
+    document.pointElement = hitElement([]);
+    window.getSelection = () => null;
+    selection.getCharacterAtPoint = () => ({ node: renderedNode, offset: 5 });
+    selection.configure({
+        language: 'en',
+        textProjection: {
+            toSemanticHit() {
+                return { node: sourceNode, offset: 5 };
+            },
+            normalizedOffsetForHit() {
+                return 5;
+            },
+            visibleRangesForSemanticRanges() {
+                return [{ node: renderedNode, start: 2, end: 6 }];
+            },
+        },
+    });
+
+    assert.equal(selection.selectText(1, 1, 80), 'difficult resistance');
+    assert.equal(selection.selection.startOffset, 2);
+    assert.equal(selection.selection.ranges[0].node, renderedNode);
+});
+
 test('shared selection treats missing language policy as a no-scan boundary', () => {
     const selection = loadSharedSelectionWithoutPolicy();
 

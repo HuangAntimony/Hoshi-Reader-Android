@@ -8,8 +8,11 @@ const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reade
 const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
 const readerVnRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-range-map.js', import.meta.url);
+const readerVnSelectionProjectionUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-selection-projection.js', import.meta.url);
 const readerHighlightsUrl = new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url);
 const sharedSelectionUrl = new URL('../../main/assets/hoshi-web/shared/selection.js', import.meta.url);
+const languageJapaneseUrl = new URL('../../main/assets/hoshi-web/shared/language-ja.js', import.meta.url);
+const selectionJapaneseUrl = new URL('../../main/assets/hoshi-web/shared/selection-ja.js', import.meta.url);
 
 function readerTextSemanticsSource() {
     return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
@@ -21,6 +24,10 @@ function readerVnContentStreamSource() {
 
 function readerVnRangeMapSource() {
     return fs.readFileSync(readerVnRangeMapUrl, 'utf8');
+}
+
+function readerVnSelectionProjectionSource() {
+    return fs.readFileSync(readerVnSelectionProjectionUrl, 'utf8');
 }
 
 function readerMediaSemanticsSource() {
@@ -35,12 +42,19 @@ function sharedSelectionSource() {
     return fs.readFileSync(sharedSelectionUrl, 'utf8');
 }
 
+function readerSelectionSource() {
+    return [languageJapaneseUrl, selectionJapaneseUrl, sharedSelectionUrl]
+        .map((url) => fs.readFileSync(url, 'utf8'))
+        .join('\n');
+}
+
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', readerTextSemanticsSource())
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', readerVnRangeMapSource())
+        .replaceAll('__HOSHI_READER_VN_SELECTION_PROJECTION_SCRIPT__', readerVnSelectionProjectionSource())
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', '0')
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify('block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', '1')
@@ -61,6 +75,10 @@ function configuredReaderSource(options = {}) {
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerVnRangeMapSource())
+        .replaceAll(
+            '__HOSHI_READER_VN_SELECTION_PROJECTION_SCRIPT__',
+            options.selectionProjectionScript ?? readerVnSelectionProjectionSource(),
+        )
         .replaceAll('__HOSHI_VISUAL_NOVEL_REVEAL_SPEED__', String(options.revealSpeed ?? 0))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SCREEN_MODE_LITERAL__', JSON.stringify(options.mode ?? 'block'))
         .replaceAll('__HOSHI_VISUAL_NOVEL_SENTENCES_PER_SCREEN__', String(options.sentencesPerScreen ?? 1))
@@ -695,12 +713,26 @@ function buildDocument(body, options = {}) {
                 node.childNodes?.forEach(visit);
             };
             visit(root);
-            let index = 0;
+            let index = -1;
             return {
+                get currentNode() {
+                    return nodes[index] ?? root;
+                },
+                set currentNode(node) {
+                    index = nodes.indexOf(node);
+                },
                 nextNode() {
-                    return nodes[index++] ?? null;
+                    index += 1;
+                    return nodes[index] ?? null;
+                },
+                previousNode() {
+                    index -= 1;
+                    return nodes[index] ?? null;
                 },
             };
+        },
+        elementFromPoint() {
+            return null;
         },
         querySelector(selector) {
             return documentElement.querySelector(selector);
@@ -725,6 +757,7 @@ function loadReader(body, options = {}) {
     const restoreMessages = [];
     const imageMessages = [];
     const sasayakiHighlights = [];
+    const selectionMessages = [];
     const timers = [];
     const imageBridge = {
         postMessage(message) {
@@ -738,6 +771,9 @@ function loadReader(body, options = {}) {
         scrollX: 0,
         scrollY: 0,
         scrollTo() {},
+        getSelection() {
+            return null;
+        },
         getComputedStyle(target) {
             const vnWritingMode = options.vnWritingMode ?? 'horizontal-tb';
             let writingMode = 'horizontal-tb';
@@ -763,6 +799,11 @@ function loadReader(body, options = {}) {
             },
         },
         HoshiReaderImage: imageBridge,
+        HoshiTextSelection: {
+            postMessage(message) {
+                selectionMessages.push(JSON.parse(message));
+            },
+        },
         hoshiReaderPopupHost: {
             renderSasayakiHighlight(payload) {
                 sasayakiHighlights.push(payload);
@@ -796,7 +837,16 @@ function loadReader(body, options = {}) {
         },
         URL,
     });
-    return { reader: window.hoshiReader, document, restoreMessages, timers, imageMessages, sasayakiHighlights, window };
+    return {
+        reader: window.hoshiReader,
+        document,
+        restoreMessages,
+        timers,
+        imageMessages,
+        sasayakiHighlights,
+        selectionMessages,
+        window,
+    };
 }
 
 async function initializeReader(body, options = {}) {
@@ -917,6 +967,12 @@ test('visual novel reader requires the VN range map asset', async () => {
     const { reader } = loadReader(bodyWith(p('本文。')), { rangeMapScript: '' });
 
     await assert.rejects(() => reader.initialize(), /hoshiReaderVnRangeMap/);
+});
+
+test('visual novel reader requires the VN selection projection asset', async () => {
+    const { reader } = loadReader(bodyWith(p('本文。')), { selectionProjectionScript: '' });
+
+    await assert.rejects(() => reader.initialize(), /hoshiReaderVnSelectionProjection/);
 });
 
 test('visual novel reader uses shared text semantics', () => {
@@ -1325,6 +1381,122 @@ test('sentence mode splits an oversized sentence after applying sentence groupin
     assert.equal(currentScreen(reader).textContent, '四五六');
     assert.equal(reader.paginate('forward'), 'scrolled');
     assert.equal(currentScreen(reader).textContent, '次。');
+});
+
+for (const mode of ['block', 'sentence']) {
+    test(`VN ${mode} selection reads cross-screen source context without rendering the next screen`, async () => {
+        const chapterText = '現在激しい抵抗を見せていた。';
+        const loaded = await initializeReader(bodyWith(p(chapterText)), {
+            mode,
+            charactersPerScreen: 3,
+            revealSpeed: 0,
+            selectionScript: readerSelectionSource(),
+        });
+        const { reader, document, selectionMessages, window } = loaded;
+        const visibleWalker = reader.createWalker();
+        const visibleNode = visibleWalker.nextNode();
+        assert.equal(currentScreen(reader).textContent, '現在激');
+
+        let nextScreenRenderCount = 0;
+        const nextRender = reader.screens[1].render;
+        reader.screens[1].render = function() {
+            nextScreenRenderCount += 1;
+            return nextRender.apply(this, arguments);
+        };
+        document.elementFromPoint = () => visibleNode.parentElement;
+        window.hoshiSelection.configure({ bridge: 'android-reader' });
+        window.hoshiSelection.getCharacterAtPoint = () => ({ node: visibleNode, offset: 2 });
+
+        assert.equal(window.hoshiSelection.selectText(12, 72, 32), '激しい抵抗を見せていた');
+        assert.equal(selectionMessages.length, 1);
+        assert.deepEqual(
+            {
+                text: selectionMessages[0].text,
+                sentence: selectionMessages[0].sentence,
+                sentenceOffset: selectionMessages[0].sentenceOffset,
+                normalizedOffset: selectionMessages[0].normalizedOffset,
+            },
+            {
+                text: '激しい抵抗を見せていた',
+                sentence: chapterText,
+                sentenceOffset: 2,
+                normalizedOffset: 2,
+            },
+        );
+        assert.equal(window.hoshiSelection.selection.ranges.length, 1);
+        assert.equal(window.hoshiSelection.selection.ranges[0].node, visibleNode);
+        assert.deepEqual(
+            {
+                start: window.hoshiSelection.selection.ranges[0].start,
+                end: window.hoshiSelection.selection.ranges[0].end,
+            },
+            { start: 2, end: 3 },
+        );
+        assert.equal(nextScreenRenderCount, 0);
+    });
+}
+
+test('VN selection ignores unrevealed clone text but visible text keeps full source context', async () => {
+    const chapterText = '現在激しい抵抗を見せていた。';
+    const loaded = await initializeReader(bodyWith(p(chapterText)), {
+        mode: 'block',
+        charactersPerScreen: 3,
+        revealSpeed: 45,
+        selectionScript: readerSelectionSource(),
+    });
+    const { reader, document, selectionMessages, window } = loaded;
+    reader.revealOneCharacter();
+    reader.revealOneCharacter();
+    reader.revealOneCharacter();
+    const visibleNode = reader.revealSegments[0].visible;
+    const hiddenNode = reader.revealSegments[0].hiddenText;
+    document.elementFromPoint = () => visibleNode.parentElement;
+    window.hoshiSelection.configure({ bridge: 'android-reader' });
+
+    window.hoshiSelection.getCharacterAtPoint = () => ({ node: hiddenNode, offset: 0 });
+    assert.equal(window.hoshiSelection.selectText(12, 72, 32), null);
+    assert.equal(selectionMessages.length, 0);
+
+    window.hoshiSelection.getCharacterAtPoint = () => ({ node: visibleNode, offset: 2 });
+    assert.equal(window.hoshiSelection.selectText(12, 72, 32), '激しい抵抗を見せていた');
+    assert.equal(selectionMessages[0].sentence, chapterText);
+    assert.equal(reader.revealComplete, false);
+});
+
+test('VN selection maps supplementary characters and ruby base text across a screen boundary', async () => {
+    const paragraph = paragraphWith(
+        '𠮟',
+        rubyText('激', 'げき'),
+        'しい抵抗。',
+    );
+    const loaded = await initializeReader(bodyWith(paragraph), {
+        mode: 'block',
+        charactersPerScreen: 2,
+        revealSpeed: 0,
+        selectionScript: readerSelectionSource(),
+    });
+    const { reader, document, selectionMessages, window } = loaded;
+    const rubyScreenIndex = reader.screens.findIndex((screen) =>
+        reader.screenStartRawCount(screen) <= 1 && reader.screenEndRawCount(screen) > 1
+    );
+    assert.ok(rubyScreenIndex >= 0);
+    reader.renderScreen(rubyScreenIndex, true);
+    const walker = reader.createWalker();
+    const visibleNodes = [];
+    let node;
+    while (node = walker.nextNode()) visibleNodes.push(node);
+    const hitNode = visibleNodes.find((candidate) => candidate.textContent.includes('激'));
+    assert.ok(hitNode);
+    document.elementFromPoint = () => hitNode.parentElement;
+    window.hoshiSelection.configure({ bridge: 'android-reader' });
+    window.hoshiSelection.getCharacterAtPoint = () => ({
+        node: hitNode,
+        offset: hitNode.textContent.indexOf('激'),
+    });
+
+    assert.equal(window.hoshiSelection.selectText(12, 48, 32), '激しい抵抗');
+    assert.equal(selectionMessages[0].sentence, '𠮟激しい抵抗。');
+    assert.equal(selectionMessages[0].normalizedOffset, 1);
 });
 
 test('sentence mode groups sentences by configured count', async () => {

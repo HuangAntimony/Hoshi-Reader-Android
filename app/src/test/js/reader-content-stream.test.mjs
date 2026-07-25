@@ -160,6 +160,25 @@ test('content stream indexes raw and matchable chapter offsets while ignoring ru
     });
 });
 
+test('content stream converts chapter raw offsets and source UTF-16 positions', () => {
+    const leading = text('現、');
+    const tail = text('𠮟激しい');
+    const paragraph = el('p', {}, [leading, tail]);
+    const stream = loadContentStreamModule().create(paragraph);
+
+    const supplementaryPosition = stream.sourcePositionForRawOffset(2);
+    assert.equal(supplementaryPosition.node, tail);
+    assert.equal(supplementaryPosition.offset, 0);
+    const followingPosition = stream.sourcePositionForRawOffset(3);
+    assert.equal(followingPosition.node, tail);
+    assert.equal(followingPosition.offset, 2);
+    assert.equal(stream.rawOffsetForSourcePosition(tail, 2), 3);
+    assert.equal(stream.matchableOffsetForSourcePosition(tail, 2), 2);
+    assert.equal(stream.sourcePositionForRawOffset(stream.totalRawChars), null);
+    assert.equal(stream.rawOffsetForSourcePosition(text('外'), 0), null);
+    assert.equal(stream.matchableOffsetForSourcePosition(text('外'), 0), null);
+});
+
 test('content stream records standalone media units in source order', () => {
     const cover = el('img', { id: 'cover', src: 'cover.jpg' });
     const svgImage = el('image', { href: 'plate.jpg' });

@@ -2,6 +2,7 @@ __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__
 __HOSHI_READER_VN_RANGE_MAP_SCRIPT__
+__HOSHI_READER_VN_SELECTION_PROJECTION_SCRIPT__
 
 window.hoshiReader = {
   revealSpeed: __HOSHI_VISUAL_NOVEL_REVEAL_SPEED__,
@@ -25,6 +26,7 @@ window.hoshiReader = {
   nodeStartRawOffsets: new WeakMap(),
   contentStream: null,
   rangeMap: null,
+  selectionProjection: null,
   sentenceDelimiters: '。！？.!?',
   lineStartProhibitedChars: '。、，,.！？!?…‥」』）)】〉》〕｝}］]',
   totalChapterChars: 0,
@@ -224,8 +226,17 @@ window.hoshiReader = {
     if (!rangeMapFactory) {
       throw new Error('hoshiReaderVnRangeMap is required for visual novel reader');
     }
+    var selectionProjectionFactory = window.hoshiReaderVnSelectionProjection &&
+      window.hoshiReaderVnSelectionProjection.create;
+    if (!selectionProjectionFactory) {
+      throw new Error('hoshiReaderVnSelectionProjection is required for visual novel reader');
+    }
     this.contentStream = contentStreamFactory(this.sourceRoot);
     this.rangeMap = rangeMapFactory(this);
+    this.selectionProjection = selectionProjectionFactory(this);
+    if (window.hoshiSelection && window.hoshiSelection.configure) {
+      window.hoshiSelection.configure({ textProjection: this.selectionProjection });
+    }
     this.totalChapterChars = this.contentStream.totalMatchableChars;
   },
   buildScreens: function() {

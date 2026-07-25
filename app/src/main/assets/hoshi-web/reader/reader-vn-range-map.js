@@ -1,6 +1,21 @@
 (function(global) {
   'use strict';
 
+  function codePointStartOffset(text, utf16Offset) {
+    var bounded = Math.max(0, Math.min(text.length, Number(utf16Offset) || 0));
+    if (
+      bounded > 0 &&
+      bounded < text.length &&
+      text.charCodeAt(bounded) >= 0xdc00 &&
+      text.charCodeAt(bounded) <= 0xdfff &&
+      text.charCodeAt(bounded - 1) >= 0xd800 &&
+      text.charCodeAt(bounded - 1) <= 0xdbff
+    ) {
+      return bounded - 1;
+    }
+    return bounded;
+  }
+
   function ReaderVnRangeMap(reader) {
     this.reader = reader;
     this.cloneTextOffsets = new WeakMap();
@@ -19,6 +34,19 @@
 
     cloneTextRawOffsetForNode: function(node) {
       return this.cloneTextRawOffsets.get(node);
+    },
+
+    chapterPositionForClone: function(node, utf16Offset) {
+      var charBase = this.cloneTextOffsets.get(node);
+      var rawBase = this.cloneTextRawOffsets.get(node);
+      if (charBase === undefined || rawBase === undefined || !node) return null;
+      var text = String(node.nodeValue || node.textContent || '');
+      var offset = codePointStartOffset(text, utf16Offset);
+      var prefix = text.slice(0, offset);
+      return {
+        matchableOffset: charBase + this.reader.countChars(prefix),
+        rawOffset: rawBase + this.reader.countRawChars(prefix)
+      };
     },
 
     collectRawSegments: function(offset, length) {
