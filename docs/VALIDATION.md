@@ -94,6 +94,13 @@ Manual reader validation should cover:
 - paginated, continuous, and VN modes in vertical and horizontal writing.
 - VN block and sentence screens, reveal speed 0/45/120, blank-area click
   advance, text lookup taps, links, images, restore, and chapter boundaries.
+- VN cross-screen lookup with a word split at the current-screen boundary:
+  verify the lookup text continues into later screens, the mined sentence
+  includes the complete source sentence, `sentenceOffset`/Sasayaki alignment
+  stays chapter-relative, and the underline/popup anchor uses only the visible
+  current-screen intersection. Repeat for block and sentence modes, large-font
+  viewport splitting, horizontal and vertical writing, ruby and supplementary
+  characters, and both incomplete and completed reveal.
 - long text page turns, chapter-list jumps into mid-book chapters, and bookmark
   restore.
 - forward and backward chapter boundaries, including reverse landing at the

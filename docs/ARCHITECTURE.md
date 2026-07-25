@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-07-01
+Date: 2026-07-25
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -109,9 +109,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   streams and rendered range mapping. `reader-vn-content-stream.js` owns source
   text/raw offsets, matchable offsets, ruby-aware text entries, structural IDs,
   and standalone media units. `reader-vn-range-map.js` maps VN rendered screens
-  back to raw highlight ranges and matchable Sasayaki ranges. VN keeps its
-  mode-specific block/sentence boundaries, reveal behavior, cross-screen
-  Sasayaki merge, viewport fitting, and current-screen rendering.
+  back to raw highlight ranges, matchable Sasayaki ranges, and source positions.
+  `reader-vn-selection-projection.js` maps current-screen selection hits into
+  the source stream for lookup text, complete sentence context, and normalized
+  offsets, then projects semantic ranges back to the visible clone for popup
+  anchors and underlines. VN keeps its mode-specific block/sentence boundaries,
+  reveal behavior, cross-screen Sasayaki merge, viewport fitting, and
+  current-screen rendering.
 - Paginated and continuous production page/scroll runtime paths remain
   unchanged and are not wired to VN content stream instances or the VN range-map
   module.
@@ -127,7 +131,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   utilities live in language-named assets such as `language-ja.js`, while
   selection scan policies live in `selection-ja.js` and `selection-en.js`;
   Kotlin loads the utility plus policy selected from `ContentLanguageProfile`,
-  and the Japanese policy owns `scanNonJapaneseText` filtering.
+  and the Japanese policy owns `scanNonJapaneseText` filtering. Shared selection
+  accepts an optional semantic projection; paginated, continuous, and popup use
+  the identity live-DOM path, while VN supplies its source/clone projection and
+  fails closed when a clone hit cannot be mapped.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for

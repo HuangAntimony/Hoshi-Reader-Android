@@ -16,6 +16,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Keep VN lookups and mined Anki sentences complete when a word or sentence
+  continues onto a later screen.
 - Keep Anki audio, book covers, Sasayaki clips, and dictionary media from
   overwriting different exported media by using content-specific filenames.
 - Keep dictionary definitions in the configured dictionary order when an

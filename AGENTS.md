@@ -39,7 +39,9 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
   Sasayaki range 和 source-to-clone offset registration。VN 是特殊分页模式，不要重新引入 VN
   私有的文本 offset、range、media 分类或 clone offset 实现；也不要把仅 VN 使用的逻辑命名为 shared
   reader core。除非先落成单独方案和验证计划，不要把 paginated/continuous 的 page/scroll runtime
-  接到 VN content stream instance 或 VN range map。
+  接到 VN content stream instance 或 VN range map。VN 查词文本、完整句子和章内 normalized offset
+  必须从 source stream 解析；current screen clone 只负责点击命中、popup anchor 和当前可见范围，
+  不要用 clone 的截断文本作为查词或制卡语义。
 
 ## 真源文档
 
