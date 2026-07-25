@@ -188,6 +188,7 @@ window.hoshiSelection = {
         imageTapResult: null,
         rubyAwareRects: false,
         scaleRects: true,
+        textProjection: null,
     },
     scanDelimiters: '。、！？…‥「」『』（）()【】〈〉《》〔〕｛｝{}［］[]・：；:;，,.─\n\r',
     sentenceDelimiters: '。！？.!?\n\r',
@@ -569,7 +570,15 @@ window.hoshiSelection = {
             this.clearSelection();
             return null;
         }
-        const hit = this.selectionStartForHit(rawHit);
+        const projection = this.options.textProjection;
+        const semanticHit = projection
+            ? projection.toSemanticHit?.(rawHit)
+            : rawHit;
+        if (!semanticHit) {
+            this.clearSelection();
+            return null;
+        }
+        const hit = this.selectionStartForHit(semanticHit);
 
         if (this.selection &&
             hit.node === this.selection.startNode &&
@@ -617,16 +626,27 @@ window.hoshiSelection = {
         if (!text) {
             return null;
         }
+        const visibleRanges = projection
+            ? projection.visibleRangesForSemanticRanges?.(ranges)
+            : ranges;
+        if (!visibleRanges?.length) {
+            return null;
+        }
 
         this.selection = {
             startNode: hit.node,
             startOffset: hit.offset,
-            ranges,
+            ranges: visibleRanges,
+            semanticRanges: ranges,
             text
         };
 
         const sentenceContext = this.getSentenceContext(hit.node, hit.offset);
-        const normalizedOffset = window.hoshiReader ? this.getNormalizedOffset(hit.node, hit.offset) : null;
+        const normalizedOffset = projection
+            ? projection.normalizedOffsetForHit?.(hit) ?? null
+            : window.hoshiReader
+                ? this.getNormalizedOffset(hit.node, hit.offset)
+                : null;
         this.postTextSelected({
             text,
             sentence: sentenceContext.sentence,

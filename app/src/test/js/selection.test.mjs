@@ -232,6 +232,69 @@ test('shared selection can preserve reader link and image tap tokens', () => {
     assert.equal(selection.imageTapResult(), 'image');
 });
 
+test('shared selection reads semantic text while keeping projected visible ranges', () => {
+    const sourceText = '現在激しい抵抗を見せていた。';
+    const { document, selection, textNode: sourceNode, window } = loadSelection(sourceText);
+    const renderedNode = {
+        nodeType: 3,
+        textContent: '激',
+        parentElement: null,
+    };
+    let projectedRanges = null;
+    let posted = null;
+    document.pointElement = hitElement([]);
+    window.getSelection = () => null;
+    selection.getCharacterAtPoint = () => ({ node: renderedNode, offset: 0 });
+    selection.postTextSelected = (payload) => {
+        posted = payload;
+    };
+    selection.configure({
+        textProjection: {
+            toSemanticHit(renderedHit) {
+                assert.equal(renderedHit.node, renderedNode);
+                return { node: sourceNode, offset: sourceText.indexOf('激') };
+            },
+            normalizedOffsetForHit() {
+                return 314;
+            },
+            visibleRangesForSemanticRanges(ranges) {
+                projectedRanges = ranges;
+                return [{ node: renderedNode, start: 0, end: 1 }];
+            },
+        },
+    });
+    window.scanNonJapaneseText = false;
+
+    const selected = selection.selectText(1, 1, 80);
+
+    assert.equal(selected, '激しい抵抗を見せていた');
+    assert.equal(posted.text, '激しい抵抗を見せていた');
+    assert.equal(posted.sentence, sourceText);
+    assert.equal(posted.sentenceOffset, sourceText.indexOf('激'));
+    assert.equal(posted.normalizedOffset, 314);
+    assert.equal(projectedRanges.length, 1);
+    assert.equal(projectedRanges[0].node, sourceNode);
+    assert.equal(selection.selection.ranges[0].node, renderedNode);
+});
+
+test('shared selection fails closed when a configured text projection cannot map the hit', () => {
+    const { document, selection, textNode, window } = loadSelection('激');
+    document.pointElement = hitElement([]);
+    window.getSelection = () => null;
+    selection.getCharacterAtPoint = () => ({ node: textNode, offset: 0 });
+    selection.configure({
+        textProjection: {
+            toSemanticHit() {
+                return null;
+            },
+        },
+    });
+    window.scanNonJapaneseText = false;
+
+    assert.equal(selection.selectText(1, 1, 80), null);
+    assert.equal(selection.selection, null);
+});
+
 test('shared selection treats missing language policy as a no-scan boundary', () => {
     const selection = loadSharedSelectionWithoutPolicy();
 
