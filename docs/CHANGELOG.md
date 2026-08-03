@@ -28,8 +28,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Keep large bookshelves smooth during repeated scrolling by reusing
   size-appropriate persistent cover thumbnails instead of decoding original
-  covers again after they leave memory, while recovering from unavailable or
-  damaged thumbnail-cache entries without hiding valid covers.
+  covers again after they leave memory, while recovering from transient
+  generation failures or damaged thumbnail-cache entries without hiding valid
+  covers.
 - Remember the selected Contents and Sasayaki tabs for the current Reader
   session, and keep Sasayaki on the current tab after importing an audiobook.
 - Keep VN lookups and mined Anki sentences complete when a word or sentence

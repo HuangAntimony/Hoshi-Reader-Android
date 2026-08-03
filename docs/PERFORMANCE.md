@@ -133,12 +133,13 @@ For a repeatable real-device check:
   making a smoothness claim.
 
 Source fingerprints include path, modification time, and length. Changing a
-cover must create a new derivative key. Failed source decodes are suppressed for
-the process lifetime so a corrupt cover cannot retry on every composition.
-Transient derivative-cache I/O failures instead use a short retry cooldown and
-fall back to the original cover through Coil. Derivative decode failures must
-invalidate the affected size bucket so the next request rebuilds it rather than
-repeatedly decoding the same bad cache entry.
+cover must create a new derivative key. Deterministically malformed or
+incomplete source images are suppressed for the process lifetime so a corrupt
+cover cannot retry on every composition. Other derivative-generation and cache
+I/O failures instead use a short retry cooldown and fall back to the original
+cover through Coil. Derivative decode failures must invalidate the affected
+size bucket so the next request rebuilds it rather than repeatedly decoding the
+same bad cache entry.
 
 ## Reader JavaScript Hotspots
 

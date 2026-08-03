@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.bookshelf
 
+import android.graphics.ImageDecoder
 import java.io.File
 import java.io.IOException
 import java.util.Collections
@@ -12,6 +13,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,6 +33,52 @@ class BookCoverThumbnailStoreTest {
         assertEquals(512, coverThumbnailBucket(512))
         assertEquals(768, coverThumbnailBucket(513))
         assertEquals(768, coverThumbnailBucket(2_000))
+    }
+
+    @Test
+    fun imageDecoderIsSkippedOnApi28() {
+        assertFalse(shouldUseImageDecoder(apiLevel = 28))
+        assertTrue(shouldUseImageDecoder(apiLevel = 29))
+    }
+
+    @Test
+    fun onlyMalformedOrIncompleteImageDecoderFailuresArePermanent() {
+        assertFalse(isPermanentImageDecoderFailure(ImageDecoder.DecodeException.SOURCE_EXCEPTION))
+        assertTrue(isPermanentImageDecoderFailure(ImageDecoder.DecodeException.SOURCE_INCOMPLETE))
+        assertTrue(isPermanentImageDecoderFailure(ImageDecoder.DecodeException.SOURCE_MALFORMED_DATA))
+    }
+
+    @Test
+    fun permanentDecodeFailureReturnsNull() {
+        val failure = IOException("malformed source")
+
+        val result = decodeOrNullOnPermanentFailure<String>(
+            isPermanentFailure = { it === failure },
+        ) { throw failure }
+
+        assertNull(result)
+    }
+
+    @Test
+    fun transientDecodeFailureIsRethrown() {
+        val failure = IOException("source read failed")
+
+        val thrown = assertThrows(IOException::class.java) {
+            decodeOrNullOnPermanentFailure<String>(isPermanentFailure = { false }) { throw failure }
+        }
+
+        assertSame(failure, thrown)
+    }
+
+    @Test
+    fun fatalDecodeFailureIsNotCaught() {
+        val failure = OutOfMemoryError("decode allocation failed")
+
+        val thrown = assertThrows(OutOfMemoryError::class.java) {
+            decodeOrNullOnPermanentFailure<String>(isPermanentFailure = { true }) { throw failure }
+        }
+
+        assertSame(failure, thrown)
     }
 
     @Test

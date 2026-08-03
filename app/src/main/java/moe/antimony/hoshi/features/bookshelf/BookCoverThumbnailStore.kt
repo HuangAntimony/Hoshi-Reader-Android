@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.os.Trace
 import android.util.Log
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.IOException
@@ -254,21 +255,44 @@ internal class AndroidBookCoverThumbnailEncoder @Inject constructor() : BookCove
 }
 
 private fun decodeCoverThumbnail(source: File, maxDimensionPx: Int): Bitmap? =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    if (deviceSupportsImageDecoder()) {
         decodeCoverThumbnailWithImageDecoder(source, maxDimensionPx)
     } else {
         decodeCoverThumbnailWithBitmapFactory(source, maxDimensionPx)
     }
 
+internal fun shouldUseImageDecoder(apiLevel: Int): Boolean = apiLevel >= Build.VERSION_CODES.Q
+
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
+private fun deviceSupportsImageDecoder(): Boolean = shouldUseImageDecoder(Build.VERSION.SDK_INT)
+
 @RequiresApi(Build.VERSION_CODES.P)
+internal fun isPermanentImageDecoderFailure(errorCode: Int): Boolean =
+    errorCode == ImageDecoder.DecodeException.SOURCE_INCOMPLETE ||
+        errorCode == ImageDecoder.DecodeException.SOURCE_MALFORMED_DATA
+
+internal inline fun <T> decodeOrNullOnPermanentFailure(
+    isPermanentFailure: (Exception) -> Boolean,
+    decode: () -> T,
+): T? = try {
+    decode()
+} catch (failure: Exception) {
+    if (isPermanentFailure(failure)) null else throw failure
+}
+
+@RequiresApi(Build.VERSION_CODES.Q)
 private fun decodeCoverThumbnailWithImageDecoder(source: File, maxDimensionPx: Int): Bitmap? =
-    runCatching {
+    decodeOrNullOnPermanentFailure(
+        isPermanentFailure = { failure ->
+            failure is ImageDecoder.DecodeException && isPermanentImageDecoderFailure(failure.error)
+        },
+    ) {
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(source)) { decoder, info, _ ->
             val target = coverThumbnailSize(info.size.width, info.size.height, maxDimensionPx)
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             decoder.setTargetSize(target.width, target.height)
         }
-    }.getOrNull()
+    }
 
 private fun decodeCoverThumbnailWithBitmapFactory(source: File, maxDimensionPx: Int): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
