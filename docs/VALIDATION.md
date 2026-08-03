@@ -121,7 +121,9 @@ Manual reader validation should cover:
 - reader chrome behavior: focus mode, transient system bars, Android Back
   revealing chrome before closing, bottom progress band, title/back-button
   settings, compact bottom buttons, and progress indicators hidden from the text
-  area when configured.
+  area when configured. With whole-book and chapter progress both enabled,
+  verify the top bubble stays on one line and the transient bottom bubble shows
+  two complete lines.
 - statistics reset time at 00:00 and a non-midnight minute boundary, including
   both sides of the boundary, app restart, a system time-zone change, and the
   Statistics dashboard using the same adjusted Today date.

@@ -103,7 +103,6 @@ data class ReaderChromeLayout(
     val showProgressInBottomBar: Boolean,
     val showStatisticsInBottomBar: Boolean,
     val bottomCenterLineCount: Int,
-    val bottomCenterMaxHeightDp: Int,
 )
 
 data class ReaderContentChromeInsets(
@@ -211,8 +210,9 @@ fun readerChromeLayout(
     return ReaderChromeLayout(
         showProgressInBottomBar = showProgressInBottomBar,
         showStatisticsInBottomBar = showStatisticsInBottomBar,
-        bottomCenterLineCount = listOf(showStatisticsInBottomBar, showProgressInBottomBar).count { it },
-        bottomCenterMaxHeightDp = ReaderBottomChromeButtonSizeDp,
+        bottomCenterLineCount =
+            (if (showStatisticsInBottomBar) 1 else 0) +
+                (if (showProgressInBottomBar) progress.lineSequence().count() else 0),
     )
 }
 

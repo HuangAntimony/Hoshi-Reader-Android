@@ -379,11 +379,13 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun bottomStatisticsAndProgressFitInsideBottomChromeButtonHeight() {
+    fun bottomChromeCountsStatisticsBookAndChapterLines() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",
             currentCharacter = 355,
             totalCharacters = 169325,
+            chapterCurrentCharacter = 55,
+            chapterTotalCharacters = 325,
             statistics = ReaderStatisticsChromeState(readingSpeed = 3600, readingTimeSeconds = 65.0),
         )
         val layout = readerChromeLayout(
@@ -391,14 +393,13 @@ class ReaderChromeTest {
             ReaderSettings(
                 alwaysShowProgress = false,
                 showProgressTop = false,
+                showChapterProgress = true,
                 enableStatistics = true,
                 showReadingSpeed = true,
                 showReadingTime = true,
             ),
         )
-
-        assertEquals(2, layout.bottomCenterLineCount)
-        assertEquals(readerBottomChromeMetrics().buttonSizeDp, layout.bottomCenterMaxHeightDp)
+        assertEquals(3, layout.bottomCenterLineCount)
     }
 
     @Test
