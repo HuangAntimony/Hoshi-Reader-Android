@@ -326,28 +326,25 @@ Validation:
   supplementary characters, ellipses, periods, and adjacent popup expression
   tags; verify lookup sentence and Anki cloze offsets.
 
-### 7. Bookshelf cover privacy, fallback artwork, and decode pressure
+### 7. Bookshelf cover privacy and fallback artwork
 
 Status: pending Android sync.
 
 Commits:
 
-- `b928010` - serialize cover thumbnail decoding.
 - `c6b29c8` - show title/author fallback artwork when no cover exists.
 - `1db2cd3` - add Show, Blur, and Hide cover modes.
 
 Dependency/value reasoning:
 
-- The fallback and privacy modes affect every local/remote/shelf preview cover;
-  the decode scheduler belongs behind the same cache boundary.
+- The fallback and privacy modes affect every local/remote/shelf preview cover
+  and should reuse the existing shared Coil/thumbnail-store boundary.
 
 iOS behavior to mirror:
 
 - A deterministic gradient card with title and optional author replaces the gray
   placeholder when a book has no real cover.
 - Bookshelf and shelf-management surfaces can show, blur, or hide covers.
-- Thumbnail decoding is serialized while retaining bounded decoded size and
-  cache behavior.
 
 Android current gap:
 
@@ -356,23 +353,17 @@ Android current gap:
 - `BookCoverCard()` in `BookshelfView.kt` renders a gray box for missing covers
   and has no title/author input. `BookMetadata` does not store author, and
   `EpubBook` does not expose parsed author metadata.
-- `BookCoverBitmapCache.load()` dispatches each miss to `Dispatchers.IO` without
-  a mutex/semaphore, allowing concurrent `BitmapFactory` decodes despite its
-  LRU and 768px sampling.
 
 Suggested slice:
 
 - Add optional author metadata compatibly during import/parse, then add a
   deterministic Compose fallback and cover-mode setting applied to all cover
   consumers.
-- Serialize or tightly bound decoding behind `BookCoverBitmapCache` without
-  blocking the main thread.
 
 Validation:
 
 - Missing-cover books with/without authors, legacy metadata, local/remote books,
   collapsed shelf previews, multi-select, Show/Blur/Hide, dark/e-ink themes.
-- Fast-scroll a large library and compare decode concurrency, memory, and jank.
 
 ### 8. Lookup popup two-column layout and visual sizing
 
@@ -543,7 +534,6 @@ Validation:
 | `4a5cfde` | 2026-07-14 | Honor media-control skip mode | Pending MediaSession command routing |
 | `a9a0747`, `d7fe3f2` | 2026-07-28 | MP4/TXT imports and larger playback ranges | Pending SAF/storage/range updates |
 | `4940ab7`, `6655ffd`, `3bff390` | 2026-07-01 / 2026-07-07 / 2026-07-24 | Text normalization and lookup boundary fixes | Pending shared Kotlin/JS semantics |
-| `b928010` | 2026-06-15 | Serialize cover thumbnail decoding | Pending cache decode limit |
 | `c6b29c8`, `1db2cd3` | 2026-07-26 | Cover fallback and Show/Blur/Hide modes | Pending metadata/settings/Compose UI |
 | `ed25036`, `8d1442e` | 2026-06-14 / 2026-07-01 | Popup masonry redesign and theme accents | Pending settings/assets/height range |
 | `53fdb72` | 2026-06-15 | Closeable Reader open-failure view | Pending route error UI |
@@ -558,7 +548,7 @@ Validation:
 4. Reader paginated paragraph splitting and explicit font readiness.
 5. Reader furigana reveal mode.
 6. Sasayaki import, playback ranges, media controls, and MP3 mining clips.
-7. Bookshelf cover privacy, fallback artwork, and decode pressure.
+7. Bookshelf cover privacy and fallback artwork.
 8. Lookup popup two-column layout and visual sizing.
 9. Reader route open-failure fallback.
 10. Google Drive timeout and automatic-refresh error suppression.
@@ -566,6 +556,9 @@ Validation:
 
 ## Covered Or No Android Action
 
+- `b928010`: Android now serializes original-cover derivative generation in
+  `BookCoverThumbnailStore` and bounds Coil bitmap decoding in the shared
+  process-wide image loader.
 - `fd124d4`, `bcbef64`, `2e1c958`, `51cb994`: Android now persists the
   first-appearance Reader image inventory and TOC fragment offsets, uses one
   true TOC range for Contents/chrome/statistics, and opens Gallery items in the
