@@ -3,9 +3,7 @@ package moe.antimony.hoshi.features.bookshelf
 import android.content.ContextWrapper
 import coil3.Extras
 import coil3.ImageLoader
-import coil3.decode.DataSource
 import coil3.decode.Decoder
-import coil3.decode.ImageSource
 import coil3.fetch.SourceFetchResult
 import coil3.request.CachePolicy
 import coil3.request.Options
@@ -19,9 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okio.FileSystem
-import okio.buffer
-import okio.source
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -63,27 +61,21 @@ class BookCoverImagePipelineTest {
         val original = temporaryFolder.newFile("cover.jpg").apply { writeText("original-cover") }
         val source = original.toBookCoverSource()
         val encodeCount = AtomicInteger()
+        val encoder = BookCoverThumbnailEncoder { input, output, _ ->
+            encodeCount.incrementAndGet()
+            output.writeText(input.readText())
+            true
+        }
+        val cacheDirectory = temporaryFolder.root.resolve("thumbnails")
         val store = BookCoverThumbnailStore(
-            cacheDirectory = temporaryFolder.root.resolve("thumbnails"),
-            encoder = BookCoverThumbnailEncoder { input, output, _ ->
-                encodeCount.incrementAndGet()
-                output.writeText(input.readText())
-                true
-            },
+            cacheDirectory = cacheDirectory,
+            encoder = encoder,
             ioDispatcher = Dispatchers.IO,
             maxDiskBytes = 1024,
         )
         val derivative = store.thumbnail(source, 256)!!
         val options = options()
-        val fetchResult = SourceFetchResult(
-            source = ImageSource(
-                source = derivative.source().buffer(),
-                fileSystem = options.fileSystem,
-                metadata = BookCoverDerivativeMetadata(source, bucket = 256),
-            ),
-            mimeType = "image/webp",
-            dataSource = DataSource.DISK,
-        )
+        val fetchResult = BookCoverFetcher(source, options, store).fetch()!!
         var fallbackPayload: String? = null
         val delegateCalls = AtomicInteger()
         val delegateFactory = object : Decoder.Factory {
@@ -106,10 +98,18 @@ class BookCoverImagePipelineTest {
             .create(fetchResult, options, unusedImageLoader())!!
 
         decoder.decode()
-        store.thumbnail(source, 256)
 
         assertEquals("original-cover", fallbackPayload)
         assertEquals(2, delegateCalls.get())
+        assertFalse(derivative.exists())
+
+        val restartedStore = BookCoverThumbnailStore(
+            cacheDirectory = cacheDirectory,
+            encoder = encoder,
+            ioDispatcher = Dispatchers.IO,
+            maxDiskBytes = 1024,
+        )
+        assertNotNull(restartedStore.thumbnail(source, 256))
         assertEquals(2, encodeCount.get())
     }
 

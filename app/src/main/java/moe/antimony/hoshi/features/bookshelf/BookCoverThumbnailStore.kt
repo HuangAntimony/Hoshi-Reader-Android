@@ -44,7 +44,10 @@ internal fun interface BookCoverThumbnailEncoder {
 }
 
 internal sealed interface BookCoverThumbnailOpenResult {
-    data class Ready(val input: InputStream) : BookCoverThumbnailOpenResult
+    data class Ready(
+        val input: InputStream,
+        val generation: Long,
+    ) : BookCoverThumbnailOpenResult
 
     data object InvalidSource : BookCoverThumbnailOpenResult
     data object CacheUnavailable : BookCoverThumbnailOpenResult
@@ -76,7 +79,8 @@ internal class BookCoverThumbnailStore internal constructor(
     private val cacheMutationMutex = Mutex()
     private val invalidSourceKeys = mutableSetOf<String>()
     private val transientRetryAfterMillis = mutableMapOf<String, Long>()
-    private val decodeFailedKeys = mutableSetOf<String>()
+    private val derivativeGenerations = mutableMapOf<String, Long>()
+    private var nextDerivativeGeneration = 0L
 
     suspend fun thumbnail(
         coverSource: BookCoverSource,
@@ -87,12 +91,6 @@ internal class BookCoverThumbnailStore internal constructor(
 
         val bucket = coverThumbnailBucket(requestedMaxDimensionPx)
         val key = thumbnailKey(coverSource.cacheKey, bucket)
-        val shouldInvalidate = synchronized(decodeFailedKeys) { decodeFailedKeys.remove(key) }
-        if (shouldInvalidate) {
-            cacheMutationMutex.withLock {
-                cacheDirectory.resolve("$key.webp").delete()
-            }
-        }
         cachedFile(key)?.let { return@withContext it }
         if (isTransientCoolingDown(key)) return@withContext null
         synchronized(invalidSourceKeys) {
@@ -117,6 +115,7 @@ internal class BookCoverThumbnailStore internal constructor(
                 }
                 cacheMutationMutex.withLock {
                     moveAtomically(temporary, destination)
+                    derivativeGenerations[key] = newDerivativeGeneration()
                     trimToSize(protectedFile = destination)
                 }
                 synchronized(transientRetryAfterMillis) { transientRetryAfterMillis.remove(key) }
@@ -145,24 +144,41 @@ internal class BookCoverThumbnailStore internal constructor(
             } else {
                 BookCoverThumbnailOpenResult.CacheUnavailable
             }
-        try {
-            BookCoverThumbnailOpenResult.Ready(inputStreamProvider(thumbnail))
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            cacheMutationMutex.withLock {
+        cacheMutationMutex.withLock {
+            try {
+                BookCoverThumbnailOpenResult.Ready(
+                    input = inputStreamProvider(thumbnail),
+                    generation = derivativeGenerations.getOrPut(key) { newDerivativeGeneration() },
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
                 thumbnail.delete()
+                derivativeGenerations.remove(key)
+                recordTransientFailure(key)
+                BookCoverThumbnailOpenResult.CacheUnavailable
             }
-            recordTransientFailure(key)
-            BookCoverThumbnailOpenResult.CacheUnavailable
         }
     }
 
-    fun markDerivativeDecodeFailed(coverSource: BookCoverSource, bucket: Int) {
-        synchronized(decodeFailedKeys) {
-            decodeFailedKeys += thumbnailKey(coverSource.cacheKey, bucket)
+    suspend fun invalidateDerivative(
+        coverSource: BookCoverSource,
+        bucket: Int,
+        generation: Long,
+    ) {
+        withContext(ioDispatcher) {
+            val key = thumbnailKey(coverSource.cacheKey, bucket)
+            cacheMutationMutex.withLock {
+                if (derivativeGenerations[key] != generation) return@withLock
+                val derivative = cacheDirectory.resolve("$key.webp")
+                if (!derivative.exists() || derivative.delete()) {
+                    derivativeGenerations.remove(key)
+                }
+            }
         }
     }
+
+    private fun newDerivativeGeneration(): Long = ++nextDerivativeGeneration
 
     private fun isTransientCoolingDown(key: String): Boolean = synchronized(transientRetryAfterMillis) {
         val retryAfter = transientRetryAfterMillis[key] ?: return@synchronized false
@@ -196,7 +212,10 @@ internal class BookCoverThumbnailStore internal constructor(
         for (file in files) {
             if (file == protectedFile) continue
             val length = file.length()
-            if (file.delete()) totalBytes -= length
+            if (file.delete()) {
+                derivativeGenerations.remove(file.nameWithoutExtension)
+                totalBytes -= length
+            }
             if (totalBytes <= maxDiskBytes) return
         }
     }

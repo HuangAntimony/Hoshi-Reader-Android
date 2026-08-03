@@ -266,19 +266,44 @@ class BookCoverThumbnailStoreTest {
     }
 
     @Test
-    fun decodeFailureMarkerInvalidatesOnlyTheServedBucket() = runBlocking {
+    fun derivativeInvalidationDeletesOnlyTheServedBucket() = runBlocking {
         val source = sourceFile("cover.jpg", "original")
         val coverSource = source.toBookCoverSource()
         val encodeCount = AtomicInteger()
         val store = store(copyingEncoder(encodeCount))
         store.thumbnail(coverSource, 256)
         store.thumbnail(coverSource, 512)
+        val served = store.openThumbnailResult(coverSource, 256)
+            as BookCoverThumbnailOpenResult.Ready
+        served.input.close()
 
-        store.markDerivativeDecodeFailed(coverSource, bucket = 256)
+        store.invalidateDerivative(coverSource, bucket = 256, generation = served.generation)
         store.thumbnail(coverSource, 256)
         store.thumbnail(coverSource, 512)
 
         assertEquals(3, encodeCount.get())
+    }
+
+    @Test
+    fun staleDecodeFailureDoesNotDeleteARebuiltDerivative() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val coverSource = source.toBookCoverSource()
+        val encodeCount = AtomicInteger()
+        val store = store(copyingEncoder(encodeCount))
+        val firstReader = store.openThumbnailResult(coverSource, 256)
+            as BookCoverThumbnailOpenResult.Ready
+        val secondReader = store.openThumbnailResult(coverSource, 256)
+            as BookCoverThumbnailOpenResult.Ready
+
+        store.invalidateDerivative(coverSource, bucket = 256, generation = firstReader.generation)
+        val rebuilt = store.thumbnail(coverSource, 256)
+        store.invalidateDerivative(coverSource, bucket = 256, generation = secondReader.generation)
+
+        firstReader.input.close()
+        secondReader.input.close()
+        assertTrue(rebuilt!!.isFile)
+        assertEquals(rebuilt, store.thumbnail(coverSource, 256))
+        assertEquals(2, encodeCount.get())
     }
 
     @Test

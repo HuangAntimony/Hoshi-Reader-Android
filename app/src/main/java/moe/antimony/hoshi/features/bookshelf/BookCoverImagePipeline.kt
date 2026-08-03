@@ -36,6 +36,7 @@ internal class BookCoverFetcher(
                     metadata = BookCoverDerivativeMetadata(
                         source = data,
                         bucket = coverThumbnailBucket(requestedDimension),
+                        generation = result.generation,
                     ),
                 ),
                 mimeType = "image/webp",
@@ -70,6 +71,7 @@ internal class BookCoverFetcher(
 internal class BookCoverDerivativeMetadata(
     val source: BookCoverSource,
     val bucket: Int,
+    val generation: Long,
 ) : ImageSource.Metadata()
 
 internal data object BookCoverOriginalMetadata : ImageSource.Metadata()
@@ -105,7 +107,11 @@ internal class BookCoverRecoveryDecoderFactory(
         options: Options,
         imageLoader: ImageLoader,
     ): DecodeResult? {
-        thumbnailStore.markDerivativeDecodeFailed(metadata.source, metadata.bucket)
+        thumbnailStore.invalidateDerivative(
+            coverSource = metadata.source,
+            bucket = metadata.bucket,
+            generation = metadata.generation,
+        )
         val original = File(metadata.source.path).takeIf { it.isFile } ?: return null
         val originalSource = ImageSource(file = original.toOkioPath(), fileSystem = options.fileSystem)
         val originalResult = SourceFetchResult(
