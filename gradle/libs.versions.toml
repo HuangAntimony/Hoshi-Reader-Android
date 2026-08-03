@@ -8,8 +8,9 @@ lifecycleRuntimeKtx = "2.10.0"
 work = "2.11.1"
 webkit = "1.16.0"
 activityCompose = "1.8.0"
-kotlin = "2.2.10"
+kotlin = "2.3.21"
 composeBom = "2026.02.01"
+coil = "3.4.0"
 desugarJdkLibs = "2.1.5"
 datastore = "1.2.1"
 media3 = "1.10.1"
@@ -50,6 +51,7 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
 androidx-hilt-lifecycle-viewmodel-compose = { group = "androidx.hilt", name = "hilt-lifecycle-viewmodel-compose", version.ref = "androidxHilt" }

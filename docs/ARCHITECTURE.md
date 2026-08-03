@@ -46,6 +46,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   persist the filename in `BookMetadata.epub`. Sidecar JSON and cached covers
   remain beside the EPUB; parser and reader paths extract packed EPUBs only into
   controlled app cache/temp directories when they need the EPUB tree.
+- Bookshelf and Statistics cover rendering uses one process-wide Coil loader.
+  `BookCoverThumbnailStore` owns a versioned, source-fingerprinted 256/512/768 px
+  WebP derivative cache under the app cache directory. Original-cover thumbnail
+  generation is single-flight and serialized; Coil owns measured-size requests,
+  small-thumbnail decode concurrency, lifecycle cancellation, and memory reuse.
+  New local and remote imports prewarm the 768 px derivative, while existing
+  books backfill lazily.
 - Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
   are persisted through book sidecar repositories and models.
 - The Statistics dashboard aggregates local book `statistics.json` sidecars

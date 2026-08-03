@@ -1,15 +1,11 @@
 package moe.antimony.hoshi.features.bookshelf
 
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.LruCache
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -99,7 +95,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -108,7 +103,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -121,6 +115,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiUiDependencies
@@ -150,8 +145,6 @@ import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 import moe.antimony.hoshi.ui.replaceTextAndSelectStart
 import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
-import java.io.File
-import kotlin.math.max
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -1461,14 +1454,6 @@ private fun BookCoverCard(
     coverSource: BookCoverSource?,
     modifier: Modifier = Modifier,
 ) {
-    val cachedBitmap = remember(coverSource?.cacheKey) {
-        BookCoverBitmapCache.get(coverSource)
-    }
-    val bitmap by produceState<Bitmap?>(initialValue = cachedBitmap, key1 = coverSource) {
-        if (cachedBitmap == null) {
-            value = BookCoverBitmapCache.load(coverSource)
-        }
-    }
     val outerShape = RoundedCornerShape(7.dp)
     val innerShape = RoundedCornerShape(6.dp)
     val coverPlaceholderColor = Color.Gray.copy(alpha = 0.3f)
@@ -1492,9 +1477,9 @@ private fun BookCoverCard(
         val coverModifier = Modifier
             .fillMaxSize()
             .clip(innerShape)
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap!!.asImageBitmap(),
+        if (coverSource != null) {
+            AsyncImage(
+                model = coverSource,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = coverModifier.background(coverPlaceholderColor),
@@ -1507,81 +1492,7 @@ private fun BookCoverCard(
     }
 }
 
-internal object BookCoverBitmapCache {
-    private const val MaxCoverDimensionPx = 768
-    private val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
-    }
-
-    fun get(coverSource: BookCoverSource?): Bitmap? {
-        coverSource ?: return null
-        return synchronized(cache) {
-            cache.get(coverSource.cacheKey)
-        }
-    }
-
-    suspend fun load(coverSource: BookCoverSource?): Bitmap? = withContext(Dispatchers.IO) {
-        coverSource ?: return@withContext null
-        synchronized(cache) {
-            cache.get(coverSource.cacheKey)?.let { return@withContext it }
-        }
-        val bitmap = decodeSampledCoverBitmap(File(coverSource.path), MaxCoverDimensionPx) ?: return@withContext null
-        bitmap.prepareToDraw()
-        synchronized(cache) {
-            cache.put(coverSource.cacheKey, bitmap)
-        }
-        bitmap
-    }
-}
-
 private const val BookCoverAspectRatio = 0.709f
-
-internal fun coverDecodeSampleSize(width: Int, height: Int, maxDimensionPx: Int): Int {
-    if (width <= 0 || height <= 0 || maxDimensionPx <= 0) return 1
-    var sampleSize = 1
-    while (max(width / (sampleSize * 2), height / (sampleSize * 2)) >= maxDimensionPx) {
-        sampleSize *= 2
-    }
-    return sampleSize
-}
-
-internal data class CoverThumbnailSize(
-    val width: Int,
-    val height: Int,
-)
-
-internal fun coverThumbnailSize(width: Int, height: Int, maxDimensionPx: Int): CoverThumbnailSize {
-    if (width <= 0 || height <= 0 || maxDimensionPx <= 0) {
-        return CoverThumbnailSize(width = width, height = height)
-    }
-    val longest = max(width, height)
-    if (longest <= maxDimensionPx) {
-        return CoverThumbnailSize(width = width, height = height)
-    }
-    val scale = maxDimensionPx.toDouble() / longest.toDouble()
-    return CoverThumbnailSize(
-        width = max(1, (width * scale).toInt()),
-        height = max(1, (height * scale).toInt()),
-    )
-}
-
-internal fun decodeSampledCoverBitmap(file: File, maxDimensionPx: Int): Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.absolutePath, bounds)
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = coverDecodeSampleSize(bounds.outWidth, bounds.outHeight, maxDimensionPx)
-    }
-    val decoded = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null
-    val targetSize = coverThumbnailSize(decoded.width, decoded.height, maxDimensionPx)
-    if (targetSize.width == decoded.width && targetSize.height == decoded.height) {
-        return decoded
-    }
-    val scaled = Bitmap.createScaledBitmap(decoded, targetSize.width, targetSize.height, true)
-    if (scaled !== decoded) {
-        decoded.recycle()
-    }
-    return scaled
-}
 
 @Composable
 private fun ReadingProgressPill(progress: Double, modifier: Modifier = Modifier) {

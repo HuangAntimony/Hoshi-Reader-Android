@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.statistics
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,14 +13,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -29,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
+import coil3.compose.AsyncImage
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.features.bookshelf.BookCoverBitmapCache
 import moe.antimony.hoshi.features.bookshelf.toBookCoverSource
 
 @Composable
@@ -116,38 +112,25 @@ private fun DistributionCover(row: BookDistributionRow) {
             runCatching { File(path).toBookCoverSource() }.getOrNull()
         }
     }
-    val cachedBitmap = remember(coverSource?.cacheKey) {
-        BookCoverBitmapCache.get(coverSource)
-    }
-    val bitmap by produceState(initialValue = cachedBitmap, key1 = coverSource) {
-        value = cachedBitmap
-        if (cachedBitmap == null) {
-            value = BookCoverBitmapCache.load(coverSource)
-        }
-    }
-    val coverBitmap = bitmap
-    if (coverBitmap != null) {
-        Image(
-            bitmap = coverBitmap.asImageBitmap(),
-            contentDescription = row.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(width = 42.dp, height = 58.dp)
-                .clip(RoundedCornerShape(6.dp)),
+    Box(
+        modifier = Modifier
+            .size(width = 42.dp, height = 58.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = row.title.firstOrNull()?.uppercase() ?: "",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
-    } else {
-        Box(
-            modifier = Modifier
-                .size(width = 42.dp, height = 58.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = row.title.firstOrNull()?.uppercase() ?: "",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+        if (coverSource != null) {
+            AsyncImage(
+                model = coverSource,
+                contentDescription = row.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
             )
         }
     }

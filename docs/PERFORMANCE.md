@@ -114,6 +114,28 @@ If old WebView targets accumulate, investigate lifecycle release first. Do not
 optimize chapter parsing or Reader JavaScript until the old instances are
 proven not to be executing.
 
+## Bookshelf Cover Scrolling
+
+Bookshelf cover profiling must distinguish expensive source-cover generation
+from cheap display-thumbnail decoding. A warm return to a previously visited
+book row may decode a bounded 256/512/768 px derivative if Coil's memory entry
+was reclaimed; it must not decode the EPUB's original cover again while the
+source fingerprint and derivative cache remain valid.
+
+For a repeatable real-device check:
+
+- record the local book count and whether the derivative cache is cold or warm;
+- clear logcat only, never app data, immediately before the measured pass;
+- count `HoshiCoverPipeline: source_decode` markers for original-cover work;
+- scroll from the first to last book and back, then repeat the same round trip;
+- require the second warm round trip to emit no source-decode markers;
+- pair the marker count with `dumpsys gfxinfo` or Perfetto frame evidence when
+  making a smoothness claim.
+
+Source fingerprints include path, modification time, and length. Changing a
+cover must create a new derivative key. Failed source decodes are suppressed for
+the process lifetime so a corrupt cover cannot retry on every composition.
+
 ## Reader JavaScript Hotspots
 
 Reader web assets are performance-sensitive because they run on the WebView
