@@ -8,6 +8,11 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - 修复问题时不要叠补丁。先对齐 iOS 行为和状态流；只有平台差异确实需要时，才加入最小 Android 侧适配。
 - 涉及 Android 平台能力、权限、SAF、WebView、Media3、WorkManager、Google/Jetpack API、打包、安装或后台行为时，优先查 Android/Google/Jetpack 官方文档确认当前推荐做法。
 
+## 工作区与规划产物
+
+- 除非用户明确要求，不得创建或使用 Git worktree；直接在用户提供的当前工作区和分支内完成任务。
+- 除非用户明确要求，不得创建、强制跟踪或提交设计/计划文档（包括 `docs/superpowers/specs` 和 `docs/superpowers/plans`），也不得为此创建独立文档提交；默认将计划保留在对话或内置计划状态中。
+
 ## 架构基线
 
 ### Android 官方推荐
