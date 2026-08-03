@@ -14,10 +14,11 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.di.IoDispatcher
-import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
-import moe.antimony.hoshi.features.bookshelf.BookCoverThumbnailStore
+import moe.antimony.hoshi.features.bookshelf.BookCoverRecoveryDecoderFactory
 import moe.antimony.hoshi.features.bookshelf.BookCoverFetcher
 import moe.antimony.hoshi.features.bookshelf.BookCoverKeyer
+import moe.antimony.hoshi.features.bookshelf.BookCoverThumbnailStore
+import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
 import moe.antimony.hoshi.features.dictionary.DictionaryAutoUpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateApkCleanup
 import moe.antimony.hoshi.features.update.UpdateScheduler
@@ -58,6 +59,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
             .components {
                 add(BookCoverKeyer)
                 add(BookCoverFetcher.Factory(bookCoverThumbnailStore.get()))
+                add(BookCoverRecoveryDecoderFactory(bookCoverThumbnailStore.get()))
             }
             .build()
 

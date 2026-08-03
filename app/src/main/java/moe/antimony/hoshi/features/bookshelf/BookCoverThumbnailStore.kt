@@ -4,10 +4,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.os.Build
+import android.os.SystemClock
 import android.os.Trace
 import android.util.Log
 import androidx.annotation.RequiresApi
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -40,12 +42,22 @@ internal fun interface BookCoverThumbnailEncoder {
     fun encode(source: File, destination: File, maxDimensionPx: Int): Boolean
 }
 
+internal sealed interface BookCoverThumbnailOpenResult {
+    data class Ready(val input: InputStream) : BookCoverThumbnailOpenResult
+
+    data object InvalidSource : BookCoverThumbnailOpenResult
+    data object CacheUnavailable : BookCoverThumbnailOpenResult
+}
+
 @Singleton
 internal class BookCoverThumbnailStore internal constructor(
     internal val cacheDirectory: File,
     private val encoder: BookCoverThumbnailEncoder,
     private val ioDispatcher: CoroutineDispatcher,
     private val maxDiskBytes: Long,
+    private val elapsedRealtimeMillis: () -> Long = SystemClock::elapsedRealtime,
+    private val transientRetryDelayMillis: Long = 30_000L,
+    private val inputStreamProvider: (File) -> InputStream = File::inputStream,
 ) {
     @Inject
     constructor(
@@ -61,27 +73,36 @@ internal class BookCoverThumbnailStore internal constructor(
 
     private val generationMutex = Mutex()
     private val cacheMutationMutex = Mutex()
-    private val failedKeys = mutableSetOf<String>()
+    private val invalidSourceKeys = mutableSetOf<String>()
+    private val transientRetryAfterMillis = mutableMapOf<String, Long>()
+    private val decodeFailedKeys = mutableSetOf<String>()
 
     suspend fun thumbnail(
-        coverSource: BookCoverSource?,
+        coverSource: BookCoverSource,
         requestedMaxDimensionPx: Int,
     ): File? = withContext(ioDispatcher) {
-        coverSource ?: return@withContext null
         val source = File(coverSource.path)
         if (!source.isFile) return@withContext null
 
         val bucket = coverThumbnailBucket(requestedMaxDimensionPx)
         val key = thumbnailKey(coverSource.cacheKey, bucket)
+        val shouldInvalidate = synchronized(decodeFailedKeys) { decodeFailedKeys.remove(key) }
+        if (shouldInvalidate) {
+            cacheMutationMutex.withLock {
+                cacheDirectory.resolve("$key.webp").delete()
+            }
+        }
         cachedFile(key)?.let { return@withContext it }
-        synchronized(failedKeys) {
-            if (key in failedKeys) return@withContext null
+        if (isTransientCoolingDown(key)) return@withContext null
+        synchronized(invalidSourceKeys) {
+            if (key in invalidSourceKeys) return@withContext null
         }
 
         generationMutex.withLock {
             cachedFile(key)?.let { return@withLock it }
-            synchronized(failedKeys) {
-                if (key in failedKeys) return@withLock null
+            if (isTransientCoolingDown(key)) return@withLock null
+            synchronized(invalidSourceKeys) {
+                if (key in invalidSourceKeys) return@withLock null
             }
 
             cacheDirectory.mkdirs()
@@ -90,18 +111,19 @@ internal class BookCoverThumbnailStore internal constructor(
             try {
                 val encoded = encoder.encode(source, temporary, bucket)
                 if (!encoded || !temporary.isFile || temporary.length() == 0L) {
-                    synchronized(failedKeys) { failedKeys += key }
+                    synchronized(invalidSourceKeys) { invalidSourceKeys += key }
                     return@withLock null
                 }
                 cacheMutationMutex.withLock {
                     moveAtomically(temporary, destination)
                     trimToSize(protectedFile = destination)
                 }
+                synchronized(transientRetryAfterMillis) { transientRetryAfterMillis.remove(key) }
                 destination
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                synchronized(failedKeys) { failedKeys += key }
+                recordTransientFailure(key)
                 null
             } finally {
                 temporary.delete()
@@ -109,20 +131,49 @@ internal class BookCoverThumbnailStore internal constructor(
         }
     }
 
-    suspend fun openThumbnail(
-        coverSource: BookCoverSource?,
+    suspend fun openThumbnailResult(
+        coverSource: BookCoverSource,
         requestedMaxDimensionPx: Int,
-    ): InputStream? = withContext(ioDispatcher) {
-        var attempt = 0
-        while (attempt < 2) {
-            val thumbnail = thumbnail(coverSource, requestedMaxDimensionPx) ?: return@withContext null
-            val input = cacheMutationMutex.withLock {
-                thumbnail.takeIf { it.isFile && it.length() > 0L }?.inputStream()
+    ): BookCoverThumbnailOpenResult = withContext(ioDispatcher) {
+        if (!File(coverSource.path).isFile) return@withContext BookCoverThumbnailOpenResult.InvalidSource
+        val bucket = coverThumbnailBucket(requestedMaxDimensionPx)
+        val key = thumbnailKey(coverSource.cacheKey, bucket)
+        val thumbnail = thumbnail(coverSource, requestedMaxDimensionPx)
+            ?: return@withContext if (synchronized(invalidSourceKeys) { key in invalidSourceKeys }) {
+                BookCoverThumbnailOpenResult.InvalidSource
+            } else {
+                BookCoverThumbnailOpenResult.CacheUnavailable
             }
-            if (input != null) return@withContext input
-            attempt += 1
+        try {
+            BookCoverThumbnailOpenResult.Ready(inputStreamProvider(thumbnail))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            cacheMutationMutex.withLock {
+                thumbnail.delete()
+            }
+            recordTransientFailure(key)
+            BookCoverThumbnailOpenResult.CacheUnavailable
         }
-        null
+    }
+
+    fun markDerivativeDecodeFailed(coverSource: BookCoverSource, bucket: Int) {
+        synchronized(decodeFailedKeys) {
+            decodeFailedKeys += thumbnailKey(coverSource.cacheKey, bucket)
+        }
+    }
+
+    private fun isTransientCoolingDown(key: String): Boolean = synchronized(transientRetryAfterMillis) {
+        val retryAfter = transientRetryAfterMillis[key] ?: return@synchronized false
+        if (elapsedRealtimeMillis() < retryAfter) return@synchronized true
+        transientRetryAfterMillis.remove(key)
+        false
+    }
+
+    private fun recordTransientFailure(key: String) {
+        synchronized(transientRetryAfterMillis) {
+            transientRetryAfterMillis[key] = elapsedRealtimeMillis() + transientRetryDelayMillis
+        }
     }
 
     private fun cachedFile(key: String): File? =
@@ -184,7 +235,10 @@ internal class AndroidBookCoverThumbnailEncoder @Inject constructor() : BookCove
             val bitmap = decodeCoverThumbnail(source, maxDimensionPx) ?: return false
             try {
                 destination.outputStream().buffered().use { output ->
-                    bitmap.compress(webpFormat(bitmap), webpQuality(bitmap), output)
+                    if (!bitmap.compress(webpFormat(bitmap), webpQuality(bitmap), output)) {
+                        throw IOException("Unable to encode book cover thumbnail.")
+                    }
+                    true
                 }
             } finally {
                 bitmap.recycle()

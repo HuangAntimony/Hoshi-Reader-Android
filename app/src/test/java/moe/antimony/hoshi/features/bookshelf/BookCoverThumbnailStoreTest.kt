@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.bookshelf
 
 import java.io.File
+import java.io.IOException
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +129,109 @@ class BookCoverThumbnailStoreTest {
     }
 
     @Test
+    fun transientEncoderFailureDoesNotPoisonTheSourceFingerprint() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val encodeCount = AtomicInteger()
+        var elapsedRealtimeMillis = 0L
+        val store = store(
+            encoder = BookCoverThumbnailEncoder { input, output, maxDimensionPx ->
+                if (encodeCount.incrementAndGet() == 1) throw IOException("cache write failed")
+                output.writeText("${input.readText()}:$maxDimensionPx")
+                true
+            },
+            elapsedRealtimeMillis = { elapsedRealtimeMillis },
+            transientRetryDelayMillis = 30_000L,
+        )
+
+        assertEquals(null, store.thumbnail(source.toBookCoverSource(), 256))
+        assertEquals(null, store.thumbnail(source.toBookCoverSource(), 256))
+        assertEquals(1, encodeCount.get())
+
+        elapsedRealtimeMillis = 30_000L
+        val recovered = store.thumbnail(source.toBookCoverSource(), 256)
+
+        assertNotNull(recovered)
+        assertEquals("original:256", recovered!!.readText())
+        assertEquals(2, encodeCount.get())
+    }
+
+    @Test
+    fun concurrentTransientFailuresEnterCooldownSingleFlight() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val encodeCount = AtomicInteger()
+        val store = store(
+            encoder = BookCoverThumbnailEncoder { _, _, _ ->
+                encodeCount.incrementAndGet()
+                Thread.sleep(40)
+                throw IOException("cache write failed")
+            },
+        )
+
+        List(8) {
+            async(Dispatchers.Default) {
+                store.thumbnail(source.toBookCoverSource(), 256)
+            }
+        }.awaitAll()
+
+        assertEquals(1, encodeCount.get())
+    }
+
+    @Test
+    fun transientFailureIsReportedAsCacheUnavailable() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val store = store(
+            encoder = BookCoverThumbnailEncoder { _, _, _ ->
+                throw IOException("cache write failed")
+            },
+        )
+
+        val result = store.openThumbnailResult(source.toBookCoverSource(), 256)
+
+        assertTrue(result is BookCoverThumbnailOpenResult.CacheUnavailable)
+    }
+
+    @Test
+    fun thumbnailOpenIoFailureIsReportedAsCacheUnavailable() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val store = store(
+            encoder = copyingEncoder(AtomicInteger()),
+            inputStreamProvider = { throw IOException("cache read failed") },
+        )
+
+        val result = store.openThumbnailResult(source.toBookCoverSource(), 256)
+
+        assertTrue(result is BookCoverThumbnailOpenResult.CacheUnavailable)
+    }
+
+    @Test
+    fun invalidSourceIsReportedWithoutOriginalFallback() = runBlocking {
+        val source = sourceFile("broken.jpg", "broken")
+        val store = store(
+            encoder = BookCoverThumbnailEncoder { _, _, _ -> false },
+        )
+
+        val result = store.openThumbnailResult(source.toBookCoverSource(), 256)
+
+        assertTrue(result is BookCoverThumbnailOpenResult.InvalidSource)
+    }
+
+    @Test
+    fun decodeFailureMarkerInvalidatesOnlyTheServedBucket() = runBlocking {
+        val source = sourceFile("cover.jpg", "original")
+        val coverSource = source.toBookCoverSource()
+        val encodeCount = AtomicInteger()
+        val store = store(copyingEncoder(encodeCount))
+        store.thumbnail(coverSource, 256)
+        store.thumbnail(coverSource, 512)
+
+        store.markDerivativeDecodeFailed(coverSource, bucket = 256)
+        store.thumbnail(coverSource, 256)
+        store.thumbnail(coverSource, 512)
+
+        assertEquals(3, encodeCount.get())
+    }
+
+    @Test
     fun openedThumbnailRemainsReadableWhenLaterGenerationTrimsItsFile() = runBlocking {
         val firstSource = sourceFile("first.jpg", "first-cover")
         val secondSource = sourceFile("second.jpg", "second-cover")
@@ -136,7 +240,7 @@ class BookCoverThumbnailStoreTest {
             maxDiskBytes = 24,
         )
 
-        store.openThumbnail(firstSource.toBookCoverSource(), 256)!!.use { firstThumbnail ->
+        store.openReady(firstSource.toBookCoverSource(), 256).use { firstThumbnail ->
             store.thumbnail(secondSource.toBookCoverSource(), 256)
 
             assertEquals("first-cover:256", firstThumbnail.bufferedReader().readText())
@@ -163,12 +267,18 @@ class BookCoverThumbnailStoreTest {
     private fun store(
         encoder: BookCoverThumbnailEncoder,
         maxDiskBytes: Long = 16L * 1024L * 1024L,
+        elapsedRealtimeMillis: () -> Long = { 0L },
+        transientRetryDelayMillis: Long = 30_000L,
+        inputStreamProvider: (File) -> java.io.InputStream = File::inputStream,
     ): BookCoverThumbnailStore =
         BookCoverThumbnailStore(
             cacheDirectory = temporaryFolder.root.resolve("thumbnails"),
             encoder = encoder,
             ioDispatcher = Dispatchers.IO,
             maxDiskBytes = maxDiskBytes,
+            elapsedRealtimeMillis = elapsedRealtimeMillis,
+            transientRetryDelayMillis = transientRetryDelayMillis,
+            inputStreamProvider = inputStreamProvider,
         )
 
     private fun copyingEncoder(encodeCount: AtomicInteger) =
@@ -177,4 +287,10 @@ class BookCoverThumbnailStoreTest {
             destination.writeText("${source.readText()}:$maxDimensionPx")
             true
         }
+
+    private suspend fun BookCoverThumbnailStore.openReady(
+        source: BookCoverSource,
+        requestedMaxDimensionPx: Int,
+    ) = (openThumbnailResult(source, requestedMaxDimensionPx) as BookCoverThumbnailOpenResult.Ready).input
+
 }

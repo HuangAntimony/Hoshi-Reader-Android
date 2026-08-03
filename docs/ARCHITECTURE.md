@@ -52,7 +52,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   generation is single-flight and serialized; Coil owns measured-size requests,
   small-thumbnail decode concurrency, lifecycle cancellation, and memory reuse.
   New local and remote imports prewarm the 768 px derivative, while existing
-  books backfill lazily.
+  books backfill lazily. Transient derivative-cache failures use the original
+  cover through Coil, and malformed or decoder-rejected derivatives invalidate
+  only their size bucket before the next request rebuilds them.
 - Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
   are persisted through book sidecar repositories and models.
 - The Statistics dashboard aggregates local book `statistics.json` sidecars
