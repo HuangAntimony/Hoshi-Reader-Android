@@ -76,8 +76,8 @@ import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 internal enum class ReaderGoToTab {
     Chapters,
     Highlights,
-    Search,
     Gallery,
+    Search,
 }
 
 internal val ReaderGoToTabRole = Role.Tab

@@ -303,8 +303,8 @@
     <string name="reader_jump_back">返回上一个跳转位置</string>
     <string name="reader_jump_forward">返回后一个跳转位置</string>
     <string name="reader_menu">阅读器菜单</string>
-    <string name="reader_go_to">跳转</string>
-    <string name="reader_search" comment="Reader Go to panel tab label, distinct from dictionary search placeholder.">搜索</string>
+    <string name="reader_go_to">内容</string>
+    <string name="reader_search" comment="Reader Contents panel tab label, distinct from dictionary search placeholder.">搜索</string>
     <string name="reader_search_in_book">在书中搜索</string>
     <string name="reader_search_empty_prompt">输入文本搜索本书</string>
     <string name="reader_searching">正在搜索...</string>

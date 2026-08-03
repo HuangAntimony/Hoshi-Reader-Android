@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -97,7 +96,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -908,7 +906,7 @@ private fun BooksTab(
                         .fillMaxWidth()
                         .padding(horizontal = layoutSpec.pageHorizontalPaddingDp.dp),
                 )
-                else -> CompositionLocalProvider(LocalOverscrollFactory provides null) {
+                else -> {
                     val pullRefreshState = rememberPullToRefreshState()
                     val pullRefreshEnabled = shouldEnableBookshelfPullRefresh(
                         syncSettings = syncSettings,

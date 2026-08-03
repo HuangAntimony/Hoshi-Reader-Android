@@ -114,6 +114,8 @@ class LocalizationResourceTest {
         assertEquals("未匹配", zhResources.strings.getValue("sasayaki_no_subtitle_match").value)
         assertEquals("自动翻页", zhResources.strings.getValue("sasayaki_auto_scroll").value)
         assertEquals("标注", zhResources.strings.getValue("reader_highlight_action").value)
+        assertEquals("Contents", defaultResources.strings.getValue("reader_go_to").value)
+        assertEquals("内容", zhResources.strings.getValue("reader_go_to").value)
         assertEquals("复制", zhResources.strings.getValue("action_copy").value)
         assertEquals("分享", zhResources.strings.getValue("action_share").value)
         assertEquals("将使用 %1\$s", zhResources.strings.getValue("bookshelf_profile_automatic_uses_format").value)

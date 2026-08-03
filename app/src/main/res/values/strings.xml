@@ -305,8 +305,8 @@
     <string name="reader_jump_back">Return to previous jump position</string>
     <string name="reader_jump_forward">Return to later jump position</string>
     <string name="reader_menu">Reader Menu</string>
-    <string name="reader_go_to">Go to</string>
-    <string name="reader_search" comment="Reader Go to panel tab label, distinct from dictionary search placeholder.">Search</string>
+    <string name="reader_go_to">Contents</string>
+    <string name="reader_search" comment="Reader Contents panel tab label, distinct from dictionary search placeholder.">Search</string>
     <string name="reader_search_in_book">Search in this book</string>
     <string name="reader_search_empty_prompt">Enter text to search this book</string>
     <string name="reader_searching">Searching...</string>

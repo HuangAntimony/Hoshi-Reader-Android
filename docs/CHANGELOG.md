@@ -18,6 +18,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   domestic and Musnap overseas firmware using standard PNG output, with Fit,
   Fill, and Stretch scaling modes.
 
+### Changed
+
+- Rename the Reader Go to panel to Contents, order its tabs as Chapters,
+  Highlights, Gallery, and Search, and remove overscroll deformation from
+  scrolling surfaces throughout the app.
+
 ### Fixed
 
 - Keep VN lookups and mined Anki sentences complete when a word or sentence

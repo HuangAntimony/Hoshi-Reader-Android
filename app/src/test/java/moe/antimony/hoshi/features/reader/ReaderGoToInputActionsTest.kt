@@ -14,9 +14,9 @@ class ReaderGoToInputActionsTest {
     }
 
     @Test
-    fun goToTabsKeepExistingOrderAndAppendGallery() {
+    fun goToTabsPutSearchLast() {
         assertEquals(
-            listOf(ReaderGoToTab.Chapters, ReaderGoToTab.Highlights, ReaderGoToTab.Search, ReaderGoToTab.Gallery),
+            listOf(ReaderGoToTab.Chapters, ReaderGoToTab.Highlights, ReaderGoToTab.Gallery, ReaderGoToTab.Search),
             ReaderGoToTab.entries.toList(),
         )
     }

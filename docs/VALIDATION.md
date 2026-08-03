@@ -107,7 +107,9 @@ Manual reader validation should cover:
   file: verify distinct row positions/current selection, true chapter progress
   and time remaining, jump/restore behavior, and Gallery first-appearance order.
   Include duplicate, gaiji, SVG, missing, and absent images; Gallery items must
-  open the existing fullscreen copy/save/share viewer.
+  open the existing fullscreen copy/save/share viewer. Verify the tabs appear as
+  Chapters, Highlights, Gallery, Search and none of their scrolling content
+  stretches or glows past either edge.
 - forward and backward chapter boundaries, including reverse landing at the
   previous chapter end.
 - page progress monotonicity, per-page progress updates, and restore landing
@@ -236,6 +238,9 @@ emulator state without clearing data or reimporting.
 
 Validate relevant settings/theme changes with:
 
+- Compose scrolling surfaces across Bookshelf, Contents, Statistics, Settings,
+  and modal sheets do not stretch or glow past either edge; normal scrolling,
+  flinging, pull-to-refresh, and sheet dragging remain available.
 - settings controls update immediately and route changes avoid fade transitions
   on E-ink displays.
 - dark-theme cold start does not show a light `No Books` frame before bookshelf

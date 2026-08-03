@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -123,6 +125,7 @@ private fun pureColorScheme(
     onTertiaryFixedVariant = background,
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HoshiReaderTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -152,6 +155,7 @@ fun HoshiReaderTheme(
     CompositionLocalProvider(
         LocalHoshiEInkMode provides eInkMode,
         LocalHoshiDarkTheme provides darkTheme,
+        LocalOverscrollFactory provides null,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
