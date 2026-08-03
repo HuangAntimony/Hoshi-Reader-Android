@@ -230,59 +230,7 @@ Validation:
 - Verify page count, progress, lookup offsets, highlights, font switching,
   chapter jumps, and bookmark restore before and after fragmentation.
 
-### 5. Reader contents gallery, true TOC ranges, and chapter progress
-
-Status: pending Android sync.
-
-Commits:
-
-- `fd124d4` - index EPUB images and add a reader gallery.
-- `bcbef64` - calculate character positions for multiple TOC entries in one
-  XHTML file.
-- `2e1c958` - show true chapter progress and fix chapter time remaining.
-- `51cb994` - group chapters, highlights, and gallery in one Contents sheet.
-
-Dependency/value reasoning:
-
-- Image indexing and TOC fragment offsets are parser/book-info facts. Land those
-  first so the Contents UI and chapter progress consume one persisted source of
-  truth.
-
-iOS behavior to mirror:
-
-- Reader Contents groups Chapters, Highlights, and Gallery. Gallery lists unique
-  non-gaiji JPG/JPEG/PNG images in book order and opens the fullscreen viewer.
-- TOC rows within the same file carry distinct fragment character positions;
-  current-row selection, chapter character/percentage display, and time to
-  finish use the true TOC range rather than the entire XHTML spine item.
-
-Android current gap:
-
-- `BookInfo` in `epub/BookStorage.kt` stores only aggregate chapter info; it has
-  no image inventory or fragment offsets. `EpubBookParser` does not persist
-  either fact.
-- `ReaderGoToSheet.kt` offers Chapters, Highlights, and Search but no Gallery.
-- `EpubBook.chapterRows()` in `ReaderChapterSheet.kt` assigns every same-file TOC
-  entry the file's `currentTotal` and marks current state by spine index only.
-- `ReaderChromeState` exposes only whole-book progress settings, while
-  `ReaderWebView.currentChapterEndCharacter()` and the Statistics sheet use the
-  next spine file boundary, not the next TOC fragment.
-
-Suggested slice:
-
-- Extend the compatible `bookinfo.json` model with optional image and fragment
-  data, regenerate stale caches, and test old sidecars.
-- Build true TOC ranges once, then use them for rows, chrome, statistics, and
-  navigation before adding the Gallery tab and fullscreen handoff.
-
-Validation:
-
-- EPUBs with several TOC entries in one XHTML file, nested TOC, percent-encoded
-  fragments, duplicate images, SVG/gaiji images, missing images, and no images.
-- Check chapter row selection/counts, chapter progress, time remaining, gallery
-  order, fullscreen display, restore, and iOS-compatible book-info sidecars.
-
-### 6. Sasayaki import, playback ranges, media controls, and MP3 mining clips
+### 5. Sasayaki import, playback ranges, media controls, and MP3 mining clips
 
 Status: pending Android sync.
 
@@ -335,7 +283,7 @@ Validation:
 - Mine clips through AnkiDroid and AnkiConnect and verify valid MP3 playback,
   MIME type, hashed filenames, and sentence range expansion.
 
-### 7. Shared Reader/lookup text-boundary corrections
+### 6. Shared Reader/lookup text-boundary corrections
 
 Status: pending Android sync.
 
@@ -378,7 +326,7 @@ Validation:
   supplementary characters, ellipses, periods, and adjacent popup expression
   tags; verify lookup sentence and Anki cloze offsets.
 
-### 8. Bookshelf cover privacy, fallback artwork, and decode pressure
+### 7. Bookshelf cover privacy, fallback artwork, and decode pressure
 
 Status: pending Android sync.
 
@@ -426,7 +374,7 @@ Validation:
   collapsed shelf previews, multi-select, Show/Blur/Hide, dark/e-ink themes.
 - Fast-scroll a large library and compare decode concurrency, memory, and jank.
 
-### 9. Lookup popup two-column layout and visual sizing
+### 8. Lookup popup two-column layout and visual sizing
 
 Status: pending Android sync.
 
@@ -471,7 +419,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 10. Reader route open-failure fallback
+### 9. Reader route open-failure fallback
 
 Status: pending Android sync.
 
@@ -505,7 +453,7 @@ Validation:
 - Missing/corrupt book, working Close, normal Reader open/close, Android Back,
   bookshelf state preservation, and bookmark refresh.
 
-### 11. Google Drive timeout and automatic-refresh error suppression
+### 10. Google Drive timeout and automatic-refresh error suppression
 
 Status: pending Android sync.
 
@@ -543,7 +491,7 @@ Validation:
 - Automatic refresh offline, slow token/list requests, and connection loss;
   manual connect/refresh/import/export/delete must still show actionable errors.
 
-### 12. Reader WebView line-box CSS parity
+### 11. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -591,8 +539,6 @@ Validation:
 | `15d4a6e`, `23e0764` | 2026-06-15 / 2026-06-20 | Three-state revealable furigana mode and migration | Pending enum, migration, and tap semantics |
 | `eb86431`, `c31c9d0` | 2026-07-26 / 2026-07-31 | Split cross-page paragraphs with edge-case fixes | Pending Android paginated fragmenter |
 | `ff86caa` | 2026-07-28 | Explicitly load selected reader font | Pending computed-font load await |
-| `fd124d4`, `51cb994` | 2026-07-14 / 2026-07-24 | Reader Gallery inside Contents | Pending image index and Gallery UI |
-| `bcbef64`, `2e1c958` | 2026-07-14 / 2026-07-16 | True same-file TOC ranges and chapter progress | Pending fragment offsets and progress consumers |
 | `947898c` | 2026-07-01 | Export Sasayaki mining clips as MP3 | Pending Android MP3 encoder/export path |
 | `4a5cfde` | 2026-07-14 | Honor media-control skip mode | Pending MediaSession command routing |
 | `a9a0747`, `d7fe3f2` | 2026-07-28 | MP4/TXT imports and larger playback ranges | Pending SAF/storage/range updates |
@@ -611,16 +557,19 @@ Validation:
 3. Shared Reader/lookup text-boundary corrections.
 4. Reader paginated paragraph splitting and explicit font readiness.
 5. Reader furigana reveal mode.
-6. Reader contents gallery, true TOC ranges, and chapter progress.
-7. Sasayaki import, playback ranges, media controls, and MP3 mining clips.
-8. Bookshelf cover privacy, fallback artwork, and decode pressure.
-9. Lookup popup two-column layout and visual sizing.
-10. Reader route open-failure fallback.
-11. Google Drive timeout and automatic-refresh error suppression.
-12. Reader WebView line-box CSS parity.
+6. Sasayaki import, playback ranges, media controls, and MP3 mining clips.
+7. Bookshelf cover privacy, fallback artwork, and decode pressure.
+8. Lookup popup two-column layout and visual sizing.
+9. Reader route open-failure fallback.
+10. Google Drive timeout and automatic-refresh error suppression.
+11. Reader WebView line-box CSS parity.
 
 ## Covered Or No Android Action
 
+- `fd124d4`, `bcbef64`, `2e1c958`, `51cb994`: Android now persists the
+  first-appearance Reader image inventory and TOC fragment offsets, uses one
+  true TOC range for Contents/chrome/statistics, and opens Gallery items in the
+  existing fullscreen viewer.
 - `f403c99`, `b4e6edd`, `54fab15`: Android now persists a minute-level
   statistics reset time, uses the adjusted local date in Reader and the
   Statistics dashboard, and pauses tracking across Reader sheets and fullscreen

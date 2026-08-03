@@ -321,6 +321,9 @@
     <string name="reader_image_saved">Image saved.</string>
     <string name="reader_image_save_failed">Could not save image.</string>
     <string name="reader_chapters" comment="Reader chapter-list label; Sasayaki intentionally reuses the same visible label for audiobook chapters.">Chapters</string>
+    <string name="reader_gallery">Gallery</string>
+    <string name="reader_gallery_image">Gallery image</string>
+    <string name="reader_no_images">No Images</string>
     <string name="reader_highlights">Highlights</string>
     <string name="reader_statistics" comment="Reader menu label, intentionally matching advanced statistics.">Statistics</string>
     <string name="reader_untitled_chapter">Untitled</string>
@@ -355,6 +358,7 @@
     <string name="reader_appearance_text">Text</string>
     <string name="reader_appearance_layout">Layout</string>
     <string name="reader_appearance_display">Display</string>
+    <string name="reader_appearance_progress">Progress</string>
     <string name="reader_appearance_popup">Popup</string>
     <string name="reader_appearance_theme_system">System</string>
     <string name="reader_appearance_theme_light">Light</string>
@@ -409,6 +413,8 @@
     <string name="reader_appearance_character_spacing">Character Spacing</string>
     <string name="reader_appearance_paragraph_spacing">Paragraph Spacing</string>
     <string name="reader_appearance_show_title">Show Title</string>
+    <string name="reader_appearance_show_progress">Show Progress</string>
+    <string name="reader_appearance_show_chapter_progress">Show Chapter Progress</string>
     <string name="reader_appearance_show_character_count">Show Character Count</string>
     <string name="reader_appearance_show_word_count">Show Word Count</string>
     <string name="reader_appearance_show_percentage">Show Percentage</string>

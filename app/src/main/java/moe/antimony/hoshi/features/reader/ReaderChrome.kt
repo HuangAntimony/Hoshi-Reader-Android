@@ -10,6 +10,8 @@ data class ReaderChromeState(
     val title: String,
     val currentCharacter: Int,
     val totalCharacters: Int,
+    val chapterCurrentCharacter: Int = 0,
+    val chapterTotalCharacters: Int = 0,
     val backTargetCharacter: Int? = null,
     val forwardTargetCharacter: Int? = null,
     val statistics: ReaderStatisticsChromeState? = null,
@@ -18,16 +20,37 @@ data class ReaderChromeState(
         settings: ReaderSettings,
         progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
     ): String {
+        val lines = mutableListOf<String>()
+        if (settings.showProgress) {
+            progressLine(currentCharacter, totalCharacters, settings, progressDisplay)
+                .takeIf { it.isNotEmpty() }
+                ?.let(lines::add)
+        }
+        if (settings.showChapterProgress) {
+            progressLine(chapterCurrentCharacter, chapterTotalCharacters, settings, progressDisplay)
+                .takeIf { it.isNotEmpty() }
+                ?.let { lines += "($it)" }
+        }
+        val separator = if (settings.alwaysShowProgress || settings.showProgressTop) " " else "\n"
+        return lines.joinToString(separator)
+    }
+
+    private fun progressLine(
+        current: Int,
+        total: Int,
+        settings: ReaderSettings,
+        progressDisplay: ReaderProgressDisplay,
+    ): String {
         val parts = mutableListOf<String>()
         if (settings.showCharacters) {
-            parts += progressDisplay.countText(currentCharacter)
-            if (totalCharacters > 0) {
-                parts[parts.lastIndex] = progressDisplay.rangeText(currentCharacter, totalCharacters)
+            parts += progressDisplay.countText(current)
+            if (total > 0) {
+                parts[parts.lastIndex] = progressDisplay.rangeText(current, total)
             }
         }
         if (settings.showPercentage) {
-            val percent = if (totalCharacters > 0) {
-                currentCharacter.toDouble() / totalCharacters.toDouble() * 100.0
+            val percent = if (total > 0) {
+                current.toDouble() / total.toDouble() * 100.0
             } else {
                 0.0
             }

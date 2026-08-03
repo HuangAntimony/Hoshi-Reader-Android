@@ -344,12 +344,7 @@ fun ReaderWebView(
             stateHolder.readerPosition.displayedPosition.progress,
         )
     fun currentChapterEndCharacter(): Int {
-        val index = stateHolder.readerPosition.displayedPosition.index
-        return if (index < book.chapters.lastIndex) {
-            book.characterCountAt(index + 1, 0.0)
-        } else {
-            book.bookInfo.characterCount
-        }
+        return book.tocRangeAt(stateHolder.readerPosition.displayedPosition).endCharacter
     }
     fun syncStatisticsState() {
         statisticsState = statisticsTracker?.state
@@ -927,10 +922,17 @@ fun ReaderWebView(
         stateHolder.forwardTargetPosition,
         statisticsState,
     ) {
+        val currentCharacter = book.characterCountAt(
+            readerPosition.displayedPosition.index,
+            readerPosition.displayedPosition.progress,
+        )
+        val chapterRange = book.tocRangeAt(readerPosition.displayedPosition)
         ReaderChromeState(
             title = book.title,
-            currentCharacter = book.characterCountAt(readerPosition.displayedPosition.index, readerPosition.displayedPosition.progress),
+            currentCharacter = currentCharacter,
             totalCharacters = book.bookInfo.characterCount,
+            chapterCurrentCharacter = chapterRange.currentCharacter(currentCharacter),
+            chapterTotalCharacters = chapterRange.totalCharacters,
             backTargetCharacter = stateHolder.backTargetPosition?.let { book.characterCountAt(it.index, it.progress) },
             forwardTargetCharacter = stateHolder.forwardTargetPosition?.let { book.characterCountAt(it.index, it.progress) },
             statistics = statisticsState?.session?.let {
@@ -1894,6 +1896,10 @@ fun ReaderWebView(
                     stateHolder.dismissGoTo()
                 },
                 onHighlightDelete = ::removeHighlight,
+                onGalleryImageSelected = { path ->
+                    stateHolder.dismissGoTo()
+                    book.galleryResourceUrl(path)?.let(::openFullscreenImage)
+                },
                 onDismiss = stateHolder::dismissGoTo,
             )
         }

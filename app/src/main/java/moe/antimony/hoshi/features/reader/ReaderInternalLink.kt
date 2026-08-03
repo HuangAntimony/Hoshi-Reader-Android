@@ -30,10 +30,3 @@ internal fun EpubBook.resolveInternalReaderLink(url: String): ReaderInternalLink
         fragment = uri.fragment?.ifBlank { null },
     )
 }
-
-private fun String.readerHrefBase(): String =
-    trim()
-        .replace('\\', '/')
-        .removePrefix("/")
-        .substringBefore('#')
-        .substringBefore('?')

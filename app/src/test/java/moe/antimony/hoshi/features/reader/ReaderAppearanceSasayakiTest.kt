@@ -51,6 +51,11 @@ class ReaderAppearanceSasayakiTest {
         )
         assertTrue(
             !readerAppearanceShowsAlwaysShowProgress(
+                ReaderSettings(showProgress = false, showChapterProgress = false),
+            ),
+        )
+        assertTrue(
+            readerAppearanceShowsAlwaysShowProgress(
                 ReaderSettings(showCharacters = false, showPercentage = false),
             ),
         )

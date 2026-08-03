@@ -2,11 +2,17 @@ package moe.antimony.hoshi.epub
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class EpubBookModelTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
     @Test
     fun exposesOnlyReaderResourcesNeededByWebView() {
         val css = "body {}".toByteArray()
@@ -89,5 +95,92 @@ class EpubBookModelTest {
         )
 
         assertTrue(bookInfo.matchesChapterShells(chapterShells))
+    }
+
+    @Test
+    fun bookInfoIndexesUniqueReaderImagesAndTrueTocFragmentOffsets() {
+        val root = temporaryFolder.newFolder("reader-facts")
+        root.resolve("OPS/text").mkdirs()
+        root.resolve("OPS/images").mkdirs()
+        root.resolve("OPS/images/first.jpg").writeBytes(byteArrayOf(1))
+        root.resolve("OPS/images/second.PNG").writeBytes(byteArrayOf(2))
+        root.resolve("OPS/images/gaiji.png").writeBytes(byteArrayOf(3))
+        root.resolve("OPS/images/vector.svg").writeText("<svg/>")
+        val chapter = EpubChapter(
+            id = "chapter",
+            href = "OPS/text/chapter.xhtml",
+            mediaType = "application/xhtml+xml",
+            html = """
+                <html><body>
+                  <p>一<ruby>二<rt>に</rt></ruby></p>
+                  <section id="part 2">三四</section>
+                  <img src="../images/first.jpg" />
+                  <img src="../images/first.jpg" />
+                  <img class="ornament gaiji" src="../images/gaiji.png" />
+                  <svg><image xlink:href="../images/second.PNG" /></svg>
+                  <img src="../images/vector.svg" />
+                  <img src="../images/missing.jpeg" />
+                </body></html>
+            """.trimIndent(),
+        )
+        val toc = listOf(
+            EpubTocItem(
+                label = "Chapter",
+                href = chapter.href,
+                children = listOf(
+                    EpubTocItem(label = "Part 2", href = "${chapter.href}#part%202"),
+                    EpubTocItem(label = "Missing", href = "${chapter.href}#missing"),
+                ),
+            ),
+        )
+
+        val bookInfo = buildBookInfo(
+            chapters = listOf(chapter),
+            toc = toc,
+            rootDirectory = root,
+        )
+
+        assertEquals(listOf("OPS/images/first.jpg", "OPS/images/second.PNG"), bookInfo.images)
+        assertEquals(
+            mapOf("part%202" to 2, "missing" to 0),
+            bookInfo.chapterInfo.getValue(chapter.href).fragmentOffsets,
+        )
+        assertEquals(4, bookInfo.characterCount)
+    }
+
+    @Test
+    fun cachedBookInfoRequiresPersistedReaderFactsForTocFragments() {
+        val chapter = EpubChapter(
+            id = "chapter",
+            href = "chapter.xhtml",
+            mediaType = "application/xhtml+xml",
+            html = "",
+        )
+        val toc = listOf(EpubTocItem(label = "Part", href = "chapter.xhtml#part"))
+        val legacy = BookInfo(
+            characterCount = 10,
+            chapterInfo = mapOf(
+                chapter.href to BookInfo.ChapterInfo(
+                    spineIndex = 0,
+                    currentTotal = 0,
+                    chapterCount = 10,
+                ),
+            ),
+        )
+        val complete = legacy.copy(
+            images = emptyList(),
+            chapterInfo = legacy.chapterInfo.mapValues { (_, info) ->
+                info.copy(fragmentOffsets = mapOf("part" to 4))
+            },
+        )
+        val incomplete = complete.copy(
+            chapterInfo = complete.chapterInfo.mapValues { (_, info) ->
+                info.copy(fragmentOffsets = mapOf("another-part" to 0))
+            },
+        )
+
+        assertFalse(legacy.matchesReaderFacts(listOf(chapter), toc))
+        assertFalse(incomplete.matchesReaderFacts(listOf(chapter), toc))
+        assertTrue(complete.matchesReaderFacts(listOf(chapter), toc))
     }
 }

@@ -319,6 +319,9 @@
     <string name="reader_image_saved">已保存图片。</string>
     <string name="reader_image_save_failed">无法保存图片。</string>
     <string name="reader_chapters" comment="Reader chapter-list label; Sasayaki intentionally reuses the same visible label for audiobook chapters.">章节</string>
+    <string name="reader_gallery">图库</string>
+    <string name="reader_gallery_image">图库图片</string>
+    <string name="reader_no_images">没有图片</string>
     <string name="reader_highlights">标注</string>
     <string name="reader_statistics" comment="Reader menu label, intentionally matching advanced statistics.">统计</string>
     <string name="reader_untitled_chapter">未命名</string>
@@ -353,6 +356,7 @@
     <string name="reader_appearance_text">文本</string>
     <string name="reader_appearance_layout">布局</string>
     <string name="reader_appearance_display">显示</string>
+    <string name="reader_appearance_progress">进度</string>
     <string name="reader_appearance_popup">弹窗</string>
     <string name="reader_appearance_theme_system">跟随系统</string>
     <string name="reader_appearance_theme_light">浅色</string>
@@ -407,6 +411,8 @@
     <string name="reader_appearance_character_spacing">字距</string>
     <string name="reader_appearance_paragraph_spacing">段落间距</string>
     <string name="reader_appearance_show_title">显示标题</string>
+    <string name="reader_appearance_show_progress">显示进度</string>
+    <string name="reader_appearance_show_chapter_progress">显示章节进度</string>
     <string name="reader_appearance_show_character_count">显示字符数</string>
     <string name="reader_appearance_show_word_count">显示单词数</string>
     <string name="reader_appearance_show_percentage">显示百分比</string>

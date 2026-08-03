@@ -77,6 +77,7 @@ internal enum class ReaderGoToTab {
     Chapters,
     Highlights,
     Search,
+    Gallery,
 }
 
 internal val ReaderGoToTabRole = Role.Tab
@@ -94,6 +95,7 @@ internal fun ReaderGoToSheet(
     onSearchResultJump: (ReaderSearchResult) -> Unit,
     onHighlightJump: (ReaderHighlight) -> Unit,
     onHighlightDelete: (ReaderHighlight) -> Unit,
+    onGalleryImageSelected: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedTab by remember { mutableStateOf(readerGoToDefaultTab()) }
@@ -166,6 +168,11 @@ internal fun ReaderGoToSheet(
                 onJump = onSearchResultJump,
                 modifier = Modifier.weight(1f),
             )
+            ReaderGoToTab.Gallery -> ReaderGalleryTab(
+                book = book,
+                onImageSelected = onGalleryImageSelected,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 
@@ -235,6 +242,7 @@ private fun ReaderGoToTabs(
                 ReaderGoToTab.Search -> stringResource(R.string.reader_search)
                 ReaderGoToTab.Chapters -> stringResource(R.string.reader_chapters)
                 ReaderGoToTab.Highlights -> stringResource(R.string.reader_highlights)
+                ReaderGoToTab.Gallery -> stringResource(R.string.reader_gallery)
             }
             Box(
                 modifier = Modifier
@@ -517,7 +525,8 @@ private fun ReaderGoToChaptersTab(
     onJump: (ReaderChapterPosition, String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val rows = remember(book, currentPosition.index) { book.chapterRows(currentPosition.index) }
+    val currentCharacter = book.characterCountAt(currentPosition.index, currentPosition.progress)
+    val rows = remember(book, currentCharacter) { book.chapterRows(currentCharacter) }
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()

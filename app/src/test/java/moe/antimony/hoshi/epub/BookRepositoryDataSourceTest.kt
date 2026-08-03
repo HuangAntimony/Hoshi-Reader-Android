@@ -53,6 +53,32 @@ class BookRepositoryDataSourceTest {
     }
 
     @Test
+    fun legacyBookInfoWithoutReaderFactsRemainsReadable() = runBlocking {
+        val repository = BookRepository(Files.createTempDirectory("hoshi-legacy-book-info").toFile())
+        val bookRoot = repository.createBookDirectory("legacy")
+        bookRoot.resolve("bookinfo.json").writeText(
+            """
+            {
+                "characterCount": 10,
+                "chapterInfo": {
+                    "chapter.xhtml": {
+                        "spineIndex": 0,
+                        "currentTotal": 0,
+                        "chapterCount": 10
+                    }
+                }
+            }
+            """.trimIndent(),
+        )
+
+        val bookInfo = repository.loadBookInfo(bookRoot)
+
+        assertEquals(10, bookInfo?.characterCount)
+        assertEquals(null, bookInfo?.images)
+        assertEquals(null, bookInfo?.chapterInfo?.get("chapter.xhtml")?.fragmentOffsets)
+    }
+
+    @Test
     fun fileDataSourceHidesDotPrefixedBookFolders() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-book-hidden").toFile()
         val dataSource = BookFileDataSource(filesDir)

@@ -19,12 +19,14 @@ data class Bookmark(
 data class BookInfo(
     val characterCount: Int,
     val chapterInfo: Map<String, ChapterInfo>,
+    val images: List<String>? = null,
 ) {
     @Serializable
     data class ChapterInfo(
         val spineIndex: Int?,
         val currentTotal: Int,
         val chapterCount: Int,
+        val fragmentOffsets: Map<String, Int>? = null,
     )
 }
 

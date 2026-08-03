@@ -103,6 +103,11 @@ Manual reader validation should cover:
   characters, and both incomplete and completed reveal.
 - long text page turns, chapter-list jumps into mid-book chapters, and bookmark
   restore.
+- Contents with nested and percent-encoded TOC fragments that share one XHTML
+  file: verify distinct row positions/current selection, true chapter progress
+  and time remaining, jump/restore behavior, and Gallery first-appearance order.
+  Include duplicate, gaiji, SVG, missing, and absent images; Gallery items must
+  open the existing fullscreen copy/save/share viewer.
 - forward and backward chapter boundaries, including reverse landing at the
   previous chapter end.
 - page progress monotonicity, per-page progress updates, and restore landing

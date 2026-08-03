@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import androidx.compose.ui.semantics.Role
+import moe.antimony.hoshi.epub.EpubBook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,11 +14,22 @@ class ReaderGoToInputActionsTest {
     }
 
     @Test
-    fun goToTabsUseChapterHighlightSearchOrder() {
+    fun goToTabsKeepExistingOrderAndAppendGallery() {
         assertEquals(
-            listOf(ReaderGoToTab.Chapters, ReaderGoToTab.Highlights, ReaderGoToTab.Search),
+            listOf(ReaderGoToTab.Chapters, ReaderGoToTab.Highlights, ReaderGoToTab.Search, ReaderGoToTab.Gallery),
             ReaderGoToTab.entries.toList(),
         )
+    }
+
+    @Test
+    fun galleryResourceUrlEncodesUnicodeAndSpacesOnTheSafeEpubOrigin() {
+        val book = EpubBook(title = "Book", chapters = emptyList())
+
+        assertEquals(
+            "https://appassets.androidplatform.net/epub/OPS/images/%E8%A1%A8%20%E7%B4%99.jpg",
+            book.galleryResourceUrl("OPS/images/表 紙.jpg"),
+        )
+        assertEquals(null, book.galleryResourceUrl("../outside.png"))
     }
 
     @Test

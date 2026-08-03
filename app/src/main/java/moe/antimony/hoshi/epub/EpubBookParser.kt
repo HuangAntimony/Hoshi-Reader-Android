@@ -17,7 +17,7 @@ data class EpubBook(
     val coverHref: String? = null,
     val resources: Map<String, EpubResource> = emptyMap(),
     val rootDirectory: File? = null,
-    val bookInfo: BookInfo = chapters.toBookInfo(),
+    val bookInfo: BookInfo = buildBookInfo(chapters),
 ) {
     fun readResource(path: String): ByteArray? {
         val normalized = path.normalizeResourceHref()
@@ -149,7 +149,8 @@ class EpubBookParser @Inject constructor(
         }
 
         require(chapterShells.isNotEmpty()) { "EPUB spine contains no readable chapters" }
-        val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesChapterShells(chapterShells) }
+        val tocItems = toc().children.map { it.toReaderTocItem(root, contentDirectory) }
+        val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesReaderFacts(chapterShells, tocItems) }
         val chapters = if (reusableBookInfo != null) {
             chapterShells
         } else {
@@ -171,11 +172,11 @@ class EpubBookParser @Inject constructor(
             coverHref = coverHref()
                 ?.let { contentDirectoryPrefix.resolveManifestHref(it) }
                 ?: resources.entries.firstOrNull { (_, resource) -> resource.mediaType.startsWith("image/") }?.key,
-            toc = toc().children.map { it.toReaderTocItem(root, contentDirectory) },
+            toc = tocItems,
             chapters = chapters,
             resources = resources,
             rootDirectory = root,
-            bookInfo = reusableBookInfo ?: chapters.toBookInfo(),
+            bookInfo = reusableBookInfo ?: buildBookInfo(chapters, tocItems, root),
         )
     }
 }
@@ -341,21 +342,3 @@ private fun String.fallbackMimeType(): String = when (substringAfterLast('.', ""
     "xhtml", "html" -> "application/xhtml+xml"
     else -> "application/octet-stream"
 }
-
-private fun List<EpubChapter>.toBookInfo(): BookInfo {
-    var total = 0
-    val chapterInfo = linkedMapOf<String, BookInfo.ChapterInfo>()
-    forEachIndexed { index, chapter ->
-        val count = chapter.html.filteredReaderText().codePointCount()
-        chapterInfo[chapter.href] = BookInfo.ChapterInfo(
-            spineIndex = index,
-            currentTotal = total,
-            chapterCount = count,
-        )
-        total += count
-    }
-    return BookInfo(characterCount = total, chapterInfo = chapterInfo)
-}
-
-private fun String.codePointCount(): Int =
-    codePointCount(0, length)

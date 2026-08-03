@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-07-25
+Date: 2026-08-03
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -94,6 +94,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and
   VN reading. Kotlin selects the asset, injects typed settings, and keeps
   persisted progress as chapter progress mapped to whole-book character count.
+- Reader `bookinfo.json` sidecars persist whole-book/spine character counts plus
+  optional iOS-compatible TOC fragment offsets and a first-appearance raster
+  image inventory. Contents rows, chapter progress, and chapter time remaining
+  derive from one Kotlin-owned TOC range model; Gallery thumbnails and the
+  fullscreen viewer reuse the existing safe EPUB resource path.
 - Reader text semantics live in `reader-text-semantics.js` and are consumed by
   paginated, continuous, and VN assets for normalization, matchable character
   counting, raw character counting, and matchable-character checks.

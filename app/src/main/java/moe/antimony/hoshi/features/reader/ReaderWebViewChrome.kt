@@ -472,7 +472,7 @@ internal fun BoxScope.ReaderBottomChrome(
                                 text = state.progressText(settings, progressDisplay),
                                 color = Color(colors.infoText),
                                 style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
+                                maxLines = 2,
                             )
                         }
                     }

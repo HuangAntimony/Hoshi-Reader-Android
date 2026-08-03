@@ -139,6 +139,41 @@ class ReaderChromeTest {
     }
 
     @Test
+    fun formatsBookAndTrueChapterProgressLikeIos() {
+        val state = ReaderChromeState(
+            title = "Book",
+            currentCharacter = 6,
+            totalCharacters = 10,
+            chapterCurrentCharacter = 2,
+            chapterTotalCharacters = 4,
+        )
+
+        assertEquals(
+            "6 / 10 60.00% (2 / 4 50.00%)",
+            state.progressText(ReaderSettings(showProgress = true, showChapterProgress = true)),
+        )
+        assertEquals(
+            "6 / 10 60.00%\n(2 / 4 50.00%)",
+            state.progressText(
+                ReaderSettings(
+                    showProgress = true,
+                    showChapterProgress = true,
+                    alwaysShowProgress = false,
+                    showProgressTop = false,
+                ),
+            ),
+        )
+        assertEquals(
+            "(2 / 4 50.00%)",
+            state.progressText(ReaderSettings(showProgress = false, showChapterProgress = true)),
+        )
+        assertEquals(
+            "",
+            state.progressText(ReaderSettings(showProgress = false, showChapterProgress = false)),
+        )
+    }
+
+    @Test
     fun readerContentReservesOnlyTheTopSafetyArea() {
         val state = ReaderChromeState(
             title = "屍人荘の殺人",

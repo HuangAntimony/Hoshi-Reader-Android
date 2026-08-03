@@ -137,6 +137,31 @@ class EpubBookParserTest {
     }
 
     @Test
+    fun staleCachedBookInfoRegeneratesReaderFactsBeforeLaterReuse() {
+        val root = tempFolder.newFolder("stale-reader-facts")
+        writeMinimalExtractedEpub(
+            root = root,
+            firstChapterHtml = "<html><body><img src=\"../images/cover.jpg\"/><p>First</p></body></html>",
+        )
+        val stale = BookInfo(
+            characterCount = 11,
+            chapterInfo = mapOf(
+                "OPS/text/chapter-1.xhtml" to BookInfo.ChapterInfo(0, 0, 5),
+                "OPS/text/chapter-2.xhtml" to BookInfo.ChapterInfo(1, 5, 6),
+            ),
+        )
+        val parser = EpubBookParser()
+
+        val regenerated = parser.parse(root, cachedBookInfo = stale)
+        val reused = parser.parse(root, cachedBookInfo = regenerated.bookInfo)
+
+        assertEquals(listOf("OPS/images/cover.jpg"), regenerated.bookInfo.images)
+        assertTrue(regenerated.chapters.all { it.html.isNotEmpty() })
+        assertTrue(reused.chapters.all { it.html.isEmpty() })
+        assertEquals(regenerated.bookInfo, reused.bookInfo)
+    }
+
+    @Test
     fun parsesPackedEpubReextractsIncompleteCacheBeforeReusingBookInfo() {
         val archive = tempFolder.newFile("incomplete-cache.epub")
         val cacheRoot = tempFolder.newFolder("incomplete-cache")

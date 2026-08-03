@@ -104,6 +104,8 @@ data class ReaderSettings(
     val characterSpacing: Double = 0.0,
     val paragraphSpacing: Double = 0.0,
     val showTitle: Boolean = true,
+    val showProgress: Boolean = true,
+    val showChapterProgress: Boolean = false,
     val showCharacters: Boolean = true,
     val showPercentage: Boolean = true,
     val alwaysShowProgress: Boolean = true,
@@ -365,6 +367,8 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         characterSpacing = preferences.getFloat("characterSpacing", 0f).toDouble(),
         paragraphSpacing = preferences.getFloat("paragraphSpacing", 0f).toDouble(),
         showTitle = preferences.getBoolean("readerShowTitle", true),
+        showProgress = preferences.getBoolean("readerShowProgress", true),
+        showChapterProgress = preferences.getBoolean("readerShowChapterProgress", false),
         showCharacters = preferences.getBoolean("readerShowCharacters", true),
         showPercentage = preferences.getBoolean("readerShowPercentage", true),
         alwaysShowProgress = preferences.getBoolean("readerAlwaysShowProgress", true),
@@ -431,6 +435,8 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putFloat("characterSpacing", settings.characterSpacing.toFloat())
             .putFloat("paragraphSpacing", settings.paragraphSpacing.toFloat())
             .putBoolean("readerShowTitle", settings.showTitle)
+            .putBoolean("readerShowProgress", settings.showProgress)
+            .putBoolean("readerShowChapterProgress", settings.showChapterProgress)
             .putBoolean("readerShowCharacters", settings.showCharacters)
             .putBoolean("readerShowPercentage", settings.showPercentage)
             .putBoolean("readerAlwaysShowProgress", settings.alwaysShowProgress)
@@ -578,6 +584,8 @@ class ReaderSettingsRepository(
             characterSpacing = (this[KEY_CHARACTER_SPACING] ?: 0f).toDouble(),
             paragraphSpacing = (this[KEY_PARAGRAPH_SPACING] ?: 0f).toDouble(),
             showTitle = this[KEY_SHOW_TITLE] ?: true,
+            showProgress = this[KEY_SHOW_PROGRESS] ?: true,
+            showChapterProgress = this[KEY_SHOW_CHAPTER_PROGRESS] ?: false,
             showCharacters = this[KEY_SHOW_CHARACTERS] ?: true,
             showPercentage = this[KEY_SHOW_PERCENTAGE] ?: true,
             alwaysShowProgress = this[KEY_ALWAYS_SHOW_PROGRESS] ?: true,
@@ -644,6 +652,8 @@ class ReaderSettingsRepository(
         this[KEY_CHARACTER_SPACING] = settings.characterSpacing.toFloat()
         this[KEY_PARAGRAPH_SPACING] = settings.paragraphSpacing.toFloat()
         this[KEY_SHOW_TITLE] = settings.showTitle
+        this[KEY_SHOW_PROGRESS] = settings.showProgress
+        this[KEY_SHOW_CHAPTER_PROGRESS] = settings.showChapterProgress
         this[KEY_SHOW_CHARACTERS] = settings.showCharacters
         this[KEY_SHOW_PERCENTAGE] = settings.showPercentage
         this[KEY_ALWAYS_SHOW_PROGRESS] = settings.alwaysShowProgress
@@ -760,6 +770,8 @@ class ReaderSettingsRepository(
         private val KEY_CHARACTER_SPACING = floatPreferencesKey("characterSpacing")
         private val KEY_PARAGRAPH_SPACING = floatPreferencesKey("paragraphSpacing")
         private val KEY_SHOW_TITLE = booleanPreferencesKey("readerShowTitle")
+        private val KEY_SHOW_PROGRESS = booleanPreferencesKey("readerShowProgress")
+        private val KEY_SHOW_CHAPTER_PROGRESS = booleanPreferencesKey("readerShowChapterProgress")
         private val KEY_SHOW_CHARACTERS = booleanPreferencesKey("readerShowCharacters")
         private val KEY_SHOW_PERCENTAGE = booleanPreferencesKey("readerShowPercentage")
         private val KEY_ALWAYS_SHOW_PROGRESS = booleanPreferencesKey("readerAlwaysShowProgress")
@@ -828,6 +840,8 @@ private data class ProfileReaderAppearanceSettings(
     val characterSpacing: Double = 0.0,
     val paragraphSpacing: Double = 0.0,
     val showTitle: Boolean = true,
+    val showProgress: Boolean = true,
+    val showChapterProgress: Boolean = false,
     val showCharacters: Boolean = true,
     val showPercentage: Boolean = true,
     val alwaysShowProgress: Boolean = true,
@@ -883,6 +897,8 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         characterSpacing = characterSpacing,
         paragraphSpacing = paragraphSpacing,
         showTitle = showTitle,
+        showProgress = showProgress,
+        showChapterProgress = showChapterProgress,
         showCharacters = showCharacters,
         showPercentage = showPercentage,
         alwaysShowProgress = alwaysShowProgress,
@@ -941,6 +957,8 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         characterSpacing = appearance.characterSpacing,
         paragraphSpacing = appearance.paragraphSpacing,
         showTitle = appearance.showTitle,
+        showProgress = appearance.showProgress,
+        showChapterProgress = appearance.showChapterProgress,
         showCharacters = appearance.showCharacters,
         showPercentage = appearance.showPercentage,
         alwaysShowProgress = appearance.alwaysShowProgress,

@@ -554,31 +554,37 @@ private fun ReaderAppearanceContent(
                         )
                     }
                 }
-                AppearanceSection(title = stringResource(R.string.reader_appearance_display), palette = palette) {
+                AppearanceSection(title = stringResource(R.string.reader_appearance_progress), palette = palette) {
                     SwitchRow(
-                        label = stringResource(R.string.reader_appearance_show_title),
-                        checked = settings.showTitle,
-                        onCheckedChange = { onSettingsChange(settings.copy(showTitle = it)) },
+                        label = stringResource(R.string.reader_appearance_show_progress),
+                        checked = settings.showProgress,
+                        onCheckedChange = { onSettingsChange(settings.copy(showProgress = it)) },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
-                        label = stringResource(
-                            if (progressDisplay.usesWords) {
-                                R.string.reader_appearance_show_word_count
-                            } else {
-                                R.string.reader_appearance_show_character_count
-                            },
-                        ),
-                        checked = settings.showCharacters,
-                        onCheckedChange = { onSettingsChange(settings.copy(showCharacters = it)) },
-                    )
-                    AppearanceDivider(palette)
-                    SwitchRow(
-                        label = stringResource(R.string.reader_appearance_show_percentage),
-                        checked = settings.showPercentage,
-                        onCheckedChange = { onSettingsChange(settings.copy(showPercentage = it)) },
+                        label = stringResource(R.string.reader_appearance_show_chapter_progress),
+                        checked = settings.showChapterProgress,
+                        onCheckedChange = { onSettingsChange(settings.copy(showChapterProgress = it)) },
                     )
                     if (readerAppearanceShowsAlwaysShowProgress(settings)) {
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(
+                                if (progressDisplay.usesWords) {
+                                    R.string.reader_appearance_show_word_count
+                                } else {
+                                    R.string.reader_appearance_show_character_count
+                                },
+                            ),
+                            checked = settings.showCharacters,
+                            onCheckedChange = { onSettingsChange(settings.copy(showCharacters = it)) },
+                        )
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_appearance_show_percentage),
+                            checked = settings.showPercentage,
+                            onCheckedChange = { onSettingsChange(settings.copy(showPercentage = it)) },
+                        )
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_appearance_always_show_progress),
@@ -598,6 +604,13 @@ private fun ReaderAppearanceContent(
                             palette = palette,
                         )
                     }
+                }
+                AppearanceSection(title = stringResource(R.string.reader_appearance_display), palette = palette) {
+                    SwitchRow(
+                        label = stringResource(R.string.reader_appearance_show_title),
+                        checked = settings.showTitle,
+                        onCheckedChange = { onSettingsChange(settings.copy(showTitle = it)) },
+                    )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_back_button),
@@ -798,7 +811,7 @@ internal fun readerAppearanceCustomColorRows(settings: ReaderSettings): List<Rea
     }
 
 internal fun readerAppearanceShowsAlwaysShowProgress(settings: ReaderSettings): Boolean =
-    settings.showCharacters || settings.showPercentage
+    settings.showProgress || settings.showChapterProgress
 
 internal fun readerAppearanceShowsProgressPosition(settings: ReaderSettings): Boolean =
     readerAppearanceShowsAlwaysShowProgress(settings) && !settings.alwaysShowProgress

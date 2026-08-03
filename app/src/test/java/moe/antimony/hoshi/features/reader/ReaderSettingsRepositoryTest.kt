@@ -87,6 +87,8 @@ class ReaderSettingsRepositoryTest {
             assertEquals(0.0, settings.characterSpacing, 0.0)
             assertEquals(0.0, settings.paragraphSpacing, 0.0)
             assertTrue(settings.showTitle)
+            assertTrue(settings.showProgress)
+            assertFalse(settings.showChapterProgress)
             assertTrue(settings.showCharacters)
             assertTrue(settings.showPercentage)
             assertTrue(settings.alwaysShowProgress)
@@ -208,6 +210,8 @@ class ReaderSettingsRepositoryTest {
                     characterSpacing = 0.03,
                     paragraphSpacing = 1.7,
                     showTitle = false,
+                    showProgress = false,
+                    showChapterProgress = true,
                     showCharacters = false,
                     showPercentage = false,
                     alwaysShowProgress = false,
@@ -269,6 +273,8 @@ class ReaderSettingsRepositoryTest {
             assertEquals(0.03, saved.characterSpacing, 0.000001)
             assertEquals(1.7, saved.paragraphSpacing, 0.000001)
             assertFalse(saved.showTitle)
+            assertFalse(saved.showProgress)
+            assertTrue(saved.showChapterProgress)
             assertFalse(saved.showCharacters)
             assertFalse(saved.showPercentage)
             assertFalse(saved.alwaysShowProgress)
