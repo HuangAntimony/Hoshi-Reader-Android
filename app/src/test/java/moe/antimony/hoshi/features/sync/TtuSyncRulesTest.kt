@@ -135,6 +135,19 @@ class TtuSyncRulesTest {
     }
 
     @Test
+    fun progressJsonPreservesTtuDataIdsOutsideIntRange() {
+        val input =
+            """{"dataId":-1959131391809764,"exploredCharCount":76793,"progress":1.0,"lastBookmarkModified":1785337187112}"""
+
+        val progress = runCatching {
+            Json.decodeFromString(TtuProgress.serializer(), input)
+        }.getOrNull()
+
+        assertEquals(-1_959_131_391_809_764L, progress?.dataId)
+        assertEquals(input, progress?.let(Json::encodeToString))
+    }
+
+    @Test
     fun driveSyncFilesPreferLatestTimestampedTtuFiles() {
         val syncFiles = listOf(
             DriveFile(id = "old-bookdata", name = "bookdata_1_6_200_1000_500.zip"),

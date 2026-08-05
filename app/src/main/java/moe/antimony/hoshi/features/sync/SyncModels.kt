@@ -68,7 +68,7 @@ sealed interface SyncResult {
 
 @Serializable
 data class TtuProgress(
-    val dataId: Int,
+    val dataId: Long,
     val exploredCharCount: Int,
     val progress: Double,
     val lastBookmarkModified: Long,
