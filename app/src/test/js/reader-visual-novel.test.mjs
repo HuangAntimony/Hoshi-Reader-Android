@@ -2065,6 +2065,66 @@ test('visual novel Sasayaki wraps and activates a cue on the current screen', as
     assert.equal(reader.nodeStartOffsets.get(collectTextNodes(wrappers[0])[0]), 0);
 });
 
+test('visual novel Sasayaki inline highlight preserves source lookup projection', async () => {
+    const chapterText = '現在激しい抵抗を見せていた。';
+    const cue = { id: 'cue', start: 2, length: 4 };
+    const loaded = await initializeReader(bodyWith(p(chapterText)), {
+        revealSpeed: 0,
+        selectionScript: readerSelectionSource(),
+    });
+    const { reader, document, selectionMessages, window } = loaded;
+
+    reader.applySasayakiCues([cue]);
+    reader.highlightSasayakiCue(cue, false);
+
+    const wrapper = sasayakiWrappers(reader)[0];
+    const highlightedText = collectTextNodes(wrapper)[0];
+    const trailingText = collectTextNodes(currentScreen(reader))
+        .find((node) => node.textContent.startsWith('抗を'));
+    assert.ok(trailingText);
+    document.elementFromPoint = () => wrapper;
+    window.hoshiSelection.configure({ bridge: 'android-reader' });
+    window.hoshiSelection.getCharacterAtPoint = () => ({ node: highlightedText, offset: 0 });
+
+    assert.equal(window.hoshiSelection.selectText(12, 72, 32), '激しい抵抗を見せていた');
+    assert.equal(selectionMessages.length, 1);
+    assert.deepEqual(
+        {
+            text: selectionMessages[0].text,
+            sentence: selectionMessages[0].sentence,
+            sentenceOffset: selectionMessages[0].sentenceOffset,
+            normalizedOffset: selectionMessages[0].normalizedOffset,
+        },
+        {
+            text: '激しい抵抗を見せていた',
+            sentence: chapterText,
+            sentenceOffset: 2,
+            normalizedOffset: 2,
+        },
+    );
+
+    window.hoshiSelection.clearSelection();
+    document.elementFromPoint = () => trailingText.parentElement;
+    window.hoshiSelection.getCharacterAtPoint = () => ({ node: trailingText, offset: 0 });
+
+    assert.equal(window.hoshiSelection.selectText(12, 72, 32), '抗を見せていた');
+    assert.equal(selectionMessages.length, 2);
+    assert.deepEqual(
+        {
+            text: selectionMessages[1].text,
+            sentence: selectionMessages[1].sentence,
+            sentenceOffset: selectionMessages[1].sentenceOffset,
+            normalizedOffset: selectionMessages[1].normalizedOffset,
+        },
+        {
+            text: '抗を見せていた',
+            sentence: chapterText,
+            sentenceOffset: 6,
+            normalizedOffset: 6,
+        },
+    );
+});
+
 test('visual novel Sasayaki range map normalizes string cue offsets', async () => {
     const cue = { id: 'cue', start: '1', length: '2' };
     const { reader } = await initializeReader(bodyWith(p('一二三四。')), { revealSpeed: 0 });

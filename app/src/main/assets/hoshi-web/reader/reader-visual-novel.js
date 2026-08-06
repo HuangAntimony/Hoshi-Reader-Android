@@ -153,6 +153,7 @@ window.hoshiReader = {
       var startRawCount = mappedRawCount !== undefined ? mappedRawCount : fallbackRawCount;
       offsets.set(node, startCount);
       rawOffsets.set(node, startRawCount);
+      this.rangeMap.registerCloneTextOffset(node, startCount, startRawCount);
       fallbackCount = startCount + this.countChars(node.textContent);
       fallbackRawCount = startRawCount + this.countRawChars(node.textContent);
     }

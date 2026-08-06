@@ -10,6 +10,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Keep Google Drive sync and TTU backup restore compatible with progress files
   whose book data IDs exceed Android's 32-bit integer range.
+- Keep dictionary lookup available when tapping Sasayaki-highlighted text in VN
+  Reader mode.
 
 ## [v1.3.2] - 2026-08-04
 

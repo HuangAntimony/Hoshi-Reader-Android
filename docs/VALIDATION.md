@@ -270,9 +270,10 @@ Validate relevant sync/update/Sasayaki changes with:
   prompts, user-triggered install, same-version APK cleanup, and split APK
   updates on arm64-v8a and armeabi-v7a targets.
 - Sasayaki defaults, reader toggle visibility, auto-scroll, auto-pause on
-  lookup, subtitle cue matching, skip controls across reader/sheet/system media
-  controls, volume-key seek, safe-area playback controls, and e-ink cue/lookup
-  overlays when those areas change.
+  lookup, subtitle cue matching, lookup taps on active cue text in normal and
+  E-ink VN rendering, skip controls across reader/sheet/system media controls,
+  volume-key seek, safe-area playback controls, and e-ink cue/lookup overlays
+  when those areas change.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
 - Sasayaki paused task-removal behavior, confirming that pausing playback and
