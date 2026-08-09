@@ -63,25 +63,61 @@ class AnkiRepositoryFetchTest {
     }
 
     @Test
-    fun fetchKeepsExistingSelectionWhenFetchSucceeds() = runBlocking {
+    fun fetchResetsEveryFormatWhilePreservingIdentityNameIconAndTags() = runBlocking {
         val settingsRepository = InMemoryAnkiSettingsRepository(
             AnkiSettings(
-                selectedDeckId = 2L,
-                selectedDeckName = "Mining",
-                selectedNoteTypeId = 7L,
-                selectedNoteTypeName = "Lapis",
-                fieldMappings = mapOf("MainDefinition" to "{single-glossary-JMdict}"),
+                cardFormats = listOf(
+                    AnkiCardFormat(
+                        id = "word",
+                        name = "Word",
+                        icon = AnkiFormatIcon.Circle,
+                        selectedDeckId = 1L,
+                        selectedDeckName = "Default",
+                        selectedNoteTypeId = 5L,
+                        selectedNoteTypeName = "Basic",
+                        fieldMappings = mapOf("Front" to "custom"),
+                        tags = "word-tag",
+                    ),
+                    AnkiCardFormat(
+                        id = "sentence",
+                        name = "Sentence",
+                        icon = AnkiFormatIcon.DiamondSmall,
+                        fieldMappings = mapOf("Stale" to "mapping"),
+                        tags = "sentence-tag",
+                    ),
+                ),
             ),
         )
         val repository = repository(settingsRepository = settingsRepository)
 
         repository.fetchConfiguration()
 
-        assertEquals(2L, settingsRepository.current.selectedDeckId)
-        assertEquals(7L, settingsRepository.current.selectedNoteTypeId)
         assertEquals(
-            mapOf("MainDefinition" to "{single-glossary-JMdict}"),
-            settingsRepository.current.fieldMappings,
+            listOf(
+                AnkiCardFormat(
+                    id = "word",
+                    name = "Word",
+                    icon = AnkiFormatIcon.Circle,
+                    selectedDeckId = 2L,
+                    selectedDeckName = "Mining",
+                    selectedNoteTypeId = 5L,
+                    selectedNoteTypeName = "Basic",
+                    fieldMappings = emptyMap(),
+                    tags = "word-tag",
+                ),
+                AnkiCardFormat(
+                    id = "sentence",
+                    name = "Sentence",
+                    icon = AnkiFormatIcon.DiamondSmall,
+                    selectedDeckId = 2L,
+                    selectedDeckName = "Mining",
+                    selectedNoteTypeId = 5L,
+                    selectedNoteTypeName = "Basic",
+                    fieldMappings = emptyMap(),
+                    tags = "sentence-tag",
+                ),
+            ),
+            settingsRepository.current.cardFormats,
         )
     }
 
@@ -103,7 +139,8 @@ class AnkiRepositoryFetchTest {
 
         repository.fetchConfiguration()
 
-        assertEquals(8L, settingsRepository.current.selectedNoteTypeId)
+        val format = settingsRepository.current.cardFormats.single()
+        assertEquals(8L, format.selectedNoteTypeId)
         assertEquals(
             mapOf(
                 "word" to "{expression}",
@@ -113,7 +150,7 @@ class AnkiRepositoryFetchTest {
                 "wordAudio" to "{audio}",
                 "sentenceAudio" to "{sasayaki-audio}",
             ),
-            settingsRepository.current.fieldMappings,
+            format.fieldMappings,
         )
     }
 

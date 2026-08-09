@@ -84,6 +84,7 @@ import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
+import moe.antimony.hoshi.features.reader.readerPopupBooleanMapJson
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupFramePayload
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupIframeSync
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupResourceHandler
@@ -413,14 +414,20 @@ fun DictionarySearchView(
                 } else {
                     popupById(message.popupId)?.state?.ankiContext ?: return
                 }
-                ankiViewModel.mineEntryAsync(message.payloadJson, miningContext) { mined ->
+                ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, miningContext) { mined ->
                     replyIframeMessage(message.popupId, messageId, mined.toString())
                 }
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
                 val messageId = message.messageId ?: return
-                ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
-                    replyIframeMessage(message.popupId, messageId, isDuplicate.toString())
+                ankiViewModel.duplicateStatesAsync(message.valuesByHandlebar) { states ->
+                    replyIframeMessage(message.popupId, messageId, readerPopupBooleanMapJson(states))
+                }
+            }
+            is ReaderLookupPopupBridgeMessage.ShowNotes -> {
+                val messageId = message.messageId ?: return
+                ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar) { shown ->
+                    replyIframeMessage(message.popupId, messageId, shown.toString())
                 }
             }
             is ReaderLookupPopupBridgeMessage.LookupRedirect -> {

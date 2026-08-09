@@ -558,11 +558,28 @@
     <string name="anki_check_duplicates_all_models">Check for duplicates across all models</string>
     <string name="anki_duplicate_check_scope">Duplicate Check Scope</string>
     <string name="anki_compact_glossaries" comment="Anki setting label, intentionally matching dictionary compact glossaries.">Compact Glossaries</string>
+    <string name="anki_embed_media">Embed media</string>
     <string name="anki_droid_force_sync">Sync AnkiDroid after adding card</string>
     <string name="anki_droid_force_sync_description">Starts AnkiDroid sync after a card is added. AnkiDroid may ignore syncs run more often than every 5 minutes.</string>
     <string name="anki_fields">Fields</string>
     <string name="anki_tags">Tags</string>
     <string name="anki_handlebar">Handlebar</string>
+    <string name="anki_format">Card Format</string>
+    <string name="anki_format_default_name">Format %1$d</string>
+    <string name="anki_add_format">Add Card Format</string>
+    <string name="anki_format_name">Format Name</string>
+    <string name="anki_format_icon">Icon</string>
+    <string name="anki_icon_square">Square</string>
+    <string name="anki_icon_square_small">Small square</string>
+    <string name="anki_icon_circle">Circle</string>
+    <string name="anki_icon_circle_small">Small circle</string>
+    <string name="anki_icon_diamond">Diamond</string>
+    <string name="anki_icon_diamond_small">Small diamond</string>
+    <string name="anki_disable_show_notes">Hide note search buttons</string>
+    <string name="anki_selected_glossary_fallback">Selected glossary fallback</string>
+    <string name="anki_show_all_handlebars">Show all handlebars</string>
+    <string name="anki_fetch_confirm_title">Reset card formats?</string>
+    <string name="anki_fetch_confirm_message">Fetching decks and models resets every card format to the default deck, first model, and its default field mappings. Names, icons, and tags are kept.</string>
     <string name="anki_duplicate_scope_collection">Collection</string>
     <string name="anki_duplicate_scope_deck" comment="Duplicate scope label, intentionally matching Anki deck selector label.">Deck</string>
     <string name="anki_duplicate_scope_deck_root">Deck Root</string>

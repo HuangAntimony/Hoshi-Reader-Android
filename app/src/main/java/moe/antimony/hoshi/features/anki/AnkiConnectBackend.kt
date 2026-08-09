@@ -182,6 +182,25 @@ class AnkiConnectBackend(
             true
         }.getOrDefault(false)
 
+    override fun openNotes(
+        deck: AnkiDeck,
+        noteType: AnkiNoteType,
+        key: String,
+        duplicateScope: AnkiDuplicateScope,
+        checkDuplicatesAcrossAllModels: Boolean,
+    ): Boolean = runCatching {
+        val query = ankiNoteBrowserQuery(
+            deck = deck,
+            noteType = noteType,
+            key = key,
+            duplicateScope = duplicateScope,
+            checkAllModels = checkDuplicatesAcrossAllModels,
+        )
+        if (query.isBlank()) return false
+        request("guiBrowse", buildJsonObject { put("query", query) })
+        true
+    }.getOrDefault(false)
+
     private fun ankiConnectNote(
         deck: AnkiDeck,
         noteType: AnkiNoteType,

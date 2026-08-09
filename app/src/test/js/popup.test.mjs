@@ -34,6 +34,7 @@ class FakeElement {
         this.dataset = {};
         this.matches = new Set(matches);
         this.nodeType = 1;
+        this.isConnected = true;
         this.parentElement = null;
         this.probeWidth = 100;
         this.textContent = '';
@@ -97,7 +98,12 @@ class FakeElement {
         return selectors.some((item) => this.matches.has(item) || item === this.tagName.toLowerCase()) ? this : null;
     }
 
-    remove() {}
+    remove() {
+        if (this.parentElement?.children) {
+            this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+        }
+        this.isConnected = false;
+    }
 }
 
 function popupContext({
@@ -106,6 +112,7 @@ function popupContext({
     htmlZoom = '1',
     htmlProbeWidth = 100,
     bodyProbeWidth = 100,
+    duplicateStates = {},
 } = {}) {
     const documentElement = new FakeElement();
     documentElement.childProbeWidth = htmlProbeWidth;
@@ -139,11 +146,15 @@ function popupContext({
     const selectTextCalls = [];
     const tapOutsideMessages = [];
     const mineEntryMessages = [];
+    const duplicateCheckMessages = [];
+    const showNotesMessages = [];
+    let currentDuplicateStates = duplicateStates;
     const window = {
         scrollX: 0,
         scrollY: 0,
         scanLength: 24,
         addEventListener() {},
+        getSelection() { return { toString: () => '' }; },
         hoshiSelection: {
             selectText(...args) {
                 selectTextCalls.push(args);
@@ -171,6 +182,18 @@ function popupContext({
                         return true;
                     },
                 },
+                duplicateCheck: {
+                    postMessage(message) {
+                        duplicateCheckMessages.push(message);
+                        return currentDuplicateStates;
+                    },
+                },
+                showNotes: {
+                    postMessage(message) {
+                        showNotesMessages.push(message);
+                        return true;
+                    },
+                },
             },
         },
         window,
@@ -190,6 +213,9 @@ function popupContext({
         selectTextCalls,
         tapOutsideMessages,
         mineEntryMessages,
+        duplicateCheckMessages,
+        showNotesMessages,
+        setDuplicateStates(value) { currentDuplicateStates = value; },
     };
 }
 
@@ -329,6 +355,7 @@ test('popup action controls remain DOM buttons even if a legacy native button fl
     context.window.nativePopupButtons = true;
     const audioSlot = context.createButtonSlot('audio', 0);
     const mineSlot = context.createButtonSlot('mine', 1, false);
+    const circleSlot = context.createButtonSlot('mine', 2, true, 'format-circle', 'circle-small');
 
     assert.equal(audioSlot.tagName, 'BUTTON');
     assert.equal(audioSlot.type, 'button');
@@ -337,6 +364,59 @@ test('popup action controls remain DOM buttons even if a legacy native button fl
     assert.equal(audioSlot.children[0].className, 'button-slot-icon');
     assert.equal(mineSlot.tagName, 'BUTTON');
     assert.equal(mineSlot.disabled, true);
+    assert.equal(circleSlot.dataset.formatId, 'format-circle');
+    assert.match(circleSlot.style.properties.get('--button-icon-url'), /add_circle\.svg/);
+});
+
+test('popup renders ordered format buttons with independent icon and disabled state', () => {
+    const { context } = popupContext();
+    context.window.ankiBackendAvailable = true;
+    context.window.ankiFormats = [
+        { id: 'word', icon: 'square', isValid: true },
+        { id: 'sentence', icon: 'circle-small', isValid: false },
+        { id: 'listening', icon: 'diamond', isValid: true },
+    ];
+    const container = new FakeElement();
+
+    const formats = context.appendAnkiFormatButtons(container, 4);
+
+    assert.equal(formats.length, 3);
+    assert.deepEqual(container.children.map((button) => button.dataset.formatId), ['word', 'sentence', 'listening']);
+    assert.equal(container.children[0].disabled, false);
+    assert.equal(container.children[1].disabled, true);
+    assert.match(container.children[1].style.properties.get('--button-icon-url'), /add_circle\.svg/);
+    assert.match(container.children[2].style.properties.get('--button-icon-url'), /diamond\.svg/);
+});
+
+test('duplicate refresh updates every format and creates or removes show-notes buttons', async () => {
+    const setup = popupContext({
+        duplicateStates: { word: true, sentence: false, listening: true },
+    });
+    const { context } = setup;
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', matched: '猫' }];
+    context.window.ankiBackendAvailable = true;
+    context.window.allowDupes = false;
+    context.window.disableShowNotes = false;
+    context.window.ankiFormats = [
+        { id: 'word', icon: 'square', isValid: true },
+        { id: 'sentence', icon: 'circle', isValid: true },
+        { id: 'listening', icon: 'diamond', isValid: true },
+    ];
+    const container = new FakeElement();
+    context.appendAnkiFormatButtons(container, 0);
+
+    await context.refreshAnkiDuplicateStates(0, container);
+
+    const mineButtons = container.children.filter((button) => button.dataset.kind === 'mine');
+    assert.deepEqual(mineButtons.map((button) => button.dataset.state), ['duplicate', 'default', 'duplicate']);
+    assert.deepEqual(mineButtons.map((button) => button.disabled), [true, false, true]);
+    assert.equal(container.children.filter((button) => button.dataset.kind === 'notes').length, 2);
+    assert.match(mineButtons[2].style.properties.get('--button-icon-url'), /diamond_fill\.svg/);
+
+    setup.setDuplicateStates({ word: false, sentence: false, listening: false });
+    await context.refreshAnkiDuplicateStates(0, container);
+    assert.equal(container.children.filter((button) => button.dataset.kind === 'notes').length, 0);
+    assert.deepEqual(mineButtons.map((button) => button.disabled), [false, false, false]);
 });
 
 test('popup language detection works with split selection policy assets', () => {
@@ -459,11 +539,64 @@ test('mineEntry posts phonetic transcriptions for Anki handlebar rendering', asy
         'read',
         0,
         'read',
+        'format-a',
     );
 
     assert.equal(mineEntryMessages.length, 1);
+    assert.equal(mineEntryMessages[0].formatId, 'format-a');
     assert.equal(
-        mineEntryMessages[0].phoneticTranscriptions,
+        mineEntryMessages[0].payload.phoneticTranscriptions,
         '<ul><li class="pronunciation" data-pronunciation-type="phonetic-transcription">/riːd/</li></ul>',
     );
+});
+
+test('show-notes and duplicate payloads use stable format ids and handlebar values', async () => {
+    const { context, showNotesMessages } = popupContext();
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', matched: '猫' }];
+
+    const values = context.duplicateValuesForEntry(context.window.lookupEntries[0]);
+    const shown = await context.showNotesAtIndex(0, 'format-cat');
+
+    assert.equal(values['{expression}'], '猫');
+    assert.equal(values['{reading}'], 'ねこ');
+    assert.equal(context.duplicateStateForFormat({ 'format-cat': true }, 'format-cat'), true);
+    assert.equal(context.duplicateStateForFormat({}, 'deleted-format'), null);
+    assert.equal(shown, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(showNotesMessages[0])), {
+        formatId: 'format-cat',
+        values: JSON.parse(JSON.stringify(values)),
+    });
+});
+
+test('pitch graph handlebars receive deduplicated SVGs and first graph selection', () => {
+    const { context } = popupContext();
+    context.window.deduplicatePitchAccents = true;
+    const pitches = [
+        { dictionary: 'A', pitchPositions: [0, 2] },
+        { dictionary: 'B', pitchPositions: [2, 1] },
+    ];
+
+    const all = context.constructPitchAccentGraphsHtml(pitches, 'ねこ');
+    const first = context.constructPitchAccentGraphsHtml(pitches, 'ねこ', true);
+
+    assert.equal((all.match(/<svg/g) || []).length, 3);
+    assert.equal((first.match(/<svg/g) || []).length, 1);
+    assert.match(first, /data-downstep="0"/);
+    assert.match(all, /stroke-dasharray:5 5/);
+});
+
+test('pitch graph output keeps duplicates when disabled and omits list for one graph', () => {
+    const { context } = popupContext();
+    context.window.deduplicatePitchAccents = false;
+
+    const multiple = context.constructPitchAccentGraphsHtml([
+        { pitchPositions: [1] },
+        { pitchPositions: [1] },
+    ], 'ねこ');
+    const single = context.constructPitchAccentGraphsHtml([{ pitchPositions: [1] }], 'ねこ');
+
+    assert.equal((multiple.match(/<svg/g) || []).length, 2);
+    assert.match(multiple, /^<ol>/);
+    assert.match(single, /^<svg/);
+    assert.doesNotMatch(single, /<ol>/);
 });

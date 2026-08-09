@@ -229,6 +229,33 @@ class AnkiConnectBackendTest {
     }
 
     @Test
+    fun openNotesUsesGuiBrowseWithFirstFieldModelAndDeckRootQuery() {
+        val transport = FakeAnkiConnectTransport("""{"result":[],"error":null}""")
+        val backend = AnkiConnectBackend("https://anki.example.com", transport)
+
+        assertTrue(
+            backend.openNotes(
+                deck = AnkiDeck(1L, "Mining::Light Novel"),
+                noteType = AnkiNoteType(2L, "Lapis", listOf("Expression")),
+                key = "食べ\"る",
+                duplicateScope = AnkiDuplicateScope.DeckRoot,
+                checkDuplicatesAcrossAllModels = false,
+            ),
+        )
+
+        assertEquals("guiBrowse", transport.actions.single())
+        assertEquals(
+            "\"Expression:食べる\" \"note:Lapis\" \"deck:Mining\"",
+            transport.lastBody()
+                .getValue("params")
+                .jsonObject
+                .getValue("query")
+                .jsonPrimitive
+                .content,
+        )
+    }
+
+    @Test
     fun ankiConnectErrorBecomesFetchExceptionMessage() {
         val transport = FakeAnkiConnectTransport("""{"result":null,"error":"permission denied"}""")
         val backend = AnkiConnectBackend("https://anki.example.com", transport)

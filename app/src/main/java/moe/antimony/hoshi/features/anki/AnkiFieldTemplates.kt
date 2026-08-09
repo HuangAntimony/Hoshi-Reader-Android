@@ -41,7 +41,7 @@ object AnkiFieldTemplates {
         "Senren" to mapOf(
             "word" to "{expression}",
             "reading" to "{reading}",
-            "sentence" to "{sentence}",
+            "sentence" to "<span class=\"group\">{cloze-prefix}<span class=\"highlight\">{cloze-body}</span>{cloze-suffix}</span>",
             "sentenceCard" to "x",
             "selectionText" to "{popup-selection-text}",
             "definition" to "{glossary-first}",

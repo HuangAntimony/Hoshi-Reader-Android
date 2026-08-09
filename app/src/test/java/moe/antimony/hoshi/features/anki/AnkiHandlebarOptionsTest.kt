@@ -12,13 +12,29 @@ class AnkiHandlebarOptionsTest {
         )
 
         assertTrue(options.contains("{expression}"))
-        assertTrue(options.contains("{glossary-brief}"))
+        assertTrue("{glossary-brief}" !in options)
         assertTrue(options.contains("{phonetic-transcriptions}"))
-        assertTrue(options.contains("{selected-glossary-fallback}"))
+        assertTrue(options.contains("{pitch-accent-graphs}"))
+        assertTrue("{selected-glossary-fallback}" !in options)
         assertEquals(
             listOf("{single-glossary-JMdict}", "{single-glossary-明鏡国語辞典 第三版}"),
             options.takeLast(2),
         )
+    }
+
+    @Test
+    fun showAllIncludesAdvancedButNotMonolingualOrBilingualVariants() {
+        val options = AnkiHandlebarOptions.forTermDictionaries(listOf("JMdict"), showAll = true)
+
+        assertTrue("{glossary-brief}" in options)
+        assertTrue("{glossary-no-dictionary}" in options)
+        assertTrue("{cloze-prefix}" in options)
+        assertTrue("{pitch-accent-graphs-first}" in options)
+        assertTrue("{glossary-first-brief}" in options)
+        assertTrue("{selected-glossary-no-dictionary}" in options)
+        assertTrue("{single-glossary-JMdict-brief}" in options)
+        assertTrue(options.none { "monolingual" in it || "bilingual" in it })
+        assertTrue("{selected-glossary-fallback}" !in options)
     }
 
     @Test

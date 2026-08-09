@@ -126,6 +126,10 @@ button.button-slot:disabled {
     pointer-events: none;
 }
 
+.button-slot-small .button-slot-icon {
+    transform: scale(0.76);
+}
+
 .entry-tags {
     margin-top: -4px;
     -webkit-user-select: none;

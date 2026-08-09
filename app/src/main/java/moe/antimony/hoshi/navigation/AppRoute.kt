@@ -26,6 +26,14 @@ sealed interface AppRoute : NavKey {
     ) : AppRoute
 
     @Serializable
+    data class AnkiCardFormatRoute(
+        val formatId: String,
+    ) : AppRoute
+
+    @Serializable
+    data object AnkiAdvancedRoute : AppRoute
+
+    @Serializable
     data class ReaderRoute(
         val bookId: String,
     ) : AppRoute

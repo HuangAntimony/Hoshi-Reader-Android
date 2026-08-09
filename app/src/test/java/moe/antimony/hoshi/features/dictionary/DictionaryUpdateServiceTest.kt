@@ -27,6 +27,7 @@ import moe.antimony.hoshi.dictionary.DictionaryStorageDataSource
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.NativeDictionaryImportResult
 import moe.antimony.hoshi.features.anki.AnkiSettings
+import moe.antimony.hoshi.features.anki.AnkiCardFormat
 import moe.antimony.hoshi.features.anki.AnkiSettingsRepository
 import moe.antimony.hoshi.features.anki.DataStoreAnkiSettingsRepository
 import moe.antimony.hoshi.profiles.ProfileRepository
@@ -62,6 +63,13 @@ class DictionaryUpdateServiceTest {
             }
             val ankiRepository = InMemoryAnkiSettingsRepository(
                 AnkiSettings(
+                    cardFormats = listOf(
+                        AnkiCardFormat(
+                            id = "format",
+                            name = "Default",
+                            fieldMappings = mapOf("MainDefinition" to "{single-glossary-${installed.title}}"),
+                        ),
+                    ),
                     fieldMappings = mapOf(
                         "MainDefinition" to "{single-glossary-${installed.title}}",
                         "BriefDefinition" to "{single-glossary-${installed.title}-brief}",
@@ -99,6 +107,10 @@ class DictionaryUpdateServiceTest {
             assertEquals(
                 "{single-glossary-${remoteIndex.title}}",
                 ankiRepository.settings.first().fieldMappings["MainDefinition"],
+            )
+            assertEquals(
+                "{single-glossary-${remoteIndex.title}}",
+                ankiRepository.settings.first().cardFormats.single().fieldMappings["MainDefinition"],
             )
             assertEquals(
                 "{single-glossary-${remoteIndex.title}-brief}",

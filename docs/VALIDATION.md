@@ -214,6 +214,25 @@ Validate relevant dictionary/audio changes with:
   changes.
 - Android AnkiConnect and AnkiDroid flows when Anki behavior changes, including
   duplicate checks, media references, add-note, and sync behavior.
+- Reader, Dictionary tab, and Process Text popups with one, two, and three Anki
+  formats. Confirm button order and icon size, independent duplicate state,
+  disabled formats whose first model field is unmapped, and safe failure after
+  deleting a format or disconnecting AnkiConnect.
+- Anki format add/edit/delete behavior across app restart and profile switches:
+  names, stable IDs, icons, decks, models, mappings, and tags persist; a fourth
+  format cannot be added and the last format cannot be deleted. Confirming a
+  deck/model fetch resets every format mapping while retaining IDs, names,
+  icons, and tags.
+- Duplicate-note search through AnkiConnect `guiBrowse` and the AnkiDroid card
+  browser deep link for collection, deck, and deck-root scopes, including the
+  all-models option and the global hide-search-button setting.
+- Exact cloze output for repeated matches, incorrect stored offsets, and
+  supplementary-plane characters; selected-glossary fallback `None` and
+  `{glossary-first}`; numeric pitch graph single/multiple/deduplicated output
+  and `{pitch-accent-graphs-first}`.
+- Cross-format audio, Sasayaki audio, cover, and dictionary-media mining through
+  both backends. Recheck after restart and profile switching without clearing
+  app data.
 
 When adb text input for Japanese is unreliable, inspect input methods before
 assuming Japanese cannot be entered:

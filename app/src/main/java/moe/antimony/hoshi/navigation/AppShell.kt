@@ -33,6 +33,8 @@ import androidx.navigation3.ui.NavDisplay
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.epub.BookSortOption
 import moe.antimony.hoshi.features.anki.AnkiView
+import moe.antimony.hoshi.features.anki.AnkiAdvancedView
+import moe.antimony.hoshi.features.anki.AnkiCardFormatView
 import moe.antimony.hoshi.features.bookshelf.BookshelfView
 import moe.antimony.hoshi.features.bookshelf.MainTab
 import moe.antimony.hoshi.features.bookshelf.SettingsDestination
@@ -215,6 +217,16 @@ fun AppShell(
         settingsBackStack.add(AppRoute.SettingsDetailRoute(section))
     }
 
+    fun openAnkiFormat(formatId: String) {
+        selectedTab = MainTab.Settings
+        settingsBackStack.add(AppRoute.AnkiCardFormatRoute(formatId))
+    }
+
+    fun openAnkiAdvanced() {
+        selectedTab = MainTab.Settings
+        settingsBackStack.add(AppRoute.AnkiAdvancedRoute)
+    }
+
     fun openReader(bookId: String) {
         clearReaderRoutesOutsideBooks()
         selectedTab = MainTab.Books
@@ -317,6 +329,17 @@ fun AppShell(
                     onClose = ::popRoute,
                     onBooksRestored = { bookshelfRefreshKey += 1 },
                     onSelectedTabChange = ::selectMainTab,
+                    onOpenAnkiFormat = ::openAnkiFormat,
+                    onOpenAnkiAdvanced = ::openAnkiAdvanced,
+                )
+                is AppRoute.AnkiCardFormatRoute -> AnkiCardFormatView(
+                    formatId = route.formatId,
+                    onClose = ::popRoute,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                AppRoute.AnkiAdvancedRoute -> AnkiAdvancedView(
+                    onClose = ::popRoute,
+                    modifier = Modifier.fillMaxSize(),
                 )
                 is AppRoute.ReaderRoute -> {
                     ReaderRouteDestination(
@@ -456,6 +479,8 @@ private fun SettingsDetailDestination(
     onClose: () -> Unit,
     onBooksRestored: () -> Unit,
     onSelectedTabChange: (MainTab) -> Unit,
+    onOpenAnkiFormat: (String) -> Unit,
+    onOpenAnkiAdvanced: () -> Unit,
 ) {
     when (route.section) {
         SettingsDetailSection.Dictionaries -> DictionaryView(
@@ -464,6 +489,8 @@ private fun SettingsDetailDestination(
         )
         SettingsDetailSection.Anki -> AnkiView(
             onClose = onClose,
+            onOpenFormat = onOpenAnkiFormat,
+            onOpenAdvanced = onOpenAnkiAdvanced,
             modifier = Modifier.fillMaxSize(),
         )
         SettingsDetailSection.Profiles -> ProfilesView(
@@ -553,6 +580,7 @@ private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
     is AppRoute.SettingsDetailRoute -> MainTab.Settings
+    is AppRoute.AnkiCardFormatRoute, AppRoute.AnkiAdvancedRoute -> MainTab.Settings
 }
 
 private fun SettingsDestination.toSection(): SettingsDetailSection = when (this) {

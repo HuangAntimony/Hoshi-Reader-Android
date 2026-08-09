@@ -14,6 +14,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.anki.AnkiPopupSettings
+import moe.antimony.hoshi.features.anki.AnkiPopupFormat
+import moe.antimony.hoshi.features.anki.AnkiFormatIcon
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSource
 import org.junit.Assert.assertFalse
@@ -158,7 +160,10 @@ class LookupPopupHtmlTest {
         val html = LookupPopupHtml.renderIframeDocument(
             ankiSettings = AnkiPopupSettings(
                 isConfigured = true,
+                formats = listOf(AnkiPopupFormat("format-a", AnkiFormatIcon.CircleSmall, true)),
+                isBackendAvailable = true,
                 useAnkiConnect = true,
+                disableShowNotes = true,
             ),
             audioSettings = AudioSettings(
                 audioSources = listOf(AudioSettings.LocalAudioSource, ankiconnectAndroidSource),
@@ -167,6 +172,9 @@ class LookupPopupHtmlTest {
         )
 
         assertTrue(html.contains("window.useAnkiConnect = true;"))
+        assertTrue(html.contains("window.ankiFormats = [{\"id\":\"format-a\",\"icon\":\"circle-small\",\"isValid\":true}];"))
+        assertTrue(html.contains("window.disableShowNotes = true;"))
+        assertTrue(html.contains("showNotes: { postMessage:"))
         assertTrue(html.contains("hoshi-local-audio-source://get/?term={term}&reading={reading}"))
         assertTrue(html.contains(AudioSettings.LocalAudioUrl))
     }

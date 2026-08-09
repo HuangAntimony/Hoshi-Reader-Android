@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.features.anki
 
 import android.content.Context
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -98,9 +100,14 @@ class DataStoreAnkiSettingsRepository(
                 repository.ankiConfigFile(profileId)
             }
             if (file.isFile) {
-                runCatching { json.decodeFromString<AnkiSettings>(file.readText()) }.getOrDefault(AnkiSettings())
+                val raw = file.readText()
+                val decoded = decodeAnkiSettings(raw) { UUID.randomUUID().toString() }
+                if (decoded.didMigrate) {
+                    file.writeText(json.encodeToString(decoded.settings))
+                }
+                decoded.settings
             } else {
-                val migrated = fallbackSettings
+                val migrated = fallbackSettings.ensureAnkiCardFormat()
                 saveProfileSettings(migrated, profileId)
                 migrated
             }
@@ -123,8 +130,10 @@ class DataStoreAnkiSettingsRepository(
 
     private fun Preferences.toAnkiSettings(): AnkiSettings =
         this[KEY_SETTINGS]?.let { raw ->
-            runCatching { json.decodeFromString<AnkiSettings>(raw) }.getOrNull()
-        } ?: AnkiSettings()
+            decodeAnkiSettings(raw) {
+                UUID.nameUUIDFromBytes(raw.toByteArray(StandardCharsets.UTF_8)).toString()
+            }.settings
+        } ?: AnkiSettings(cardFormats = listOf(defaultAnkiCardFormat(UUID.randomUUID().toString())))
 
     private companion object {
         val KEY_SETTINGS = stringPreferencesKey("ankiSettings")
@@ -134,6 +143,11 @@ class DataStoreAnkiSettingsRepository(
         }
     }
 }
+
+private fun AnkiSettings.ensureAnkiCardFormat(): AnkiSettings =
+    if (cardFormats.isNotEmpty()) this else copy(
+        cardFormats = listOf(defaultAnkiCardFormat(UUID.randomUUID().toString())),
+    )
 
 private val Context.ankiDataStore by preferencesDataStore(name = "anki_settings")
 

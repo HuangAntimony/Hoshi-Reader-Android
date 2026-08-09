@@ -71,4 +71,54 @@ class AnkiDuplicateQueryTest {
 
         assertEquals(setOf(2L), deckIds)
     }
+
+    @Test
+    fun noteBrowserQueryHonorsDuplicateScopeAndModelSetting() {
+        val noteType = AnkiNoteType(7L, "Lapis", listOf("Expression"))
+        val nestedDeck = AnkiDeck(3L, "Mining::Light Novel")
+
+        assertEquals(
+            "\"Expression:食べる\" \"note:Lapis\"",
+            ankiNoteBrowserQuery(
+                deck = nestedDeck,
+                noteType = noteType,
+                key = "食べる",
+                duplicateScope = AnkiDuplicateScope.Collection,
+                checkAllModels = false,
+            ),
+        )
+        assertEquals(
+            "\"Expression:食べる\" \"deck:Mining::Light Novel\"",
+            ankiNoteBrowserQuery(
+                deck = nestedDeck,
+                noteType = noteType,
+                key = "食べる",
+                duplicateScope = AnkiDuplicateScope.Deck,
+                checkAllModels = true,
+            ),
+        )
+        assertEquals(
+            "\"Expression:食べる\" \"note:Lapis\" \"deck:Mining\"",
+            ankiNoteBrowserQuery(
+                deck = nestedDeck,
+                noteType = noteType,
+                key = "食べ\"る",
+                duplicateScope = AnkiDuplicateScope.DeckRoot,
+                checkAllModels = false,
+            ),
+        )
+    }
+
+    @Test
+    fun ankiDroidBrowserIntentTargetsOfficialDeepLink() {
+        val spec = ankiDroidBrowserIntentSpec("\"Expression:食べる\"")
+
+        assertEquals("android.intent.action.VIEW", spec.action)
+        assertEquals("com.ichi2.anki", spec.packageName)
+        assertEquals(
+            "anki://x-callback-url/browser?search=%22Expression%3A%E9%A3%9F%E3%81%B9%E3%82%8B%22",
+            spec.uri,
+        )
+        assertTrue(spec.newTask)
+    }
 }
