@@ -335,6 +335,7 @@ fun AppShell(
                 is AppRoute.AnkiCardFormatRoute -> AnkiCardFormatView(
                     formatId = route.formatId,
                     onClose = ::popRoute,
+                    onOpenFormat = ::openAnkiFormat,
                     modifier = Modifier.fillMaxSize(),
                 )
                 AppRoute.AnkiAdvancedRoute -> AnkiAdvancedView(

@@ -565,6 +565,7 @@
     <string name="anki_format">卡片格式</string>
     <string name="anki_format_default_name">格式 %1$d</string>
     <string name="anki_add_format">添加卡片格式</string>
+    <string name="anki_duplicate_format">复制此格式</string>
     <string name="anki_delete_format_title">删除“%1$s”？</string>
     <string name="anki_delete_format_confirmation">这会从 Hoshi 中永久删除该卡片格式及其字段映射。</string>
     <string name="anki_format_name">格式名称</string>

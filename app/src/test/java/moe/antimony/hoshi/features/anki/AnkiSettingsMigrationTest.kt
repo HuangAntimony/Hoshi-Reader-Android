@@ -9,6 +9,50 @@ import kotlinx.serialization.json.Json
 
 class AnkiSettingsMigrationTest {
     @Test
+    fun duplicateCardFormatCopiesConfigurationWithANewIdentity() {
+        val source = AnkiCardFormat(
+            id = "source",
+            name = "Mining",
+            icon = AnkiFormatIcon.DiamondSmall,
+            selectedDeckId = 11,
+            selectedDeckName = "Japanese::Mining",
+            selectedNoteTypeId = 22,
+            selectedNoteTypeName = "Hoshi",
+            fieldMappings = mapOf(
+                "Expression" to "{expression}",
+                "Sentence" to "{sentence}",
+            ),
+            tags = "hoshi mined",
+        )
+        val settings = AnkiSettings(cardFormats = listOf(source))
+
+        val duplicated = settings.duplicateCardFormat(
+            sourceFormatId = "source",
+            newFormatId = "copy",
+            newName = "Format 2",
+        )
+
+        assertEquals(
+            AnkiCardFormat(
+                id = "copy",
+                name = "Format 2",
+                icon = AnkiFormatIcon.DiamondSmall,
+                selectedDeckId = 11,
+                selectedDeckName = "Japanese::Mining",
+                selectedNoteTypeId = 22,
+                selectedNoteTypeName = "Hoshi",
+                fieldMappings = mapOf(
+                    "Expression" to "{expression}",
+                    "Sentence" to "{sentence}",
+                ),
+                tags = "hoshi mined",
+            ),
+            duplicated.cardFormats.last(),
+        )
+        assertEquals(listOf("source", "copy"), duplicated.cardFormats.map(AnkiCardFormat::id))
+    }
+
+    @Test
     fun cardFormatCrudCapsAtThreeAndProtectsLastFormat() {
         val initial = AnkiSettings(
             cardFormats = listOf(AnkiCardFormat(id = "one", name = "Default")),

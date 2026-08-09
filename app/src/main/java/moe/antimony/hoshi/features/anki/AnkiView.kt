@@ -33,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Diamond
 import androidx.core.content.ContextCompat
@@ -292,11 +294,17 @@ fun AnkiView(
 }
 
 @Composable
-fun AnkiCardFormatView(formatId: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun AnkiCardFormatView(
+    formatId: String,
+    onClose: () -> Unit,
+    onOpenFormat: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val appContainer = LocalHoshiUiDependencies.current
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val format = uiState.settings.cardFormats.firstOrNull { it.id == formatId }
+    val duplicateName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
     val handlebarOptions by produceState(
         initialValue = AnkiHandlebarOptions.forTermDictionaries(emptyList(), uiState.settings.showAllHandlebars),
         key1 = appContainer.dictionaryRepository,
@@ -311,6 +319,25 @@ fun AnkiCardFormatView(formatId: String, onClose: () -> Unit, modifier: Modifier
         if (format == null) return@SettingsDetailScaffold
         val noteType = uiState.availableNoteTypes.firstOrNull { it.id == format.selectedNoteTypeId || it.name == format.selectedNoteTypeName }
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
+            item {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.duplicateCardFormat(
+                            formatId = formatId,
+                            name = duplicateName,
+                            onCreated = onOpenFormat,
+                        )
+                    },
+                    enabled = uiState.settings.cardFormats.size < MaxAnkiCardFormats,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.anki_duplicate_format),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
             item {
                 AnkiCard {
                     AnkiTextValueRow(stringResource(R.string.anki_format_name), format.name, { viewModel.updateFormatName(formatId, it) }, stringResource(R.string.anki_format_name))

@@ -567,6 +567,7 @@
     <string name="anki_format">Card Format</string>
     <string name="anki_format_default_name">Format %1$d</string>
     <string name="anki_add_format">Add Card Format</string>
+    <string name="anki_duplicate_format">Duplicate This Format</string>
     <string name="anki_delete_format_title">Delete “%1$s”?</string>
     <string name="anki_delete_format_confirmation">This permanently deletes the card format and its field mappings from Hoshi.</string>
     <string name="anki_format_name">Format Name</string>

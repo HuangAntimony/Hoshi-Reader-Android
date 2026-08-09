@@ -125,6 +125,15 @@ internal fun AnkiSettings.addCardFormat(format: AnkiCardFormat): AnkiSettings =
         copy(cardFormats = cardFormats + format)
     }
 
+internal fun AnkiSettings.duplicateCardFormat(
+    sourceFormatId: String,
+    newFormatId: String,
+    newName: String,
+): AnkiSettings {
+    val source = cardFormats.firstOrNull { it.id == sourceFormatId } ?: return this
+    return addCardFormat(source.copy(id = newFormatId, name = newName))
+}
+
 internal fun AnkiSettings.updateCardFormat(
     formatId: String,
     transform: (AnkiCardFormat) -> AnkiCardFormat,
