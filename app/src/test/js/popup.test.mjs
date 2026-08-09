@@ -438,6 +438,9 @@ test('duplicate refresh updates every format and creates or removes show-notes b
     ];
     const container = new FakeElement();
     context.appendAnkiFormatButtons(container, 0);
+    const notesButtons = descendants(container).filter((button) => button.dataset.kind === 'notes');
+
+    assert.deepEqual(notesButtons.map((button) => button.style.display), ['none', 'none', 'none']);
 
     await context.refreshAnkiDuplicateStates(0, container);
 
@@ -445,11 +448,13 @@ test('duplicate refresh updates every format and creates or removes show-notes b
     assert.deepEqual(mineButtons.map((button) => button.dataset.state), ['duplicate', 'default', 'duplicate']);
     assert.deepEqual(mineButtons.map((button) => button.disabled), [true, false, true]);
     assert.equal(descendants(container).filter((button) => button.dataset.kind === 'notes' && !button.hidden).length, 2);
+    assert.deepEqual(notesButtons.map((button) => button.style.display), ['', 'none', '']);
     assert.match(mineButtons[2].style.properties.get('--button-icon-url'), /diamond_fill\.svg/);
 
     setup.setDuplicateStates({ word: false, sentence: false, listening: false });
     await context.refreshAnkiDuplicateStates(0, container);
     assert.equal(descendants(container).filter((button) => button.dataset.kind === 'notes' && !button.hidden).length, 0);
+    assert.deepEqual(notesButtons.map((button) => button.style.display), ['none', 'none', 'none']);
     assert.deepEqual(mineButtons.map((button) => button.disabled), [false, false, false]);
 });
 

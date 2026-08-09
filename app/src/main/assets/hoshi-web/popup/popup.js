@@ -1444,6 +1444,12 @@ function updateButtonSlot(slot, changes) {
     applyButtonSlotVisualState(slot);
 }
 
+function setButtonSlotHidden(slot, hidden) {
+    if (!slot) { return; }
+    slot.hidden = hidden;
+    slot.style.display = hidden ? 'none' : '';
+}
+
 function applyButtonSlotVisualState(slot) {
     if (!slot) { return; }
     const kind = slot.dataset.kind;
@@ -1544,7 +1550,7 @@ function appendAnkiFormatButtons(container, entryIndex) {
             format.icon,
         );
         const notesButton = createButtonSlot('notes', entryIndex, true, format.id, format.icon);
-        notesButton.hidden = true;
+        setButtonSlotHidden(notesButton, true);
         if (placement === 'leading') {
             actions.appendChild(notesButton);
             actions.appendChild(mineButton);
@@ -1578,9 +1584,7 @@ function buttonSlotInContainer(container, kind, entryIndex, formatId) {
 
 function syncShowNotesButton(container, entryIndex, format, visible) {
     const existing = buttonSlotInContainer(container, 'notes', entryIndex, format.id);
-    if (existing) {
-        existing.hidden = !visible;
-    }
+    setButtonSlotHidden(existing, !visible);
 }
 
 async function refreshAnkiDuplicateStates(entryIndex, buttonsContainer) {

@@ -226,7 +226,8 @@ Validate relevant dictionary/audio changes with:
   every format mapping while retaining IDs, names, icons, and tags.
 - Duplicate-note search through AnkiConnect `guiBrowse` and the AnkiDroid card
   browser deep link for collection, deck, and deck-root scopes, including the
-  all-models option and the global hide-search-button setting.
+  all-models option and the global hide-search-button setting. Confirm the
+  search button is absent when duplicate checking reports no matching note.
 - Exact cloze output for repeated matches, incorrect stored offsets, and
   supplementary-plane characters; selected-glossary fallback `None` and
   `{glossary-first}`; numeric pitch graph single/multiple/deduplicated output

@@ -13,8 +13,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   deleting formats, an edit-screen action that duplicates an existing format
   and returns to the format list, and grouped popup mining/search buttons placed
   before the audio action.
-- Add Anki duplicate-note search, precise cloze-part handlebars, numeric pitch
-  accent graph handlebars, and advanced glossary mapping options.
+- Add Anki duplicate-note search buttons that appear only for matching notes,
+  precise cloze-part handlebars, numeric pitch accent graph handlebars, and
+  advanced glossary mapping options.
 
 ### Fixed
 
