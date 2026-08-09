@@ -10,12 +10,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -338,8 +341,28 @@ private fun AnkiFormatIconView(icon: AnkiFormatIcon) {
         AnkiFormatIcon.Circle, AnkiFormatIcon.CircleSmall -> Icons.Default.AddCircle
         AnkiFormatIcon.Diamond, AnkiFormatIcon.DiamondSmall -> Icons.Default.Diamond
     }
-    Icon(image, contentDescription = null, modifier = Modifier.padding(if (icon.name.endsWith("Small")) 4.dp else 0.dp))
+    val layout = ankiFormatIconLayout(icon)
+    Box(modifier = Modifier.size(layout.slotSize), contentAlignment = Alignment.Center) {
+        Icon(image, contentDescription = null, modifier = Modifier.size(layout.glyphSize))
+    }
 }
+
+internal data class AnkiFormatIconLayout(
+    val slotSize: Dp,
+    val glyphSize: Dp,
+)
+
+internal fun ankiFormatIconLayout(icon: AnkiFormatIcon): AnkiFormatIconLayout =
+    AnkiFormatIconLayout(
+        slotSize = 24.dp,
+        glyphSize = when (icon) {
+            AnkiFormatIcon.SquareSmall,
+            AnkiFormatIcon.CircleSmall,
+            AnkiFormatIcon.DiamondSmall,
+            -> 18.dp
+            else -> 24.dp
+        },
+    )
 
 private val AnkiFormatIcon.labelRes: Int
     get() = when (this) {
