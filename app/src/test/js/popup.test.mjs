@@ -379,13 +379,47 @@ test('popup renders ordered format buttons with independent icon and disabled st
     const container = new FakeElement();
 
     const formats = context.appendAnkiFormatButtons(container, 4);
+    const mineButtons = descendants(container).filter((button) => button.dataset.kind === 'mine');
 
     assert.equal(formats.length, 3);
     assert.deepEqual(container.children.map((button) => button.dataset.formatId), ['word', 'sentence', 'listening']);
-    assert.equal(container.children[0].disabled, false);
-    assert.equal(container.children[1].disabled, true);
-    assert.match(container.children[1].style.properties.get('--button-icon-url'), /add_circle\.svg/);
-    assert.match(container.children[2].style.properties.get('--button-icon-url'), /diamond\.svg/);
+    assert.equal(mineButtons[0].disabled, false);
+    assert.equal(mineButtons[1].disabled, true);
+    assert.match(mineButtons[1].style.properties.get('--button-icon-url'), /add_circle\.svg/);
+    assert.match(mineButtons[2].style.properties.get('--button-icon-url'), /diamond\.svg/);
+});
+
+test('popup places Anki formats before audio and keeps each notes action with its format', async () => {
+    const { context } = popupContext({
+        duplicateStates: { word: true, sentence: true },
+    });
+    context.window.audioSources = ['https://example.com/audio'];
+    context.window.ankiBackendAvailable = true;
+    context.window.allowDupes = false;
+    context.window.disableShowNotes = false;
+    context.window.ankiFormats = [
+        { id: 'word', icon: 'square', isValid: true },
+        { id: 'sentence', icon: 'circle', isValid: true },
+    ];
+    context.window.lookupEntries = [{ expression: '猫', reading: '猫' }];
+
+    const header = context.createEntryHeader({ expression: '猫', reading: '猫' }, 0);
+    await Promise.resolve();
+    const buttons = header.children.find((child) => child.className === 'header-buttons');
+
+    assert.deepEqual(
+        buttons.children.map((child) => child.dataset.formatId || child.dataset.kind),
+        ['word', 'sentence', 'audio'],
+    );
+    const [wordActions, sentenceActions, audioButton] = buttons.children;
+    assert.equal(wordActions.className, 'anki-format-actions');
+    assert.deepEqual(wordActions.children.map((child) => child.dataset.kind), ['notes', 'mine']);
+    assert.equal(wordActions.children[0].hidden, false);
+    assert.equal(sentenceActions.className, 'anki-format-actions');
+    assert.deepEqual(sentenceActions.children.map((child) => child.dataset.kind), ['mine', 'notes']);
+    assert.equal(sentenceActions.children[1].dataset.placement, 'above');
+    assert.equal(sentenceActions.children[1].hidden, false);
+    assert.equal(audioButton.dataset.kind, 'audio');
 });
 
 test('duplicate refresh updates every format and creates or removes show-notes buttons', async () => {
@@ -407,15 +441,15 @@ test('duplicate refresh updates every format and creates or removes show-notes b
 
     await context.refreshAnkiDuplicateStates(0, container);
 
-    const mineButtons = container.children.filter((button) => button.dataset.kind === 'mine');
+    const mineButtons = descendants(container).filter((button) => button.dataset.kind === 'mine');
     assert.deepEqual(mineButtons.map((button) => button.dataset.state), ['duplicate', 'default', 'duplicate']);
     assert.deepEqual(mineButtons.map((button) => button.disabled), [true, false, true]);
-    assert.equal(container.children.filter((button) => button.dataset.kind === 'notes').length, 2);
+    assert.equal(descendants(container).filter((button) => button.dataset.kind === 'notes' && !button.hidden).length, 2);
     assert.match(mineButtons[2].style.properties.get('--button-icon-url'), /diamond_fill\.svg/);
 
     setup.setDuplicateStates({ word: false, sentence: false, listening: false });
     await context.refreshAnkiDuplicateStates(0, container);
-    assert.equal(container.children.filter((button) => button.dataset.kind === 'notes').length, 0);
+    assert.equal(descendants(container).filter((button) => button.dataset.kind === 'notes' && !button.hidden).length, 0);
     assert.deepEqual(mineButtons.map((button) => button.disabled), [false, false, false]);
 });
 

@@ -1418,7 +1418,11 @@ function createButtonSlot(kind, entryIndex, enabled = true, formatId = null, for
         if (kind === 'audio') {
             playEntryAudio(entryIndex);
         } else if (kind === 'mine') {
-            mineEntryAtIndex(entryIndex, formatId, slot.parentElement);
+            const parent = slot.parentElement;
+            const buttonsContainer = parent?.className === 'anki-format-actions'
+                ? parent.parentElement
+                : parent;
+            mineEntryAtIndex(entryIndex, formatId, buttonsContainer);
         } else if (kind === 'notes') {
             showNotesAtIndex(entryIndex, formatId);
         }
@@ -1525,33 +1529,57 @@ async function showNotesAtIndex(entryIndex, formatId) {
 
 function appendAnkiFormatButtons(container, entryIndex) {
     const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
-    formats.forEach((format) => {
-        container.appendChild(createButtonSlot(
+    formats.forEach((format, index) => {
+        const placement = index === 0 ? 'leading' : 'above';
+        const actions = el('span', {
+            className: 'anki-format-actions',
+            'data-format-id': format.id,
+            'data-notes-placement': placement,
+        });
+        const mineButton = createButtonSlot(
             'mine',
             entryIndex,
             Boolean(window.ankiBackendAvailable && format.isValid),
             format.id,
             format.icon,
-        ));
+        );
+        const notesButton = createButtonSlot('notes', entryIndex, true, format.id, format.icon);
+        notesButton.hidden = true;
+        if (placement === 'leading') {
+            actions.appendChild(notesButton);
+            actions.appendChild(mineButton);
+        } else {
+            notesButton.dataset.placement = 'above';
+            actions.appendChild(mineButton);
+            actions.appendChild(notesButton);
+        }
+        container.appendChild(actions);
     });
     return formats;
 }
 
 function buttonSlotInContainer(container, kind, entryIndex, formatId) {
-    const local = Array.from(container?.children || []).find((child) =>
-        child?.dataset?.kind === kind &&
-        child.dataset.entryIndex === String(entryIndex) &&
-        child.dataset.formatId === (formatId || ''),
-    );
+    const pending = Array.from(container?.children || []);
+    let local = null;
+    while (pending.length && !local) {
+        const child = pending.shift();
+        if (
+            child?.dataset?.kind === kind &&
+            child.dataset.entryIndex === String(entryIndex) &&
+            child.dataset.formatId === (formatId || '')
+        ) {
+            local = child;
+        } else {
+            pending.push(...Array.from(child?.children || []));
+        }
+    }
     return container ? (local || null) : getButtonSlot(kind, entryIndex, formatId);
 }
 
 function syncShowNotesButton(container, entryIndex, format, visible) {
     const existing = buttonSlotInContainer(container, 'notes', entryIndex, format.id);
-    if (visible && !existing) {
-        container?.appendChild(createButtonSlot('notes', entryIndex, true, format.id, format.icon));
-    } else if (!visible && existing) {
-        existing.remove();
+    if (existing) {
+        existing.hidden = !visible;
     }
 }
 
@@ -1612,12 +1640,12 @@ function createEntryHeader(entry, idx) {
 
     const buttonsContainer = el('div', { className: 'header-buttons' });
 
+    appendAnkiFormatButtons(buttonsContainer, idx);
+    refreshAnkiDuplicateStates(idx, buttonsContainer);
+
     if (window.audioSources?.length) {
         buttonsContainer.appendChild(createButtonSlot('audio', idx));
     }
-
-    appendAnkiFormatButtons(buttonsContainer, idx);
-    refreshAnkiDuplicateStates(idx, buttonsContainer);
 
     header.appendChild(buttonsContainer);
 
