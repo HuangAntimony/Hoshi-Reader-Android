@@ -227,6 +227,10 @@ fun AppShell(
         settingsBackStack.add(AppRoute.AnkiAdvancedRoute)
     }
 
+    fun returnFromDuplicatedAnkiFormat() {
+        settingsBackStack.returnFromAnkiFormatDuplicate()
+    }
+
     fun openReader(bookId: String) {
         clearReaderRoutesOutsideBooks()
         selectedTab = MainTab.Books
@@ -335,7 +339,7 @@ fun AppShell(
                 is AppRoute.AnkiCardFormatRoute -> AnkiCardFormatView(
                     formatId = route.formatId,
                     onClose = ::popRoute,
-                    onOpenFormat = ::openAnkiFormat,
+                    onDuplicated = ::returnFromDuplicatedAnkiFormat,
                     modifier = Modifier.fillMaxSize(),
                 )
                 AppRoute.AnkiAdvancedRoute -> AnkiAdvancedView(

@@ -297,7 +297,7 @@ fun AnkiView(
 fun AnkiCardFormatView(
     formatId: String,
     onClose: () -> Unit,
-    onOpenFormat: (String) -> Unit = {},
+    onDuplicated: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val appContainer = LocalHoshiUiDependencies.current
@@ -325,7 +325,7 @@ fun AnkiCardFormatView(
                         viewModel.duplicateCardFormat(
                             formatId = formatId,
                             name = duplicateName,
-                            onCreated = onOpenFormat,
+                            onCreated = onDuplicated,
                         )
                     },
                     enabled = uiState.settings.cardFormats.size < MaxAnkiCardFormats,

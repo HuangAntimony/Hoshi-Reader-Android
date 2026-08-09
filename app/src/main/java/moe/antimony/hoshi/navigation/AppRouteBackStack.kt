@@ -12,6 +12,12 @@ internal fun MutableList<NavKey>.popAppRoute(
     notifyReaderRouteRemoved(hadReaderRoute, onReaderRouteRemoved)
 }
 
+internal fun MutableList<NavKey>.returnFromAnkiFormatDuplicate() {
+    if (lastOrNull() is AppRoute.AnkiCardFormatRoute) {
+        removeAt(lastIndex)
+    }
+}
+
 internal fun MutableList<NavKey>.replaceWithTopLevelRoute(
     route: AppRoute,
     onReaderRouteRemoved: () -> Unit = {},

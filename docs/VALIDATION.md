@@ -220,10 +220,10 @@ Validate relevant dictionary/audio changes with:
   deleting a format or disconnecting AnkiConnect.
 - Anki format add/edit/duplicate/delete behavior across app restart and profile
   switches: a duplicate receives a new stable ID and automatic name while
-  copying the source icon, deck, model, mappings, and tags; all values persist,
-  a fourth format cannot be added or duplicated, and the last format cannot be
-  deleted. Confirming a deck/model fetch resets every format mapping while
-  retaining IDs, names, icons, and tags.
+  copying the source icon, deck, model, mappings, and tags, then returns to the
+  format list; all values persist, a fourth format cannot be added or duplicated,
+  and the last format cannot be deleted. Confirming a deck/model fetch resets
+  every format mapping while retaining IDs, names, icons, and tags.
 - Duplicate-note search through AnkiConnect `guiBrowse` and the AnkiDroid card
   browser deep link for collection, deck, and deck-root scopes, including the
   all-models option and the global hide-search-button setting.

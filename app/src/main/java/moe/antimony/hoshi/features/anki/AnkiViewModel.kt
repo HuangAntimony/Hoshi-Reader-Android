@@ -215,7 +215,7 @@ internal class AnkiViewModel @Inject constructor(
         }
     }
 
-    fun duplicateCardFormat(formatId: String, name: String, onCreated: (String) -> Unit) {
+    fun duplicateCardFormat(formatId: String, name: String, onCreated: () -> Unit) {
         val newFormatId = UUID.randomUUID().toString()
         viewModelScope.launch {
             var created = false
@@ -228,7 +228,7 @@ internal class AnkiViewModel @Inject constructor(
                 created = updated != settings
                 updated
             }
-            if (created) onCreated(newFormatId)
+            if (created) onCreated()
         }
     }
 
