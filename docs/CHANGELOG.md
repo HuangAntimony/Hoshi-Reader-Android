@@ -9,8 +9,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Add up to three named Anki card formats with independent icon shapes and sizes,
-  decks, note types, field mappings, tags, duplicate states, and grouped popup
-  mining/search buttons placed before the audio action.
+  decks, note types, field mappings, tags, duplicate states, confirmation before
+  deleting formats, and grouped popup mining/search buttons placed before the
+  audio action.
 - Add Anki duplicate-note search, precise cloze-part handlebars, numeric pitch
   accent graph handlebars, and advanced glossary mapping options.
 

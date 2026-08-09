@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -82,6 +83,7 @@ fun AnkiView(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val nextFormatName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
     var confirmFetch by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<AnkiFormatDeleteRequest?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -176,7 +178,12 @@ fun AnkiView(
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(
-                                        onClick = { viewModel.removeCardFormat(format.id) },
+                                        onClick = {
+                                            pendingDelete = ankiFormatDeleteRequest(
+                                                uiState.settings.cardFormats,
+                                                format.id,
+                                            )
+                                        },
                                         enabled = uiState.settings.cardFormats.size > 1,
                                     ) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete)) }
                                     Icon(Icons.Default.ChevronRight, contentDescription = null)
@@ -255,6 +262,31 @@ fun AnkiView(
             text = { Text(stringResource(R.string.anki_fetch_confirm_message)) },
             confirmButton = { TextButton(onClick = { confirmFetch = false; fetchAnki() }) { Text(stringResource(R.string.action_confirm)) } },
             dismissButton = { TextButton(onClick = { confirmFetch = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+    pendingDelete?.let { request ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.anki_delete_format_title, request.name)) },
+            text = { Text(stringResource(R.string.anki_delete_format_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        viewModel.removeCardFormat(request.formatId)
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
         )
     }
 }
@@ -351,6 +383,20 @@ internal data class AnkiFormatIconLayout(
     val slotSize: Dp,
     val glyphSize: Dp,
 )
+
+internal data class AnkiFormatDeleteRequest(
+    val formatId: String,
+    val name: String,
+)
+
+internal fun ankiFormatDeleteRequest(
+    formats: List<AnkiCardFormat>,
+    formatId: String,
+): AnkiFormatDeleteRequest? {
+    if (formats.size <= 1) return null
+    val format = formats.firstOrNull { it.id == formatId } ?: return null
+    return AnkiFormatDeleteRequest(format.id, format.name)
+}
 
 internal fun ankiFormatIconLayout(icon: AnkiFormatIcon): AnkiFormatIconLayout =
     AnkiFormatIconLayout(
