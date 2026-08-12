@@ -4,8 +4,10 @@ import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
 
-abstract class SwipePageTouchListener : View.OnTouchListener {
-    private val tracker = ReaderSwipeGestureTracker(minDistance = MIN_DISTANCE)
+abstract class SwipePageTouchListener(
+    swipeDistance: Float = DEFAULT_SWIPE_DISTANCE,
+) : View.OnTouchListener {
+    private val tracker = ReaderSwipeGestureTracker(minDistance = swipeDistance)
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         if (shouldIgnoreReaderGesture(event)) {
@@ -14,6 +16,7 @@ abstract class SwipePageTouchListener : View.OnTouchListener {
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> tracker.onDown(event.x, event.y, event.eventTime)
+            MotionEvent.ACTION_POINTER_DOWN -> tracker.onAdditionalPointerDown()
             MotionEvent.ACTION_MOVE -> dispatch(tracker.onMove(event.x, event.y, event.eventTime))
             MotionEvent.ACTION_UP -> dispatch(tracker.onUp(event.x, event.y, event.eventTime))
             MotionEvent.ACTION_CANCEL -> tracker.onCancel()
@@ -36,7 +39,7 @@ abstract class SwipePageTouchListener : View.OnTouchListener {
     }
 
     private companion object {
-        const val MIN_DISTANCE = 72f
+        const val DEFAULT_SWIPE_DISTANCE = 72f
     }
 }
 
@@ -58,13 +61,13 @@ internal class ReaderSwipeGestureTracker(
     }
 
     fun onMove(x: Float, y: Float, eventTime: Long): Result {
-        if (!hasDown || swipeDispatched) return Result.None
+        if (!hasDown || swipeDispatched || minDistance <= 0f) return Result.None
         val dx = x - downX
         val dy = y - downY
         val elapsedMs = (eventTime - downTime).coerceAtLeast(1L)
         val velocityX = abs(dx) * 1_000f / elapsedMs
         val hasPageDistance = abs(dx) >= minDistance
-        val hasFastFlickDistance = abs(dx) >= MIN_FAST_FLICK_DISTANCE &&
+        val hasFastFlickDistance = abs(dx) >= minDistance / 2f &&
             velocityX >= MIN_FAST_FLICK_VELOCITY_PX_PER_SECOND
         if (
             !hasPageDistance && !hasFastFlickDistance ||
@@ -87,8 +90,8 @@ internal class ReaderSwipeGestureTracker(
         return if (
             !wasSwipeDispatched &&
             elapsedMs <= MAX_TAP_DURATION_MS &&
-            abs(dx) < minDistance &&
-            abs(dy) < minDistance
+            abs(dx) < TAP_SLOP &&
+            abs(dy) < TAP_SLOP
         ) {
             Result.Tap(x, y)
         } else {
@@ -105,6 +108,10 @@ internal class ReaderSwipeGestureTracker(
         onCancel()
     }
 
+    fun onAdditionalPointerDown() {
+        suppressCurrentGesture()
+    }
+
     sealed class Result {
         data object None : Result()
         data object LeftSwipe : Result()
@@ -113,7 +120,7 @@ internal class ReaderSwipeGestureTracker(
     }
 
     private companion object {
-        const val MIN_FAST_FLICK_DISTANCE = 36f
+        const val TAP_SLOP = 72f
         const val MIN_FAST_FLICK_VELOCITY_PX_PER_SECOND = 900f
         const val MAX_EARLY_SWIPE_DURATION_MS = 300L
         const val MAX_TAP_DURATION_MS = 500L

@@ -103,6 +103,12 @@ Manual reader validation should cover:
   characters, and both incomplete and completed reveal.
 - long text page turns, chapter-list jumps into mid-book chapters, and bookmark
   restore.
+- paginated and VN swipe thresholds below, at, and above the default value;
+  verify zero disables both normal and fast swipe page turns while Page Up/Down
+  and enabled volume-key turns still work. With a nonzero threshold, press at
+  one position, add a second finger elsewhere, then release the first finger;
+  the pointer handoff must not turn the page or suppress the next single-finger
+  tap/lookup.
 - Contents with nested and percent-encoded TOC fragments that share one XHTML
   file: verify distinct row positions/current selection, true chapter progress
   and time remaining, jump/restore behavior, and Gallery first-appearance order.

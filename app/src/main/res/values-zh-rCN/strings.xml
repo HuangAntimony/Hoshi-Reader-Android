@@ -408,6 +408,9 @@
     <string name="reader_visual_novel_click_advance">点击空白处前进</string>
     <string name="reader_visual_novel_merge_cross_screen_sasayaki_cues">字幕文本同屏</string>
     <string name="reader_appearance_chapter_swipe_distance">章节滑动距离</string>
+    <string name="reader_appearance_page_swipe_threshold">翻页滑动阈值</string>
+    <string name="reader_appearance_page_swipe_threshold_value">%1$d px</string>
+    <string name="reader_appearance_page_swipe_disabled" comment="分页和 VN 阅读器的滑动阈值状态；有意与其他关闭标签使用相同文案。">关闭</string>
     <string name="reader_appearance_horizontal_padding">水平边距</string>
     <string name="reader_appearance_vertical_padding">垂直边距</string>
     <string name="reader_appearance_top_safe_area">顶部安全区</string>

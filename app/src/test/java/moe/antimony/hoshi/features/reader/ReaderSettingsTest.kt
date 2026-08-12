@@ -39,6 +39,7 @@ class ReaderSettingsTest {
         assertTrue(settings.showProgress)
         assertFalse(settings.showChapterProgress)
         assertEquals(20, settings.chapterSwipeDistance)
+        assertEquals(72, settings.pageSwipeThresholdPx)
         assertTrue(settings.popupSwipeToDismiss)
         assertEquals(30, settings.popupSwipeThreshold)
         assertFalse(settings.openLastReadBookOnLaunch)
@@ -51,6 +52,14 @@ class ReaderSettingsTest {
         assertEquals(32, 31.coerceReaderTopSafeAreaDp())
         assertEquals(40, 39.coerceReaderTopSafeAreaDp())
         assertEquals(72, 73.coerceReaderTopSafeAreaDp())
+    }
+
+    @Test
+    fun pageSwipeThresholdKeepsLegacyDefaultAndAllowsDisabledValue() {
+        assertEquals(0, (-1).coerceReaderPageSwipeThresholdPx())
+        assertEquals(0, 0.coerceReaderPageSwipeThresholdPx())
+        assertEquals(72, 72.coerceReaderPageSwipeThresholdPx())
+        assertEquals(360, 500.coerceReaderPageSwipeThresholdPx())
     }
 
     @Test

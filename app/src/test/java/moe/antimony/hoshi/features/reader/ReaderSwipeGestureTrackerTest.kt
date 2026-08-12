@@ -28,6 +28,60 @@ class ReaderSwipeGestureTrackerTest {
     }
 
     @Test
+    fun configuredSwipeDistanceScalesFastFlickDistanceProportionally() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 120f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+        assertTrue(
+            tracker.onMove(196f, 104f, eventTime = 1_030L) ==
+                ReaderSwipeGestureTracker.Result.None,
+        )
+
+        assertTrue(
+            tracker.onMove(180f, 104f, eventTime = 1_040L) ==
+                ReaderSwipeGestureTracker.Result.LeftSwipe,
+        )
+    }
+
+    @Test
+    fun zeroSwipeDistanceDisablesSwipesWithoutDisablingTaps() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 0f)
+
+        tracker.onDown(240f, 100f, eventTime = 1_000L)
+        assertTrue(
+            tracker.onMove(120f, 104f, eventTime = 1_100L) ==
+                ReaderSwipeGestureTracker.Result.None,
+        )
+        assertTrue(
+            tracker.onUp(120f, 104f, eventTime = 1_120L) ==
+                ReaderSwipeGestureTracker.Result.None,
+        )
+
+        tracker.onDown(240f, 100f, eventTime = 2_000L)
+        assertTrue(
+            tracker.onUp(242f, 103f, eventTime = 2_120L) is
+                ReaderSwipeGestureTracker.Result.Tap,
+        )
+    }
+
+    @Test
+    fun additionalPointerCancelsGestureUntilEveryPointerIsReleased() {
+        val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
+
+        tracker.onDown(80f, 100f, eventTime = 1_000L)
+        tracker.onAdditionalPointerDown()
+
+        assertTrue(
+            tracker.onMove(240f, 100f, eventTime = 1_040L) ==
+                ReaderSwipeGestureTracker.Result.None,
+        )
+        assertTrue(
+            tracker.onUp(240f, 100f, eventTime = 1_080L) ==
+                ReaderSwipeGestureTracker.Result.None,
+        )
+    }
+
+    @Test
     fun tinyFastHorizontalMoveDoesNotTriggerPageSwipe() {
         val tracker = ReaderSwipeGestureTracker(minDistance = 72f)
 

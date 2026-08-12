@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add a Reader Appearance swipe-threshold control for paginated and VN modes;
+  setting it to zero disables swipe page turns while preserving hardware page
+  keys.
 - Add up to three named Anki card formats with independent icon shapes and sizes,
   decks, note types, field mappings, tags, duplicate states, confirmation before
   deleting formats, an edit-screen action that duplicates an existing format
@@ -19,6 +22,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Prevent staggered multi-touch taps in paginated and VN Reader modes from
+  being mistaken for a page-turn swipe.
 - Keep Google Drive sync and TTU backup restore compatible with progress files
   whose book data IDs exceed Android's 32-bit integer range.
 - Keep dictionary lookup available when tapping Sasayaki-highlighted text in VN

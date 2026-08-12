@@ -76,6 +76,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.showReadingSpeed)
             assertFalse(settings.showReadingTime)
             assertEquals(20, settings.chapterSwipeDistance)
+            assertEquals(72, settings.pageSwipeThresholdPx)
             assertEquals(5, settings.horizontalPadding)
             assertEquals(0, settings.verticalPadding)
             assertEquals(30, settings.topSafeAreaDp)
@@ -124,6 +125,7 @@ class ReaderSettingsRepositoryTest {
                 fontSize = 29,
                 viewMode = ReaderViewMode.Continuous,
                 chapterSwipeDistance = 120,
+                pageSwipeThresholdPx = 500,
                 topSafeAreaDp = 100,
                 bottomSafeAreaDp = 100,
                 lineHeight = 1.9,
@@ -151,6 +153,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(ReaderViewMode.Continuous, migrated.viewMode)
             assertTrue(migrated.continuousMode)
             assertEquals(60, migrated.chapterSwipeDistance)
+            assertEquals(360, migrated.pageSwipeThresholdPx)
             assertEquals(72, migrated.topSafeAreaDp)
             assertEquals(72, migrated.bottomSafeAreaDp)
             assertEquals(1.9, migrated.lineHeight, 0.000001)
@@ -199,6 +202,7 @@ class ReaderSettingsRepositoryTest {
                     showReadingSpeed = true,
                     showReadingTime = true,
                     chapterSwipeDistance = 35,
+                    pageSwipeThresholdPx = 108,
                     horizontalPadding = 12,
                     verticalPadding = 6,
                     topSafeAreaDp = 40,
@@ -262,6 +266,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.showReadingSpeed)
             assertTrue(saved.showReadingTime)
             assertEquals(35, saved.chapterSwipeDistance)
+            assertEquals(108, saved.pageSwipeThresholdPx)
             assertEquals(12, saved.horizontalPadding)
             assertEquals(6, saved.verticalPadding)
             assertEquals(40, saved.topSafeAreaDp)
@@ -346,6 +351,7 @@ class ReaderSettingsRepositoryTest {
                     theme = ReaderTheme.Dark,
                     fontSize = 30,
                     popupWidth = 440,
+                    pageSwipeThresholdPx = 96,
                     topSafeAreaDp = 46,
                     bottomSafeAreaDp = 44,
                     visualNovelMergeCrossScreenSasayakiCues = true,
@@ -362,6 +368,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(ReaderTheme.Dark, inherited.theme)
             assertEquals(30, inherited.fontSize)
             assertEquals(440, inherited.popupWidth)
+            assertEquals(96, inherited.pageSwipeThresholdPx)
             assertEquals(46, inherited.topSafeAreaDp)
             assertEquals(44, inherited.bottomSafeAreaDp)
             assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
@@ -375,6 +382,7 @@ class ReaderSettingsRepositoryTest {
                     theme = ReaderTheme.Light,
                     fontSize = 18,
                     popupWidth = 280,
+                    pageSwipeThresholdPx = 120,
                     topSafeAreaDp = 58,
                     bottomSafeAreaDp = 60,
                     visualNovelMergeCrossScreenSasayakiCues = false,
@@ -390,6 +398,7 @@ class ReaderSettingsRepositoryTest {
             assertEquals(ReaderTheme.Dark, japanese.theme)
             assertEquals(30, japanese.fontSize)
             assertEquals(440, japanese.popupWidth)
+            assertEquals(96, japanese.pageSwipeThresholdPx)
             assertEquals(46, japanese.topSafeAreaDp)
             assertEquals(44, japanese.bottomSafeAreaDp)
             assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)

@@ -410,6 +410,9 @@
     <string name="reader_visual_novel_click_advance">Tap Blank Area to Advance</string>
     <string name="reader_visual_novel_merge_cross_screen_sasayaki_cues">Keep Sasayaki Text Together</string>
     <string name="reader_appearance_chapter_swipe_distance">Chapter Swipe Distance</string>
+    <string name="reader_appearance_page_swipe_threshold">Page Swipe Threshold</string>
+    <string name="reader_appearance_page_swipe_threshold_value">%1$d px</string>
+    <string name="reader_appearance_page_swipe_disabled" comment="Paginated and VN Reader swipe-threshold value; intentionally matches other off labels.">Off</string>
     <string name="reader_appearance_horizontal_padding">Horizontal Padding</string>
     <string name="reader_appearance_vertical_padding">Vertical Padding</string>
     <string name="reader_appearance_top_safe_area">Top Safe Area</string>

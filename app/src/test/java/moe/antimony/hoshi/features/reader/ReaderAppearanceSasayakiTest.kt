@@ -108,4 +108,19 @@ class ReaderAppearanceSasayakiTest {
         assertEquals(40, readerAppearanceBottomSafeAreaFromSlider(40.8f))
         assertEquals(72, readerAppearanceBottomSafeAreaFromSlider(100f))
     }
+
+    @Test
+    fun pageSwipeThresholdIsVisibleOnlyForPagedReaderModes() {
+        assertTrue(readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.Paginated))
+        assertTrue(readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.VisualNovel))
+        assertTrue(!readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.Continuous))
+    }
+
+    @Test
+    fun pageSwipeThresholdSliderUsesEighteenPixelSteps() {
+        assertEquals(19, readerAppearancePageSwipeThresholdSliderSteps())
+        assertEquals(0, readerAppearancePageSwipeThresholdFromSlider(0f))
+        assertEquals(72, readerAppearancePageSwipeThresholdFromSlider(70f))
+        assertEquals(360, readerAppearancePageSwipeThresholdFromSlider(500f))
+    }
 }

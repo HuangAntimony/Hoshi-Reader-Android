@@ -367,6 +367,30 @@ private fun ReaderAppearanceContent(
                                 onSettingsChange(settings.copy(chapterSwipeDistance = (round(value / 5) * 5).toInt()))
                             },
                         )
+                    } else if (readerAppearanceShowsPageSwipeThreshold(settings.viewMode)) {
+                        AppearanceDivider(palette)
+                        SliderRow(
+                            label = stringResource(R.string.reader_appearance_page_swipe_threshold),
+                            value = if (settings.pageSwipeThresholdPx == 0) {
+                                stringResource(R.string.reader_appearance_page_swipe_disabled)
+                            } else {
+                                stringResource(
+                                    R.string.reader_appearance_page_swipe_threshold_value,
+                                    settings.pageSwipeThresholdPx,
+                                )
+                            },
+                            sliderValue = settings.pageSwipeThresholdPx.toFloat(),
+                            valueRange = ReaderPageSwipeThresholdMinPx.toFloat()..
+                                ReaderPageSwipeThresholdMaxPx.toFloat(),
+                            steps = readerAppearancePageSwipeThresholdSliderSteps(),
+                            onValueChange = { value ->
+                                onSettingsChange(
+                                    settings.copy(
+                                        pageSwipeThresholdPx = readerAppearancePageSwipeThresholdFromSlider(value),
+                                    ),
+                                )
+                            },
+                        )
                     }
                     if (settings.viewMode == ReaderViewMode.VisualNovel) {
                         AppearanceDivider(palette)
@@ -831,6 +855,18 @@ internal fun readerAppearanceBottomSafeAreaFromSlider(value: Float): Int =
     (round(value / ReaderBottomSafeAreaStepDp) * ReaderBottomSafeAreaStepDp)
         .toInt()
         .coerceReaderBottomSafeAreaDp()
+
+internal fun readerAppearanceShowsPageSwipeThreshold(viewMode: ReaderViewMode): Boolean =
+    viewMode == ReaderViewMode.Paginated || viewMode == ReaderViewMode.VisualNovel
+
+internal fun readerAppearancePageSwipeThresholdSliderSteps(): Int =
+    (ReaderPageSwipeThresholdMaxPx - ReaderPageSwipeThresholdMinPx) /
+        ReaderPageSwipeThresholdStepPx - 1
+
+internal fun readerAppearancePageSwipeThresholdFromSlider(value: Float): Int =
+    (round(value / ReaderPageSwipeThresholdStepPx) * ReaderPageSwipeThresholdStepPx)
+        .toInt()
+        .coerceReaderPageSwipeThresholdPx()
 
 internal fun readerAppearanceStatisticsRows(settings: ReaderSettings): List<ReaderAppearanceStatisticsRow> =
     if (settings.enableStatistics) {

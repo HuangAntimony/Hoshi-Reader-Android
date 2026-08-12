@@ -42,9 +42,16 @@ internal const val ReaderBottomSafeAreaDefaultDp = 18
 internal const val ReaderBottomSafeAreaMinDp = ReaderBottomSafeAreaDefaultDp
 internal const val ReaderBottomSafeAreaMaxDp = 72
 internal const val ReaderBottomSafeAreaStepDp = 2
+internal const val ReaderPageSwipeThresholdDefaultPx = 72
+internal const val ReaderPageSwipeThresholdMinPx = 0
+internal const val ReaderPageSwipeThresholdMaxPx = 360
+internal const val ReaderPageSwipeThresholdStepPx = 18
 
 internal fun Double.coerceReaderPopupScale(): Double =
     coerceIn(ReaderPopupScaleMin, ReaderPopupScaleMax)
+
+internal fun Int.coerceReaderPageSwipeThresholdPx(): Int =
+    coerceIn(ReaderPageSwipeThresholdMinPx, ReaderPageSwipeThresholdMaxPx)
 
 internal fun Int.coerceReaderTopSafeAreaDp(): Int {
     val clamped = coerceIn(ReaderTopSafeAreaMinDp, ReaderTopSafeAreaMaxDp)
@@ -92,6 +99,7 @@ data class ReaderSettings(
     val showReadingSpeed: Boolean = false,
     val showReadingTime: Boolean = false,
     val chapterSwipeDistance: Int = 20,
+    val pageSwipeThresholdPx: Int = ReaderPageSwipeThresholdDefaultPx,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
     val topSafeAreaDp: Int = ReaderTopSafeAreaDefaultDp,
@@ -353,6 +361,10 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         showReadingSpeed = preferences.getBoolean("readerShowReadingSpeed", false),
         showReadingTime = preferences.getBoolean("readerShowReadingTime", false),
         chapterSwipeDistance = preferences.getInt("chapterSwipeDistance", 20).coerceIn(10, 60),
+        pageSwipeThresholdPx = preferences.getInt(
+            "pageSwipeThresholdPx",
+            ReaderPageSwipeThresholdDefaultPx,
+        ).coerceReaderPageSwipeThresholdPx(),
         horizontalPadding = preferences.getInt("layoutHorizontalPadding", 5),
         verticalPadding = preferences.getInt("layoutVerticalPadding", 0),
         topSafeAreaDp = preferences.getInt("readerTopSafeAreaDp", ReaderTopSafeAreaDefaultDp)
@@ -423,6 +435,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("readerShowReadingSpeed", settings.showReadingSpeed)
             .putBoolean("readerShowReadingTime", settings.showReadingTime)
             .putInt("chapterSwipeDistance", settings.chapterSwipeDistance)
+            .putInt("pageSwipeThresholdPx", settings.pageSwipeThresholdPx.coerceReaderPageSwipeThresholdPx())
             .putInt("layoutHorizontalPadding", settings.horizontalPadding)
             .putInt("layoutVerticalPadding", settings.verticalPadding)
             .putInt("readerTopSafeAreaDp", settings.topSafeAreaDp.coerceReaderTopSafeAreaDp())
@@ -570,6 +583,9 @@ class ReaderSettingsRepository(
             showReadingSpeed = this[KEY_SHOW_READING_SPEED] ?: false,
             showReadingTime = this[KEY_SHOW_READING_TIME] ?: false,
             chapterSwipeDistance = (this[KEY_CHAPTER_SWIPE_DISTANCE] ?: 20).coerceIn(10, 60),
+            pageSwipeThresholdPx = (
+                this[KEY_PAGE_SWIPE_THRESHOLD_PX] ?: ReaderPageSwipeThresholdDefaultPx
+            ).coerceReaderPageSwipeThresholdPx(),
             horizontalPadding = this[KEY_HORIZONTAL_PADDING] ?: 5,
             verticalPadding = this[KEY_VERTICAL_PADDING] ?: 0,
             topSafeAreaDp = (this[KEY_TOP_SAFE_AREA_DP] ?: ReaderTopSafeAreaDefaultDp)
@@ -640,6 +656,7 @@ class ReaderSettingsRepository(
         this[KEY_SHOW_READING_SPEED] = settings.showReadingSpeed
         this[KEY_SHOW_READING_TIME] = settings.showReadingTime
         this[KEY_CHAPTER_SWIPE_DISTANCE] = settings.chapterSwipeDistance
+        this[KEY_PAGE_SWIPE_THRESHOLD_PX] = settings.pageSwipeThresholdPx.coerceReaderPageSwipeThresholdPx()
         this[KEY_HORIZONTAL_PADDING] = settings.horizontalPadding
         this[KEY_VERTICAL_PADDING] = settings.verticalPadding
         this[KEY_TOP_SAFE_AREA_DP] = settings.topSafeAreaDp.coerceReaderTopSafeAreaDp()
@@ -758,6 +775,7 @@ class ReaderSettingsRepository(
         private val KEY_SHOW_READING_SPEED = booleanPreferencesKey("readerShowReadingSpeed")
         private val KEY_SHOW_READING_TIME = booleanPreferencesKey("readerShowReadingTime")
         private val KEY_CHAPTER_SWIPE_DISTANCE = intPreferencesKey("chapterSwipeDistance")
+        private val KEY_PAGE_SWIPE_THRESHOLD_PX = intPreferencesKey("pageSwipeThresholdPx")
         private val KEY_HORIZONTAL_PADDING = intPreferencesKey("layoutHorizontalPadding")
         private val KEY_VERTICAL_PADDING = intPreferencesKey("layoutVerticalPadding")
         private val KEY_TOP_SAFE_AREA_DP = intPreferencesKey("readerTopSafeAreaDp")
@@ -828,6 +846,7 @@ private data class ProfileReaderAppearanceSettings(
     val showReadingSpeed: Boolean = false,
     val showReadingTime: Boolean = false,
     val chapterSwipeDistance: Int = 20,
+    val pageSwipeThresholdPx: Int = ReaderPageSwipeThresholdDefaultPx,
     val horizontalPadding: Int = 5,
     val verticalPadding: Int = 0,
     val topSafeAreaDp: Int = ReaderTopSafeAreaDefaultDp,
@@ -885,6 +904,7 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         showReadingSpeed = showReadingSpeed,
         showReadingTime = showReadingTime,
         chapterSwipeDistance = chapterSwipeDistance,
+        pageSwipeThresholdPx = pageSwipeThresholdPx.coerceReaderPageSwipeThresholdPx(),
         horizontalPadding = horizontalPadding,
         verticalPadding = verticalPadding,
         topSafeAreaDp = topSafeAreaDp.coerceReaderTopSafeAreaDp(),
@@ -945,6 +965,7 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         showReadingSpeed = appearance.showReadingSpeed,
         showReadingTime = appearance.showReadingTime,
         chapterSwipeDistance = appearance.chapterSwipeDistance.coerceIn(10, 60),
+        pageSwipeThresholdPx = appearance.pageSwipeThresholdPx.coerceReaderPageSwipeThresholdPx(),
         horizontalPadding = appearance.horizontalPadding,
         verticalPadding = appearance.verticalPadding,
         topSafeAreaDp = appearance.topSafeAreaDp.coerceReaderTopSafeAreaDp(),

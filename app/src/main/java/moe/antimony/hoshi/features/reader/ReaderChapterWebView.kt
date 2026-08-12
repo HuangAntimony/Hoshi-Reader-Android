@@ -373,60 +373,64 @@ internal fun ChapterWebView(
                     continuousScrollProgressScheduler.reset(webView::removeCallbacks)
                     readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                     webView.setOnScrollChangeListener(null)
-                    webView.setOnTouchListener(object : SwipePageTouchListener() {
-                        override fun shouldIgnoreReaderGesture(event: MotionEvent): Boolean =
-                            shouldIgnoreReaderGestureEvent(event)
+                    webView.setOnTouchListener(
+                        object : SwipePageTouchListener(
+                            swipeDistance = readerSettings.pageSwipeThresholdPx.toFloat(),
+                        ) {
+                            override fun shouldIgnoreReaderGesture(event: MotionEvent): Boolean =
+                                shouldIgnoreReaderGestureEvent(event)
 
-                        override fun onTap(x: Float, y: Float) {
-                            selectAt(x, y) {
-                                if (readerSettings.viewMode == ReaderViewMode.VisualNovel && readerSettings.visualNovelClickAdvance) {
-                                    currentOnReaderInteraction.value()
-                                    currentOnClearLookupPopup.value()
-                                    webView.navigatePageForDirection(
-                                        direction = ReaderNavigationDirection.Forward,
-                                        onNextChapter = currentOnNextChapter.value,
-                                        onPreviousChapter = currentOnPreviousChapter.value,
-                                        onDisplayedProgress = currentOnDisplayProgress.value,
-                                        onSaveProgress = currentOnSaveBookmark.value,
-                                    )
-                                } else {
-                                    currentOnReaderTapOutside.value()
+                            override fun onTap(x: Float, y: Float) {
+                                selectAt(x, y) {
+                                    if (readerSettings.viewMode == ReaderViewMode.VisualNovel && readerSettings.visualNovelClickAdvance) {
+                                        currentOnReaderInteraction.value()
+                                        currentOnClearLookupPopup.value()
+                                        webView.navigatePageForDirection(
+                                            direction = ReaderNavigationDirection.Forward,
+                                            onNextChapter = currentOnNextChapter.value,
+                                            onPreviousChapter = currentOnPreviousChapter.value,
+                                            onDisplayedProgress = currentOnDisplayProgress.value,
+                                            onSaveProgress = currentOnSaveBookmark.value,
+                                        )
+                                    } else {
+                                        currentOnReaderTapOutside.value()
+                                    }
                                 }
                             }
-                        }
 
-                        override fun onLeftSwipe() {
-                            currentOnReaderInteraction.value()
-                            currentOnClearLookupPopup.value()
-                            val direction = readerNavigationDirectionForSwipe(
-                                isVerticalWriting = readerSettings.verticalWriting,
-                                swipeDirection = ReaderSwipeDirection.Left,
-                            )
-                            webView.navigatePageForDirection(
-                                direction = direction,
-                                onNextChapter = currentOnNextChapter.value,
-                                onPreviousChapter = currentOnPreviousChapter.value,
-                                onDisplayedProgress = currentOnDisplayProgress.value,
-                                onSaveProgress = currentOnSaveBookmark.value,
-                            )
-                        }
+                            override fun onLeftSwipe() {
+                                currentOnReaderInteraction.value()
+                                currentOnClearLookupPopup.value()
+                                val direction = readerNavigationDirectionForSwipe(
+                                    isVerticalWriting = readerSettings.verticalWriting,
+                                    swipeDirection = ReaderSwipeDirection.Left,
+                                )
+                                webView.navigatePageForDirection(
+                                    direction = direction,
+                                    onNextChapter = currentOnNextChapter.value,
+                                    onPreviousChapter = currentOnPreviousChapter.value,
+                                    onDisplayedProgress = currentOnDisplayProgress.value,
+                                    onSaveProgress = currentOnSaveBookmark.value,
+                                )
+                            }
 
-                        override fun onRightSwipe() {
-                            currentOnReaderInteraction.value()
-                            currentOnClearLookupPopup.value()
-                            val direction = readerNavigationDirectionForSwipe(
-                                isVerticalWriting = readerSettings.verticalWriting,
-                                swipeDirection = ReaderSwipeDirection.Right,
-                            )
-                            webView.navigatePageForDirection(
-                                direction = direction,
-                                onNextChapter = currentOnNextChapter.value,
-                                onPreviousChapter = currentOnPreviousChapter.value,
-                                onDisplayedProgress = currentOnDisplayProgress.value,
-                                onSaveProgress = currentOnSaveBookmark.value,
-                            )
-                        }
-                    })
+                            override fun onRightSwipe() {
+                                currentOnReaderInteraction.value()
+                                currentOnClearLookupPopup.value()
+                                val direction = readerNavigationDirectionForSwipe(
+                                    isVerticalWriting = readerSettings.verticalWriting,
+                                    swipeDirection = ReaderSwipeDirection.Right,
+                                )
+                                webView.navigatePageForDirection(
+                                    direction = direction,
+                                    onNextChapter = currentOnNextChapter.value,
+                                    onPreviousChapter = currentOnPreviousChapter.value,
+                                    onDisplayedProgress = currentOnDisplayProgress.value,
+                                    onSaveProgress = currentOnSaveBookmark.value,
+                                )
+                            }
+                        },
+                    )
                 }
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
