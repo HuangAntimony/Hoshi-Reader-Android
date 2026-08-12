@@ -48,6 +48,16 @@ class ImportFileTypeTest {
     }
 
     @Test
+    fun acceptsHashCharactersInsideDisplayNames() {
+        assertTrue(ImportFileType.Epub.matchesDisplayName("Book #01.epub"))
+    }
+
+    @Test
+    fun acceptsQuestionMarksInsideDisplayNames() {
+        assertTrue(ImportFileType.Epub.matchesDisplayName("Who?.epub"))
+    }
+
+    @Test
     fun rejectsWrongExtensionsBeforeOpeningTheFile() {
         assertFalse(ImportFileType.SasayakiSubtitle.matchesDisplayName("audiobook.m4b"))
         assertFalse(ImportFileType.SasayakiAudiobook.matchesDisplayName("subtitle.srt"))

@@ -11,8 +11,6 @@ data class ImportFileType(
 ) {
     fun matchesDisplayName(displayName: String): Boolean {
         val extension = displayName
-            .substringBefore('?')
-            .substringBefore('#')
             .substringAfterLast('/')
             .substringAfterLast('\\')
             .substringAfterLast('.', missingDelimiterValue = "")

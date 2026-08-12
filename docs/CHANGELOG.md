@@ -36,6 +36,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Allow importing supported files whose display names contain `#` or `?`,
+  including EPUB volume numbers such as `Book #01.epub`.
 - Base reduced-motion popup scrolling on the portion of the popup that is
   actually visible when its configured height exceeds the screen.
 - Show Reader Contents, fragment jumps, and chapter labels for EPUBs whose
