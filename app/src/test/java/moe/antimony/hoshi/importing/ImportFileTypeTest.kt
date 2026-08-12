@@ -10,7 +10,9 @@ class ImportFileTypeTest {
     fun regularFileTypesExposePickerMimeTypesWithoutAcceptingEverything() {
         assertEquals(listOf("epub"), ImportFileType.Epub.extensions)
         assertEquals(listOf("srt"), ImportFileType.SasayakiSubtitle.extensions)
-        assertEquals(listOf("mp3", "m4b"), ImportFileType.SasayakiAudiobook.extensions)
+        assertEquals(listOf("mp3", "m4b", "opus"), ImportFileType.SasayakiAudiobook.extensions)
+        assertTrue(ImportFileType.SasayakiAudiobook.mimeTypes.contains("audio/ogg"))
+        assertTrue(ImportFileType.SasayakiAudiobook.mimeTypes.contains("audio/opus"))
         assertEquals(listOf("db"), ImportFileType.LocalAudioDatabase.extensions)
         assertEquals(listOf("zip"), ImportFileType.DictionaryArchive.extensions)
         assertEquals(listOf("ttf", "otf", "woff", "woff2"), ImportFileType.ReaderFont.extensions)
@@ -40,6 +42,7 @@ class ImportFileTypeTest {
         assertTrue(ImportFileType.SasayakiSubtitle.matchesDisplayName("subtitle.srt"))
         assertTrue(ImportFileType.SasayakiAudiobook.matchesDisplayName("audio.MP3"))
         assertTrue(ImportFileType.SasayakiAudiobook.matchesDisplayName("audio.m4b"))
+        assertTrue(ImportFileType.SasayakiAudiobook.matchesDisplayName("audio.OPUS"))
         assertTrue(ImportFileType.LocalAudioDatabase.matchesDisplayName("android.db"))
         assertTrue(ImportFileType.DictionaryArchive.matchesDisplayName("JMdict.zip"))
     }
@@ -57,6 +60,6 @@ class ImportFileTypeTest {
     fun errorMessageNamesExpectedExtensions() {
         val error = ImportFileType.SasayakiAudiobook.unsupportedFileError("subtitle.srt")
 
-        assertEquals("Select an .mp3 or .m4b audiobook file.", error.message)
+        assertEquals("Select an .mp3 or .m4b or .opus audiobook file.", error.message)
     }
 }

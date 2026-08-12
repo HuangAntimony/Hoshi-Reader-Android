@@ -74,7 +74,9 @@ node --test app/src/test/js/*.test.mjs
 - Dictionaries: `testdata/JMdict_english.zip`, `testdata/MK3.zip`,
   `testdata/freq.zip`, `testdata/pitch.zip`.
 - Font: `testdata/KleeOne-SemiBold.ttf`.
-- Sasayaki: `testdata/test.srt`, `testdata/test.m4b`.
+- Sasayaki: `testdata/test.srt`, `testdata/test.m4b`,
+  `testdata/opus_test.opus`. Unit tests generate tracked M4B and Ogg Opus
+  fixtures instead of depending on these ignored local files.
 
 ## Reader And Lookup
 
@@ -214,6 +216,10 @@ Validate relevant dictionary/audio changes with:
   to dragging.
 - local audio database source ordering with imported MP3 and Opus `android.db`
   files, lookup playback, and Anki audio export.
+- Sasayaki MP3, M4B, and Opus imports from local or seekable SAF sources before pressing Play: confirm the total
+  duration is already visible; M4B/Opus title, artist, cover, and chapters load
+  together without a delayed artist row; playback preparation may subsequently
+  correct the displayed duration without resetting the current position.
 - deinflection explanations for conjugated lookups such as `食べた`.
 - popup theme contrast for deinflection explanations and JMdict forms tables.
 - Dictionary tab and Process Text iframe popup cold paths after reader popup
@@ -301,6 +307,11 @@ Validate relevant sync/update/Sasayaki changes with:
   E-ink VN rendering, skip controls across reader/sheet/system media controls,
   volume-key seek, safe-area playback controls, and e-ink cue/lookup overlays
   when those areas change.
+- Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
+  Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
+  chapter seeking, and EPUB-cover fallback because this sample has no embedded
+  cover. Validate embedded Opus cover display with a separate OpusTags
+  `METADATA_BLOCK_PICTURE` fixture when cover parsing changes.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
 - Sasayaki paused task-removal behavior, confirming that pausing playback and

@@ -51,6 +51,36 @@ internal fun minimalMp4WithMetadata(
         }
     }
 
+internal fun minimalMp4WithInfo(
+    durationSeconds: Double,
+    chapters: List<SasayakiChapterFixture>,
+    title: String? = null,
+    artist: String? = null,
+    albumArtist: String? = null,
+    artworkData: ByteArray? = null,
+): ByteArray =
+    buildBytes {
+        writeBox("ftyp") {
+            writeAscii("M4A ")
+            writeUInt32(0)
+            writeAscii("M4A ")
+        }
+        writeBox("moov") {
+            writeMvhd(durationSeconds)
+            writeBox("udta") {
+                writeChpl(chapters)
+                writeMeta {
+                    writeBox("ilst") {
+                        title?.let { writeTextMetadataItem("\u00a9nam", it) }
+                        artist?.let { writeTextMetadataItem("\u00a9ART", it) }
+                        albumArtist?.let { writeTextMetadataItem("aART", it) }
+                        artworkData?.let { writeBinaryMetadataItem("covr", dataType = 13, it) }
+                    }
+                }
+            }
+        }
+    }
+
 private fun ByteArrayOutputStream.writeMvhd(durationSeconds: Double) {
     writeBox("mvhd") {
         writeUInt32(0)

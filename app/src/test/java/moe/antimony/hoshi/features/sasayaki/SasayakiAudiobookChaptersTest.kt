@@ -33,6 +33,31 @@ class SasayakiAudiobookChaptersTest {
     }
 
     @Test
+    fun parsesVorbisCommentChaptersFromOpus() {
+        val file = temporaryFolder.newFile("book.opus")
+        file.writeBytes(
+            minimalOggOpusWithComments(
+                listOf(
+                    "CHAPTER000=00:00:00.000",
+                    "CHAPTER000NAME=Opening",
+                    "CHAPTER001=00:10:30.250",
+                    "CHAPTER001NAME=Part One",
+                ),
+            ),
+        )
+
+        val chapters = SasayakiAudiobookChapters.parse(file)
+
+        assertEquals(
+            listOf(
+                SasayakiAudiobookChapter(index = 0, title = "Opening", startSeconds = 0.0, endSeconds = 630.25),
+                SasayakiAudiobookChapter(index = 1, title = "Part One", startSeconds = 630.25, endSeconds = null),
+            ),
+            chapters,
+        )
+    }
+
+    @Test
     fun findsCurrentChapterForPlaybackPosition() {
         val chapters = listOf(
             SasayakiAudiobookChapter(index = 0, title = "Prologue", startSeconds = 0.0, endSeconds = 12.5),

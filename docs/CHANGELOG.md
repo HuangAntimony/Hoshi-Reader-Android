@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add Ogg Opus audiobook import with embedded title, artist, cover, and chapter
+  metadata in Sasayaki, load its artist without the platform-reader delay, and
+  show MP3, M4B, and Opus audiobook duration before playback starts.
 - Add a Reader Appearance swipe-threshold control for paginated and VN modes;
   setting it to zero disables swipe page turns while preserving hardware page
   keys.
