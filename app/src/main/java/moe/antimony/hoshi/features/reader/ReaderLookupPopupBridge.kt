@@ -546,6 +546,7 @@ internal fun lookupPopupAssetResponse(name: String, assets: LookupPopupAssets): 
         "selection-en.js" -> assets.selectionEnglishJs
         "selection.js" -> assets.selectionJs
         "popup.js" -> assets.popupJs
+        "popup-gestures.js" -> assets.popupGesturesJs
         "reader-popup-host.js" -> assets.readerPopupHostJs
         else -> return null
     }

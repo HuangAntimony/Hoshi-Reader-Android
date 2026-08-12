@@ -68,12 +68,14 @@ class LookupPopupHtmlTest {
                 popupJs = "window.renderPopup = function() {};",
                 popupCss = ".entry-header {}",
                 selectionJs = "window.hoshiSelection = { selectText: function() {} };",
+                popupGesturesJs = "window.hoshiPopupGesturesLoaded = true;",
             ),
         )
 
         assertTrue(html.contains("<style>.entry-header {}</style>"))
         assertTrue(html.contains("<script>window.hoshiSelection = { selectText: function() {} };</script>"))
         assertTrue(html.contains("<script>window.renderPopup = function() {};</script>"))
+        assertTrue(html.contains("<script>window.hoshiPopupGesturesLoaded = true;</script>"))
     }
 
     @Test
@@ -103,9 +105,7 @@ class LookupPopupHtmlTest {
         )
 
         assertTrue(html.contains("window.swipeThreshold = 35;"))
-        assertTrue(html.contains("document.addEventListener('touchstart', function(e)"))
-        assertTrue(html.contains("document.addEventListener('touchend', function(e)"))
-        assertTrue(html.contains("webkit.messageHandlers.swipeDismiss.postMessage(null);"))
+        assertTrue(html.contains("""<script src="https://appassets.androidplatform.net/popup/popup-gestures.js"></script>"""))
         assertTrue(html.contains("overscroll-behavior: none;"))
     }
 
