@@ -216,6 +216,10 @@ Validate relevant dictionary/audio changes with:
   to dragging.
 - local audio database source ordering with imported MP3 and Opus `android.db`
   files, lookup playback, and Anki audio export.
+- Sasayaki MP3, M4B, and Opus imports from local or seekable SAF sources before pressing Play: confirm the total
+  duration is already visible; M4B/Opus title, artist, cover, and chapters load
+  together without a delayed artist row; playback preparation may subsequently
+  correct the displayed duration without resetting the current position.
 - deinflection explanations for conjugated lookups such as `食べた`.
 - popup theme contrast for deinflection explanations and JMdict forms tables.
 - Dictionary tab and Process Text iframe popup cold paths after reader popup

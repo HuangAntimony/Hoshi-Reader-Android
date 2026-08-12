@@ -78,8 +78,7 @@ import moe.antimony.hoshi.features.dictionary.openPopupExternalLink
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
-import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookChapter
-import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookMetadata
+import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookInfo
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRange
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
@@ -156,11 +155,8 @@ fun ReaderWebView(
         isSasayakiPlaybackLoaded = true
     }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
-    var sasayakiAudiobookChapters by remember(bookRoot) {
-        mutableStateOf<List<SasayakiAudiobookChapter>>(emptyList())
-    }
-    var sasayakiAudiobookMetadata by remember(bookRoot) {
-        mutableStateOf(SasayakiAudiobookMetadata.Empty)
+    var sasayakiAudiobookInfo by remember(bookRoot) {
+        mutableStateOf(SasayakiAudiobookInfo.Empty)
     }
     val sasayakiCoverFile = remember(bookCoverFile) {
         bookCoverFile?.takeIf { it.isFile }
@@ -1380,19 +1376,12 @@ fun ReaderWebView(
     ) {
         val repository = sasayakiAudioRepository
         val playback = currentSasayakiPlayback
-        sasayakiAudiobookChapters = if (repository != null && playback != null) {
+        sasayakiAudiobookInfo = if (repository != null && playback != null) {
             withContext(Dispatchers.IO) {
-                repository.audiobookChapters(playback, context.contentResolver)
+                repository.inspectAudiobook(playback, context)
             }
         } else {
-            emptyList()
-        }
-        sasayakiAudiobookMetadata = if (repository != null && playback != null) {
-            withContext(Dispatchers.IO) {
-                repository.audiobookMetadata(playback, context)
-            }
-        } else {
-            SasayakiAudiobookMetadata.Empty
+            SasayakiAudiobookInfo.Empty
         }
     }
     DisposableEffect(Unit) {
@@ -1856,7 +1845,7 @@ fun ReaderWebView(
                     stateHolder.openSasayakiFromMenu(
                         sasayakiDefaultSheetTab(
                             hasAudio = sasayakiPlayer?.hasAudio == true,
-                            hasChapters = sasayakiAudiobookChapters.isNotEmpty(),
+                            hasChapters = sasayakiAudiobookInfo.chapters.isNotEmpty(),
                         ),
                     )
                 }
@@ -1925,7 +1914,7 @@ fun ReaderWebView(
                 settings = sasayakiSettings,
                 bookTitle = book.title,
                 bookCoverFile = sasayakiCoverFile,
-                audiobookMetadata = sasayakiAudiobookMetadata,
+                audiobookInfo = sasayakiAudiobookInfo,
                 subtitleMatchData = sasayakiSheetMatchData,
                 matchDependencies = bookEntry?.let { entry ->
                     SasayakiMatchDependencies(
@@ -1934,7 +1923,6 @@ fun ReaderWebView(
                         epubBookParser = appContainer.epubBookParser,
                     )
                 },
-                chapters = sasayakiAudiobookChapters,
                 selectedTab = stateHolder.selectedSasayakiTab,
                 onSelectedTabChange = stateHolder::selectSasayakiTab,
                 onSubtitleMatchUpdated = { matchData ->

@@ -12,6 +12,7 @@ import java.util.Locale
 internal data class SasayakiAudiobookOpusInfo(
     val metadata: SasayakiAudiobookMetadata = SasayakiAudiobookMetadata.Empty,
     val chapters: List<SasayakiAudiobookChapter> = emptyList(),
+    val durationSeconds: Double? = null,
 )
 
 internal object SasayakiAudiobookOpusMetadata {
@@ -38,6 +39,7 @@ private class OggOpusReader(
         input.position(0)
         var opusSerial: Int? = null
         var nextSequence: Int? = null
+        var preSkip = 0
         val packetBuffer = ByteArrayOutputStream()
         while (input.position() + OggFixedHeaderSize <= input.size()) {
             val header = input.readBytes(OggFixedHeaderSize)
@@ -63,6 +65,10 @@ private class OggOpusReader(
                 val firstPacket = payload.copyOfRange(0, firstPacketSize)
                 if (!firstPacket.startsWith(OpusHeadMagic)) continue
                 opusSerial = serial
+                preSkip = ByteBuffer.wrap(firstPacket, OpusPreSkipOffset, ShortBytes)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .short
+                    .toInt() and 0xffff
                 nextSequence = sequence + 1
                 continue
             }
@@ -82,7 +88,12 @@ private class OggOpusReader(
                     val packet = packetBuffer.toByteArray()
                     packetBuffer.reset()
                     when {
-                        packet.startsWith(OpusTagsMagic) -> return parseTags(packet)
+                        packet.startsWith(OpusTagsMagic) -> return parseTags(packet).copy(
+                            durationSeconds = readDurationSeconds(
+                                opusSerial = requireNotNull(opusSerial),
+                                preSkip = preSkip,
+                            ),
+                        )
                         else -> return SasayakiAudiobookOpusInfo()
                     }
                 }
@@ -187,6 +198,62 @@ private class OggOpusReader(
 
     private fun decodeBase64(value: String): ByteArray? =
         runCatching { Base64.getDecoder().decode(value.trim()) }.getOrNull()
+
+    private fun readDurationSeconds(opusSerial: Int, preSkip: Int): Double? {
+        val tailSize = minOf(input.size(), MaxOggTailSearchBytes.toLong()).toInt()
+        if (tailSize < OggFixedHeaderSize) return null
+        val tailStart = input.size() - tailSize
+        input.position(tailStart)
+        val tail = input.readBytes(tailSize)
+        var offset = 0
+        var finalGranulePosition: Long? = null
+        while (offset + OggFixedHeaderSize <= tail.size) {
+            if (!tail.matchesAt(offset, OggCapturePattern)) {
+                offset += 1
+                continue
+            }
+            val header = tail.copyOfRange(offset, offset + OggFixedHeaderSize)
+            if (header[4].toInt() != 0) {
+                offset += 1
+                continue
+            }
+            val segmentCount = header[26].toInt() and 0xff
+            val lacingEnd = offset + OggFixedHeaderSize + segmentCount
+            if (lacingEnd > tail.size) break
+            val lacingValues = tail.copyOfRange(offset + OggFixedHeaderSize, lacingEnd)
+            val payloadSize = lacingValues.sumOf { it.toInt() and 0xff }
+            val pageEnd = lacingEnd + payloadSize
+            if (pageEnd > tail.size) {
+                offset += 1
+                continue
+            }
+            val serial = ByteBuffer.wrap(header, OggSerialOffset, IntBytes)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .int
+            val expectedChecksum = ByteBuffer.wrap(header, OggChecksumOffset, IntBytes)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .int
+            val payload = tail.copyOfRange(lacingEnd, pageEnd)
+            if (!validOggChecksum(header, lacingValues, payload, expectedChecksum)) {
+                offset += 1
+                continue
+            }
+            if (serial == opusSerial) {
+                val granulePosition = ByteBuffer.wrap(header, OggGranulePositionOffset, LongBytes)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .long
+                if (granulePosition >= preSkip.toLong()) {
+                    finalGranulePosition = granulePosition
+                }
+            }
+            offset = pageEnd
+        }
+        return finalGranulePosition
+            ?.minus(preSkip.toLong())
+            ?.takeIf { it > 0L }
+            ?.toDouble()
+            ?.div(OpusGranuleRate)
+    }
 }
 
 private fun ByteBuffer.readBoundedLength(maximum: Int): Int? {
@@ -205,6 +272,11 @@ private fun SeekableByteChannel.readBytes(count: Int): ByteArray {
 
 private fun ByteArray.startsWith(prefix: ByteArray): Boolean =
     size >= prefix.size && copyOfRange(0, prefix.size).contentEquals(prefix)
+
+private fun ByteArray.matchesAt(offset: Int, prefix: ByteArray): Boolean =
+    offset >= 0 && offset + prefix.size <= size && prefix.indices.all { index ->
+        this[offset + index] == prefix[index]
+    }
 
 private fun firstCompletedPacketSize(lacingValues: ByteArray): Int? {
     var packetSize = 0
@@ -247,10 +319,14 @@ private val OpusTagsMagic = "OpusTags".toByteArray(Charsets.US_ASCII)
 private val ChapterTimeKey = Regex("CHAPTER(\\d{3})")
 private val ChapterTime = Regex("(\\d+):(\\d{2}):(\\d{2})(?:\\.(\\d{1,3}))?")
 private const val OggFixedHeaderSize = 27
+private const val OggGranulePositionOffset = 6
+private const val OggSerialOffset = 14
+private const val OggChecksumOffset = 22
 private const val OggContinuedFlag = 0x01
 private const val OggBosFlag = 0x02
 private const val OggCrcPolynomial = 0x04c11db7
 private const val MinimumOpusHeadPacketSize = 19
+private const val OpusPreSkipOffset = 10
 private const val MaxOggSegmentBytes = 255
 private const val MaxOggPagePayloadBytes = 255 * 255
 private const val MaxOpusPacketBytes = 32 * 1024 * 1024
@@ -261,3 +337,8 @@ private const val FrontCoverPictureType = 3
 private const val FlacPictureFixedFieldsBytes = 8
 private const val FlacPictureDimensionsBytes = 16
 private const val IntBytes = 4
+private const val ShortBytes = 2
+private const val LongBytes = 8
+private const val MaxOggPageBytes = OggFixedHeaderSize + 255 + MaxOggPagePayloadBytes
+private const val MaxOggTailSearchBytes = MaxOggPageBytes * 2
+private const val OpusGranuleRate = 48_000.0

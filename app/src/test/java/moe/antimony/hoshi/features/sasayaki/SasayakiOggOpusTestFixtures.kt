@@ -8,12 +8,16 @@ internal fun minimalOggOpusWithComments(
     splitTagsAcrossPages: Boolean = false,
     omitContinuationFlag: Boolean = false,
     channelMappingFamily: Int = 0,
+    preSkip: Int = 0,
+    finalGranulePosition: Long? = null,
+    durationTailPrefix: ByteArray = byteArrayOf(),
+    finalPagePayloadSize: Int = 1,
 ): ByteArray {
     val opusHead = ByteArrayOutputStream().apply {
         write("OpusHead".toByteArray(Charsets.US_ASCII))
         write(1)
         write(2)
-        writeLe16(0)
+        writeLe16(preSkip)
         writeLe32(48_000)
         writeLe16(0)
         write(channelMappingFamily)
@@ -69,8 +73,33 @@ internal fun minimalOggOpusWithComments(
                 payload = opusTags,
             )
         }
+        finalGranulePosition?.let { granulePosition ->
+            write(durationTailPrefix)
+            val finalPayload = ByteArray(finalPagePayloadSize)
+            writeOggPage(
+                headerType = 0x04,
+                granulePosition = granulePosition,
+                serial = 7,
+                sequence = if (splitTagsAcrossPages) 3 else 2,
+                lacingValues = if (finalPagePayloadSize == 255 * 255) {
+                    ByteArray(255) { 0xff.toByte() }
+                } else {
+                    packetLacingValues(finalPagePayloadSize)
+                },
+                payload = finalPayload,
+            )
+        }
     }.toByteArray()
 }
+
+internal fun oggTailPrefixWithFalseCapturePattern(size: Int = 65_000): ByteArray =
+    ByteArray(size).also { bytes ->
+        val offset = 10
+        "OggS".toByteArray(Charsets.US_ASCII).copyInto(bytes, destinationOffset = offset)
+        bytes[offset + 4] = 0
+        bytes[offset + 26] = 0xff.toByte()
+        repeat(255) { index -> bytes[offset + 27 + index] = 0xff.toByte() }
+    }
 
 private fun packetLacingValues(packetSize: Int): ByteArray {
     val fullSegments = packetSize / 255
@@ -103,6 +132,7 @@ internal fun flacPictureComment(
 
 private fun ByteArrayOutputStream.writeOggPage(
     headerType: Int,
+    granulePosition: Long = 0,
     serial: Int,
     sequence: Int,
     lacingValues: ByteArray,
@@ -112,7 +142,7 @@ private fun ByteArrayOutputStream.writeOggPage(
         write("OggS".toByteArray(Charsets.US_ASCII))
         write(0)
         write(headerType)
-        writeLe64(0)
+        writeLe64(granulePosition)
         writeLe32(serial)
         writeLe32(sequence)
         writeLe32(0)

@@ -172,4 +172,37 @@ class SasayakiAudiobookOpusMetadataTest {
 
         assertEquals(SasayakiAudiobookMetadata.Empty, info.metadata)
     }
+
+    @Test
+    fun calculatesDurationFromFinalGranulePositionAfterPreSkip() {
+        val file = temporaryFolder.newFile("duration.opus")
+        file.writeBytes(
+            minimalOggOpusWithComments(
+                comments = listOf("TITLE=Duration Test"),
+                preSkip = 312,
+                finalGranulePosition = 480_312,
+            ),
+        )
+
+        val info = requireNotNull(SasayakiAudiobookOpusMetadata.parse(file))
+
+        assertEquals(10.0, info.durationSeconds ?: error("Missing Opus duration"), 0.000_001)
+    }
+
+    @Test
+    fun tailScanResynchronizesAfterFalseOggCapturePattern() {
+        val file = temporaryFolder.newFile("false-tail-capture.opus")
+        file.writeBytes(
+            minimalOggOpusWithComments(
+                comments = listOf("TITLE=Tail Resync"),
+                finalGranulePosition = 480_000,
+                durationTailPrefix = oggTailPrefixWithFalseCapturePattern(),
+                finalPagePayloadSize = 255 * 255,
+            ),
+        )
+
+        val info = requireNotNull(SasayakiAudiobookOpusMetadata.parse(file))
+
+        assertEquals(10.0, info.durationSeconds ?: error("Missing resynchronized duration"), 0.000_001)
+    }
 }

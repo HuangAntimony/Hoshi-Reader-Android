@@ -97,10 +97,9 @@ internal fun SasayakiSheet(
     settings: SasayakiSettings,
     bookTitle: String,
     bookCoverFile: File?,
-    audiobookMetadata: SasayakiAudiobookMetadata,
+    audiobookInfo: SasayakiAudiobookInfo,
     subtitleMatchData: SasayakiMatchData?,
     matchDependencies: SasayakiMatchDependencies?,
-    chapters: List<SasayakiAudiobookChapter>,
     selectedTab: SasayakiSheetTab,
     onSelectedTabChange: (SasayakiSheetTab) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
@@ -115,7 +114,7 @@ internal fun SasayakiSheet(
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
     var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
-    val currentChapter = SasayakiAudiobookChapters.currentChapterAt(chapters, player.currentTime)
+    val currentChapter = SasayakiAudiobookChapters.currentChapterAt(audiobookInfo.chapters, player.currentTime)
     val importFailedMessage = stringResource(R.string.sasayaki_import_audiobook_failed)
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
         if (uri == null || isImporting) return@rememberLauncherForActivityResult
@@ -168,7 +167,7 @@ internal fun SasayakiSheet(
                         player = player,
                         bookTitle = bookTitle,
                         bookCoverFile = bookCoverFile,
-                        audiobookMetadata = audiobookMetadata,
+                        audiobookInfo = audiobookInfo,
                         currentChapter = currentChapter,
                         modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
                     )
@@ -198,7 +197,7 @@ internal fun SasayakiSheet(
                         modifier = Modifier.weight(1f),
                     )
                     SasayakiSheetTab.Chapters -> SasayakiChaptersTab(
-                        chapters = chapters,
+                        chapters = audiobookInfo.chapters,
                         currentChapter = currentChapter,
                         onChapterJump = { chapter -> player.seekTo(chapter.startSeconds) },
                         modifier = Modifier.weight(1f),
@@ -241,13 +240,13 @@ private fun SasayakiPlaybackHeader(
     player: SasayakiPlayer,
     bookTitle: String,
     bookCoverFile: File?,
-    audiobookMetadata: SasayakiAudiobookMetadata,
+    audiobookInfo: SasayakiAudiobookInfo,
     currentChapter: SasayakiAudiobookChapter?,
     modifier: Modifier = Modifier,
 ) {
     val headerInfo = sasayakiPlaybackHeaderInfo(
         playback = player.playback,
-        metadata = audiobookMetadata,
+        metadata = audiobookInfo.metadata,
         fallbackBookTitle = bookTitle,
         currentChapter = currentChapter,
     )
@@ -258,7 +257,7 @@ private fun SasayakiPlaybackHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SasayakiAudiobookCover(
-                metadata = audiobookMetadata,
+                metadata = audiobookInfo.metadata,
                 fallbackCoverFile = bookCoverFile,
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -291,7 +290,10 @@ private fun SasayakiPlaybackHeader(
                 }
             }
         }
-        SasayakiPlaybackProgress(player = player)
+        SasayakiPlaybackProgress(
+            player = player,
+            inspectedDurationSeconds = audiobookInfo.durationSeconds,
+        )
     }
 }
 
@@ -350,8 +352,14 @@ private fun rememberSasayakiCoverBitmap(
 }
 
 @Composable
-private fun SasayakiPlaybackProgress(player: SasayakiPlayer) {
-    val duration = player.duration.nonNegativeFiniteSeconds()
+private fun SasayakiPlaybackProgress(
+    player: SasayakiPlayer,
+    inspectedDurationSeconds: Double?,
+) {
+    val duration = sasayakiPlaybackDuration(
+        playerDuration = player.duration,
+        inspectedDuration = inspectedDurationSeconds,
+    )
     val canSeek = player.hasAudio && duration > 0.0
     val rangeEnd = duration.toFloat().coerceAtLeast(1f)
     var isScrubbing by remember { mutableStateOf(false) }
@@ -978,6 +986,14 @@ internal fun formatSasayakiChapterRowTime(seconds: Double): String =
 
 private fun Double.nonNegativeFiniteSeconds(): Double =
     if (isFinite()) coerceAtLeast(0.0) else 0.0
+
+internal fun sasayakiPlaybackDuration(
+    playerDuration: Double,
+    inspectedDuration: Double?,
+): Double =
+    playerDuration.nonNegativeFiniteSeconds().takeIf { it > 0.0 }
+        ?: inspectedDuration?.nonNegativeFiniteSeconds()?.takeIf { it > 0.0 }
+        ?: 0.0
 
 internal data class SasayakiPlaybackHeaderInfo(
     val title: String,

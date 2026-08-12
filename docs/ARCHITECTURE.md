@@ -189,13 +189,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   and network preflight; Books keeps remote-only Google Drive books as
   `RemoteBookEntry` models rather than local `BookEntry` placeholders.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
-- Sasayaki accepts MP3, M4B, and Ogg Opus audiobook sources. Container fallback
-  parsing reads M4B title/artist/cover metadata from MP4 atoms and Ogg Opus
-  title/artist/cover metadata from OpusTags; displayed artist normalization
-  remains `ARTIST`, then `ALBUMARTIST`, then `AUTHOR`. Audiobook chapter
-  parsing is format-aware: M4B uses MP4 `moov/udta/chpl`, while Opus uses
-  `CHAPTERnnn` and `CHAPTERnnnNAME` comments. MP3 has no app-level chapter
-  parser.
+- Sasayaki accepts MP3, M4B, and Ogg Opus audiobook sources. One repository
+  inspection returns format, metadata, chapters, and static duration for
+  seekable sources before playback starts. M4B inspection reads MP4 metadata, `moov/udta/chpl`, and
+  `mvhd`; Opus inspection reads OpusTags and derives duration from the final
+  Ogg granule position after pre-skip without invoking Android's platform
+  metadata reader. MP3 keeps the platform metadata/duration path and has no
+  app-level chapter parser. A provider that exposes only a non-seekable stream
+  may leave static duration or container-only metadata unknown until playback
+  preparation. Displayed artist normalization remains `ARTIST`, then
+  `ALBUMARTIST`, then `AUTHOR`.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
   ExoPlayer and MediaSession, but Reader load paths do not connect to the
