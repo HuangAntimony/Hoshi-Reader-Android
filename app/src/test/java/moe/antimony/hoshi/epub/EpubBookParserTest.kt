@@ -123,6 +123,69 @@ class EpubBookParserTest {
     }
 
     @Test
+    fun resolvesEpub3TocHrefsRelativeToNestedNavigationDocument() {
+        val root = tempFolder.newFolder("nested-epub3-navigation")
+        writeNestedEpub3NavigationFixture(root)
+        val cachedBookInfoWithoutFragmentOffsets = BookInfo(
+            characterCount = 29,
+            chapterInfo = mapOf(
+                "OEBPS/Text/p-002.xhtml" to BookInfo.ChapterInfo(
+                    spineIndex = 0,
+                    currentTotal = 0,
+                    chapterCount = 19,
+                ),
+                "OEBPS/Text/p-003.xhtml" to BookInfo.ChapterInfo(
+                    spineIndex = 1,
+                    currentTotal = 19,
+                    chapterCount = 10,
+                ),
+            ),
+            images = emptyList(),
+        )
+
+        val book = EpubBookParser().parse(
+            root,
+            cachedBookInfo = cachedBookInfoWithoutFragmentOffsets,
+        )
+
+        assertEquals(
+            listOf(
+                "OEBPS/Text/p-002.xhtml#toc-001",
+                "OEBPS/Text/p-003.xhtml#toc-002",
+            ),
+            book.toc.map { it.href },
+        )
+        assertEquals(listOf("Prologue", "Chapter One"), book.toc.map { it.label })
+        assertEquals(
+            6,
+            book.bookInfo.chapterInfo
+                .getValue("OEBPS/Text/p-002.xhtml")
+                .fragmentOffsets
+                ?.get("toc-001"),
+        )
+    }
+
+    @Test
+    fun resolvesEpub2TocHrefsRelativeToNestedNcxDocument() {
+        val root = tempFolder.newFolder("nested-epub2-ncx")
+        writeNestedEpub2NcxFixture(root)
+
+        val book = EpubBookParser().parse(root)
+
+        assertEquals(
+            listOf("OEBPS/Text/chapter.xhtml#part-1"),
+            book.toc.map { it.href },
+        )
+        assertEquals(
+            5,
+            book.bookInfo.chapterInfo
+                .getValue("OEBPS/Text/chapter.xhtml")
+                .fragmentOffsets
+                ?.get("part-1"),
+        )
+    }
+
+    @Test
     fun parsesPackedEpubIntoStableCacheDirectoryForRepeatedReads() {
         val archive = tempFolder.newFile("stable-packed.epub")
         val cacheRoot = tempFolder.newFolder("stable-cache")
@@ -327,6 +390,122 @@ class EpubBookParserTest {
                 <itemref idref="chapter-1"/>
               </spine>
             </package>
+            """.trimIndent(),
+        )
+    }
+
+    private fun writeNestedEpub3NavigationFixture(root: File) {
+        writeContainer(root, packagePath = "OEBPS/content.opf")
+        root.resolve("OEBPS/Text").mkdirs()
+        root.resolve("OEBPS/Misc").mkdirs()
+        root.resolve("OEBPS/Text/p-002.xhtml").writeText(
+            "<html><body><p>Before</p><h1 id=\"toc-001\">Prologue</h1><p>After</p></body></html>",
+        )
+        root.resolve("OEBPS/Text/p-003.xhtml").writeText(
+            "<html><body><h1 id=\"toc-002\">Chapter One</h1></body></html>",
+        )
+        root.resolve("OEBPS/Text/navigation-documents.xhtml").writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+              <head><title>Contents</title></head>
+              <body>
+                <nav epub:type="toc">
+                  <ol>
+                    <li><a href="p-002.xhtml?edition=1#toc-001">Prologue</a></li>
+                    <li><a href="p-003.xhtml#toc-002">Chapter One</a></li>
+                  </ol>
+                </nav>
+              </body>
+            </html>
+            """.trimIndent(),
+        )
+        root.resolve("OEBPS/Misc/toc.ncx").writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+              <docTitle><text>Broken fallback</text></docTitle>
+              <navMap>
+                <navPoint id="broken" playOrder="1">
+                  <navLabel><text>Broken NCX</text></navLabel>
+                  <content src="xhtml/p-cover.xhtml"/>
+                </navPoint>
+              </navMap>
+            </ncx>
+            """.trimIndent(),
+        )
+        root.resolve("OEBPS/content.opf").writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:title>Nested EPUB 3 Navigation</dc:title>
+              </metadata>
+              <manifest>
+                <item id="p-002" href="Text/p-002.xhtml" media-type="application/xhtml+xml"/>
+                <item id="p-003" href="Text/p-003.xhtml" media-type="application/xhtml+xml"/>
+                <item id="nav" href="Text/navigation-documents.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+                <item id="ncx" href="Misc/toc.ncx" media-type="application/x-dtbncx+xml"/>
+              </manifest>
+              <spine toc="ncx">
+                <itemref idref="p-002"/>
+                <itemref idref="p-003"/>
+              </spine>
+            </package>
+            """.trimIndent(),
+        )
+    }
+
+    private fun writeNestedEpub2NcxFixture(root: File) {
+        writeContainer(root, packagePath = "OEBPS/content.opf")
+        root.resolve("OEBPS/Text").mkdirs()
+        root.resolve("OEBPS/Misc").mkdirs()
+        root.resolve("OEBPS/Text/chapter.xhtml").writeText(
+            "<html><body><p>Intro</p><h1 id=\"part-1\">Part One</h1></body></html>",
+        )
+        root.resolve("OEBPS/Misc/toc.ncx").writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+              <docTitle><text>Contents</text></docTitle>
+              <navMap>
+                <navPoint id="part-1" playOrder="1">
+                  <navLabel><text>Part One</text></navLabel>
+                  <content src="../Text/chapter.xhtml#part-1"/>
+                </navPoint>
+              </navMap>
+            </ncx>
+            """.trimIndent(),
+        )
+        root.resolve("OEBPS/content.opf").writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:title>Nested EPUB 2 NCX</dc:title>
+              </metadata>
+              <manifest>
+                <item id="chapter" href="Text/chapter.xhtml" media-type="application/xhtml+xml"/>
+                <item id="ncx" href="Misc/toc.ncx" media-type="application/x-dtbncx+xml"/>
+              </manifest>
+              <spine toc="ncx">
+                <itemref idref="chapter"/>
+              </spine>
+            </package>
+            """.trimIndent(),
+        )
+    }
+
+    private fun writeContainer(root: File, packagePath: String) {
+        root.resolve("META-INF").mkdirs()
+        root.resolve("META-INF/container.xml").writeText(
+            """
+            <?xml version="1.0"?>
+            <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+              <rootfiles>
+                <rootfile full-path="$packagePath" media-type="application/oebps-package+xml"/>
+              </rootfiles>
+            </container>
             """.trimIndent(),
         )
     }

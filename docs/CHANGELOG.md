@@ -36,6 +36,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Show Reader Contents, fragment jumps, and chapter labels for EPUBs whose
+  navigation document is stored in a subdirectory.
 - Prevent staggered multi-touch taps in paginated and VN Reader modes from
   being mistaken for a page-turn swipe.
 - Keep Google Drive sync and TTU backup restore compatible with progress files

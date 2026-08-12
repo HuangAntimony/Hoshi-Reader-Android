@@ -72,7 +72,10 @@ impl EpubBook {
     }
 
     pub fn language(&self) -> Option<String> {
-        self.epub.metadata().language().map(|l| l.value().to_string())
+        self.epub
+            .metadata()
+            .language()
+            .map(|l| l.value().to_string())
     }
 
     pub fn cover_href(&self) -> Option<String> {
@@ -164,7 +167,7 @@ impl EpubBook {
         let children = entry.iter().map(|e| Self::convert_toc_entry(&e)).collect();
         TocNode {
             label: entry.label().to_string(),
-            href: entry.href_raw().map(|h| h.to_string()),
+            href: entry.href().map(|h| h.to_string()),
             children,
         }
     }

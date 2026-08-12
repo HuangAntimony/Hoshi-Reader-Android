@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 name = "hoshiepub"
 
 [dependencies]
-rbook = { version = "0.7", default-features = false, features = ["threadsafe"] }
+rbook = { version = "0.7.10", default-features = false, features = ["threadsafe"] }
 uniffi = { version = "0.31", default-features = false }
 thiserror = "2"
 

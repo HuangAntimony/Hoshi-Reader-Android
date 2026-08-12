@@ -149,7 +149,7 @@ class EpubBookParser @Inject constructor(
         }
 
         require(chapterShells.isNotEmpty()) { "EPUB spine contains no readable chapters" }
-        val tocItems = toc().children.map { it.toReaderTocItem(root, contentDirectory) }
+        val tocItems = toc().children.map { it.toReaderTocItem() }
         val reusableBookInfo = cachedBookInfo?.takeIf { it.matchesReaderFacts(chapterShells, tocItems) }
         val chapters = if (reusableBookInfo != null) {
             chapterShells
@@ -244,20 +244,19 @@ internal fun BookInfo.matchesChapterShells(chapters: List<EpubChapter>): Boolean
     return total == characterCount
 }
 
-private fun NativeTocNode.toReaderTocItem(root: File, contentDirectory: File): EpubTocItem =
+private fun NativeTocNode.toReaderTocItem(): EpubTocItem =
     EpubTocItem(
         label = label,
-        href = href?.normalizeTocHref(root, contentDirectory),
-        children = children.map { it.toReaderTocItem(root, contentDirectory) },
+        href = href?.normalizeTocHref(),
+        children = children.map { it.toReaderTocItem() },
     )
 
-private fun String.normalizeTocHref(root: File, contentDirectory: File): String {
-    val raw = trim().replace('\\', '/').removePrefix("/")
+private fun String.normalizeTocHref(): String {
+    val raw = trim().replace('\\', '/')
     if (raw.isBlank()) return raw
     val fragment = raw.substringAfter('#', "")
-    val base = raw.substringBefore('#').substringBefore('?')
-    val href = contentDirectory.resolve(base).relativeHref(root)
-        ?: base.normalizeResourceHref()
+    val base = raw.substringBefore('#').substringBefore('?').removePrefix("/")
+    val href = File(base).normalize().invariantSeparatorsPath.normalizeResourceHref()
     return if (fragment.isBlank()) href else "$href#$fragment"
 }
 
