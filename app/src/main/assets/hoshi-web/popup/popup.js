@@ -645,6 +645,43 @@ function constructPhoneticTranscriptionsHtml(pitches) {
     return `<ul>${items.join('')}</ul>`;
 }
 
+function constructPitchAccentGraphsHtml(pitches, reading, firstOnly = false) {
+    const positions = [];
+    const seen = new Set();
+    (pitches || []).forEach((group) => (group?.pitchPositions || []).forEach((position) => {
+        const downstep = Number(position);
+        if (!Number.isInteger(downstep) || downstep < 0) return;
+        if (window.deduplicatePitchAccents && seen.has(downstep)) return;
+        seen.add(downstep);
+        positions.push(downstep);
+    }));
+    const selected = firstOnly ? positions.slice(0, 1) : positions;
+    const morae = getKanaMorae(reading || '');
+    if (!morae.length || !selected.length) return '';
+    const graphs = selected.map((downstep) => createPronunciationGraphHtml(morae, downstep));
+    if (graphs.length === 1) return graphs[0];
+    return `<ol>${graphs.map((graph) => `<li>${graph}</li>`).join('')}</ol>`;
+}
+
+function createPronunciationGraphHtml(morae, downstep) {
+    const points = [];
+    const dots = [];
+    morae.forEach((_, index) => {
+        const high = isMoraPitchHigh(index, downstep);
+        const highNext = isMoraPitchHigh(index + 1, downstep);
+        const x = index * 50 + 25;
+        const y = high ? 25 : 75;
+        points.push(`${x} ${y}`);
+        dots.push(high && !highNext
+            ? `<circle style="fill:none;stroke-width:5;stroke:currentColor;" cx="${x}" cy="${y}" r="15"/><circle style="fill:currentColor;" cx="${x}" cy="${y}" r="5"/>`
+            : `<circle style="stroke-width:5;fill:currentColor;stroke:currentColor;" cx="${x}" cy="${y}" r="15"/>`);
+    });
+    const tailX = morae.length * 50 + 25;
+    const tailY = isMoraPitchHigh(morae.length, downstep) ? 25 : 75;
+    const last = points[points.length - 1];
+    return `<svg xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;height:1.5em;" focusable="false" viewBox="0 0 ${50 * (morae.length + 1)} 100" data-downstep="${downstep}"><path style="fill:none;stroke-width:5;stroke:currentColor;" d="M${points.join(' L')}"/><path style="fill:none;stroke-width:5;stroke:currentColor;stroke-dasharray:5 5;" d="M${last} L${tailX} ${tailY}"/>${dots.join('')}<path style="fill:none;stroke-width:5;stroke:currentColor;" d="M0 13 L15 -13 L-15 -13 Z" transform="translate(${tailX},${tailY})"/></svg>`;
+}
+
 // https://github.com/yomidevs/yomitan/blob/d810b2f0842536d24ab82b6cd75d00841710e57b/ext/js/display/structured-content-generator.js#L64
 function createDefinitionImage(data, dictionary, exporting = false) {
     const {
@@ -890,7 +927,7 @@ function getFrequencyHarmonicRank(frequencies) {
     return String(Math.floor(values.length / sumOfReciprocals));
 }
 
-async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText) {
+async function mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, popupSelectionText, formatId = null) {
     const idx = entryIndex || 0;
     const furiganaPlain = constructFuriganaPlain(expression, reading);
     currentDictionaryMedia = new Map();
@@ -904,6 +941,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     const pitchPositions = constructPitchPositionHtml(pitches);
     const pitchCategories = constructPitchCategories(pitches, reading, rules);
     const phoneticTranscriptions = constructPhoneticTranscriptionsHtml(pitches);
+    const pitchAccentGraphs = constructPitchAccentGraphsHtml(pitches, reading || expression);
 
     if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
         audioUrls[idx] = await fetchAudioUrl(expression, reading || expression);
@@ -911,7 +949,7 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
 
     const audio = audioUrls[idx] || '';
 
-    return await webkit.messageHandlers.mineEntry.postMessage({
+    const payload = {
         expression,
         reading,
         matched,
@@ -923,12 +961,14 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
         singleGlossaries: JSON.stringify(singleGlossaries),
         pitchPositions,
         pitchCategories,
+        pitchAccentGraphs,
         phoneticTranscriptions,
         popupSelectionText,
         audio,
         selectedDictionary: selectedDictionaries[idx]?.name || '',
         dictionaryMedia: JSON.stringify([...dictionaryMedia.values()])
-    });
+    };
+    return await webkit.messageHandlers.mineEntry.postMessage({ formatId, payload });
 }
 
 function renderStructuredContent(parent, node, language = null, dictName = null, exporting = false) {
@@ -1360,15 +1400,17 @@ function getButtonRectScale() {
     return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
-function createButtonSlot(kind, entryIndex, enabled = true) {
+function createButtonSlot(kind, entryIndex, enabled = true, formatId = null, formatIcon = 'square') {
     const slot = el('button', {
         className: 'button-slot',
         'data-kind': kind,
         'data-entry-index': entryIndex,
-        'data-enabled': String(enabled)
+        'data-enabled': String(enabled),
+        'data-format-id': formatId || '',
+        'data-format-icon': formatIcon
     });
     slot.type = 'button';
-    slot.setAttribute('aria-label', kind === 'audio' ? 'Play audio' : 'Add to Anki');
+    slot.setAttribute('aria-label', kind === 'audio' ? 'Play audio' : kind === 'notes' ? 'Show Anki notes' : 'Add to Anki');
     slot.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1376,7 +1418,13 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
         if (kind === 'audio') {
             playEntryAudio(entryIndex);
         } else if (kind === 'mine') {
-            mineEntryAtIndex(entryIndex);
+            const parent = slot.parentElement;
+            const buttonsContainer = parent?.className === 'anki-format-actions'
+                ? parent.parentElement
+                : parent;
+            mineEntryAtIndex(entryIndex, formatId, buttonsContainer);
+        } else if (kind === 'notes') {
+            showNotesAtIndex(entryIndex, formatId);
         }
     });
     slot.appendChild(el('span', { className: 'button-slot-icon' }));
@@ -1384,8 +1432,9 @@ function createButtonSlot(kind, entryIndex, enabled = true) {
     return slot;
 }
 
-function getButtonSlot(kind, entryIndex) {
-    return document.querySelector(`.button-slot[data-kind="${kind}"][data-entry-index="${entryIndex}"]`);
+function getButtonSlot(kind, entryIndex, formatId = null) {
+    const formatSelector = formatId ? `[data-format-id="${formatId}"]` : '';
+    return document.querySelector(`.button-slot[data-kind="${kind}"][data-entry-index="${entryIndex}"]${formatSelector}`);
 }
 
 function updateButtonSlot(slot, changes) {
@@ -1395,15 +1444,26 @@ function updateButtonSlot(slot, changes) {
     applyButtonSlotVisualState(slot);
 }
 
+function setButtonSlotHidden(slot, hidden) {
+    if (!slot) { return; }
+    slot.hidden = hidden;
+    slot.style.display = hidden ? 'none' : '';
+}
+
 function applyButtonSlotVisualState(slot) {
     if (!slot) { return; }
     const kind = slot.dataset.kind;
     const state = slot.dataset.state || 'default';
     const enabled = slot.dataset.enabled !== 'false';
+    const formatIcon = (slot.dataset.formatIcon || 'square').replace('-small', '');
     const iconName = kind === 'audio'
         ? (state === 'error' ? 'volume_off' : 'volume_up')
+        : kind === 'notes' ? 'search'
+        : formatIcon === 'circle' ? (state === 'duplicate' ? 'check_circle' : 'add_circle')
+        : formatIcon === 'diamond' ? (state === 'duplicate' ? 'diamond_fill' : 'diamond')
         : (state === 'duplicate' ? 'check_box' : 'add_box');
     slot.disabled = !enabled;
+    slot.classList?.toggle?.('button-slot-small', slot.dataset.formatIcon?.endsWith('-small'));
     slot.style.setProperty('--button-icon-url', `url("https://appassets.androidplatform.net/popup/icons/${iconName}.svg")`);
 }
 
@@ -1421,29 +1481,146 @@ async function playEntryAudio(entryIndex) {
     }
 }
 
-async function mineEntryAtIndex(entryIndex) {
+function duplicateValuesForEntry(entry) {
+    return {
+        '{expression}': entry?.expression || '',
+        '{reading}': entry?.reading || '',
+        '{furigana-plain}': constructFuriganaPlain(entry?.expression || '', entry?.reading || ''),
+        '{popup-selection-text}': getPopupSelectionText(),
+        '{sentence}': entry?.matched || entry?.expression || ''
+    };
+}
+
+function duplicateStateForFormat(states, formatId) {
+    return states && Object.prototype.hasOwnProperty.call(states, formatId)
+        ? Boolean(states[formatId])
+        : null;
+}
+
+async function mineEntryAtIndex(entryIndex, formatId, buttonsContainer = null) {
     const entry = window.lookupEntries?.[entryIndex];
     if (!entry) { return; }
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
-    const mineSlot = getButtonSlot('mine', entryIndex);
+    const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
+    const mineSlot = buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, formatId);
 
     lastSelection = getPopupSelectionText();
-    updateButtonSlot(mineSlot, { enabled: false });
+    formats.forEach((format) => updateButtonSlot(
+        buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, format.id),
+        { enabled: false },
+    ));
 
-    const isAnkiConnect = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection);
-    const checkDuplicate = async () => {
-        const wasAdded = await webkit.messageHandlers.duplicateCheck.postMessage(expression);
-        updateButtonSlot(mineSlot, {
-            state: wasAdded ? 'duplicate' : 'default',
-            enabled: !(wasAdded && !window.allowDupes)
-        });
-    };
+    const mined = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection, formatId);
+    if (!mined) {
+        updateButtonSlot(mineSlot, { state: 'error', enabled: false });
+        return;
+    }
+    const checkDuplicate = () => refreshAnkiDuplicateStates(entryIndex, buttonsContainer);
 
-    if (isAnkiConnect) {
+    if (window.useAnkiConnect) {
         await checkDuplicate();
     } else {
         setTimeout(checkDuplicate, 1000);
     }
+}
+
+async function showNotesAtIndex(entryIndex, formatId) {
+    const entry = window.lookupEntries?.[entryIndex];
+    if (!entry || !formatId) return false;
+    return await webkit.messageHandlers.showNotes.postMessage({
+        formatId,
+        values: duplicateValuesForEntry(entry)
+    });
+}
+
+function appendAnkiFormatButtons(container, entryIndex) {
+    const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
+    formats.forEach((format, index) => {
+        const placement = index === 0 ? 'leading' : 'above';
+        const actions = el('span', {
+            className: 'anki-format-actions',
+            'data-format-id': format.id,
+            'data-notes-placement': placement,
+        });
+        const mineButton = createButtonSlot(
+            'mine',
+            entryIndex,
+            Boolean(window.ankiBackendAvailable && format.isValid),
+            format.id,
+            format.icon,
+        );
+        const notesButton = createButtonSlot('notes', entryIndex, true, format.id, format.icon);
+        setButtonSlotHidden(notesButton, true);
+        if (placement === 'leading') {
+            actions.appendChild(notesButton);
+            actions.appendChild(mineButton);
+        } else {
+            notesButton.dataset.placement = 'above';
+            actions.appendChild(mineButton);
+            actions.appendChild(notesButton);
+        }
+        container.appendChild(actions);
+    });
+    return formats;
+}
+
+function buttonSlotInContainer(container, kind, entryIndex, formatId) {
+    const pending = Array.from(container?.children || []);
+    let local = null;
+    while (pending.length && !local) {
+        const child = pending.shift();
+        if (
+            child?.dataset?.kind === kind &&
+            child.dataset.entryIndex === String(entryIndex) &&
+            child.dataset.formatId === (formatId || '')
+        ) {
+            local = child;
+        } else {
+            pending.push(...Array.from(child?.children || []));
+        }
+    }
+    return container ? (local || null) : getButtonSlot(kind, entryIndex, formatId);
+}
+
+function syncShowNotesButton(container, entryIndex, format, visible) {
+    const existing = buttonSlotInContainer(container, 'notes', entryIndex, format.id);
+    setButtonSlotHidden(existing, !visible);
+}
+
+async function refreshAnkiDuplicateStates(entryIndex, buttonsContainer) {
+    const entry = window.lookupEntries?.[entryIndex];
+    const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
+    if (!entry) return false;
+    let states;
+    try {
+        states = await webkit.messageHandlers.duplicateCheck.postMessage(duplicateValuesForEntry(entry));
+    } catch {
+        states = null;
+    }
+    formats.forEach((format) => {
+        const mineSlot = buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, format.id);
+        const isDuplicate = duplicateStateForFormat(states, format.id);
+        if (isDuplicate === null) {
+            updateButtonSlot(mineSlot, { state: 'error', enabled: false });
+            syncShowNotesButton(buttonsContainer, entryIndex, format, false);
+            return;
+        }
+        updateButtonSlot(mineSlot, {
+            state: isDuplicate ? 'duplicate' : 'default',
+            enabled: Boolean(
+                window.ankiBackendAvailable &&
+                format.isValid &&
+                !(isDuplicate && !window.allowDupes)
+            ),
+        });
+        syncShowNotesButton(
+            buttonsContainer,
+            entryIndex,
+            format,
+            Boolean(isDuplicate && !window.disableShowNotes),
+        );
+    });
+    return states !== null;
 }
 
 function createEntryHeader(entry, idx) {
@@ -1467,18 +1644,12 @@ function createEntryHeader(entry, idx) {
 
     const buttonsContainer = el('div', { className: 'header-buttons' });
 
+    appendAnkiFormatButtons(buttonsContainer, idx);
+    refreshAnkiDuplicateStates(idx, buttonsContainer);
+
     if (window.audioSources?.length) {
         buttonsContainer.appendChild(createButtonSlot('audio', idx));
     }
-
-    const mineSlot = createButtonSlot('mine', idx, false);
-    buttonsContainer.appendChild(mineSlot);
-    webkit.messageHandlers.duplicateCheck.postMessage(expression).then(isDuplicate => {
-        updateButtonSlot(mineSlot, {
-            state: isDuplicate ? 'duplicate' : 'default',
-            enabled: !(isDuplicate && !window.allowDupes)
-        });
-    });
 
     header.appendChild(buttonsContainer);
 

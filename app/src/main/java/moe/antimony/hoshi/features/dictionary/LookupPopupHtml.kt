@@ -13,6 +13,7 @@ import kotlinx.serialization.json.putJsonArray
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.anki.AnkiPopupSettings
+import moe.antimony.hoshi.features.anki.AnkiFormatIcon
 import moe.antimony.hoshi.features.reader.coerceReaderPopupScale
 import java.util.Locale
 
@@ -173,7 +174,8 @@ internal object LookupPopupHtml {
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
                             popupScrolled: { postMessage: function() { window.HoshiAndroidPopup.postMessage('popupScrolled'); } },
                             mineEntry: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('mineEntry', content); } },
-                            duplicateCheck: { postMessage: function(expression) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', expression); } },
+                            duplicateCheck: { postMessage: function(values) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', values); } },
+                            showNotes: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('showNotes', content); } },
                             getEntry: { postMessage: function(index) { return window.HoshiAndroidPopup.requestMessage('getEntry', index); } },
                             lookupRedirect: { postMessage: function(query) { return window.HoshiAndroidPopup.requestMessage('lookupRedirect', query); } }
                         }
@@ -199,6 +201,9 @@ internal object LookupPopupHtml {
                     window.useAnkiConnect = ${ankiSettings.useAnkiConnect};
                     window.embedMedia = ${ankiSettings.embedMedia};
                     window.compactGlossariesAnki = ${ankiSettings.compactGlossaries};
+                    window.ankiFormats = ${ankiFormatsJson(ankiSettings)};
+                    window.ankiBackendAvailable = ${ankiSettings.isBackendAvailable};
+                    window.disableShowNotes = ${ankiSettings.disableShowNotes};
                     window.customCSS = ${JsonPrimitive(normalizedSettings.customCSS)};
                     window.swipeThreshold = $effectiveSwipeThreshold;
                     window.reducedMotionScrolling = $reducedMotionScrolling;
@@ -733,6 +738,26 @@ internal object LookupPopupHtml {
 
     private const val PopupAssetBaseUrl = "https://appassets.androidplatform.net/popup"
 }
+
+private fun ankiFormatsJson(settings: AnkiPopupSettings) = buildJsonArray {
+    settings.formats.forEach { format ->
+        add(buildJsonObject {
+            put("id", format.id)
+            put("icon", format.icon.popupName)
+            put("isValid", format.isValid)
+        })
+    }
+}
+
+private val AnkiFormatIcon.popupName: String
+    get() = when (this) {
+        AnkiFormatIcon.Square -> "square"
+        AnkiFormatIcon.SquareSmall -> "square-small"
+        AnkiFormatIcon.Circle -> "circle"
+        AnkiFormatIcon.CircleSmall -> "circle-small"
+        AnkiFormatIcon.Diamond -> "diamond"
+        AnkiFormatIcon.DiamondSmall -> "diamond-small"
+    }
 
 private fun selectionSupportAssetNames(contentLanguageProfile: ContentLanguageProfile): List<String> =
     when (contentLanguageProfile.dictionaryLanguageId) {

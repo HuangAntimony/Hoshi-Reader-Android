@@ -762,13 +762,18 @@ fun ReaderWebView(
                         sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
                     )
                 } ?: popup.state.ankiContext
-                ankiViewModel.mineEntryAsync(message.payloadJson, ankiContext) { mined ->
+                ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, ankiContext) { mined ->
                     replyReaderPopupMessage(message.popupId, messageId, mined.toString())
                 }
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
-                ankiViewModel.duplicateCheckAsync(message.expression) { isDuplicate ->
-                    replyReaderPopupMessage(message.popupId, message.messageId ?: return@duplicateCheckAsync, isDuplicate.toString())
+                ankiViewModel.duplicateStatesAsync(message.valuesByHandlebar) { states ->
+                    replyReaderPopupMessage(message.popupId, message.messageId ?: return@duplicateStatesAsync, readerPopupBooleanMapJson(states))
+                }
+            }
+            is ReaderLookupPopupBridgeMessage.ShowNotes -> {
+                ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar) { shown ->
+                    replyReaderPopupMessage(message.popupId, message.messageId ?: return@showNotesAsync, shown.toString())
                 }
             }
             is ReaderLookupPopupBridgeMessage.LookupRedirect -> {

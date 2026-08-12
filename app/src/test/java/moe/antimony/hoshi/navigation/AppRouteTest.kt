@@ -19,6 +19,8 @@ class AppRouteTest {
             "StatisticsRoute",
             "SettingsRoute",
             "SettingsDetailRoute",
+            "AnkiCardFormatRoute",
+            "AnkiAdvancedRoute",
             "ReaderRoute",
         )
 
@@ -34,6 +36,12 @@ class AppRouteTest {
     @Test
     fun readerRoutesCarryOnlyStableBookIds() {
         assertRouteConstructor("ReaderRoute", String::class.java)
+    }
+
+    @Test
+    fun ankiFormatRoutesCarryOnlyStableFormatIds() {
+        assertRouteConstructor("AnkiCardFormatRoute", String::class.java)
+        assertRouteConstructor("AnkiAdvancedRoute")
     }
 
     @Test

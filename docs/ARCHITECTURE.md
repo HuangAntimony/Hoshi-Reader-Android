@@ -176,8 +176,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   loading, and the integration does not request broad storage access.
 - Anki work stays behind the Anki backend/repository boundary.
 - Anki settings are stored per active profile in
-  `Profiles/<profileId>/anki_config.json`; duplicate checks and note creation
-  still go through the existing Anki backend/repository boundary.
+  `Profiles/<profileId>/anki_config.json`. Schema version 2 owns one to three
+  stable-ID `AnkiCardFormat` values, each with its own icon, deck, note type,
+  field mappings, and tags; legacy single-format JSON is migrated and persisted
+  as one default format. Popup mining, per-format duplicate checks, and opening
+  existing notes all carry the stable format ID through the reader bridge and
+  still go through the Anki repository/backend boundary. AnkiConnect opens
+  notes with `guiBrowse`; AnkiDroid uses its browser deep link.
 - Google Drive sync uses Android/Google OAuth and Drive APIs through the
   repository/sync boundary. The Drive data source owns paginated folder listing,
   grouped sync-file discovery, bookdata upload/download, trash, cache clearing,

@@ -105,6 +105,11 @@ internal class DictionaryUpdateService(
                     fieldMappings = current.fieldMappings.mapValues { (_, template) ->
                         template.renamedSingleGlossaryHandlebars(summary.renamedDictionaries)
                     },
+                    cardFormats = current.cardFormats.map { format ->
+                        format.copy(fieldMappings = format.fieldMappings.mapValues { (_, template) ->
+                            template.renamedSingleGlossaryHandlebars(summary.renamedDictionaries)
+                        })
+                    },
                 )
             }
         }

@@ -214,4 +214,88 @@ class AnkiHandlebarRendererTest {
             rendered,
         )
     }
+
+    @Test
+    fun clozePartsUsePreciseSelectedOccurrenceAndShareSentenceRange() {
+        val payload = AnkiMiningPayload(expression = "僕", matched = "僕")
+        val context = AnkiMiningContext(sentence = "僕は僕の本", sentenceOffset = 2)
+
+        assertEquals(
+            "僕は|僕|の本|僕は<b>僕</b>の本",
+            AnkiHandlebarRenderer.render(
+                "{cloze-prefix}|{cloze-body}|{cloze-suffix}|{sentence}",
+                payload,
+                context,
+            ),
+        )
+    }
+
+    @Test
+    fun clozePartsHandleSupplementaryCharactersAndInvalidOffsets() {
+        val payload = AnkiMiningPayload(expression = "𠮟る", matched = "𠮟る")
+
+        assertEquals(
+            "前|𠮟る|後",
+            AnkiHandlebarRenderer.render(
+                "{cloze-prefix}|{cloze-body}|{cloze-suffix}",
+                payload,
+                AnkiMiningContext(sentence = "前𠮟る後", sentenceOffset = 1),
+            ),
+        )
+        assertEquals(
+            "前|𠮟る|後",
+            AnkiHandlebarRenderer.render(
+                "{cloze-prefix}|{cloze-body}|{cloze-suffix}",
+                payload,
+                AnkiMiningContext(sentence = "前𠮟る後", sentenceOffset = 99),
+            ),
+        )
+    }
+
+    @Test
+    fun selectedGlossaryUsesConfiguredFallbackWithoutRecursing() {
+        val payload = AnkiMiningPayload(
+            expression = "読む",
+            glossaryFirst = "first glossary",
+            selectedDictionary = "Missing",
+        )
+
+        assertEquals(
+            "first glossary",
+            AnkiHandlebarRenderer.render(
+                template = "{selected-glossary}",
+                payload = payload,
+                context = AnkiMiningContext(sentence = "読む"),
+                selectedGlossaryFallback = "{glossary-first}",
+            ),
+        )
+        assertEquals(
+            "",
+            AnkiHandlebarRenderer.render(
+                template = "{selected-glossary}",
+                payload = payload,
+                context = AnkiMiningContext(sentence = "読む"),
+                selectedGlossaryFallback = "{selected-glossary}",
+            ),
+        )
+    }
+
+    @Test
+    fun rendersAllAndFirstPitchAccentGraphsFromPayload() {
+        val first = """<svg viewBox="0 0 100 100"><circle/></svg>"""
+        val second = """<svg viewBox="0 0 150 100"><path/></svg>"""
+        val payload = AnkiMiningPayload(
+            expression = "食べる",
+            pitchAccentGraphs = "<ol><li>$first</li><li>$second</li></ol>",
+        )
+
+        assertEquals(
+            "<ol><li>$first</li><li>$second</li></ol>|$first",
+            AnkiHandlebarRenderer.render(
+                "{pitch-accent-graphs}|{pitch-accent-graphs-first}",
+                payload,
+                AnkiMiningContext(sentence = "食べる"),
+            ),
+        )
+    }
 }

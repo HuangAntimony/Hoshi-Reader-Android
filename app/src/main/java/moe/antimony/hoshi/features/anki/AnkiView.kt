@@ -10,24 +10,30 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -45,7 +51,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddBox
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Diamond
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,22 +76,16 @@ import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 @Composable
 fun AnkiView(
     onClose: () -> Unit,
+    onOpenFormat: (String) -> Unit = {},
+    onOpenAdvanced: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val appContainer = LocalHoshiUiDependencies.current
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val handlebarOptions by produceState(
-        initialValue = AnkiHandlebarOptions.forTermDictionaries(emptyList()),
-        key1 = appContainer.dictionaryRepository,
-    ) {
-        value = AnkiHandlebarOptions.forTermDictionaries(
-            appContainer.dictionaryRepository
-                .loadDictionaries(DictionaryType.Term)
-                .map { it.index.title },
-        )
-    }
+    val nextFormatName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
+    var confirmFetch by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<AnkiFormatDeleteRequest?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -142,7 +151,7 @@ fun AnkiView(
                             }
                         },
                         trailingContent = {
-                            TextButton(onClick = fetchAnki, enabled = !uiState.isFetching) {
+                            TextButton(onClick = { confirmFetch = true }, enabled = !uiState.isFetching) {
                                 Text(
                                     if (uiState.isFetching) {
                                         stringResource(R.string.anki_fetching)
@@ -157,9 +166,45 @@ fun AnkiView(
             }
             item {
                 AnkiCard {
-                    AnkiDeckRow(uiState = uiState, onSelect = viewModel::selectDeck)
-                    AnkiDivider()
-                    AnkiNoteTypeRow(uiState = uiState, onSelect = viewModel::selectNoteType)
+                    uiState.settings.cardFormats.forEachIndexed { index, format ->
+                        ListItem(
+                            modifier = Modifier.clickable { onOpenFormat(format.id) },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            leadingContent = { AnkiFormatIconView(format.icon) },
+                            headlineContent = { Text(format.name) },
+                            supportingContent = {
+                                Text(listOfNotNull(format.selectedDeckName, format.selectedNoteTypeName).joinToString(" · ").ifBlank {
+                                    stringResource(R.string.none)
+                                })
+                            },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            pendingDelete = ankiFormatDeleteRequest(
+                                                uiState.settings.cardFormats,
+                                                format.id,
+                                            )
+                                        },
+                                        enabled = uiState.settings.cardFormats.size > 1,
+                                    ) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete)) }
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null)
+                                }
+                            },
+                        )
+                        if (index != uiState.settings.cardFormats.lastIndex) AnkiDivider()
+                    }
+                    if (uiState.settings.cardFormats.size < MaxAnkiCardFormats) {
+                        if (uiState.settings.cardFormats.isNotEmpty()) AnkiDivider()
+                        ListItem(
+                            modifier = Modifier.clickable {
+                                viewModel.addCardFormat(nextFormatName)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            leadingContent = { Icon(Icons.Default.Add, contentDescription = null) },
+                            headlineContent = { Text(stringResource(R.string.anki_add_format)) },
+                        )
+                    }
                 }
             }
             item {
@@ -168,6 +213,12 @@ fun AnkiView(
                         label = stringResource(R.string.anki_allow_duplicates),
                         checked = uiState.settings.allowDupes,
                         onCheckedChange = viewModel::updateAllowDupes,
+                    )
+                    AnkiDivider()
+                    AnkiSwitchRow(
+                        label = stringResource(R.string.anki_disable_show_notes),
+                        checked = uiState.settings.disableShowNotes,
+                        onCheckedChange = viewModel::updateDisableShowNotes,
                     )
                     AnkiDivider()
                     AnkiSwitchRow(
@@ -186,6 +237,13 @@ fun AnkiView(
                         checked = uiState.settings.compactGlossaries,
                         onCheckedChange = viewModel::updateCompactGlossaries,
                     )
+                    AnkiDivider()
+                    ListItem(
+                        modifier = Modifier.clickable(onClick = onOpenAdvanced),
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        headlineContent = { Text(stringResource(R.string.settings_advanced)) },
+                        trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                    )
                     if (uiState.settings.backendKind == AnkiBackendKind.AnkiDroid) {
                         AnkiDivider()
                         AnkiSwitchRow(
@@ -197,39 +255,197 @@ fun AnkiView(
                     }
                 }
             }
-            val selectedNoteType = uiState.selectedNoteType
-            if (selectedNoteType != null) {
-                item {
+        }
+    }
+    if (confirmFetch) {
+        AlertDialog(
+            onDismissRequest = { confirmFetch = false },
+            title = { Text(stringResource(R.string.anki_fetch_confirm_title)) },
+            text = { Text(stringResource(R.string.anki_fetch_confirm_message)) },
+            confirmButton = { TextButton(onClick = { confirmFetch = false; fetchAnki() }) { Text(stringResource(R.string.action_confirm)) } },
+            dismissButton = { TextButton(onClick = { confirmFetch = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+    pendingDelete?.let { request ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.anki_delete_format_title, request.name)) },
+            text = { Text(stringResource(R.string.anki_delete_format_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        viewModel.removeCardFormat(request.formatId)
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun AnkiCardFormatView(
+    formatId: String,
+    onClose: () -> Unit,
+    onDuplicated: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    val appContainer = LocalHoshiUiDependencies.current
+    val viewModel: AnkiViewModel = hiltViewModel()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val format = uiState.settings.cardFormats.firstOrNull { it.id == formatId }
+    val duplicateName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
+    val handlebarOptions by produceState(
+        initialValue = AnkiHandlebarOptions.forTermDictionaries(emptyList(), uiState.settings.showAllHandlebars),
+        key1 = appContainer.dictionaryRepository,
+        key2 = uiState.settings.showAllHandlebars,
+    ) {
+        value = AnkiHandlebarOptions.forTermDictionaries(
+            appContainer.dictionaryRepository.loadDictionaries(DictionaryType.Term).map { it.index.title },
+            uiState.settings.showAllHandlebars,
+        )
+    }
+    SettingsDetailScaffold(title = format?.name ?: stringResource(R.string.anki_format), onClose = onClose, modifier = modifier) { padding ->
+        if (format == null) return@SettingsDetailScaffold
+        val noteType = uiState.availableNoteTypes.firstOrNull { it.id == format.selectedNoteTypeId || it.name == format.selectedNoteTypeName }
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
+            item {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.duplicateCardFormat(
+                            formatId = formatId,
+                            name = duplicateName,
+                            onCreated = onDuplicated,
+                        )
+                    },
+                    enabled = uiState.settings.cardFormats.size < MaxAnkiCardFormats,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null)
                     Text(
-                        text = stringResource(R.string.anki_fields),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 18.dp, bottom = 8.dp),
-                    )
-                }
-                items(
-                    items = selectedNoteType.fields,
-                    key = { field -> field },
-                    contentType = { "anki-field-mapping" },
-                ) { field ->
-                    AnkiFieldMappingRow(
-                        field = field,
-                        value = uiState.settings.fieldMappings[field].orEmpty(),
-                        handlebarOptions = handlebarOptions,
-                        onValueChange = { viewModel.updateFieldMapping(field, it) },
-                    )
-                }
-                item {
-                    AnkiTextValueRow(
-                        label = stringResource(R.string.anki_tags),
-                        value = uiState.settings.tags,
-                        onValueChange = viewModel::updateTags,
-                        dialogLabel = stringResource(R.string.anki_tags),
+                        text = stringResource(R.string.anki_duplicate_format),
+                        modifier = Modifier.padding(start = 8.dp),
                     )
                 }
             }
+            item {
+                AnkiCard {
+                    AnkiTextValueRow(stringResource(R.string.anki_format_name), format.name, { viewModel.updateFormatName(formatId, it) }, stringResource(R.string.anki_format_name))
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        headlineContent = { Text(stringResource(R.string.anki_format_icon)) },
+                        supportingContent = { AnkiFormatIconView(format.icon) },
+                        trailingContent = {
+                            var expanded by remember { mutableStateOf(false) }
+                            TextButton(onClick = { expanded = true }) { Text(stringResource(R.string.action_choose)) }
+                            DropdownMenu(expanded, { expanded = false }) {
+                                AnkiFormatIcon.entries.forEach { icon ->
+                                    DropdownMenuItem(text = { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { AnkiFormatIconView(icon); Text(stringResource(icon.labelRes)) } }, onClick = { expanded = false; viewModel.updateFormatIcon(formatId, icon) })
+                                }
+                            }
+                        },
+                    )
+                    AnkiDivider()
+                    AnkiDropdownRow(stringResource(R.string.anki_deck), format.selectedDeckName ?: stringResource(R.string.none), uiState.availableDecks.isNotEmpty(), uiState.availableDecks, { it.name }) { viewModel.selectDeck(formatId, it) }
+                    AnkiDivider()
+                    AnkiDropdownRow(stringResource(R.string.anki_model), format.selectedNoteTypeName ?: stringResource(R.string.none), uiState.availableNoteTypes.isNotEmpty(), uiState.availableNoteTypes, { it.name }) { viewModel.selectNoteType(formatId, it) }
+                }
+            }
+            noteType?.fields?.forEach { field ->
+                item(key = field) { AnkiFieldMappingRow(field, format.fieldMappings[field].orEmpty(), handlebarOptions) { viewModel.updateFieldMapping(formatId, field, it) } }
+            }
+            item { AnkiTextValueRow(stringResource(R.string.anki_tags), format.tags, { viewModel.updateTags(formatId, it) }, stringResource(R.string.anki_tags)) }
         }
     }
 }
+
+@Composable
+fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val viewModel: AnkiViewModel = hiltViewModel()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    SettingsDetailScaffold(title = stringResource(R.string.settings_advanced), onClose = onClose, modifier = modifier) { padding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
+            item { AnkiCard {
+                AnkiSwitchRow(stringResource(R.string.anki_embed_media), checked = uiState.settings.embedMedia, onCheckedChange = viewModel::updateEmbedMedia)
+                AnkiDivider()
+                AnkiDropdownRow(
+                    stringResource(R.string.anki_selected_glossary_fallback),
+                    uiState.settings.selectedGlossaryFallback.ifBlank { stringResource(R.string.none) },
+                    true,
+                    listOf("", "{glossary-first}"),
+                    { if (it.isBlank()) stringResource(R.string.none) else it },
+                    viewModel::updateSelectedGlossaryFallback,
+                )
+                AnkiDivider()
+                AnkiSwitchRow(stringResource(R.string.anki_show_all_handlebars), checked = uiState.settings.showAllHandlebars, onCheckedChange = viewModel::updateShowAllHandlebars)
+            } }
+        }
+    }
+}
+
+@Composable
+private fun AnkiFormatIconView(icon: AnkiFormatIcon) {
+    val image = when (icon) {
+        AnkiFormatIcon.Square, AnkiFormatIcon.SquareSmall -> Icons.Default.AddBox
+        AnkiFormatIcon.Circle, AnkiFormatIcon.CircleSmall -> Icons.Default.AddCircle
+        AnkiFormatIcon.Diamond, AnkiFormatIcon.DiamondSmall -> Icons.Default.Diamond
+    }
+    val layout = ankiFormatIconLayout(icon)
+    Box(modifier = Modifier.size(layout.slotSize), contentAlignment = Alignment.Center) {
+        Icon(image, contentDescription = null, modifier = Modifier.size(layout.glyphSize))
+    }
+}
+
+internal data class AnkiFormatIconLayout(
+    val slotSize: Dp,
+    val glyphSize: Dp,
+)
+
+internal data class AnkiFormatDeleteRequest(
+    val formatId: String,
+    val name: String,
+)
+
+internal fun ankiFormatDeleteRequest(
+    formats: List<AnkiCardFormat>,
+    formatId: String,
+): AnkiFormatDeleteRequest? {
+    if (formats.size <= 1) return null
+    val format = formats.firstOrNull { it.id == formatId } ?: return null
+    return AnkiFormatDeleteRequest(format.id, format.name)
+}
+
+internal fun ankiFormatIconLayout(icon: AnkiFormatIcon): AnkiFormatIconLayout =
+    AnkiFormatIconLayout(
+        slotSize = 24.dp,
+        glyphSize = when (icon) {
+            AnkiFormatIcon.SquareSmall,
+            AnkiFormatIcon.CircleSmall,
+            AnkiFormatIcon.DiamondSmall,
+            -> 18.dp
+            else -> 24.dp
+        },
+    )
+
+private val AnkiFormatIcon.labelRes: Int
+    get() = when (this) {
+        AnkiFormatIcon.Square -> R.string.anki_icon_square
+        AnkiFormatIcon.SquareSmall -> R.string.anki_icon_square_small
+        AnkiFormatIcon.Circle -> R.string.anki_icon_circle
+        AnkiFormatIcon.CircleSmall -> R.string.anki_icon_circle_small
+        AnkiFormatIcon.Diamond -> R.string.anki_icon_diamond
+        AnkiFormatIcon.DiamondSmall -> R.string.anki_icon_diamond_small
+    }
 
 internal enum class AnkiFetchAction {
     FetchConfiguration,
@@ -507,26 +723,42 @@ internal object AnkiHandlebarOptions {
         "{furigana-plain}",
         "{audio}",
         "{glossary}",
-        "{glossary-brief}",
         "{glossary-first}",
         "{selected-glossary}",
-        "{selected-glossary-fallback}",
         "{popup-selection-text}",
         "{sentence}",
         "{frequencies}",
         "{frequency-harmonic-rank}",
         "{pitch-accent-positions}",
         "{pitch-accent-categories}",
+        "{pitch-accent-graphs}",
         "{phonetic-transcriptions}",
         "{document-title}",
         "{book-cover}",
         "{sasayaki-audio}",
     )
 
-    fun forTermDictionaries(dictionaryNames: List<String>): List<String> =
-        CoreOptions + dictionaryNames
+    private val AdvancedOptions = listOf(
+        "{glossary-brief}",
+        "{glossary-no-dictionary}",
+        "{glossary-first-brief}",
+        "{glossary-first-no-dictionary}",
+        "{selected-glossary-brief}",
+        "{selected-glossary-no-dictionary}",
+        "{cloze-prefix}",
+        "{cloze-body}",
+        "{cloze-suffix}",
+        "{pitch-accent-graphs-first}",
+    )
+
+    fun forTermDictionaries(dictionaryNames: List<String>, showAll: Boolean = false): List<String> =
+        CoreOptions + (if (showAll) AdvancedOptions else emptyList()) + dictionaryNames
             .distinct()
-            .map { dictionaryName -> "{single-glossary-$dictionaryName}" }
+            .flatMap { dictionaryName ->
+                listOf("{single-glossary-$dictionaryName}") + if (showAll) {
+                    listOf("{single-glossary-$dictionaryName-brief}", "{single-glossary-$dictionaryName-no-dictionary}")
+                } else emptyList()
+            }
 }
 
 private const val AnkiDroidReadWritePermission = "com.ichi2.anki.permission.READ_WRITE_DATABASE"

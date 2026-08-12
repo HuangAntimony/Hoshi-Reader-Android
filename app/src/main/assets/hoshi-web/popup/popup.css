@@ -89,6 +89,36 @@ body {
     -webkit-user-select: none;
 }
 
+.anki-format-actions {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+}
+
+.anki-format-actions[data-notes-placement="leading"] {
+    width: auto;
+    gap: 2px;
+}
+
+.button-slot[data-kind="notes"] {
+    width: 14px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.button-slot[data-kind="notes"][data-placement="above"] {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 2px);
+    transform: translateX(-50%);
+    width: 22px;
+    height: 16px;
+    padding: 0 3px;
+}
+
 button.button-slot {
     appearance: none;
     border: 0;
@@ -124,6 +154,10 @@ button.button-slot:disabled {
     -webkit-mask-size: contain;
     mask-size: contain;
     pointer-events: none;
+}
+
+.button-slot-small .button-slot-icon {
+    transform: scale(0.76);
 }
 
 .entry-tags {

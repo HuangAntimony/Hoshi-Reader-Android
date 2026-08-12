@@ -6,6 +6,25 @@ import org.junit.Test
 
 class AppRouteBackStackTest {
     @Test
+    fun duplicateCompletionReturnsFromTheSourceFormatToTheFormatList() {
+        val backStack = mutableListOf<NavKey>(
+            AppRoute.SettingsRoute,
+            AppRoute.SettingsDetailRoute(SettingsDetailSection.Anki),
+            AppRoute.AnkiCardFormatRoute("source"),
+        )
+
+        backStack.returnFromAnkiFormatDuplicate()
+
+        assertEquals(
+            listOf(
+                AppRoute.SettingsRoute,
+                AppRoute.SettingsDetailRoute(SettingsDetailSection.Anki),
+            ),
+            backStack,
+        )
+    }
+
+    @Test
     fun externalBookImportReturnsToBooksBeforeTheBookshelfConsumesTheUri() {
         val backStack = mutableListOf<NavKey>(
             AppRoute.BooksRoute,

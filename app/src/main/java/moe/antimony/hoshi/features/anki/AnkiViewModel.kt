@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,7 @@ data class AnkiUiState(
     val isFetching: Boolean = false,
     val isConnectingAnkiConnect: Boolean = false,
     val isAnkiConnectReachable: Boolean = false,
+    val isAnkiDroidAvailable: Boolean = false,
     val ankiConnectMessage: UiText? = null,
     val errorMessage: UiText? = null,
     val errorAction: AnkiErrorAction? = null,
@@ -34,22 +36,79 @@ data class AnkiUiState(
             ?: settings.selectedNoteTypeName?.let { name -> availableNoteTypes.firstOrNull { it.name == name } }
 
     val isConfigured: Boolean
-        get() = settings.selectedDeckId != null && settings.selectedNoteTypeId != null
+        get() = settings.effectiveCardFormats().any { format ->
+            val deckExists = availableDecks.any { deck ->
+                deck.id == format.selectedDeckId || format.selectedDeckName != null && deck.name == format.selectedDeckName
+            }
+            val noteType = availableNoteTypes.firstOrNull { type ->
+                type.id == format.selectedNoteTypeId ||
+                    format.selectedNoteTypeName != null && type.name == format.selectedNoteTypeName
+            }
+            deckExists && noteType?.fields?.firstOrNull()?.let { field ->
+                !format.fieldMappings[field].isNullOrBlank()
+            } == true
+        }
 
     val popupSettings: AnkiPopupSettings
         get() {
-            val activeMappings = selectedNoteType?.let(settings.fieldMappings::activeAnkiFieldMappings)
-                ?: settings.fieldMappings
+            val backendAvailable = when (settings.backendKind) {
+                AnkiBackendKind.AnkiDroid -> isAnkiDroidAvailable
+                AnkiBackendKind.AnkiConnect -> isAnkiConnectReachable
+            }
+            val formats = settings.effectiveCardFormats().map { format ->
+                val deckExists = availableDecks.any { deck ->
+                    deck.id == format.selectedDeckId || format.selectedDeckName != null && deck.name == format.selectedDeckName
+                }
+                val noteType = availableNoteTypes.firstOrNull { type ->
+                    type.id == format.selectedNoteTypeId ||
+                        format.selectedNoteTypeName != null && type.name == format.selectedNoteTypeName
+                }
+                val firstFieldMapped = noteType?.fields?.firstOrNull()?.let { field ->
+                    !format.fieldMappings[field].isNullOrBlank()
+                } == true
+                AnkiPopupFormat(
+                    id = format.id,
+                    icon = format.icon,
+                    isValid = backendAvailable && deckExists && noteType != null && firstFieldMapped,
+                )
+            }
+            val activeMappings = settings.effectiveCardFormats().flatMap { format ->
+                val noteType = availableNoteTypes.firstOrNull { type ->
+                    type.id == format.selectedNoteTypeId ||
+                        format.selectedNoteTypeName != null && type.name == format.selectedNoteTypeName
+                }
+                (noteType?.let(format.fieldMappings::activeAnkiFieldMappings) ?: format.fieldMappings).values
+            }
             return AnkiPopupSettings(
                 isConfigured = isConfigured,
+                formats = formats,
+                isBackendAvailable = backendAvailable,
                 useAnkiConnect = settings.backendKind == AnkiBackendKind.AnkiConnect,
-                needsAudio = activeMappings.referencesAnkiHandlebar("{audio}"),
-                needsSasayakiAudio = activeMappings.referencesAnkiHandlebar("{sasayaki-audio}"),
+                needsAudio = activeMappings.any { "{audio}" in it },
+                needsSasayakiAudio = activeMappings.any { "{sasayaki-audio}" in it },
                 allowDupes = settings.allowDupes,
                 compactGlossaries = settings.compactGlossaries,
+                disableShowNotes = settings.disableShowNotes,
+                embedMedia = isConfigured && settings.embedMedia,
             )
         }
 }
+
+private fun AnkiSettings.effectiveCardFormats(): List<AnkiCardFormat> =
+    cardFormats.ifEmpty {
+        listOf(
+            AnkiCardFormat(
+                id = "legacy",
+                name = "Default",
+                selectedDeckId = selectedDeckId,
+                selectedDeckName = selectedDeckName,
+                selectedNoteTypeId = selectedNoteTypeId,
+                selectedNoteTypeName = selectedNoteTypeName,
+                fieldMappings = fieldMappings,
+                tags = tags,
+            ),
+        )
+    }
 
 enum class AnkiErrorAction {
     OpenPermissionSettings,
@@ -59,24 +118,27 @@ enum class AnkiErrorAction {
 internal class AnkiViewModel @Inject constructor(
     private val repository: AnkiRepository,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(AnkiUiState())
+    private val _uiState = MutableStateFlow(
+        AnkiUiState(isAnkiDroidAvailable = repository.isAnkiDroidAvailable()),
+    )
     val uiState: StateFlow<AnkiUiState> = _uiState.asStateFlow()
-    private var attemptedRestoreFetch = false
     private var attemptedAnkiConnectPing = false
+    private var ankiConnectIdentity: Pair<String, String>? = null
 
     init {
         viewModelScope.launch {
             repository.settings.collectLatest { settings ->
-                _uiState.value = _uiState.value.copy(settings = settings)
-                if (
-                    !attemptedRestoreFetch &&
-                    settings.selectedDeckId != null &&
-                    settings.selectedNoteTypeId != null &&
-                    (settings.availableDecks.isEmpty() || settings.availableNoteTypes.isEmpty())
-                ) {
-                    attemptedRestoreFetch = true
-                    fetchConfiguration()
+                val nextIdentity = settings.ankiConnectUrl to settings.ankiConnectApiKey
+                if (settings.backendKind == AnkiBackendKind.AnkiConnect && ankiConnectIdentity != nextIdentity) {
+                    ankiConnectIdentity = nextIdentity
+                    attemptedAnkiConnectPing = false
+                    _uiState.value = _uiState.value.copy(isAnkiConnectReachable = false)
+                } else if (settings.backendKind == AnkiBackendKind.AnkiDroid) {
+                    ankiConnectIdentity = null
+                    attemptedAnkiConnectPing = false
+                    _uiState.value = _uiState.value.copy(isAnkiConnectReachable = false)
                 }
+                _uiState.value = _uiState.value.copy(settings = settings)
                 if (
                     !attemptedAnkiConnectPing &&
                     settings.backendKind == AnkiBackendKind.AnkiConnect &&
@@ -132,49 +194,102 @@ internal class AnkiViewModel @Inject constructor(
         )
     }
 
-    fun selectDeck(deck: AnkiDeck) {
+    fun addCardFormat(name: String) {
+        viewModelScope.launch {
+            val deck = _uiState.value.availableDecks.firstOrNull { !it.name.equals("Default", ignoreCase = true) }
+                ?: _uiState.value.availableDecks.firstOrNull()
+            val noteType = _uiState.value.availableNoteTypes.firstOrNull()
+            repository.updateSettings { settings ->
+                settings.addCardFormat(
+                    AnkiCardFormat(
+                        id = UUID.randomUUID().toString(),
+                        name = name,
+                        selectedDeckId = deck?.id,
+                        selectedDeckName = deck?.name,
+                        selectedNoteTypeId = noteType?.id,
+                        selectedNoteTypeName = noteType?.name,
+                        fieldMappings = noteType?.let(AnkiFieldTemplates::defaultMappings).orEmpty(),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun duplicateCardFormat(formatId: String, name: String, onCreated: () -> Unit) {
+        val newFormatId = UUID.randomUUID().toString()
+        viewModelScope.launch {
+            var created = false
+            repository.updateSettings { settings ->
+                val updated = settings.duplicateCardFormat(
+                    sourceFormatId = formatId,
+                    newFormatId = newFormatId,
+                    newName = name,
+                )
+                created = updated != settings
+                updated
+            }
+            if (created) onCreated()
+        }
+    }
+
+    fun removeCardFormat(formatId: String) {
+        viewModelScope.launch {
+            repository.updateSettings { it.removeCardFormat(formatId) }
+        }
+    }
+
+    fun updateFormatName(formatId: String, name: String) = updateFormat(formatId) {
+        it.copy(name = name.trim().ifBlank { it.name })
+    }
+
+    fun updateFormatIcon(formatId: String, icon: AnkiFormatIcon) = updateFormat(formatId) {
+        it.copy(icon = icon)
+    }
+
+    fun selectDeck(formatId: String, deck: AnkiDeck) {
         viewModelScope.launch {
             repository.updateSettings {
-                it.copy(
+                it.updateCardFormat(formatId) { format -> format.copy(
                     selectedDeckId = deck.id,
                     selectedDeckName = deck.name,
+                ) }.copy(
                     availableDecks = (it.availableDecks + deck).distinctBy(AnkiDeck::id),
                 )
             }
         }
     }
 
-    fun selectNoteType(noteType: AnkiNoteType) {
+    fun selectNoteType(formatId: String, noteType: AnkiNoteType) {
         viewModelScope.launch {
             repository.updateSettings {
-                it.copy(
+                it.updateCardFormat(formatId) { format -> format.copy(
                     selectedNoteTypeId = noteType.id,
                     selectedNoteTypeName = noteType.name,
+                    fieldMappings = AnkiFieldTemplates.applyDefaultsIfUnmapped(noteType, format.fieldMappings),
+                ) }.copy(
                     availableNoteTypes = (it.availableNoteTypes + noteType).distinctBy(AnkiNoteType::id),
-                    fieldMappings = AnkiFieldTemplates.applyDefaultsIfUnmapped(noteType, it.fieldMappings),
                 )
             }
         }
     }
 
-    fun updateFieldMapping(field: String, value: String) {
+    fun updateFieldMapping(formatId: String, field: String, value: String) {
         viewModelScope.launch {
             repository.updateSettings { settings ->
-                val trimmed = value.trim()
-                val mappings = if (trimmed.isEmpty()) {
-                    settings.fieldMappings - field
-                } else {
-                    settings.fieldMappings + (field to value)
+                settings.updateCardFormat(formatId) { format ->
+                    val trimmed = value.trim()
+                    val mappings = if (trimmed.isEmpty()) format.fieldMappings - field
+                    else format.fieldMappings + (field to value)
+                    format.copy(fieldMappings = mappings)
                 }
-                settings.copy(fieldMappings = mappings)
             }
         }
     }
 
-    fun updateTags(tags: String) {
-        viewModelScope.launch {
-            repository.updateSettings { it.copy(tags = tags) }
-        }
+    fun updateTags(formatId: String, tags: String) = updateFormat(formatId) { it.copy(tags = tags) }
+
+    private fun updateFormat(formatId: String, transform: (AnkiCardFormat) -> AnkiCardFormat) {
+        viewModelScope.launch { repository.updateSettings { it.updateCardFormat(formatId, transform) } }
     }
 
     fun updateAllowDupes(value: Boolean) {
@@ -264,17 +379,53 @@ internal class AnkiViewModel @Inject constructor(
         }
     }
 
-    fun mineEntryAsync(rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) {
+    fun updateEmbedMedia(value: Boolean) {
+        viewModelScope.launch { repository.updateSettings { it.copy(embedMedia = value) } }
+    }
+
+    fun updateDisableShowNotes(value: Boolean) {
+        viewModelScope.launch { repository.updateSettings { it.copy(disableShowNotes = value) } }
+    }
+
+    fun updateSelectedGlossaryFallback(value: String) {
+        viewModelScope.launch { repository.updateSettings { it.copy(selectedGlossaryFallback = value) } }
+    }
+
+    fun updateShowAllHandlebars(value: Boolean) {
+        viewModelScope.launch { repository.updateSettings { it.copy(showAllHandlebars = value) } }
+    }
+
+    fun mineEntryAsync(formatId: String?, rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val mined = runCatching {
                 repository.mineEntry(
                     rawPayload = rawPayload,
                     context = context,
-                    decks = _uiState.value.decks,
-                    noteTypes = _uiState.value.noteTypes,
+                    decks = _uiState.value.availableDecks,
+                    noteTypes = _uiState.value.availableNoteTypes,
+                    formatId = formatId,
                 )
             }.getOrDefault(false)
             onResult(mined)
+        }
+    }
+
+    fun mineEntryAsync(rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) =
+        mineEntryAsync(null, rawPayload, context, onResult)
+
+    fun duplicateStatesAsync(valuesByHandlebar: Map<String, String>, onResult: (Map<String, Boolean>) -> Unit) {
+        viewModelScope.launch {
+            onResult(runCatching {
+                repository.duplicateStates(valuesByHandlebar, _uiState.value.availableDecks, _uiState.value.availableNoteTypes)
+            }.getOrDefault(emptyMap()))
+        }
+    }
+
+    fun showNotesAsync(formatId: String, valuesByHandlebar: Map<String, String>, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            onResult(runCatching {
+                repository.showNotes(formatId, valuesByHandlebar, _uiState.value.availableDecks, _uiState.value.availableNoteTypes)
+            }.getOrDefault(false))
         }
     }
 
@@ -283,8 +434,8 @@ internal class AnkiViewModel @Inject constructor(
             val isDuplicate = runCatching {
                 repository.isDuplicate(
                     expression = expression,
-                    decks = _uiState.value.decks,
-                    noteTypes = _uiState.value.noteTypes,
+                    decks = _uiState.value.availableDecks,
+                    noteTypes = _uiState.value.availableNoteTypes,
                 )
             }.getOrDefault(false)
             onResult(isDuplicate)

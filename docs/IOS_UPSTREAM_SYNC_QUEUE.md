@@ -73,8 +73,10 @@ Validation:
 
 ### 2. Multiple Anki card formats and advanced handlebars
 
-Status: pending Android sync; depends on dictionary categories and final popup
-payloads from queue item 1.
+Status: partially synced on Android. Multi-format storage/UI/popup routing,
+show-notes, cloze parts, selected-glossary fallback, and numeric pitch graphs
+are complete. Category-aware monolingual/bilingual handlebars and the final
+string/nasal/devoice pitch schema still depend on queue item 1.
 
 Commits:
 
@@ -96,7 +98,7 @@ Dependency/value reasoning:
 
 iOS behavior to mirror:
 
-- Users can keep up to six named/icon card formats, each with its own deck, note
+- Users can keep up to three named card formats with six icon choices, each with its own deck, note
   type, field mappings, and tags; legacy single-format config migrates to a
   default format.
 - Popup mining exposes every valid format, tolerates deleted formats, disables
@@ -106,33 +108,31 @@ iOS behavior to mirror:
   monolingual/bilingual definitions and their variants, cloze parts, and pitch
   graph handlebars.
 
-Android current gap:
+Android completed slice:
 
-- `AnkiSettings` in `AnkiModels.kt` stores one deck, note type, mapping map, and
-  tag string. `AnkiView.kt` edits that single format and has no format list,
-  selected-glossary fallback, advanced handlebar visibility, or show-notes
-  preference.
-- `AnkiHandlebarRenderer` lacks monolingual/bilingual, cloze-part, and pitch
-  graph handlebars. The popup payload has no category-aware glossary data or
-  pitch graph HTML.
-- `AnkiUiState.isConfigured` in `AnkiViewModel.kt` checks only selected deck and
-  note type, not whether the first note field is mapped.
-- `app/src/main/assets/hoshi-web/popup/popup.js` has one mine button per entry and
-  no format identifier or show-notes bridge. `AnkiRepository.mineEntry()` mines
-  only the single stored configuration.
+- `AnkiSettings` schema version 2 migrates legacy profile JSON into a stable-ID
+  default format and stores one to three independently editable formats.
+- Typed Navigation3 format/Advanced destinations, localized settings, guarded
+  add/delete behavior, and confirmed bulk deck/model reset match current iOS.
+- Reader, Dictionary, and Process Text popup bridges use stable format IDs for
+  mining, per-format duplicate state, and show-notes. Missing/deleted formats
+  and unavailable backends fail closed.
+- AnkiConnect uses `guiBrowse`; AnkiDroid uses
+  `anki://x-callback-url/browser?search=...` with first-field/model/scope search.
+- The renderer supports precise UTF-16 cloze parts, selected-glossary fallback,
+  numeric pitch SVGs, first-pitch extraction, and non-category advanced
+  glossary variants. Legacy selected-glossary fallback aliases remain hidden.
 
-Suggested slice:
+Remaining gap:
 
-- Add a versioned, backward-compatible format list to the DataStore-backed Anki
-  repository and migrate the current fields into one default format.
-- Add format management and advanced mapping UI with localized strings, then
-  pass format IDs through popup mining and duplicate/show-note actions.
-- Extend payload generation and renderer tests for every new handlebar and
-  selected-glossary fallback rule.
+- Add monolingual/bilingual definition handlebars only after dictionary
+  categories are available from queue item 1.
+- Feed final string pitch patterns plus nasal/devoice data into exported pitch
+  graphs after the bridge and popup schema in queue item 1 land.
 
 Validation:
 
-- Migrate existing single-format settings, add/edit/delete/reorder formats, and
+- Migrate existing single-format settings, add/edit/delete formats, and
   restart the app with all formats intact.
 - Mine through AnkiConnect and AnkiDroid using different formats, unmapped first
   fields, deleted formats, disconnected backends, duplicates, media, cloze
@@ -477,10 +477,10 @@ Validation:
 | `67fc9e8` | 2026-07-27 | Add Kanji dictionary support | Pending bridge, storage, query, and popup support |
 | `3cd8294` | 2026-07-28 | Complete pitch string/nasal/devoice rendering | Pending bridge model and popup rendering |
 | `119fb5b` | 2026-06-18 | Advanced Anki definition mappings | Pending category-aware renderer/settings |
-| `bd85c9b` | 2026-06-19 | Multiple Anki card formats | Pending format storage/UI/popup routing |
-| `c943171`, `395218a` | 2026-06-19 / 2026-07-10 | Show existing Anki notes and own the setting in Anki | Pending show-notes action/setting |
-| `8464a2c`, `f1bc74b`, `2c86ed6` | 2026-06-20 | Cloze, pitch graph, and definition variant handlebars | Pending payload/renderer support |
-| `47683d9`, `2702e31` | 2026-06-20 | Guard invalid/deleted Anki formats | Pending multi-format validation |
+| `bd85c9b` | 2026-06-19 | Multiple Anki card formats | Synced (current three-format limit) |
+| `c943171`, `395218a` | 2026-06-19 / 2026-07-10 | Show existing Anki notes and own the setting in Anki | Synced for AnkiConnect and AnkiDroid |
+| `8464a2c`, `f1bc74b`, `2c86ed6` | 2026-06-20 | Cloze, pitch graph, and definition variant handlebars | Partial: cloze/numeric pitch/non-category variants synced; category variants pending |
+| `47683d9`, `2702e31` | 2026-06-20 | Guard invalid/deleted Anki formats | Synced |
 | `15d4a6e`, `23e0764` | 2026-06-15 / 2026-06-20 | Three-state revealable furigana mode and migration | Pending enum, migration, and tap semantics |
 | `eb86431`, `c31c9d0` | 2026-07-26 / 2026-07-31 | Split cross-page paragraphs with edge-case fixes | Pending Android paginated fragmenter |
 | `ff86caa` | 2026-07-28 | Explicitly load selected reader font | Pending computed-font load await |
@@ -496,7 +496,7 @@ Validation:
 ## Suggested Implementation Order
 
 1. Dictionary categories, Kanji dictionaries, and complete pitch data.
-2. Multiple Anki card formats and advanced handlebars.
+2. Finish category-aware Anki definitions and final pitch graph schema.
 3. Reader paginated paragraph splitting and explicit font readiness.
 4. Reader furigana reveal mode.
 5. Sasayaki import, media controls, and MP3 mining clips.

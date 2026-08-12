@@ -12,6 +12,7 @@ import java.lang.SecurityException
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.net.URLEncoder
 import java.util.Locale
 import javax.inject.Inject
 
@@ -101,6 +102,24 @@ class AndroidAnkiContentApi @Inject constructor(
             false
         }.getOrDefault(false)
 
+    override fun openNotes(query: String): Boolean =
+        runCatching {
+            val spec = ankiDroidBrowserIntentSpec(
+                query = query,
+                packageName = AddContentApi.getAnkiDroidPackageName(appContext) ?: "com.ichi2.anki",
+            )
+            appContext.startActivity(
+                Intent(spec.action, Uri.parse(spec.uri)).apply {
+                    setPackage(spec.packageName)
+                    if (spec.newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
+            true
+        }.recoverCatching { error ->
+            logAnkiApiFailure("Unable to open the AnkiDroid card browser.", error)
+            false
+        }.getOrDefault(false)
+
     override fun isAvailable(): Boolean =
         AddContentApi.getAnkiDroidPackageName(appContext) != null
 
@@ -175,6 +194,25 @@ internal fun ankiDroidSyncIntentSpec(): AnkiDroidSyncIntentSpec =
             Intent.FLAG_ACTIVITY_NO_HISTORY or
             Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
             Intent.FLAG_ACTIVITY_NO_ANIMATION,
+    )
+
+internal data class AnkiDroidBrowserIntentSpec(
+    val action: String,
+    val uri: String,
+    val packageName: String,
+    val newTask: Boolean,
+)
+
+internal fun ankiDroidBrowserIntentSpec(
+    query: String,
+    packageName: String = "com.ichi2.anki",
+): AnkiDroidBrowserIntentSpec =
+    AnkiDroidBrowserIntentSpec(
+        action = Intent.ACTION_VIEW,
+        uri = "anki://x-callback-url/browser?search=" +
+            URLEncoder.encode(query, StandardCharsets.UTF_8.name()),
+        packageName = packageName,
+        newTask = true,
     )
 
 internal fun ankiDuplicateNoteSelection(

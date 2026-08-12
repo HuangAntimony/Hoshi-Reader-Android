@@ -1,6 +1,12 @@
 package moe.antimony.hoshi.features.anki
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -33,8 +39,60 @@ enum class AnkiDuplicateScope {
     DeckRoot,
 }
 
+const val AnkiSettingsSchemaVersion = 2
+
+@Serializable(with = AnkiFormatIconSerializer::class)
+enum class AnkiFormatIcon {
+    Square,
+    SquareSmall,
+    Circle,
+    CircleSmall,
+    Diamond,
+    DiamondSmall,
+}
+
+object AnkiFormatIconSerializer : KSerializer<AnkiFormatIcon> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AnkiFormatIcon", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AnkiFormatIcon) {
+        encoder.encodeString(value.storageValue)
+    }
+
+    override fun deserialize(decoder: Decoder): AnkiFormatIcon {
+        val raw = decoder.decodeString()
+        return AnkiFormatIcon.entries.firstOrNull { it.name == raw || it.storageValue == raw }
+            ?: AnkiFormatIcon.Square
+    }
+}
+
+private val AnkiFormatIcon.storageValue: String
+    get() = when (this) {
+        AnkiFormatIcon.Square -> "plus.square"
+        AnkiFormatIcon.SquareSmall -> "plus.square.small"
+        AnkiFormatIcon.Circle -> "plus.circle"
+        AnkiFormatIcon.CircleSmall -> "plus.circle.small"
+        AnkiFormatIcon.Diamond -> "plus.diamond"
+        AnkiFormatIcon.DiamondSmall -> "plus.diamond.small"
+    }
+
+@Serializable
+data class AnkiCardFormat(
+    val id: String,
+    val name: String,
+    val icon: AnkiFormatIcon = AnkiFormatIcon.Square,
+    val selectedDeckId: Long? = null,
+    val selectedDeckName: String? = null,
+    val selectedNoteTypeId: Long? = null,
+    val selectedNoteTypeName: String? = null,
+    val fieldMappings: Map<String, String> = emptyMap(),
+    val tags: String = "",
+)
+
 @Serializable
 data class AnkiSettings(
+    val schemaVersion: Int = AnkiSettingsSchemaVersion,
+    val cardFormats: List<AnkiCardFormat> = emptyList(),
     val backendKind: AnkiBackendKind = AnkiBackendKind.AnkiDroid,
     val selectedDeckId: Long? = null,
     val selectedDeckName: String? = null,
@@ -49,23 +107,130 @@ data class AnkiSettings(
     val duplicateScope: AnkiDuplicateScope = AnkiDuplicateScope.Collection,
     val compactGlossaries: Boolean = false,
     val embedMedia: Boolean = true,
+    val disableShowNotes: Boolean = false,
+    val selectedGlossaryFallback: String = "",
+    val showAllHandlebars: Boolean = false,
     val ankiDroidForceSync: Boolean = false,
     val ankiConnectUrl: String = "",
     val ankiConnectApiKey: String = "",
     val ankiConnectForceSync: Boolean = false,
 )
 
+const val MaxAnkiCardFormats = 3
+
+internal fun AnkiSettings.addCardFormat(format: AnkiCardFormat): AnkiSettings =
+    if (cardFormats.size >= MaxAnkiCardFormats || cardFormats.any { it.id == format.id }) {
+        this
+    } else {
+        copy(cardFormats = cardFormats + format)
+    }
+
+internal fun AnkiSettings.duplicateCardFormat(
+    sourceFormatId: String,
+    newFormatId: String,
+    newName: String,
+): AnkiSettings {
+    val source = cardFormats.firstOrNull { it.id == sourceFormatId } ?: return this
+    return addCardFormat(source.copy(id = newFormatId, name = newName))
+}
+
+internal fun AnkiSettings.updateCardFormat(
+    formatId: String,
+    transform: (AnkiCardFormat) -> AnkiCardFormat,
+): AnkiSettings {
+    if (cardFormats.none { it.id == formatId }) return this
+    return copy(cardFormats = cardFormats.map { format ->
+        if (format.id == formatId) transform(format).copy(id = format.id) else format
+    })
+}
+
+internal fun AnkiSettings.removeCardFormat(formatId: String): AnkiSettings =
+    if (cardFormats.size <= 1 || cardFormats.none { it.id == formatId }) {
+        this
+    } else {
+        copy(cardFormats = cardFormats.filterNot { it.id == formatId })
+    }
+
+data class AnkiSettingsDecodeResult(
+    val settings: AnkiSettings,
+    val didMigrate: Boolean,
+)
+
+internal fun decodeAnkiSettings(
+    raw: String,
+    newFormatId: () -> String,
+): AnkiSettingsDecodeResult {
+    val root = runCatching { ankiSettingsJson.parseToJsonElement(raw).jsonObject }.getOrNull()
+        ?: return AnkiSettingsDecodeResult(
+            settings = AnkiSettings(cardFormats = listOf(defaultAnkiCardFormat(newFormatId()))),
+            didMigrate = true,
+        )
+    val decoded = runCatching { ankiSettingsJson.decodeFromJsonElement(AnkiSettings.serializer(), root) }
+        .getOrElse { AnkiSettings() }
+    val hasVersionTwoFormats = root["schemaVersion"]?.jsonPrimitive?.contentOrNull == AnkiSettingsSchemaVersion.toString() &&
+        root["cardFormats"] != null
+    if (hasVersionTwoFormats && decoded.cardFormats.isNotEmpty()) {
+        val seenIds = mutableSetOf<String>()
+        val normalizedFormats = decoded.cardFormats.take(MaxAnkiCardFormats).map { format ->
+            val id = format.id.takeIf { it.isNotBlank() && seenIds.add(it) }
+                ?: newFormatId().also(seenIds::add)
+            format.copy(id = id, name = format.name.ifBlank { "Default" })
+        }
+        val normalized = decoded.copy(cardFormats = normalizedFormats)
+        return AnkiSettingsDecodeResult(normalized, didMigrate = normalized != decoded)
+    }
+    val format = if (hasVersionTwoFormats) {
+        defaultAnkiCardFormat(newFormatId())
+    } else {
+        AnkiCardFormat(
+            id = newFormatId(),
+            name = "Default",
+            selectedDeckId = decoded.selectedDeckId,
+            selectedDeckName = decoded.selectedDeckName,
+            selectedNoteTypeId = decoded.selectedNoteTypeId,
+            selectedNoteTypeName = decoded.selectedNoteTypeName,
+            fieldMappings = decoded.fieldMappings,
+            tags = decoded.tags,
+        )
+    }
+    return AnkiSettingsDecodeResult(
+        settings = decoded.copy(
+            schemaVersion = AnkiSettingsSchemaVersion,
+            cardFormats = listOf(format),
+        ),
+        didMigrate = true,
+    )
+}
+
+internal fun defaultAnkiCardFormat(id: String): AnkiCardFormat =
+    AnkiCardFormat(
+        id = id,
+        name = "Default",
+    )
+
+private val ankiSettingsJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+data class AnkiPopupFormat(
+    val id: String,
+    val icon: AnkiFormatIcon,
+    val isValid: Boolean,
+)
+
 data class AnkiPopupSettings(
     val isConfigured: Boolean = false,
+    val formats: List<AnkiPopupFormat> = emptyList(),
+    val isBackendAvailable: Boolean = false,
     val useAnkiConnect: Boolean = false,
     val needsAudio: Boolean = false,
     val needsSasayakiAudio: Boolean = false,
     val allowDupes: Boolean = false,
     val compactGlossaries: Boolean = false,
-) {
-    val embedMedia: Boolean
-        get() = isConfigured
-}
+    val disableShowNotes: Boolean = false,
+    val embedMedia: Boolean = false,
+)
 
 internal fun Map<String, String>.referencesAnkiHandlebar(handlebar: String): Boolean =
     values.any { template -> handlebar in template }
@@ -95,6 +260,7 @@ data class AnkiMiningPayload(
     val singleGlossaries: Map<String, String> = emptyMap(),
     val pitchPositions: String = "",
     val pitchCategories: String = "",
+    val pitchAccentGraphs: String = "",
     val phoneticTranscriptions: String = "",
     val popupSelectionText: String = "",
     val audio: String = "",
@@ -126,6 +292,7 @@ data class AnkiMiningPayload(
                 singleGlossaries = singleGlossaries,
                 pitchPositions = root.string("pitchPositions"),
                 pitchCategories = root.string("pitchCategories"),
+                pitchAccentGraphs = root.string("pitchAccentGraphs"),
                 phoneticTranscriptions = root.string("phoneticTranscriptions"),
                 popupSelectionText = root.string("popupSelectionText"),
                 audio = root.string("audio"),
@@ -159,14 +326,16 @@ object AnkiHandlebarRenderer {
         template: String,
         payload: AnkiMiningPayload,
         context: AnkiMiningContext,
+        selectedGlossaryFallback: String = "",
     ): String = handlebarRegex.replace(template) { match ->
-        handlebarToValue(match.value, payload, context)
+        handlebarToValue(match.value, payload, context, selectedGlossaryFallback)
     }
 
     private fun handlebarToValue(
         handlebar: String,
         payload: AnkiMiningPayload,
         context: AnkiMiningContext,
+        selectedGlossaryFallback: String,
     ): String {
         if (handlebar.startsWith(SingleGlossaryPrefix)) {
             return payload.singleGlossaryHandlebarValue(handlebar)
@@ -182,22 +351,30 @@ object AnkiHandlebarRenderer {
             "{glossary-first}" -> payload.glossaryFirst
             "{glossary-first-brief}" -> stripGlossaryHeaders(payload.glossaryFirst)
             "{glossary-first-no-dictionary}" -> stripDictionaryName(payload.glossaryFirst)
-            "{selected-glossary}" -> payload.singleGlossaryForDictionary(payload.selectedDictionary)
+            "{selected-glossary}" -> payload.selectedGlossaryOrConfiguredFallback(
+                context,
+                selectedGlossaryFallback,
+            )
             "{selected-glossary-fallback}" -> payload.selectedGlossaryOrFallback()
             "{selected-glossary-brief}" -> stripGlossaryHeaders(
-                payload.singleGlossaryForDictionary(payload.selectedDictionary),
+                payload.selectedGlossaryOrConfiguredFallback(context, selectedGlossaryFallback),
             )
             "{selected-glossary-brief-fallback}" -> stripGlossaryHeaders(payload.selectedGlossaryOrFallback())
             "{selected-glossary-no-dictionary}" -> stripDictionaryName(
-                payload.singleGlossaryForDictionary(payload.selectedDictionary),
+                payload.selectedGlossaryOrConfiguredFallback(context, selectedGlossaryFallback),
             )
             "{selected-glossary-no-dictionary-fallback}" -> stripDictionaryName(payload.selectedGlossaryOrFallback())
             "{popup-selection-text}" -> payload.popupSelectionText
             "{sentence}" -> sentenceValue(payload, context)
+            "{cloze-prefix}" -> clozeParts(payload, context).prefix
+            "{cloze-body}" -> clozeParts(payload, context).body
+            "{cloze-suffix}" -> clozeParts(payload, context).suffix
             "{frequencies}" -> payload.frequenciesHtml
             "{frequency-harmonic-rank}" -> payload.freqHarmonicRank
             "{pitch-accent-positions}" -> payload.pitchPositions
             "{pitch-accent-categories}" -> payload.pitchCategories
+            "{pitch-accent-graphs}" -> payload.pitchAccentGraphs
+            "{pitch-accent-graphs-first}" -> firstPitchAccentGraph(payload.pitchAccentGraphs)
             "{phonetic-transcriptions}" -> payload.phoneticTranscriptions
             "{document-title}" -> context.documentTitle.orEmpty()
             "{book-cover}" -> context.coverPath.orEmpty()
@@ -223,6 +400,21 @@ object AnkiHandlebarRenderer {
 
     private fun AnkiMiningPayload.selectedGlossaryOrFallback(): String =
         singleGlossaryForDictionary(selectedDictionary).ifBlank { glossaryFirst }
+
+    private fun AnkiMiningPayload.selectedGlossaryOrConfiguredFallback(
+        context: AnkiMiningContext,
+        selectedGlossaryFallback: String,
+    ): String {
+        val selected = singleGlossaryForDictionary(selectedDictionary)
+        if (selected.isNotBlank()) return selected
+        if (selectedGlossaryFallback in SelectedGlossaryHandlebars) return ""
+        return handlebarToValue(
+            handlebar = selectedGlossaryFallback,
+            payload = this,
+            context = context,
+            selectedGlossaryFallback = "",
+        )
+    }
 
     private fun AnkiMiningPayload.singleGlossaryForDictionary(dictionary: String): String {
         if (dictionary.isBlank()) return ""
@@ -252,16 +444,48 @@ object AnkiHandlebarRenderer {
         trim().replace(Regex("""\s*\[[^]]+]\s*$"""), "")
 
     private fun sentenceValue(payload: AnkiMiningPayload, context: AnkiMiningContext): String {
-        val matched = payload.matched.takeIf { it.isNotBlank() } ?: return context.sentence
+        val parts = clozeParts(payload, context)
+        if (parts.body.isEmpty()) return context.sentence
+        return "${parts.prefix}<b>${parts.body}</b>${parts.suffix}"
+    }
+
+    private fun clozeParts(payload: AnkiMiningPayload, context: AnkiMiningContext): ClozeParts {
+        val matched = payload.matched.takeIf { it.isNotBlank() }
+            ?: return ClozeParts(context.sentence, "", "")
         val offset = context.sentenceOffset
-        if (
+        val start = if (
             offset != null &&
             offset >= 0 &&
             offset + matched.length <= context.sentence.length &&
             context.sentence.regionMatches(offset, matched, 0, matched.length)
         ) {
-            return context.sentence.replaceRange(offset, offset + matched.length, "<b>$matched</b>")
+            offset
+        } else {
+            context.sentence.indexOf(matched).takeIf { it >= 0 }
+                ?: return ClozeParts(context.sentence, "", "")
         }
-        return context.sentence.replaceFirst(matched, "<b>$matched</b>")
+        return ClozeParts(
+            prefix = context.sentence.substring(0, start),
+            body = context.sentence.substring(start, start + matched.length),
+            suffix = context.sentence.substring(start + matched.length),
+        )
     }
+
+    private fun firstPitchAccentGraph(html: String): String =
+        Regex("""<svg\b[\s\S]*?</svg>""").find(html)?.value.orEmpty()
+
+    private data class ClozeParts(
+        val prefix: String,
+        val body: String,
+        val suffix: String,
+    )
+
+    private val SelectedGlossaryHandlebars = setOf(
+        "{selected-glossary}",
+        "{selected-glossary-brief}",
+        "{selected-glossary-no-dictionary}",
+        "{selected-glossary-fallback}",
+        "{selected-glossary-brief-fallback}",
+        "{selected-glossary-no-dictionary-fallback}",
+    )
 }

@@ -26,6 +26,13 @@ interface AnkiBackend {
     ): Boolean
     fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String?
     fun addMediaFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? = null
+    fun openNotes(
+        deck: AnkiDeck,
+        noteType: AnkiNoteType,
+        key: String,
+        duplicateScope: AnkiDuplicateScope,
+        checkDuplicatesAcrossAllModels: Boolean,
+    ): Boolean = false
     fun sync(): Boolean = false
 }
 
@@ -78,6 +85,7 @@ interface AnkiContentApi {
     ): Boolean
     fun addNote(modelId: Long, deckId: Long, fields: Array<String>, tags: Set<String>): Long?
     fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? = null
+    fun openNotes(query: String): Boolean = false
     fun sync(): Boolean = false
     fun isAvailable(): Boolean = true
 }
@@ -168,6 +176,22 @@ class AnkiDroidBackendAdapter @Inject constructor(
     override fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? =
         api.addMediaFromUri(uriString, preferredName, mimeType)
 
+    override fun openNotes(
+        deck: AnkiDeck,
+        noteType: AnkiNoteType,
+        key: String,
+        duplicateScope: AnkiDuplicateScope,
+        checkDuplicatesAcrossAllModels: Boolean,
+    ): Boolean = api.openNotes(
+        ankiNoteBrowserQuery(
+            deck = deck,
+            noteType = noteType,
+            key = key,
+            duplicateScope = duplicateScope,
+            checkAllModels = checkDuplicatesAcrossAllModels,
+        ),
+    )
+
     override fun sync(): Boolean = api.sync()
 }
 
@@ -177,3 +201,24 @@ internal fun List<AnkiDeck>.sortedAnkiDecks(): List<AnkiDeck> =
             .thenBy { it.name }
             .thenBy { it.id },
     )
+
+internal fun ankiNoteBrowserQuery(
+    deck: AnkiDeck,
+    noteType: AnkiNoteType,
+    key: String,
+    duplicateScope: AnkiDuplicateScope,
+    checkAllModels: Boolean,
+): String {
+    val firstField = noteType.fields.firstOrNull() ?: return ""
+    val escapedKey = key.replace("\"", "")
+    if (escapedKey.isBlank()) return ""
+    return buildList {
+        add("\"$firstField:$escapedKey\"")
+        if (!checkAllModels) add("\"note:${noteType.name}\"")
+        when (duplicateScope) {
+            AnkiDuplicateScope.Collection -> Unit
+            AnkiDuplicateScope.Deck -> add("\"deck:${deck.name}\"")
+            AnkiDuplicateScope.DeckRoot -> add("\"deck:${deck.name.substringBefore("::")}\"")
+        }
+    }.joinToString(" ")
+}
