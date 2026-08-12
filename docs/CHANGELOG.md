@@ -29,6 +29,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Increase the default lookup popup size to 500 × 500 dp and allow its
+  height to be adjusted up to 1000 dp.
 - Align the built-in Lapis, Kiku, and Senren field presets with iOS by no longer
   setting sentence-card marker fields.
 

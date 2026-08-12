@@ -678,8 +678,8 @@ private fun ReaderAppearanceContent(
                         label = stringResource(R.string.reader_appearance_height),
                         value = settings.popupHeight.toString(),
                         sliderValue = settings.popupHeight.toFloat(),
-                        valueRange = 100f..500f,
-                        steps = 39,
+                        valueRange = 100f..1000f,
+                        steps = 89,
                         onValueChange = { value ->
                             onSettingsChange(settings.copy(popupHeight = (round(value / 10) * 10).toInt()))
                         },
