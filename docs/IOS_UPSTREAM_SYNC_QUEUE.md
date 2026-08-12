@@ -179,108 +179,7 @@ Validation:
   and vertical writing, with lookup, highlights, Sasayaki, restore, and ruby
   split across styled nodes.
 
-### 4. Reader paginated paragraph splitting and explicit font readiness
-
-Status: pending Android sync.
-
-Commits:
-
-- `eb86431` - split paragraphs that span pages so native selection remains
-  visible.
-- `ff86caa` - explicitly load the selected reader font before layout/restore.
-- `c31c9d0` - handle ruby, empty elements, and boundary edge cases in paragraph
-  splitting.
-
-Dependency/value reasoning:
-
-- Both changes stabilize the geometry used by pagination, native selection,
-  progress, and restore. Font readiness must be established before fragment
-  boundaries are calculated.
-
-iOS behavior to mirror:
-
-- Paginated paragraphs spanning multiple columns are split into layout-neutral
-  fragments at measured page boundaries, preserving ruby and empty/replaced
-  elements and keeping justified fragments visually correct.
-- The selected custom font is explicitly requested and awaited before splitting,
-  node-offset construction, initial restore, or fragment jumps.
-
-Android current gap:
-
-- `app/src/main/assets/hoshi-web/reader/reader-paginated.js` has native-selection
-  scroll locking but no `splitPoints`/paragraph fragmentation equivalent, so a
-  selection spanning a CSS-column boundary can still be created outside the
-  visible column.
-- Paginated and continuous scripts await `document.fonts.ready`, but do not call
-  `document.fonts.load()` for the computed body family. Imported fonts are
-  injected by `ReaderContentStyles.kt`, so passive readiness may not force the
-  selected face to load before restore measurements.
-
-Suggested slice:
-
-- Add a shared font-await helper and a paginated-only fragmenter after a focused
-  Android WebView geometry design. Keep offsets compatible with
-  `reader-dom-text.js`, highlights, and Sasayaki rather than copying Swift glue.
-
-Validation:
-
-- Long-press native selection across page boundaries in horizontal/vertical
-  writing with ruby, inline elements, empty spans, images, justified text, and
-  custom fonts.
-- Verify page count, progress, lookup offsets, highlights, font switching,
-  chapter jumps, and bookmark restore before and after fragmentation.
-
-### 5. Sasayaki import, media controls, and MP3 mining clips
-
-Status: pending Android sync.
-
-Commits:
-
-- `947898c` - export mined Sasayaki sentence audio as MP3.
-- `4a5cfde` - honor the command-center skip-control preference.
-- `a9a0747` - accept MP4 audiobooks and TXT subtitle files.
-
-Dependency/value reasoning:
-
-- These changes share import validation, Media3 playback, notification/session
-  commands, and Anki media export.
-
-iOS behavior to mirror:
-
-- Sasayaki accepts `.srt` or `.txt` subtitle files and `.mp3`, `.m4b`, or `.mp4`
-  audiobooks.
-- When skip controls are enabled, external previous/next commands seek by the
-  configured skip interval; otherwise they move by cue.
-- Mined sentence clips are broadly compatible MP3 files with MP3 filenames.
-
-Android current gap:
-
-- `ImportFileType.SasayakiSubtitle` accepts only `srt`, while
-  `SasayakiAudiobook` and `SasayakiAudioRepository` accept only `mp3`/`m4b`.
-- `SasayakiPlaybackServiceRuntime.previousFromSession()`/`nextFromSession()`
-  always move by cue; `readerSkipButtonAction` affects Reader buttons but not the
-  MediaSession command path.
-- `SasayakiCueAudioExporter` transcodes to AAC/ADTS and names output `.aac`, not
-  MP3. Current content-hashed Anki filenames are otherwise already correct.
-
-Suggested slice:
-
-- Expand SAF type validation and storage extension handling, then update
-  MediaSession command routing.
-- Choose an Android-supported MP3 encoding path only after checking current
-  Media3/Android media guidance; preserve failure handling and background
-  playback ownership in the existing MediaSessionService.
-
-Validation:
-
-- Import and play every accepted subtitle/audio extension through SAF; reject
-  unsupported content without losing the previous source.
-- Exercise cue/seconds skip modes from Reader, headset, notification, and system
-  controls.
-- Mine clips through AnkiDroid and AnkiConnect and verify valid MP3 playback,
-  MIME type, hashed filenames, and sentence range expansion.
-
-### 6. Bookshelf cover privacy and fallback artwork
+### 4. Bookshelf cover privacy and fallback artwork
 
 Status: pending Android sync.
 
@@ -319,7 +218,7 @@ Validation:
 - Missing-cover books with/without authors, legacy metadata, local/remote books,
   collapsed shelf previews, multi-select, Show/Blur/Hide, dark/e-ink themes.
 
-### 7. Lookup popup two-column layout and visual sizing
+### 5. Lookup popup two-column layout and visual sizing
 
 Status: pending Android sync.
 
@@ -364,7 +263,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 8. Reader route open-failure fallback
+### 6. Reader route open-failure fallback
 
 Status: pending Android sync.
 
@@ -398,7 +297,7 @@ Validation:
 - Missing/corrupt book, working Close, normal Reader open/close, Android Back,
   bookshelf state preservation, and bookmark refresh.
 
-### 9. Google Drive timeout and automatic-refresh error suppression
+### 7. Google Drive timeout and automatic-refresh error suppression
 
 Status: pending Android sync.
 
@@ -436,7 +335,7 @@ Validation:
 - Automatic refresh offline, slow token/list requests, and connection loss;
   manual connect/refresh/import/export/delete must still show actionable errors.
 
-### 10. Reader WebView line-box CSS parity
+### 8. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -477,16 +376,8 @@ Validation:
 | `67fc9e8` | 2026-07-27 | Add Kanji dictionary support | Pending bridge, storage, query, and popup support |
 | `3cd8294` | 2026-07-28 | Complete pitch string/nasal/devoice rendering | Pending bridge model and popup rendering |
 | `119fb5b` | 2026-06-18 | Advanced Anki definition mappings | Pending category-aware renderer/settings |
-| `bd85c9b` | 2026-06-19 | Multiple Anki card formats | Synced (current three-format limit) |
-| `c943171`, `395218a` | 2026-06-19 / 2026-07-10 | Show existing Anki notes and own the setting in Anki | Synced for AnkiConnect and AnkiDroid |
-| `8464a2c`, `f1bc74b`, `2c86ed6` | 2026-06-20 | Cloze, pitch graph, and definition variant handlebars | Partial: cloze/numeric pitch/non-category variants synced; category variants pending |
-| `47683d9`, `2702e31` | 2026-06-20 | Guard invalid/deleted Anki formats | Synced |
+| `8464a2c`, `f1bc74b`, `2c86ed6` | 2026-06-20 | Cloze, pitch graph, and definition variant handlebars | Pending only category-aware definition variants and the final pitch schema |
 | `15d4a6e`, `23e0764` | 2026-06-15 / 2026-06-20 | Three-state revealable furigana mode and migration | Pending enum, migration, and tap semantics |
-| `eb86431`, `c31c9d0` | 2026-07-26 / 2026-07-31 | Split cross-page paragraphs with edge-case fixes | Pending Android paginated fragmenter |
-| `ff86caa` | 2026-07-28 | Explicitly load selected reader font | Pending computed-font load await |
-| `947898c` | 2026-07-01 | Export Sasayaki mining clips as MP3 | Pending Android MP3 encoder/export path |
-| `4a5cfde` | 2026-07-14 | Honor media-control skip mode | Pending MediaSession command routing |
-| `a9a0747` | 2026-07-28 | MP4/TXT Sasayaki imports | Pending SAF/storage updates |
 | `c6b29c8`, `1db2cd3` | 2026-07-26 | Cover fallback and Show/Blur/Hide modes | Pending metadata/settings/Compose UI |
 | `ed25036`, `8d1442e` | 2026-06-14 / 2026-07-01 | Popup masonry redesign and theme accents | Pending settings/assets/height range |
 | `53fdb72` | 2026-06-15 | Closeable Reader open-failure view | Pending route error UI |
@@ -497,17 +388,30 @@ Validation:
 
 1. Dictionary categories, Kanji dictionaries, and complete pitch data.
 2. Finish category-aware Anki definitions and final pitch graph schema.
-3. Reader paginated paragraph splitting and explicit font readiness.
-4. Reader furigana reveal mode.
-5. Sasayaki import, media controls, and MP3 mining clips.
-6. Bookshelf cover privacy and fallback artwork.
-7. Lookup popup two-column layout and visual sizing.
-8. Reader route open-failure fallback.
-9. Google Drive timeout and automatic-refresh error suppression.
-10. Reader WebView line-box CSS parity.
+3. Reader furigana reveal mode.
+4. Bookshelf cover privacy and fallback artwork.
+5. Lookup popup two-column layout and visual sizing.
+6. Reader route open-failure fallback.
+7. Google Drive timeout and automatic-refresh error suppression.
+8. Reader WebView line-box CSS parity.
 
 ## Covered Or No Android Action
 
+- `eb86431`, `c31c9d0`, `ff86caa`: the paragraph fragmenter and explicit font
+  request are WKWebView-specific selection/layout workarounds. Android's
+  paginated reader already locks Chromium WebView scrolling during native
+  selection and awaits used fonts before restore; copying the DOM fragmenter
+  would add offset, highlight, progress, and Sasayaki mapping risk without a
+  reproduced Android behavior gap.
+- `947898c`, `4a5cfde`, `a9a0747`: no Android product action. Android's
+  `SasayakiCueAudioExporter` emits platform-supported AAC/ADTS clips that both
+  Anki backends already consume; adding an MP3 encoder only to match an iOS
+  filename is not justified. Media3 keeps previous/next cue navigation separate
+  from Reader skip-by-seconds controls, and the supported `.srt`, `.mp3`, and
+  `.m4b` import set intentionally excludes generic `.txt` and `.mp4` aliases.
+- `bd85c9b`, `c943171`, `395218a`, `47683d9`, `2702e31`: Android already has
+  three independent Anki formats, show-notes routing for both backends, and
+  guards for invalid, deleted, or unusable formats.
 - `d7fe3f2`: Android Sasayaki now exposes -4...4-second delay and 0.5...3x
   playback-speed sliders with the existing 0.05 step size.
 - `4940ab7`, `6655ffd`, `3bff390`: Android now removes numeric HTML entities
