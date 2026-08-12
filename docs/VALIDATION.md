@@ -214,8 +214,11 @@ Validate relevant dictionary/audio changes with:
 - Low Memory Usage Mode with a large Yomitan archive.
 - dictionary row long-press deletion, keeping the left reorder handle dedicated
   to dragging.
-- local audio database source ordering with imported MP3 and Opus `android.db`
-  files, lookup playback, and Anki audio export.
+- local audio database source ordering and per-source enable controls with
+  imported MP3 and Opus `android.db` files. Disable the highest-priority source
+  and confirm lookup playback and Anki audio export use the next enabled source;
+  disable every source and confirm both return no local audio; then re-enable
+  and reorder sources and confirm the preserved priority takes effect.
 - Sasayaki MP3, M4B, and Opus imports from local or seekable SAF sources before pressing Play: confirm the total
   duration is already visible; M4B/Opus title, artist, cover, and chapters load
   together without a delayed artist row; playback preparation may subsequently

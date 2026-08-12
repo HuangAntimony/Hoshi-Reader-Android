@@ -8,6 +8,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add per-source enable controls for imported local audio databases while
+  preserving each source's configured priority.
 - Add Ogg Opus audiobook import with embedded title, artist, cover, and chapter
   metadata in Sasayaki, load its artist without the platform-reader delay, and
   show MP3, M4B, and Opus audiobook duration before playback starts.

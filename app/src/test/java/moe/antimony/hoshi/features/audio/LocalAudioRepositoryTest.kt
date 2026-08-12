@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.audio
 
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -66,5 +67,43 @@ class LocalAudioRepositoryTest {
         assertTrue(result.isFailure)
         assertEquals("old database", repository.dbFile.readText())
         assertNull(repository.dbFile.parentFile?.resolve("${repository.dbFile.name}.tmp")?.takeIf { it.exists() })
+    }
+
+    @Test
+    fun updatingSourceOrderPreservesDisabledSources() {
+        val filesDir = Files.createTempDirectory("hoshi-local-audio-source-order").toFile()
+        val configFile = filesDir.resolve(AudioSettings.LocalAudioSourceConfigPath)
+        configFile.parentFile?.mkdirs()
+        configFile.writeText(
+            """{"version":1,"sourceOrder":["nhk16","forvo"],"disabledSources":["forvo"]}""",
+        )
+        val repository = LocalAudioRepository(filesDir)
+
+        val updated = repository.updateSourceOrder(listOf("forvo", "nhk16"))
+
+        assertEquals(listOf("forvo", "nhk16"), updated.sourceOrder)
+        assertEquals(setOf("forvo"), updated.disabledSources)
+    }
+
+    @Test
+    fun sourceEnabledUpdatesPersistAndAllowAllSourcesToBeDisabled() {
+        val filesDir = Files.createTempDirectory("hoshi-local-audio-source-enabled").toFile()
+        val configFile = filesDir.resolve(AudioSettings.LocalAudioSourceConfigPath)
+        configFile.parentFile?.mkdirs()
+        configFile.writeText(
+            """{"version":1,"sourceOrder":["nhk16","forvo"],"disabledSources":[]}""",
+        )
+        val repository = LocalAudioRepository(filesDir)
+
+        repository.updateSourceEnabled("nhk16", enabled = false)
+        val allDisabled = repository.updateSourceEnabled("forvo", enabled = false)
+
+        assertEquals(setOf("nhk16", "forvo"), allDisabled.disabledSources)
+
+        val reenabled = repository.updateSourceEnabled("forvo", enabled = true)
+        val persisted = Json.decodeFromString<LocalAudioSourceConfig>(configFile.readText())
+
+        assertEquals(setOf("nhk16"), reenabled.disabledSources)
+        assertEquals(reenabled, persisted)
     }
 }

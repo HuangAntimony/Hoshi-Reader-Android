@@ -85,7 +85,7 @@ fun AudioSettingsView(
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
     var importedSize by remember { mutableStateOf(repository.databaseSizeBytes()) }
-    var localAudioSourceConfig by remember { mutableStateOf<LocalAudioSourceConfig?>(null) }
+    var localAudioSourceState by remember { mutableStateOf(LocalAudioSourceUiState()) }
     var importProgress by remember { mutableStateOf<LocalAudioImportProgress?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
     var isImporting by remember { mutableStateOf(false) }
@@ -107,26 +107,39 @@ fun AudioSettingsView(
     }
 
     fun moveLocalAudioSource(from: Int, to: Int) {
-        val current = localAudioSourceConfig ?: return
+        val current = localAudioSourceState.config ?: return
         val sources = current.sourceOrder.toMutableList()
         if (from !in sources.indices || to !in sources.indices) return
         val source = sources.removeAt(from)
         sources.add(to, source)
         scope.launch {
-            localAudioSourceConfig = withContext(Dispatchers.IO) {
-                repository.updateSourceOrder(sources)
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.updateSourceOrder(sources)
+                }
             }
+            localAudioSourceState = localAudioSourceState.withSaveResult(result)
+        }
+    }
+
+    fun setLocalAudioSourceEnabled(source: String, enabled: Boolean) {
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.updateSourceEnabled(source, enabled)
+                }
+            }
+            localAudioSourceState = localAudioSourceState.withSaveResult(result)
         }
     }
 
     LaunchedEffect(hasImportedDatabase, isImporting) {
-        localAudioSourceConfig = if (hasImportedDatabase && !isImporting) {
-            withContext(Dispatchers.IO) {
-                repository.ensureSourceConfig()
-            }
+        val config = if (hasImportedDatabase && !isImporting) {
+            withContext(Dispatchers.IO) { repository.ensureSourceConfig() }
         } else {
             null
         }
+        localAudioSourceState = LocalAudioSourceUiState(config = config)
     }
 
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
@@ -150,9 +163,9 @@ fun AudioSettingsView(
                 }
             }.onSuccess { size ->
                 importedSize = size
-                localAudioSourceConfig = withContext(Dispatchers.IO) {
-                    repository.ensureSourceConfig()
-                }
+                localAudioSourceState = LocalAudioSourceUiState(
+                    config = withContext(Dispatchers.IO) { repository.ensureSourceConfig() },
+                )
             }.onFailure { error ->
                 importError = error.localizedImportMessage(context, importFailedMessage)
             }
@@ -360,7 +373,7 @@ fun AudioSettingsView(
                                             onClick = {
                                                 repository.deleteDatabase()
                                                 importedSize = null
-                                                localAudioSourceConfig = null
+                                                localAudioSourceState = LocalAudioSourceUiState()
                                                 importError = null
                                                 importProgress = null
                                             },
@@ -370,7 +383,8 @@ fun AudioSettingsView(
                                     },
                                 )
                             }
-                            localAudioSourceConfig?.sourceOrder?.takeIf { it.isNotEmpty() }?.let { sources ->
+                            localAudioSourceState.config?.takeIf { it.sourceOrder.isNotEmpty() }?.let { sourceConfig ->
+                                val sources = sourceConfig.sourceOrder
                                 GroupDivider()
                                 ListItem(
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -380,10 +394,20 @@ fun AudioSettingsView(
                                             sources.forEachIndexed { index, source ->
                                                 LocalAudioSourceOrderRow(
                                                     source = source,
+                                                    enabled = source !in sourceConfig.disabledSources,
                                                     canMoveUp = index > 0,
                                                     canMoveDown = index < sources.lastIndex,
+                                                    onEnabledChange = { setLocalAudioSourceEnabled(source, it) },
                                                     onMoveUp = { moveLocalAudioSource(index, index - 1) },
                                                     onMoveDown = { moveLocalAudioSource(index, index + 1) },
+                                                )
+                                            }
+                                            if (localAudioSourceState.saveFailed) {
+                                                Text(
+                                                    text = stringResource(R.string.audio_local_source_save_failed),
+                                                    color = MaterialTheme.colorScheme.error,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    modifier = Modifier.padding(top = 8.dp),
                                                 )
                                             }
                                         }
@@ -453,8 +477,10 @@ private fun AudioSourceRow(
 @Composable
 private fun LocalAudioSourceOrderRow(
     source: String,
+    enabled: Boolean,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
 ) {
@@ -475,6 +501,10 @@ private fun LocalAudioSourceOrderRow(
         IconButton(onClick = onMoveDown, enabled = canMoveDown) {
             Icon(Icons.Rounded.ArrowDownward, contentDescription = stringResource(R.string.audio_move_local_source_down))
         }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onEnabledChange,
+        )
     }
 }
 

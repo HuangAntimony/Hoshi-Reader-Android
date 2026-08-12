@@ -31,11 +31,13 @@ object LocalAudioResolver {
         reading: String,
         rows: List<LocalAudioEntry>,
         sourceOrder: List<String> = LocalAudioSourceOrder.defaultOrder(rows.map { it.source }),
+        disabledSources: Set<String> = emptySet(),
     ): LocalAudioEntry? {
         val normalizedReading = katakanaToHiragana(reading)
         val sourceRank = sourceOrder.withIndex().associate { it.value to it.index }
         return rows
             .asSequence()
+            .filterNot { it.source in disabledSources }
             .filter { it.expression == term || (!it.reading.isNullOrBlank() && it.reading == normalizedReading) }
             .filter { isSupportedAudioFile(it.file) }
             .sortedWith(
@@ -81,7 +83,7 @@ object LocalAudioResolver {
         val readingMatches = normalizedReading.isNotBlank() && reading == normalizedReading
         val expressionMatches = expression == term
         return when {
-            readingMatches && expressionMatches -> 0
+            expressionMatches && (reading == null || readingMatches) -> 0
             readingMatches -> 1
             expressionMatches -> 2
             else -> 3

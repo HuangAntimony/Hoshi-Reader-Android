@@ -108,13 +108,29 @@ class LocalAudioRepository @Inject constructor(
     }
 
     fun updateSourceOrder(sourceOrder: List<String>): LocalAudioSourceConfig {
-        val availableSources = ensureSourceConfig().sourceOrder.toSet()
+        val current = ensureSourceConfig()
+        val availableSources = current.sourceOrder.toSet()
         if (availableSources.isEmpty()) {
             sourceConfigFile.delete()
             sourceConfigCache.clear()
             return LocalAudioSourceConfig()
         }
-        val next = LocalAudioSourceConfig(sourceOrder = sourceOrder).repair(availableSources)
+        val next = current.copy(sourceOrder = sourceOrder).repair(availableSources)
+        writeSourceConfig(next)
+        sourceConfigCache.replace(next)
+        return next
+    }
+
+    fun updateSourceEnabled(source: String, enabled: Boolean): LocalAudioSourceConfig {
+        val current = ensureSourceConfig()
+        if (source !in current.sourceOrder) return current
+        val next = current.copy(
+            disabledSources = if (enabled) {
+                current.disabledSources - source
+            } else {
+                current.disabledSources + source
+            },
+        )
         writeSourceConfig(next)
         sourceConfigCache.replace(next)
         return next
@@ -122,7 +138,8 @@ class LocalAudioRepository @Inject constructor(
 
     fun findAudio(term: String, reading: String): LocalAudioEntry? {
         val normalizedReading = LocalAudioResolver.katakanaToHiragana(reading)
-        val sourceOrder = ensureSourceConfig().sourceOrder
+        val sourceConfig = ensureSourceConfig()
+        if (sourceConfig.sourceOrder.all { it in sourceConfig.disabledSources }) return null
         val rows = withReadOnlyDatabase { db ->
             val args: Array<String>
             val selection: String
@@ -154,7 +171,13 @@ class LocalAudioRepository @Inject constructor(
             }
             rows
         } ?: return null
-        return LocalAudioResolver.resolve(term, normalizedReading, rows, sourceOrder)
+        return LocalAudioResolver.resolve(
+            term = term,
+            reading = normalizedReading,
+            rows = rows,
+            sourceOrder = sourceConfig.sourceOrder,
+            disabledSources = sourceConfig.disabledSources,
+        )
     }
 
     fun audioSourcesFromDatabase(): List<String> {

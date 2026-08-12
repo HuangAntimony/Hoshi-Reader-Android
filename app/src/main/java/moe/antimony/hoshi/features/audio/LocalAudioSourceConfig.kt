@@ -6,13 +6,18 @@ import kotlinx.serialization.Serializable
 data class LocalAudioSourceConfig(
     val version: Int = CurrentVersion,
     val sourceOrder: List<String> = emptyList(),
+    val disabledSources: Set<String> = emptySet(),
 ) {
     fun repair(availableSources: Set<String>): LocalAudioSourceConfig {
         val kept = sourceOrder
             .filter { it in availableSources }
             .distinct()
         val appended = LocalAudioSourceOrder.defaultOrder(availableSources - kept.toSet())
-        return copy(version = CurrentVersion, sourceOrder = kept + appended)
+        return copy(
+            version = CurrentVersion,
+            sourceOrder = kept + appended,
+            disabledSources = disabledSources.filterTo(linkedSetOf()) { it in availableSources },
+        )
     }
 
     companion object {

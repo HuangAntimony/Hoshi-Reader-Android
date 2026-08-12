@@ -1,9 +1,19 @@
 package moe.antimony.hoshi.features.audio
 
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LocalAudioSourceConfigTest {
+    @Test
+    fun legacyConfigDefaultsToAllSourcesEnabled() {
+        val config = Json.decodeFromString<LocalAudioSourceConfig>(
+            """{"version":1,"sourceOrder":["nhk16","forvo"]}""",
+        )
+
+        assertEquals(emptySet<String>(), config.disabledSources)
+    }
+
     @Test
     fun defaultOrderSortsKnownSourcesByBuiltInPriorityAndUnknownSourcesByName() {
         val order = LocalAudioSourceOrder.defaultOrder(
@@ -30,6 +40,22 @@ class LocalAudioSourceConfigTest {
 
         assertEquals(
             LocalAudioSourceConfig(sourceOrder = listOf("forvo", "nhk16", "jpod", "custom_a")),
+            repaired,
+        )
+    }
+
+    @Test
+    fun repairKeepsOnlyDisabledSourcesThatStillExist() {
+        val repaired = LocalAudioSourceConfig(
+            sourceOrder = listOf("forvo", "missing", "nhk16"),
+            disabledSources = setOf("forvo", "missing"),
+        ).repair(availableSources = setOf("nhk16", "forvo", "jpod"))
+
+        assertEquals(
+            LocalAudioSourceConfig(
+                sourceOrder = listOf("forvo", "nhk16", "jpod"),
+                disabledSources = setOf("forvo"),
+            ),
             repaired,
         )
     }
