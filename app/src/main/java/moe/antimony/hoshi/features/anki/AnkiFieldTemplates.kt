@@ -18,7 +18,6 @@ object AnkiFieldTemplates {
             "Frequency" to "{frequencies}",
             "FreqSort" to "{frequency-harmonic-rank}",
             "MiscInfo" to "{document-title}",
-            "IsWordAndSentenceCard" to "x",
         ),
         "Kiku" to mapOf(
             "Expression" to "{expression}",
@@ -36,13 +35,11 @@ object AnkiFieldTemplates {
             "Frequency" to "{frequencies}",
             "FreqSort" to "{frequency-harmonic-rank}",
             "MiscInfo" to "{document-title}",
-            "IsWordAndSentenceCard" to "x",
         ),
         "Senren" to mapOf(
             "word" to "{expression}",
             "reading" to "{reading}",
             "sentence" to "<span class=\"group\">{cloze-prefix}<span class=\"highlight\">{cloze-body}</span>{cloze-suffix}</span>",
-            "sentenceCard" to "x",
             "selectionText" to "{popup-selection-text}",
             "definition" to "{glossary-first}",
             "wordAudio" to "{audio}",

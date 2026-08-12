@@ -14,14 +14,19 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Add a Reader Appearance swipe-threshold control for paginated and VN modes;
   setting it to zero disables swipe page turns while preserving hardware page
   keys.
-- Add up to three named Anki card formats with independent icon shapes and sizes,
-  decks, note types, field mappings, tags, duplicate states, confirmation before
-  deleting formats, an edit-screen action that duplicates an existing format
-  and returns to the format list, and grouped popup mining/search buttons placed
-  before the audio action.
+- Add up to three named Anki card formats with independent icons, decks, note
+  types, field mappings, tags, and duplicate states.
+- Add confirmation before deleting Anki formats and an edit-screen action that
+  duplicates a format and returns to the format list.
 - Add Anki duplicate-note search buttons that appear only for matching notes,
-  precise cloze-part handlebars, numeric pitch accent graph handlebars, and
-  advanced glossary mapping options.
+  plus grouped per-format mining and search actions placed before audio.
+- Add precise cloze-part handlebars, numeric pitch accent graph handlebars, and
+  advanced glossary mapping options for Anki cards.
+
+### Changed
+
+- Align the built-in Lapis, Kiku, and Senren field presets with iOS by no longer
+  setting sentence-card marker fields.
 
 ### Fixed
 

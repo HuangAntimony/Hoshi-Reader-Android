@@ -140,7 +140,6 @@ class AnkiRepositoryTest {
             mapOf(
                 "word" to "{expression}",
                 "reading" to "{reading}",
-                "sentenceCard" to "x",
                 "definition" to "{glossary-first}",
                 "wordAudio" to "{audio}",
                 "sentenceAudio" to "{sasayaki-audio}",
