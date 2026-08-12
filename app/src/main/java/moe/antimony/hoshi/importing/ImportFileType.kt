@@ -42,8 +42,16 @@ data class ImportFileType(
 
         val SasayakiAudiobook = ImportFileType(
             description = "audiobook",
-            extensions = listOf("mp3", "m4b"),
-            mimeTypes = arrayOf("audio/mpeg", "audio/mp4", "audio/x-m4b", "application/octet-stream"),
+            extensions = listOf("mp3", "m4b", "opus"),
+            mimeTypes = arrayOf(
+                "audio/mpeg",
+                "audio/mp4",
+                "audio/x-m4b",
+                "audio/ogg",
+                "audio/opus",
+                "application/ogg",
+                "application/octet-stream",
+            ),
             unsupportedMessageRes = R.string.import_select_audiobook,
         )
 

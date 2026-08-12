@@ -82,7 +82,7 @@ class SasayakiPlaybackPersistenceStateTest {
         assertEquals(0.9f, state.playback.rate)
         assertEquals(null, state.playback.audioUri)
         assertEquals(null, state.playback.audioFileName)
-        assertEquals("Select an .mp3 or .m4b audiobook", state.audioStorageSummary)
+        assertEquals("Select a .mp3, .m4b, or .opus audiobook", state.audioStorageSummary)
         assertEquals(state.playback, repository.saved.last())
         assertTrue(copiedAudio.exists())
     }

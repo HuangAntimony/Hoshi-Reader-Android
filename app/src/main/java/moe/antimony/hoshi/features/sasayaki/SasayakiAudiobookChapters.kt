@@ -26,6 +26,8 @@ internal object SasayakiAudiobookChapters {
 
     fun parse(channel: SeekableByteChannel): List<SasayakiAudiobookChapter> =
         try {
+            SasayakiAudiobookOpusMetadata.parse(channel)?.let { return it.chapters }
+            channel.position(0)
             Mp4ChapterReader(channel).read()
         } catch (_: Exception) {
             emptyList()

@@ -58,7 +58,7 @@ class SasayakiAudioRepositoryTest {
             repository.storageSummary(playback(audioUri = "content://audio/book.m4b")),
         )
         assertEquals(
-            "Select an .mp3 or .m4b audiobook",
+            "Select a .mp3, .m4b, or .opus audiobook",
             repository.storageSummary(playback()),
         )
     }
@@ -161,6 +161,60 @@ class SasayakiAudioRepositoryTest {
         assertEquals("MP4 Title", metadata.title)
         assertEquals("Author", metadata.artist)
         assertArrayEquals(artwork, metadata.artworkData)
+    }
+
+    @Test
+    fun audiobookMetadataFallsBackToOpusTagsWhenPlatformReaderReturnsEmpty() {
+        val bookRoot = temporaryFolder.newFolder("opus-metadata-book")
+        val repository = SasayakiAudioRepository(bookRoot)
+        val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.opus")
+        val artwork = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2)
+        audioFile.parentFile!!.mkdirs()
+        audioFile.writeBytes(
+            minimalOggOpusWithComments(
+                listOf(
+                    "TITLE=Opus Title",
+                    "ALBUMARTIST=Opus Artist",
+                    "COMPOSER=Narrator That Must Not Be Displayed",
+                    flacPictureComment(artwork),
+                ),
+            ),
+        )
+
+        val metadata = repository.audiobookMetadata(playback(audioFileName = "sasayaki_audio.opus")) {
+            SasayakiAudiobookMetadata.Empty
+        }
+
+        assertEquals("Opus Title", metadata.title)
+        assertEquals("Opus Artist", metadata.artist)
+        assertArrayEquals(artwork, metadata.artworkData)
+    }
+
+    @Test
+    fun audiobookMetadataPreservesArtistPriorityAcrossPlatformAndContainerReaders() {
+        val bookRoot = temporaryFolder.newFolder("opus-artist-priority-book")
+        val repository = SasayakiAudioRepository(bookRoot)
+        val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.opus")
+        audioFile.parentFile!!.mkdirs()
+        audioFile.writeBytes(
+            minimalOggOpusWithComments(
+                listOf(
+                    "ARTIST=Tagged Artist",
+                    "ALBUMARTIST=Tagged Album Artist",
+                ),
+            ),
+        )
+
+        val metadata = repository.audiobookMetadata(playback(audioFileName = "sasayaki_audio.opus")) {
+            SasayakiAudiobookMetadata(
+                title = "Platform Title",
+                albumArtist = "Platform Album Artist",
+                author = "Platform Author",
+                artworkData = byteArrayOf(1),
+            )
+        }
+
+        assertEquals("Tagged Artist", metadata.artist)
     }
 
     @Test

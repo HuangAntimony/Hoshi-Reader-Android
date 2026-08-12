@@ -74,7 +74,9 @@ node --test app/src/test/js/*.test.mjs
 - Dictionaries: `testdata/JMdict_english.zip`, `testdata/MK3.zip`,
   `testdata/freq.zip`, `testdata/pitch.zip`.
 - Font: `testdata/KleeOne-SemiBold.ttf`.
-- Sasayaki: `testdata/test.srt`, `testdata/test.m4b`.
+- Sasayaki: `testdata/test.srt`, `testdata/test.m4b`,
+  `testdata/opus_test.opus`. Unit tests generate tracked M4B and Ogg Opus
+  fixtures instead of depending on these ignored local files.
 
 ## Reader And Lookup
 
@@ -301,6 +303,11 @@ Validate relevant sync/update/Sasayaki changes with:
   E-ink VN rendering, skip controls across reader/sheet/system media controls,
   volume-key seek, safe-area playback controls, and e-ink cue/lookup overlays
   when those areas change.
+- Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
+  Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
+  chapter seeking, and EPUB-cover fallback because this sample has no embedded
+  cover. Validate embedded Opus cover display with a separate OpusTags
+  `METADATA_BLOCK_PICTURE` fixture when cover parsing changes.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
 - Sasayaki paused task-removal behavior, confirming that pausing playback and

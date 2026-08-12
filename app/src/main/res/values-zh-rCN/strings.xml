@@ -38,7 +38,7 @@
     <string name="dialog_error_title">错误</string>
     <string name="import_select_epub_book">请选择 .epub EPUB 书籍文件。</string>
     <string name="import_select_srt_subtitle">请选择 .srt 字幕文件。</string>
-    <string name="import_select_audiobook">请选择 .mp3 或 .m4b 有声书文件。</string>
+    <string name="import_select_audiobook">请选择 .mp3、.m4b 或 .opus 有声书文件。</string>
     <string name="import_select_audio_database">请选择 .db 音频数据库文件。</string>
     <string name="import_select_dictionary_archive">请选择 .zip 辞典压缩包文件。</string>
     <string name="import_select_hoshi_backup">请选择 .hoshi Hoshi 备份文件。</string>
@@ -699,7 +699,7 @@
     <string name="sasayaki_remove_audio">移除</string>
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
-    <string name="sasayaki_storage_select_audio">选择 .mp3 或 .m4b 有声书</string>
+    <string name="sasayaki_storage_select_audio">选择 .mp3、.m4b 或 .opus 有声书</string>
     <string name="sasayaki_subtitle_match">字幕匹配</string>
     <string name="sasayaki_no_subtitle_match">未匹配</string>
     <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
@@ -707,7 +707,7 @@
     <string name="sasayaki_current_chapter">当前章节</string>
     <string name="sasayaki_skip_cue">1 句</string>
     <string name="sasayaki_skip_seconds_format">%1$d 秒</string>
-    <string name="sasayaki_settings_description">在阅读器的有声书菜单中载入 .mp3 或 .m4b 有声书。如果有对应的 .srt 字幕文件，可以在资源页进行字幕匹配。</string>
+    <string name="sasayaki_settings_description">在阅读器的有声书菜单中载入 .mp3、.m4b 或 .opus 有声书。如果有对应的 .srt 字幕文件，可以在资源页进行字幕匹配。</string>
     <string name="sasayaki_select_srt_file">请选择 .srt 字幕文件。</string>
     <string name="sasayaki_selected_srt">已选择 SRT</string>
     <string name="sasayaki_open_srt_failed">无法打开所选 SRT。</string>

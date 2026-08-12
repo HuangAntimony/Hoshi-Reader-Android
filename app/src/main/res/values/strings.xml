@@ -38,7 +38,7 @@
     <string name="dialog_error_title">Error</string>
     <string name="import_select_epub_book">Select a .epub EPUB book file.</string>
     <string name="import_select_srt_subtitle">Select a .srt subtitle file.</string>
-    <string name="import_select_audiobook">Select a .mp3 or .m4b audiobook file.</string>
+    <string name="import_select_audiobook">Select a .mp3, .m4b, or .opus audiobook file.</string>
     <string name="import_select_audio_database">Select a .db audio database file.</string>
     <string name="import_select_dictionary_archive">Select a .zip dictionary archive file.</string>
     <string name="import_select_hoshi_backup">Select a .hoshi Hoshi backup file.</string>
@@ -701,7 +701,7 @@
     <string name="sasayaki_remove_audio">Remove</string>
     <string name="sasayaki_storage_copied">Copied to app storage. The original audiobook file can be deleted.</string>
     <string name="sasayaki_storage_linked">Linked to the external audiobook file. Keep the original file available.</string>
-    <string name="sasayaki_storage_select_audio">Select an .mp3 or .m4b audiobook</string>
+    <string name="sasayaki_storage_select_audio">Select a .mp3, .m4b, or .opus audiobook</string>
     <string name="sasayaki_subtitle_match">Subtitle Match</string>
     <string name="sasayaki_no_subtitle_match">No match</string>
     <string name="sasayaki_no_chapters">No chapters found in this audiobook.</string>
@@ -709,7 +709,7 @@
     <string name="sasayaki_current_chapter">Current chapter</string>
     <string name="sasayaki_skip_cue">1 sentence</string>
     <string name="sasayaki_skip_seconds_format">%1$d seconds</string>
-    <string name="sasayaki_settings_description">Open the Reader Sasayaki menu to load an .mp3 or .m4b audiobook. Subtitle matching is available from the Resources tab when you have a matching .srt file.</string>
+    <string name="sasayaki_settings_description">Open the Reader Sasayaki menu to load a .mp3, .m4b, or .opus audiobook. Subtitle matching is available from the Resources tab when you have a matching .srt file.</string>
     <string name="sasayaki_select_srt_file">Select an .srt subtitle file.</string>
     <string name="sasayaki_selected_srt">Selected SRT</string>
     <string name="sasayaki_open_srt_failed">Unable to open selected SRT.</string>
