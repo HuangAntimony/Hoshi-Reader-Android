@@ -48,6 +48,7 @@ class ReaderTocRangeTest {
 
         assertEquals(listOf(0, 4, 8), rows.map { it.characterCount })
         assertEquals(listOf(false, true, false), rows.map { it.isCurrent })
+        assertEquals(1, readerCurrentChapterRowIndex(rows))
     }
 
     @Test

@@ -8,6 +8,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Automatically center the current chapter when opening the Reader Contents or
+  Sasayaki chapter list.
 - Add per-source enable controls for imported local audio databases while
   preserving each source's configured priority.
 - Add Ogg Opus audiobook import with embedded title, artist, cover, and chapter

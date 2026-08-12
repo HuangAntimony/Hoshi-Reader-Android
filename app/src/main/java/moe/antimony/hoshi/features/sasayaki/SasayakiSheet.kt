@@ -53,6 +53,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -83,6 +84,7 @@ import moe.antimony.hoshi.importing.localizedImportMessage
 import moe.antimony.hoshi.importing.validateImportFile
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.rememberInitiallyCenteredLazyListState
 
 internal val SasayakiSpeedSliderRange = 0.5f..3.0f
 internal const val SasayakiSpeedSliderSteps = 49
@@ -615,8 +617,16 @@ private fun SasayakiChaptersTab(
         }
         return
     }
+    val centeredListState = rememberInitiallyCenteredLazyListState(
+        targetIndex = sasayakiCurrentChapterListIndex(chapters, currentChapter),
+        itemCount = chapters.size,
+    )
     LazyColumn(
-        modifier = modifier.fillMaxWidth(),
+        state = centeredListState.listState,
+        userScrollEnabled = centeredListState.contentVisible,
+        modifier = modifier
+            .fillMaxWidth()
+            .alpha(if (centeredListState.contentVisible) 1f else 0f),
         contentPadding = PaddingValues(bottom = 28.dp),
     ) {
         items(chapters, key = { chapter -> chapter.index }) { chapter ->
@@ -627,6 +637,13 @@ private fun SasayakiChaptersTab(
             )
         }
     }
+}
+
+internal fun sasayakiCurrentChapterListIndex(
+    chapters: List<SasayakiAudiobookChapter>,
+    currentChapter: SasayakiAudiobookChapter?,
+): Int? = currentChapter?.let { current ->
+    chapters.indexOfFirst { it.index == current.index }.takeIf { it >= 0 }
 }
 
 @Composable

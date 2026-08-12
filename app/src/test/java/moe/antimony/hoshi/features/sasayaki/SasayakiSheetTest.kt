@@ -90,6 +90,23 @@ class SasayakiSheetTest {
     }
 
     @Test
+    fun currentChapterListIndexUsesTheChapterIdInsteadOfAssumingASequentialIndex() {
+        val chapters = listOf(
+            SasayakiAudiobookChapter(10, "Chapter 1", 0.0, 60.0),
+            SasayakiAudiobookChapter(20, "Chapter 2", 60.0, 120.0),
+        )
+
+        assertEquals(1, sasayakiCurrentChapterListIndex(chapters, chapters[1]))
+        assertNull(
+            sasayakiCurrentChapterListIndex(
+                chapters,
+                SasayakiAudiobookChapter(30, "Missing", 120.0, null),
+            ),
+        )
+        assertNull(sasayakiCurrentChapterListIndex(chapters, null))
+    }
+
+    @Test
     fun playbackHeaderInfoUsesAudiobookMetadataAndCurrentChapter() {
         val info = sasayakiPlaybackHeaderInfo(
             playback = SasayakiPlaybackData(

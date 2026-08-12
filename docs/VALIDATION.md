@@ -112,8 +112,12 @@ Manual reader validation should cover:
   the pointer handoff must not turn the page or suppress the next single-finger
   tap/lookup.
 - Contents with nested and percent-encoded TOC fragments that share one XHTML
-  file: verify distinct row positions/current selection, true chapter progress
-  and time remaining, jump/restore behavior, and Gallery first-appearance order.
+  file: verify distinct row positions/current selection, current-chapter
+  centering without first flashing the default list position when the chapter
+  tab opens, true chapter progress and time remaining, jump/restore behavior,
+  and Gallery first-appearance order. After scrolling away, current-row updates
+  must not reposition the open list; switching away from Chapters and back must
+  center the then-current row once again.
   Include duplicate, gaiji, SVG, missing, and absent images; Gallery items must
   open the existing fullscreen copy/save/share viewer. Verify the tabs appear as
   Chapters, Highlights, Gallery, Search and none of their scrolling content
@@ -312,9 +316,15 @@ Validate relevant sync/update/Sasayaki changes with:
   when those areas change.
 - Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
   Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
-  chapter seeking, and EPUB-cover fallback because this sample has no embedded
-  cover. Validate embedded Opus cover display with a separate OpusTags
-  `METADATA_BLOCK_PICTURE` fixture when cover parsing changes.
+  current-chapter centering without first flashing the default list position
+  when the chapter tab opens, chapter seeking, and EPUB-cover fallback because
+  this sample has no embedded cover. Validate embedded Opus cover display with
+  a separate OpusTags
+  `METADATA_BLOCK_PICTURE` fixture when cover parsing changes. Scroll away and
+  let playback cross a chapter boundary without allowing selection updates to
+  reposition the list; switching away from Chapters and back must center the
+  new current chapter. If no chapter is current when Chapters opens, later
+  playback updates must not trigger an automatic scroll.
 - Sasayaki media-session notification return behavior, confirming it restores
   the existing app task instead of creating a duplicate task.
 - Sasayaki paused task-removal behavior, confirming that pausing playback and
