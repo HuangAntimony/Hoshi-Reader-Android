@@ -6,6 +6,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+## [v1.3.3] - 2026-08-13
+
 ### Added
 
 - Automatically center the current chapter when opening the Reader Contents or
