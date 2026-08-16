@@ -4,30 +4,9 @@
         var root = function() {
             return document.scrollingElement || document.documentElement || document.body;
         };
-        var visibleHeight = function(popupHeight) {
-            try {
-                var frame = window.frameElement;
-                var parentWindow = window.parent;
-                if (!frame || !parentWindow || parentWindow === window) {
-                    return popupHeight;
-                }
-                var frameRect = frame.getBoundingClientRect();
-                var parentHeight = parentWindow.innerHeight;
-                if (!frameRect || frameRect.height <= 0 || !Number.isFinite(parentHeight) || parentHeight <= 0) {
-                    return popupHeight;
-                }
-                var visibleTop = Math.max(0, frameRect.top);
-                var visibleBottom = Math.min(parentHeight, frameRect.bottom);
-                var visibleFrameHeight = Math.max(0, visibleBottom - visibleTop);
-                return popupHeight * Math.min(1, visibleFrameHeight / frameRect.height);
-            } catch (e) {
-                return popupHeight;
-            }
-        };
         var scrollByPopupHeight = function(direction) {
             var scrollRoot = root();
-            var layoutHeight = document.documentElement.clientHeight || window.innerHeight || scrollRoot.clientHeight;
-            var popupHeight = visibleHeight(layoutHeight);
+            var popupHeight = document.documentElement.clientHeight || window.innerHeight || scrollRoot.clientHeight;
             var maxScroll = Math.max(0, scrollRoot.scrollHeight - popupHeight);
             var current = scrollRoot.scrollTop || window.scrollY || 0;
             var target = Math.max(0, Math.min(maxScroll, current + popupHeight * window.reducedMotionScrollScale * direction));

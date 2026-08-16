@@ -38,9 +38,12 @@ data class LookupPopupLayout(
     }
 
     private fun height(): Double {
-        if (isVertical || isFullWidth) return maxHeight
+        if (isVertical || isFullWidth) return minOf(availableHeight(), maxHeight)
         return minOf(maxOf(spaceAbove(), spaceBelow()) - screenBorderPadding, maxHeight)
     }
+
+    private fun availableHeight(): Double =
+        (screenHeight - topInset - bottomInset - screenBorderPadding * 2).coerceAtLeast(0.0)
 
     private fun centerX(width: Double): Double {
         if (isFullWidth) return width / 2 + screenBorderPadding
@@ -57,7 +60,7 @@ data class LookupPopupLayout(
     }
 
     private fun centerY(height: Double): Double {
-        if (isFullWidth) return screenHeight - height / 2 - screenBorderPadding
+        if (isFullWidth) return screenHeight - bottomInset - height / 2 - screenBorderPadding
         if (isVertical) {
             val raw = selectionRect.y + height / 2
             return clampLikeIos(

@@ -102,19 +102,46 @@ class LookupPopupTest {
     }
 
     @Test
-    fun verticalLayoutUsesIosClampWhenPopupIsTallerThanAvailableHeight() {
+    fun verticalLayoutClampsConfiguredHeightToVisibleSafeArea() {
         val layout = LookupPopupLayout(
-            selectionRect = ReaderSelectionRect(x = 100.0, y = 0.0, width = 20.0, height = 30.0),
+            selectionRect = ReaderSelectionRect(x = 100.0, y = 200.0, width = 20.0, height = 30.0),
             screenWidth = 400.0,
-            screenHeight = 244.62222290039062,
+            screenHeight = 800.0,
             maxWidth = 320.0,
-            maxHeight = 250.0,
+            maxHeight = 1_000.0,
             isVertical = true,
+            topInset = 96.0,
+            bottomInset = 24.0,
         )
 
         val result = layout.calculate()
 
-        assertEquals(131.0, result.centerY, 0.0)
+        assertEquals(668.0, result.height, 0.0)
+        assertEquals(436.0, result.centerY, 0.0)
+        assertEquals(102.0, result.centerY - result.height / 2.0, 0.0)
+        assertEquals(770.0, result.centerY + result.height / 2.0, 0.0)
+    }
+
+    @Test
+    fun fullWidthLayoutClampsConfiguredHeightToVisibleSafeArea() {
+        val layout = LookupPopupLayout(
+            selectionRect = ReaderSelectionRect(x = 100.0, y = 200.0, width = 20.0, height = 30.0),
+            screenWidth = 400.0,
+            screenHeight = 800.0,
+            maxWidth = 320.0,
+            maxHeight = 1_000.0,
+            isVertical = true,
+            isFullWidth = true,
+            topInset = 96.0,
+            bottomInset = 24.0,
+        )
+
+        val result = layout.calculate()
+
+        assertEquals(668.0, result.height, 0.0)
+        assertEquals(436.0, result.centerY, 0.0)
+        assertEquals(102.0, result.centerY - result.height / 2.0, 0.0)
+        assertEquals(770.0, result.centerY + result.height / 2.0, 0.0)
     }
 
     @Test

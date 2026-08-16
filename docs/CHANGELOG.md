@@ -6,6 +6,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep oversized lookup popup frames fully inside the visible screen so their
+  bottom border and all scrollable content remain reachable.
+
 ## [v1.3.3] - 2026-08-13
 
 ### Added

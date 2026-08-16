@@ -5,8 +5,6 @@ import vm from 'node:vm';
 
 function popupGestures({
     iframeHeight = 300,
-    iframeTop = 0,
-    parentViewportHeight = iframeHeight,
     scrollHeight = 3_000,
     reducedMotionScrollScale = 0.9,
 } = {}) {
@@ -28,21 +26,8 @@ function popupGestures({
             listeners.set(type, typeListeners);
         },
     };
-    const parent = {
-        innerHeight: parentViewportHeight,
-    };
     const window = {
         innerHeight: iframeHeight,
-        parent,
-        frameElement: {
-            getBoundingClientRect() {
-                return {
-                    top: iframeTop,
-                    bottom: iframeTop + iframeHeight,
-                    height: iframeHeight,
-                };
-            },
-        },
         reducedMotionScrolling: true,
         reducedMotionScrollScale,
         reducedMotionSwipeThreshold: 40,
@@ -76,19 +61,4 @@ test('reduced motion scrolls by the configured percentage when the iframe is ful
 
     assert.equal(scrollRoot.scrollTop, 270);
     assert.equal(window.scrollY, 270);
-});
-
-test('reduced motion uses the iframe height visible inside the parent viewport', () => {
-    const { dispatch, scrollRoot, window } = popupGestures({
-        iframeHeight: 1_000,
-        parentViewportHeight: 800,
-    });
-
-    dispatch('wheel', {
-        deltaY: 1,
-        preventDefault() {},
-    });
-
-    assert.equal(scrollRoot.scrollTop, 720);
-    assert.equal(window.scrollY, 720);
 });
