@@ -30,7 +30,7 @@ body {
     --background-color-dark1: #eeeeee;
     color: var(--text-color);
     background-color: transparent;
-    font-family: var(--hoshi-content-font-family, "Noto Sans CJK JP", "NotoSansCJKJP-Regular", sans-serif) !important;
+    font-family: Arial, var(--hoshi-content-font-family, "Noto Sans CJK JP", "NotoSansCJKJP-Regular", sans-serif) !important;
     overscroll-behavior-y: contain;
     touch-action: pan-y;
 }
@@ -442,20 +442,18 @@ a {
 }
 
 .pitch-dict-label {
+    display: inline-block;
     background-color: var(--pitch-tag-color, #94a6eb);
     color: #fff;
     padding: 2px 4px;
     border-radius: 4px;
+    white-space: nowrap;
 }
 
 .pitch-entries {
     list-style: circle inside;
     margin: 2px 0 0 0;
     padding: 0;
-}
-
-.pitch-group + .pitch-group {
-    margin-top: 5px;
 }
 
 /* https://github.com/yomidevs/yomitan/blob/master/ext/css/display-pronunciation.css */

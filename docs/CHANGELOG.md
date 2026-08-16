@@ -10,6 +10,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Keep oversized lookup popup frames fully inside the visible screen so their
   bottom border and all scrollable content remain reachable.
+- Prefer Arial throughout lookup popups before Android's Japanese font fallback
+  so pitch-accent markers stay aligned with their reading, and keep pitch
+  dictionary labels intact when compact entries wrap.
 
 ## [v1.3.3] - 2026-08-13
 
