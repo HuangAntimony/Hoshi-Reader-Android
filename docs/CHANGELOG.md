@@ -6,6 +6,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add an optional Reader Behavior setting that uses the volume keys to jump
+  between terms in the topmost lookup popup.
+
 ### Fixed
 
 - Keep oversized lookup popup frames fully inside the visible screen so their

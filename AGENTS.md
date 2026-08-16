@@ -33,6 +33,7 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - Storage：已有 iOS 兼容 sidecar JSON 必须保持兼容。
 - Reader：保留 WebView 阅读和查词；本地 WebView 资源优先使用 `WebViewAssetLoader` 或仓库已有安全加载路径；不要启用宽泛 file URL 访问，例如 `allowUniversalAccessFromFileURLs`。
 - Reader JS/CSS：长期 reader web 代码放在 `app/src/main/assets/hoshi-web`；不要新增大段 Kotlin 字符串脚本。Kotlin 侧只保留小型 typed command、参数转义、asset 加载、动态配置填充和桥接调用。
+- Reader popup 坐标：`popup.js` 的 `hoshiPopupGeometry` 是 CSS `zoom` 下 popup 坐标换算、滚动位置和元素对齐的唯一入口。popup 代码不得把 `offsetTop` 等未缩放 layout 坐标与 `scrollTop` / `getBoundingClientRect()` 等视觉滚动坐标混用，也不得另写缩放补偿。
 - Reader web 共享语义：`reader-text-semantics.js` 是三种 reader mode 共享的文本 normalization、
   matchable/raw 计数和 matchable-character 判断入口；`reader-dom-text.js` 是 paginated/continuous
   共享的 live DOM ruby/text normalization 入口；`reader-media-semantics.js` 是三种 reader mode

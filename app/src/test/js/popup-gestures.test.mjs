@@ -37,6 +37,17 @@ function popupGestures({
             this.scrollY = y;
         },
     };
+    window.hoshiPopupGeometry = {
+        scrollByViewport(direction, scale) {
+            const maxScroll = Math.max(0, scrollRoot.scrollHeight - iframeHeight);
+            const target = Math.max(0, Math.min(
+                maxScroll,
+                scrollRoot.scrollTop + iframeHeight * scale * direction,
+            ));
+            scrollRoot.scrollTop = target;
+            window.scrollTo(0, target);
+        },
+    };
     const script = fs.readFileSync(
         new URL('../../main/assets/hoshi-web/popup/popup-gestures.js', import.meta.url),
         'utf8',

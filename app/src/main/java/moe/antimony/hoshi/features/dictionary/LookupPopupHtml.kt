@@ -226,7 +226,8 @@ internal object LookupPopupHtml {
                     window.popupId = null;
                     window.hoshiPostPopupScrollState = function() {
                         var scrollRoot = document.scrollingElement || document.documentElement || document.body;
-                        var scrollTop = scrollRoot ? (scrollRoot.scrollTop || window.scrollY || 0) : 0;
+                        var scrollTop = window.hoshiPopupGeometry?.scrollTop()
+                            ?? (scrollRoot ? (scrollRoot.scrollTop || window.scrollY || 0) : 0);
                         window.HoshiAndroidPopup.postMessage('scrollState', {
                             atTop: scrollTop <= 1,
                             scrollTop: scrollTop
@@ -337,6 +338,10 @@ internal object LookupPopupHtml {
                             }
                             if (message.type === 'navigateForward') {
                                 window.navigateForward?.();
+                                return;
+                            }
+                            if (message.type === 'navigateTerm') {
+                                window.navigatePopupTerm?.(message.direction);
                             }
                         });
                         webkit.messageHandlers.shellReady.postMessage(null);

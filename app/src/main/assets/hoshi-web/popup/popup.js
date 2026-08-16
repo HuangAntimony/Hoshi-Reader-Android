@@ -24,6 +24,211 @@ let selectedDictionaries = {};
 let dictionaryMediaObserver = null;
 let renderGeneration = 0;
 
+window.createPopupGeometry = function({
+    documentRef = document,
+    windowRef = window,
+    computedStyle = getComputedStyle,
+} = {}) {
+    function scrollRoot() {
+        return documentRef.scrollingElement || documentRef.documentElement || documentRef.body;
+    }
+
+    function scrollTop() {
+        const rootTop = Number(scrollRoot()?.scrollTop);
+        if (Number.isFinite(rootTop)) return rootTop;
+        const windowTop = Number(windowRef.scrollY);
+        return Number.isFinite(windowTop) ? windowTop : 0;
+    }
+
+    function setScrollTop(value) {
+        const top = Number.isFinite(value) ? value : 0;
+        const root = scrollRoot();
+        if (root) root.scrollTop = top;
+        windowRef.scrollTo?.(0, top);
+    }
+
+    function viewportHeight() {
+        const candidates = [
+            documentRef.documentElement?.clientHeight,
+            windowRef.innerHeight,
+            scrollRoot()?.clientHeight,
+        ];
+        return candidates.find(value => Number.isFinite(value) && value > 0) || 0;
+    }
+
+    function scrollByViewport(direction, scale = 1) {
+        const root = scrollRoot();
+        if (!root) return;
+        const height = viewportHeight();
+        const maxScrollTop = Math.max(0, (root.scrollHeight || 0) - height);
+        const target = Math.max(0, Math.min(
+            maxScrollTop,
+            scrollTop() + height * scale * direction,
+        ));
+        setScrollTop(target);
+    }
+
+    function elementDocumentTop(element) {
+        const top = Number(element?.getBoundingClientRect?.().top);
+        return Number.isFinite(top) ? scrollTop() + top : Number.NaN;
+    }
+
+    function scrollElementToTop(element) {
+        element?.scrollIntoView?.({
+            block: 'start',
+            inline: 'nearest',
+            behavior: 'instant',
+        });
+    }
+
+    function bridgeRectScale() {
+        const zoom = Number.parseFloat(computedStyle(documentRef.documentElement).zoom);
+        if (!Number.isFinite(zoom) || zoom === 1) return 1;
+
+        const probe = documentRef.createElement('div');
+        probe.style = 'position:absolute;width:100px;visibility:hidden;';
+        const parent = documentRef.documentElement || documentRef.body;
+        if (!parent?.appendChild) return 1;
+
+        parent.appendChild(probe);
+        const width = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (!Number.isFinite(width) || width <= 0) return 1;
+
+        const scale = 100 * zoom / width;
+        return Number.isFinite(scale) && scale > 0 ? scale : 1;
+    }
+
+    function selectionCoordinates(clientX, clientY) {
+        const scale = bridgeRectScale();
+        const scrollX = windowRef.scrollX || 0;
+        const scrollY = windowRef.scrollY || 0;
+        return {
+            rectX: (clientX + scrollX) / scale - scrollX,
+            rectY: (clientY + scrollY) / scale - scrollY,
+        };
+    }
+
+    function bridgeSelectionRect(rect) {
+        const scale = bridgeRectScale();
+        const scrollX = windowRef.scrollX || 0;
+        const scrollY = windowRef.scrollY || 0;
+        return {
+            x: (rect.x + scrollX) * scale - scrollX,
+            y: (rect.y + scrollY) * scale - scrollY,
+            width: rect.width * scale,
+            height: rect.height * scale,
+        };
+    }
+
+    return Object.freeze({
+        bridgeRectScale,
+        bridgeSelectionRect,
+        elementDocumentTop,
+        scrollByViewport,
+        scrollElementToTop,
+        scrollTop,
+        selectionCoordinates,
+        setScrollTop,
+        viewportHeight,
+    });
+};
+
+const popupGeometry = window.createPopupGeometry();
+window.hoshiPopupGeometry = popupGeometry;
+window.getButtonRectScale = () => popupGeometry.bridgeRectScale();
+
+window.createPopupTermNavigator = function({ entryCount, entries, scrollTop, scrollTo }) {
+    const topTolerance = 1;
+    let pendingIndex = null;
+
+    function sortedEntries() {
+        return entries()
+            .filter(entry => Number.isInteger(entry.index) && Number.isFinite(entry.top))
+            .sort((a, b) => a.index - b.index);
+    }
+
+    function currentEntry(availableEntries, currentScrollTop) {
+        if (!availableEntries.length) return null;
+        let current = availableEntries[0];
+        for (const entry of availableEntries) {
+            if (entry.top > currentScrollTop + topTolerance) break;
+            current = entry;
+        }
+        return current;
+    }
+
+    function fulfillPending() {
+        if (pendingIndex === null) return false;
+        const target = sortedEntries().find(entry => entry.index === pendingIndex);
+        if (!target) return false;
+        pendingIndex = null;
+        scrollTo(target);
+        return true;
+    }
+
+    return {
+        navigate(direction) {
+            if (direction !== 'previous' && direction !== 'next') return;
+            const count = entryCount();
+            if (!Number.isInteger(count) || count <= 0) return;
+            const availableEntries = sortedEntries();
+            const currentScrollTop = scrollTop();
+            const current = currentEntry(availableEntries, currentScrollTop);
+            const baseIndex = pendingIndex ?? current?.index ?? 0;
+            let targetIndex;
+            let returnsToCurrentHeader = false;
+            if (direction === 'next') {
+                targetIndex = Math.min(count - 1, baseIndex + 1);
+            } else if (
+                pendingIndex === null &&
+                current &&
+                currentScrollTop > current.top + topTolerance
+            ) {
+                targetIndex = current.index;
+                returnsToCurrentHeader = true;
+            } else {
+                targetIndex = Math.max(0, baseIndex - 1);
+            }
+            if (pendingIndex === null && targetIndex === baseIndex && !returnsToCurrentHeader) return;
+            pendingIndex = targetIndex;
+            fulfillPending();
+        },
+        entryRendered() {
+            fulfillPending();
+        },
+        userScrolled() {
+            pendingIndex = null;
+        },
+        reset() {
+            pendingIndex = null;
+        },
+    };
+};
+
+window.installPopupTermNavigationInput = function(navigator, target = document) {
+    const cancelPending = () => navigator.userScrolled();
+    target.addEventListener('pointerdown', cancelPending, { passive: true });
+    target.addEventListener('touchstart', cancelPending, { passive: true });
+    target.addEventListener('wheel', cancelPending, { passive: true });
+};
+
+const popupTermNavigator = window.createPopupTermNavigator({
+    entryCount: () => window.entryCount || 0,
+    entries: () => {
+        return [...document.querySelectorAll('.entry[data-entry-index]')].map(entry => ({
+            index: Number(entry.dataset.entryIndex),
+            top: popupGeometry.elementDocumentTop(entry),
+            element: entry,
+        }));
+    },
+    scrollTop: popupGeometry.scrollTop,
+    scrollTo: entry => popupGeometry.scrollElementToTop(entry.element),
+});
+window.installPopupTermNavigationInput(popupTermNavigator);
+
+window.navigatePopupTerm = direction => popupTermNavigator.navigate(direction);
+
 function getPopupSelectionText() {
     return window.hoshiSelection?.selection?.text || window.getSelection()?.toString() || '';
 }
@@ -1377,29 +1582,6 @@ function playWordAudio(audioUrl) {
     }
 }
 
-function getButtonRectScale() {
-    const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom);
-    if (!Number.isFinite(zoom) || zoom === 1) {
-        return 1;
-    }
-
-    const probe = el('div', { style: 'position:absolute;width:100px;visibility:hidden;' });
-    const parent = document.documentElement || document.body;
-    if (!parent?.appendChild) {
-        return 1;
-    }
-
-    parent.appendChild(probe);
-    const width = probe.getBoundingClientRect().width;
-    probe.remove();
-    if (!Number.isFinite(width) || width <= 0) {
-        return 1;
-    }
-
-    const scale = 100 * zoom / width;
-    return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
 function createButtonSlot(kind, entryIndex, enabled = true, formatId = null, formatIcon = 'square') {
     const slot = el('button', {
         className: 'button-slot',
@@ -1764,6 +1946,7 @@ let pendingHistoryRestore = null;
 
 window.resetPopupResults = function() {
     renderGeneration++;
+    popupTermNavigator.reset();
     flushPendingHistoryRestore();
     backStack.length = 0;
     forwardStack.length = 0;
@@ -1774,7 +1957,7 @@ window.resetPopupResults = function() {
     selectedDictionaries = {};
     resetDictionaryMediaObserver();
     document.getElementById('entries-container')?.replaceChildren();
-    document.scrollingElement.scrollTop = 0;
+    popupGeometry.setScrollTop(0);
 };
 
 function appendPendingHistoryRestore(flush = false) {
@@ -1787,6 +1970,7 @@ function appendPendingHistoryRestore(flush = false) {
     if (chunk.length) {
         pending.container.append(...chunk);
         observePendingDictionaryMedia(pending.container);
+        popupTermNavigator.entryRendered();
     }
     if (!pending.nodes.length) {
         pendingHistoryRestore = null;
@@ -1802,6 +1986,7 @@ function flushPendingHistoryRestore() {
 }
 
 function redirect(count) {
+    popupTermNavigator.reset();
     flushPendingHistoryRestore();
     resetDictionaryMediaObserver();
     backStack.push(snapshot());
@@ -1813,15 +1998,16 @@ function redirect(count) {
     document.getElementById('entries-container').innerHTML = '';
     window.renderPopup();
     requestAnimationFrame(() => {
-        document.scrollingElement.scrollTop = 0;
+        popupGeometry.setScrollTop(0);
         requestAnimationFrame(() => {
-            document.scrollingElement.scrollTop = 0;
+            popupGeometry.setScrollTop(0);
         });
     });
 }
 
 window.replacePopupResults = function(count, initialEntries) {
     closeOverlay();
+    popupTermNavigator.reset();
     flushPendingHistoryRestore();
     renderGeneration++;
     backStack.length = 0;
@@ -1838,7 +2024,7 @@ window.replacePopupResults = function(count, initialEntries) {
     window.hoshiPopupObserveContentReady?.();
     window.renderPopup();
     requestAnimationFrame(() => {
-        document.scrollingElement.scrollTop = 0;
+        popupGeometry.setScrollTop(0);
     });
 };
 
@@ -1847,13 +2033,14 @@ function snapshot() {
     const container = document.getElementById('entries-container');
     return {
         nodes: [...container.childNodes],
-        scrollTop: document.scrollingElement.scrollTop,
+        scrollTop: popupGeometry.scrollTop(),
         lookupEntries: window.lookupEntries,
         entryCount: window.entryCount,
     };
 }
 
 function restore(snapshot) {
+    popupTermNavigator.reset();
     flushPendingHistoryRestore();
     const container = document.getElementById('entries-container');
     const nodes = [...snapshot.nodes];
@@ -1873,7 +2060,7 @@ function restore(snapshot) {
     selectedDictionaries = {};
     applyHoshiPopupThemeOverrides(container);
     requestAnimationFrame(() => {
-        document.scrollingElement.scrollTop = snapshot.scrollTop;
+        popupGeometry.setScrollTop(snapshot.scrollTop);
     });
 }
 
@@ -1925,9 +2112,7 @@ function handlePopupTap(target, clientX, clientY) {
         webkit.messageHandlers.tapOutside.postMessage(null);
         return true;
     }
-    const scale = getButtonRectScale();
-    const rectX = (clientX + window.scrollX) / scale - window.scrollX;
-    const rectY = (clientY + window.scrollY) / scale - window.scrollY;
+    const { rectX, rectY } = popupGeometry.selectionCoordinates(clientX, clientY);
     const selected = window.hoshiSelection?.selectText(clientX, clientY, window.scanLength, rectX, rectY);
     if (!selected) {
         webkit.messageHandlers.tapOutside.postMessage(null);
@@ -2030,7 +2215,10 @@ window.renderPopup = function() {
                 container.appendChild(document.createElement('hr'));
             }
 
-            const entryDiv = el('div', { className: 'entry' });
+            const entryDiv = el('div', {
+                className: 'entry',
+                'data-entry-index': idx,
+            });
             entryDiv.appendChild(createEntryHeader(entry, idx));
 
             if (window.audioEnableAutoplay && window.audioSources?.length && idx === 0) {
@@ -2043,6 +2231,7 @@ window.renderPopup = function() {
             }
 
             container.appendChild(entryDiv);
+            popupTermNavigator.entryRendered();
             await new Promise(r => requestAnimationFrame(r));
             if (generation !== renderGeneration) return;
 

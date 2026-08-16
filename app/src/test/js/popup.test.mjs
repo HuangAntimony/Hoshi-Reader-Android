@@ -176,6 +176,9 @@ function popupContext({
                         tapOutsideMessages.push(message);
                     },
                 },
+                popupScrolled: {
+                    postMessage() {},
+                },
                 mineEntry: {
                     postMessage(message) {
                         mineEntryMessages.push(message);
@@ -285,6 +288,34 @@ test('popup tap coordinates ignore user body zoom when popup scale is active', (
     assert.deepEqual(
         selectTextCalls[0],
         [45.35555648803711, 233.93334197998047, 24, 45.35555648803711, 233.93334197998047],
+    );
+});
+
+test('popup geometry keeps scaled visual positions in the scroll coordinate space', () => {
+    const { context, document } = popupContext({ htmlZoom: '1.5' });
+    document.scrollingElement = { scrollTop: 615 };
+    context.window.scrollX = 10;
+    context.window.scrollY = 20;
+    const entry = new FakeElement();
+    entry.offsetTop = 615;
+    entry.getBoundingClientRect = () => ({ top: 307 });
+    const scrollCalls = [];
+    entry.scrollIntoView = (options) => scrollCalls.push(options);
+
+    assert.equal(context.window.hoshiPopupGeometry.elementDocumentTop(entry), 922);
+    context.window.hoshiPopupGeometry.scrollElementToTop(entry);
+    assert.equal(scrollCalls.length, 1);
+    assert.equal(scrollCalls[0].block, 'start');
+    assert.equal(scrollCalls[0].inline, 'nearest');
+    assert.equal(scrollCalls[0].behavior, 'instant');
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(context.window.hoshiPopupGeometry.bridgeSelectionRect({
+            x: 100,
+            y: 200,
+            width: 40,
+            height: 20,
+        }))),
+        { x: 155, y: 310, width: 60, height: 30 },
     );
 });
 
@@ -546,6 +577,110 @@ test('popup preserves IPA dictionary transcription delimiters', () => {
 
     assert.equal(nodes.some((node) => node.textContent === '/riːd/'), true);
     assert.equal(nodes.some((node) => node.textContent === '//riːd//'), false);
+});
+
+function popupTermNavigator(entryCount = 3) {
+    const { context, document } = popupContext();
+    const entries = [];
+    const scrollTargets = [];
+    let scrollTop = 0;
+    const navigator = context.window.createPopupTermNavigator({
+        entryCount: () => entryCount,
+        entries: () => entries,
+        scrollTop: () => scrollTop,
+        scrollTo: (entry) => {
+            scrollTop = entry.top;
+            scrollTargets.push(entry.top);
+        },
+    });
+    return {
+        entries,
+        context,
+        document,
+        navigator,
+        scrollTargets,
+        setScrollTop(value) { scrollTop = value; },
+    };
+}
+
+test('popup term navigation moves between rendered entry headers without wrapping', () => {
+    const setup = popupTermNavigator();
+    setup.entries.push(
+        { index: 0, top: 0 },
+        { index: 1, top: 120 },
+        { index: 2, top: 300 },
+    );
+
+    setup.navigator.navigate('next');
+    setup.navigator.navigate('next');
+    setup.navigator.navigate('next');
+    setup.navigator.navigate('previous');
+
+    assert.deepEqual(setup.scrollTargets, [120, 300, 120]);
+});
+
+test('popup previous term first returns to the current entry header after manual scrolling', () => {
+    const setup = popupTermNavigator();
+    setup.entries.push(
+        { index: 0, top: 0 },
+        { index: 1, top: 120 },
+        { index: 2, top: 300 },
+    );
+    setup.setScrollTop(180);
+
+    setup.navigator.navigate('previous');
+    setup.navigator.navigate('previous');
+
+    assert.deepEqual(setup.scrollTargets, [120, 0]);
+});
+
+test('popup term navigation queues repeated moves until the target entry renders', () => {
+    const setup = popupTermNavigator();
+    setup.entries.push({ index: 0, top: 0 });
+
+    setup.navigator.navigate('next');
+    setup.navigator.navigate('next');
+    setup.entries.push({ index: 1, top: 120 });
+    setup.navigator.entryRendered();
+    setup.entries.push({ index: 2, top: 300 });
+    setup.navigator.entryRendered();
+
+    assert.deepEqual(setup.scrollTargets, [300]);
+});
+
+test('a delayed programmatic scroll does not cancel a newer pending term move', () => {
+    const setup = popupTermNavigator();
+    setup.entries.push(
+        { index: 0, top: 0 },
+        { index: 1, top: 120 },
+    );
+    setup.context.window.installPopupTermNavigationInput(setup.navigator, setup.document);
+
+    setup.navigator.navigate('next');
+    setup.navigator.navigate('next');
+    setup.document.dispatch('scroll', {});
+    setup.entries.push({ index: 2, top: 300 });
+    setup.navigator.entryRendered();
+
+    assert.deepEqual(setup.scrollTargets, [120, 300]);
+});
+
+test('manual scrolling and reset cancel pending popup term navigation', () => {
+    const setup = popupTermNavigator();
+    setup.entries.push({ index: 0, top: 0 });
+    setup.context.window.installPopupTermNavigationInput(setup.navigator, setup.document);
+
+    setup.navigator.navigate('next');
+    setup.document.dispatch('pointerdown', {});
+    setup.entries.push({ index: 1, top: 120 });
+    setup.navigator.entryRendered();
+    setup.setScrollTop(120);
+    setup.navigator.navigate('next');
+    setup.navigator.reset();
+    setup.entries.push({ index: 2, top: 300 });
+    setup.navigator.entryRendered();
+
+    assert.deepEqual(setup.scrollTargets, []);
 });
 
 test('popup builds Yomitan-compatible phonetic transcriptions Anki HTML', () => {

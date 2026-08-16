@@ -1,17 +1,8 @@
 (function() {
     if (window.reducedMotionScrolling) {
         var reducedMotionStartY = 0;
-        var root = function() {
-            return document.scrollingElement || document.documentElement || document.body;
-        };
         var scrollByPopupHeight = function(direction) {
-            var scrollRoot = root();
-            var popupHeight = document.documentElement.clientHeight || window.innerHeight || scrollRoot.clientHeight;
-            var maxScroll = Math.max(0, scrollRoot.scrollHeight - popupHeight);
-            var current = scrollRoot.scrollTop || window.scrollY || 0;
-            var target = Math.max(0, Math.min(maxScroll, current + popupHeight * window.reducedMotionScrollScale * direction));
-            scrollRoot.scrollTop = target;
-            window.scrollTo(0, target);
+            window.hoshiPopupGeometry?.scrollByViewport(direction, window.reducedMotionScrollScale);
         };
         document.addEventListener('touchstart', function(e) {
             if (e.touches.length === 1) {

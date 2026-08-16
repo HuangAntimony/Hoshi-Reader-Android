@@ -1397,10 +1397,21 @@ fun ReaderWebView(
             settings = effectiveSettings,
             sasayakiEnabled = sasayakiSettings.enabled,
             hasSasayakiAudio = sasayakiPlayer?.hasAudio == true,
+            hasLookupPopup = stateHolder.lookupPopups.isNotEmpty(),
         )
         if (!keyEvent.consumed) return@rememberUpdatedState false
         when (val action = keyEvent.action) {
             is ReaderHardwareKeyAction.ReaderNavigation -> navigateReaderPage(action.direction)
+            is ReaderHardwareKeyAction.PopupTermNavigation -> {
+                val direction = when (action.direction) {
+                    PopupTermNavigationDirection.Previous -> "previous"
+                    PopupTermNavigationDirection.Next -> "next"
+                }
+                webView?.evaluateJavascript(
+                    "window.hoshiReaderPopupHost && window.hoshiReaderPopupHost.navigateTopTerm('$direction')",
+                    null,
+                )
+            }
             ReaderHardwareKeyAction.SasayakiSeekBackward -> {
                 sasayakiPlayer?.previousCue()
             }

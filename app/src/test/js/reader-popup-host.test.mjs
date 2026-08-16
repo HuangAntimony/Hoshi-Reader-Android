@@ -285,6 +285,37 @@ test('public navigation helpers forward messages to the active iframe', () => {
     ]);
 });
 
+test('term navigation targets only the top popup iframe', () => {
+    const scene = popupHost();
+    scene.host.renderStack({
+        popups: [
+            rootPopupPayload(),
+            {
+                ...rootPopupPayload(),
+                id: 'child',
+                frame: { left: 20, top: 20, width: 200, height: 180 },
+            },
+        ],
+    });
+    const [rootShell, childShell] = scene.document.getElementById('hoshi-reader-popup-layer').children;
+    const rootMessages = [];
+    const childMessages = [];
+    rootShell.querySelector('.hoshi-reader-popup-iframe').contentWindow.postMessage = (message) => rootMessages.push(message);
+    childShell.querySelector('.hoshi-reader-popup-iframe').contentWindow.postMessage = (message) => childMessages.push(message);
+
+    scene.host.navigateTopTerm('next');
+    scene.host.navigateTopTerm('previous');
+
+    assert.deepEqual(rootMessages, []);
+    assert.deepEqual(
+        childMessages.map((message) => JSON.parse(JSON.stringify(message))),
+        [
+            { type: 'navigateTerm', direction: 'next' },
+            { type: 'navigateTerm', direction: 'previous' },
+        ],
+    );
+});
+
 test('outside pointer dismissal is opt-in for process text iframe host', () => {
     const scene = popupHost();
     const nativeMessages = [];

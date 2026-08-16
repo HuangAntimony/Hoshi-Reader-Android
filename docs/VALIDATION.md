@@ -130,6 +130,14 @@ Manual reader validation should cover:
   duplicate state, redirect history, audio/autoplay errors, Anki actions,
   Sasayaki controls, dictionary media images, outside tap dismissal, and
   absence of invisible touch blockers after dismissal.
+- volume-key popup term navigation in paginated, continuous, and VN modes:
+  verify the root or topmost recursive popup takes priority over enabled page
+  turns and Sasayaki seeking, default and reversed directions reach adjacent
+  term headers aligned exactly to the popup top without wrapping; repeat at
+  popup scales 0.8, 1.0, 1.5, and 2.0. Verify long-press repeats work while
+  asynchronously rendered terms appear, manual scrolling resumes from the
+  visible term, and closing the popup restores the previously configured
+  volume-key behavior.
 - E-ink selection marks, horizontal and vertical lookup underlines, reduced
   motion popup scrolling, and slow-device first-visible-content behavior.
 - reader chrome behavior: focus mode, transient system bars, Android Back

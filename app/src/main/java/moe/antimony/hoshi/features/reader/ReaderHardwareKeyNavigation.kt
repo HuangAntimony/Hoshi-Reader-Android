@@ -2,8 +2,14 @@ package moe.antimony.hoshi.features.reader
 
 import android.view.KeyEvent
 
+internal enum class PopupTermNavigationDirection {
+    Previous,
+    Next,
+}
+
 internal sealed interface ReaderHardwareKeyAction {
     data class ReaderNavigation(val direction: ReaderNavigationDirection) : ReaderHardwareKeyAction
+    data class PopupTermNavigation(val direction: PopupTermNavigationDirection) : ReaderHardwareKeyAction
     data object SasayakiSeekForward : ReaderHardwareKeyAction
     data object SasayakiSeekBackward : ReaderHardwareKeyAction
 }
@@ -35,6 +41,7 @@ internal fun readerHardwareKeyActionForKeyEvent(
     settings: ReaderSettings,
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
+    hasLookupPopup: Boolean = false,
 ): ReaderHardwareKeyAction? =
     readerHardwareKeyEventForKeyEvent(
         keyCode = keyCode,
@@ -43,6 +50,7 @@ internal fun readerHardwareKeyActionForKeyEvent(
         settings = settings,
         sasayakiEnabled = sasayakiEnabled,
         hasSasayakiAudio = hasSasayakiAudio,
+        hasLookupPopup = hasLookupPopup,
     ).action
 
 internal fun readerHardwareKeyEventForKeyEvent(
@@ -52,6 +60,7 @@ internal fun readerHardwareKeyEventForKeyEvent(
     settings: ReaderSettings,
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
+    hasLookupPopup: Boolean = false,
 ): ReaderHardwareKeyEventResult {
     return when (keyCode) {
         KeyEvent.KEYCODE_PAGE_DOWN -> pageKeyResult(
@@ -72,6 +81,7 @@ internal fun readerHardwareKeyEventForKeyEvent(
             settings = settings,
             sasayakiEnabled = sasayakiEnabled,
             hasSasayakiAudio = hasSasayakiAudio,
+            hasLookupPopup = hasLookupPopup,
         )
         else -> ReaderHardwareKeyEventResult(consumed = false)
     }
@@ -97,12 +107,14 @@ private fun volumeKeyResult(
     settings: ReaderSettings,
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
+    hasLookupPopup: Boolean,
 ): ReaderHardwareKeyEventResult {
     val keyAction = readerVolumeKeyAction(
         keyCode = keyCode,
         settings = settings,
         sasayakiEnabled = sasayakiEnabled,
         hasSasayakiAudio = hasSasayakiAudio,
+        hasLookupPopup = hasLookupPopup,
     ) ?: return ReaderHardwareKeyEventResult(consumed = false)
     return ReaderHardwareKeyEventResult(
         consumed = true,
@@ -115,7 +127,16 @@ private fun readerVolumeKeyAction(
     settings: ReaderSettings,
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
+    hasLookupPopup: Boolean,
 ): ReaderHardwareKeyAction? {
+    if (settings.volumeKeysNavigatePopupTerms && hasLookupPopup) {
+        return ReaderHardwareKeyAction.PopupTermNavigation(
+            popupTermNavigationDirectionForVolumeKey(
+                keyCode = keyCode,
+                reverseDirection = settings.reverseVolumeKeyDirection,
+            ),
+        )
+    }
     if (settings.volumeKeysSeekSasayaki && sasayakiEnabled && hasSasayakiAudio) {
         return sasayakiSeekActionForVolumeKey(
             keyCode = keyCode,
@@ -130,6 +151,24 @@ private fun readerVolumeKeyAction(
         ),
     )
 }
+
+private fun popupTermNavigationDirectionForVolumeKey(
+    keyCode: Int,
+    reverseDirection: Boolean,
+): PopupTermNavigationDirection =
+    when (keyCode) {
+        KeyEvent.KEYCODE_VOLUME_UP -> if (reverseDirection) {
+            PopupTermNavigationDirection.Next
+        } else {
+            PopupTermNavigationDirection.Previous
+        }
+        KeyEvent.KEYCODE_VOLUME_DOWN -> if (reverseDirection) {
+            PopupTermNavigationDirection.Previous
+        } else {
+            PopupTermNavigationDirection.Next
+        }
+        else -> error("Unsupported volume key: $keyCode")
+    }
 
 private fun sasayakiSeekActionForVolumeKey(
     keyCode: Int,

@@ -204,6 +204,14 @@ class LookupPopupHtmlTest {
     }
 
     @Test
+    fun iframePopupShellForwardsTermNavigationMessages() {
+        val html = LookupPopupHtml.renderIframeDocument()
+
+        assertTrue(html.contains("message.type === 'navigateTerm'"))
+        assertTrue(html.contains("window.navigatePopupTerm?.(message.direction)"))
+    }
+
+    @Test
     fun eInkPopupCssTargetsPopupControlsAndStructuredRows() {
         val html = LookupPopupHtml.renderIframeDocument(eInkMode = true)
 

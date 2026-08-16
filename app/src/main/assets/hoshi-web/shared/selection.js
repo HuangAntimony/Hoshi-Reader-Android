@@ -708,6 +708,9 @@ window.hoshiSelection = {
         if (!this.options.scaleRects) {
             return rect;
         }
+        if (window.hoshiPopupGeometry?.bridgeSelectionRect) {
+            return window.hoshiPopupGeometry.bridgeSelectionRect(rect);
+        }
         const scale = window.getButtonRectScale?.() ?? 1;
         const scrollX = window.scrollX || 0;
         const scrollY = window.scrollY || 0;

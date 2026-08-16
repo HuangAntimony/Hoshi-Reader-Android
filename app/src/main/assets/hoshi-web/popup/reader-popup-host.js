@@ -653,6 +653,13 @@
         postNative({ name: 'navigateForward', popupId });
     }
 
+    function navigateTopTerm(direction) {
+        if (direction !== 'previous' && direction !== 'next') return;
+        const popupId = topPopupId();
+        const record = popupId ? frames.get(popupId) : null;
+        record?.iframe.contentWindow?.postMessage({ type: 'navigateTerm', direction }, ORIGIN);
+    }
+
     function adjustSelectionBody(popupId, body) {
         const record = frames.get(popupId);
         if (!record || !body?.rect) return body;
@@ -832,6 +839,7 @@
         highlightSelection,
         navigateBack,
         navigateForward,
+        navigateTopTerm,
         renderSasayakiHighlight,
         clearSasayakiHighlight,
         preloadIdleRootFrame

@@ -156,6 +156,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- Lookup popup CSS `zoom` coordinate conversion and scrolling are owned by
+  `popup.js` through `hoshiPopupGeometry`. Popup term alignment, reduced-motion
+  viewport scrolling, history/reset positions, tap selection coordinates, and
+  selection bridge rect scaling use that shared visual-coordinate boundary
+  instead of mixing unscaled layout offsets with scaled scroll coordinates.
 - Lookup opens from a single tap on reader text. Long press is reserved for
   native selection/highlight flows.
 
