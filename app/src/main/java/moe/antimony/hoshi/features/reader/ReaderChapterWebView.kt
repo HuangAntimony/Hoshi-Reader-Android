@@ -29,6 +29,7 @@ import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -130,9 +131,20 @@ internal fun ChapterWebView(
     val continuousScrollProgressScheduler = remember { ReaderContinuousScrollProgressScheduler() }
     val chapter = book.chapters[chapterPosition.index]
     var readerWebView by remember { mutableStateOf<WebView?>(null) }
-    val fontFaceUrl = remember(readerSettings.selectedFont) {
-        fontManager.webViewFontUrl(readerSettings.selectedFont)
+    val fontLibraryState by fontManager.libraryState.collectAsState()
+    val fontRenderSpec = remember(
+        readerSettings.selectedFont,
+        readerSettings.selectedFontFamilyId,
+        readerSettings.selectedFontVariantId,
+        fontLibraryState.revision,
+    ) {
+        fontManager.resolveRenderSpec(
+            selectedFont = readerSettings.selectedFont,
+            familyId = readerSettings.selectedFontFamilyId,
+            variantId = readerSettings.selectedFontVariantId,
+        )
     }
+    val fontFaceUrl = fontRenderSpec.faces.firstOrNull()?.url
     val baseUrl = remember(chapter) { "https://appassets.androidplatform.net/epub/${chapter.href}" }
     val readerContentReloadKey = remember(readerSettings) {
         readerSettings.readerContentReloadKey()
@@ -152,6 +164,9 @@ internal fun ChapterWebView(
         scanNonJapaneseText,
         contentLanguageProfile,
         fontFaceUrl,
+        fontRenderSpec.familyId,
+        fontRenderSpec.variantId,
+        fontRenderSpec.revision,
     ) {
         ReaderWebViewSetupReloadKey(
             initialProgress = chapterPosition.progress,
@@ -159,6 +174,9 @@ internal fun ChapterWebView(
             scanNonJapaneseText = scanNonJapaneseText,
             contentLanguageProfile = contentLanguageProfile,
             fontFaceUrl = fontFaceUrl,
+            fontFamilyId = fontRenderSpec.familyId,
+            fontVariantId = fontRenderSpec.variantId,
+            fontRevision = fontRenderSpec.revision,
         )
     }
     val loadKey = readerWebViewLoadKey(
@@ -175,6 +193,7 @@ internal fun ChapterWebView(
         readerContentReloadKey,
         appearanceUpdateKey,
         fontFaceUrl,
+        fontRenderSpec,
         systemDark,
         scanNonJapaneseText,
         contentLanguageProfile,
@@ -191,6 +210,7 @@ internal fun ChapterWebView(
             initialFragment = chapterFragment,
             settings = readerSettings,
             fontFaceUrl = fontFaceUrl,
+            fontRenderSpec = fontRenderSpec,
             systemDark = systemDark,
             scanNonJapaneseText = scanNonJapaneseText,
             contentLanguageProfile = contentLanguageProfile,
@@ -504,6 +524,9 @@ internal data class ReaderWebViewSetupReloadKey(
     val scanNonJapaneseText: Boolean,
     val contentLanguageProfile: ContentLanguageProfile,
     val fontFaceUrl: String?,
+    val fontFamilyId: String? = null,
+    val fontVariantId: String? = null,
+    val fontRevision: Long = 0,
 )
 
 internal data class ReaderAppearanceUpdateKey(
@@ -822,6 +845,7 @@ private fun readerSetupScript(
     initialFragment: String?,
     settings: ReaderSettings,
     fontFaceUrl: String?,
+    fontRenderSpec: ReaderFontRenderSpec?,
     systemDark: Boolean,
     scanNonJapaneseText: Boolean,
     contentLanguageProfile: ContentLanguageProfile,
@@ -844,6 +868,7 @@ private fun readerSetupScript(
     val css = ReaderContentStyles.css(
         settings = settings,
         fontFaceUrl = fontFaceUrl,
+        fontRenderSpec = fontRenderSpec,
         systemDark = systemDark,
         sasayakiTextColor = sasayakiTextColor,
         sasayakiBackgroundColor = sasayakiBackgroundColor,

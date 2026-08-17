@@ -116,6 +116,7 @@ fun ReaderWebView(
     val appContainer = LocalHoshiUiDependencies.current
     val scope = rememberCoroutineScope()
     val fontManager = appContainer.readerFontManager
+    val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
     val readerImageResourceBridge = remember(book, fontManager) {
         ReaderWebResourceBridge(book, fontManager)
     }
@@ -236,6 +237,7 @@ fun ReaderWebView(
         audioSettings,
         ankiUiState.popupSettings,
         fontManager,
+        fontLibraryState.revision,
         effectiveSettings.popupScale,
         popupContentLanguageProfile,
     ) {

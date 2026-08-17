@@ -78,4 +78,14 @@ class ReaderLookupPopupResourceHandlerTest {
         assertEquals("application/javascript", response?.mimeType)
         assertEquals("window.hoshiPopupGesturesLoaded = true;", response?.content)
     }
+
+    @Test
+    fun fontRequestPathPreservesManagedSystemSubdirectory() {
+        assertEquals(
+            "System/NotoSansJP-wght.ttf",
+            readerLookupPopupFontPath("/fonts/System/NotoSansJP-wght.ttf"),
+        )
+        assertEquals("Klee One.woff2", readerLookupPopupFontPath("/fonts/Klee One.woff2"))
+        assertNull(readerLookupPopupFontPath("/popup/NotoSansJP-wght.ttf"))
+    }
 }

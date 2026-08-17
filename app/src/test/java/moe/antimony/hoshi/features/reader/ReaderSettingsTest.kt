@@ -9,6 +9,19 @@ import java.io.File
 
 class ReaderSettingsTest {
     @Test
+    fun selectingFontVariantUpdatesStableIdsAndPerFamilyMemory() {
+        val family = ReaderRecommendedFontCatalog.families.first { it.id == "recommended:kleeone" }
+        val variant = family.variants.first { it.weight == 600 }
+
+        val selected = ReaderSettings().withFontSelection(family, variant)
+
+        assertEquals("Klee One", selected.selectedFont)
+        assertEquals(family.id, selected.selectedFontFamilyId)
+        assertEquals(variant.id, selected.selectedFontVariantId)
+        assertEquals(variant.id, selected.fontVariantSelections[family.id])
+    }
+
+    @Test
     fun defaultsMatchIosUserConfigFirstRunValuesWithAndroidFontPreset() {
         val settings = ReaderSettings()
 
@@ -259,6 +272,70 @@ class ReaderSettingsTest {
         assertFalse(css.contains("font-family:"))
         assertTrue(css.contains("font-size: 22px !important;"))
         assertTrue(css.contains("writing-mode: vertical-rl !important;"))
+    }
+
+    @Test
+    fun readerCssUsesRealFacesAndSelectedVariableWeight() {
+        val spec = ReaderFontRenderSpec(
+            familyId = "recommended:notosansjp",
+            variantId = "wght-600-normal",
+            cssFamily = "hoshi-font-recommended-notosansjp",
+            displayName = "Noto Sans JP",
+            weight = 600,
+            italic = false,
+            variationSettings = mapOf("wght" to 600f),
+            faces = listOf(
+                ReaderFontFace(
+                    url = "https://appassets.androidplatform.net/fonts/System/NotoSansJP-wght.ttf",
+                    weight = 400,
+                    italic = false,
+                    variableWeightRange = 100..900,
+                ),
+                ReaderFontFace(
+                    url = "https://appassets.androidplatform.net/fonts/System/NotoSansJP-wght.ttf",
+                    weight = 600,
+                    italic = false,
+                    variableWeightRange = 100..900,
+                ),
+            ),
+        )
+
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(
+                selectedFont = "Noto Sans JP",
+                selectedFontFamilyId = spec.familyId,
+                selectedFontVariantId = spec.variantId,
+            ),
+            fontRenderSpec = spec,
+        )
+
+        assertTrue(css.contains("font-family: 'hoshi-font-recommended-notosansjp';"))
+        assertTrue(css.contains("font-weight: 100 900;"))
+        assertEquals(1, css.windowed("@font-face".length).count { it == "@font-face" })
+        assertTrue(css.contains("font-weight: 600 !important;"))
+        assertTrue(css.contains("font-variation-settings: 'wght' 600 !important;"))
+    }
+
+    @Test
+    fun publisherRenderSpecLeavesFamilyStyleAndWeightUntouched() {
+        val spec = ReaderFontRenderSpec(
+            familyId = ReaderFontManager.publisherFamilyId,
+            variantId = ReaderFontManager.publisherVariantId,
+            cssFamily = null,
+            displayName = ReaderFontManager.publisherFont,
+            weight = 400,
+            italic = false,
+            publisherFont = true,
+        )
+
+        val css = ReaderContentStyles.styleTag(
+            settings = ReaderSettings(selectedFont = ReaderFontManager.publisherFont),
+            fontRenderSpec = spec,
+        )
+
+        assertFalse(css.contains("font-family:"))
+        assertFalse(css.contains("font-weight:"))
+        assertFalse(css.contains("font-style:"))
     }
 
     @Test

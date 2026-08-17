@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add downloadable recommended Japanese font families to Reader Appearance,
+  including real static and variable weight selection, verified app-private
+  downloads, and family/variant grouping for imported TTF and OTF fonts.
 - Add an optional Reader Behavior setting that uses the volume keys to jump
   between terms in the topmost lookup popup.
 - Add `hoshi://search?text=...` deep links for opening lookup results in the

@@ -85,6 +85,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader Appearance settings are stored per active/effective profile in
   `Profiles/<profileId>/reader_settings.json`; Reader Behavior and statistics
   sync settings remain global DataStore settings.
+- Reader font selections retain the legacy display-name field and additionally
+  persist stable family/variant IDs plus each profile's last variant per family.
 - Statistics dashboard target settings are global DataStore settings behind a
   repository.
 - Profile-scoped Reader Appearance, Dictionary, and Anki settings JSON reads and
@@ -99,6 +101,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 ## Reader
 
+- `ReaderFontManager` owns the app-private font library under `Fonts/`, exposes
+  an immutable revisioned family/variant state, groups user TTF/OTF files by
+  bounded SFNT metadata, and keeps legacy basename-only WOFF/WOFF2 and malformed
+  pre-existing imports readable. Managed recommended files live under
+  `Fonts/System/` and cannot be deleted from the UI. A private atomic alias
+  sidecar preserves legacy basename selections and dictionary CSS references
+  when a parsed family/weight/style slot is replaced by a new internal file.
+- `ReaderAppearanceViewModel` owns visible font import/download/delete state.
+  Recommended files come only from the pinned internal Google Fonts catalog,
+  are streamed to a same-directory temporary file, and become visible only
+  after exact size and SHA-256 verification followed by an atomic move. These
+  short user-visible transfers use cancellable in-process coroutines rather
+  than WorkManager.
+- Reader and lookup WebViews consume stable per-family CSS aliases and render
+  specs containing installed faces, real weight/style values, variable axes,
+  and the font-library revision. System Mincho/Gothic remain CSS-matched platform
+  families; Publisher leaves EPUB family, style, and weight declarations intact.
 - Reader rendering and lookup remain WebView-based to preserve iOS-aligned
   visible behavior.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and
