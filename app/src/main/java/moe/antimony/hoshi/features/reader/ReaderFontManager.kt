@@ -523,6 +523,8 @@ class ReaderFontManager @Inject constructor(
 
     companion object {
         const val publisherFont = "__hoshi_publisher_font__"
+        // Persisted compatibility names and preferred CSS fallbacks. The UI uses generic system
+        // serif/sans-serif labels because an OEM WebView may resolve these to a different font.
         const val defaultMinchoFont = "Noto Serif CJK JP"
         const val defaultGothicFont = "Noto Sans CJK JP"
         const val publisherFamilyId = "publisher"

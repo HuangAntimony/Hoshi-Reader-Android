@@ -389,15 +389,18 @@
     <string name="reader_appearance_vertical">竖排</string>
     <string name="reader_appearance_horizontal">横排</string>
     <string name="reader_appearance_font" comment="Reader font setting, intentionally matching dictionary custom CSS font.">字体</string>
-    <string name="reader_appearance_font_publisher">出版社</string>
+    <string name="reader_appearance_font_publisher">出版方字体</string>
     <string name="reader_appearance_font_system" comment="Font-library section label, intentionally matching the System reader theme label.">系统</string>
+    <string name="reader_appearance_font_system_serif">系统衬线体</string>
+    <string name="reader_appearance_font_system_sans_serif">系统无衬线体</string>
     <string name="reader_appearance_font_recommended">推荐</string>
     <string name="reader_appearance_font_imported">已导入</string>
     <string name="reader_appearance_font_system_matched">系统匹配</string>
-    <string name="reader_appearance_font_source">Google Fonts · OFL 1.1</string>
-    <string name="reader_appearance_font_license">许可证 · OFL 1.1</string>
+    <string name="reader_appearance_font_variant">变体</string>
+    <string name="reader_appearance_font_variant_publisher">由出版方决定</string>
+    <string name="reader_appearance_font_variant_format">%1$s（%2$d）</string>
     <string name="reader_appearance_font_download_size_format">下载 · %1$s</string>
-    <string name="reader_appearance_font_downloading_format">正在下载 %1$d%%</string>
+    <string name="reader_appearance_font_downloading_item_format">%1$s · 正在下载 %2$d%%</string>
     <string name="reader_appearance_font_download_failed">无法下载并校验该字体，请检查网络后重试。</string>
     <string name="reader_appearance_font_import_failed">无法导入该字体，请使用有效的 TTF、OTF、WOFF 或 WOFF2 文件。</string>
     <string name="reader_appearance_font_category_serif">明朝／衬线</string>

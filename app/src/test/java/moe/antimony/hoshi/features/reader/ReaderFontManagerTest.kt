@@ -39,7 +39,7 @@ class ReaderFontManagerTest {
     }
 
     @Test
-    fun defaultFontsAreAndroidJapaneseMinchoAndGothicPresets() {
+    fun legacySystemFontNamesRemainStableForSettingsCompatibility() {
         assertEquals(listOf("Noto Serif CJK JP", "Noto Sans CJK JP"), ReaderFontManager.defaultFonts)
     }
 

@@ -30,6 +30,13 @@ class ReaderFontCatalogTest {
         assertEquals((200..900 step 100).toList(), weights.getValue("Noto Serif JP"))
         assertEquals((100..900 step 100).toList(), weights.getValue("Noto Sans JP"))
         assertEquals(listOf(400, 600), weights.getValue("Klee One"))
+        assertEquals(
+            listOf("Regular", "SemiBold"),
+            ReaderRecommendedFontCatalog.families
+                .first { it.displayName == "Klee One" }
+                .variants
+                .map(ReaderFontVariant::displayName),
+        )
     }
 
     @Test

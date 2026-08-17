@@ -19,19 +19,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,7 +64,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
@@ -173,8 +173,9 @@ private fun ReaderAppearanceContent(
     val fontUiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentSettings by rememberUpdatedState(settings)
     val currentOnSettingsChange by rememberUpdatedState(onSettingsChange)
-    var fontPickerOpen by remember { mutableStateOf(false) }
-    var selectedFontFamilyId by remember { mutableStateOf<String?>(null) }
+    var fontMenuExpanded by remember { mutableStateOf(false) }
+    var fontVariantMenuExpanded by remember { mutableStateOf(false) }
+    var fontDownloadOrigin by remember { mutableStateOf<ReaderFontDownloadOrigin?>(null) }
     var fontToDelete by remember { mutableStateOf<ReaderFontFamily?>(null) }
     var colorDialogRow by remember { mutableStateOf<ReaderAppearanceCustomColorRow?>(null) }
     val fontImporter = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
@@ -191,7 +192,18 @@ private fun ReaderAppearanceContent(
             variantId = settings.selectedFontVariantId,
         )
     }
-    val selectedFontDisplayLabel = readerFontLabel(selectedFontSpec.displayName)
+    val selectedFontDisplayLabel = readerFontLabel(selectedFontSpec.familyId, selectedFontSpec.displayName)
+    val selectedFontFamily = fontUiState.library.families.firstOrNull { it.id == selectedFontSpec.familyId }
+    val selectedFontVariant = selectedFontFamily?.variants?.firstOrNull { it.id == selectedFontSpec.variantId }
+    val fontOrganization = remember(fontUiState.library.families) {
+        organizeReaderFontFamilies(fontUiState.library.families)
+    }
+    val downloadingFamily = fontUiState.download?.let { activeDownload ->
+        fontUiState.library.families.firstOrNull { it.id == activeDownload.familyId }
+    }
+    val downloadingVariant = downloadingFamily?.variants?.firstOrNull {
+        it.id == fontUiState.download?.variantId
+    }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -200,8 +212,9 @@ private fun ReaderAppearanceContent(
                     val variant = family?.variants?.firstOrNull { it.id == event.variantId }
                     if (family != null && variant != null) {
                         currentOnSettingsChange(currentSettings.withFontSelection(family, variant))
-                        fontPickerOpen = false
-                        selectedFontFamilyId = null
+                        fontMenuExpanded = false
+                        fontVariantMenuExpanded = false
+                        fontDownloadOrigin = null
                     }
                 }
             }
@@ -308,17 +321,20 @@ private fun ReaderAppearanceContent(
                     )
                     AppearanceDivider(palette)
                     ReaderFontRow(
-                        selectedLabel = buildString {
-                            append(selectedFontDisplayLabel)
-                            if (!selectedFontSpec.publisherFont) {
-                                append(" · ")
-                                append(selectedFontSpec.weight)
-                            }
+                        label = stringResource(R.string.reader_appearance_font),
+                        selectedLabel = selectedFontDisplayLabel,
+                        menuExpanded = fontMenuExpanded,
+                        onMenuExpandedChange = { fontMenuExpanded = it },
+                        enabled = fontUiState.download == null,
+                        download = fontUiState.download.takeIf {
+                            fontDownloadOrigin == ReaderFontDownloadOrigin.FAMILY
                         },
-                        onClick = {
-                            selectedFontFamilyId = settings.selectedFontFamilyId
-                                ?: selectedFontSpec.familyId
-                            fontPickerOpen = true
+                        downloadLabel = downloadingFamily?.let {
+                            readerFontLabel(it.id, it.displayName)
+                        },
+                        onCancelDownload = {
+                            fontDownloadOrigin = null
+                            viewModel.cancelDownload()
                         },
                         canDeleteFont = fontManager.fontFamilies().any {
                             it.id == selectedFontSpec.familyId && it.source == ReaderFontSource.USER
@@ -328,7 +344,55 @@ private fun ReaderAppearanceContent(
                                 it.id == selectedFontSpec.familyId && it.source == ReaderFontSource.USER
                             }
                         },
-                    )
+                    ) {
+                        ReaderFontFamilyDropdownContent(
+                            organization = fontOrganization,
+                            activeFamilyId = selectedFontSpec.familyId,
+                            rememberedVariants = settings.fontVariantSelections,
+                            onFamilySelected = { family ->
+                                fontMenuExpanded = false
+                                val variant = family.preferredVariant(settings.fontVariantSelections[family.id])
+                                fontDownloadOrigin = ReaderFontDownloadOrigin.FAMILY
+                                viewModel.selectVariant(family.id, variant.id)
+                            },
+                        )
+                    }
+                    AppearanceDivider(palette)
+                    ReaderFontRow(
+                        label = stringResource(R.string.reader_appearance_font_variant),
+                        selectedLabel = if (selectedFontSpec.publisherFont) {
+                            stringResource(R.string.reader_appearance_font_variant_publisher)
+                        } else {
+                            readerFontVariantLabel(selectedFontVariant, selectedFontSpec.weight)
+                        },
+                        menuExpanded = fontVariantMenuExpanded,
+                        onMenuExpandedChange = { fontVariantMenuExpanded = it },
+                        enabled = !selectedFontSpec.publisherFont && selectedFontFamily != null,
+                        download = fontUiState.download.takeIf {
+                            fontDownloadOrigin == ReaderFontDownloadOrigin.VARIANT
+                        },
+                        downloadLabel = downloadingVariant?.let {
+                            readerFontVariantLabel(it, it.weight)
+                        },
+                        onCancelDownload = {
+                            fontDownloadOrigin = null
+                            viewModel.cancelDownload()
+                        },
+                        canDeleteFont = false,
+                        onDeleteFont = {},
+                    ) {
+                        selectedFontFamily?.let { family ->
+                            ReaderFontVariantDropdownContent(
+                                family = family,
+                                activeVariantId = selectedFontSpec.variantId,
+                                onVariantSelected = { variant ->
+                                    fontVariantMenuExpanded = false
+                                    fontDownloadOrigin = ReaderFontDownloadOrigin.VARIANT
+                                    viewModel.selectVariant(family.id, variant.id)
+                                },
+                            )
+                        }
+                    }
                     AppearanceDivider(palette)
                     ActionRow(
                         label = stringResource(R.string.reader_appearance_import_font),
@@ -826,42 +890,45 @@ private fun ReaderAppearanceContent(
             },
         )
     }
-    if (fontPickerOpen) {
-        ReaderFontPickerDialog(
-            families = fontUiState.library.families,
-            selectedFamilyId = selectedFontFamilyId,
-            activeFamilyId = selectedFontSpec.familyId,
-            activeVariantId = selectedFontSpec.variantId,
-            rememberedVariants = settings.fontVariantSelections,
-            download = fontUiState.download,
-            error = fontUiState.error?.asString(),
-            failedSelection = fontUiState.failedSelection,
-            onFamilySelected = { selectedFontFamilyId = it },
-            onVariantSelected = { familyId, variantId -> viewModel.selectVariant(familyId, variantId) },
-            onDeleteFamily = { family -> fontToDelete = family },
-            onCancelDownload = viewModel::cancelDownload,
-            onClearError = viewModel::clearError,
-            onOpenSource = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, ReaderRecommendedFontCatalog.sourceUrl.toUri()))
-            },
-            onOpenLicense = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, ReaderRecommendedFontCatalog.licenseUrl.toUri()))
-            },
-            onDismiss = {
-                viewModel.cancelDownload()
-                viewModel.clearError()
-                fontPickerOpen = false
-                selectedFontFamilyId = null
-            },
-        )
-    }
-    if (!fontPickerOpen && fontUiState.error != null) {
+    if (fontUiState.error != null) {
+        val failedSelection = fontUiState.failedSelection
         AlertDialog(
-            onDismissRequest = viewModel::clearError,
+            onDismissRequest = {
+                fontDownloadOrigin = null
+                viewModel.clearError()
+            },
             title = { Text(stringResource(R.string.reader_appearance_font)) },
             text = { Text(requireNotNull(fontUiState.error).asString()) },
             confirmButton = {
-                TextButton(onClick = viewModel::clearError) { Text(stringResource(R.string.action_close)) }
+                TextButton(
+                    onClick = {
+                        viewModel.clearError()
+                        if (failedSelection == null) {
+                            fontDownloadOrigin = null
+                        } else {
+                            viewModel.selectVariant(failedSelection.familyId, failedSelection.variantId)
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (failedSelection == null) R.string.action_close
+                            else R.string.reader_appearance_font_retry,
+                        ),
+                    )
+                }
+            },
+            dismissButton = if (failedSelection == null) null else {
+                {
+                    TextButton(
+                        onClick = {
+                            fontDownloadOrigin = null
+                            viewModel.clearError()
+                        },
+                    ) {
+                        Text(stringResource(R.string.action_close))
+                    }
+                }
             },
         )
     }
@@ -1142,251 +1209,268 @@ internal fun segmentedControlWidthDp(options: List<String>): Int =
 
 @Composable
 private fun ReaderFontRow(
+    label: String,
     selectedLabel: String,
-    onClick: () -> Unit,
+    menuExpanded: Boolean,
+    onMenuExpandedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    download: ReaderFontDownloadUiState?,
+    downloadLabel: String?,
+    onCancelDownload: () -> Unit,
     canDeleteFont: Boolean,
     onDeleteFont: () -> Unit,
+    menuContent: @Composable ColumnScope.() -> Unit,
 ) {
     val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = metrics.appearanceFontRowVerticalPaddingDp.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.reader_appearance_font),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = metrics.appearanceFontRowVerticalPaddingDp.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-                TextButton(onClick = onClick) {
-                    Text(
-                        text = selectedLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box {
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                        TextButton(
+                            onClick = { onMenuExpandedChange(true) },
+                            enabled = enabled,
+                        ) {
+                            Text(
+                                text = selectedLabel,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { onMenuExpandedChange(false) },
+                        content = menuContent,
                     )
                 }
-            }
-            if (canDeleteFont) {
-                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
-                    TextButton(onClick = onDeleteFont) {
-                        Text(stringResource(R.string.action_delete))
+                if (canDeleteFont) {
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                        TextButton(onClick = onDeleteFont) {
+                            Text(stringResource(R.string.action_delete))
+                        }
                     }
                 }
             }
         }
+        if (download != null && downloadLabel != null) {
+            ReaderFontDownloadStatus(
+                download = download,
+                label = downloadLabel,
+                onCancelDownload = onCancelDownload,
+            )
+        }
+    }
+}
+
+private enum class ReaderFontDownloadOrigin {
+    FAMILY,
+    VARIANT,
+}
+
+@Composable
+private fun ReaderFontFamilyDropdownContent(
+    organization: ReaderFontPickerOrganization,
+    activeFamilyId: String,
+    rememberedVariants: Map<String, String>,
+    onFamilySelected: (ReaderFontFamily) -> Unit,
+) {
+    organization.publisher?.let { family ->
+        ReaderFontDropdownItem(
+            label = readerFontLabel(family.id, family.displayName),
+            selected = family.id == activeFamilyId,
+            downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
+            onClick = { onFamilySelected(family) },
+        )
+    }
+    ReaderFontFamilyDropdownSection(
+        title = stringResource(R.string.reader_appearance_font_system),
+        families = organization.system,
+        activeFamilyId = activeFamilyId,
+        rememberedVariants = rememberedVariants,
+        onFamilySelected = onFamilySelected,
+    )
+    if (organization.recommended.isNotEmpty()) {
+        ReaderFontDropdownHeader(stringResource(R.string.reader_appearance_font_recommended))
+        organization.recommended.forEach { group ->
+            ReaderFontDropdownHeader(
+                title = readerFontCategoryLabel(group.category),
+                category = true,
+            )
+            group.families.forEach { family ->
+                ReaderFontDropdownItem(
+                    label = family.displayName,
+                    selected = family.id == activeFamilyId,
+                    downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
+                    onClick = { onFamilySelected(family) },
+                )
+            }
+        }
+    }
+    ReaderFontFamilyDropdownSection(
+        title = stringResource(R.string.reader_appearance_font_imported),
+        families = organization.imported,
+        activeFamilyId = activeFamilyId,
+        rememberedVariants = rememberedVariants,
+        onFamilySelected = onFamilySelected,
+    )
+}
+
+@Composable
+private fun ReaderFontFamilyDropdownSection(
+    title: String,
+    families: List<ReaderFontFamily>,
+    activeFamilyId: String,
+    rememberedVariants: Map<String, String>,
+    onFamilySelected: (ReaderFontFamily) -> Unit,
+) {
+    if (families.isEmpty()) return
+    ReaderFontDropdownHeader(title)
+    families.forEach { family ->
+        ReaderFontDropdownItem(
+            label = readerFontLabel(family.id, family.displayName),
+            selected = family.id == activeFamilyId,
+            downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
+            onClick = { onFamilySelected(family) },
+        )
     }
 }
 
 @Composable
-private fun ReaderFontPickerDialog(
-    families: List<ReaderFontFamily>,
-    selectedFamilyId: String?,
-    activeFamilyId: String,
+private fun ReaderFontVariantDropdownContent(
+    family: ReaderFontFamily,
     activeVariantId: String,
-    rememberedVariants: Map<String, String>,
-    download: ReaderFontDownloadUiState?,
-    error: String?,
-    failedSelection: ReaderFontSelection?,
-    onFamilySelected: (String?) -> Unit,
-    onVariantSelected: (String, String) -> Unit,
-    onDeleteFamily: (ReaderFontFamily) -> Unit,
-    onCancelDownload: () -> Unit,
-    onClearError: () -> Unit,
-    onOpenSource: () -> Unit,
-    onOpenLicense: () -> Unit,
-    onDismiss: () -> Unit,
+    onVariantSelected: (ReaderFontVariant) -> Unit,
 ) {
     val context = LocalContext.current
-    val selectedFamily = families.firstOrNull { it.id == selectedFamilyId }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (selectedFamily == null) stringResource(R.string.reader_appearance_font)
-                else selectedFamily.displayName,
-            )
-        },
+    if (family.source == ReaderFontSource.SYSTEM) {
+        ReaderFontDropdownHeader(stringResource(R.string.reader_appearance_font_system_matched))
+    }
+    family.variants.forEach { variant ->
+        ReaderFontDropdownItem(
+            label = readerFontVariantLabel(variant, variant.weight),
+            selected = variant.id == activeVariantId,
+            downloadable = !variant.isInstalled,
+            supportingLabel = if (!variant.isInstalled) {
+                formatFontBytes(
+                    context = context,
+                    bytes = requireNotNull(variant.remoteFile).expectedSize,
+                )
+            } else {
+                null
+            },
+            onClick = { onVariantSelected(variant) },
+        )
+    }
+}
+
+@Composable
+private fun ReaderFontDropdownHeader(
+    title: String,
+    category: Boolean = false,
+) {
+    Text(
+        text = title,
+        style = if (category) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
+        color = LocalContentColor.current,
+        modifier = Modifier.padding(
+            start = if (category) 20.dp else 12.dp,
+            top = if (category) 6.dp else 10.dp,
+            end = 12.dp,
+            bottom = 2.dp,
+        ),
+    )
+}
+
+@Composable
+private fun ReaderFontDropdownItem(
+    label: String,
+    selected: Boolean,
+    downloadable: Boolean,
+    onClick: () -> Unit,
+    supportingLabel: String? = null,
+) {
+    DropdownMenuItem(
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (selectedFamily == null) {
-                    val groups = listOf(
-                        ReaderFontSource.PUBLISHER to R.string.reader_appearance_font_publisher,
-                        ReaderFontSource.SYSTEM to R.string.reader_appearance_font_system,
-                        ReaderFontSource.RECOMMENDED to R.string.reader_appearance_font_recommended,
-                        ReaderFontSource.USER to R.string.reader_appearance_font_imported,
+            Column {
+                Text(
+                    text = label,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                supportingLabel?.let { size ->
+                    Text(
+                        text = stringResource(R.string.reader_appearance_font_download_size_format, size),
+                        style = MaterialTheme.typography.bodySmall,
                     )
-                    groups.forEach { (source, labelRes) ->
-                        val group = families.filter { it.source == source }
-                        if (group.isNotEmpty()) {
-                            Text(
-                                text = stringResource(labelRes),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                            group.forEach { family ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    TextButton(
-                                        onClick = {
-                                            val remembered = rememberedVariants[family.id]
-                                            if (family.variants.size == 1 && family.variants.first().isInstalled) {
-                                                onVariantSelected(family.id, remembered ?: family.variants.first().id)
-                                            } else {
-                                                onFamilySelected(family.id)
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            Text(
-                                                text = if (family.source == ReaderFontSource.PUBLISHER) {
-                                                    stringResource(R.string.reader_appearance_font_publisher)
-                                                } else family.displayName,
-                                                fontWeight = if (family.id == activeFamilyId) FontWeight.SemiBold else FontWeight.Normal,
-                                            )
-                                            if (family.source == ReaderFontSource.RECOMMENDED) {
-                                                Text(
-                                                    text = readerFontCategoryLabel(family.category),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    if (family.source == ReaderFontSource.USER) {
-                                        IconButton(onClick = { onDeleteFamily(family) }) {
-                                            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.action_delete))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    TextButton(onClick = onOpenSource, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.reader_appearance_font_source))
-                    }
-                    TextButton(onClick = onOpenLicense, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Rounded.Info, contentDescription = null)
-                        Text(stringResource(R.string.reader_appearance_font_license))
-                    }
-                } else {
-                    if (selectedFamily.source == ReaderFontSource.RECOMMENDED) {
-                        TextButton(onClick = onOpenSource) {
-                            Text(stringResource(R.string.reader_appearance_font_source))
-                        }
-                    }
-                    selectedFamily.variants.forEach { variant ->
-                        val isDownloading = download?.familyId == selectedFamily.id && download.variantId == variant.id
-                        val preferredVariantId = if (selectedFamily.id == activeFamilyId) {
-                            activeVariantId
-                        } else {
-                            rememberedVariants[selectedFamily.id]
-                                ?: selectedFamily.variants.firstOrNull { it.weight == 400 && !it.italic }?.id
-                        }
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            TextButton(
-                                onClick = { onVariantSelected(selectedFamily.id, variant.id) },
-                                enabled = download == null,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (selectedFamily.source in setOf(
-                                                ReaderFontSource.SYSTEM,
-                                                ReaderFontSource.RECOMMENDED,
-                                            )
-                                        ) {
-                                            variant.weight.toString()
-                                        } else {
-                                            "${variant.displayName} · ${variant.weight}"
-                                        },
-                                        fontWeight = if (
-                                            variant.id == preferredVariantId
-                                        ) FontWeight.SemiBold else FontWeight.Normal,
-                                    )
-                                    when {
-                                        selectedFamily.source == ReaderFontSource.SYSTEM -> Text(
-                                            stringResource(R.string.reader_appearance_font_system_matched),
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                        !variant.isInstalled -> Text(
-                                            stringResource(
-                                                R.string.reader_appearance_font_download_size_format,
-                                                formatFontBytes(
-                                                    context,
-                                                    requireNotNull(variant.remoteFile).expectedSize,
-                                                ),
-                                            ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                    }
-                                }
-                                if (!variant.isInstalled) {
-                                    Icon(Icons.Rounded.Download, contentDescription = stringResource(R.string.action_download))
-                                }
-                            }
-                            if (isDownloading) {
-                                val progress = download.progress
-                                val fraction = if (progress.totalBytes > 0) {
-                                    progress.downloadedBytes.toFloat() / progress.totalBytes.toFloat()
-                                } else 0f
-                                LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        stringResource(
-                                            R.string.reader_appearance_font_downloading_format,
-                                            (fraction * 100).toInt(),
-                                        ),
-                                    )
-                                    TextButton(onClick = onCancelDownload) { Text(stringResource(R.string.action_cancel)) }
-                                }
-                            }
-                        }
-                    }
-                    error?.let { message ->
-                        Text(message, color = MaterialTheme.colorScheme.error)
-                        TextButton(
-                            onClick = {
-                                onClearError()
-                                val retryVariant = selectedFamily.variants.firstOrNull {
-                                    failedSelection?.familyId == selectedFamily.id && it.id == failedSelection.variantId
-                                }
-                                retryVariant?.let { onVariantSelected(selectedFamily.id, it.id) }
-                            },
-                        ) { Text(stringResource(R.string.reader_appearance_font_retry)) }
-                    }
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = {
-                if (selectedFamily == null) onDismiss() else onFamilySelected(null)
-            }) {
-                Text(stringResource(if (selectedFamily == null) R.string.action_close else R.string.action_back))
+        trailingIcon = {
+            when {
+                selected -> Icon(Icons.Rounded.Check, contentDescription = null)
+                downloadable -> Icon(
+                    Icons.Rounded.Download,
+                    contentDescription = stringResource(R.string.action_download),
+                )
             }
         },
+        onClick = onClick,
     )
+}
+
+@Composable
+private fun ReaderFontDownloadStatus(
+    download: ReaderFontDownloadUiState,
+    onCancelDownload: () -> Unit,
+    label: String,
+) {
+    val progress = download.progress
+    val fraction = if (progress.totalBytes > 0) {
+        progress.downloadedBytes.toFloat() / progress.totalBytes.toFloat()
+    } else {
+        0f
+    }
+    LinearProgressIndicator(
+        progress = { fraction.coerceIn(0f, 1f) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp),
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(
+                R.string.reader_appearance_font_downloading_item_format,
+                label,
+                (fraction * 100).toInt(),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        TextButton(onClick = onCancelDownload) {
+            Text(stringResource(R.string.action_cancel))
+        }
+    }
 }
 
 @Composable
@@ -1430,12 +1514,19 @@ private fun ActionRow(
 }
 
 @Composable
-private fun readerFontLabel(fontName: String): String =
-    if (ReaderFontManager.isPublisherFont(fontName)) {
-        stringResource(R.string.reader_appearance_font_publisher)
-    } else {
-        fontName
-    }
+private fun readerFontLabel(familyId: String, fontName: String): String = when (familyId) {
+    ReaderFontManager.publisherFamilyId -> stringResource(R.string.reader_appearance_font_publisher)
+    ReaderFontManager.systemMinchoFamilyId -> stringResource(R.string.reader_appearance_font_system_serif)
+    ReaderFontManager.systemGothicFamilyId -> stringResource(R.string.reader_appearance_font_system_sans_serif)
+    else -> fontName
+}
+
+@Composable
+private fun readerFontVariantLabel(variant: ReaderFontVariant?, fallbackWeight: Int): String {
+    val name = variant?.displayName ?: ReaderRecommendedFontCatalog.weightName(fallbackWeight)
+    val weight = variant?.weight ?: fallbackWeight
+    return stringResource(R.string.reader_appearance_font_variant_format, name, weight)
+}
 
 @Composable
 private fun SwitchRow(

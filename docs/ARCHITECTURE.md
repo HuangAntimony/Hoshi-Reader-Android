@@ -116,8 +116,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   than WorkManager.
 - Reader and lookup WebViews consume stable per-family CSS aliases and render
   specs containing installed faces, real weight/style values, variable axes,
-  and the font-library revision. System Mincho/Gothic remain CSS-matched platform
-  families; Publisher leaves EPUB family, style, and weight declarations intact.
+  and the font-library revision. Generic system serif/sans-serif choices remain
+  CSS-matched platform families because OEM builds may not include Noto; legacy
+  Noto display-name values remain compatibility keys only. Publisher leaves EPUB
+  family, style, and weight declarations intact.
 - Reader rendering and lookup remain WebView-based to preserve iOS-aligned
   visible behavior.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and

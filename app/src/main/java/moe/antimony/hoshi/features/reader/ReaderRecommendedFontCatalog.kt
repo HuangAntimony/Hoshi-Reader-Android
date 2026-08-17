@@ -1,11 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
 object ReaderRecommendedFontCatalog {
-    const val sourceUrl =
-        "https://github.com/google/fonts/tree/${ReaderRemoteFontFile.GOOGLE_FONTS_COMMIT}/ofl"
-    const val licenseUrl =
-        "https://github.com/google/fonts/blob/${ReaderRemoteFontFile.GOOGLE_FONTS_COMMIT}/ofl/notosansjp/OFL.txt"
-
     val families: List<ReaderFontFamily> by lazy { listOf(
         variableFamily("notoserifjp", "Noto Serif JP", ReaderFontCategory.SERIF, 200..900 step 100,
             "ofl/notoserifjp/NotoSerifJP[wght].ttf", "NotoSerifJP-wght.ttf", 13_574_352,
@@ -154,13 +149,13 @@ object ReaderRecommendedFontCatalog {
 
     fun weightName(weight: Int): String = when (weight) {
         100 -> "Thin"
-        200 -> "Extra Light"
+        200 -> "ExtraLight"
         300 -> "Light"
         400 -> "Regular"
         500 -> "Medium"
-        600 -> "Semi Bold"
+        600 -> "SemiBold"
         700 -> "Bold"
-        800 -> "Extra Bold"
+        800 -> "ExtraBold"
         900 -> "Black"
         else -> weight.toString()
     }
