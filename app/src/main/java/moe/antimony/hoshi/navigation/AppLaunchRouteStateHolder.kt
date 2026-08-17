@@ -11,6 +11,7 @@ internal class AppLaunchRouteStateHolder {
         readerSettings: ReaderSettings,
         dictionarySettings: DictionarySettings,
         hasPendingImport: Boolean,
+        hasPendingDictionaryLookup: Boolean = false,
         isBooksTabSelected: Boolean,
         backStack: List<NavKey>,
         recentBookIdProvider: suspend () -> String?,
@@ -21,6 +22,7 @@ internal class AppLaunchRouteStateHolder {
         defaultRouteApplied = true
         if (
             hasPendingImport ||
+            hasPendingDictionaryLookup ||
             !isBooksTabSelected ||
             backStack.size != 1 ||
             backStack.lastOrNull() != AppRoute.BooksRoute

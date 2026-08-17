@@ -113,6 +113,40 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
+    fun externalLookupPreservesQueryAndRunsTrimmedSearch() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("猫")),
+        )
+        val viewModel = viewModel(repository)
+
+        viewModel.applyExternalLookup(" 猫 ")
+
+        val state = viewModel.uiState.value
+        assertEquals(" 猫 ", state.query)
+        assertEquals("猫", state.lastQuery)
+        assertEquals(listOf("猫:16:16"), repository.lookupCalls)
+    }
+
+    @Test
+    fun blankExternalLookupResetsExistingSearchWithoutCallingLookup() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("猫")),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.updateQuery("猫")
+        viewModel.runLookup()
+
+        viewModel.applyExternalLookup("   ")
+
+        val state = viewModel.uiState.value
+        assertEquals("", state.query)
+        assertEquals("", state.lastQuery)
+        assertFalse(state.hasSearched)
+        assertEquals(emptyList<LookupResult>(), state.results)
+        assertEquals(listOf("猫:16:16"), repository.lookupCalls)
+    }
+
+    @Test
     fun effectiveProfileChangeClearsRenderedResultsAndStylesWithoutClearingQuery() {
         val repository = FakeDictionarySearchRepository(
             lookupResults = listOf(lookupResult("猫")),

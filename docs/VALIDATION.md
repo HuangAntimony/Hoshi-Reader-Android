@@ -90,6 +90,18 @@ unless the test explicitly restores an existing Reader route. Do not long-press
 reader text for lookup. Hoshi lookup opens from a single tap on reader text; long
 press is for native selection/highlight-style flows when those are under test.
 
+Validate lookup deep links with:
+
+```bash
+adb shell "am start -a android.intent.action.VIEW -d 'hoshi://search?text=%E7%8C%AB'"
+adb shell "am start -a android.intent.action.VIEW -d 'hoshi://search?text=%E7%8C%AB&mode=app'"
+```
+
+The first link opens the default popup overlay and the second opens the
+Dictionary tab. Cover cold start, an existing foreground task, two consecutive
+identical links, URL-encoded Japanese text, and missing or blank `text`; empty
+text must open a cleared, focused Dictionary search instead of an empty popup.
+
 Manual reader validation should cover:
 
 - cover image pages and multi-image illustration pages.

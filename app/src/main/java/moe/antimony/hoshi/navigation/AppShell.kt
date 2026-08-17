@@ -42,6 +42,7 @@ import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
 import moe.antimony.hoshi.features.dictionary.DictionaryView
+import moe.antimony.hoshi.features.dictionary.PendingDictionaryLookupRequest
 import moe.antimony.hoshi.features.reader.ReaderAppearanceScreen
 import moe.antimony.hoshi.features.reader.ReaderBehaviorScreen
 import moe.antimony.hoshi.features.reader.ReaderFontManager
@@ -70,6 +71,8 @@ fun AppShell(
     onPendingImportConsumed: () -> Unit = {},
     pendingSasayakiReaderBookId: String? = null,
     onPendingSasayakiReaderConsumed: () -> Unit = {},
+    pendingDictionaryLookupRequest: PendingDictionaryLookupRequest? = null,
+    onPendingDictionaryLookupConsumed: () -> Unit = {},
     readerSettings: ReaderSettings,
     onReaderSettingsChange: (ReaderSettings) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
@@ -96,10 +99,12 @@ fun AppShell(
     val currentReaderSettings by rememberUpdatedState(readerSettings)
     val currentOnPendingImportConsumed by rememberUpdatedState(onPendingImportConsumed)
     val currentOnPendingSasayakiReaderConsumed by rememberUpdatedState(onPendingSasayakiReaderConsumed)
+    val currentOnPendingDictionaryLookupConsumed by rememberUpdatedState(onPendingDictionaryLookupConsumed)
     val currentOnReaderSettingsChange by rememberUpdatedState(onReaderSettingsChange)
     val currentOnReaderKeyEventHandlerChange by rememberUpdatedState(onReaderKeyEventHandlerChange)
     val currentPendingImportUri by rememberUpdatedState(pendingImportUri)
     val currentPendingSasayakiReaderBookId by rememberUpdatedState(pendingSasayakiReaderBookId)
+    val currentPendingDictionaryLookupRequest by rememberUpdatedState(pendingDictionaryLookupRequest)
     val readerBookmarkRefreshState = remember { ReaderBookmarkRefreshState() }
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
     var dictionaryFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
@@ -178,6 +183,7 @@ fun AppShell(
                 readerSettings = currentReaderSettings,
                 dictionarySettings = settings,
                 hasPendingImport = currentPendingImportUri != null || currentPendingSasayakiReaderBookId != null,
+                hasPendingDictionaryLookup = currentPendingDictionaryLookupRequest != null,
                 isBooksTabSelected = selectedTab == MainTab.Books,
                 backStack = booksBackStack,
                 recentBookIdProvider = {
@@ -267,6 +273,12 @@ fun AppShell(
         currentOnPendingSasayakiReaderConsumed()
     }
 
+    LaunchedEffect(pendingDictionaryLookupRequest?.requestId) {
+        if (pendingDictionaryLookupRequest != null) {
+            selectedTab = MainTab.Dictionary
+        }
+    }
+
     val entryProvider: (NavKey) -> NavEntry<NavKey> = { key ->
         val route = key as AppRoute
         NavEntry(route, metadata = appShellNavEntryMetadata(route)) {
@@ -290,6 +302,8 @@ fun AppShell(
                     onOpenReader = ::openReader,
                     bookshelfRefreshKey = bookshelfRefreshKey,
                     dictionaryFocusRequestKey = dictionaryFocusRequestKey,
+                    pendingDictionaryLookupRequest = currentPendingDictionaryLookupRequest,
+                    onPendingDictionaryLookupConsumed = currentOnPendingDictionaryLookupConsumed,
                 )
                 AppRoute.StatisticsRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Statistics,
@@ -444,6 +458,8 @@ private fun TopLevelRouteContent(
     onOpenReader: (String) -> Unit,
     bookshelfRefreshKey: Int,
     dictionaryFocusRequestKey: Int,
+    pendingDictionaryLookupRequest: PendingDictionaryLookupRequest? = null,
+    onPendingDictionaryLookupConsumed: () -> Unit = {},
     onSettingsDestination: (SettingsDestination) -> Unit = {},
 ) {
     val layoutSpec = currentMainShellLayoutSpec()
@@ -459,6 +475,8 @@ private fun TopLevelRouteContent(
         MainTab.Dictionary -> DictionarySearchView(
             readerSettings = readerSettings,
             focusRequestKey = dictionaryFocusRequestKey,
+            pendingLookupRequest = pendingDictionaryLookupRequest,
+            onPendingLookupConsumed = onPendingDictionaryLookupConsumed,
             modifier = Modifier.fillMaxSize(),
         )
         MainTab.Statistics -> StatisticsView(

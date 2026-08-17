@@ -282,6 +282,28 @@ class AppShellCoordinatorTest {
     }
 
     @Test
+    fun launchDefaultRouteDoesNotOverridePendingDictionaryLookup() = runBlocking {
+        val stateHolder = AppLaunchRouteStateHolder()
+        var recentBookQueries = 0
+
+        assertNull(
+            stateHolder.defaultRouteAfterSettingsLoad(
+                readerSettings = ReaderSettings(openLastReadBookOnLaunch = true),
+                dictionarySettings = DictionarySettings(dictionaryTabDefault = true),
+                hasPendingImport = false,
+                hasPendingDictionaryLookup = true,
+                isBooksTabSelected = true,
+                backStack = mutableListOf(AppRoute.BooksRoute),
+                recentBookIdProvider = {
+                    recentBookQueries += 1
+                    "book-a"
+                },
+            ),
+        )
+        assertEquals(0, recentBookQueries)
+    }
+
+    @Test
     fun dictionaryDefaultRouteDoesNotOverrideRestoredNonBooksTab() = runBlocking {
         val stateHolder = AppLaunchRouteStateHolder()
 

@@ -131,6 +131,15 @@ internal class DictionarySearchViewModel : ViewModel {
         }
     }
 
+    fun applyExternalLookup(query: String) {
+        if (query.isBlank()) {
+            resetSearch()
+        } else {
+            updateQuery(query)
+            runLookup()
+        }
+    }
+
     fun onEffectiveProfileChanged(profileId: String) {
         val previousProfileId = observedEffectiveProfileId
         if (previousProfileId == profileId) return

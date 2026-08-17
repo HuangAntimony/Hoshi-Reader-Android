@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.ProcessTextLookupRequest
+import moe.antimony.hoshi.MainActivity
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
@@ -82,7 +84,25 @@ class ProcessTextLookupActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val request = ProcessTextLookupRequest.fromIntent(intent) ?: run {
+        val deepLinkRequest = DictionaryDeepLinkRequest.fromIntent(intent)
+        if (deepLinkRequest?.destination == DictionaryDeepLinkDestination.MainApp) {
+            startActivity(
+                Intent(this, MainActivity::class.java).apply {
+                    action = OpenDictionaryLookupAction
+                    putExtra(OpenDictionaryLookupTextExtra, deepLinkRequest.text)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                },
+            )
+            finish()
+            return
+        }
+        val request = deepLinkRequest
+            ?.takeIf { it.destination == DictionaryDeepLinkDestination.Overlay }
+            ?.let { ProcessTextLookupRequest(query = it.text.trim()) }
+            ?: ProcessTextLookupRequest.fromIntent(intent)
+            ?: run {
             finish()
             return
         }
