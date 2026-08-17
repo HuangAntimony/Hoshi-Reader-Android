@@ -36,7 +36,10 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - Reader popup 坐标：`popup.js` 的 `hoshiPopupGeometry` 是 CSS `zoom` 下 popup 坐标换算、滚动位置和元素对齐的唯一入口。popup 代码不得把 `offsetTop` 等未缩放 layout 坐标与 `scrollTop` / `getBoundingClientRect()` 等视觉滚动坐标混用，也不得另写缩放补偿。
 - Reader web 共享语义：`reader-text-semantics.js` 是三种 reader mode 共享的文本 normalization、
   matchable/raw 计数和 matchable-character 判断入口；`reader-dom-text.js` 是 paginated/continuous
-  共享的 live DOM ruby/text normalization 入口；`reader-media-semantics.js` 是三种 reader mode
+  共享的 live DOM ruby/text normalization 入口；`reader-emphasis.js` 是三种 reader mode 共享的
+  `text-emphasis`（傍点）normalization 入口，负责把 emphasis 声明改写成逐字 `ruby.hoshi-emphasis`
+  标记，必须在内容仍在 live document 中时调用（VN 需在 detach chapter source 之前）；
+  `reader-media-semantics.js` 是三种 reader mode
   共享的 image setup 入口，包含 SVG image aspect-ratio 修正、large image block 标记、blur
   wrapper、tap-to-native-image bridge 和 scoped setup。VN 可以用当前 screen scope 且不等待 image
   load，但不要重新引入 VN 私有的同类 image setup。`reader-vn-content-stream.js` 和

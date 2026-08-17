@@ -110,6 +110,11 @@ private fun replacementDeclarations(indent: String, property: String, value: Str
             "-webkit-text-orientation" to value,
             "text-orientation" to value,
         )
+        "text-emphasis" -> declarations(
+            indent,
+            "-webkit-text-emphasis" to value,
+            "text-emphasis" to value,
+        )
         "text-emphasis-style" -> declarations(
             indent,
             "-webkit-text-emphasis-style" to value,

@@ -46,6 +46,21 @@ class ReaderResourceSanitizerTest {
     }
 
     @Test
+    fun cssSanitizerKeepsEpubPrivateEmphasisShorthandForWebViewRendering() {
+        val css = """
+            .boutenn {
+              -epub-text-emphasis: filled sesame;
+            }
+        """.trimIndent()
+
+        val sanitized = sanitizeReaderCss(css)
+
+        assertFalse(sanitized, sanitized.contains("-epub-"))
+        assertTrue(sanitized.contains("-webkit-text-emphasis: filled sesame;"))
+        assertTrue(sanitized.contains("text-emphasis: filled sesame;"))
+    }
+
+    @Test
     fun nonCssResourcesAreReturnedUnchanged() {
         val bytes = "<html><body>本文</body></html>".toByteArray()
 

@@ -8,6 +8,7 @@ const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-c
 const readerSasayakiUrl = new URL('../../main/assets/hoshi-web/reader/reader-sasayaki.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
 const readerDomTextUrl = new URL('../../main/assets/hoshi-web/reader/reader-dom-text.js', import.meta.url);
+const readerEmphasisUrl = new URL('../../main/assets/hoshi-web/reader/reader-emphasis.js', import.meta.url);
 const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 
 function readerTextSemanticsSource() {
@@ -16,6 +17,10 @@ function readerTextSemanticsSource() {
 
 function readerDomTextSource() {
     return fs.readFileSync(readerDomTextUrl, 'utf8');
+}
+
+function readerEmphasisSource() {
+    return fs.readFileSync(readerEmphasisUrl, 'utf8');
 }
 
 function readerMediaSemanticsSource() {
@@ -29,6 +34,7 @@ function readerSource(url, options = {}) {
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
         .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replace('__HOSHI_READER_DOM_TEXT_SCRIPT__', options.domTextScript ?? readerDomTextSource())
+        .replace('__HOSHI_READER_EMPHASIS_SCRIPT__', options.emphasisScript ?? readerEmphasisSource())
         .replace('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', String(options.bottomOverlapPx ?? 0))

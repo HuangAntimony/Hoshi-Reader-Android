@@ -1,5 +1,6 @@
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_DOM_TEXT_SCRIPT__
+__HOSHI_READER_EMPHASIS_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 
  window.hoshiReader = {
@@ -335,6 +336,15 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     });
     parents.forEach(function(parent) { self.normalizeReaderText(parent); });
   },
+  emphasis: function() {
+    if (!window.hoshiReaderEmphasis) {
+      throw new Error('hoshiReaderEmphasis is required for reader text emphasis normalization');
+    }
+    return window.hoshiReaderEmphasis;
+  },
+  normalizeTextEmphasis: function(root) {
+    this.emphasis().normalizeTextEmphasis(root, { vertical: this.isVertical() });
+  },
   normalizeReaderText: function(parent) {
     this.domText().normalizeReaderText(this, parent);
   },
@@ -482,6 +492,7 @@ window.hoshiReader.initialize = function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {
+    window.hoshiReader.normalizeTextEmphasis();
     window.hoshiReader.normalizeRubyTextNodes();
     window.hoshiReader.stabilizeRubyAdjacentTextNodes();
     window.hoshiReader.buildNodeOffsets();

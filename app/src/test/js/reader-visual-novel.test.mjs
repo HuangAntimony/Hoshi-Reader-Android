@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
+const readerEmphasisUrl = new URL('../../main/assets/hoshi-web/reader/reader-emphasis.js', import.meta.url);
 const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
 const readerVnRangeMapUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-range-map.js', import.meta.url);
@@ -30,6 +31,10 @@ function readerVnSelectionProjectionSource() {
     return fs.readFileSync(readerVnSelectionProjectionUrl, 'utf8');
 }
 
+function readerEmphasisSource() {
+    return fs.readFileSync(readerEmphasisUrl, 'utf8');
+}
+
 function readerMediaSemanticsSource() {
     return fs.readFileSync(readerMediaSemanticsUrl, 'utf8');
 }
@@ -51,6 +56,7 @@ function readerSelectionSource() {
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_EMPHASIS_SCRIPT__', readerEmphasisSource())
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', readerVnRangeMapSource())
@@ -72,6 +78,7 @@ function readerSource() {
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
+        .replaceAll('__HOSHI_READER_EMPHASIS_SCRIPT__', options.emphasisScript ?? readerEmphasisSource())
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerVnContentStreamSource())
         .replaceAll('__HOSHI_READER_VN_RANGE_MAP_SCRIPT__', options.rangeMapScript ?? readerVnRangeMapSource())

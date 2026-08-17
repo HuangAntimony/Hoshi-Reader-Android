@@ -1,4 +1,5 @@
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
+__HOSHI_READER_EMPHASIS_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__
 __HOSHI_READER_VN_RANGE_MAP_SCRIPT__
@@ -104,6 +105,15 @@ window.hoshiReader = {
   isJapaneseBreakCharacter: function(char) {
     return this.textSemantics().isJapaneseBreakCharacter(char);
   },
+  emphasis: function() {
+    if (!window.hoshiReaderEmphasis) {
+      throw new Error('hoshiReaderEmphasis is required for reader text emphasis normalization');
+    }
+    return window.hoshiReaderEmphasis;
+  },
+  normalizeTextEmphasis: function(root) {
+    this.emphasis().normalizeTextEmphasis(root, { vertical: this.isVertical() });
+  },
   textOffsetForCharCount: function(node, targetCount) {
     var text = node.textContent || '';
     var count = 0;
@@ -180,6 +190,7 @@ window.hoshiReader = {
     if (this.readyPromise) return this.readyPromise;
     this.readyPromise = Promise.resolve(document.fonts && document.fonts.ready)
       .then(() => {
+        this.normalizeTextEmphasis();
         this.detachChapterSource();
         return this.waitForImages();
       })

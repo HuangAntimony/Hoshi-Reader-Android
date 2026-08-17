@@ -111,6 +111,7 @@ internal object ReaderPaginationScripts {
             .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
             .replace("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__", source.readerTextSemantics)
             .replace("__HOSHI_READER_DOM_TEXT_SCRIPT__", source.readerDomText)
+            .replace("__HOSHI_READER_EMPHASIS_SCRIPT__", source.readerEmphasis)
             .replace("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__", source.readerMediaSemantics)
             .replace("__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__", source.readerVnContentStream)
             .replace("__HOSHI_READER_VN_RANGE_MAP_SCRIPT__", source.readerVnRangeMap)
@@ -155,6 +156,7 @@ private data class ReaderPaginationAssetSource(
     val readerSasayaki: String,
     val readerTextSemantics: String,
     val readerDomText: String,
+    val readerEmphasis: String,
     val readerMediaSemantics: String,
     val readerVnContentStream: String,
     val readerVnRangeMap: String,
@@ -171,6 +173,7 @@ private data class ReaderPaginationAssetSource(
                     readerSasayaki = assets.readerSasayakiJs,
                     readerTextSemantics = assets.readerTextSemanticsJs,
                     readerDomText = assets.readerDomTextJs,
+                    readerEmphasis = assets.readerEmphasisJs,
                     readerMediaSemantics = assets.readerMediaSemanticsJs,
                     readerVnContentStream = assets.readerVnContentStreamJs,
                     readerVnRangeMap = assets.readerVnRangeMapJs,
@@ -192,6 +195,7 @@ private object SourceTreeReaderPaginationAssets {
             readerSasayaki = readSourceAsset("hoshi-web/reader/reader-sasayaki.js"),
             readerTextSemantics = readSourceAsset("hoshi-web/reader/reader-text-semantics.js"),
             readerDomText = readSourceAsset("hoshi-web/reader/reader-dom-text.js"),
+            readerEmphasis = readSourceAsset("hoshi-web/reader/reader-emphasis.js"),
             readerMediaSemantics = readSourceAsset("hoshi-web/reader/reader-media-semantics.js"),
             readerVnContentStream = readSourceAsset("hoshi-web/reader/reader-vn-content-stream.js"),
             readerVnRangeMap = readSourceAsset("hoshi-web/reader/reader-vn-range-map.js"),

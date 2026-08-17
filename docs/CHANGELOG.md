@@ -16,6 +16,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Render 傍点 emphasis marks next to their own characters instead of letting the
+  emphasized run take abnormal extra space, keep the marks visible when furigana
+  is hidden, and stop dropping publisher `-epub-text-emphasis` shorthand styling.
 - Keep oversized lookup popup frames fully inside the visible screen so their
   bottom border and all scrollable content remain reachable.
 - Prefer Arial throughout lookup popups before Android's Japanese font fallback
