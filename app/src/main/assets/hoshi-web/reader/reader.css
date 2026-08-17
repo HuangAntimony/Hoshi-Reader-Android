@@ -49,13 +49,17 @@ svg {
     -webkit-column-break-inside: avoid !important;
 }
 __HOSHI_FURIGANA_CSS__
-ruby.hoshi-emphasis {
-    text-decoration-line: none !important;
-}
 ruby.hoshi-emphasis > rt {
-    display: revert !important;
+    display: ruby-text !important;
     font-size: 0.5em !important;
     visibility: visible !important;
+}
+ruby.hoshi-emphasis {
+    display: ruby !important;
+    ruby-position: over !important;
+    text-decoration-line: none !important;
+    white-space: normal !important;
+    word-break: normal !important;
 }
 ruby > rt, ruby > rp {
     -webkit-user-select: none;
