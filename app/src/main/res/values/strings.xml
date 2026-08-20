@@ -392,12 +392,9 @@
     <string name="reader_appearance_horizontal">Horizontal</string>
     <string name="reader_appearance_font" comment="Reader font setting, intentionally matching dictionary custom CSS font.">Font</string>
     <string name="reader_appearance_font_publisher">Publisher Font</string>
-    <string name="reader_appearance_font_system" comment="Font-library section label, intentionally matching the System reader theme label.">System</string>
     <string name="reader_appearance_font_system_serif">System Serif</string>
     <string name="reader_appearance_font_system_sans_serif">System Sans Serif</string>
-    <string name="reader_appearance_font_recommended">Recommended</string>
     <string name="reader_appearance_font_imported">Imported</string>
-    <string name="reader_appearance_font_system_matched">System matched</string>
     <string name="reader_appearance_font_variant">Variant</string>
     <string name="reader_appearance_font_variant_publisher">Determined by publisher</string>
     <string name="reader_appearance_font_variant_format">%1$s (%2$d)</string>

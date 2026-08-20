@@ -1,12 +1,13 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
 class ReaderFontPickerOrganizationTest {
     @Test
-    fun publisherIsStandaloneAndRecommendedFamiliesAreGroupedByType() {
+    fun familyMenuUsesOnlyOneLevelOfVisibleHeadings() {
         val publisher = family("publisher", ReaderFontSource.PUBLISHER, ReaderFontCategory.PUBLISHER)
         val system = family("system", ReaderFontSource.SYSTEM, ReaderFontCategory.SYSTEM)
         val serifA = family("serif-a", ReaderFontSource.RECOMMENDED, ReaderFontCategory.SERIF)
@@ -16,21 +17,52 @@ class ReaderFontPickerOrganizationTest {
         val serifB = family("serif-b", ReaderFontSource.RECOMMENDED, ReaderFontCategory.SERIF)
         val imported = family("imported", ReaderFontSource.USER, ReaderFontCategory.IMPORTED)
 
-        val organization = organizeReaderFontFamilies(
+        val entries = buildReaderFontPickerEntries(
             listOf(imported, sans, publisher, serifA, system, rounded, handwriting, serifB),
         )
 
-        assertSame(publisher, organization.publisher)
-        assertEquals(listOf(system), organization.system)
-        assertEquals(listOf(imported), organization.imported)
         assertEquals(
             listOf(
-                ReaderFontCategory.SERIF to listOf(serifA, serifB),
-                ReaderFontCategory.SANS_SERIF to listOf(sans),
-                ReaderFontCategory.ROUNDED to listOf(rounded),
-                ReaderFontCategory.HANDWRITING to listOf(handwriting),
+                ReaderFontPickerEntry.Family(publisher),
+                ReaderFontPickerEntry.Divider,
+                ReaderFontPickerEntry.Family(system),
+                ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED),
+                ReaderFontPickerEntry.Family(imported),
+                ReaderFontPickerEntry.Divider,
+                ReaderFontPickerEntry.Header(ReaderFontCategory.SERIF),
+                ReaderFontPickerEntry.Family(serifA),
+                ReaderFontPickerEntry.Family(serifB),
+                ReaderFontPickerEntry.Header(ReaderFontCategory.SANS_SERIF),
+                ReaderFontPickerEntry.Family(sans),
+                ReaderFontPickerEntry.Header(ReaderFontCategory.ROUNDED),
+                ReaderFontPickerEntry.Family(rounded),
+                ReaderFontPickerEntry.Header(ReaderFontCategory.HANDWRITING),
+                ReaderFontPickerEntry.Family(handwriting),
             ),
-            organization.recommended.map { it.category to it.families },
+            entries,
+        )
+    }
+
+    @Test
+    fun familyMenuOmitsEmptySectionsAndRedundantDividers() {
+        val system = family("system", ReaderFontSource.SYSTEM, ReaderFontCategory.SYSTEM)
+        val imported = family("imported", ReaderFontSource.USER, ReaderFontCategory.IMPORTED)
+
+        assertEquals(
+            listOf(
+                ReaderFontPickerEntry.Family(system),
+                ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED),
+                ReaderFontPickerEntry.Family(imported),
+            ),
+            buildReaderFontPickerEntries(listOf(imported, system)),
+        )
+    }
+
+    @Test
+    fun importedSectionUsesItsVisibleLocalizedHeading() {
+        assertEquals(
+            R.string.reader_appearance_font_imported,
+            readerFontCategoryStringResource(ReaderFontCategory.IMPORTED),
         )
     }
 

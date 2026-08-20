@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -195,8 +197,8 @@ private fun ReaderAppearanceContent(
     val selectedFontDisplayLabel = readerFontLabel(selectedFontSpec.familyId, selectedFontSpec.displayName)
     val selectedFontFamily = fontUiState.library.families.firstOrNull { it.id == selectedFontSpec.familyId }
     val selectedFontVariant = selectedFontFamily?.variants?.firstOrNull { it.id == selectedFontSpec.variantId }
-    val fontOrganization = remember(fontUiState.library.families) {
-        organizeReaderFontFamilies(fontUiState.library.families)
+    val fontPickerEntries = remember(fontUiState.library.families) {
+        buildReaderFontPickerEntries(fontUiState.library.families)
     }
     val downloadingFamily = fontUiState.download?.let { activeDownload ->
         fontUiState.library.families.firstOrNull { it.id == activeDownload.familyId }
@@ -346,7 +348,7 @@ private fun ReaderAppearanceContent(
                         },
                     ) {
                         ReaderFontFamilyDropdownContent(
-                            organization = fontOrganization,
+                            entries = fontPickerEntries,
                             activeFamilyId = selectedFontSpec.familyId,
                             rememberedVariants = settings.fontVariantSelections,
                             onFamilySelected = { family ->
@@ -1257,6 +1259,9 @@ private fun ReaderFontRow(
                     DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { onMenuExpandedChange(false) },
+                        modifier = Modifier
+                            .widthIn(min = 280.dp)
+                            .heightIn(max = 480.dp),
                         content = menuContent,
                     )
                 }
@@ -1286,69 +1291,29 @@ private enum class ReaderFontDownloadOrigin {
 
 @Composable
 private fun ReaderFontFamilyDropdownContent(
-    organization: ReaderFontPickerOrganization,
+    entries: List<ReaderFontPickerEntry>,
     activeFamilyId: String,
     rememberedVariants: Map<String, String>,
     onFamilySelected: (ReaderFontFamily) -> Unit,
 ) {
-    organization.publisher?.let { family ->
-        ReaderFontDropdownItem(
-            label = readerFontLabel(family.id, family.displayName),
-            selected = family.id == activeFamilyId,
-            downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
-            onClick = { onFamilySelected(family) },
-        )
-    }
-    ReaderFontFamilyDropdownSection(
-        title = stringResource(R.string.reader_appearance_font_system),
-        families = organization.system,
-        activeFamilyId = activeFamilyId,
-        rememberedVariants = rememberedVariants,
-        onFamilySelected = onFamilySelected,
-    )
-    if (organization.recommended.isNotEmpty()) {
-        ReaderFontDropdownHeader(stringResource(R.string.reader_appearance_font_recommended))
-        organization.recommended.forEach { group ->
-            ReaderFontDropdownHeader(
-                title = readerFontCategoryLabel(group.category),
-                category = true,
-            )
-            group.families.forEach { family ->
+    entries.forEach { entry ->
+        when (entry) {
+            is ReaderFontPickerEntry.Family -> {
+                val family = entry.family
                 ReaderFontDropdownItem(
-                    label = family.displayName,
+                    label = readerFontLabel(family.id, family.displayName),
                     selected = family.id == activeFamilyId,
                     downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
                     onClick = { onFamilySelected(family) },
                 )
             }
+            is ReaderFontPickerEntry.Header -> ReaderFontDropdownHeader(
+                stringResource(readerFontCategoryStringResource(entry.category)),
+            )
+            ReaderFontPickerEntry.Divider -> HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
         }
-    }
-    ReaderFontFamilyDropdownSection(
-        title = stringResource(R.string.reader_appearance_font_imported),
-        families = organization.imported,
-        activeFamilyId = activeFamilyId,
-        rememberedVariants = rememberedVariants,
-        onFamilySelected = onFamilySelected,
-    )
-}
-
-@Composable
-private fun ReaderFontFamilyDropdownSection(
-    title: String,
-    families: List<ReaderFontFamily>,
-    activeFamilyId: String,
-    rememberedVariants: Map<String, String>,
-    onFamilySelected: (ReaderFontFamily) -> Unit,
-) {
-    if (families.isEmpty()) return
-    ReaderFontDropdownHeader(title)
-    families.forEach { family ->
-        ReaderFontDropdownItem(
-            label = readerFontLabel(family.id, family.displayName),
-            selected = family.id == activeFamilyId,
-            downloadable = !family.preferredVariant(rememberedVariants[family.id]).isInstalled,
-            onClick = { onFamilySelected(family) },
-        )
     }
 }
 
@@ -1359,9 +1324,6 @@ private fun ReaderFontVariantDropdownContent(
     onVariantSelected: (ReaderFontVariant) -> Unit,
 ) {
     val context = LocalContext.current
-    if (family.source == ReaderFontSource.SYSTEM) {
-        ReaderFontDropdownHeader(stringResource(R.string.reader_appearance_font_system_matched))
-    }
     family.variants.forEach { variant ->
         ReaderFontDropdownItem(
             label = readerFontVariantLabel(variant, variant.weight),
@@ -1383,17 +1345,17 @@ private fun ReaderFontVariantDropdownContent(
 @Composable
 private fun ReaderFontDropdownHeader(
     title: String,
-    category: Boolean = false,
 ) {
     Text(
         text = title,
-        style = if (category) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
         color = LocalContentColor.current,
         modifier = Modifier.padding(
-            start = if (category) 20.dp else 12.dp,
-            top = if (category) 6.dp else 10.dp,
+            start = 12.dp,
+            top = 8.dp,
             end = 12.dp,
-            bottom = 2.dp,
+            bottom = 0.dp,
         ),
     )
 }
@@ -1471,15 +1433,6 @@ private fun ReaderFontDownloadStatus(
             Text(stringResource(R.string.action_cancel))
         }
     }
-}
-
-@Composable
-private fun readerFontCategoryLabel(category: ReaderFontCategory): String = when (category) {
-    ReaderFontCategory.SERIF -> stringResource(R.string.reader_appearance_font_category_serif)
-    ReaderFontCategory.SANS_SERIF -> stringResource(R.string.reader_appearance_font_category_sans)
-    ReaderFontCategory.ROUNDED -> stringResource(R.string.reader_appearance_font_category_rounded)
-    ReaderFontCategory.HANDWRITING -> stringResource(R.string.reader_appearance_font_category_handwriting)
-    else -> ""
 }
 
 private fun formatFontBytes(context: android.content.Context, bytes: Long): String =
