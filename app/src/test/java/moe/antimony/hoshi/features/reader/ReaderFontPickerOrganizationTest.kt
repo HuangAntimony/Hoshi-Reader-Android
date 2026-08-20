@@ -26,6 +26,7 @@ class ReaderFontPickerOrganizationTest {
                 ReaderFontPickerEntry.Family(publisher),
                 ReaderFontPickerEntry.Divider,
                 ReaderFontPickerEntry.Family(system),
+                ReaderFontPickerEntry.Divider,
                 ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED),
                 ReaderFontPickerEntry.Family(imported),
                 ReaderFontPickerEntry.Divider,
@@ -51,6 +52,7 @@ class ReaderFontPickerOrganizationTest {
         assertEquals(
             listOf(
                 ReaderFontPickerEntry.Family(system),
+                ReaderFontPickerEntry.Divider,
                 ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED),
                 ReaderFontPickerEntry.Family(imported),
             ),

@@ -19,15 +19,6 @@ internal fun buildReaderFontPickerEntries(
     val recommended = families.filter { it.source == ReaderFontSource.RECOMMENDED }
     val imported = families.filter { it.source == ReaderFontSource.USER }
 
-    publisher?.let { add(ReaderFontPickerEntry.Family(it)) }
-    if (publisher != null && system.isNotEmpty()) add(ReaderFontPickerEntry.Divider)
-    system.forEach { add(ReaderFontPickerEntry.Family(it)) }
-
-    if (imported.isNotEmpty()) {
-        add(ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED))
-        imported.forEach { add(ReaderFontPickerEntry.Family(it)) }
-    }
-
     val recommendedCategoryOrder = listOf(
         ReaderFontCategory.SERIF,
         ReaderFontCategory.SANS_SERIF,
@@ -39,7 +30,21 @@ internal fun buildReaderFontPickerEntries(
             .takeIf(List<ReaderFontFamily>::isNotEmpty)
             ?.let { category to it }
     }
-    if ((publisher != null || system.isNotEmpty() || imported.isNotEmpty()) && recommendedGroups.isNotEmpty()) {
+
+    publisher?.let { add(ReaderFontPickerEntry.Family(it)) }
+    if (publisher != null && system.isNotEmpty()) add(ReaderFontPickerEntry.Divider)
+    system.forEach { add(ReaderFontPickerEntry.Family(it)) }
+    if (system.isNotEmpty() && (imported.isNotEmpty() || recommendedGroups.isNotEmpty())) {
+        add(ReaderFontPickerEntry.Divider)
+    }
+
+    if (imported.isNotEmpty()) {
+        add(ReaderFontPickerEntry.Header(ReaderFontCategory.IMPORTED))
+        imported.forEach { add(ReaderFontPickerEntry.Family(it)) }
+    }
+
+    val needsDividerBeforeRecommended = imported.isNotEmpty() || (system.isEmpty() && publisher != null)
+    if (recommendedGroups.isNotEmpty() && needsDividerBeforeRecommended) {
         add(ReaderFontPickerEntry.Divider)
     }
     recommendedGroups.forEach { (category, categoryFamilies) ->
