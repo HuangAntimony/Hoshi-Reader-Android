@@ -3,6 +3,7 @@ package moe.antimony.hoshi.dictionary
 import de.manhhao.hoshi.DictionaryStyle
 import de.manhhao.hoshi.HoshiDicts
 import de.manhhao.hoshi.LookupResult
+import de.manhhao.hoshi.KanjiResult
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,6 +14,7 @@ internal data class NativeDictionaryImportResult(
     val metaCount: Long,
     val freqCount: Long,
     val pitchCount: Long,
+    val kanjiCount: Long = 0,
     val mediaCount: Long,
 )
 
@@ -28,9 +30,12 @@ internal interface DictionaryNativeBridge {
         termPaths: Array<String>,
         freqPaths: Array<String>,
         pitchPaths: Array<String>,
+        kanjiPaths: Array<String>,
     ) = Unit
 
     fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): List<LookupResult> = emptyList()
+
+    fun queryKanji(session: Long, kanji: String): KanjiResult = KanjiResult(kanji, emptyArray())
 
     fun getStyles(session: Long): List<DictionaryStyle> = emptyList()
 
@@ -48,6 +53,7 @@ internal class HoshiDictionaryNativeBridge @Inject constructor() : DictionaryNat
                 metaCount = result.metaCount,
                 freqCount = result.freqCount,
                 pitchCount = result.pitchCount,
+                kanjiCount = result.kanjiCount,
                 mediaCount = result.mediaCount,
             )
         }
@@ -64,12 +70,16 @@ internal class HoshiDictionaryNativeBridge @Inject constructor() : DictionaryNat
         termPaths: Array<String>,
         freqPaths: Array<String>,
         pitchPaths: Array<String>,
+        kanjiPaths: Array<String>,
     ) {
-        HoshiDicts.rebuildQuery(session, termPaths, freqPaths, pitchPaths)
+        HoshiDicts.rebuildQuery(session, termPaths, freqPaths, pitchPaths, kanjiPaths)
     }
 
     override fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): List<LookupResult> =
         HoshiDicts.lookup(session, text, maxResults, scanLength).toList()
+
+    override fun queryKanji(session: Long, kanji: String): KanjiResult =
+        HoshiDicts.queryKanji(session, kanji)
 
     override fun getStyles(session: Long): List<DictionaryStyle> =
         HoshiDicts.getStyles(session).toList()

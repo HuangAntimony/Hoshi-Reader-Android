@@ -784,6 +784,7 @@ private val DictionaryType.displayNameRes: Int
         DictionaryType.Term -> R.string.dictionary_type_term
         DictionaryType.Frequency -> R.string.dictionary_type_frequency
         DictionaryType.Pitch -> R.string.dictionary_type_pitch
+        DictionaryType.Kanji -> R.string.dictionary_type_kanji
     }
 
 private enum class DictionarySwipeRevealValue {

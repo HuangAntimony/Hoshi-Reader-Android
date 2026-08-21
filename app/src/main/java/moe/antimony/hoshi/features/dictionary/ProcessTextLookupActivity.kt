@@ -425,6 +425,24 @@ private fun ProcessTextLookupOverlay(
                     }
                     replyIframeMessage(message.popupId, messageId, results.size.toString())
                 }
+                is ReaderLookupPopupBridgeMessage.KanjiRedirect -> {
+                    val messageId = message.messageId ?: return
+                    val result = dependencies.dictionaryRepository.lookupKanji(message.kanji)
+                    replyIframeMessage(
+                        message.popupId,
+                        messageId,
+                        if (result.entries.isEmpty()) "null" else LookupPopupHtml.kanjiJsonString(result),
+                    )
+                }
+                is ReaderLookupPopupBridgeMessage.KanjiRedirectCommitted -> {
+                    val current = popupHistories[message.popupId] ?: ReaderPopupHistoryCounts()
+                    popupHistories = popupHistories + (
+                        message.popupId to current.copy(
+                            backCount = current.backCount + 1,
+                            forwardCount = 0,
+                        )
+                    )
+                }
                 is ReaderLookupPopupBridgeMessage.GetEntry -> {
                     val entry = popupById(message.popupId)?.state?.results?.getOrNull(message.index)
                     replyIframeMessage(

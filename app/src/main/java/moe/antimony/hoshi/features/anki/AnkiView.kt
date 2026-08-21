@@ -36,10 +36,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -67,6 +71,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryType
+import moe.antimony.hoshi.dictionary.DictionaryCategory
+import moe.antimony.hoshi.features.dictionary.DictionaryViewModel
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
@@ -373,6 +379,11 @@ fun AnkiCardFormatView(
 fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val dictionaryViewModel: DictionaryViewModel = hiltViewModel()
+    val dictionaryUiState by dictionaryViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        dictionaryViewModel.reload()
+    }
     SettingsDetailScaffold(title = stringResource(R.string.settings_advanced), onClose = onClose, modifier = modifier) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
             item { AnkiCard {
@@ -389,9 +400,48 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 AnkiDivider()
                 AnkiSwitchRow(stringResource(R.string.anki_show_all_handlebars), checked = uiState.settings.showAllHandlebars, onCheckedChange = viewModel::updateShowAllHandlebars)
             } }
+            item {
+                Text(
+                    text = stringResource(R.string.anki_categorize_dictionaries),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                )
+            }
+            items(
+                items = dictionaryUiState.dictionaries[DictionaryType.Term].orEmpty(),
+                key = { dictionary -> dictionary.path.name },
+            ) { dictionary ->
+                AnkiCard {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(dictionary.index.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
+                            DictionaryCategory.entries.forEachIndexed { index, category ->
+                                SegmentedButton(
+                                    selected = dictionary.category == category,
+                                    onClick = { dictionaryViewModel.setDictionaryCategory(dictionary, category) },
+                                    shape = SegmentedButtonDefaults.itemShape(index, DictionaryCategory.entries.size),
+                                    icon = {},
+                                ) {
+                                    Text(stringResource(category.labelRes), maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
+
+private val DictionaryCategory.labelRes: Int
+    get() = when (this) {
+        DictionaryCategory.None -> R.string.dictionary_category_none
+        DictionaryCategory.Monolingual -> R.string.dictionary_category_monolingual
+        DictionaryCategory.Bilingual -> R.string.dictionary_category_bilingual
+        DictionaryCategory.Exclude -> R.string.dictionary_category_exclude
+    }
 
 @Composable
 private fun AnkiFormatIconView(icon: AnkiFormatIcon) {

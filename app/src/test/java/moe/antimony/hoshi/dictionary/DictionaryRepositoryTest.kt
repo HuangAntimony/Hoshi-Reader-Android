@@ -36,6 +36,7 @@ class DictionaryRepositoryTest {
         writeDictionary(storage.typeDirectory(DictionaryType.Term), "Second", "Second")
         writeDictionary(storage.typeDirectory(DictionaryType.Frequency), "Freq", "Freq")
         writeDictionary(storage.typeDirectory(DictionaryType.Pitch), "Pitch", "Pitch")
+        writeDictionary(storage.typeDirectory(DictionaryType.Kanji), "KANJIDIC", "KANJIDIC")
 
         repository.setDictionaryEnabled(DictionaryType.Term, "Second", enabled = false)
 
@@ -46,11 +47,47 @@ class DictionaryRepositoryTest {
         assertEquals(listOf(filesDir.resolve("Dictionaries/Term/First").absolutePath), bridge.termPaths.toList())
         assertEquals(listOf(filesDir.resolve("Dictionaries/Frequency/Freq").absolutePath), bridge.freqPaths.toList())
         assertEquals(listOf(filesDir.resolve("Dictionaries/Pitch/Pitch").absolutePath), bridge.pitchPaths.toList())
+        assertEquals(listOf(filesDir.resolve("Dictionaries/Kanji/KANJIDIC").absolutePath), bridge.kanjiPaths.toList())
+
+        repository.setDictionaryCategory("First", DictionaryCategory.Exclude)
+
+        assertEquals(emptyList<String>(), bridge.termPaths.toList())
+        assertEquals(DictionaryCategory.Exclude, repository.loadDictionaries(DictionaryType.Term).first { it.path.name == "First" }.category)
 
         repository.deleteDictionary(DictionaryType.Frequency, "Freq")
 
         assertEquals(emptyList<String>(), repository.loadDictionaries(DictionaryType.Frequency).map { it.path.name })
         assertEquals(emptyList<String>(), bridge.freqPaths.toList())
+    }
+
+    @Test
+    fun failedCategoryRebuildRollsBackPersistedCategoryAndKeepsCurrentLookupSession() {
+        val filesDir = temporaryFolder.newFolder("category-rollback-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val bridge = RecordingDictionaryNativeBridge()
+        val repository = DictionaryRepository(
+            filesDir,
+            storage,
+            DictionaryImportDataSource(bridge),
+            DictionaryLookupQueryService(bridge),
+        )
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), "First", "First")
+        storage.saveConfigFromStorage()
+        repository.rebuildLookupQuery()
+        bridge.failNextRebuild = true
+
+        assertThrows(IllegalStateException::class.java) {
+            repository.setDictionaryCategory("First", DictionaryCategory.Exclude)
+        }
+
+        assertEquals(
+            DictionaryCategory.None,
+            repository.loadDictionaries(DictionaryType.Term).single().category,
+        )
+        assertEquals(
+            listOf(filesDir.resolve("Dictionaries/Term/First").absolutePath),
+            bridge.termPaths.toList(),
+        )
     }
 
     @Test
@@ -132,7 +169,12 @@ class DictionaryRepositoryTest {
             DictionaryConfig(
                 termDictionaries = listOf(
                     DictionaryConfig.DictionaryEntry("First", isEnabled = true, order = 0),
-                    DictionaryConfig.DictionaryEntry(installedIndex.title, isEnabled = true, order = 1),
+                    DictionaryConfig.DictionaryEntry(
+                        installedIndex.title,
+                        isEnabled = true,
+                        order = 1,
+                        category = DictionaryCategory.Monolingual,
+                    ),
                     DictionaryConfig.DictionaryEntry("Third", isEnabled = true, order = 2),
                 ),
                 frequencyDictionaries = emptyList(),
@@ -164,6 +206,7 @@ class DictionaryRepositoryTest {
         assertEquals(listOf("First", remoteIndex.title, "Third"), updated.map { it.index.title })
         assertEquals(listOf(true, false, true), updated.map { it.isEnabled })
         assertEquals(listOf(0, 1, 2), updated.map { it.order })
+        assertEquals(DictionaryCategory.Monolingual, updated[1].category)
         assertEquals(
             listOf(
                 filesDir.resolve("Dictionaries/Term/First").absolutePath,
@@ -199,12 +242,14 @@ class DictionaryRepositoryTest {
         )
         writeDictionary(storage.typeDirectory(DictionaryType.Term), installedIndex.title, installedIndex)
         storage.saveConfigFromStorage()
+        repository.setDictionaryCategory(installedIndex.title, DictionaryCategory.Bilingual)
         val disabledProfile = profileRepository.createProfile(
             name = "Second",
             dictionaryLanguageId = ContentLanguageProfile.JapaneseLanguageId,
         )
         profileRepository.activateGlobal(disabledProfile.id)
         repository.setDictionaryEnabled(DictionaryType.Term, installedIndex.title, enabled = false)
+        repository.setDictionaryCategory(installedIndex.title, DictionaryCategory.Exclude)
         profileRepository.activateGlobal(ProfileRepository.DefaultProfileId)
 
         val summary = repository.updateDictionaries()
@@ -212,11 +257,13 @@ class DictionaryRepositoryTest {
         assertEquals(1, summary.updatedCount)
         assertEquals(listOf(remoteIndex.title), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
         assertEquals(listOf(true), repository.loadDictionaries(DictionaryType.Term).map { it.isEnabled })
+        assertEquals(listOf(DictionaryCategory.Bilingual), repository.loadDictionaries(DictionaryType.Term).map { it.category })
 
         profileRepository.activateGlobal(disabledProfile.id)
         val disabledProfileDictionaries = repository.loadDictionaries(DictionaryType.Term)
         assertEquals(listOf(remoteIndex.title), disabledProfileDictionaries.map { it.index.title })
         assertEquals(listOf(false), disabledProfileDictionaries.map { it.isEnabled })
+        assertEquals(listOf(DictionaryCategory.Exclude), disabledProfileDictionaries.map { it.category })
     }
 
     @Test
@@ -540,6 +587,7 @@ class DictionaryRepositoryTest {
                 metaCount = 0,
                 freqCount = 3,
                 pitchCount = 2,
+                kanjiCount = 4,
                 mediaCount = 0,
             ),
         )
@@ -558,10 +606,12 @@ class DictionaryRepositoryTest {
         assertEquals(listOf("Mixed"), repository.loadDictionaries(DictionaryType.Term).map { it.index.title })
         assertEquals(listOf("Mixed"), repository.loadDictionaries(DictionaryType.Frequency).map { it.index.title })
         assertEquals(listOf("Mixed"), repository.loadDictionaries(DictionaryType.Pitch).map { it.index.title })
+        assertEquals(listOf("Mixed"), repository.loadDictionaries(DictionaryType.Kanji).map { it.index.title })
         assertEquals(listOf(true), bridge.lowRamModes)
         assertEquals(listOf(filesDir.resolve("Dictionaries/Term/Mixed").absolutePath), bridge.termPaths.toList())
         assertEquals(listOf(filesDir.resolve("Dictionaries/Frequency/Mixed").absolutePath), bridge.freqPaths.toList())
         assertEquals(listOf(filesDir.resolve("Dictionaries/Pitch/Mixed").absolutePath), bridge.pitchPaths.toList())
+        assertEquals(listOf(filesDir.resolve("Dictionaries/Kanji/Mixed").absolutePath), bridge.kanjiPaths.toList())
     }
 
     @Test
@@ -790,9 +840,12 @@ class DictionaryRepositoryTest {
             private set
         var pitchPaths: Array<String> = emptyArray()
             private set
+        var kanjiPaths: Array<String> = emptyArray()
+            private set
         val lowRamModes = mutableListOf<Boolean>()
         var rebuildCount = 0
             private set
+        var failNextRebuild = false
 
         override fun importDictionary(zipPath: String, outputDir: String, lowRam: Boolean): NativeDictionaryImportResult {
             lowRamModes += lowRam
@@ -812,11 +865,17 @@ class DictionaryRepositoryTest {
             termPaths: Array<String>,
             freqPaths: Array<String>,
             pitchPaths: Array<String>,
+            kanjiPaths: Array<String>,
         ) {
             rebuildCount += 1
+            if (failNextRebuild) {
+                failNextRebuild = false
+                error("Unable to rebuild query.")
+            }
             this.termPaths = termPaths
             this.freqPaths = freqPaths
             this.pitchPaths = pitchPaths
+            this.kanjiPaths = kanjiPaths
         }
     }
 }

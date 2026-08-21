@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryInfo
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.DictionaryUpdateCandidate
@@ -43,6 +44,7 @@ internal interface DictionaryViewModelRepository {
     )
     suspend fun updateDictionaries(onProgress: (DictionaryUpdateProgress) -> Unit): DictionaryUpdateSummary
     suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean
+    suspend fun setDictionaryCategory(fileName: String, category: DictionaryCategory): Boolean
     suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean
     suspend fun moveDictionary(type: DictionaryType, fromIndex: Int, toIndex: Int): Boolean
     suspend fun rebuildLookupQuery()
@@ -141,6 +143,13 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
             true
         } ?: false
 
+    override suspend fun setDictionaryCategory(fileName: String, category: DictionaryCategory): Boolean =
+        mutationCoordinator.runExclusiveQueued(DictionaryMutationOperation.Edit) {
+            dictionaryRepository.setDictionaryCategory(fileName, category)
+            markDictionariesChanged()
+            true
+        }
+
     override suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean =
         mutationCoordinator.runExclusive(DictionaryMutationOperation.Edit) {
             dictionaryRepository.deleteDictionary(type, fileName)
@@ -173,6 +182,9 @@ internal class DictionaryViewModel : ViewModel {
     private val ioDispatcher: CoroutineDispatcher
     private val injectedScope: CoroutineScope?
     private var lastCompletedChangeVersion = 0L
+    private val categoryQueueLock = Any()
+    private val pendingCategoryChanges = linkedMapOf<String, DictionaryCategory>()
+    private var categoryWorkerRunning = false
     private val scope: CoroutineScope
         get() = injectedScope ?: viewModelScope
 
@@ -393,6 +405,56 @@ internal class DictionaryViewModel : ViewModel {
         }
     }
 
+    fun setDictionaryCategory(dictionary: DictionaryInfo, category: DictionaryCategory) {
+        _uiState.update { state ->
+            val terms = state.dictionaries[DictionaryType.Term].orEmpty()
+            state.copy(
+                dictionaries = state.dictionaries + (
+                    DictionaryType.Term to terms.map { current ->
+                        if (current.path.name == dictionary.path.name) current.copy(category = category) else current
+                    }
+                ),
+            )
+        }
+        val shouldStartWorker = synchronized(categoryQueueLock) {
+            pendingCategoryChanges[dictionary.path.name] = category
+            if (categoryWorkerRunning) {
+                false
+            } else {
+                categoryWorkerRunning = true
+                true
+            }
+        }
+        if (shouldStartWorker) {
+            scope.launch { drainDictionaryCategoryChanges() }
+        }
+    }
+
+    private suspend fun drainDictionaryCategoryChanges() {
+        while (true) {
+            val change = synchronized(categoryQueueLock) {
+                val first = pendingCategoryChanges.entries.firstOrNull()
+                if (first == null) {
+                    categoryWorkerRunning = false
+                    null
+                } else {
+                    (first.key to first.value).also { pendingCategoryChanges.remove(first.key) }
+                }
+            } ?: return
+            val result = runCatching {
+                withContext(ioDispatcher) {
+                    repository.setDictionaryCategory(change.first, change.second)
+                }
+            }
+            if (result.getOrDefault(false)) continue
+
+            _uiState.update {
+                it.copy(errorMessage = UiText.Resource(R.string.dictionary_category_update_failed))
+            }
+            reloadDictionaryLists(clearError = false)
+        }
+    }
+
     fun deleteDictionary(dictionary: DictionaryInfo) {
         val type = _uiState.value.selectedType
         scope.launch {
@@ -436,11 +498,13 @@ internal class DictionaryViewModel : ViewModel {
     }
 
     private suspend fun reloadDictionaries(clearError: Boolean) {
+        withContext(ioDispatcher) { repository.rebuildLookupQuery() }
+        reloadDictionaryLists(clearError)
+    }
+
+    private suspend fun reloadDictionaryLists(clearError: Boolean) {
         val (dictionaries, updatableDictionaries) = withContext(ioDispatcher) {
-            val dictionaries = repository.loadDictionaries().also {
-                repository.rebuildLookupQuery()
-            }
-            dictionaries to repository.updatableDictionaries()
+            repository.loadDictionaries() to repository.updatableDictionaries()
         }
         _uiState.update { state ->
             state.copy(

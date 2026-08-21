@@ -12,6 +12,7 @@ object DictionaryManager {
             result += stored.copy(
                 isEnabled = config.isEnabled,
                 order = config.order,
+                category = config.category,
             )
         }
 
@@ -47,6 +48,7 @@ object DictionaryManager {
                 fileName = dictionary.path.name,
                 isEnabled = dictionary.isEnabled,
                 order = index,
+                category = dictionary.category,
             )
         }
 }

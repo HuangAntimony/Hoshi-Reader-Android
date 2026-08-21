@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 90
 
     env:
-      CMAKE_VERSION: "3.22.1"
+      CMAKE_VERSION: "3.31.6"
       NDK_VERSION: "29.0.14206865"
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}

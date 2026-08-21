@@ -255,6 +255,17 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         val query: String,
     ) : ReaderLookupPopupBridgeMessage()
 
+    data class KanjiRedirect(
+        override val popupId: String,
+        override val messageId: String?,
+        val kanji: String,
+    ) : ReaderLookupPopupBridgeMessage()
+
+    data class KanjiRedirectCommitted(
+        override val popupId: String,
+        override val messageId: String?,
+    ) : ReaderLookupPopupBridgeMessage()
+
     data class GetEntry(
         override val popupId: String,
         override val messageId: String?,
@@ -358,6 +369,15 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                     popupId = popupId,
                     messageId = messageId ?: return null,
                     query = payload.string("body") ?: return null,
+                )
+                "kanjiRedirect" -> KanjiRedirect(
+                    popupId = popupId,
+                    messageId = messageId ?: return null,
+                    kanji = payload.string("body")?.takeIf { it.codePointCount(0, it.length) == 1 } ?: return null,
+                )
+                "kanjiRedirectCommitted" -> KanjiRedirectCommitted(
+                    popupId = popupId,
+                    messageId = messageId,
                 )
                 "getEntry" -> GetEntry(
                     popupId = popupId,

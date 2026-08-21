@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryIndex
 import moe.antimony.hoshi.dictionary.DictionaryInfo
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 import moe.antimony.hoshi.dictionary.DictionaryRename
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.dictionary.DictionaryType
@@ -64,6 +65,66 @@ class DictionaryViewModelTest {
 
         assertEquals(DictionaryType.Frequency, viewModel.uiState.value.selectedType)
         assertEquals(listOf(frequency), viewModel.uiState.value.currentDictionaries)
+    }
+
+    @Test
+    fun setDictionaryCategoryPersistsTermCategoryAndRefreshesState() {
+        val term = dictionary("term", "JMdict")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(term)),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+
+        repository.onCategory = { category ->
+            repository.dictionaries = mapOf(
+                DictionaryType.Term to listOf(term.copy(category = category)),
+            )
+            true
+        }
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Exclude)
+
+        assertEquals(listOf("term:Exclude"), repository.categoryCalls)
+        assertEquals(DictionaryCategory.Exclude, viewModel.uiState.value.currentDictionaries.single().category)
+    }
+
+    @Test
+    fun rapidDictionaryCategoryChangesPersistTheLatestIntent() {
+        val term = dictionary("term", "JMdict")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(term)),
+        )
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var mutationActive = false
+        var persistedCategory = DictionaryCategory.None
+        repository.onCategory = { category ->
+            if (mutationActive) {
+                false
+            } else {
+                mutationActive = true
+                if (category == DictionaryCategory.Monolingual) {
+                    firstEntered.complete(Unit)
+                    releaseFirst.await()
+                }
+                persistedCategory = category
+                repository.dictionaries = mapOf(
+                    DictionaryType.Term to listOf(term.copy(category = category)),
+                )
+                mutationActive = false
+                true
+            }
+        }
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Monolingual)
+        assertTrue(firstEntered.isCompleted)
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Exclude)
+        releaseFirst.complete(Unit)
+
+        assertEquals(DictionaryCategory.Exclude, persistedCategory)
+        assertEquals(DictionaryCategory.Exclude, viewModel.uiState.value.currentDictionaries.single().category)
     }
 
     @Test
@@ -634,10 +695,12 @@ private class FakeDictionaryRepository(
     var loadDictionariesCount = 0
     var onImport: (() -> Unit)? = null
     var onMove: (suspend () -> Unit)? = null
+    var onCategory: (suspend (DictionaryCategory) -> Boolean)? = null
     var onUpdate: (suspend ((DictionaryUpdateProgress) -> Unit) -> DictionaryUpdateSummary)? = null
     val enabledCalls = mutableListOf<String>()
     val deleteCalls = mutableListOf<String>()
     val moveCalls = mutableListOf<Pair<DictionaryType, Pair<Int, Int>>>()
+    val categoryCalls = mutableListOf<String>()
     val importedItems = mutableListOf<DictionaryImportItem>()
     val progressMessages = mutableListOf<String?>()
     val importedRecommendedDictionaries = mutableListOf<RecommendedDictionary>()
@@ -714,6 +777,13 @@ private class FakeDictionaryRepository(
         enabledCalls += "$fileName:$enabled"
         publishCompletedChange()
         return true
+    }
+
+    override suspend fun setDictionaryCategory(fileName: String, category: DictionaryCategory): Boolean {
+        categoryCalls += "$fileName:$category"
+        val changed = onCategory?.invoke(category) ?: true
+        if (changed) publishCompletedChange()
+        return changed
     }
 
     override suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean {

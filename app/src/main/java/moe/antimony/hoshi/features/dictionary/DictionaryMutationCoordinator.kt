@@ -56,6 +56,21 @@ internal class DictionaryMutationCoordinator @Inject constructor() {
         block: suspend DictionaryMutationSession.() -> T,
     ): T? {
         if (!mutex.tryLock()) return null
+        return runLocked(operation, block)
+    }
+
+    suspend fun <T> runExclusiveQueued(
+        operation: DictionaryMutationOperation,
+        block: suspend DictionaryMutationSession.() -> T,
+    ): T {
+        mutex.lock()
+        return runLocked(operation, block)
+    }
+
+    private suspend fun <T> runLocked(
+        operation: DictionaryMutationOperation,
+        block: suspend DictionaryMutationSession.() -> T,
+    ): T {
         val session = DictionaryMutationSession { transform ->
             _state.update(transform)
         }

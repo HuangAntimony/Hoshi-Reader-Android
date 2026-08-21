@@ -70,11 +70,22 @@ internal class DictionaryStorageDataSource(
             DictionaryManager.moveDictionaries(loadDictionaries(type), fromIndex, toIndex)
         }
 
+    fun configWithDictionaryCategory(
+        fileName: String,
+        category: DictionaryCategory,
+    ): DictionaryConfig =
+        currentConfig().copyForType(DictionaryType.Term) { entries ->
+            entries.map { entry ->
+                if (entry.fileName == fileName) entry.copy(category = category) else entry
+            }
+        }
+
     fun configWithImportedDictionaryReplacing(
         type: DictionaryType,
         replacementFileName: String,
         enabled: Boolean,
         order: Int,
+        category: DictionaryCategory,
     ): DictionaryConfig =
         currentConfig().copyForType(type) {
             val dictionaries = loadDictionaries(type)
@@ -84,12 +95,16 @@ internal class DictionaryStorageDataSource(
             val ordered = dictionaries
                 .filterNot { dictionary -> dictionary.path.name == replacementFileName }
                 .toMutableList()
-            ordered.add(order.coerceIn(0, ordered.size), replacement.copy(isEnabled = enabled))
+            ordered.add(
+                order.coerceIn(0, ordered.size),
+                replacement.copy(isEnabled = enabled, category = category),
+            )
             ordered.mapIndexed { index, dictionary ->
                 DictionaryConfig.DictionaryEntry(
                     fileName = dictionary.path.name,
                     isEnabled = if (dictionary.path.name == replacementFileName) enabled else dictionary.isEnabled,
                     order = index,
+                    category = dictionary.category,
                 )
             }
         }
@@ -100,10 +115,11 @@ internal class DictionaryStorageDataSource(
         replacementFileName: String,
         enabled: Boolean,
         order: Int,
+        category: DictionaryCategory,
     ) {
         val profiles = profileRepository?.state?.value?.profiles
         if (profiles == null) {
-            saveConfig(configWithImportedDictionaryReplacing(type, replacementFileName, enabled, order))
+            saveConfig(configWithImportedDictionaryReplacing(type, replacementFileName, enabled, order, category))
             return
         }
 
@@ -197,6 +213,11 @@ internal class DictionaryStorageDataSource(
             configFile = configFile,
             unconfiguredDictionariesEnabled = unconfiguredDictionariesEnabled,
         ),
+        kanjiDictionaries = configEntries(
+            type = DictionaryType.Kanji,
+            configFile = configFile,
+            unconfiguredDictionariesEnabled = unconfiguredDictionariesEnabled,
+        ),
     )
 
     private fun configEntries(
@@ -209,7 +230,12 @@ internal class DictionaryStorageDataSource(
             configFile = configFile,
             unconfiguredDictionariesEnabled = unconfiguredDictionariesEnabled,
         ).mapIndexed { index, dictionary ->
-            DictionaryConfig.DictionaryEntry(dictionary.path.name, dictionary.isEnabled, index)
+            DictionaryConfig.DictionaryEntry(
+                fileName = dictionary.path.name,
+                isEnabled = dictionary.isEnabled,
+                order = index,
+                category = dictionary.category,
+            )
         }
 
     private fun loadDictionaries(
@@ -255,6 +281,7 @@ private val EmptyDictionaryConfig = DictionaryConfig(
     termDictionaries = emptyList(),
     frequencyDictionaries = emptyList(),
     pitchDictionaries = emptyList(),
+    kanjiDictionaries = emptyList(),
 )
 
 private fun DictionaryConfig.entriesForType(type: DictionaryType): List<DictionaryConfig.DictionaryEntry> =
@@ -262,6 +289,7 @@ private fun DictionaryConfig.entriesForType(type: DictionaryType): List<Dictiona
         DictionaryType.Term -> termDictionaries
         DictionaryType.Frequency -> frequencyDictionaries
         DictionaryType.Pitch -> pitchDictionaries
+        DictionaryType.Kanji -> kanjiDictionaries
     }
 
 private fun DictionaryConfig.copyForType(
@@ -271,6 +299,7 @@ private fun DictionaryConfig.copyForType(
     DictionaryType.Term -> copy(termDictionaries = transform(termDictionaries))
     DictionaryType.Frequency -> copy(frequencyDictionaries = transform(frequencyDictionaries))
     DictionaryType.Pitch -> copy(pitchDictionaries = transform(pitchDictionaries))
+    DictionaryType.Kanji -> copy(kanjiDictionaries = transform(kanjiDictionaries))
 }
 
 private fun DictionaryConfig.withUpdatedDictionaryReplacement(

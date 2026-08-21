@@ -230,4 +230,5 @@ private fun NativeDictionaryImportResult.detectedTypes(): Set<DictionaryType> =
         if (termCount > 0) add(DictionaryType.Term)
         if (freqCount > 0) add(DictionaryType.Frequency)
         if (pitchCount > 0) add(DictionaryType.Pitch)
+        if (kanjiCount > 0) add(DictionaryType.Kanji)
     }

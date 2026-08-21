@@ -247,6 +247,13 @@
     <string name="dictionary_type_term">词条</string>
     <string name="dictionary_type_frequency">词频</string>
     <string name="dictionary_type_pitch">音调</string>
+    <string name="dictionary_type_kanji">汉字</string>
+    <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">无</string>
+    <string name="dictionary_category_monolingual">单语</string>
+    <string name="dictionary_category_bilingual">双语</string>
+    <string name="dictionary_category_exclude">排除</string>
+    <string name="dictionary_category_update_failed">更新辞典分类失败。</string>
+    <string name="anki_categorize_dictionaries">辞典分类</string>
     <string name="dictionary_custom_css">自定义 CSS</string>
     <string name="dictionary_import_action">导入辞典</string>
     <string name="dictionary_delete_action">删除辞典</string>

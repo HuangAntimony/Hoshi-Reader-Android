@@ -7,6 +7,7 @@ class ImportResult(
     val metaCount: Long,
     val freqCount: Long,
     val pitchCount: Long,
+    val kanjiCount: Long,
     val mediaCount: Long,
 )
 
@@ -32,10 +33,36 @@ class FrequencyEntry(
     val frequencies: Array<Frequency>,
 )
 
+class Pitch(
+    val position: Int,
+    val pattern: String,
+    val nasal: IntArray,
+    val devoice: IntArray,
+)
+
 class PitchEntry(
     val dictName: String,
-    val pitchPositions: IntArray,
+    val pitches: Array<Pitch>,
     val transcriptions: Array<String>,
+)
+
+class KanjiStat(
+    val key: String,
+    val value: String,
+)
+
+class KanjiEntry(
+    val dictName: String,
+    val onyomi: String,
+    val kunyomi: String,
+    val tags: String,
+    val definitions: Array<String>,
+    val stats: Array<KanjiStat>,
+)
+
+class KanjiResult(
+    val character: String,
+    val entries: Array<KanjiEntry>,
 )
 
 class TermResult(
@@ -84,9 +111,11 @@ object HoshiDicts {
         termPaths: Array<String>,
         freqPaths: Array<String>,
         pitchPaths: Array<String>,
+        kanjiPaths: Array<String>,
     )
 
     external fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): Array<LookupResult>
+    external fun queryKanji(session: Long, kanji: String): KanjiResult
     external fun getStyles(session: Long): Array<DictionaryStyle>
     external fun getMediaFile(session: Long, dictName: String, mediaPath: String): ByteArray?
 }

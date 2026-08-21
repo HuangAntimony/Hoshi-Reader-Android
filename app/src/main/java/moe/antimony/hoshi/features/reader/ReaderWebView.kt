@@ -801,6 +801,23 @@ fun ReaderWebView(
                 }
                 replyReaderPopupMessage(message.popupId, message.messageId ?: return, results.size.toString())
             }
+            is ReaderLookupPopupBridgeMessage.KanjiRedirect -> {
+                val result = dictionaryRepository.lookupKanji(message.kanji)
+                replyReaderPopupMessage(
+                    message.popupId,
+                    message.messageId ?: return,
+                    if (result.entries.isEmpty()) "null" else LookupPopupHtml.kanjiJsonString(result),
+                )
+            }
+            is ReaderLookupPopupBridgeMessage.KanjiRedirectCommitted -> {
+                val current = readerPopupHistories[message.popupId] ?: ReaderPopupHistoryCounts()
+                readerPopupHistories = readerPopupHistories + (
+                    message.popupId to current.copy(
+                        backCount = current.backCount + 1,
+                        forwardCount = 0,
+                    )
+                )
+            }
             is ReaderLookupPopupBridgeMessage.GetEntry -> {
                 val entry = popupById(message.popupId)?.state?.results?.getOrNull(message.index)
                 val body = entry?.let(LookupPopupHtml::entryJsonString) ?: "null"

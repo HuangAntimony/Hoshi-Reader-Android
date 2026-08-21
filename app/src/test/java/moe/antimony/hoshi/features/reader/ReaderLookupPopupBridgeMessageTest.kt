@@ -94,6 +94,25 @@ class ReaderLookupPopupBridgeMessageTest {
             ),
         )
         assertEquals(
+            ReaderLookupPopupBridgeMessage.KanjiRedirect(
+                popupId = "child",
+                messageId = "kanji-1",
+                kanji = "星",
+            ),
+            ReaderLookupPopupBridgeMessage.fromJson(
+                """{"name":"kanjiRedirect","id":"kanji-1","popupId":"child","body":"星"}""",
+            ),
+        )
+        assertEquals(
+            ReaderLookupPopupBridgeMessage.KanjiRedirectCommitted(
+                popupId = "child",
+                messageId = null,
+            ),
+            ReaderLookupPopupBridgeMessage.fromJson(
+                """{"name":"kanjiRedirectCommitted","popupId":"child"}""",
+            ),
+        )
+        assertEquals(
             ReaderLookupPopupBridgeMessage.GetEntry(
                 popupId = "child",
                 messageId = "44",

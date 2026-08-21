@@ -74,6 +74,25 @@ body {
     -webkit-user-select: none;
 }
 
+.kanji-char {
+    cursor: pointer;
+}
+
+.kanji {
+    font-size: 120px;
+    line-height: 1;
+    font-family: var(--hoshi-content-font-family, "Noto Sans CJK JP", sans-serif);
+}
+
+.kanji-separator {
+    margin: 6px 0;
+}
+
+.kanji-reading-label {
+    opacity: 0.6;
+    margin-right: 6px;
+}
+
 .header-buttons {
     display: flex;
     align-items: center;
@@ -478,6 +497,46 @@ a {
 .pronunciation-mora[data-pitch="high"][data-pitch-next="low"] {
     padding-right: 1px;
     margin-right: 1px;
+}
+
+.pronunciation-devoice-indicator {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.125em;
+    height: 1.125em;
+    border: 1px dotted #c83c28;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.pronunciation-nasal-indicator {
+    display: block;
+    position: absolute;
+    right: -0.125em;
+    top: 0.125em;
+    width: 0.375em;
+    height: 0.375em;
+    border: 1px solid #c83c28;
+    border-radius: 50%;
+}
+
+.pronunciation-nasal-diacritic {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+}
+
+.pronunciation-character-group {
+    display: inline-block;
+    position: relative;
+}
+
+html[data-hoshi-eink-mode="true"] .pronunciation-devoice-indicator,
+html[data-hoshi-eink-mode="true"] .pronunciation-nasal-indicator {
+    border-color: currentColor;
 }
 
 ::highlight(hoshi-selection) {

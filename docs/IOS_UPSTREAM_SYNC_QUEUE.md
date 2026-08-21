@@ -13,70 +13,12 @@ This document tracks open Android work after checking iOS upstream `develop`.
 
 ## Current Queue
 
-### 1. Dictionary categories, Kanji dictionaries, and complete pitch data
-
-Status: pending Android sync.
-
-Commits:
-
-- `9eff7dd` - add an excluded dictionary category.
-- `67fc9e8` - add basic Kanji dictionary import, lookup, and popup rendering.
-- `3cd8294` - support string pitch patterns plus nasal and devoice indicators.
-
-Dependency/value reasoning:
-
-- This is the native bridge and stored-dictionary foundation for later Anki
-  template work. Land the bridge/data model before UI and template consumers.
-
-iOS behavior to mirror:
-
-- Term dictionaries can be categorized as monolingual, bilingual, excluded, or
-  uncategorized. Excluded dictionaries stay installed but do not participate in
-  term lookup.
-- Yomitan Kanji dictionaries are imported, configured, queried for a selected
-  character, and rendered as Kanji readings and meanings in the popup.
-- Pitch entries accept numeric downsteps or explicit high/low strings and render
-  nasal and devoiced mora indicators without losing dictionary attribution.
-
-Android current gap:
-
-- `DictionaryType` and `DictionaryConfig` in
-  `app/src/main/java/moe/antimony/hoshi/dictionary/DictionaryModels.kt` expose
-  only Term, Frequency, and Pitch and have no dictionary category or Kanji list.
-- `DictionaryNativeBridge` and `DictionaryLookupQueryService` in
-  `app/src/main/java/moe/antimony/hoshi/dictionary/` pass only term/frequency/
-  pitch paths and expose no Kanji query API. The current query service already
-  serializes rebuilds and atomically swaps sessions, so `47b0bba` is covered;
-  the remaining gap is bridge capability and its consumers.
-- `app/src/main/java/de/manhhao/hoshi/HoshiDicts.kt` and the tracked
-  `third_party/hoshidicts-kotlin-bridge` model pitch positions as `IntArray` and
-  expose neither nasal/devoice metadata nor Kanji results.
-- `LookupPopupHtml.kt` and `app/src/main/assets/hoshi-web/popup/popup.js` consume
-  only `pitchPositions`; `DictionaryView.kt` has no category or Kanji sections.
-
-Suggested slice:
-
-- Update the tracked Kotlin/JNI bridge and ABI tests first, then extend import
-  summaries, storage/config/profile backup compatibility, and query sessions.
-- Add category and Kanji management UI through the existing dictionary
-  repository/ViewModel boundary.
-- Extend popup JSON and JS/CSS for Kanji entries and the final pitch schema.
-
-Validation:
-
-- Import term, frequency, pitch, and Kanji Yomitan archives; toggle, reorder,
-  delete, back up, and restore each type.
-- Confirm excluded dictionaries disappear from lookup without being deleted and
-  category-aware config survives profile switching and iOS-compatible backup.
-- Validate numeric/string pitch patterns, nasal/devoice markers, duplicate pitch
-  suppression, Kanji lookup, dark/e-ink themes, and dictionary media.
-
-### 2. Multiple Anki card formats and advanced handlebars
+### 1. Multiple Anki card formats and advanced handlebars
 
 Status: partially synced on Android. Multi-format storage/UI/popup routing,
-show-notes, cloze parts, selected-glossary fallback, and numeric pitch graphs
-are complete. Category-aware monolingual/bilingual handlebars and the final
-string/nasal/devoice pitch schema still depend on queue item 1.
+show-notes, cloze parts, selected-glossary fallback, dictionary categorization,
+and numeric/string pitch graphs are complete. Category-aware
+monolingual/bilingual handlebars and nasal/devoice Anki graph markers remain.
 
 Commits:
 
@@ -119,16 +61,20 @@ Android completed slice:
   and unavailable backends fail closed.
 - AnkiConnect uses `guiBrowse`; AnkiDroid uses
   `anki://x-callback-url/browser?search=...` with first-field/model/scope search.
-- The renderer supports precise UTF-16 cloze parts, selected-glossary fallback,
-  numeric pitch SVGs, first-pitch extraction, and non-category advanced
-  glossary variants. Legacy selected-glossary fallback aliases remain hidden.
+- Anki Advanced exposes the persisted none/monolingual/bilingual/exclude
+  categories for term dictionaries. The renderer supports precise UTF-16 cloze
+  parts, selected-glossary fallback, numeric and H/L pitch SVGs,
+  first-pitch extraction, and non-category advanced glossary variants. Legacy
+  selected-glossary fallback aliases remain hidden.
 
 Remaining gap:
 
-- Add monolingual/bilingual definition handlebars only after dictionary
-  categories are available from queue item 1.
-- Feed final string pitch patterns plus nasal/devoice data into exported pitch
-  graphs after the bridge and popup schema in queue item 1 land.
+- First route glossary selection through the persisted dictionary categories,
+  then add the monolingual/bilingual definition handlebars and fallback
+  variants without changing the popup lookup schema.
+- After category handlebars are stable, extend exported Anki pitch graphics with
+  the already-available 1-based nasal/devoice mora markers. Popup rendering and
+  numeric/H/L Anki pitch graphs are already complete.
 
 Validation:
 
@@ -138,7 +84,7 @@ Validation:
   fields, deleted formats, disconnected backends, duplicates, media, cloze
   offsets, category fallbacks, and pitch graphs.
 
-### 3. Reader furigana reveal mode
+### 2. Reader furigana reveal mode
 
 Status: pending Android sync.
 
@@ -179,7 +125,7 @@ Validation:
   and vertical writing, with lookup, highlights, Sasayaki, restore, and ruby
   split across styled nodes.
 
-### 4. Bookshelf cover privacy and fallback artwork
+### 3. Bookshelf cover privacy and fallback artwork
 
 Status: pending Android sync.
 
@@ -218,7 +164,7 @@ Validation:
 - Missing-cover books with/without authors, legacy metadata, local/remote books,
   collapsed shelf previews, multi-select, Show/Blur/Hide, dark/e-ink themes.
 
-### 5. Lookup popup two-column layout and visual sizing
+### 4. Lookup popup two-column layout and visual sizing
 
 Status: pending Android sync.
 
@@ -263,7 +209,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 6. Reader route open-failure fallback
+### 5. Reader route open-failure fallback
 
 Status: pending Android sync.
 
@@ -297,7 +243,7 @@ Validation:
 - Missing/corrupt book, working Close, normal Reader open/close, Android Back,
   bookshelf state preservation, and bookmark refresh.
 
-### 7. Google Drive timeout and automatic-refresh error suppression
+### 6. Google Drive timeout and automatic-refresh error suppression
 
 Status: pending Android sync.
 
@@ -335,7 +281,7 @@ Validation:
 - Automatic refresh offline, slow token/list requests, and connection loss;
   manual connect/refresh/import/export/delete must still show actionable errors.
 
-### 8. Reader WebView line-box CSS parity
+### 7. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
