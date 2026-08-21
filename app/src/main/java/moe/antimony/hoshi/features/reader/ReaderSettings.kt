@@ -24,6 +24,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
@@ -80,6 +82,9 @@ data class ReaderSettings(
     val customInfoColor: Long = 0xFF999999,
     val verticalWriting: Boolean = true,
     val selectedFont: String = ReaderFontManager.defaultMinchoFont,
+    val selectedFontFamilyId: String? = null,
+    val selectedFontVariantId: String? = null,
+    val fontVariantSelections: Map<String, String> = emptyMap(),
     val fontSize: Int = 22,
     val hideFurigana: Boolean = false,
     val viewMode: ReaderViewMode = ReaderViewMode.Paginated,
@@ -241,6 +246,31 @@ data class ReaderSettings(
     }
 }
 
+internal fun ReaderSettings.withFontSelection(
+    family: ReaderFontFamily,
+    variant: ReaderFontVariant,
+): ReaderSettings {
+    val legacyName = if (family.source == ReaderFontSource.PUBLISHER) {
+        ReaderFontManager.publisherFont
+    } else {
+        family.displayName
+    }
+    return copy(
+        selectedFont = legacyName,
+        selectedFontFamilyId = family.id,
+        selectedFontVariantId = variant.id,
+        fontVariantSelections = fontVariantSelections + (family.id to variant.id),
+    )
+}
+
+internal fun ReaderSettings.withDefaultFont(): ReaderSettings = copy(
+    selectedFont = ReaderFontManager.defaultMinchoFont,
+    selectedFontFamilyId = ReaderFontManager.systemMinchoFamilyId,
+    selectedFontVariantId = "wght-400-normal",
+    fontVariantSelections = fontVariantSelections +
+        (ReaderFontManager.systemMinchoFamilyId to "wght-400-normal"),
+)
+
 enum class ReaderTheme(val label: String) {
     System("System"),
     Light("Light"),
@@ -336,6 +366,11 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         customInfoColor = preferences.getLong("customInfoColor", 0xFF999999),
         verticalWriting = preferences.getBoolean("verticalWriting", true),
         selectedFont = preferences.getString("selectedFont", null) ?: ReaderFontManager.defaultMinchoFont,
+        selectedFontFamilyId = preferences.getString("selectedFontFamilyId", null),
+        selectedFontVariantId = preferences.getString("selectedFontVariantId", null),
+        fontVariantSelections = preferences.getString("fontVariantSelections", null)
+            ?.let { runCatching { Json.decodeFromString<Map<String, String>>(it) }.getOrNull() }
+            .orEmpty(),
         fontSize = preferences.getInt("fontSize", 22),
         hideFurigana = preferences.getBoolean("readerHideFurigana", false),
         viewMode = ReaderViewMode.fromStorage(
@@ -418,6 +453,9 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putLong("customInfoColor", settings.customInfoColor)
             .putBoolean("verticalWriting", settings.verticalWriting)
             .putString("selectedFont", settings.selectedFont)
+            .putString("selectedFontFamilyId", settings.selectedFontFamilyId)
+            .putString("selectedFontVariantId", settings.selectedFontVariantId)
+            .putString("fontVariantSelections", Json.encodeToString(settings.fontVariantSelections))
             .putInt("fontSize", settings.fontSize)
             .putBoolean("readerHideFurigana", settings.hideFurigana)
             .putString("readerViewMode", settings.viewMode.rawValue)
@@ -564,6 +602,11 @@ class ReaderSettingsRepository(
             customInfoColor = this[KEY_CUSTOM_INFO_COLOR] ?: 0xFF999999,
             verticalWriting = this[KEY_VERTICAL_WRITING] ?: true,
             selectedFont = this[KEY_SELECTED_FONT] ?: ReaderFontManager.defaultMinchoFont,
+            selectedFontFamilyId = this[KEY_SELECTED_FONT_FAMILY_ID],
+            selectedFontVariantId = this[KEY_SELECTED_FONT_VARIANT_ID],
+            fontVariantSelections = this[KEY_FONT_VARIANT_SELECTIONS]
+                ?.let { runCatching { json.decodeFromString<Map<String, String>>(it) }.getOrNull() }
+                .orEmpty(),
             fontSize = this[KEY_FONT_SIZE] ?: 22,
             hideFurigana = this[KEY_HIDE_FURIGANA] ?: false,
             viewMode = ReaderViewMode.fromStorage(
@@ -640,6 +683,11 @@ class ReaderSettingsRepository(
         this[KEY_CUSTOM_INFO_COLOR] = settings.customInfoColor
         this[KEY_VERTICAL_WRITING] = settings.verticalWriting
         this[KEY_SELECTED_FONT] = settings.selectedFont
+        settings.selectedFontFamilyId?.let { this[KEY_SELECTED_FONT_FAMILY_ID] = it }
+            ?: remove(KEY_SELECTED_FONT_FAMILY_ID)
+        settings.selectedFontVariantId?.let { this[KEY_SELECTED_FONT_VARIANT_ID] = it }
+            ?: remove(KEY_SELECTED_FONT_VARIANT_ID)
+        this[KEY_FONT_VARIANT_SELECTIONS] = json.encodeToString(settings.fontVariantSelections)
         this[KEY_FONT_SIZE] = settings.fontSize
         this[KEY_HIDE_FURIGANA] = settings.hideFurigana
         this[KEY_READER_VIEW_MODE] = settings.viewMode.rawValue
@@ -759,6 +807,9 @@ class ReaderSettingsRepository(
         private val KEY_CUSTOM_INFO_COLOR = longPreferencesKey("customInfoColor")
         private val KEY_VERTICAL_WRITING = booleanPreferencesKey("verticalWriting")
         private val KEY_SELECTED_FONT = stringPreferencesKey("selectedFont")
+        private val KEY_SELECTED_FONT_FAMILY_ID = stringPreferencesKey("selectedFontFamilyId")
+        private val KEY_SELECTED_FONT_VARIANT_ID = stringPreferencesKey("selectedFontVariantId")
+        private val KEY_FONT_VARIANT_SELECTIONS = stringPreferencesKey("fontVariantSelections")
         private val KEY_FONT_SIZE = intPreferencesKey("fontSize")
         private val KEY_HIDE_FURIGANA = booleanPreferencesKey("readerHideFurigana")
         private val KEY_READER_VIEW_MODE = stringPreferencesKey("readerViewMode")
@@ -839,6 +890,9 @@ private data class ProfileReaderAppearanceSettings(
     val customInfoColor: Long = 0xFF999999,
     val verticalWriting: Boolean = true,
     val selectedFont: String = ReaderFontManager.defaultMinchoFont,
+    val selectedFontFamilyId: String? = null,
+    val selectedFontVariantId: String? = null,
+    val fontVariantSelections: Map<String, String> = emptyMap(),
     val fontSize: Int = 22,
     val hideFurigana: Boolean = false,
     val viewMode: ReaderViewMode? = null,
@@ -897,6 +951,9 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         customInfoColor = customInfoColor,
         verticalWriting = verticalWriting,
         selectedFont = selectedFont,
+        selectedFontFamilyId = selectedFontFamilyId,
+        selectedFontVariantId = selectedFontVariantId,
+        fontVariantSelections = fontVariantSelections,
         fontSize = fontSize,
         hideFurigana = hideFurigana,
         viewMode = viewMode,
@@ -955,6 +1012,9 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         customInfoColor = appearance.customInfoColor,
         verticalWriting = appearance.verticalWriting,
         selectedFont = appearance.selectedFont,
+        selectedFontFamilyId = appearance.selectedFontFamilyId,
+        selectedFontVariantId = appearance.selectedFontVariantId,
+        fontVariantSelections = appearance.fontVariantSelections,
         fontSize = appearance.fontSize,
         hideFurigana = appearance.hideFurigana,
         viewMode = appearance.viewMode ?: if (appearance.continuousMode) {

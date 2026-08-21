@@ -57,6 +57,9 @@ class ReaderSettingsRepositoryTest {
             assertEquals(0xFF999999L, settings.customInfoColor)
             assertTrue(settings.verticalWriting)
             assertEquals(ReaderFontManager.defaultMinchoFont, settings.selectedFont)
+            assertEquals(null, settings.selectedFontFamilyId)
+            assertEquals(null, settings.selectedFontVariantId)
+            assertTrue(settings.fontVariantSelections.isEmpty())
             assertEquals(22, settings.fontSize)
             assertFalse(settings.hideFurigana)
             assertEquals(ReaderViewMode.Paginated, settings.viewMode)
@@ -188,6 +191,12 @@ class ReaderSettingsRepositoryTest {
                     customInfoColor = 0xFF708090,
                     verticalWriting = false,
                     selectedFont = ReaderFontManager.defaultGothicFont,
+                    selectedFontFamilyId = ReaderFontManager.systemGothicFamilyId,
+                    selectedFontVariantId = "wght-600-normal",
+                    fontVariantSelections = mapOf(
+                        ReaderFontManager.systemGothicFamilyId to "wght-600-normal",
+                        "recommended:kleeone" to "wght-400-normal",
+                    ),
                     fontSize = 24,
                     hideFurigana = true,
                     viewMode = ReaderViewMode.VisualNovel,
@@ -252,6 +261,9 @@ class ReaderSettingsRepositoryTest {
             assertEquals(0xFF708090, saved.customInfoColor)
             assertFalse(saved.verticalWriting)
             assertEquals(ReaderFontManager.defaultGothicFont, saved.selectedFont)
+            assertEquals(ReaderFontManager.systemGothicFamilyId, saved.selectedFontFamilyId)
+            assertEquals("wght-600-normal", saved.selectedFontVariantId)
+            assertEquals("wght-400-normal", saved.fontVariantSelections["recommended:kleeone"])
             assertEquals(24, saved.fontSize)
             assertTrue(saved.hideFurigana)
             assertEquals(ReaderViewMode.VisualNovel, saved.viewMode)

@@ -205,7 +205,8 @@ fun DictionarySearchView(
     val localAudioRepository = appContainer.localAudioRepository
     val dictionaryRepository = appContainer.dictionaryRepository
     val fontManager = appContainer.readerFontManager
-    val fontFaceCss = fontManager.popupFontFaceCss()
+    val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
+    val fontFaceCss = remember(fontManager, fontLibraryState.revision) { fontManager.popupFontFaceCss() }
     val rootContentLanguageProfile = profileState.effectiveContentLanguageProfile
     val readerPopupBridgeHolder = remember { ReaderLookupPopupBridgeCallbackHolder() }
     val popupDarkMode = MaterialTheme.colorScheme.background.luminance() < 0.5f

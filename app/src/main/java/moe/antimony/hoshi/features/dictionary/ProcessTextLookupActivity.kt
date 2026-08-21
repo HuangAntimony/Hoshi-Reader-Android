@@ -159,7 +159,10 @@ private fun ProcessTextLookupOverlay(
     val ankiViewModel: AnkiViewModel = hiltViewModel()
     val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
     val assets = remember(context) { LookupPopupAssets.load(context) }
-    val fontFaceCss = dependencies.readerFontManager.popupFontFaceCss()
+    val fontLibraryState by dependencies.readerFontManager.libraryState.collectAsStateWithLifecycle()
+    val fontFaceCss = remember(dependencies.readerFontManager, fontLibraryState.revision) {
+        dependencies.readerFontManager.popupFontFaceCss()
+    }
     val popupSettings = popups.firstOrNull()?.state
     val readerPopupIframeDocument = remember(
         popupSettings?.dictionaryStyles,

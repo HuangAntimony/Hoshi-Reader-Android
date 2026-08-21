@@ -15,6 +15,8 @@ import moe.antimony.hoshi.features.dictionary.AndroidDictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionaryViewModelRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySearchRepository
 import moe.antimony.hoshi.features.dictionary.DictionaryViewModelRepository
+import moe.antimony.hoshi.features.reader.HttpReaderFontRemoteDataSource
+import moe.antimony.hoshi.features.reader.ReaderFontRemoteDataSource
 import moe.antimony.hoshi.features.statistics.AndroidStatisticsRepository
 import moe.antimony.hoshi.features.statistics.StatisticsDateProvider
 import moe.antimony.hoshi.features.statistics.StatisticsRepository
@@ -32,6 +34,10 @@ import moe.antimony.hoshi.features.update.UpdateDownloadController
 @Module
 @InstallIn(SingletonComponent::class)
 internal interface HoshiBindingsModule {
+    @Binds
+    @Singleton
+    fun bindReaderFontRemoteDataSource(dataSource: HttpReaderFontRemoteDataSource): ReaderFontRemoteDataSource
+
     @Binds
     @Singleton
     fun bindDriveAuthorizer(authorizer: DeviceCodeDriveAuthorizer): DriveAuthorizer

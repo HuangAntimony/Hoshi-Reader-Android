@@ -1265,7 +1265,8 @@ private fun DictionaryCustomCssView(
 ) {
     BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
-    val fontNames = remember(fontManager) { fontManager.allFontNames() }
+    val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
+    val fontNames = remember(fontManager, fontLibraryState.revision) { fontManager.allFontNames() }
     var fontMenuExpanded by remember { mutableStateOf(false) }
     var selectorMenuExpanded by remember { mutableStateOf(false) }
     var cssFieldValue by remember {

@@ -311,6 +311,19 @@ Validate relevant settings/theme changes with:
   Custom, System, and E-ink modes, including status/navigation icon contrast,
   lookup taps, popup display, reader color updates without unnecessary WebView
   reload, and cursor visibility.
+- Reader Appearance fonts: cancel and retry an offline recommended-font
+  download without changing the active font; verify one Noto variable download
+  enables every advertised weight while static families download variants
+  independently. Verify family and named variant use separate selectors and a
+  default-variant download shows progress directly below the selected family.
+  On an OEM build without Noto, verify the two platform choices remain labeled
+  as generic system serif/sans-serif. Restart and switch profiles to confirm
+  per-family variant memory. Import two TTF/OTF variants of one family, replace
+  an existing family/weight/style slot, confirm its old basename selection and
+  dictionary CSS alias still resolve, delete the family, and verify WOFF/WOFF2
+  remain standalone while TTC is not offered. Recheck paginated, continuous,
+  and VN rendering in horizontal/vertical writing plus Reader, Dictionary, and
+  Process Text lookup popups.
 - App Language on Android 13+: the Advanced settings Language card appears,
   Follow system clears the app locale, and Android 12 or lower follows the
   system language without showing the card.

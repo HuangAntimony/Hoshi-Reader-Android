@@ -506,8 +506,8 @@ internal class ReaderLookupPopupResourceHandler(
 
     private fun handleFontRequest(uri: Uri): WebResourceResponse? {
         if (uri.scheme != "https" || uri.host != "appassets.androidplatform.net") return null
-        val fileName = uri.lastPathSegment?.takeIf { uri.path.orEmpty().startsWith("/fonts/") } ?: return null
-        val fontFile = fontManager.fontFileForRequest(fileName) ?: return null
+        val relativePath = readerLookupPopupFontPath(uri.path) ?: return null
+        val fontFile = fontManager.fontFileForRequest(relativePath) ?: return null
         return WebResourceResponse(
             fontFile.popupFontMediaType(),
             null,
@@ -532,6 +532,11 @@ internal class ReaderLookupPopupResourceHandler(
             ByteArrayInputStream(ByteArray(0)),
         )
 }
+
+internal fun readerLookupPopupFontPath(path: String?): String? = path
+    ?.takeIf { it.startsWith("/fonts/") }
+    ?.removePrefix("/fonts/")
+    ?.takeIf(String::isNotBlank)
 
 internal data class LookupPopupAssetResponse(
     val mimeType: String,

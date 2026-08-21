@@ -308,6 +308,8 @@ internal class ReaderWebViewStateHolder(
 internal data class ReaderContentReloadKey(
     val verticalWriting: Boolean,
     val selectedFont: String,
+    val selectedFontFamilyId: String?,
+    val selectedFontVariantId: String?,
     val fontSize: Int,
     val hideFurigana: Boolean,
     val viewMode: ReaderViewMode,
@@ -329,6 +331,8 @@ internal fun ReaderSettings.readerContentReloadKey(): ReaderContentReloadKey =
     ReaderContentReloadKey(
         verticalWriting = verticalWriting,
         selectedFont = selectedFont,
+        selectedFontFamilyId = selectedFontFamilyId,
+        selectedFontVariantId = selectedFontVariantId,
         fontSize = fontSize,
         hideFurigana = hideFurigana,
         viewMode = viewMode,

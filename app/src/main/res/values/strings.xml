@@ -369,7 +369,7 @@
     <string name="reader_appearance_display">Display</string>
     <string name="reader_appearance_progress">Progress</string>
     <string name="reader_appearance_popup">Popup</string>
-    <string name="reader_appearance_theme_system">System</string>
+    <string name="reader_appearance_theme_system" comment="Reader theme option, intentionally matching the font-library System section label.">System</string>
     <string name="reader_appearance_theme_light">Light</string>
     <string name="reader_appearance_theme_dark">Dark</string>
     <string name="reader_appearance_theme_sepia">Sepia</string>
@@ -391,8 +391,22 @@
     <string name="reader_appearance_vertical">Vertical</string>
     <string name="reader_appearance_horizontal">Horizontal</string>
     <string name="reader_appearance_font" comment="Reader font setting, intentionally matching dictionary custom CSS font.">Font</string>
-    <string name="reader_appearance_font_publisher">Publisher</string>
-    <string name="reader_appearance_font_file" comment="Fallback filename label, intentionally matching font setting labels.">font</string>
+    <string name="reader_appearance_font_publisher">Publisher Font</string>
+    <string name="reader_appearance_font_system_serif">System Serif</string>
+    <string name="reader_appearance_font_system_sans_serif">System Sans Serif</string>
+    <string name="reader_appearance_font_imported">Imported</string>
+    <string name="reader_appearance_font_variant">Variant</string>
+    <string name="reader_appearance_font_variant_publisher">Determined by publisher</string>
+    <string name="reader_appearance_font_variant_format">%1$s (%2$d)</string>
+    <string name="reader_appearance_font_download_size_format">Download · %1$s</string>
+    <string name="reader_appearance_font_downloading_item_format">%1$s · Downloading %2$d%%</string>
+    <string name="reader_appearance_font_download_failed">Couldn’t download and verify this font. Check your connection and try again.</string>
+    <string name="reader_appearance_font_import_failed">This font could not be imported. Use a valid TTF, OTF, WOFF, or WOFF2 file.</string>
+    <string name="reader_appearance_font_category_serif">Serif / Mincho</string>
+    <string name="reader_appearance_font_category_sans">Sans serif / Gothic</string>
+    <string name="reader_appearance_font_category_rounded">Rounded</string>
+    <string name="reader_appearance_font_category_handwriting">Handwriting / Body</string>
+    <string name="reader_appearance_font_retry">Retry</string>
     <string name="reader_appearance_import_font">Import Font</string>
     <string name="reader_appearance_importing" comment="Generic import progress label, intentionally shared with ッツ backup import.">Importing...</string>
     <string name="reader_appearance_font_size">Font Size</string>
