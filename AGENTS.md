@@ -69,6 +69,7 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 
 ## 用户可见 UI
 
+- 本项目不以 Android 无障碍服务或屏幕阅读器（包括 TalkBack）为支持目标。除非用户明确要求，设计、实现、审查和验收时不要为无障碍专门增加或要求 `contentDescription`、Compose accessibility semantics、TalkBack 选中状态或播报、无障碍焦点/遍历顺序及其他屏幕阅读器适配；不得仅因缺少这些适配将变更判定为存在缺陷。已有无障碍专用代码也不属于必须保留的兼容行为，可在确认不影响普通用户交互后删除，以减少代码量和维护负担。
 - 所有用户可见 UI 字符串必须使用 Android 本地化资源。
 - Compose 使用 `stringResource()` / `pluralStringResource()`。
 - 非 UI 层发出的可见消息应使用 `UiText` 或等价资源引用，不应持有 `Context`。
