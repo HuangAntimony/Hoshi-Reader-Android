@@ -50,7 +50,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,7 +92,10 @@ internal fun ReaderAppearanceScreen(
     val palette = appearancePalette()
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_appearance),
-        onClose = onClose,
+        onClose = {
+            viewModel.cancelDownload()
+            onClose()
+        },
         modifier = modifier.fillMaxSize(),
         containerColor = palette.background,
         contentColor = palette.onBackground,
@@ -129,13 +131,17 @@ internal fun ReaderAppearanceSheet(
     viewModel: ReaderAppearanceViewModel = hiltViewModel(),
 ) {
     val palette = appearancePalette()
+    val dismissWithDownloadCancel = {
+        viewModel.cancelDownload()
+        onDismiss()
+    }
     val sheetStyle = readerSheetStyle().copy(
         containerColor = palette.background,
         contentColor = palette.onBackground,
     )
     ReaderBottomPanel(
         sheetStyle = sheetStyle,
-        onDismiss = onDismiss,
+        onDismiss = dismissWithDownloadCancel,
     ) {
         ReaderAppearanceContent(
             settings = settings,
@@ -148,7 +154,7 @@ internal fun ReaderAppearanceSheet(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
             showTitle = false,
             showDone = true,
-            onDone = onDismiss,
+            onDone = dismissWithDownloadCancel,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -177,7 +183,6 @@ private fun ReaderAppearanceContent(
     val currentOnSettingsChange by rememberUpdatedState(onSettingsChange)
     var fontMenuExpanded by remember { mutableStateOf(false) }
     var fontVariantMenuExpanded by remember { mutableStateOf(false) }
-    var fontDownloadOrigin by remember { mutableStateOf<ReaderFontDownloadOrigin?>(null) }
     var fontToDelete by remember { mutableStateOf<ReaderFontFamily?>(null) }
     var colorDialogRow by remember { mutableStateOf<ReaderAppearanceCustomColorRow?>(null) }
     val fontImporter = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
@@ -206,24 +211,16 @@ private fun ReaderAppearanceContent(
     val downloadingVariant = downloadingFamily?.variants?.firstOrNull {
         it.id == fontUiState.download?.variantId
     }
-    LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is ReaderAppearanceFontEvent.Apply -> {
-                    val family = fontManager.fontFamilies().firstOrNull { it.id == event.familyId }
-                    val variant = family?.variants?.firstOrNull { it.id == event.variantId }
-                    if (family != null && variant != null) {
-                        currentOnSettingsChange(currentSettings.withFontSelection(family, variant))
-                        fontMenuExpanded = false
-                        fontVariantMenuExpanded = false
-                        fontDownloadOrigin = null
-                    }
-                }
-            }
+    LaunchedEffect(fontUiState.selectionToApply) {
+        val selection = fontUiState.selectionToApply ?: return@LaunchedEffect
+        val family = fontManager.fontFamilies().firstOrNull { it.id == selection.familyId }
+        val variant = family?.variants?.firstOrNull { it.id == selection.variantId }
+        if (family != null && variant != null) {
+            currentOnSettingsChange(currentSettings.withFontSelection(family, variant))
+            fontMenuExpanded = false
+            fontVariantMenuExpanded = false
         }
-    }
-    DisposableEffect(viewModel) {
-        onDispose(viewModel::cancelDownload)
+        viewModel.acknowledgeSelection(selection)
     }
     val palette = appearancePalette()
     val metrics = readerSheetDensityMetrics()
@@ -328,14 +325,13 @@ private fun ReaderAppearanceContent(
                         menuExpanded = fontMenuExpanded,
                         onMenuExpandedChange = { fontMenuExpanded = it },
                         enabled = fontUiState.download == null,
-                        download = fontUiState.download.takeIf {
-                            fontDownloadOrigin == ReaderFontDownloadOrigin.FAMILY
+                        download = fontUiState.download?.takeIf {
+                            it.origin == ReaderFontDownloadOrigin.FAMILY
                         },
                         downloadLabel = downloadingFamily?.let {
                             readerFontLabel(it.id, it.displayName)
                         },
                         onCancelDownload = {
-                            fontDownloadOrigin = null
                             viewModel.cancelDownload()
                         },
                         canDeleteFont = fontManager.fontFamilies().any {
@@ -354,8 +350,11 @@ private fun ReaderAppearanceContent(
                             onFamilySelected = { family ->
                                 fontMenuExpanded = false
                                 val variant = family.preferredVariant(settings.fontVariantSelections[family.id])
-                                fontDownloadOrigin = ReaderFontDownloadOrigin.FAMILY
-                                viewModel.selectVariant(family.id, variant.id)
+                                viewModel.selectVariant(
+                                    family.id,
+                                    variant.id,
+                                    ReaderFontDownloadOrigin.FAMILY,
+                                )
                             },
                         )
                     }
@@ -369,15 +368,15 @@ private fun ReaderAppearanceContent(
                         },
                         menuExpanded = fontVariantMenuExpanded,
                         onMenuExpandedChange = { fontVariantMenuExpanded = it },
-                        enabled = !selectedFontSpec.publisherFont && selectedFontFamily != null,
-                        download = fontUiState.download.takeIf {
-                            fontDownloadOrigin == ReaderFontDownloadOrigin.VARIANT
+                        enabled = fontUiState.download == null &&
+                            !selectedFontSpec.publisherFont && selectedFontFamily != null,
+                        download = fontUiState.download?.takeIf {
+                            it.origin == ReaderFontDownloadOrigin.VARIANT
                         },
                         downloadLabel = downloadingVariant?.let {
                             readerFontVariantLabel(it, it.weight)
                         },
                         onCancelDownload = {
-                            fontDownloadOrigin = null
                             viewModel.cancelDownload()
                         },
                         canDeleteFont = false,
@@ -389,8 +388,11 @@ private fun ReaderAppearanceContent(
                                 activeVariantId = selectedFontSpec.variantId,
                                 onVariantSelected = { variant ->
                                     fontVariantMenuExpanded = false
-                                    fontDownloadOrigin = ReaderFontDownloadOrigin.VARIANT
-                                    viewModel.selectVariant(family.id, variant.id)
+                                    viewModel.selectVariant(
+                                        family.id,
+                                        variant.id,
+                                        ReaderFontDownloadOrigin.VARIANT,
+                                    )
                                 },
                             )
                         }
@@ -896,7 +898,6 @@ private fun ReaderAppearanceContent(
         val failedSelection = fontUiState.failedSelection
         AlertDialog(
             onDismissRequest = {
-                fontDownloadOrigin = null
                 viewModel.clearError()
             },
             title = { Text(stringResource(R.string.reader_appearance_font)) },
@@ -905,10 +906,12 @@ private fun ReaderAppearanceContent(
                 TextButton(
                     onClick = {
                         viewModel.clearError()
-                        if (failedSelection == null) {
-                            fontDownloadOrigin = null
-                        } else {
-                            viewModel.selectVariant(failedSelection.familyId, failedSelection.variantId)
+                        if (failedSelection != null) {
+                            viewModel.selectVariant(
+                                failedSelection.familyId,
+                                failedSelection.variantId,
+                                failedSelection.origin,
+                            )
                         }
                     },
                 ) {
@@ -924,7 +927,6 @@ private fun ReaderAppearanceContent(
                 {
                     TextButton(
                         onClick = {
-                            fontDownloadOrigin = null
                             viewModel.clearError()
                         },
                     ) {
@@ -1282,11 +1284,6 @@ private fun ReaderFontRow(
             )
         }
     }
-}
-
-private enum class ReaderFontDownloadOrigin {
-    FAMILY,
-    VARIANT,
 }
 
 @Composable

@@ -167,6 +167,7 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     ksp(libs.google.dagger.hilt.android.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly("net.java.dev.jna:jna:${libs.versions.jna.get()}@jar")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

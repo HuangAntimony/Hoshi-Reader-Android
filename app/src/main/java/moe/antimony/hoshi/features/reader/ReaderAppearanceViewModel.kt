@@ -11,12 +11,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,7 +25,19 @@ import moe.antimony.hoshi.ui.UiText
 data class ReaderFontDownloadUiState(
     val familyId: String,
     val variantId: String,
+    val origin: ReaderFontDownloadOrigin,
     val progress: ReaderFontDownloadProgress,
+)
+
+enum class ReaderFontDownloadOrigin {
+    FAMILY,
+    VARIANT,
+}
+
+data class ReaderFontSelectionRequest(
+    val familyId: String,
+    val variantId: String,
+    val origin: ReaderFontDownloadOrigin,
 )
 
 data class ReaderAppearanceFontUiState(
@@ -36,12 +45,9 @@ data class ReaderAppearanceFontUiState(
     val download: ReaderFontDownloadUiState? = null,
     val isImporting: Boolean = false,
     val error: UiText? = null,
-    val failedSelection: ReaderFontSelection? = null,
+    val failedSelection: ReaderFontSelectionRequest? = null,
+    val selectionToApply: ReaderFontSelection? = null,
 )
-
-sealed interface ReaderAppearanceFontEvent {
-    data class Apply(val familyId: String, val variantId: String) : ReaderAppearanceFontEvent
-}
 
 @HiltViewModel
 internal class ReaderAppearanceViewModel @Inject constructor(
@@ -52,12 +58,11 @@ internal class ReaderAppearanceViewModel @Inject constructor(
     private val downloadState = MutableStateFlow<ReaderFontDownloadUiState?>(null)
     private val importing = MutableStateFlow(false)
     private val error = MutableStateFlow<UiText?>(null)
-    private val failedSelection = MutableStateFlow<ReaderFontSelection?>(null)
-    private val _events = MutableSharedFlow<ReaderAppearanceFontEvent>(extraBufferCapacity = 1)
+    private val failedSelection = MutableStateFlow<ReaderFontSelectionRequest?>(null)
+    private val selectionToApply = MutableStateFlow<ReaderFontSelection?>(null)
     private var downloadJob: Job? = null
 
-    val events: SharedFlow<ReaderAppearanceFontEvent> = _events.asSharedFlow()
-    val uiState: StateFlow<ReaderAppearanceFontUiState> = combine(
+    private val baseUiState = combine(
         fontManager.libraryState,
         downloadState,
         importing,
@@ -65,13 +70,23 @@ internal class ReaderAppearanceViewModel @Inject constructor(
         failedSelection,
     ) { library, download, isImporting, currentError, failed ->
         ReaderAppearanceFontUiState(library, download, isImporting, currentError, failed)
+    }
+    val uiState: StateFlow<ReaderAppearanceFontUiState> = combine(
+        baseUiState,
+        selectionToApply,
+    ) { state, pendingSelection ->
+        state.copy(selectionToApply = pendingSelection)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = ReaderAppearanceFontUiState(fontManager.libraryState.value),
     )
 
-    fun selectVariant(familyId: String, variantId: String) {
+    fun selectVariant(
+        familyId: String,
+        variantId: String,
+        origin: ReaderFontDownloadOrigin,
+    ) {
         if (downloadJob?.isActive == true) return
         error.value = null
         failedSelection.value = null
@@ -79,26 +94,27 @@ internal class ReaderAppearanceViewModel @Inject constructor(
         val variant = family.variants.firstOrNull { it.id == variantId } ?: return
         val remote = variant.remoteFile
         if (remote == null || variant.localFile != null) {
-            _events.tryEmit(ReaderAppearanceFontEvent.Apply(familyId, variantId))
+            selectionToApply.value = ReaderFontSelection(familyId, variantId)
             return
         }
+        downloadState.value = ReaderFontDownloadUiState(
+            familyId,
+            variantId,
+            origin,
+            ReaderFontDownloadProgress(0, remote.expectedSize),
+        )
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            downloadState.value = ReaderFontDownloadUiState(
-                familyId,
-                variantId,
-                ReaderFontDownloadProgress(0, remote.expectedSize),
-            )
             try {
                 downloaderFactory.create(fontManager.managedFontsDirectory()).download(remote) { progress ->
-                    downloadState.value = ReaderFontDownloadUiState(familyId, variantId, progress)
+                    downloadState.value = ReaderFontDownloadUiState(familyId, variantId, origin, progress)
                 }
                 withContext(ioDispatcher) { fontManager.refresh() }
-                _events.emit(ReaderAppearanceFontEvent.Apply(familyId, variantId))
+                selectionToApply.value = ReaderFontSelection(familyId, variantId)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 error.value = UiText.Resource(R.string.reader_appearance_font_download_failed)
-                failedSelection.value = ReaderFontSelection(familyId, variantId)
+                failedSelection.value = ReaderFontSelectionRequest(familyId, variantId, origin)
             } finally {
                 downloadState.value = null
                 if (downloadJob === currentCoroutineContext()[Job]) downloadJob = null
@@ -106,6 +122,10 @@ internal class ReaderAppearanceViewModel @Inject constructor(
         }
         downloadJob = job
         job.start()
+    }
+
+    fun acknowledgeSelection(selection: ReaderFontSelection) {
+        selectionToApply.compareAndSet(selection, null)
     }
 
     fun cancelDownload() {

@@ -209,7 +209,7 @@ private suspend fun <T> ReaderFontRemoteResponse.useCancellable(
 
 @Singleton
 class ReaderFontDownloaderFactory @Inject constructor(
-    private val remoteDataSource: HttpReaderFontRemoteDataSource,
+    private val remoteDataSource: ReaderFontRemoteDataSource,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     private val downloaders = ConcurrentHashMap<String, ReaderFontDownloader>()

@@ -16,6 +16,7 @@ datastore = "1.2.1"
 media3 = "1.10.1"
 jna = "5.18.1"
 kotlinxSerializationJson = "1.9.0"
+kotlinxCoroutines = "1.10.2"
 navigation3 = "1.1.2"
 ankidroidApi = "api-v1.1.0"
 hilt = "2.59.2"
@@ -61,6 +62,7 @@ ankidroid-api = { group = "com.github.ankidroid", name = "Anki-Android", version
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 google-dagger-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 google-dagger-hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 
