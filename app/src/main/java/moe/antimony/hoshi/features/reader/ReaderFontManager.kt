@@ -386,7 +386,7 @@ class ReaderFontManager @Inject constructor(
         source = ReaderFontSource.SYSTEM,
         category = ReaderFontCategory.SYSTEM,
         variants = systemWeights.map { weight ->
-            ReaderFontVariant("wght-$weight-normal", ReaderRecommendedFontCatalog.weightName(weight), weight)
+            ReaderFontVariant("wght-$weight-normal", standardFontWeightName(weight), weight)
         },
     )
 

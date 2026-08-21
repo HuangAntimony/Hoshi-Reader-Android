@@ -1473,7 +1473,7 @@ private fun readerFontLabel(familyId: String, fontName: String): String = when (
 
 @Composable
 private fun readerFontVariantLabel(variant: ReaderFontVariant?, fallbackWeight: Int): String {
-    val name = variant?.displayName ?: ReaderRecommendedFontCatalog.weightName(fallbackWeight)
+    val name = variant?.displayName ?: standardFontWeightName(fallbackWeight)
     val weight = variant?.weight ?: fallbackWeight
     return stringResource(R.string.reader_appearance_font_variant_format, name, weight)
 }

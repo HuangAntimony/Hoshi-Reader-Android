@@ -1,44 +1,85 @@
 package moe.antimony.hoshi.features.reader
 
-object ReaderRecommendedFontCatalog {
-    val families: List<ReaderFontFamily> by lazy { listOf(
-        variableFamily("notoserifjp", "Noto Serif JP", ReaderFontCategory.SERIF, 200..900 step 100,
-            "ofl/notoserifjp/NotoSerifJP[wght].ttf", "NotoSerifJP-wght.ttf", 13_574_352,
-            "2fd527ba12b6a44ec30d796d633360da0aeba6c5d4af1304ce12bb4dc15a7dfc", 200..900),
-        staticFamily("shipporimincho", "Shippori Mincho", ReaderFontCategory.SERIF, listOf(
-            static(400, "Regular"), static(500, "Medium"), static(600, "SemiBold"),
-            static(700, "Bold"), static(800, "ExtraBold"),
-        )),
-        staticFamily("bizudpmincho", "BIZ UDPMincho", ReaderFontCategory.SERIF, listOf(
-            static(400, "Regular"), static(700, "Bold"),
-        )),
-        staticFamily("zenoldmincho", "Zen Old Mincho", ReaderFontCategory.SERIF, listOf(
-            static(400, "Regular"), static(500, "Medium"), static(600, "SemiBold"),
-            static(700, "Bold"), static(900, "Black"),
-        )),
-        variableFamily("notosansjp", "Noto Sans JP", ReaderFontCategory.SANS_SERIF, 100..900 step 100,
-            "ofl/notosansjp/NotoSansJP[wght].ttf", "NotoSansJP-wght.ttf", 9_589_900,
-            "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f", 100..900),
-        staticFamily("bizudpgothic", "BIZ UDPGothic", ReaderFontCategory.SANS_SERIF, listOf(
-            static(400, "Regular"), static(700, "Bold"),
-        )),
-        staticFamily("zenkakugothicnew", "Zen Kaku Gothic New", ReaderFontCategory.SANS_SERIF, listOf(
-            static(300, "Light"), static(400, "Regular"), static(500, "Medium"),
-            static(700, "Bold"), static(900, "Black"),
-        )),
-        staticFamily("mplusrounded1c", "M PLUS Rounded 1c", ReaderFontCategory.ROUNDED, listOf(
-            static(100, "Thin"), static(300, "Light"), static(400, "Regular"),
-            static(500, "Medium"), static(700, "Bold"), static(800, "ExtraBold"), static(900, "Black"),
-        )),
-        staticFamily("kiwimaru", "Kiwi Maru", ReaderFontCategory.ROUNDED, listOf(
-            static(300, "Light"), static(400, "Regular"), static(500, "Medium"),
-        )),
-        staticFamily("kleeone", "Klee One", ReaderFontCategory.HANDWRITING, listOf(
-            static(400, "Regular"), static(600, "SemiBold"),
-        )),
-    ) }
+internal data class ReaderRecommendedVariantMetadata(
+    val weight: Int,
+    val displayName: String,
+)
 
-    private data class StaticVariant(val weight: Int, val suffix: String)
+internal fun ReaderRecommendedVariantMetadata.toReaderFontVariant(
+    remoteFile: ReaderRemoteFontFile,
+    variationSettings: Map<String, Float> = emptyMap(),
+): ReaderFontVariant = ReaderFontVariant(
+    id = "wght-$weight-normal",
+    displayName = displayName,
+    weight = weight,
+    variationSettings = variationSettings,
+    remoteFile = remoteFile,
+)
+
+object ReaderRecommendedFontCatalog {
+    val families: List<ReaderFontFamily> by lazy {
+        listOf(
+            variableFamily(
+                slug = "notoserifjp",
+                name = "Noto Serif JP",
+                category = ReaderFontCategory.SERIF,
+                variants = listOf(
+                    named(200, "ExtraLight"), named(300, "Light"), named(400, "Regular"),
+                    named(500, "Medium"), named(600, "SemiBold"), named(700, "Bold"),
+                    named(800, "ExtraBold"), named(900, "Black"),
+                ),
+                path = "ofl/notoserifjp/NotoSerifJP[wght].ttf",
+                fileName = "NotoSerifJP-wght.ttf",
+                size = 13_574_352,
+                sha256 = "2fd527ba12b6a44ec30d796d633360da0aeba6c5d4af1304ce12bb4dc15a7dfc",
+                range = 200..900,
+            ),
+            staticFamily("shipporimincho", "Shippori Mincho", ReaderFontCategory.SERIF, listOf(
+                named(400, "Regular"), named(500, "Medium"), named(600, "SemiBold"),
+                named(700, "Bold"), named(800, "ExtraBold"),
+            )),
+            staticFamily("bizudpmincho", "BIZ UDPMincho", ReaderFontCategory.SERIF, listOf(
+                named(400, "Regular"), named(700, "Bold"),
+            )),
+            staticFamily("zenoldmincho", "Zen Old Mincho", ReaderFontCategory.SERIF, listOf(
+                named(400, "Regular"), named(500, "Medium"), named(600, "SemiBold"),
+                named(700, "Bold"), named(900, "Black"),
+            )),
+            variableFamily(
+                slug = "notosansjp",
+                name = "Noto Sans JP",
+                category = ReaderFontCategory.SANS_SERIF,
+                variants = listOf(
+                    named(100, "Thin"), named(200, "ExtraLight"), named(300, "Light"),
+                    named(400, "Regular"), named(500, "Medium"), named(600, "SemiBold"),
+                    named(700, "Bold"), named(800, "ExtraBold"), named(900, "Black"),
+                ),
+                path = "ofl/notosansjp/NotoSansJP[wght].ttf",
+                fileName = "NotoSansJP-wght.ttf",
+                size = 9_589_900,
+                sha256 = "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+                range = 100..900,
+            ),
+            staticFamily("bizudpgothic", "BIZ UDPGothic", ReaderFontCategory.SANS_SERIF, listOf(
+                named(400, "Regular"), named(700, "Bold"),
+            )),
+            staticFamily("zenkakugothicnew", "Zen Kaku Gothic New", ReaderFontCategory.SANS_SERIF, listOf(
+                named(300, "Light"), named(400, "Regular"), named(500, "Medium"),
+                named(700, "Bold"), named(900, "Black"),
+            )),
+            staticFamily("mplusrounded1c", "M PLUS Rounded 1c", ReaderFontCategory.ROUNDED, listOf(
+                named(100, "Thin"), named(300, "Light"), named(400, "Regular"),
+                named(500, "Medium"), named(700, "Bold"), named(800, "ExtraBold"), named(900, "Black"),
+            )),
+            staticFamily("kiwimaru", "Kiwi Maru", ReaderFontCategory.ROUNDED, listOf(
+                named(300, "Light"), named(400, "Regular"), named(500, "Medium"),
+            )),
+            staticFamily("kleeone", "Klee One", ReaderFontCategory.HANDWRITING, listOf(
+                named(400, "Regular"), named(600, "SemiBold"),
+            )),
+        )
+    }
+
     private data class StaticMetadata(val size: Long, val sha256: String)
 
     private val staticMetadata = mapOf(
@@ -75,13 +116,15 @@ object ReaderRecommendedFontCatalog {
         "kleeone/SemiBold" to StaticMetadata(8_905_128, "b031ec426c23ca1143ef1f7d58bee7a79efe119ed654152f121c922202b303fd"),
     )
 
-    private fun static(weight: Int, suffix: String) = StaticVariant(weight, suffix)
+    // Names are copied from the pinned files' typographic subfamily or fvar instance metadata.
+    private fun named(weight: Int, displayName: String) =
+        ReaderRecommendedVariantMetadata(weight, displayName)
 
     private fun variableFamily(
         slug: String,
         name: String,
         category: ReaderFontCategory,
-        weights: Iterable<Int>,
+        variants: List<ReaderRecommendedVariantMetadata>,
         path: String,
         fileName: String,
         size: Long,
@@ -89,13 +132,10 @@ object ReaderRecommendedFontCatalog {
         range: IntRange,
     ): ReaderFontFamily {
         val remote = ReaderRemoteFontFile(path, fileName, size, sha256, range)
-        return recommendedFamily(slug, name, category, weights.map { weight ->
-            ReaderFontVariant(
-                id = "wght-$weight-normal",
-                displayName = weightName(weight),
-                weight = weight,
-                variationSettings = mapOf("wght" to weight.toFloat()),
+        return recommendedFamily(slug, name, category, variants.map { variant ->
+            variant.toReaderFontVariant(
                 remoteFile = remote,
+                variationSettings = mapOf("wght" to variant.weight.toFloat()),
             )
         })
     }
@@ -104,26 +144,23 @@ object ReaderRecommendedFontCatalog {
         slug: String,
         name: String,
         category: ReaderFontCategory,
-        variants: List<StaticVariant>,
+        variants: List<ReaderRecommendedVariantMetadata>,
     ): ReaderFontFamily = recommendedFamily(slug, name, category, variants.map { variant ->
         val compactName = name.replace(" ", "")
             .replace("MPLUS", "MPLUS")
         val fileName = when (slug) {
-            "mplusrounded1c" -> "MPLUSRounded1c-${variant.suffix}.ttf"
-            "bizudpmincho" -> "BIZUDPMincho-${variant.suffix}.ttf"
-            "bizudpgothic" -> "BIZUDPGothic-${variant.suffix}.ttf"
-            "kiwimaru" -> "KiwiMaru-${variant.suffix}.ttf"
-            "kleeone" -> "KleeOne-${variant.suffix}.ttf"
-            "shipporimincho" -> "ShipporiMincho-${variant.suffix}.ttf"
-            "zenoldmincho" -> "ZenOldMincho-${variant.suffix}.ttf"
-            "zenkakugothicnew" -> "ZenKakuGothicNew-${variant.suffix}.ttf"
-            else -> "$compactName-${variant.suffix}.ttf"
+            "mplusrounded1c" -> "MPLUSRounded1c-${variant.displayName}.ttf"
+            "bizudpmincho" -> "BIZUDPMincho-${variant.displayName}.ttf"
+            "bizudpgothic" -> "BIZUDPGothic-${variant.displayName}.ttf"
+            "kiwimaru" -> "KiwiMaru-${variant.displayName}.ttf"
+            "kleeone" -> "KleeOne-${variant.displayName}.ttf"
+            "shipporimincho" -> "ShipporiMincho-${variant.displayName}.ttf"
+            "zenoldmincho" -> "ZenOldMincho-${variant.displayName}.ttf"
+            "zenkakugothicnew" -> "ZenKakuGothicNew-${variant.displayName}.ttf"
+            else -> "$compactName-${variant.displayName}.ttf"
         }
-        val metadata = requireNotNull(staticMetadata["$slug/${variant.suffix}"])
-        ReaderFontVariant(
-            id = "wght-${variant.weight}-normal",
-            displayName = weightName(variant.weight),
-            weight = variant.weight,
+        val metadata = requireNotNull(staticMetadata["$slug/${variant.displayName}"])
+        variant.toReaderFontVariant(
             remoteFile = ReaderRemoteFontFile(
                 path = "ofl/$slug/$fileName",
                 fileName = fileName,
@@ -146,17 +183,4 @@ object ReaderRecommendedFontCatalog {
         category = category,
         variants = variants,
     )
-
-    fun weightName(weight: Int): String = when (weight) {
-        100 -> "Thin"
-        200 -> "ExtraLight"
-        300 -> "Light"
-        400 -> "Regular"
-        500 -> "Medium"
-        600 -> "SemiBold"
-        700 -> "Bold"
-        800 -> "ExtraBold"
-        900 -> "Black"
-        else -> weight.toString()
-    }
 }

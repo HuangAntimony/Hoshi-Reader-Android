@@ -68,7 +68,7 @@ object SfntFontParser {
         val italicFromHead = head?.takeIf { it.length >= 46 }
             ?.let { buffer.u16(it.offset + 44) and 2 != 0 }
         val family = names[16] ?: names[1] ?: throw InvalidFontException("Missing font family name.")
-        val subfamily = names[17] ?: names[2] ?: ReaderRecommendedFontCatalog.weightName(weight)
+        val subfamily = names[17] ?: names[2] ?: standardFontWeightName(weight)
         val variation = tables["fvar"]?.let { parseFvar(buffer, bytes, it, names) }
         SfntFontMetadata(
             familyName = family,

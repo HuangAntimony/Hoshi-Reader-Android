@@ -114,3 +114,16 @@ internal fun String.sha256(): String =
     MessageDigest.getInstance("SHA-256")
         .digest(toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
+
+internal fun standardFontWeightName(weight: Int): String = when (weight) {
+    100 -> "Thin"
+    200 -> "ExtraLight"
+    300 -> "Light"
+    400 -> "Regular"
+    500 -> "Medium"
+    600 -> "SemiBold"
+    700 -> "Bold"
+    800 -> "ExtraBold"
+    900 -> "Black"
+    else -> weight.toString()
+}

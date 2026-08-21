@@ -7,6 +7,26 @@ import org.junit.Test
 
 class ReaderFontCatalogTest {
     @Test
+    fun recommendedVariantKeepsTheFontProvidedNameInsteadOfNormalizingItsWeight() {
+        val remote = ReaderRemoteFontFile(
+            path = "ofl/test/Test.ttf",
+            fileName = "Test.ttf",
+            expectedSize = 1,
+            sha256 = "0".repeat(64),
+        )
+
+        val book = ReaderRecommendedVariantMetadata(weight = 400, displayName = "Book")
+            .toReaderFontVariant(remote)
+        val demiBold = ReaderRecommendedVariantMetadata(weight = 600, displayName = "DemiBold")
+            .toReaderFontVariant(remote)
+
+        assertEquals("Book", book.displayName)
+        assertEquals(400, book.weight)
+        assertEquals("DemiBold", demiBold.displayName)
+        assertEquals(600, demiBold.weight)
+    }
+
+    @Test
     fun catalogExposesTheApprovedFamiliesAndWeights() {
         val weights = ReaderRecommendedFontCatalog.families.associate { family ->
             family.displayName to family.variants.map(ReaderFontVariant::weight)
@@ -30,6 +50,23 @@ class ReaderFontCatalogTest {
         assertEquals((200..900 step 100).toList(), weights.getValue("Noto Serif JP"))
         assertEquals((100..900 step 100).toList(), weights.getValue("Noto Sans JP"))
         assertEquals(listOf(400, 600), weights.getValue("Klee One"))
+        assertEquals(
+            listOf(
+                "Thin",
+                "ExtraLight",
+                "Light",
+                "Regular",
+                "Medium",
+                "SemiBold",
+                "Bold",
+                "ExtraBold",
+                "Black",
+            ),
+            ReaderRecommendedFontCatalog.families
+                .first { it.displayName == "Noto Sans JP" }
+                .variants
+                .map(ReaderFontVariant::displayName),
+        )
         assertEquals(
             listOf("Regular", "SemiBold"),
             ReaderRecommendedFontCatalog.families
