@@ -36,11 +36,12 @@ class ReaderFontCatalogTest {
             listOf(
                 "Noto Serif JP",
                 "Shippori Mincho",
-                "BIZ UDPMincho",
+                "BIZ UDMincho",
                 "Zen Old Mincho",
                 "Noto Sans JP",
                 "BIZ UDPGothic",
                 "Zen Kaku Gothic New",
+                "M PLUS 2",
                 "M PLUS Rounded 1c",
                 "Kiwi Maru",
                 "Klee One",
@@ -49,6 +50,7 @@ class ReaderFontCatalogTest {
         )
         assertEquals((200..900 step 100).toList(), weights.getValue("Noto Serif JP"))
         assertEquals((100..900 step 100).toList(), weights.getValue("Noto Sans JP"))
+        assertEquals((100..900 step 100).toList(), weights.getValue("M PLUS 2"))
         assertEquals(listOf(400, 600), weights.getValue("Klee One"))
         assertEquals(
             listOf(
@@ -85,6 +87,31 @@ class ReaderFontCatalogTest {
             assertSame(family.variants.first().remoteFile, variant.remoteFile)
         }
         assertTrue(requireNotNull(family.variants.first().remoteFile).url.endsWith("NotoSansJP%5Bwght%5D.ttf"))
+    }
+
+    @Test
+    fun mPlus2VariantsShareOneVariableFontDownload() {
+        val family = ReaderRecommendedFontCatalog.families.first { it.displayName == "M PLUS 2" }
+
+        assertEquals(
+            listOf(
+                "Thin",
+                "ExtraLight",
+                "Light",
+                "Regular",
+                "Medium",
+                "SemiBold",
+                "Bold",
+                "ExtraBold",
+                "Black",
+            ),
+            family.variants.map(ReaderFontVariant::displayName),
+        )
+        assertTrue(family.variants.all { it.remoteFile != null })
+        family.variants.drop(1).forEach { variant ->
+            assertSame(family.variants.first().remoteFile, variant.remoteFile)
+        }
+        assertTrue(requireNotNull(family.variants.first().remoteFile).url.endsWith("MPLUS2%5Bwght%5D.ttf"))
     }
 
     @Test

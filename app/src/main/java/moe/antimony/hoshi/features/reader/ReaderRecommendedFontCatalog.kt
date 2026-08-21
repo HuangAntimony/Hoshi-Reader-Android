@@ -38,7 +38,7 @@ object ReaderRecommendedFontCatalog {
                 named(400, "Regular"), named(500, "Medium"), named(600, "SemiBold"),
                 named(700, "Bold"), named(800, "ExtraBold"),
             )),
-            staticFamily("bizudpmincho", "BIZ UDPMincho", ReaderFontCategory.SERIF, listOf(
+            staticFamily("bizudmincho", "BIZ UDMincho", ReaderFontCategory.SERIF, listOf(
                 named(400, "Regular"), named(700, "Bold"),
             )),
             staticFamily("zenoldmincho", "Zen Old Mincho", ReaderFontCategory.SERIF, listOf(
@@ -67,6 +67,21 @@ object ReaderRecommendedFontCatalog {
                 named(300, "Light"), named(400, "Regular"), named(500, "Medium"),
                 named(700, "Bold"), named(900, "Black"),
             )),
+            variableFamily(
+                slug = "mplus2",
+                name = "M PLUS 2",
+                category = ReaderFontCategory.SANS_SERIF,
+                variants = listOf(
+                    named(100, "Thin"), named(200, "ExtraLight"), named(300, "Light"),
+                    named(400, "Regular"), named(500, "Medium"), named(600, "SemiBold"),
+                    named(700, "Bold"), named(800, "ExtraBold"), named(900, "Black"),
+                ),
+                path = "ofl/mplus2/MPLUS2[wght].ttf",
+                fileName = "MPLUS2-wght.ttf",
+                size = 4_201_608,
+                sha256 = "2e4f45c2391355fb03195da4854ffbe85fea49bfdff5cc51020238083af6b75c",
+                range = 100..900,
+            ),
             staticFamily("mplusrounded1c", "M PLUS Rounded 1c", ReaderFontCategory.ROUNDED, listOf(
                 named(100, "Thin"), named(300, "Light"), named(400, "Regular"),
                 named(500, "Medium"), named(700, "Bold"), named(800, "ExtraBold"), named(900, "Black"),
@@ -88,8 +103,8 @@ object ReaderRecommendedFontCatalog {
         "shipporimincho/SemiBold" to StaticMetadata(8_650_032, "bc7925544894a91466449adb73c6d943f50c3e53eb1c74d0673fe2dbafcd4d2d"),
         "shipporimincho/Bold" to StaticMetadata(8_563_788, "63bc4eddc74793f671c3ab827c5175e773ffbe569d0bf50ee65375ea9e3bc286"),
         "shipporimincho/ExtraBold" to StaticMetadata(8_563_208, "bdb787644b4b347e9a7efdd576f0d16ee4528cc9b5c86d23e06fa1a14ae0444c"),
-        "bizudpmincho/Regular" to StaticMetadata(6_156_444, "dbcea04578ac1e9d3484525e870ce491bd04361768f4d2ba4b827d96e20f891d"),
-        "bizudpmincho/Bold" to StaticMetadata(7_109_432, "99618e39b881597efc03d58706bd194757c968c1bf7a7017a893efead6b1b260"),
+        "bizudmincho/Regular" to StaticMetadata(6_153_932, "468ee6d9b149ca144809e03841bf18740ecf014e055a00da6ecaf1aaf4165af2"),
+        "bizudmincho/Bold" to StaticMetadata(7_107_032, "1f077f8f84c1e09d5c4acdd6828048180c2f733ae5ae13271f48cf01bee4ae83"),
         "zenoldmincho/Regular" to StaticMetadata(5_442_512, "4c051a78a21c4e8e9dccf1c754776d33f356b8cc6ef95d9b64761b9bae814b84"),
         "zenoldmincho/Medium" to StaticMetadata(5_502_836, "e60c7961e5110d0f08f902de43fe60865f1538845ff2092c779837257efac3bf"),
         "zenoldmincho/SemiBold" to StaticMetadata(5_521_388, "d98b9783652081f7f9e662b0568bddeaf6462962dd39edf68781268eb60ea3a0"),
@@ -150,7 +165,7 @@ object ReaderRecommendedFontCatalog {
             .replace("MPLUS", "MPLUS")
         val fileName = when (slug) {
             "mplusrounded1c" -> "MPLUSRounded1c-${variant.displayName}.ttf"
-            "bizudpmincho" -> "BIZUDPMincho-${variant.displayName}.ttf"
+            "bizudmincho" -> "BIZUDMincho-${variant.displayName}.ttf"
             "bizudpgothic" -> "BIZUDPGothic-${variant.displayName}.ttf"
             "kiwimaru" -> "KiwiMaru-${variant.displayName}.ttf"
             "kleeone" -> "KleeOne-${variant.displayName}.ttf"
