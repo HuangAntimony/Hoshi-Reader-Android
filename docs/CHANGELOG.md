@@ -21,6 +21,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Open EPUB pages that use paired XHTML viewport metadata instead of remaining
+  on the Reader loading screen.
 - Keep oversized lookup popup frames fully inside the visible screen so their
   bottom border and all scrollable content remain reachable.
 - Prefer Arial throughout lookup popups before Android's Japanese font fallback

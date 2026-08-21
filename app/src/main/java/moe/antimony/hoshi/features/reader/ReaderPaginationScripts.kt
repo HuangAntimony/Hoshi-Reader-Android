@@ -108,6 +108,7 @@ internal object ReaderPaginationScripts {
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         val body = template
             .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
+            .replace("__HOSHI_READER_VIEWPORT_SCRIPT__", source.readerViewport)
             .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
             .replace("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__", source.readerTextSemantics)
             .replace("__HOSHI_READER_DOM_TEXT_SCRIPT__", source.readerDomText)
@@ -152,6 +153,7 @@ private data class ReaderPaginationAssetSource(
     val paginated: String,
     val continuous: String,
     val visualNovel: String,
+    val readerViewport: String,
     val readerSasayaki: String,
     val readerTextSemantics: String,
     val readerDomText: String,
@@ -168,6 +170,7 @@ private data class ReaderPaginationAssetSource(
                     paginated = assets.readerPaginatedJs,
                     continuous = assets.readerContinuousJs,
                     visualNovel = assets.readerVisualNovelJs,
+                    readerViewport = assets.readerViewportJs,
                     readerSasayaki = assets.readerSasayakiJs,
                     readerTextSemantics = assets.readerTextSemanticsJs,
                     readerDomText = assets.readerDomTextJs,
@@ -189,6 +192,7 @@ private object SourceTreeReaderPaginationAssets {
             paginated = readSourceAsset("hoshi-web/reader/reader-paginated.js"),
             continuous = readSourceAsset("hoshi-web/reader/reader-continuous.js"),
             visualNovel = readSourceAsset("hoshi-web/reader/reader-visual-novel.js"),
+            readerViewport = readSourceAsset("hoshi-web/reader/reader-viewport.js"),
             readerSasayaki = readSourceAsset("hoshi-web/reader/reader-sasayaki.js"),
             readerTextSemantics = readSourceAsset("hoshi-web/reader/reader-text-semantics.js"),
             readerDomText = readSourceAsset("hoshi-web/reader/reader-dom-text.js"),

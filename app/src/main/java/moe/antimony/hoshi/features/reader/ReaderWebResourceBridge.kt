@@ -84,7 +84,7 @@ internal class ReaderWebResourceBridge(
         val rawData = book.readResource(path) ?: return null
         val normalizedMediaType = mediaType.substringBefore(';').trim()
         val data = if (normalizedMediaType.isReaderHtmlMediaType()) {
-            readerHtmlWithEarlyViewport(rawData.toString(Charsets.UTF_8)).toByteArray(Charsets.UTF_8)
+            rawData.normalizeLeadingXmlDeclaration()
         } else {
             sanitizeReaderResource(mediaType, rawData)
         }
@@ -101,6 +101,17 @@ internal class ReaderWebResourceBridge(
             encoding = encoding,
             data = data,
         )
+    }
+}
+
+private fun ByteArray.normalizeLeadingXmlDeclaration(): ByteArray {
+    val html = toString(Charsets.UTF_8)
+    if (html.startsWith("<?xml", ignoreCase = true)) return this
+    val trimmed = html.trimStart()
+    return if (trimmed.startsWith("<?xml", ignoreCase = true)) {
+        trimmed.toByteArray(Charsets.UTF_8)
+    } else {
+        this
     }
 }
 

@@ -1,3 +1,4 @@
+__HOSHI_READER_VIEWPORT_SCRIPT__
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 __HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__
@@ -178,6 +179,7 @@ window.hoshiReader = {
   },
   initialize: function() {
     if (this.readyPromise) return this.readyPromise;
+    window.hoshiReaderViewport.ensureDeviceViewport();
     this.readyPromise = Promise.resolve(document.fonts && document.fonts.ready)
       .then(() => {
         this.detachChapterSource();

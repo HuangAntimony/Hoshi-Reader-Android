@@ -51,17 +51,19 @@ class ReaderWebResourceBridgeTest {
     }
 
     @Test
-    fun servesEpubHtmlWithSingleEarlyViewportMeta() {
+    fun servesValidEpubXhtmlWithoutRewritingPublisherMarkup() {
+        val xhtml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml">
+            <head><meta name="viewport" content="width=320"></meta></head>
+            <body><p>Reader text</p></body>
+            </html>
+        """.trimIndent()
         val bridge = ReaderWebResourceBridge(
             book = bookWithResource(
                 path = "chapter.xhtml",
                 mediaType = "application/xhtml+xml",
-                bytes = """
-                    <html>
-                    <head><meta name="viewport" content="width=320"></head>
-                    <body><p>Reader text</p></body>
-                    </html>
-                """.trimIndent().toByteArray(),
+                bytes = xhtml.toByteArray(),
             ),
             fontFileForRequest = { null },
         )
@@ -71,10 +73,32 @@ class ReaderWebResourceBridgeTest {
 
         assertEquals("application/xhtml+xml", resource.mediaType)
         assertEquals("UTF-8", resource.encoding)
-        assertEquals(1, Regex("""<meta\s+name=["']viewport["']""").findAll(html).count())
-        assertTrue(html.contains("width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"))
-        assertTrue(html.contains("""user-scalable=no" />"""))
-        assertTrue(html.contains("<p>Reader text</p>"))
+        assertEquals(xhtml, html)
+    }
+
+    @Test
+    fun keepsXmlDeclarationAtDocumentStartForAndroidXhtmlParsing() {
+        val bridge = ReaderWebResourceBridge(
+            book = bookWithResource(
+                path = "chapter.xhtml",
+                mediaType = "application/xhtml+xml",
+                bytes = """
+
+                      <?xml version="1.0" encoding="UTF-8"?>
+                      <html xmlns="http://www.w3.org/1999/xhtml">
+                      <head><title>Reader</title></head>
+                      <body><p>Reader text</p></body>
+                      </html>
+                """.trimIndent().toByteArray(),
+            ),
+            fontFileForRequest = { null },
+        )
+
+        val resource = bridge.resourceForUrl("https://appassets.androidplatform.net/epub/chapter.xhtml")
+        val html = resource!!.data.decodeToString()
+
+        assertTrue(html.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
+        assertTrue(html.contains("<body><p>Reader text</p></body>"))
     }
 
     @Test

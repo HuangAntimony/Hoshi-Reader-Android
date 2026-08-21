@@ -568,30 +568,6 @@ internal fun readerWebViewLoadKey(
 internal fun readerWebViewRestoreToken(loadKey: String, restoreEpoch: Int): String =
     "$loadKey#$restoreEpoch"
 
-internal fun readerHtmlWithEarlyViewport(html: String): String {
-    val normalizedHtml = html.removeWhitespaceBeforeXmlDeclaration()
-    val withoutViewport = readerViewportMetaRegex.replace(normalizedHtml, "")
-    val head = readerHeadOpenTagRegex.find(withoutViewport)
-    val viewport = """<meta name="viewport" content="$ReaderViewportContent" />"""
-    if (head != null) {
-        val insertAt = head.range.last + 1
-        return withoutViewport.substring(0, insertAt) + "\n$viewport" + withoutViewport.substring(insertAt)
-    }
-    return withoutViewport
-}
-
-private fun String.removeWhitespaceBeforeXmlDeclaration(): String {
-    val trimmed = trimStart()
-    return if (trimmed.startsWith("<?xml", ignoreCase = true)) trimmed else this
-}
-
-private const val ReaderViewportContent = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-
-private val readerViewportMetaRegex =
-    Regex("""(?is)<meta\b(?=[^>]*\bname\s*=\s*(['"])viewport\1)[^>]*>""")
-
-private val readerHeadOpenTagRegex = Regex("""(?is)<head\b[^>]*>""")
-
 internal fun readerShouldReserveSasayakiTopToggle(bookRoot: File?, settings: SasayakiSettings): Boolean =
     settings.enabled &&
         settings.showReaderToggle &&

@@ -16,6 +16,7 @@ class ReaderWebAssetsTest {
             "hoshi-web/reader/reader-paginated.js",
             "hoshi-web/reader/reader-continuous.js",
             "hoshi-web/reader/reader-visual-novel.js",
+            "hoshi-web/reader/reader-viewport.js",
             "hoshi-web/reader/reader-text-semantics.js",
             "hoshi-web/reader/reader-dom-text.js",
             "hoshi-web/reader/reader-media-semantics.js",

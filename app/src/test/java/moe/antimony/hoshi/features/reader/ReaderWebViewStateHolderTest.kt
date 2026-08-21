@@ -526,63 +526,6 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun readerChapterHtmlInjectsSingleEarlyViewportMetaBeforeBodyContent() {
-        val html = """
-            <!doctype html>
-            <html>
-            <head>
-                <title>Chapter</title>
-                <meta name="viewport" content="width=320">
-            </head>
-            <body><p>Reader text</p></body>
-            </html>
-        """.trimIndent()
-
-        val prepared = readerHtmlWithEarlyViewport(html)
-
-        assertEquals(1, Regex("""<meta\s+name=["']viewport["']""").findAll(prepared).count())
-        assertTrue(
-            prepared.indexOf("width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no") <
-                prepared.indexOf("<body>"),
-        )
-        assertTrue(prepared.contains("<p>Reader text</p>"))
-    }
-
-    @Test
-    fun readerChapterHtmlKeepsXmlDeclarationAtDocumentStart() {
-        val html = """
-
-              <?xml version="1.0" encoding="UTF-8"?>
-              <html xmlns="http://www.w3.org/1999/xhtml">
-              <head><title>Reader</title></head>
-              <body><p>Reader text</p></body>
-              </html>
-        """.trimIndent()
-
-        val prepared = readerHtmlWithEarlyViewport(html)
-
-        assertTrue(prepared.startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
-        assertFalse(prepared.startsWith("\n"))
-        assertFalse(prepared.startsWith(" "))
-        assertTrue(prepared.contains("<meta name=\"viewport\""))
-    }
-
-    @Test
-    fun readerChapterHtmlDoesNotFabricateHeadForMalformedXhtmlLikeIos() {
-        val html = """
-            <html>
-            <body><p>Reader text</p></body>
-            </html>
-        """.trimIndent()
-
-        val prepared = readerHtmlWithEarlyViewport(html)
-
-        assertFalse(prepared.contains("<head>"))
-        assertFalse(prepared.contains("<meta name=\"viewport\""))
-        assertTrue(prepared.contains("<p>Reader text</p>"))
-    }
-
-    @Test
     fun sasayakiTopToggleSpaceIsReservedBeforeSidecarsAreParsed() {
         val root = createTempDirectory("hoshi-sasayaki-sidecar").toFile()
         try {

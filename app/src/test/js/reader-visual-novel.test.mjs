@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
+const readerViewportUrl = new URL('../../main/assets/hoshi-web/reader/reader-viewport.js', import.meta.url);
 const readerTextSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-text-semantics.js', import.meta.url);
 const readerMediaSemanticsUrl = new URL('../../main/assets/hoshi-web/reader/reader-media-semantics.js', import.meta.url);
 const readerVnContentStreamUrl = new URL('../../main/assets/hoshi-web/reader/reader-vn-content-stream.js', import.meta.url);
@@ -16,6 +17,10 @@ const selectionJapaneseUrl = new URL('../../main/assets/hoshi-web/shared/selecti
 
 function readerTextSemanticsSource() {
     return fs.readFileSync(readerTextSemanticsUrl, 'utf8');
+}
+
+function readerViewportSource() {
+    return fs.readFileSync(readerViewportUrl, 'utf8');
 }
 
 function readerVnContentStreamSource() {
@@ -50,6 +55,7 @@ function readerSelectionSource() {
 
 function readerSource() {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
+        .replaceAll('__HOSHI_READER_VIEWPORT_SCRIPT__', readerViewportSource())
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', readerTextSemanticsSource())
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', readerVnContentStreamSource())
@@ -71,6 +77,7 @@ function readerSource() {
 
 function configuredReaderSource(options = {}) {
     return fs.readFileSync(readerVisualNovelUrl, 'utf8')
+        .replaceAll('__HOSHI_READER_VIEWPORT_SCRIPT__', options.viewportScript ?? readerViewportSource())
         .replaceAll('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replaceAll('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
         .replaceAll('__HOSHI_READER_VN_CONTENT_STREAM_SCRIPT__', options.contentStreamScript ?? readerVnContentStreamSource())
@@ -618,6 +625,11 @@ function matchesSelector(node, selector) {
     if (selector.startsWith('[') && selector.endsWith(']')) {
         return node.hasAttribute(selector.slice(1, -1));
     }
+    const tagAttributeMatch = selector.match(/^([a-z]+)\[([a-z]+)="([^"]+)"\]$/i);
+    if (tagAttributeMatch) {
+        return node.tagName === tagAttributeMatch[1].toUpperCase() &&
+            (node.getAttribute(tagAttributeMatch[2]) ?? node[tagAttributeMatch[2]]) === tagAttributeMatch[3];
+    }
     return node.tagName === selector.toUpperCase();
 }
 
@@ -949,6 +961,24 @@ test('visual novel reader asset defines the expected public surface', () => {
     });
     assert.equal(typeof reader.nodeStartOffsets.get, 'function');
     assert.equal(typeof reader.nodeStartRawOffsets.get, 'function');
+});
+
+test('visual novel reader replaces the publisher viewport after parsing', async () => {
+    const publisherViewport = new TestElement('meta');
+    publisherViewport.setAttribute('name', 'viewport');
+    publisherViewport.setAttribute('content', 'width=1200');
+    const loaded = loadReader(bodyWith(p('本文。')));
+    loaded.document.head.appendChild(publisherViewport);
+
+    await loaded.reader.initialize();
+
+    const viewports = loaded.document.querySelectorAll('meta[name="viewport"]');
+    assert.equal(viewports.length, 1);
+    assert.notEqual(viewports[0], publisherViewport);
+    assert.equal(
+        viewports[0].content,
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no',
+    );
 });
 
 test('visual novel reader requires the shared text semantics asset', async () => {
