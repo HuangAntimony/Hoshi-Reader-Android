@@ -621,6 +621,8 @@
     <string name="anki_connect_api_key_configured">已配置</string>
     <string name="anki_connect_use">使用 AnkiConnect</string>
     <string name="anki_connect_use_description">这会用 AnkiConnect JSON 请求替代 AnkiDroid 请求。</string>
+    <string name="anki_connect_setup_warning_title">绝大多数用户不需要 AnkiConnect</string>
+    <string name="anki_connect_setup_warning_message">Hoshi 可以直接通过 AnkiDroid 获取牌组和笔记类型并制卡，无需额外设置。\n\nAnkiConnect 仅适合已经自行部署并了解其配置方式的用户。开启后，它会替代 AnkiDroid；如果没有正确配置，将导致无法获取牌组和笔记类型，也无法制卡。除非你确定需要它，否则请保持关闭。</string>
     <string name="anki_connect_address_help">互联网主机请使用 HTTPS。HTTP 仅允许 localhost 和私有网络地址。</string>
     <string name="anki_connect_connection">连接</string>
     <string name="anki_connect_connected" comment="AnkiConnect connection state, intentionally matching sync connection state.">已连接</string>

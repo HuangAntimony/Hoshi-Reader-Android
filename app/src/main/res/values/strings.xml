@@ -623,6 +623,8 @@
     <string name="anki_connect_api_key_configured">Configured</string>
     <string name="anki_connect_use">Use AnkiConnect</string>
     <string name="anki_connect_use_description">This replaces AnkiDroid requests with AnkiConnect JSON requests.</string>
+    <string name="anki_connect_setup_warning_title">Most users do not need AnkiConnect</string>
+    <string name="anki_connect_setup_warning_message">Hoshi can fetch decks and note types and create cards directly through AnkiDroid with no extra setup.\n\nAnkiConnect is intended only for users who run their own instance and understand how to configure it. Once enabled, it replaces AnkiDroid; incorrect setup will prevent Hoshi from fetching decks and note types or creating cards. Unless you know you need it, leave this switch off.</string>
     <string name="anki_connect_address_help">Use HTTPS for internet hosts. HTTP is accepted only for localhost and private network addresses.</string>
     <string name="anki_connect_connection">Connection</string>
     <string name="anki_connect_connected" comment="AnkiConnect connection state, intentionally matching sync connection state.">Connected</string>

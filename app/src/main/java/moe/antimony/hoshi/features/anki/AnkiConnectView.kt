@@ -1,20 +1,26 @@
 package moe.antimony.hoshi.features.anki
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,6 +57,7 @@ fun AnkiConnectView(
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val enabled = uiState.settings.backendKind == AnkiBackendKind.AnkiConnect
+    val showSetupWarning = shouldShowAnkiConnectSetupWarning(uiState.settings.backendKind)
     var editingAddress by remember { mutableStateOf(false) }
     var addressInput by remember { mutableStateOf("") }
     var editingApiKey by remember { mutableStateOf(false) }
@@ -159,6 +167,35 @@ fun AnkiConnectView(
                             )
                         },
                     )
+                    if (showSetupWarning) {
+                        HorizontalDivider()
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.errorContainer)
+                                .padding(16.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ReportProblem,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = stringResource(R.string.anki_connect_setup_warning_title),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Text(
+                                    text = stringResource(R.string.anki_connect_setup_warning_message),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                    }
                 }
             }
             if (enabled) {
@@ -268,6 +305,9 @@ fun AnkiConnectView(
         }
     }
 }
+
+internal fun shouldShowAnkiConnectSetupWarning(backendKind: AnkiBackendKind): Boolean =
+    backendKind == AnkiBackendKind.AnkiDroid
 
 @Composable
 private fun AnkiConnectCard(content: @Composable () -> Unit) {

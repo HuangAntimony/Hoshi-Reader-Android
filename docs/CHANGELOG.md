@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Warn users before enabling AnkiConnect that most setups can create cards
+  directly through AnkiDroid and that an incorrect AnkiConnect configuration
+  prevents fetching decks and note types or creating cards.
 - Add term dictionary categories, Kanji dictionary import/management and popup
   lookup, a verified one-tap stroke-order font download for Kanji users, plus
   complete pitch data with H/L patterns and nasal/devoice markers.
