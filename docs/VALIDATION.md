@@ -243,6 +243,12 @@ Validate relevant dictionary/audio changes with:
   across profile switches and dictionary backup restore. Categorize term
   dictionaries as none/monolingual/bilingual/exclude and confirm excluded data
   remains installed while disappearing immediately from lookup.
+- stroke-order font download visibility: confirm it is absent without Kanji
+  dictionaries, appears after importing one, shows the 17 MB confirmation,
+  automatically imports a verified `KanjiStrokeOrders` font, and remains visible
+  but disabled afterward. Confirm a failed or interrupted download leaves no
+  partial font and restores the enabled action, then verify numbered strokes in
+  Reader, Dictionary, and Process Text Kanji popups.
 - local audio database source ordering and per-source enable controls with
   imported MP3 and Opus `android.db` files. Disable the highest-priority source
   and confirm lookup playback and Anki audio export use the next enabled source;

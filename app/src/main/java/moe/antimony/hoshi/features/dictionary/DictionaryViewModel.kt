@@ -29,6 +29,7 @@ import moe.antimony.hoshi.dictionary.DictionaryUpdateStage
 import moe.antimony.hoshi.dictionary.DictionaryUpdateSummary
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.di.IoDispatcher
+import moe.antimony.hoshi.features.reader.KanjiStrokeOrderFontInstaller
 import moe.antimony.hoshi.ui.UiText
 
 internal interface DictionaryViewModelRepository {
@@ -43,6 +44,8 @@ internal interface DictionaryViewModelRepository {
         onProgress: (DictionaryUpdateProgress) -> Unit,
     )
     suspend fun updateDictionaries(onProgress: (DictionaryUpdateProgress) -> Unit): DictionaryUpdateSummary
+    fun isStrokeOrderFontInstalled(): Boolean
+    suspend fun installStrokeOrderFont()
     suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean
     suspend fun setDictionaryCategory(fileName: String, category: DictionaryCategory): Boolean
     suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean
@@ -70,6 +73,7 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     private val settingsRepository: DictionarySettingsRepository,
     private val dictionaryUpdateService: DictionaryUpdateService,
     private val mutationCoordinator: DictionaryMutationCoordinator,
+    private val strokeOrderFontInstaller: KanjiStrokeOrderFontInstaller,
 ) : DictionaryViewModelRepository {
     override val settings: Flow<DictionarySettings> = settingsRepository.settings
     override val mutationState: StateFlow<DictionaryMutationState> = mutationCoordinator.state
@@ -135,6 +139,12 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ): DictionaryUpdateSummary =
         dictionaryUpdateService.updateDictionaries(onProgress)
+
+    override fun isStrokeOrderFontInstalled(): Boolean = strokeOrderFontInstaller.isInstalled()
+
+    override suspend fun installStrokeOrderFont() {
+        strokeOrderFontInstaller.install()
+    }
 
     override suspend fun setDictionaryEnabled(type: DictionaryType, fileName: String, enabled: Boolean): Boolean =
         mutationCoordinator.runExclusive(DictionaryMutationOperation.Edit) {
@@ -290,6 +300,36 @@ internal class DictionaryViewModel : ViewModel {
     fun importRecommendedDictionaries(dictionaries: List<RecommendedDictionary>) {
         importRecommendedDictionaries { onProgress ->
             repository.importRecommendedDictionaries(dictionaries, onProgress)
+        }
+    }
+
+    fun installStrokeOrderFont() {
+        if (!_uiState.value.canDownloadStrokeOrderFont) return
+        scope.launch {
+            _uiState.update {
+                it.copy(
+                    isInstallingStrokeOrderFont = true,
+                    currentImportMessage = UiText.Resource(R.string.dictionary_stroke_order_font_downloading),
+                    errorMessage = null,
+                )
+            }
+            try {
+                withContext(ioDispatcher) { repository.installStrokeOrderFont() }
+                _uiState.update { it.copy(strokeOrderFontInstalled = true) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = UiText.Resource(R.string.dictionary_stroke_order_font_download_failed))
+                }
+            } finally {
+                _uiState.update {
+                    it.copy(
+                        isInstallingStrokeOrderFont = false,
+                        currentImportMessage = null,
+                    )
+                }
+            }
         }
     }
 
@@ -503,13 +543,18 @@ internal class DictionaryViewModel : ViewModel {
     }
 
     private suspend fun reloadDictionaryLists(clearError: Boolean) {
-        val (dictionaries, updatableDictionaries) = withContext(ioDispatcher) {
-            repository.loadDictionaries() to repository.updatableDictionaries()
+        val (dictionaries, updatableDictionaries, strokeOrderFontInstalled) = withContext(ioDispatcher) {
+            Triple(
+                repository.loadDictionaries(),
+                repository.updatableDictionaries(),
+                repository.isStrokeOrderFontInstalled(),
+            )
         }
         _uiState.update { state ->
             state.copy(
                 dictionaries = dictionaries,
                 updatableDictionaries = updatableDictionaries,
+                strokeOrderFontInstalled = strokeOrderFontInstalled,
                 errorMessage = if (clearError) null else state.errorMessage,
             )
         }

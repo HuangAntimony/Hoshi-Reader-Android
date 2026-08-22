@@ -115,6 +115,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `Fonts/System/` and cannot be deleted from the UI. A private atomic alias
   sidecar preserves legacy basename selections and dictionary CSS references
   when a parsed family/weight/style slot is replaced by a new internal file.
+- Dictionary settings exposes a stroke-order font download after the active
+  profile has at least one Kanji dictionary. The screen-scoped installer pins
+  the source file size and SHA-256, downloads through a private temporary file,
+  and enters the verified result through `ReaderFontManager`'s normal user-font
+  import path. An already installed `KanjiStrokeOrders` family keeps the action
+  visible but disabled.
 - `ReaderAppearanceViewModel` owns visible font import/download/delete state.
   Recommended files come only from the pinned internal Google Fonts catalog,
   are streamed to a same-directory temporary file, and become visible only

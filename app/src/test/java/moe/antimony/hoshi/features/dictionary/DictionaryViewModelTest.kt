@@ -68,6 +68,84 @@ class DictionaryViewModelTest {
     }
 
     @Test
+    fun strokeOrderFontActionAppearsForKanjiDictionariesAndDisablesWhenInstalled() {
+        val kanji = dictionary("kanjidic", "KANJIDIC")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(kanji)),
+            strokeOrderFontInstalled = false,
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+
+        viewModel.reload()
+
+        assertTrue(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertTrue(viewModel.uiState.value.canDownloadStrokeOrderFont)
+
+        repository.strokeOrderFontInstalled = true
+        viewModel.reload()
+
+        assertTrue(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+    }
+
+    @Test
+    fun strokeOrderFontActionStaysHiddenWithoutKanjiDictionaries() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(dictionary("term", "JMdict"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+
+        viewModel.reload()
+
+        assertFalse(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+    }
+
+    @Test
+    fun strokeOrderFontInstallPublishesBusyStateAndDisablesTheActionAfterSuccess() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(dictionary("kanjidic", "KANJIDIC"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+        var busyStateObserved = false
+        repository.onInstallStrokeOrderFont = {
+            busyStateObserved = viewModel.uiState.value.isInstallingStrokeOrderFont &&
+                !viewModel.uiState.value.canDownloadStrokeOrderFont
+            repository.strokeOrderFontInstalled = true
+        }
+
+        viewModel.installStrokeOrderFont()
+
+        assertTrue(busyStateObserved)
+        assertTrue(repository.strokeOrderFontInstalled)
+        assertTrue(viewModel.uiState.value.strokeOrderFontInstalled)
+        assertFalse(viewModel.uiState.value.isInstallingStrokeOrderFont)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun strokeOrderFontInstallFailureRestoresEnabledActionAndShowsLocalizedError() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(dictionary("kanjidic", "KANJIDIC"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+        repository.onInstallStrokeOrderFont = { error("network failure") }
+
+        viewModel.installStrokeOrderFont()
+
+        assertFalse(viewModel.uiState.value.isInstallingStrokeOrderFont)
+        assertFalse(viewModel.uiState.value.strokeOrderFontInstalled)
+        assertTrue(viewModel.uiState.value.canDownloadStrokeOrderFont)
+        assertEquals(
+            "resource:${R.string.dictionary_stroke_order_font_download_failed}:",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
+    }
+
+    @Test
     fun setDictionaryCategoryPersistsTermCategoryAndRefreshesState() {
         val term = dictionary("term", "JMdict")
         val repository = FakeDictionaryRepository(
@@ -686,6 +764,7 @@ private class FakeDictionaryRepository(
     settings: DictionarySettings = DictionarySettings(),
     var updatableDictionaries: List<DictionaryUpdateCandidate> = emptyList(),
     private val failedImportItems: Set<DictionaryImportItem> = emptySet(),
+    var strokeOrderFontInstalled: Boolean = false,
 ) : DictionaryViewModelRepository {
     private val settingsFlow = MutableStateFlow(settings)
     override val settings: StateFlow<DictionarySettings> = settingsFlow
@@ -697,6 +776,7 @@ private class FakeDictionaryRepository(
     var onMove: (suspend () -> Unit)? = null
     var onCategory: (suspend (DictionaryCategory) -> Boolean)? = null
     var onUpdate: (suspend ((DictionaryUpdateProgress) -> Unit) -> DictionaryUpdateSummary)? = null
+    var onInstallStrokeOrderFont: (suspend () -> Unit)? = null
     val enabledCalls = mutableListOf<String>()
     val deleteCalls = mutableListOf<String>()
     val moveCalls = mutableListOf<Pair<DictionaryType, Pair<Int, Int>>>()
@@ -751,6 +831,13 @@ private class FakeDictionaryRepository(
 
     override suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         updatableDictionaries
+
+    override fun isStrokeOrderFontInstalled(): Boolean = strokeOrderFontInstalled
+
+    override suspend fun installStrokeOrderFont() {
+        onInstallStrokeOrderFont?.invoke()
+        strokeOrderFontInstalled = true
+    }
 
     override suspend fun updateDictionaries(
         onProgress: (DictionaryUpdateProgress) -> Unit,

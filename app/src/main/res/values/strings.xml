@@ -229,6 +229,11 @@
     <string name="dictionary_importing_named_format">Importing %1$s</string>
     <string name="dictionary_importing_default">Importing dictionary</string>
     <string name="dictionary_download_recommended">Download Recommended Dictionaries</string>
+    <string name="dictionary_download_stroke_order_font">Download Stroke Order Font</string>
+    <string name="dictionary_stroke_order_font_dialog_title">Download Font</string>
+    <string name="dictionary_stroke_order_font_dialog_message">This will download and automatically import the Kanji stroke order font (17 MB).</string>
+    <string name="dictionary_stroke_order_font_downloading">Downloading and importing the stroke order font…</string>
+    <string name="dictionary_stroke_order_font_download_failed">Couldn’t download and import the stroke order font. Check your connection and try again.</string>
     <string name="dictionary_supported_archive_types">Yomitan term, frequency, and pitch dictionaries (.zip) are supported</string>
     <string name="dictionary_default_tab">Default to Dictionary Tab</string>
     <string name="dictionary_empty_type_format">No %1$s Dictionaries</string>

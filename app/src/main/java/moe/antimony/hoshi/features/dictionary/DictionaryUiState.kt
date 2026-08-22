@@ -13,6 +13,8 @@ internal data class DictionaryUiState(
     val mutationOperation: DictionaryMutationOperation? = null,
     val isImporting: Boolean = false,
     val isUpdating: Boolean = false,
+    val isInstallingStrokeOrderFont: Boolean = false,
+    val strokeOrderFontInstalled: Boolean = false,
     val showBlockingProgress: Boolean = false,
     val currentImportMessage: UiText? = null,
     val errorMessage: UiText? = null,
@@ -22,6 +24,17 @@ internal data class DictionaryUiState(
 
     val currentDictionaries: List<DictionaryInfo>
         get() = dictionaries[selectedType].orEmpty()
+
+    val showStrokeOrderFontDownload: Boolean
+        get() = dictionaries[DictionaryType.Kanji].orEmpty().isNotEmpty()
+
+    val canDownloadStrokeOrderFont: Boolean
+        get() = showStrokeOrderFontDownload &&
+            !strokeOrderFontInstalled &&
+            !isInstallingStrokeOrderFont &&
+            !isMutationInProgress &&
+            !isImporting &&
+            !isUpdating
 }
 
 internal data class DictionaryListLayout(
