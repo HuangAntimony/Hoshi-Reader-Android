@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.features.audio.LocalAudioFile
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.LocalAudioResolver
@@ -29,6 +30,7 @@ internal class AnkiRepository(
     private val localAudioRepository: LocalAudioRepository,
     private val ankiConnectBackendFactory: (String, String) -> AnkiBackend,
     private val loadDictionaryMedia: (DictionaryMedia) -> ByteArray?,
+    private val loadTermDictionaries: () -> List<AnkiTermDictionary>,
 ) {
     @Inject
     constructor(
@@ -46,6 +48,14 @@ internal class AnkiRepository(
             AnkiConnectBackend(endpoint, apiKey = apiKey)
         },
         loadDictionaryMedia = { media -> dictionaryRepository.dictionaryMedia(media.dictionary, media.path) },
+        loadTermDictionaries = {
+            dictionaryRepository.loadDictionaries(DictionaryType.Term).map { dictionary ->
+                AnkiTermDictionary(
+                    name = dictionary.index.title,
+                    category = dictionary.category,
+                )
+            }
+        },
     )
 
     internal constructor(
@@ -56,6 +66,7 @@ internal class AnkiRepository(
         ankiConnectBackendFactory: (String, String) -> AnkiBackend = { endpoint: String, apiKey: String ->
             AnkiConnectBackend(endpoint, apiKey = apiKey)
         },
+        loadTermDictionaries: () -> List<AnkiTermDictionary> = { emptyList() },
     ) : this(
         context = context,
         backend = backend,
@@ -63,6 +74,7 @@ internal class AnkiRepository(
         localAudioRepository = localAudioRepository,
         ankiConnectBackendFactory = ankiConnectBackendFactory,
         loadDictionaryMedia = { null },
+        loadTermDictionaries = loadTermDictionaries,
     )
 
     val settings: Flow<AnkiSettings> = settingsRepository.settings
@@ -190,6 +202,7 @@ internal class AnkiRepository(
         formatId: String? = null,
     ): Boolean = withContext(Dispatchers.IO) {
         val settings = settings.first()
+        val termDictionaries = loadTermDictionaries()
         val format = settings.resolveAnkiCardFormat(formatId) ?: return@withContext false
         val activeBackend = activeBackendOrError(settings).getOrElse { return@withContext false }
         if (!activeBackend.isAvailable()) return@withContext false
@@ -233,6 +246,7 @@ internal class AnkiRepository(
                     payload = mediaPayload,
                     context = mediaContext,
                     selectedGlossaryFallback = settings.selectedGlossaryFallback,
+                    termDictionaries = termDictionaries,
                 ),
             ) { value, (filename, tag) -> value.replace(filename, tag) }
                 .let(::normalizeAnkiDictionaryHtml)

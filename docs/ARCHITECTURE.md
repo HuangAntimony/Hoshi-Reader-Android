@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-08-03
+Date: 2026-08-23
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -226,7 +226,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   as one default format. Popup mining, per-format duplicate checks, and opening
   existing notes all carry the stable format ID through the reader bridge and
   still go through the Anki repository/backend boundary. AnkiConnect opens
-  notes with `guiBrowse`; AnkiDroid uses its browser deep link.
+  notes with `guiBrowse`; AnkiDroid uses its browser deep link. At mining time,
+  glossary-first and monolingual/bilingual definition handlebars resolve from
+  the current profile's persisted term-dictionary order and categories without
+  extending the popup mining payload.
 - Google Drive sync uses Android/Google OAuth and Drive APIs through the
   repository/sync boundary. The Drive data source owns paginated folder listing,
   grouped sync-file discovery, bookdata upload/download, trash, cache clearing,

@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 
 @Serializable
 data class AnkiDeck(
@@ -314,7 +315,12 @@ data class AnkiMiningContext(
     val sentenceOffset: Int? = null,
 )
 
-object AnkiHandlebarRenderer {
+internal data class AnkiTermDictionary(
+    val name: String,
+    val category: DictionaryCategory,
+)
+
+internal object AnkiHandlebarRenderer {
     private val handlebarRegex = Regex("\\{[^}]*\\}")
     private val glossaryHeaderRegex = Regex("""(<li data-dictionary="[^"]*">)<i>[^<]*</i> """)
     private val dictionaryLabelRegex = Regex("""<li data-dictionary="([^"]+)"><i>([^<]*)</i> """)
@@ -327,8 +333,9 @@ object AnkiHandlebarRenderer {
         payload: AnkiMiningPayload,
         context: AnkiMiningContext,
         selectedGlossaryFallback: String = "",
+        termDictionaries: List<AnkiTermDictionary> = emptyList(),
     ): String = handlebarRegex.replace(template) { match ->
-        handlebarToValue(match.value, payload, context, selectedGlossaryFallback)
+        handlebarToValue(match.value, payload, context, selectedGlossaryFallback, termDictionaries)
     }
 
     private fun handlebarToValue(
@@ -336,6 +343,7 @@ object AnkiHandlebarRenderer {
         payload: AnkiMiningPayload,
         context: AnkiMiningContext,
         selectedGlossaryFallback: String,
+        termDictionaries: List<AnkiTermDictionary>,
     ): String {
         if (handlebar.startsWith(SingleGlossaryPrefix)) {
             return payload.singleGlossaryHandlebarValue(handlebar)
@@ -348,20 +356,87 @@ object AnkiHandlebarRenderer {
             "{glossary}" -> payload.glossary
             "{glossary-brief}" -> stripGlossaryHeaders(payload.glossary)
             "{glossary-no-dictionary}" -> stripDictionaryName(payload.glossary)
-            "{glossary-first}" -> payload.glossaryFirst
-            "{glossary-first-brief}" -> stripGlossaryHeaders(payload.glossaryFirst)
-            "{glossary-first-no-dictionary}" -> stripDictionaryName(payload.glossaryFirst)
+            "{glossary-first}" -> payload.firstGlossary(termDictionaries)
+            "{glossary-first-brief}" -> stripGlossaryHeaders(payload.firstGlossary(termDictionaries))
+            "{glossary-first-no-dictionary}" -> stripDictionaryName(payload.firstGlossary(termDictionaries))
+            "{monolingual-definition}" -> payload.firstGlossary(
+                termDictionaries,
+                DictionaryCategory.Monolingual,
+            )
+            "{monolingual-definition-brief}" -> stripGlossaryHeaders(
+                payload.firstGlossary(termDictionaries, DictionaryCategory.Monolingual),
+            )
+            "{monolingual-definition-no-dictionary}" -> stripDictionaryName(
+                payload.firstGlossary(termDictionaries, DictionaryCategory.Monolingual),
+            )
+            "{bilingual-definition}" -> payload.firstGlossary(
+                termDictionaries,
+                DictionaryCategory.Bilingual,
+            )
+            "{bilingual-definition-brief}" -> stripGlossaryHeaders(
+                payload.firstGlossary(termDictionaries, DictionaryCategory.Bilingual),
+            )
+            "{bilingual-definition-no-dictionary}" -> stripDictionaryName(
+                payload.firstGlossary(termDictionaries, DictionaryCategory.Bilingual),
+            )
+            "{monolingual-definition-fallback}" -> payload.firstGlossaryWithFallback(
+                termDictionaries,
+                DictionaryCategory.Monolingual,
+                DictionaryCategory.Bilingual,
+            )
+            "{monolingual-definition-fallback-brief}" -> stripGlossaryHeaders(
+                payload.firstGlossaryWithFallback(
+                    termDictionaries,
+                    DictionaryCategory.Monolingual,
+                    DictionaryCategory.Bilingual,
+                ),
+            )
+            "{monolingual-definition-fallback-no-dictionary}" -> stripDictionaryName(
+                payload.firstGlossaryWithFallback(
+                    termDictionaries,
+                    DictionaryCategory.Monolingual,
+                    DictionaryCategory.Bilingual,
+                ),
+            )
+            "{bilingual-definition-fallback}" -> payload.firstGlossaryWithFallback(
+                termDictionaries,
+                DictionaryCategory.Bilingual,
+                DictionaryCategory.Monolingual,
+            )
+            "{bilingual-definition-fallback-brief}" -> stripGlossaryHeaders(
+                payload.firstGlossaryWithFallback(
+                    termDictionaries,
+                    DictionaryCategory.Bilingual,
+                    DictionaryCategory.Monolingual,
+                ),
+            )
+            "{bilingual-definition-fallback-no-dictionary}" -> stripDictionaryName(
+                payload.firstGlossaryWithFallback(
+                    termDictionaries,
+                    DictionaryCategory.Bilingual,
+                    DictionaryCategory.Monolingual,
+                ),
+            )
             "{selected-glossary}" -> payload.selectedGlossaryOrConfiguredFallback(
                 context,
                 selectedGlossaryFallback,
+                termDictionaries,
             )
             "{selected-glossary-fallback}" -> payload.selectedGlossaryOrFallback()
             "{selected-glossary-brief}" -> stripGlossaryHeaders(
-                payload.selectedGlossaryOrConfiguredFallback(context, selectedGlossaryFallback),
+                payload.selectedGlossaryOrConfiguredFallback(
+                    context,
+                    selectedGlossaryFallback,
+                    termDictionaries,
+                ),
             )
             "{selected-glossary-brief-fallback}" -> stripGlossaryHeaders(payload.selectedGlossaryOrFallback())
             "{selected-glossary-no-dictionary}" -> stripDictionaryName(
-                payload.selectedGlossaryOrConfiguredFallback(context, selectedGlossaryFallback),
+                payload.selectedGlossaryOrConfiguredFallback(
+                    context,
+                    selectedGlossaryFallback,
+                    termDictionaries,
+                ),
             )
             "{selected-glossary-no-dictionary-fallback}" -> stripDictionaryName(payload.selectedGlossaryOrFallback())
             "{popup-selection-text}" -> payload.popupSelectionText
@@ -404,6 +479,7 @@ object AnkiHandlebarRenderer {
     private fun AnkiMiningPayload.selectedGlossaryOrConfiguredFallback(
         context: AnkiMiningContext,
         selectedGlossaryFallback: String,
+        termDictionaries: List<AnkiTermDictionary>,
     ): String {
         val selected = singleGlossaryForDictionary(selectedDictionary)
         if (selected.isNotBlank()) return selected
@@ -413,16 +489,48 @@ object AnkiHandlebarRenderer {
             payload = this,
             context = context,
             selectedGlossaryFallback = "",
+            termDictionaries = termDictionaries,
         )
     }
 
+    private fun AnkiMiningPayload.firstGlossary(
+        termDictionaries: List<AnkiTermDictionary>,
+        category: DictionaryCategory? = null,
+    ): String {
+        if (termDictionaries.isEmpty()) {
+            return if (category == null) glossaryFirst else ""
+        }
+        return termDictionaries.firstNotNullOfOrNull { dictionary ->
+            if (
+                dictionary.category == DictionaryCategory.Exclude ||
+                category != null && dictionary.category != category
+            ) {
+                null
+            } else {
+                singleGlossaryForDictionaryOrNull(dictionary.name)
+            }
+        }.orEmpty()
+    }
+
+    private fun AnkiMiningPayload.firstGlossaryWithFallback(
+        termDictionaries: List<AnkiTermDictionary>,
+        preferredCategory: DictionaryCategory,
+        fallbackCategory: DictionaryCategory,
+    ): String = firstGlossary(termDictionaries, preferredCategory).ifEmpty {
+        firstGlossary(termDictionaries, fallbackCategory)
+    }
+
     private fun AnkiMiningPayload.singleGlossaryForDictionary(dictionary: String): String {
-        if (dictionary.isBlank()) return ""
+        return singleGlossaryForDictionaryOrNull(dictionary).orEmpty()
+    }
+
+    private fun AnkiMiningPayload.singleGlossaryForDictionaryOrNull(dictionary: String): String? {
+        if (dictionary.isBlank()) return null
         singleGlossaries[dictionary]?.let { return it }
         val normalizedDictionary = dictionary.normalizedDictionaryName()
         return singleGlossaries.entries.firstOrNull { (name, _) ->
             name.normalizedDictionaryName() == normalizedDictionary
-        }?.value.orEmpty()
+        }?.value
     }
 
     private fun stripGlossaryHeaders(html: String): String =

@@ -393,7 +393,7 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     stringResource(R.string.anki_selected_glossary_fallback),
                     uiState.settings.selectedGlossaryFallback.ifBlank { stringResource(R.string.none) },
                     true,
-                    listOf("", "{glossary-first}"),
+                    AnkiHandlebarOptions.selectedGlossaryFallbackOptions,
                     { if (it.isBlank()) stringResource(R.string.none) else it },
                     viewModel::updateSelectedGlossaryFallback,
                 )
@@ -766,6 +766,15 @@ private fun AnkiDivider() {
 }
 
 internal object AnkiHandlebarOptions {
+    val selectedGlossaryFallbackOptions = listOf(
+        "",
+        "{glossary-first}",
+        "{monolingual-definition}",
+        "{bilingual-definition}",
+        "{monolingual-definition-fallback}",
+        "{bilingual-definition-fallback}",
+    )
+
     private val CoreOptions = listOf(
         "-",
         "{expression}",
@@ -793,6 +802,18 @@ internal object AnkiHandlebarOptions {
         "{glossary-no-dictionary}",
         "{glossary-first-brief}",
         "{glossary-first-no-dictionary}",
+        "{monolingual-definition}",
+        "{monolingual-definition-brief}",
+        "{monolingual-definition-no-dictionary}",
+        "{bilingual-definition}",
+        "{bilingual-definition-brief}",
+        "{bilingual-definition-no-dictionary}",
+        "{monolingual-definition-fallback}",
+        "{monolingual-definition-fallback-brief}",
+        "{monolingual-definition-fallback-no-dictionary}",
+        "{bilingual-definition-fallback}",
+        "{bilingual-definition-fallback-brief}",
+        "{bilingual-definition-fallback-no-dictionary}",
         "{selected-glossary-brief}",
         "{selected-glossary-no-dictionary}",
         "{cloze-prefix}",

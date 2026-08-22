@@ -285,11 +285,14 @@ Validate relevant dictionary/audio changes with:
   all-models option and the global hide-search-button setting. Confirm the
   search button is absent when duplicate checking reports no matching note.
 - Exact cloze output for repeated matches, incorrect stored offsets, and
-  supplementary-plane characters; selected-glossary fallback `None` and
-  `{glossary-first}`; numeric and H/L pitch graph
-  single/multiple/deduplicated output and `{pitch-accent-graphs-first}`. Nasal
-  and devoice markers in exported Anki graphs remain a separate validation item
-  after that renderer is implemented.
+  supplementary-plane characters; selected-glossary fallback `None`,
+  `{glossary-first}`, monolingual, bilingual, and both category fallback
+  directions; all ordinary/brief/no-dictionary monolingual and bilingual
+  handlebars against persisted dictionary order, excluded dictionaries,
+  profile switches, and version-suffixed titles. Validate numeric and H/L pitch
+  graph single/multiple/deduplicated output and
+  `{pitch-accent-graphs-first}`. Popup pitch text includes 1-based nasal/devoice
+  markers; exported Anki pitch SVGs follow iOS and do not encode those markers.
 - Cross-format audio, Sasayaki audio, cover, and dictionary-media mining through
   both backends. Recheck after restart and profile switching without clearing
   app data.

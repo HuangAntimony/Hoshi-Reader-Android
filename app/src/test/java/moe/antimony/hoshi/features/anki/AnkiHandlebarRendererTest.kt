@@ -1,9 +1,139 @@
 package moe.antimony.hoshi.features.anki
 
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AnkiHandlebarRendererTest {
+    @Test
+    fun glossarySelectionUsesPersistedDictionaryOrderCategoriesAndAllCategoryVariants() {
+        val excluded =
+            """<li data-dictionary="Excluded"><i>(Excluded)</i> <span>excluded</span></li>"""
+        val uncategorized =
+            """<li data-dictionary="General"><i>(General)</i> <span>general</span></li>"""
+        val monolingual =
+            """<li data-dictionary="国語辞典"><i>(名詞, 国語辞典)</i> <span>単語の意味</span></li>"""
+        val bilingual =
+            """<li data-dictionary="JMdict"><i>(JMdict)</i> <span>translation</span></li>"""
+        val payload = AnkiMiningPayload(
+            expression = "言葉",
+            glossaryFirst = "popup-order-must-not-win",
+            singleGlossaries = linkedMapOf(
+                "JMdict" to bilingual,
+                "Excluded" to excluded,
+                "General" to uncategorized,
+                "国語辞典" to monolingual,
+            ),
+        )
+        val dictionaries = listOf(
+            AnkiTermDictionary("Excluded", DictionaryCategory.Exclude),
+            AnkiTermDictionary("General", DictionaryCategory.None),
+            AnkiTermDictionary("国語辞典 [2026-08-23]", DictionaryCategory.Monolingual),
+            AnkiTermDictionary("JMdict [2026-08-23]", DictionaryCategory.Bilingual),
+        )
+
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{glossary-first}|" +
+                "{monolingual-definition}|{monolingual-definition-brief}|{monolingual-definition-no-dictionary}|" +
+                "{bilingual-definition}|{bilingual-definition-brief}|{bilingual-definition-no-dictionary}|" +
+                "{monolingual-definition-fallback}|{monolingual-definition-fallback-brief}|" +
+                "{monolingual-definition-fallback-no-dictionary}|" +
+                "{bilingual-definition-fallback}|{bilingual-definition-fallback-brief}|" +
+                "{bilingual-definition-fallback-no-dictionary}",
+            payload = payload,
+            context = AnkiMiningContext(sentence = ""),
+            termDictionaries = dictionaries,
+        )
+
+        assertEquals(
+            listOf(
+                uncategorized,
+                monolingual,
+                """<li data-dictionary="国語辞典"><span>単語の意味</span></li>""",
+                """<li data-dictionary="国語辞典"><i>(名詞)</i> <span>単語の意味</span></li>""",
+                bilingual,
+                """<li data-dictionary="JMdict"><span>translation</span></li>""",
+                """<li data-dictionary="JMdict"><span>translation</span></li>""",
+                monolingual,
+                """<li data-dictionary="国語辞典"><span>単語の意味</span></li>""",
+                """<li data-dictionary="国語辞典"><i>(名詞)</i> <span>単語の意味</span></li>""",
+                bilingual,
+                """<li data-dictionary="JMdict"><span>translation</span></li>""",
+                """<li data-dictionary="JMdict"><span>translation</span></li>""",
+            ).joinToString("|"),
+            rendered,
+        )
+    }
+
+    @Test
+    fun categoryFallbackUsesOnlyTheOppositeCategoryWhenThePreferredCategoryIsMissing() {
+        val bilingual =
+            """<li data-dictionary="JMdict"><i>(JMdict)</i> <span>translation</span></li>"""
+        val payload = AnkiMiningPayload(
+            expression = "言葉",
+            singleGlossaries = mapOf("JMdict" to bilingual),
+        )
+        val dictionaries = listOf(
+            AnkiTermDictionary("国語辞典", DictionaryCategory.Monolingual),
+            AnkiTermDictionary("JMdict", DictionaryCategory.Bilingual),
+        )
+
+        assertEquals(
+            "|$bilingual",
+            AnkiHandlebarRenderer.render(
+                template = "{monolingual-definition}|{monolingual-definition-fallback}",
+                payload = payload,
+                context = AnkiMiningContext(sentence = ""),
+                termDictionaries = dictionaries,
+            ),
+        )
+    }
+
+    @Test
+    fun categoryFallbackMatchesIosByFallingBackOnlyForAnEmptyPrimaryGlossary() {
+        val payload = AnkiMiningPayload(
+            expression = "言葉",
+            singleGlossaries = mapOf(
+                "国語辞典" to " ",
+                "JMdict" to "translation",
+            ),
+        )
+
+        assertEquals(
+            " ",
+            AnkiHandlebarRenderer.render(
+                template = "{monolingual-definition-fallback}",
+                payload = payload,
+                context = AnkiMiningContext(sentence = ""),
+                termDictionaries = listOf(
+                    AnkiTermDictionary("国語辞典", DictionaryCategory.Monolingual),
+                    AnkiTermDictionary("JMdict", DictionaryCategory.Bilingual),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun categorySelectionSkipsConfiguredDictionariesMissingFromThePopupGlossaries() {
+        val payload = AnkiMiningPayload(
+            expression = "言葉",
+            singleGlossaries = mapOf("Second" to "second glossary"),
+        )
+
+        assertEquals(
+            "second glossary",
+            AnkiHandlebarRenderer.render(
+                template = "{monolingual-definition}",
+                payload = payload,
+                context = AnkiMiningContext(sentence = ""),
+                termDictionaries = listOf(
+                    AnkiTermDictionary("Missing", DictionaryCategory.Monolingual),
+                    AnkiTermDictionary("Second", DictionaryCategory.Monolingual),
+                ),
+            ),
+        )
+    }
+
     @Test
     fun rendersAllIosCoreHandlebars() {
         val payload = AnkiMiningPayload(
@@ -267,6 +397,18 @@ class AnkiHandlebarRendererTest {
                 payload = payload,
                 context = AnkiMiningContext(sentence = "読む"),
                 selectedGlossaryFallback = "{glossary-first}",
+            ),
+        )
+        assertEquals(
+            "monolingual glossary",
+            AnkiHandlebarRenderer.render(
+                template = "{selected-glossary}",
+                payload = payload.copy(singleGlossaries = mapOf("国語辞典" to "monolingual glossary")),
+                context = AnkiMiningContext(sentence = "読む"),
+                selectedGlossaryFallback = "{monolingual-definition}",
+                termDictionaries = listOf(
+                    AnkiTermDictionary("国語辞典", DictionaryCategory.Monolingual),
+                ),
             ),
         )
         assertEquals(
