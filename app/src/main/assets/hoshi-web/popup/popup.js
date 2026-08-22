@@ -1411,6 +1411,28 @@ function pitchPattern(position, moraCount) {
     return pattern;
 }
 
+// https://github.com/yomidevs/yomitan/blob/c0c3702963c22e0f39fdd2f03deef6b15558a7f5/ext/js/language/ja/japanese.js#L138
+const DIACRITIC_MAPPING = (() => {
+    const kana = 'うゔ-かが-きぎ-くぐ-けげ-こご-さざ-しじ-すず-せぜ-そぞ-ただ-ちぢ-つづ-てで-とど-はばぱひびぴふぶぷへべぺほぼぽワヷ-ヰヸ-ウヴ-ヱヹ-ヲヺ-カガ-キギ-クグ-ケゲ-コゴ-サザ-シジ-スズ-セゼ-ソゾ-タダ-チヂ-ツヅ-テデ-トド-ハバパヒビピフブプヘベペホボポ';
+    const mapping = new Map();
+    for (let i = 0; i < kana.length; i += 3) {
+        const character = kana[i];
+        const dakuten = kana[i + 1];
+        const handakuten = kana[i + 2];
+        mapping.set(dakuten, { character, type: 'dakuten' });
+        if (handakuten !== '-') {
+            mapping.set(handakuten, { character, type: 'handakuten' });
+        }
+    }
+    return mapping;
+})();
+
+// https://github.com/yomidevs/yomitan/blob/c0c3702963c22e0f39fdd2f03deef6b15558a7f5/ext/js/language/ja/japanese.js#L573
+function getKanaDiacriticInfo(character) {
+    const info = DIACRITIC_MAPPING.get(character);
+    return typeof info !== 'undefined' ? { character: info.character, type: info.type } : null;
+}
+
 // https://github.com/yomidevs/yomitan/blob/c24d4c9b39ceec1b5fd133df774c41972e9ebbdc/ext/js/language/ja/japanese.js#L406
 function getKanaMorae(text) {
     const morae = [];
@@ -1471,12 +1493,19 @@ function createPitchHtml(reading, pitchValue, nasalPositions = [], devoicePositi
 
         if (nasalSet.has(i + 1)) {
             moraSpan.dataset.nasal = 'true';
+            const characterInfo = getKanaDiacriticInfo(mora[0]);
+            if (characterInfo !== null) {
+                moraSpan.dataset.originalText = mora;
+            }
             const group = el('span', { className: 'pronunciation-character-group' }, [
-                document.createTextNode(mora),
+                el('span', { textContent: characterInfo !== null ? characterInfo.character : mora[0] }),
                 el('span', { className: 'pronunciation-nasal-diacritic', textContent: '\u309a' }),
                 el('span', { className: 'pronunciation-nasal-indicator' }),
             ]);
             moraSpan.appendChild(group);
+            if (mora.length > 1) {
+                moraSpan.appendChild(document.createTextNode(mora.slice(1)));
+            }
         } else {
             moraSpan.appendChild(document.createTextNode(mora));
         }

@@ -853,6 +853,44 @@ test('complete pitch renders string patterns with 1-based nasal and devoice mora
     assert.match(context.constructPitchPositionHtml([{ pitches: [{ position: 'LHL' }] }]), />2</);
 });
 
+test('nasal pitch renders the base kana for voiced and semi-voiced morae', () => {
+    const { context } = popupContext();
+    const cases = [
+        { reading: 'かぎ', nasalPosition: 2, expected: 'き' },
+        { reading: 'ぱく', nasalPosition: 1, expected: 'は' },
+    ];
+
+    for (const { reading, nasalPosition, expected } of cases) {
+        const group = context.createPitchGroup({
+            dictionary: 'NHK+',
+            pitches: [{ position: 'LHL', nasal: [nasalPosition], devoice: [] }],
+        }, reading);
+        const nasalMora = descendants(group)
+            .filter((node) => node.className === 'pronunciation-mora')
+            .find((node) => node.dataset.nasal === 'true');
+        const characterGroup = descendants(nasalMora)
+            .find((node) => node.className === 'pronunciation-character-group');
+
+        assert.equal(characterGroup.children[0].textContent, expected);
+    }
+});
+
+test('nasal pitch keeps the small kana tail outside the marked character group', () => {
+    const { context } = popupContext();
+    const group = context.createPitchGroup({
+        dictionary: 'NHK+',
+        pitches: [{ position: 'HLL', nasal: [1], devoice: [] }],
+    }, 'ぎゃく');
+    const nasalMora = descendants(group)
+        .filter((node) => node.className === 'pronunciation-mora')
+        .find((node) => node.dataset.nasal === 'true');
+    const characterGroup = descendants(nasalMora)
+        .find((node) => node.className === 'pronunciation-character-group');
+
+    assert.equal(characterGroup.children[0].textContent, 'き');
+    assert.equal(nasalMora.children[1].textContent, 'ゃ');
+});
+
 test('kanji touch redirect renders in place and suppresses its duplicate click', async () => {
     const result = {
         character: '星',
