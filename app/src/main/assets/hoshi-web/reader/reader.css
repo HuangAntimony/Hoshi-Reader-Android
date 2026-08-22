@@ -27,6 +27,25 @@ img.block-img {
     -webkit-column-break-inside: avoid !important;
     object-fit: contain !important;
 }
+.hoshi-gaiji-fallback {
+    display: inline;
+    font: inherit;
+    vertical-align: baseline;
+    white-space: nowrap;
+    color: inherit;
+}
+.hoshi-gaiji-fallback-single {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    line-height: 1;
+    text-align: center;
+    text-orientation: upright;
+}
+.hoshi-gaiji-fallback::before {
+    content: attr(data-hoshi-gaiji-alt);
+}
 img.block-img.blurred,
 svg.blurred {
     filter: blur(24px) !important;

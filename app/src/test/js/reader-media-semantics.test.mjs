@@ -238,3 +238,47 @@ test('shared media setup waits for pending images when requested', async () => {
     assert.equal(resolved, true);
     assert.equal(pending.classList.contains('block-img'), true);
 });
+
+test('shared media setup replaces failed gaiji with alt text and removes empty fallbacks', async () => {
+    const media = loadMediaSemantics();
+    const root = new TestElement('section');
+    const withAlt = image({ class: 'gaiji', src: 'images/sigma.png', alt: 'Σ' });
+    const withMultipleCharacters = image({ class: 'gaiji-line', src: 'images/formula.png', alt: 'eiπ＋１＝０' });
+    const withoutAlt = image({ class: 'gaiji-line', src: 'images/ornament.png', alt: '' });
+    const regular = image({ src: 'images/illustration.png', alt: 'Illustration' });
+    [withAlt, withMultipleCharacters, withoutAlt, regular].forEach((img) => {
+        img.naturalWidth = 0;
+        img.naturalHeight = 0;
+        root.appendChild(img);
+    });
+
+    await media.setupReaderImages(root, { waitForImages: true });
+
+    assert.equal(root.childNodes.length, 3);
+    assert.equal(root.childNodes[0].tagName, 'SPAN');
+    assert.equal(root.childNodes[0].classList.contains('hoshi-gaiji-fallback'), true);
+    assert.equal(root.childNodes[0].classList.contains('hoshi-gaiji-fallback-single'), true);
+    assert.equal(root.childNodes[0].getAttribute('data-hoshi-gaiji-alt'), 'Σ');
+    assert.equal(root.childNodes[1].tagName, 'SPAN');
+    assert.equal(root.childNodes[1].classList.contains('hoshi-gaiji-fallback'), true);
+    assert.equal(root.childNodes[1].classList.contains('hoshi-gaiji-fallback-single'), false);
+    assert.equal(root.childNodes[1].getAttribute('data-hoshi-gaiji-alt'), 'eiπ＋１＝０');
+    assert.equal(root.childNodes[2], regular);
+});
+
+test('shared media setup replaces gaiji that fail after non-blocking setup', async () => {
+    const media = loadMediaSemantics();
+    const root = new TestElement('section');
+    const pending = image({ class: 'gaiji', src: 'images/pending.png', alt: '冴' });
+    pending.complete = false;
+    pending.naturalWidth = 0;
+    pending.naturalHeight = 0;
+    root.appendChild(pending);
+
+    await media.setupReaderImages(root, { waitForImages: false });
+    pending.onerror();
+
+    assert.equal(root.childNodes.length, 1);
+    assert.equal(root.childNodes[0].tagName, 'SPAN');
+    assert.equal(root.childNodes[0].getAttribute('data-hoshi-gaiji-alt'), '冴');
+});

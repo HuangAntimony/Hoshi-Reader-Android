@@ -24,6 +24,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Use EPUB fallback text for failed inline gaiji images and suppress Android's
+  broken-image marker when the EPUB does not provide fallback text.
 - Open EPUB pages that use paired XHTML viewport metadata instead of remaining
   on the Reader loading screen.
 - Keep oversized lookup popup frames fully inside the visible screen so their

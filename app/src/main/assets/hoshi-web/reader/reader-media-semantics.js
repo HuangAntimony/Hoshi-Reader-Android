@@ -13,6 +13,25 @@
     return Number(img && img.naturalWidth || 0) > 256 || Number(img && img.naturalHeight || 0) > 256;
   }
 
+  function replaceFailedGaiji(img) {
+    if (!isGaijiImage(img) || !img.parentNode) return;
+    var doc = documentForNode(img);
+    if (!doc || !doc.createElement) return;
+    var alt = (img.getAttribute && img.getAttribute('alt')) || '';
+    if (!alt.trim()) {
+      img.parentNode.removeChild(img);
+      return;
+    }
+    var fallback = doc.createElement('span');
+    fallback.className = 'hoshi-gaiji-fallback';
+    if (Array.from(alt.trim()).length === 1) {
+      fallback.classList.add('hoshi-gaiji-fallback-single');
+    }
+    fallback.setAttribute('data-hoshi-gaiji-alt', alt);
+    img.parentNode.insertBefore(fallback, img);
+    img.parentNode.removeChild(img);
+  }
+
   function imageSource(img) {
     return (img && (img.currentSrc || img.src || (img.getAttribute && img.getAttribute('src')))) || '';
   }
@@ -88,18 +107,20 @@
       }
       if (resolve) resolve();
     };
+    var fail = function() {
+      replaceFailedGaiji(img);
+      if (resolve) resolve();
+    };
     if (img.complete) {
       if ((Number(img.naturalWidth) || 0) > 0) {
         mark();
-      } else if (resolve) {
-        resolve();
+      } else {
+        fail();
       }
       return;
     }
     img.onload = mark;
-    if (resolve) {
-      img.onerror = function() { resolve(); };
-    }
+    img.onerror = fail;
   }
 
   function setupReaderImages(scope, options) {
