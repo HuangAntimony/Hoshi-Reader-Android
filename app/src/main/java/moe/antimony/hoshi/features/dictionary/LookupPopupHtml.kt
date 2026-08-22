@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.dictionary
 
 import android.content.Context
 import de.manhhao.hoshi.LookupResult
+import de.manhhao.hoshi.KanjiResult
 import de.manhhao.hoshi.TraceCandidate
 import de.manhhao.hoshi.TraceSource
 import kotlinx.serialization.json.JsonObject
@@ -188,7 +189,9 @@ internal object LookupPopupHtml {
                             duplicateCheck: { postMessage: function(values) { return window.HoshiAndroidPopup.requestMessage('duplicateCheck', values); } },
                             showNotes: { postMessage: function(content) { return window.HoshiAndroidPopup.requestMessage('showNotes', content); } },
                             getEntry: { postMessage: function(index) { return window.HoshiAndroidPopup.requestMessage('getEntry', index); } },
-                            lookupRedirect: { postMessage: function(query) { return window.HoshiAndroidPopup.requestMessage('lookupRedirect', query); } }
+                            lookupRedirect: { postMessage: function(query) { return window.HoshiAndroidPopup.requestMessage('lookupRedirect', query); } },
+                            kanjiRedirect: { postMessage: function(kanji) { return window.HoshiAndroidPopup.requestMessage('kanjiRedirect', kanji); } },
+                            kanjiRedirectCommitted: { postMessage: function() { window.HoshiAndroidPopup.postMessage('kanjiRedirectCommitted'); } }
                         }
                     };
                     window.scanNonJapaneseText = ${normalizedSettings.scanNonJapaneseText};
@@ -355,6 +358,25 @@ internal object LookupPopupHtml {
 
     internal fun entryJsonString(result: LookupResult): String = result.toEntryJson().toString()
 
+    internal fun kanjiJsonString(result: KanjiResult): String =
+        buildJsonObject {
+            put("character", result.character)
+            putJsonArray("entries") {
+                result.entries.forEach { entry ->
+                    add(
+                        buildJsonObject {
+                            put("dictName", entry.dictName)
+                            put("onyomi", entry.onyomi)
+                            put("kunyomi", entry.kunyomi)
+                            putJsonArray("meanings") {
+                                entry.definitions.forEach { add(JsonPrimitive(it)) }
+                            }
+                        },
+                    )
+                }
+            }
+        }.toString()
+
     private fun dictionaryStylesJson(styles: Map<String, String>): JsonObject =
         buildJsonObject {
             styles.forEach { (dictionary, css) ->
@@ -476,8 +498,26 @@ internal object LookupPopupHtml {
                 add(
                     buildJsonObject {
                         put("dictionary", pitch.dictName)
-                        putJsonArray("pitchPositions") {
-                            pitch.pitchPositions.distinct().forEach { add(JsonPrimitive(it)) }
+                        putJsonArray("pitches") {
+                            pitch.pitches
+                                .distinctBy { accent -> accent.pattern.takeIf(String::isNotBlank) ?: accent.position.toString() }
+                                .forEach { accent ->
+                                    add(
+                                        buildJsonObject {
+                                            if (accent.pattern.isNotBlank()) {
+                                                put("position", accent.pattern)
+                                            } else {
+                                                put("position", accent.position)
+                                            }
+                                            putJsonArray("nasal") {
+                                                accent.nasal.forEach { add(JsonPrimitive(it)) }
+                                            }
+                                            putJsonArray("devoice") {
+                                                accent.devoice.forEach { add(JsonPrimitive(it)) }
+                                            }
+                                        },
+                                    )
+                                }
                         }
                         putJsonArray("transcriptions") {
                             pitch.transcriptions.distinct().forEach { add(JsonPrimitive(it)) }

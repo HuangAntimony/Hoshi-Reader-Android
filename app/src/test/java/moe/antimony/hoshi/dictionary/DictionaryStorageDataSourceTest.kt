@@ -19,7 +19,12 @@ class DictionaryStorageDataSourceTest {
                 DictionaryConfig(
                     termDictionaries = listOf(
                         DictionaryConfig.DictionaryEntry("Second", isEnabled = false, order = 0),
-                        DictionaryConfig.DictionaryEntry("First", isEnabled = true, order = 1),
+                        DictionaryConfig.DictionaryEntry(
+                            "First",
+                            isEnabled = true,
+                            order = 1,
+                            category = DictionaryCategory.Bilingual,
+                        ),
                     ),
                     frequencyDictionaries = emptyList(),
                     pitchDictionaries = emptyList(),
@@ -31,6 +36,10 @@ class DictionaryStorageDataSourceTest {
             assertEquals(listOf("Second", "First", "Unconfigured"), dictionaries.map { it.path.name })
             assertEquals(listOf(false, true, true), dictionaries.map { it.isEnabled })
             assertEquals(listOf(0, 1, 2), dictionaries.map { it.order })
+            assertEquals(
+                listOf(DictionaryCategory.None, DictionaryCategory.Bilingual, DictionaryCategory.None),
+                dictionaries.map { it.category },
+            )
         }
     }
 
@@ -58,6 +67,27 @@ class DictionaryStorageDataSourceTest {
             assertTrue(configText.contains("\"frequencyDictionaries\""))
             assertTrue(configText.contains("\"pitchDictionaries\""))
             assertFalse(configText.contains("term_dictionaries"))
+        }
+    }
+
+    @Test
+    fun categoryAndKanjiConfigurationPersistAcrossReload() {
+        withTempDir { root ->
+            val storage = DictionaryStorageDataSource(root)
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), "JMdict", "JMdict")
+            writeDictionary(storage.typeDirectory(DictionaryType.Kanji), "KANJIDIC", "KANJIDIC")
+            storage.saveConfig(storage.currentConfig())
+
+            storage.saveConfig(
+                storage.configWithDictionaryCategory(
+                    fileName = "JMdict",
+                    category = DictionaryCategory.Exclude,
+                ),
+            )
+
+            assertEquals(DictionaryCategory.Exclude, storage.loadDictionaries(DictionaryType.Term).single().category)
+            assertEquals(listOf("KANJIDIC"), storage.loadDictionaries(DictionaryType.Kanji).map { it.path.name })
+            assertEquals(listOf("KANJIDIC"), storage.currentConfig().kanjiDictionaries.map { it.fileName })
         }
     }
 

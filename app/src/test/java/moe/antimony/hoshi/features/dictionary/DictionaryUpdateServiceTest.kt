@@ -492,14 +492,14 @@ class DictionaryUpdateServiceTest {
             )
         }
 
-        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
+        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>, kanjiPaths: Array<String>) = Unit
     }
 
     private object NoOpDictionaryNativeBridge : DictionaryNativeBridge {
         override fun importDictionary(zipPath: String, outputDir: String, lowRam: Boolean): NativeDictionaryImportResult =
             error("No imports expected.")
 
-        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>) = Unit
+        override fun rebuildQuery(session: Long, termPaths: Array<String>, freqPaths: Array<String>, pitchPaths: Array<String>, kanjiPaths: Array<String>) = Unit
     }
 
     private class FakeDictionaryUpdateClock(private val now: Long) : DictionaryUpdateClock {

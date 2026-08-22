@@ -227,7 +227,12 @@
     <string name="dictionary_importing_named_format">正在导入 %1$s</string>
     <string name="dictionary_importing_default">正在导入辞典</string>
     <string name="dictionary_download_recommended">下载推荐辞典</string>
-    <string name="dictionary_supported_archive_types">支持 Yomitan 词条、词频和音调辞典（.zip）</string>
+    <string name="dictionary_download_stroke_order_font">下载笔顺字体</string>
+    <string name="dictionary_stroke_order_font_dialog_title">下载字体</string>
+    <string name="dictionary_stroke_order_font_dialog_message">这将下载并自动导入汉字笔顺字体（17 MB）。</string>
+    <string name="dictionary_stroke_order_font_downloading">正在下载并导入笔顺字体…</string>
+    <string name="dictionary_stroke_order_font_download_failed">无法下载并导入笔顺字体，请检查网络连接后重试。</string>
+    <string name="dictionary_supported_archive_types">支持 Yomitan 词条、词频、音调和汉字辞典（.zip）</string>
     <string name="dictionary_default_tab">默认打开查词标签页</string>
     <string name="dictionary_empty_type_format">没有%1$s辞典</string>
     <string name="dictionary_updates_section" comment="Dictionary settings section label for installed dictionary update controls; intentionally matches the About update section label.">更新</string>
@@ -247,6 +252,13 @@
     <string name="dictionary_type_term">词条</string>
     <string name="dictionary_type_frequency">词频</string>
     <string name="dictionary_type_pitch">音调</string>
+    <string name="dictionary_type_kanji">汉字</string>
+    <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">无</string>
+    <string name="dictionary_category_monolingual">单语</string>
+    <string name="dictionary_category_bilingual">双语</string>
+    <string name="dictionary_category_exclude">排除</string>
+    <string name="dictionary_category_update_failed">更新辞典分类失败。</string>
+    <string name="anki_categorize_dictionaries">辞典分类</string>
     <string name="dictionary_custom_css">自定义 CSS</string>
     <string name="dictionary_import_action">导入辞典</string>
     <string name="dictionary_delete_action">删除辞典</string>

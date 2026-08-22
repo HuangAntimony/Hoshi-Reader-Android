@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add term dictionary categories, Kanji dictionary import/management and popup
+  lookup, a verified one-tap stroke-order font download for Kanji users, plus
+  complete pitch data with H/L patterns and nasal/devoice markers.
 - Add downloadable recommended Japanese font families to Reader Appearance,
   including separate family and named variant selectors, real static and
   variable weight selection, verified app-private downloads, and family/variant

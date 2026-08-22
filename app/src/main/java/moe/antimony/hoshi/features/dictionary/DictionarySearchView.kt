@@ -501,6 +501,28 @@ fun DictionarySearchView(
                 }
                 replyIframeMessage(message.popupId, messageId, results.size.toString())
             }
+            is ReaderLookupPopupBridgeMessage.KanjiRedirect -> {
+                val messageId = message.messageId ?: return
+                val result = searchViewModel.lookupKanji(message.kanji)
+                replyIframeMessage(
+                    message.popupId,
+                    messageId,
+                    if (result.entries.isEmpty()) "null" else LookupPopupHtml.kanjiJsonString(result),
+                )
+            }
+            is ReaderLookupPopupBridgeMessage.KanjiRedirectCommitted -> {
+                if (message.popupId == DictionarySearchRootPopupId) {
+                    searchViewModel.recordLookupRedirected(1)
+                } else {
+                    val current = childHistories[message.popupId] ?: ReaderPopupHistoryCounts()
+                    childHistories = childHistories + (
+                        message.popupId to current.copy(
+                            backCount = current.backCount + 1,
+                            forwardCount = 0,
+                        )
+                    )
+                }
+            }
             is ReaderLookupPopupBridgeMessage.GetEntry -> {
                 val entry = searchViewModel.entryForPopup(message.popupId, message.index)
                 replyIframeMessage(

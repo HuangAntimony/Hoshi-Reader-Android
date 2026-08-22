@@ -196,7 +196,7 @@ class ReaderFontDownloader(
     }
 }
 
-private suspend fun <T> ReaderFontRemoteResponse.useCancellable(
+internal suspend fun <T> ReaderFontRemoteResponse.useCancellable(
     block: (ReaderFontRemoteResponse) -> T,
 ): T = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { close() }

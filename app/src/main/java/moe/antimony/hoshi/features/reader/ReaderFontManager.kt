@@ -197,8 +197,13 @@ class ReaderFontManager @Inject constructor(
                 val sourceUrl = requireNotNull(localFontUrl(file))
                 buildList {
                     add(fontFaceCss(family.cssFamily, variant, sourceUrl))
-                    if (family.source == ReaderFontSource.USER && file.nameWithoutExtension != family.cssFamily) {
-                        add(fontFaceCss(file.nameWithoutExtension, variant, sourceUrl))
+                    if (family.source == ReaderFontSource.USER) {
+                        if (family.displayName != family.cssFamily) {
+                            add(fontFaceCss(family.displayName, variant, sourceUrl))
+                        }
+                        if (file.nameWithoutExtension !in setOf(family.cssFamily, family.displayName)) {
+                            add(fontFaceCss(file.nameWithoutExtension, variant, sourceUrl))
+                        }
                     }
                 }
             }

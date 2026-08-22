@@ -4,6 +4,9 @@ import de.manhhao.hoshi.FrequencyEntry
 import de.manhhao.hoshi.GlossaryEntry
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.PitchEntry
+import de.manhhao.hoshi.Pitch
+import de.manhhao.hoshi.KanjiEntry
+import de.manhhao.hoshi.KanjiResult
 import de.manhhao.hoshi.TermResult
 import de.manhhao.hoshi.TraceCandidate
 import de.manhhao.hoshi.TraceSource
@@ -311,7 +314,7 @@ class LookupPopupHtmlTest {
                 pitches = arrayOf(
                     PitchEntry(
                         dictName = "English",
-                        pitchPositions = intArrayOf(),
+                        pitches = emptyArray(),
                         transcriptions = arrayOf("/riːd/", "/rɛd/"),
                     ),
                 ),
@@ -319,7 +322,57 @@ class LookupPopupHtmlTest {
         )
 
         assertTrue(entryJson.contains(""""transcriptions":["/riːd/","/rɛd/"]"""))
-        assertTrue(entryJson.contains(""""pitchPositions":[]"""))
+        assertTrue(entryJson.contains(""""pitches":[]"""))
+    }
+
+    @Test
+    fun completePitchSchemaUsesPatternWhenPresentAndKeepsMoraFeatures() {
+        val entryJson = LookupPopupHtml.entryJsonString(
+            lookupResult(
+                expression = "猫",
+                reading = "ねこ",
+                glossary = "cat",
+                pitches = arrayOf(
+                    PitchEntry(
+                        dictName = "アクセント",
+                        pitches = arrayOf(
+                            Pitch(position = 1, pattern = "", nasal = intArrayOf(1), devoice = intArrayOf(2)),
+                            Pitch(position = 9, pattern = "LHL", nasal = intArrayOf(2), devoice = intArrayOf()),
+                            Pitch(position = 7, pattern = "LHL", nasal = intArrayOf(), devoice = intArrayOf()),
+                        ),
+                        transcriptions = emptyArray(),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(entryJson.contains(""""position":1,"nasal":[1],"devoice":[2]"""))
+        assertTrue(entryJson.contains(""""position":"LHL","nasal":[2],"devoice":[]"""))
+        assertFalse(entryJson.contains(""""position":9"""))
+        assertFalse(entryJson.contains(""""position":7"""))
+    }
+
+    @Test
+    fun kanjiResultJsonUsesPopupMeaningsSchema() {
+        val json = LookupPopupHtml.kanjiJsonString(
+            KanjiResult(
+                character = "星",
+                entries = arrayOf(
+                    KanjiEntry(
+                        dictName = "KANJIDIC",
+                        onyomi = "セイ, ショウ",
+                        kunyomi = "ほし",
+                        tags = "jouyou",
+                        definitions = arrayOf("star", "spot"),
+                        stats = emptyArray(),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(json.contains(""""character":"星"""))
+        assertTrue(json.contains(""""dictName":"KANJIDIC"""))
+        assertTrue(json.contains(""""meanings":["star","spot"]"""))
     }
 
     private fun lookupResult(

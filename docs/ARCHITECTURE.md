@@ -65,16 +65,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.
-- Dictionary import, lookup, media, style extraction, and deinflection behavior
-  are owned by `third_party/hoshidicts-kotlin-bridge`.
+- Dictionary import, term/Kanji lookup, media, style extraction, deinflection,
+  frequency, and complete pitch data are owned by
+  `third_party/hoshidicts-kotlin-bridge`. The parent Kotlin ABI copy must remain
+  constructor- and method-compatible with the bridge submodule.
 - `DictionaryLookupQueryService` owns the active native lookup session. Rebuilds
   construct a new native query session for the active profile's dictionary
-  language before swapping it into service; lookup, style, and dictionary-media
-  reads use the currently published session and return empty results when no
-  session is ready.
+  language and enabled Term/Frequency/Pitch/Kanji paths before swapping it into
+  service; term lookup, Kanji query, style, and dictionary-media reads use the
+  currently published session and return empty results when no session is
+  ready. Enabled term dictionaries categorized as `exclude` remain stored and
+  manageable but are omitted from the replacement session.
 - Dictionary data directories remain global under `Dictionaries/`, while each
   profile owns `dictionary_config.json` and `dictionary_settings.json` under
-  `Profiles/<profileId>/`.
+  `Profiles/<profileId>/`. The config preserves per-type order and enable state,
+  the optional Kanji list, and iOS-compatible term categories `none`,
+  `monolingual`, `bilingual`, and `exclude`; missing newer fields use legacy-safe
+  defaults.
 - Dictionary `.hoshi` backups keep the legacy root archive shape for iOS/older
   Android compatibility and include profile-scoped dictionary metadata under the
   reserved `.hoshi-profiles/` payload. The root `config.json` projects the
@@ -108,6 +115,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `Fonts/System/` and cannot be deleted from the UI. A private atomic alias
   sidecar preserves legacy basename selections and dictionary CSS references
   when a parsed family/weight/style slot is replaced by a new internal file.
+- Dictionary settings exposes a stroke-order font download after the active
+  profile has at least one Kanji dictionary. The screen-scoped installer pins
+  the source file size and SHA-256, downloads through a private temporary file,
+  and enters the verified result through `ReaderFontManager`'s normal user-font
+  import path. An already installed `KanjiStrokeOrders` family keeps the action
+  visible but disabled.
 - `ReaderAppearanceViewModel` owns visible font import/download/delete state.
   Recommended files come only from the pinned internal Google Fonts catalog,
   are streamed to a same-directory temporary file, and become visible only
@@ -177,6 +190,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- The shared popup term payload carries pitch entries as a numeric downstep or
+  explicit H/L pattern plus 1-based nasal/devoice mora positions. Popup JS owns
+  effective-pattern deduplication and visual rendering. A single Kanji in a term
+  header routes through the same iframe bridge to the native Kanji query and is
+  rendered in place with the popup's existing back/forward history.
 - Lookup popup CSS `zoom` coordinate conversion and scrolling are owned by
   `popup.js` through `hoshiPopupGeometry`. Popup term alignment, reduced-motion
   viewport scrolling, history/reset positions, tap selection coordinates, and
@@ -286,6 +304,8 @@ Current build wiring lives in `app/build.gradle.kts`:
   JVM tests.
 - Uses JNA AAR for Android packaging and JNA jar for JVM unit tests.
 - Uses Java 17 targets and KSP-backed Hilt code generation for the app graph.
+- Pins CMake 3.31.6 for local Android builds and both CI/release workflows,
+  matching the minimum required by the tracked Glaze dependency.
 
 Hard constraints:
 

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.manhhao.hoshi.LookupResult
+import de.manhhao.hoshi.KanjiResult
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,6 +30,7 @@ internal interface DictionarySearchRepository {
     suspend fun rebuildLookupQuery()
     fun lookup(query: String, maxResults: Int, scanLength: Int): List<LookupResult>
     fun dictionaryStyles(): Map<String, String>
+    fun lookupKanji(kanji: String): KanjiResult = KanjiResult(kanji, emptyArray())
 }
 
 @Singleton
@@ -49,6 +51,9 @@ internal class AndroidDictionarySearchRepository @Inject constructor(
 
     override fun dictionaryStyles(): Map<String, String> =
         dictionaryRepository.dictionaryStyles()
+
+    override fun lookupKanji(kanji: String): KanjiResult =
+        dictionaryRepository.lookupKanji(kanji)
 }
 
 @HiltViewModel
@@ -241,6 +246,8 @@ internal class DictionarySearchViewModel : ViewModel {
         val settings = _uiState.value.dictionarySettings.normalized()
         return repository.lookup(query, settings.maxResults, settings.scanLength)
     }
+
+    fun lookupKanji(kanji: String): KanjiResult = repository.lookupKanji(kanji)
 
     fun entryForPopup(popupId: String, index: Int): LookupResult? {
         if (index < 0) return null

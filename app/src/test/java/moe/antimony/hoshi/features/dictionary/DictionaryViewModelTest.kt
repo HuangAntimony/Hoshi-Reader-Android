@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryIndex
 import moe.antimony.hoshi.dictionary.DictionaryInfo
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 import moe.antimony.hoshi.dictionary.DictionaryRename
 import moe.antimony.hoshi.dictionary.RecommendedDictionary
 import moe.antimony.hoshi.dictionary.DictionaryType
@@ -64,6 +65,144 @@ class DictionaryViewModelTest {
 
         assertEquals(DictionaryType.Frequency, viewModel.uiState.value.selectedType)
         assertEquals(listOf(frequency), viewModel.uiState.value.currentDictionaries)
+    }
+
+    @Test
+    fun strokeOrderFontActionAppearsForKanjiDictionariesAndDisablesWhenInstalled() {
+        val kanji = dictionary("kanjidic", "KANJIDIC")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(kanji)),
+            strokeOrderFontInstalled = false,
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+
+        viewModel.reload()
+
+        assertTrue(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertTrue(viewModel.uiState.value.canDownloadStrokeOrderFont)
+
+        repository.strokeOrderFontInstalled = true
+        viewModel.reload()
+
+        assertTrue(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+    }
+
+    @Test
+    fun strokeOrderFontActionStaysHiddenWithoutKanjiDictionaries() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(dictionary("term", "JMdict"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+
+        viewModel.reload()
+
+        assertFalse(viewModel.uiState.value.showStrokeOrderFontDownload)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+    }
+
+    @Test
+    fun strokeOrderFontInstallPublishesBusyStateAndDisablesTheActionAfterSuccess() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(dictionary("kanjidic", "KANJIDIC"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+        var busyStateObserved = false
+        repository.onInstallStrokeOrderFont = {
+            busyStateObserved = viewModel.uiState.value.isInstallingStrokeOrderFont &&
+                !viewModel.uiState.value.canDownloadStrokeOrderFont
+            repository.strokeOrderFontInstalled = true
+        }
+
+        viewModel.installStrokeOrderFont()
+
+        assertTrue(busyStateObserved)
+        assertTrue(repository.strokeOrderFontInstalled)
+        assertTrue(viewModel.uiState.value.strokeOrderFontInstalled)
+        assertFalse(viewModel.uiState.value.isInstallingStrokeOrderFont)
+        assertFalse(viewModel.uiState.value.canDownloadStrokeOrderFont)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun strokeOrderFontInstallFailureRestoresEnabledActionAndShowsLocalizedError() {
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Kanji to listOf(dictionary("kanjidic", "KANJIDIC"))),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+        repository.onInstallStrokeOrderFont = { error("network failure") }
+
+        viewModel.installStrokeOrderFont()
+
+        assertFalse(viewModel.uiState.value.isInstallingStrokeOrderFont)
+        assertFalse(viewModel.uiState.value.strokeOrderFontInstalled)
+        assertTrue(viewModel.uiState.value.canDownloadStrokeOrderFont)
+        assertEquals(
+            "resource:${R.string.dictionary_stroke_order_font_download_failed}:",
+            viewModel.uiState.value.errorMessage.testString(),
+        )
+    }
+
+    @Test
+    fun setDictionaryCategoryPersistsTermCategoryAndRefreshesState() {
+        val term = dictionary("term", "JMdict")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(term)),
+        )
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+
+        repository.onCategory = { category ->
+            repository.dictionaries = mapOf(
+                DictionaryType.Term to listOf(term.copy(category = category)),
+            )
+            true
+        }
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Exclude)
+
+        assertEquals(listOf("term:Exclude"), repository.categoryCalls)
+        assertEquals(DictionaryCategory.Exclude, viewModel.uiState.value.currentDictionaries.single().category)
+    }
+
+    @Test
+    fun rapidDictionaryCategoryChangesPersistTheLatestIntent() {
+        val term = dictionary("term", "JMdict")
+        val repository = FakeDictionaryRepository(
+            dictionaries = mapOf(DictionaryType.Term to listOf(term)),
+        )
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var mutationActive = false
+        var persistedCategory = DictionaryCategory.None
+        repository.onCategory = { category ->
+            if (mutationActive) {
+                false
+            } else {
+                mutationActive = true
+                if (category == DictionaryCategory.Monolingual) {
+                    firstEntered.complete(Unit)
+                    releaseFirst.await()
+                }
+                persistedCategory = category
+                repository.dictionaries = mapOf(
+                    DictionaryType.Term to listOf(term.copy(category = category)),
+                )
+                mutationActive = false
+                true
+            }
+        }
+        val viewModel = DictionaryViewModel(repository, testScope, Dispatchers.Unconfined)
+        viewModel.reload()
+
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Monolingual)
+        assertTrue(firstEntered.isCompleted)
+        viewModel.setDictionaryCategory(term, DictionaryCategory.Exclude)
+        releaseFirst.complete(Unit)
+
+        assertEquals(DictionaryCategory.Exclude, persistedCategory)
+        assertEquals(DictionaryCategory.Exclude, viewModel.uiState.value.currentDictionaries.single().category)
     }
 
     @Test
@@ -625,6 +764,7 @@ private class FakeDictionaryRepository(
     settings: DictionarySettings = DictionarySettings(),
     var updatableDictionaries: List<DictionaryUpdateCandidate> = emptyList(),
     private val failedImportItems: Set<DictionaryImportItem> = emptySet(),
+    var strokeOrderFontInstalled: Boolean = false,
 ) : DictionaryViewModelRepository {
     private val settingsFlow = MutableStateFlow(settings)
     override val settings: StateFlow<DictionarySettings> = settingsFlow
@@ -634,10 +774,13 @@ private class FakeDictionaryRepository(
     var loadDictionariesCount = 0
     var onImport: (() -> Unit)? = null
     var onMove: (suspend () -> Unit)? = null
+    var onCategory: (suspend (DictionaryCategory) -> Boolean)? = null
     var onUpdate: (suspend ((DictionaryUpdateProgress) -> Unit) -> DictionaryUpdateSummary)? = null
+    var onInstallStrokeOrderFont: (suspend () -> Unit)? = null
     val enabledCalls = mutableListOf<String>()
     val deleteCalls = mutableListOf<String>()
     val moveCalls = mutableListOf<Pair<DictionaryType, Pair<Int, Int>>>()
+    val categoryCalls = mutableListOf<String>()
     val importedItems = mutableListOf<DictionaryImportItem>()
     val progressMessages = mutableListOf<String?>()
     val importedRecommendedDictionaries = mutableListOf<RecommendedDictionary>()
@@ -689,6 +832,13 @@ private class FakeDictionaryRepository(
     override suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         updatableDictionaries
 
+    override fun isStrokeOrderFontInstalled(): Boolean = strokeOrderFontInstalled
+
+    override suspend fun installStrokeOrderFont() {
+        onInstallStrokeOrderFont?.invoke()
+        strokeOrderFontInstalled = true
+    }
+
     override suspend fun updateDictionaries(
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ): DictionaryUpdateSummary =
@@ -714,6 +864,13 @@ private class FakeDictionaryRepository(
         enabledCalls += "$fileName:$enabled"
         publishCompletedChange()
         return true
+    }
+
+    override suspend fun setDictionaryCategory(fileName: String, category: DictionaryCategory): Boolean {
+        categoryCalls += "$fileName:$category"
+        val changed = onCategory?.invoke(category) ?: true
+        if (changed) publishCompletedChange()
+        return changed
     }
 
     override suspend fun deleteDictionary(type: DictionaryType, fileName: String, title: String): Boolean {

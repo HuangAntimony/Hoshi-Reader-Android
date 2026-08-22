@@ -236,7 +236,10 @@ class HoshiBackupRepositoryTest {
         val sourceDir = Files.createTempDirectory("hoshi-dictionaries-backup-source").toFile()
         sourceDir.resolve("Dictionaries/Term/JMdict").mkdirs()
         sourceDir.resolve("Dictionaries/Term/JMdict/index.json").writeText("""{"title":"JMdict"}""")
-        sourceDir.resolve("Dictionaries/config.json").writeText("""{"termDictionaries":[]}""")
+        sourceDir.resolve("Dictionaries/Kanji/KANJIDIC").mkdirs()
+        sourceDir.resolve("Dictionaries/Kanji/KANJIDIC/index.json").writeText("""{"title":"KANJIDIC"}""")
+        val config = """{"termDictionaries":[{"fileName":"JMdict","isEnabled":true,"order":0,"category":"exclude"}],"frequencyDictionaries":[],"pitchDictionaries":[],"kanjiDictionaries":[{"fileName":"KANJIDIC","isEnabled":true,"order":0,"category":"none"}]}"""
+        sourceDir.resolve("Dictionaries/config.json").writeText(config)
         val output = ByteArrayOutputStream()
         HoshiBackupRepository(sourceDir).exportDictionaries(output)
         val targetDir = Files.createTempDirectory("hoshi-dictionaries-backup-target").toFile()
@@ -249,7 +252,8 @@ class HoshiBackupRepositoryTest {
 
         assertFalse(targetDir.resolve("Dictionaries/old/index.json").exists())
         assertEquals("""{"title":"JMdict"}""", targetDir.resolve("Dictionaries/Term/JMdict/index.json").readText())
-        assertEquals("""{"termDictionaries":[]}""", targetDir.resolve("Dictionaries/config.json").readText())
+        assertEquals("""{"title":"KANJIDIC"}""", targetDir.resolve("Dictionaries/Kanji/KANJIDIC/index.json").readText())
+        assertEquals(config, targetDir.resolve("Dictionaries/config.json").readText())
         assertFalse(zipEntryNames(output.toByteArray()).any { it == "Dictionaries/" || it.startsWith("Dictionaries/") })
     }
 

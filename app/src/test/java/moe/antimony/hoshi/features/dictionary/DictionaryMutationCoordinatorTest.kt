@@ -70,4 +70,33 @@ class DictionaryMutationCoordinatorTest {
         assertFalse(secondRan)
         assertEquals("first", first.await())
     }
+
+    @Test
+    fun queuedMutationRunsAfterBusyMutationCompletes() = runBlocking {
+        val coordinator = DictionaryMutationCoordinator()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var queuedRan = false
+
+        val first = async {
+            coordinator.runExclusive(DictionaryMutationOperation.Import) {
+                entered.complete(Unit)
+                release.await()
+            }
+        }
+        entered.await()
+        val queued = async {
+            coordinator.runExclusiveQueued(DictionaryMutationOperation.Edit) {
+                queuedRan = true
+                "queued"
+            }
+        }
+
+        assertFalse(queuedRan)
+        release.complete(Unit)
+        first.await()
+
+        assertEquals("queued", queued.await())
+        assertFalse(coordinator.isMutationInProgress)
+    }
 }

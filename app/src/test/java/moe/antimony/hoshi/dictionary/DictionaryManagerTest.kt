@@ -11,22 +11,41 @@ class DictionaryManagerTest {
         assertEquals("Term", DictionaryType.Term.directoryName)
         assertEquals("Frequency", DictionaryType.Frequency.directoryName)
         assertEquals("Pitch", DictionaryType.Pitch.directoryName)
+        assertEquals("Kanji", DictionaryType.Kanji.directoryName)
     }
 
     @Test
     fun dictionaryConfigUsesIosJsonShape() {
         val config = DictionaryConfig(
-            termDictionaries = listOf(DictionaryConfig.DictionaryEntry("JMdict", isEnabled = true, order = 0)),
+            termDictionaries = listOf(
+                DictionaryConfig.DictionaryEntry(
+                    "JMdict",
+                    isEnabled = true,
+                    order = 0,
+                    category = DictionaryCategory.Monolingual,
+                ),
+            ),
             frequencyDictionaries = emptyList(),
             pitchDictionaries = emptyList(),
+            kanjiDictionaries = listOf(DictionaryConfig.DictionaryEntry("KANJIDIC", isEnabled = true, order = 0)),
         )
 
         val json = Json.encodeToString(config)
 
         assertEquals(
-            """{"termDictionaries":[{"fileName":"JMdict","isEnabled":true,"order":0}],"frequencyDictionaries":[],"pitchDictionaries":[]}""",
+            """{"termDictionaries":[{"fileName":"JMdict","isEnabled":true,"order":0,"category":"monolingual"}],"frequencyDictionaries":[],"pitchDictionaries":[],"kanjiDictionaries":[{"fileName":"KANJIDIC","isEnabled":true,"order":0,"category":"none"}]}""",
             json,
         )
+    }
+
+    @Test
+    fun dictionaryConfigDefaultsNewFieldsWhenLoadingLegacyJson() {
+        val config = Json.decodeFromString<DictionaryConfig>(
+            """{"termDictionaries":[{"fileName":"JMdict","isEnabled":true,"order":0}],"frequencyDictionaries":[],"pitchDictionaries":[]}""",
+        )
+
+        assertEquals(DictionaryCategory.None, config.termDictionaries.single().category)
+        assertEquals(emptyList<DictionaryConfig.DictionaryEntry>(), config.kanjiDictionaries)
     }
 
     @Test
@@ -54,6 +73,16 @@ class DictionaryManagerTest {
     }
 
     @Test
+    fun dictionaryIndexAcceptsNativeSummaryWithVersionInsteadOfFormat() {
+        val index = Json { ignoreUnknownKeys = true }.decodeFromString<DictionaryIndex>(
+            """{"title":"KANJIDIC","revision":"2026.08","version":3}""",
+        )
+
+        assertEquals(3, index.format)
+        assertEquals("KANJIDIC", index.title)
+    }
+
+    @Test
     fun collectDictionariesPreservesConfigOrderAndAppendsUnconfiguredImports() {
         val stored = listOf(
             dictionaryInfo(title = "Unconfigured", fileName = "Unconfigured"),
@@ -61,7 +90,12 @@ class DictionaryManagerTest {
             dictionaryInfo(title = "First", fileName = "First"),
         )
         val config = listOf(
-            DictionaryConfig.DictionaryEntry(fileName = "First", isEnabled = false, order = 1),
+            DictionaryConfig.DictionaryEntry(
+                fileName = "First",
+                isEnabled = false,
+                order = 1,
+                category = DictionaryCategory.Bilingual,
+            ),
             DictionaryConfig.DictionaryEntry(fileName = "Second", isEnabled = true, order = 0),
         )
 
@@ -70,6 +104,10 @@ class DictionaryManagerTest {
         assertEquals(listOf("Second", "First", "Unconfigured"), result.map { it.index.title })
         assertEquals(listOf(true, false, true), result.map { it.isEnabled })
         assertEquals(listOf(0, 1, 2), result.map { it.order })
+        assertEquals(
+            listOf(DictionaryCategory.None, DictionaryCategory.Bilingual, DictionaryCategory.None),
+            result.map { it.category },
+        )
     }
 
     @Test
@@ -77,7 +115,12 @@ class DictionaryManagerTest {
         val dictionaries = listOf(
             dictionaryInfo(title = "First", fileName = "First", isEnabled = true),
             dictionaryInfo(title = "Second", fileName = "Second", isEnabled = false),
-            dictionaryInfo(title = "Third", fileName = "Third", isEnabled = true),
+            dictionaryInfo(
+                title = "Third",
+                fileName = "Third",
+                isEnabled = true,
+                category = DictionaryCategory.Exclude,
+            ),
         )
 
         val result = DictionaryManager.moveDictionaries(dictionaries, fromIndex = 2, toIndex = 0)
@@ -85,6 +128,7 @@ class DictionaryManagerTest {
         assertEquals(listOf("Third", "First", "Second"), result.map { it.fileName })
         assertEquals(listOf(true, true, false), result.map { it.isEnabled })
         assertEquals(listOf(0, 1, 2), result.map { it.order })
+        assertEquals(DictionaryCategory.Exclude, result.first().category)
     }
 
     @Test
@@ -104,6 +148,7 @@ class DictionaryManagerTest {
         title: String,
         fileName: String,
         isEnabled: Boolean = true,
+        category: DictionaryCategory = DictionaryCategory.None,
     ): DictionaryInfo =
         DictionaryInfo(
             index = DictionaryIndex(
@@ -116,5 +161,6 @@ class DictionaryManagerTest {
             ),
             path = File("/tmp/$fileName"),
             isEnabled = isEnabled,
+            category = category,
         )
 }

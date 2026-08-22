@@ -60,6 +60,28 @@ class ReaderFontManagerTest {
     }
 
     @Test
+    fun popupFontFaceCssExposesParsedFamilyNameForDictionaryCss() {
+        val root = createTempDirectory().toFile()
+        val manager = ReaderFontManager(root)
+        manager.importFont(
+            File(root, "KanjiStrokeOrders_v4.005.ttf").apply {
+                writeBytes(
+                    sfntFixture(
+                        family = "KanjiStrokeOrders",
+                        vendorId = "KSOF",
+                        weight = 500,
+                    ),
+                )
+            },
+        )
+
+        val css = manager.popupFontFaceCss()
+
+        assertTrue(css.contains("""font-family: "KanjiStrokeOrders";"""))
+        assertTrue(css.contains("font-weight: 500;"))
+    }
+
+    @Test
     fun importFontRejectsNonFontExtensions() {
         val root = createTempDirectory().toFile()
         val source = File(root, "not-a-font.zip").apply { writeBytes(byteArrayOf(1)) }

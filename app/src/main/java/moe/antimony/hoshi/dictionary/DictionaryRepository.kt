@@ -3,6 +3,7 @@ package moe.antimony.hoshi.dictionary
 import android.content.ContentResolver
 import android.net.Uri
 import de.manhhao.hoshi.LookupResult
+import de.manhhao.hoshi.KanjiResult
 import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
@@ -89,6 +90,21 @@ internal class DictionaryRepository @Inject constructor(
         rebuildLookupQuery()
     }
 
+    fun setDictionaryCategory(fileName: String, category: DictionaryCategory) {
+        synchronized(lookupQueryLock) {
+            val previousConfig = storage.currentConfig()
+            storage.saveConfig(storage.configWithDictionaryCategory(fileName, category))
+            try {
+                rebuildLookupQueryLocked()
+            } catch (error: Throwable) {
+                runCatching { storage.saveConfig(previousConfig) }
+                    .exceptionOrNull()
+                    ?.let(error::addSuppressed)
+                throw error
+            }
+        }
+    }
+
     fun deleteDictionary(type: DictionaryType, fileName: String) {
         storage.deleteDictionary(type, fileName)
         storage.saveConfig(storage.currentConfig())
@@ -144,6 +160,7 @@ internal class DictionaryRepository @Inject constructor(
                     replacementFileName = replacement.fileName,
                     enabled = installed.isEnabled,
                     order = installed.order,
+                    category = installed.category,
                 )
                 if (replacement.index.title != installedIndex.title) {
                     renames += DictionaryRename(
@@ -236,6 +253,11 @@ internal class DictionaryRepository @Inject constructor(
         return lookupQueryService.lookup(text, maxResults, scanLength)
     }
 
+    fun lookupKanji(kanji: String): KanjiResult {
+        ensureLookupQueryReady()
+        return lookupQueryService.queryKanji(kanji)
+    }
+
     fun dictionaryStyles(): Map<String, String> {
         ensureLookupQueryReady()
         return lookupQueryService.getStyles().associate { it.dictName to it.styles }
@@ -249,9 +271,12 @@ internal class DictionaryRepository @Inject constructor(
     private fun rebuildLookupQueryLocked() {
         val contentLanguageProfile = profileRepository.currentEffectiveContentLanguageProfile
         lookupQueryService.rebuild(
-            termDictionaries = storage.enabledDictionaryPaths(DictionaryType.Term),
+            termDictionaries = storage.loadDictionaries(DictionaryType.Term)
+                .filter { it.isEnabled && it.category != DictionaryCategory.Exclude }
+                .map { it.path },
             frequencyDictionaries = storage.enabledDictionaryPaths(DictionaryType.Frequency),
             pitchDictionaries = storage.enabledDictionaryPaths(DictionaryType.Pitch),
+            kanjiDictionaries = storage.enabledDictionaryPaths(DictionaryType.Kanji),
             dictionaryLanguageId = contentLanguageProfile.dictionaryLanguageId
                 .takeIf { ContentLanguageProfile.fromDictionaryLanguageId(it) != null }
                 ?: ContentLanguageProfile.Default.dictionaryLanguageId,

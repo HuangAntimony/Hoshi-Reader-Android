@@ -229,7 +229,12 @@
     <string name="dictionary_importing_named_format">Importing %1$s</string>
     <string name="dictionary_importing_default">Importing dictionary</string>
     <string name="dictionary_download_recommended">Download Recommended Dictionaries</string>
-    <string name="dictionary_supported_archive_types">Yomitan term, frequency, and pitch dictionaries (.zip) are supported</string>
+    <string name="dictionary_download_stroke_order_font">Download Stroke Order Font</string>
+    <string name="dictionary_stroke_order_font_dialog_title">Download Font</string>
+    <string name="dictionary_stroke_order_font_dialog_message">This will download and automatically import the Kanji stroke order font (17 MB).</string>
+    <string name="dictionary_stroke_order_font_downloading">Downloading and importing the stroke order font…</string>
+    <string name="dictionary_stroke_order_font_download_failed">Couldn’t download and import the stroke order font. Check your connection and try again.</string>
+    <string name="dictionary_supported_archive_types">Yomitan term, frequency, pitch, and Kanji dictionaries (.zip) are supported</string>
     <string name="dictionary_default_tab">Default to Dictionary Tab</string>
     <string name="dictionary_empty_type_format">No %1$s Dictionaries</string>
     <string name="dictionary_updates_section" comment="Dictionary settings section label for installed dictionary update controls; intentionally matches the About update section label.">Updates</string>
@@ -249,6 +254,13 @@
     <string name="dictionary_type_term">Term</string>
     <string name="dictionary_type_frequency">Frequency</string>
     <string name="dictionary_type_pitch">Pitch</string>
+    <string name="dictionary_type_kanji">Kanji</string>
+    <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">None</string>
+    <string name="dictionary_category_monolingual">Monolingual</string>
+    <string name="dictionary_category_bilingual">Bilingual</string>
+    <string name="dictionary_category_exclude">Exclude</string>
+    <string name="dictionary_category_update_failed">Failed to update the dictionary category.</string>
+    <string name="anki_categorize_dictionaries">Categorize dictionaries</string>
     <string name="dictionary_custom_css">Custom CSS</string>
     <string name="dictionary_import_action">Import Dictionary</string>
     <string name="dictionary_delete_action">Delete Dictionary</string>

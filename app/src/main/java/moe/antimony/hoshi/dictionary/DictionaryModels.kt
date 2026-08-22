@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.dictionary
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import java.io.File
@@ -9,6 +12,22 @@ enum class DictionaryType(val directoryName: String) {
     Term("Term"),
     Frequency("Frequency"),
     Pitch("Pitch"),
+    Kanji("Kanji"),
+}
+
+@Serializable
+enum class DictionaryCategory {
+    @SerialName("none")
+    None,
+
+    @SerialName("monolingual")
+    Monolingual,
+
+    @SerialName("bilingual")
+    Bilingual,
+
+    @SerialName("exclude")
+    Exclude,
 }
 
 data class DictionaryInfo(
@@ -17,6 +36,7 @@ data class DictionaryInfo(
     val path: File,
     val isEnabled: Boolean = true,
     val order: Int = 0,
+    val category: DictionaryCategory = DictionaryCategory.None,
 )
 
 data class DictionaryUpdateCandidate(
@@ -160,23 +180,31 @@ fun recommendedDictionariesForLanguage(languageId: String): List<RecommendedDict
     RecommendedDictionaries.filter { it.languageId == languageId }
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class DictionaryConfig(
     val termDictionaries: List<DictionaryEntry>,
     val frequencyDictionaries: List<DictionaryEntry>,
     val pitchDictionaries: List<DictionaryEntry>,
+    @EncodeDefault
+    val kanjiDictionaries: List<DictionaryEntry> = emptyList(),
 ) {
     @Serializable
+    @OptIn(ExperimentalSerializationApi::class)
     data class DictionaryEntry(
         val fileName: String,
         val isEnabled: Boolean,
         val order: Int,
+        @EncodeDefault
+        val category: DictionaryCategory = DictionaryCategory.None,
     )
 }
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class DictionaryIndex(
     val title: String,
-    val format: Int,
+    @EncodeDefault
+    val format: Int = 3,
     val revision: String,
     val isUpdatable: Boolean = false,
     val indexUrl: String = "",

@@ -73,6 +73,23 @@ class FakeElement {
         children.forEach((child) => this.appendChild(child));
     }
 
+    replaceChildren(...children) {
+        this.children = [];
+        this.append(...children);
+    }
+
+    get childNodes() {
+        return this.children;
+    }
+
+    set innerHTML(value) {
+        if (value === '') this.children = [];
+    }
+
+    querySelectorAll() {
+        return [];
+    }
+
     addEventListener(type, listener) {
         const listeners = this.listeners?.get(type) ?? [];
         listeners.push(listener);
@@ -113,6 +130,8 @@ function popupContext({
     htmlProbeWidth = 100,
     bodyProbeWidth = 100,
     duplicateStates = {},
+    kanjiResult = null,
+    getEntry = null,
 } = {}) {
     const documentElement = new FakeElement();
     documentElement.childProbeWidth = htmlProbeWidth;
@@ -125,6 +144,8 @@ function popupContext({
         return element;
     };
     const documentListeners = new Map();
+    const entriesContainer = new FakeElement();
+    const overlay = new FakeElement();
     const document = {
         body,
         documentElement,
@@ -139,8 +160,18 @@ function popupContext({
         createElement(tagName) {
             return new FakeElement([], tagName);
         },
+        createTextNode(text) {
+            return { nodeType: 3, textContent: text, parentElement: null };
+        },
+        getElementById(id) {
+            return id === 'entries-container' ? entriesContainer : null;
+        },
+        scrollingElement: { scrollTop: 0, scrollHeight: 0, clientHeight: 0 },
         querySelectorAll() {
             return [];
+        },
+        querySelector(selector) {
+            return selector === '.overlay' ? overlay : null;
         },
     };
     const selectTextCalls = [];
@@ -148,6 +179,8 @@ function popupContext({
     const mineEntryMessages = [];
     const duplicateCheckMessages = [];
     const showNotesMessages = [];
+    const kanjiRedirectMessages = [];
+    const kanjiRedirectCommittedMessages = [];
     let currentDuplicateStates = duplicateStates;
     const window = {
         scrollX: 0,
@@ -197,9 +230,29 @@ function popupContext({
                         return true;
                     },
                 },
+                kanjiRedirect: {
+                    postMessage(message) {
+                        kanjiRedirectMessages.push(message);
+                        return typeof kanjiResult === 'function' ? kanjiResult(message) : kanjiResult;
+                    },
+                },
+                kanjiRedirectCommitted: {
+                    postMessage(message) {
+                        kanjiRedirectCommittedMessages.push(message);
+                    },
+                },
+                getEntry: {
+                    postMessage(index) {
+                        return getEntry?.(index) ?? null;
+                    },
+                },
             },
         },
         window,
+        requestAnimationFrame(callback) {
+            callback();
+            return 1;
+        },
     };
     if (loadJapaneseLanguageAsset) {
         vm.runInNewContext(fs.readFileSync(japaneseLanguageUrl, 'utf8'), context);
@@ -218,8 +271,17 @@ function popupContext({
         mineEntryMessages,
         duplicateCheckMessages,
         showNotesMessages,
+        kanjiRedirectMessages,
+        kanjiRedirectCommittedMessages,
+        entriesContainer,
         setDuplicateStates(value) { currentDuplicateStates = value; },
     };
+}
+
+async function flushAsyncWork(turns = 8) {
+    for (let turn = 0; turn < turns; turn++) {
+        await Promise.resolve();
+    }
 }
 
 function touchEvent(target, x, y, cancelable = false) {
@@ -544,7 +606,7 @@ test('popup transcription entries do not render as Japanese pitch accents', () =
         pitches: [
             {
                 dictionary: 'English',
-                pitchPositions: [],
+                pitches: [],
                 transcriptions: ['/riːd/', '/rɛd/'],
             },
         ],
@@ -568,7 +630,7 @@ test('popup preserves IPA dictionary transcription delimiters', () => {
         pitches: [
             {
                 dictionary: 'seth-oald-ipa',
-                pitchPositions: [],
+                pitches: [],
                 transcriptions: ['/riːd/'],
             },
         ],
@@ -689,7 +751,7 @@ test('popup builds Yomitan-compatible phonetic transcriptions Anki HTML', () => 
     const html = context.constructPhoneticTranscriptionsHtml([
         {
             dictionary: 'seth-oald-ipa',
-            pitchPositions: [],
+            pitches: [],
             transcriptions: ['/riːd/', '/rɛd/'],
         },
     ]);
@@ -708,7 +770,7 @@ test('mineEntry posts phonetic transcriptions for Anki handlebar rendering', asy
         'read',
         'read',
         [],
-        [{ dictionary: 'seth-oald-ipa', pitchPositions: [], transcriptions: ['/riːd/'] }],
+        [{ dictionary: 'seth-oald-ipa', pitches: [], transcriptions: ['/riːd/'] }],
         [],
         'read',
         0,
@@ -746,8 +808,8 @@ test('pitch graph handlebars receive deduplicated SVGs and first graph selection
     const { context } = popupContext();
     context.window.deduplicatePitchAccents = true;
     const pitches = [
-        { dictionary: 'A', pitchPositions: [0, 2] },
-        { dictionary: 'B', pitchPositions: [2, 1] },
+        { dictionary: 'A', pitches: [{ position: 0 }, { position: 2 }] },
+        { dictionary: 'B', pitches: [{ position: 2 }, { position: 1 }] },
     ];
 
     const all = context.constructPitchAccentGraphsHtml(pitches, 'ねこ');
@@ -764,13 +826,207 @@ test('pitch graph output keeps duplicates when disabled and omits list for one g
     context.window.deduplicatePitchAccents = false;
 
     const multiple = context.constructPitchAccentGraphsHtml([
-        { pitchPositions: [1] },
-        { pitchPositions: [1] },
+        { pitches: [{ position: 1 }] },
+        { pitches: [{ position: 1 }] },
     ], 'ねこ');
-    const single = context.constructPitchAccentGraphsHtml([{ pitchPositions: [1] }], 'ねこ');
+    const single = context.constructPitchAccentGraphsHtml([{ pitches: [{ position: 1 }] }], 'ねこ');
 
     assert.equal((multiple.match(/<svg/g) || []).length, 2);
     assert.match(multiple, /^<ol>/);
     assert.match(single, /^<svg/);
     assert.doesNotMatch(single, /<ol>/);
+});
+
+test('complete pitch renders string patterns with 1-based nasal and devoice mora markers', () => {
+    const { context } = popupContext();
+    const group = context.createPitchGroup({
+        dictionary: 'Accent',
+        pitches: [{ position: 'LHL', nasal: [1], devoice: [2] }],
+    }, 'ねこ');
+    const morae = descendants(group).filter((node) => node.className === 'pronunciation-mora');
+
+    assert.equal(morae.length, 2);
+    assert.equal(morae[0].dataset.pitch, 'low');
+    assert.equal(morae[0].dataset.nasal, 'true');
+    assert.equal(morae[1].dataset.pitch, 'high');
+    assert.equal(morae[1].dataset.devoice, 'true');
+    assert.match(context.constructPitchPositionHtml([{ pitches: [{ position: 'LHL' }] }]), />2</);
+});
+
+test('nasal pitch renders the base kana for voiced and semi-voiced morae', () => {
+    const { context } = popupContext();
+    const cases = [
+        { reading: 'かぎ', nasalPosition: 2, expected: 'き' },
+        { reading: 'ぱく', nasalPosition: 1, expected: 'は' },
+    ];
+
+    for (const { reading, nasalPosition, expected } of cases) {
+        const group = context.createPitchGroup({
+            dictionary: 'NHK+',
+            pitches: [{ position: 'LHL', nasal: [nasalPosition], devoice: [] }],
+        }, reading);
+        const nasalMora = descendants(group)
+            .filter((node) => node.className === 'pronunciation-mora')
+            .find((node) => node.dataset.nasal === 'true');
+        const characterGroup = descendants(nasalMora)
+            .find((node) => node.className === 'pronunciation-character-group');
+
+        assert.equal(characterGroup.children[0].textContent, expected);
+    }
+});
+
+test('nasal pitch keeps the small kana tail outside the marked character group', () => {
+    const { context } = popupContext();
+    const group = context.createPitchGroup({
+        dictionary: 'NHK+',
+        pitches: [{ position: 'HLL', nasal: [1], devoice: [] }],
+    }, 'ぎゃく');
+    const nasalMora = descendants(group)
+        .filter((node) => node.className === 'pronunciation-mora')
+        .find((node) => node.dataset.nasal === 'true');
+    const characterGroup = descendants(nasalMora)
+        .find((node) => node.className === 'pronunciation-character-group');
+
+    assert.equal(characterGroup.children[0].textContent, 'き');
+    assert.equal(nasalMora.children[1].textContent, 'ゃ');
+});
+
+test('kanji touch redirect renders in place and suppresses its duplicate click', async () => {
+    const result = {
+        character: '星',
+        entries: [{ dictName: 'KANJIDIC', onyomi: 'セイ', kunyomi: 'ほし', meanings: ['star'] }],
+    };
+    const setup = popupContext({ kanjiResult: result });
+    const container = new FakeContainer();
+    const target = new FakeElement(['.kanji-char']);
+    target.textContent = '星';
+    setup.context.installPopupTapHandlers(container);
+
+    container.dispatch('touchstart', touchEvent(target, 20, 30));
+    container.dispatch('touchend', touchEvent(target, 20, 30, true));
+    const duplicateClick = clickEvent(target, 20, 30);
+    container.dispatch('click', duplicateClick);
+    await Promise.resolve();
+
+    assert.deepEqual(setup.kanjiRedirectMessages, ['星']);
+    assert.equal(setup.kanjiRedirectCommittedMessages.length, 1);
+    assert.equal(duplicateClick.defaultPrevented, true);
+    assert.equal(setup.selectTextCalls.length, 0);
+    assert.equal(setup.entriesContainer.children[0].className, 'entry kanji-entry');
+
+    setup.context.window.navigateBack();
+    assert.equal(setup.entriesContainer.children.length, 0);
+    setup.context.window.navigateForward();
+    assert.equal(setup.entriesContainer.children[0].className, 'entry kanji-entry');
+});
+
+test('kanji history resumes entries that were still loading when redirect started', async () => {
+    let resolveSecondEntry;
+    const secondEntry = new Promise((resolve) => { resolveSecondEntry = resolve; });
+    const entries = [
+        { expression: '星空', reading: 'ほしぞら', glossaries: [] },
+        { expression: '星', reading: 'ほし', glossaries: [] },
+    ];
+    const setup = popupContext({
+        kanjiResult: {
+            character: '星',
+            entries: [{ dictName: 'KANJIDIC', onyomi: 'セイ', kunyomi: 'ほし', meanings: ['star'] }],
+        },
+        getEntry(index) {
+            return index === 0 ? entries[0] : secondEntry;
+        },
+    });
+    setup.context.window.entryCount = entries.length;
+    setup.context.window.renderPopup();
+    await flushAsyncWork();
+    assert.equal(setup.entriesContainer.children.filter((node) => node.dataset?.entryIndex !== undefined).length, 1);
+
+    const target = new FakeElement(['.kanji-char']);
+    target.textContent = '星';
+    setup.context.handlePopupTap(target, 10, 10);
+    await flushAsyncWork();
+    setup.context.window.navigateBack();
+    resolveSecondEntry(entries[1]);
+    await flushAsyncWork(16);
+
+    assert.equal(setup.entriesContainer.children.filter((node) => node.dataset?.entryIndex !== undefined).length, 2);
+});
+
+test('term redirect history never resumes old DOM from the replacement host result set', async () => {
+    let resolveOldSecondEntry;
+    const oldSecondEntry = new Promise((resolve) => { resolveOldSecondEntry = resolve; });
+    const oldEntries = [
+        { expression: '古い一', reading: '', glossaries: [] },
+        { expression: '古い二', reading: '', glossaries: [] },
+    ];
+    const newEntries = [
+        { expression: '新しい一', reading: '', glossaries: [] },
+        { expression: '新しい二', reading: '', glossaries: [] },
+    ];
+    let hostEntries = oldEntries;
+    const setup = popupContext({
+        getEntry(index) {
+            if (hostEntries === oldEntries && index === 1) return oldSecondEntry;
+            return hostEntries[index];
+        },
+    });
+    setup.context.window.entryCount = oldEntries.length;
+    setup.context.window.renderPopup();
+    await flushAsyncWork();
+    assert.equal(setup.entriesContainer.children.filter((node) => node.dataset?.entryIndex !== undefined).length, 1);
+
+    hostEntries = newEntries;
+    setup.context.redirect(newEntries.length);
+    await flushAsyncWork(16);
+    setup.context.window.navigateBack();
+    await flushAsyncWork(16);
+
+    assert.equal(setup.entriesContainer.children.filter((node) => node.dataset?.entryIndex !== undefined).length, 1);
+    resolveOldSecondEntry(oldEntries[1]);
+    await flushAsyncWork();
+    assert.equal(setup.entriesContainer.children.filter((node) => node.dataset?.entryIndex !== undefined).length, 1);
+});
+
+test('only the latest Kanji response may replace popup state or commit native history', async () => {
+    const resolvers = new Map();
+    const setup = popupContext({
+        kanjiResult(kanji) {
+            return new Promise((resolve) => resolvers.set(kanji, resolve));
+        },
+    });
+    const star = new FakeElement(['.kanji-char']);
+    star.textContent = '星';
+    const sun = new FakeElement(['.kanji-char']);
+    sun.textContent = '日';
+
+    setup.context.handlePopupTap(star, 10, 10);
+    setup.context.handlePopupTap(sun, 10, 10);
+    resolvers.get('日')({
+        character: '日',
+        entries: [{ dictName: 'KANJIDIC', onyomi: 'ニチ', kunyomi: 'ひ', meanings: ['sun'] }],
+    });
+    await flushAsyncWork();
+    resolvers.get('星')({
+        character: '星',
+        entries: [{ dictName: 'KANJIDIC', onyomi: 'セイ', kunyomi: 'ほし', meanings: ['star'] }],
+    });
+    await flushAsyncWork();
+
+    const renderedCharacter = descendants(setup.entriesContainer.children[0])
+        .find((node) => node.className === 'kanji')?.textContent;
+    assert.equal(renderedCharacter, '日');
+    assert.equal(setup.kanjiRedirectCommittedMessages.length, 1);
+
+    const late = new FakeElement(['.kanji-char']);
+    late.textContent = '月';
+    setup.context.handlePopupTap(late, 10, 10);
+    setup.context.window.replacePopupResults(0, []);
+    resolvers.get('月')({
+        character: '月',
+        entries: [{ dictName: 'KANJIDIC', onyomi: 'ゲツ', kunyomi: 'つき', meanings: ['moon'] }],
+    });
+    await flushAsyncWork();
+
+    assert.equal(setup.entriesContainer.children.length, 0);
+    assert.equal(setup.kanjiRedirectCommittedMessages.length, 1);
 });
