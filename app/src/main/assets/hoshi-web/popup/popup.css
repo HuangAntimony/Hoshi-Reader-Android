@@ -81,7 +81,7 @@ body {
 .kanji {
     font-size: 120px;
     line-height: 1;
-    font-family: var(--hoshi-content-font-family, "Noto Sans CJK JP", sans-serif);
+    font-family: "KanjiStrokeOrders_v4.005", "KanjiStrokeOrders", "YuKyo-Medium", var(--hoshi-content-font-family, "Noto Sans CJK JP", sans-serif);
 }
 
 .kanji-separator {
