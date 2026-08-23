@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
@@ -65,6 +67,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -384,47 +387,80 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         dictionaryViewModel.reload()
     }
+    val sections = ankiAdvancedSections(uiState.settings.backendKind)
+    val termDictionaries = dictionaryUiState.dictionaries[DictionaryType.Term].orEmpty()
     SettingsDetailScaffold(title = stringResource(R.string.settings_advanced), onClose = onClose, modifier = modifier) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
-            item { AnkiCard {
-                AnkiSwitchRow(stringResource(R.string.anki_embed_media), checked = uiState.settings.embedMedia, onCheckedChange = viewModel::updateEmbedMedia)
-                AnkiDivider()
-                AnkiDropdownRow(
-                    stringResource(R.string.anki_selected_glossary_fallback),
-                    uiState.settings.selectedGlossaryFallback.ifBlank { stringResource(R.string.none) },
-                    true,
-                    AnkiHandlebarOptions.selectedGlossaryFallbackOptions,
-                    { if (it.isBlank()) stringResource(R.string.none) else it },
-                    viewModel::updateSelectedGlossaryFallback,
-                )
-                AnkiDivider()
-                AnkiSwitchRow(stringResource(R.string.anki_show_all_handlebars), checked = uiState.settings.showAllHandlebars, onCheckedChange = viewModel::updateShowAllHandlebars)
-            } }
-            item {
-                Text(
-                    text = stringResource(R.string.anki_categorize_dictionaries),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
-                )
-            }
-            items(
-                items = dictionaryUiState.dictionaries[DictionaryType.Term].orEmpty(),
-                key = { dictionary -> dictionary.path.name },
-            ) { dictionary ->
-                AnkiCard {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text(dictionary.index.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        SingleChoiceSegmentedButtonRow(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        ) {
-                            DictionaryCategory.entries.forEachIndexed { index, category ->
-                                SegmentedButton(
-                                    selected = dictionary.category == category,
-                                    onClick = { dictionaryViewModel.setDictionaryCategory(dictionary, category) },
-                                    shape = SegmentedButtonDefaults.itemShape(index, DictionaryCategory.entries.size),
-                                    icon = {},
-                                ) {
-                                    Text(stringResource(category.labelRes), maxLines = 1)
+            sections.forEach { section ->
+                when (section) {
+                    is AnkiAdvancedSection.General -> item {
+                        AnkiCard {
+                            if (section.showEmbedMedia) {
+                                AnkiSwitchRow(
+                                    stringResource(R.string.anki_embed_media),
+                                    checked = uiState.settings.embedMedia,
+                                    onCheckedChange = viewModel::updateEmbedMedia,
+                                )
+                                AnkiDivider()
+                            }
+                            AnkiSwitchRow(
+                                stringResource(R.string.anki_show_all_handlebars),
+                                checked = uiState.settings.showAllHandlebars,
+                                onCheckedChange = viewModel::updateShowAllHandlebars,
+                            )
+                        }
+                    }
+                    is AnkiAdvancedSection.SelectedGlossaryFallback -> item {
+                        AnkiCard {
+                            AnkiSelectedGlossaryFallbackRow(
+                                value = uiState.settings.selectedGlossaryFallback,
+                                options = section.options,
+                                onValueChange = viewModel::updateSelectedGlossaryFallback,
+                            )
+                        }
+                    }
+                    AnkiAdvancedSection.DictionaryCategories -> {
+                        item {
+                            Text(
+                                text = stringResource(R.string.anki_categorize_dictionaries),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                            )
+                        }
+                        if (termDictionaries.isNotEmpty()) {
+                            item {
+                                AnkiCard {
+                                    termDictionaries.forEachIndexed { dictionaryIndex, dictionary ->
+                                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                            Text(dictionary.index.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            SingleChoiceSegmentedButtonRow(
+                                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                            ) {
+                                                DictionaryCategory.entries.forEachIndexed { index, category ->
+                                                    SegmentedButton(
+                                                        selected = dictionary.category == category,
+                                                        onClick = { dictionaryViewModel.setDictionaryCategory(dictionary, category) },
+                                                        shape = SegmentedButtonDefaults.itemShape(index, DictionaryCategory.entries.size),
+                                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                                                        icon = {},
+                                                    ) {
+                                                        Text(
+                                                            text = stringResource(category.labelRes),
+                                                            autoSize = TextAutoSize.StepBased(
+                                                                minFontSize = 10.sp,
+                                                                maxFontSize = 14.sp,
+                                                                stepSize = 0.5.sp,
+                                                            ),
+                                                            maxLines = 1,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (dictionaryIndex != termDictionaries.lastIndex) {
+                                            AnkiDivider()
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -434,6 +470,25 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 }
+
+internal sealed interface AnkiAdvancedSection {
+    data class General(val showEmbedMedia: Boolean) : AnkiAdvancedSection
+
+    data class SelectedGlossaryFallback(
+        val options: List<String>,
+    ) : AnkiAdvancedSection
+
+    data object DictionaryCategories : AnkiAdvancedSection
+}
+
+internal fun ankiAdvancedSections(backendKind: AnkiBackendKind): List<AnkiAdvancedSection> =
+    listOf(
+        AnkiAdvancedSection.General(showEmbedMedia = backendKind != AnkiBackendKind.AnkiConnect),
+        AnkiAdvancedSection.SelectedGlossaryFallback(
+            options = AnkiHandlebarOptions.selectedGlossaryFallbackOptions,
+        ),
+        AnkiAdvancedSection.DictionaryCategories,
+    )
 
 private val DictionaryCategory.labelRes: Int
     get() = when (this) {
@@ -649,11 +704,46 @@ private fun AnkiFieldMappingRow(
 }
 
 @Composable
+private fun AnkiSelectedGlossaryFallbackRow(
+    value: String,
+    options: List<String>,
+    onValueChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    AnkiTextValueRow(
+        label = stringResource(R.string.anki_selected_glossary_fallback),
+        value = value,
+        onValueChange = onValueChange,
+        dialogLabel = stringResource(R.string.anki_handlebar),
+        showDivider = false,
+        trailingContent = {
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.UnfoldMore, contentDescription = null)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    options.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.ifBlank { stringResource(R.string.none) }) },
+                            onClick = {
+                                expanded = false
+                                onValueChange(option)
+                            },
+                        )
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
 private fun AnkiTextValueRow(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
     dialogLabel: String,
+    showDivider: Boolean = true,
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     var editing by remember { mutableStateOf(false) }
@@ -684,7 +774,9 @@ private fun AnkiTextValueRow(
         }
         trailingContent?.invoke()
     }
-    AnkiDivider()
+    if (showDivider) {
+        AnkiDivider()
+    }
     if (editing) {
         AnkiTextValueDialog(
             title = label,

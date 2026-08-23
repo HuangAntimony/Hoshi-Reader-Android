@@ -130,6 +130,14 @@ class LocalizationResourceTest {
         assertEquals("Profile", zhResources.strings.getValue("settings_profiles").value)
         assertEquals("Profile", zhResources.strings.getValue("profiles_title").value)
         assertEquals(
+            "{selected-glossary} Fallback",
+            defaultResources.strings.getValue("anki_selected_glossary_fallback").value,
+        )
+        assertEquals(
+            "{selected-glossary} Fallback",
+            zhResources.strings.getValue("anki_selected_glossary_fallback").value,
+        )
+        assertEquals(
             "新 Profile 会基于当前启用 Profile 拷贝一份设置。",
             zhResources.strings.getValue("profiles_create_copy_settings_note").value,
         )

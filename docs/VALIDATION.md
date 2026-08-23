@@ -293,6 +293,11 @@ Validate relevant dictionary/audio changes with:
   graph single/multiple/deduplicated output and
   `{pitch-accent-graphs-first}`. Popup pitch text includes 1-based nasal/devoice
   markers; exported Anki pitch SVGs follow iOS and do not encode those markers.
+- Anki Advanced keeps `{selected-glossary} Fallback` visible as a literal
+  handlebar label, accepts both custom text and every preset fallback option,
+  and separates general settings, fallback editing, and the grouped term
+  dictionary category list in iOS order. Confirm all four category labels,
+  especially `Monolingual`, remain fully visible without abbreviation.
 - Cross-format audio, Sasayaki audio, cover, and dictionary-media mining through
   both backends. Recheck after restart and profile switching without clearing
   app data.

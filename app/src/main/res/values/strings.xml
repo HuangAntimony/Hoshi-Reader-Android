@@ -610,7 +610,7 @@
     <string name="anki_icon_diamond">Diamond</string>
     <string name="anki_icon_diamond_small">Small diamond</string>
     <string name="anki_disable_show_notes">Hide note search buttons</string>
-    <string name="anki_selected_glossary_fallback">Selected glossary fallback</string>
+    <string name="anki_selected_glossary_fallback">{selected-glossary} Fallback</string>
     <string name="anki_show_all_handlebars">Show all handlebars</string>
     <string name="anki_fetch_confirm_title">Reset card formats?</string>
     <string name="anki_fetch_confirm_message">Fetching decks and models resets every card format to the default deck, first model, and its default field mappings. Names, icons, and tags are kept.</string>

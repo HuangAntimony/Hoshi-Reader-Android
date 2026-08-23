@@ -608,7 +608,7 @@
     <string name="anki_icon_diamond">菱形</string>
     <string name="anki_icon_diamond_small">小菱形</string>
     <string name="anki_disable_show_notes">隐藏笔记搜索按钮</string>
-    <string name="anki_selected_glossary_fallback">所选释义回退</string>
+    <string name="anki_selected_glossary_fallback">{selected-glossary} Fallback</string>
     <string name="anki_show_all_handlebars">显示全部占位符</string>
     <string name="anki_fetch_confirm_title">重置卡片格式？</string>
     <string name="anki_fetch_confirm_message">获取牌组和模板会将每个卡片格式重置为默认牌组、首个模板及其默认字段映射。名称、图标和标签会保留。</string>
