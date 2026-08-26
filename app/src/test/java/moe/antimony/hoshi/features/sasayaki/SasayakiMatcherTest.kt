@@ -42,7 +42,7 @@ class SasayakiMatcherTest {
             SasayakiCue(id = "2", startTime = 29.0, endTime = 31.0, text = "次の章の本文です。"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 200)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(2, match.matches.size)
         assertEquals(1, match.unmatched)
@@ -56,7 +56,116 @@ class SasayakiMatcherTest {
     }
 
     @Test
-    fun searchWindowIncludesCueLengthLikeIos() {
+    fun choosesLaterCoherentCueSequenceOverEarlierRepeatedOpeningCue() {
+        val lowerVolumeLines = listOf(
+            "八月一日火曜日",
+            "時計館新館に宿泊した二人が起床した",
+            "午前十一時半ごろのことだった",
+            "鹿谷が尋ねた",
+            "そのあとに続く固有の文章です",
+            "さらに次の文章が続いている",
+        )
+        val book = EpubBook(
+            title = "Combined Book",
+            chapters = listOf(
+                EpubChapter(
+                    id = "upper",
+                    href = "upper.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>鹿谷が尋ねた。${"上".repeat(300)}</body></html>",
+                ),
+                EpubChapter(
+                    id = "lower",
+                    href = "lower.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>${lowerVolumeLines.joinToString("。")}</body></html>",
+                ),
+            ),
+        )
+        val cues = lowerVolumeLines.mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(lowerVolumeLines.indices.map(Int::toString), match.matches.map { it.id })
+        assertEquals(List(lowerVolumeLines.size) { 1 }, match.matches.map { it.chapterIndex })
+        assertEquals(0, match.unmatched)
+    }
+
+    @Test
+    fun resynchronizesOnlyWhenMultipleLaterCuesFormACoherentSequence() {
+        val openingLines = listOf(
+            "最初の固有文章です",
+            "二番目の固有文章です",
+            "三番目の固有文章です",
+            "四番目の固有文章です",
+            "五番目の固有文章です",
+        )
+        val resumedLines = listOf(
+            "再同期一番目の文章です",
+            "再同期二番目の文章です",
+            "再同期三番目の文章です",
+            "再同期四番目の文章です",
+        )
+        val book = EpubBook(
+            title = "Book With Inserted Text",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = buildString {
+                        append("<html><body>")
+                        append(openingLines.joinToString("。"))
+                        append("挿入".repeat(150))
+                        append(resumedLines.joinToString("。"))
+                        append("</body></html>")
+                    },
+                ),
+            ),
+        )
+        val cues = (openingLines + resumedLines).mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(cues.map { it.id }, match.matches.map { it.id })
+        assertEquals(0, match.unmatched)
+    }
+
+    @Test
+    fun doesNotResynchronizeToAnIsolatedFarCue() {
+        val openingLines = listOf(
+            "开头第一句完整文章",
+            "开头第二句完整文章",
+            "开头第三句完整文章",
+        )
+        val isolatedLine = "只有这一句在远处出现"
+        val book = EpubBook(
+            title = "Book With Isolated Match",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>${openingLines.joinToString("。")}。${"隔".repeat(300)}$isolatedLine</body></html>",
+                ),
+            ),
+        )
+        val cues = (openingLines + listOf("短一", "短二", isolatedLine)).mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("0", "1", "2"), match.matches.map { it.id })
+        assertEquals(3, match.unmatched)
+    }
+
+    @Test
+    fun localSearchIncludesCueLength() {
         val book = EpubBook(
             title = "Book",
             chapters = listOf(
@@ -75,7 +184,7 @@ class SasayakiMatcherTest {
             text = "これは検索窓より長い本文です。",
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = listOf(cue), searchWindow = 3)
+        val match = SasayakiMatcher.match(book = book, cues = listOf(cue))
 
         assertEquals(listOf("0"), match.matches.map { it.id })
         assertEquals(0, match.unmatched)
@@ -94,7 +203,6 @@ class SasayakiMatcherTest {
         val match = SasayakiMatcher.match(
             book = book,
             cues = listOf(SasayakiCue("0", 0.0, 1.0, "前半後半")),
-            searchWindow = 50,
         )
 
         assertEquals(0, match.matches.size)
@@ -122,7 +230,7 @@ class SasayakiMatcherTest {
             SasayakiCue("4", 4.0, 5.0, "東条さんの言葉だった"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 10)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(listOf("0", "1", "2", "3", "4"), match.matches.map { it.id })
         assertEquals(0, match.unmatched)
@@ -147,7 +255,7 @@ class SasayakiMatcherTest {
             SasayakiCue("2", 2.0, 3.0, "次の本文です"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 1)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(listOf("0", "2"), match.matches.map { it.id })
         assertEquals(1, match.unmatched)
@@ -176,7 +284,7 @@ class SasayakiMatcherTest {
             SasayakiCue("3804", 14584.592, 14588.176, "「僕も部屋に戻るよ」"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 80)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(listOf("3802", "3803", "3804"), match.matches.map { it.id })
         assertEquals(0, match.unmatched)
@@ -196,7 +304,7 @@ class SasayakiMatcherTest {
             SasayakiCue("1", 1.0, 2.0, "本文一番長い文章"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 50)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(listOf("1"), match.matches.map { it.id })
         assertEquals(1, match.unmatched)
@@ -213,7 +321,7 @@ class SasayakiMatcherTest {
             SasayakiCue("2", 2.0, 3.0, "読書本文一番長い文章"),
         )
 
-        val match = SasayakiMatcher.match(book = book, cues = cues, searchWindow = 80)
+        val match = SasayakiMatcher.match(book = book, cues = cues)
 
         assertEquals(listOf("2"), match.matches.map { it.id })
         assertEquals(2, match.unmatched)

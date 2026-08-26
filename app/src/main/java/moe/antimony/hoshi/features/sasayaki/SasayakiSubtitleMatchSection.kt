@@ -12,12 +12,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,7 +27,6 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,7 +50,6 @@ internal fun SasayakiSubtitleMatchSection(
     val scope = rememberCoroutineScope()
     var selectedSrtUri by remember { mutableStateOf<Uri?>(null) }
     var selectedSrtName by remember { mutableStateOf<String?>(null) }
-    var searchWindow by remember { mutableFloatStateOf(200f) }
     var isMatching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var displayedMatch by remember { mutableStateOf(currentMatchData) }
@@ -94,7 +90,6 @@ internal fun SasayakiSubtitleMatchSection(
                     val nextMatch = SasayakiMatcher.match(
                         book = book,
                         cues = SasayakiParser.parseCues(srtBytes),
-                        searchWindow = searchWindow.roundToInt(),
                     )
                     activeDependencies.bookRepository.saveSasayakiMatch(activeDependencies.bookEntry.root, nextMatch)
                     nextMatch
@@ -135,31 +130,6 @@ internal fun SasayakiSubtitleMatchSection(
                 actionEnabled = dependencies != null && !isMatching,
                 onAction = { importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes) },
             )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.sasayaki_search_window),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = "${searchWindow.roundToInt()}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Slider(
-                    value = searchWindow,
-                    onValueChange = { searchWindow = it },
-                    valueRange = 50f..1000f,
-                    steps = 18,
-                    enabled = dependencies != null && !isMatching,
-                )
-            }
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = dependencies != null && selectedSrtUri != null && !isMatching,

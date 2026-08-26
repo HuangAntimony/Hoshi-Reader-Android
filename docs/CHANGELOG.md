@@ -37,6 +37,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   paragraphs or empty layout struts in oversized inline blocks.
 - Restore book files and covers from iOS Books backups when equivalent Unicode
   paths use different composed forms.
+- Match Sasayaki subtitles across combined-volume EPUBs and large text gaps
+  automatically, without requiring Search Window tuning.
 - Import EPUB and TTU bookdata with multibyte titles that exceed Android's
   filename byte limit while preserving the complete visible title and cleaning
   temporary EPUB data after failed imports.
