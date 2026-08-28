@@ -70,6 +70,45 @@ class SasayakiSheetTest {
     }
 
     @Test
+    fun acceptedSubtitleSelectionStartsMatchingImmediately() {
+        val transition = SasayakiSubtitleMatchUiState(
+            errorMessage = "previous error",
+        ).acceptFile("book.srt")
+
+        assertTrue(transition.shouldStartMatching)
+        assertEquals("book.srt", transition.state.selectedFileName)
+        assertTrue(transition.state.isMatching)
+        assertNull(transition.state.errorMessage)
+    }
+
+    @Test
+    fun subtitleSelectionCannotStartAnotherMatchWhileOneIsRunning() {
+        val current = SasayakiSubtitleMatchUiState(
+            selectedFileName = "first.srt",
+            isMatching = true,
+        )
+
+        val transition = current.acceptFile("second.srt")
+
+        assertFalse(transition.shouldStartMatching)
+        assertEquals(current, transition.state)
+    }
+
+    @Test
+    fun subtitleMatchCompletionAllowsTheNextFileSelection() {
+        val completed = SasayakiSubtitleMatchUiState(
+            selectedFileName = "first.srt",
+            isMatching = true,
+        ).finishMatching(errorMessage = null)
+
+        val transition = completed.acceptFile("second.srt")
+
+        assertTrue(transition.shouldStartMatching)
+        assertEquals("second.srt", transition.state.selectedFileName)
+        assertTrue(transition.state.isMatching)
+    }
+
+    @Test
     fun audiobookCoverUsesSquareArtworkFrame() {
         assertEquals(SasayakiAudiobookCoverWidthDp, SasayakiAudiobookCoverHeightDp)
     }

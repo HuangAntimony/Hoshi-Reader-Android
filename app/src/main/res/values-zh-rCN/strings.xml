@@ -748,7 +748,6 @@
     <string name="sasayaki_selected_srt">已选择 SRT</string>
     <string name="sasayaki_open_srt_failed">无法打开所选 SRT。</string>
     <string name="sasayaki_match_failed">无法匹配有声书字幕。</string>
-    <string name="sasayaki_match_title">匹配</string>
     <string name="sasayaki_file">文件</string>
     <string name="sasayaki_no_file_selected">未选择文件</string>
     <string name="sasayaki_matching">正在匹配...</string>

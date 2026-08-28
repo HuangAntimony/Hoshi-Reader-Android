@@ -750,7 +750,6 @@
     <string name="sasayaki_selected_srt">Selected SRT</string>
     <string name="sasayaki_open_srt_failed">Unable to open selected SRT.</string>
     <string name="sasayaki_match_failed">Failed to match Sasayaki subtitles.</string>
-    <string name="sasayaki_match_title">Match</string>
     <string name="sasayaki_file">File</string>
     <string name="sasayaki_no_file_selected">No file selected</string>
     <string name="sasayaki_matching">Matching...</string>

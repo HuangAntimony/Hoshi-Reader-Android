@@ -34,3 +34,31 @@ internal data class SasayakiMatchDependencies(
 
 internal fun sasayakiSubtitleMatchSummary(matchData: SasayakiMatchData?): String? =
     matchData?.matchRateText()
+
+internal data class SasayakiSubtitleMatchUiState(
+    val selectedFileName: String? = null,
+    val isMatching: Boolean = false,
+    val errorMessage: String? = null,
+) {
+    fun acceptFile(fileName: String): SasayakiSubtitleSelectionTransition =
+        if (isMatching) {
+            SasayakiSubtitleSelectionTransition(state = this, shouldStartMatching = false)
+        } else {
+            SasayakiSubtitleSelectionTransition(
+                state = copy(
+                    selectedFileName = fileName,
+                    isMatching = true,
+                    errorMessage = null,
+                ),
+                shouldStartMatching = true,
+            )
+        }
+
+    fun finishMatching(errorMessage: String?): SasayakiSubtitleMatchUiState =
+        copy(isMatching = false, errorMessage = errorMessage)
+}
+
+internal data class SasayakiSubtitleSelectionTransition(
+    val state: SasayakiSubtitleMatchUiState,
+    val shouldStartMatching: Boolean,
+)

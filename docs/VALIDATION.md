@@ -381,8 +381,9 @@ Validate relevant sync/update/Sasayaki changes with:
   prompts, user-triggered install, same-version APK cleanup, and split APK
   updates on arm64-v8a and armeabi-v7a targets.
 - Sasayaki defaults, reader toggle visibility, auto-scroll, auto-pause on
-  lookup, subtitle cue matching, lookup taps on active cue text in normal and
-  E-ink VN rendering, skip controls across reader/sheet/system media controls,
+  lookup, subtitle cue matching that starts immediately after selecting a valid
+  SRT without a separate Match action, lookup taps on active cue text in normal
+  and E-ink VN rendering, skip controls across reader/sheet/system media controls,
   volume-key seek, safe-area playback controls, and e-ink cue/lookup overlays
   when those areas change. For subtitle matcher changes, include a
   combined-volume EPUB with separate per-volume SRT files: both volumes should

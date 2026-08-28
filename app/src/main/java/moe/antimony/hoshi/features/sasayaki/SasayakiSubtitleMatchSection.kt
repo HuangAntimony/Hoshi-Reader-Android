@@ -4,12 +4,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -48,10 +43,7 @@ internal fun SasayakiSubtitleMatchSection(
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-    var selectedSrtUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedSrtName by remember { mutableStateOf<String?>(null) }
-    var isMatching by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var matchUiState by remember { mutableStateOf(SasayakiSubtitleMatchUiState()) }
     var displayedMatch by remember { mutableStateOf(currentMatchData) }
     val selectSrtMessage = stringResource(R.string.sasayaki_select_srt_file)
     val selectedSrtFallback = stringResource(R.string.sasayaki_selected_srt)
@@ -61,25 +53,12 @@ internal fun SasayakiSubtitleMatchSection(
         displayedMatch = currentMatchData
     }
 
-    val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
-        }.onFailure { error ->
-            errorMessage = error.localizedImportMessage(context, selectSrtMessage)
-            return@rememberLauncherForActivityResult
+    fun startMatching(uri: Uri) {
+        val activeDependencies = dependencies
+        if (activeDependencies == null) {
+            matchUiState = matchUiState.finishMatching(matchFailedMessage)
+            return
         }
-        selectedSrtUri = uri
-        selectedSrtName = context.contentResolver.importDisplayName(uri).ifBlank { selectedSrtFallback }
-        errorMessage = null
-    }
-
-    fun matchSelectedFile() {
-        val activeDependencies = dependencies ?: return
-        val uri = selectedSrtUri ?: return
-        if (isMatching) return
-        isMatching = true
-        errorMessage = null
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -97,11 +76,30 @@ internal fun SasayakiSubtitleMatchSection(
             }.onSuccess { nextMatch ->
                 displayedMatch = nextMatch
                 onMatchUpdated(nextMatch)
+                matchUiState = matchUiState.finishMatching(errorMessage = null)
             }.onFailure { error ->
-                errorMessage = error.localizedMessage ?: matchFailedMessage
+                matchUiState = matchUiState.finishMatching(
+                    errorMessage = error.localizedMessage ?: matchFailedMessage,
+                )
             }
-            isMatching = false
         }
+    }
+
+    val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
+        if (uri == null || matchUiState.isMatching) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
+        }.onFailure { error ->
+            matchUiState = matchUiState.finishMatching(
+                errorMessage = error.localizedImportMessage(context, selectSrtMessage),
+            )
+            return@rememberLauncherForActivityResult
+        }
+        val transition = matchUiState.acceptFile(
+            context.contentResolver.importDisplayName(uri).ifBlank { selectedSrtFallback },
+        )
+        matchUiState = transition.state
+        if (transition.shouldStartMatching) startMatching(uri)
     }
 
     SasayakiResourceCard {
@@ -125,33 +123,17 @@ internal fun SasayakiSubtitleMatchSection(
             HorizontalDivider()
             SasayakiInlineActionRow(
                 label = stringResource(R.string.sasayaki_file),
-                value = selectedSrtName ?: stringResource(R.string.sasayaki_no_file_selected),
-                action = stringResource(R.string.action_open),
-                actionEnabled = dependencies != null && !isMatching,
+                value = matchUiState.selectedFileName ?: stringResource(R.string.sasayaki_no_file_selected),
+                action = if (matchUiState.isMatching) {
+                    stringResource(R.string.sasayaki_matching)
+                } else {
+                    stringResource(R.string.action_open)
+                },
+                actionEnabled = dependencies != null && !matchUiState.isMatching,
                 onAction = { importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes) },
             )
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = dependencies != null && selectedSrtUri != null && !isMatching,
-                onClick = ::matchSelectedFile,
-            ) {
-                if (isMatching) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Text(stringResource(R.string.sasayaki_matching))
-                    }
-                } else {
-                    Text(stringResource(R.string.sasayaki_match_title))
-                }
-            }
         }
-        errorMessage?.let { message ->
+        matchUiState.errorMessage?.let { message ->
             Text(
                 text = message,
                 color = MaterialTheme.colorScheme.error,
