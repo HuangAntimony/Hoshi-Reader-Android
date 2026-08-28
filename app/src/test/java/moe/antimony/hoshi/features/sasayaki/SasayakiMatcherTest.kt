@@ -191,6 +191,179 @@ class SasayakiMatcherTest {
     }
 
     @Test
+    fun recoversLowConfidenceCueOnlyAfterTrustedResynchronization() {
+        val opening = listOf(
+            "开头的第一条可信正文",
+            "开头的第二条可信正文",
+            "开头的第三条可信正文",
+            "开头的第四条可信正文",
+        )
+        val recoverableLowConfidence = "低可信但确实存在于正文中的旁白"
+        val trustedAnchors = listOf(
+            "恢复位置后的第一条可信正文",
+            "恢复位置后的第二条可信正文",
+            "恢复位置后的第三条可信正文",
+        )
+        val book = EpubBook(
+            title = "Book With Low Confidence Gap",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = buildString {
+                        append("<html><body>")
+                        append(opening.joinToString("。"))
+                        append("插入".repeat(90))
+                        append(recoverableLowConfidence)
+                        append(trustedAnchors.joinToString("。"))
+                        append("</body></html>")
+                    },
+                ),
+            ),
+        )
+        val cueTexts = opening + listOf(
+            "＊正文中不存在的低可信旁白甲",
+            "＊$recoverableLowConfidence",
+            "＊正文中不存在的低可信旁白乙",
+        ) + trustedAnchors
+        val cues = cueTexts.mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("0", "1", "2", "3", "5", "7", "8", "9"), match.matches.map { it.id })
+        assertEquals(2, match.unmatched)
+        assertTrue(
+            match.matches.zipWithNext().all { (current, next) ->
+                current.chapterIndex < next.chapterIndex ||
+                    current.chapterIndex == next.chapterIndex && current.start + current.length <= next.start
+            },
+        )
+    }
+
+    @Test
+    fun lowConfidenceCuesCannotEstablishAResynchronizationPoint() {
+        val opening = "开头的可信正文已经匹配"
+        val lowConfidenceLines = listOf(
+            "第一条低可信旁白文本",
+            "第二条低可信旁白文本",
+            "第三条低可信旁白文本",
+        )
+        val book = EpubBook(
+            title = "Book With Only Low Confidence Recovery",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>$opening${"插入".repeat(90)}${lowConfidenceLines.joinToString("。")}</body></html>",
+                ),
+            ),
+        )
+        val cues = (listOf(opening) + lowConfidenceLines.map { "＊$it" }).mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("0"), match.matches.map { it.id })
+        assertEquals(3, match.unmatched)
+    }
+
+    @Test
+    fun doesNotRecoverAmbiguousLowConfidenceCueBetweenTrustedPositions() {
+        val opening = listOf(
+            "开头的第一条可信正文",
+            "开头的第二条可信正文",
+            "开头的第三条可信正文",
+            "开头的第四条可信正文",
+        )
+        val ambiguous = "重复出现的低可信旁白文本"
+        val trustedAnchors = listOf(
+            "恢复位置后的第一条可信正文",
+            "恢复位置后的第二条可信正文",
+            "恢复位置后的第三条可信正文",
+        )
+        val book = EpubBook(
+            title = "Book With Ambiguous Low Confidence Cue",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = buildString {
+                        append("<html><body>")
+                        append(opening.joinToString("。"))
+                        append("插入".repeat(90))
+                        append(ambiguous)
+                        append("间隔正文")
+                        append(ambiguous)
+                        append(trustedAnchors.joinToString("。"))
+                        append("</body></html>")
+                    },
+                ),
+            ),
+        )
+        val cueTexts = opening + listOf(
+            "＊正文中不存在的低可信旁白甲",
+            "＊$ambiguous",
+            "＊正文中不存在的低可信旁白乙",
+        ) + trustedAnchors
+        val cues = cueTexts.mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("0", "1", "2", "3", "7", "8", "9"), match.matches.map { it.id })
+        assertEquals(3, match.unmatched)
+    }
+
+    @Test
+    fun countsEachCueOnceWhenResynchronizationCrossesAShortLowConfidenceCue() {
+        val opening = listOf(
+            "开头的第一条可信正文",
+            "开头的第二条可信正文",
+            "开头的第三条可信正文",
+            "开头的第四条可信正文",
+        )
+        val trustedAnchors = listOf(
+            "恢复位置后的第一条可信正文",
+            "恢复位置后的第二条可信正文",
+            "恢复位置后的第三条可信正文",
+        )
+        val cueTexts = opening + listOf(
+            "正文中不存在的失败文本甲",
+            "正文中不存在的失败文本乙",
+            "＊瞬间",
+            "正文中不存在的失败文本丙",
+        ) + trustedAnchors
+        val book = EpubBook(
+            title = "Book With Skipped Cue During Recovery",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>${opening.joinToString("。")}${"插入".repeat(90)}${trustedAnchors.joinToString("。")}</body></html>",
+                ),
+            ),
+        )
+        val cues = cueTexts.mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("0", "1", "2", "3", "8", "9", "10"), match.matches.map { it.id })
+        assertEquals(4, match.unmatched)
+        assertEquals(cues.size, match.matches.size + match.unmatched)
+        assertEquals(match.matches.size, match.matches.map { it.id }.distinct().size)
+    }
+
+    @Test
     fun doesNotResynchronizeToAnIsolatedFarCue() {
         val openingLines = listOf(
             "开头第一句完整文章",
