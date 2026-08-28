@@ -30,7 +30,7 @@ object SasayakiMatcher {
 
     private data class MatchCue(
         val cue: SasayakiCue,
-        val text: List<Int>,
+        val text: IntArray,
     )
 
     private data class AnchorScore(
@@ -41,23 +41,31 @@ object SasayakiMatcher {
     )
 
     fun match(book: EpubBook, cues: List<SasayakiCue>): SasayakiMatchData {
-        val source = mutableListOf<Int>()
+        val chapterTexts = mutableListOf<IntArray>()
         val chapters = mutableListOf<ChapterRange>()
+        var sourceLength = 0
         book.chapters.forEachIndexed { index, chapter ->
             if (!chapter.linear) return@forEachIndexed
             if (chapter.properties.hasManifestProperty("nav")) return@forEachIndexed
             if (chapter.isGuideToc) return@forEachIndexed
-            val codePoints = chapter.html.filteredReaderText().codePointsList()
+            val codePoints = chapter.html.filteredReaderText().codePointsArray()
             chapters += ChapterRange(
                 chapterIndex = index,
-                start = source.size,
+                start = sourceLength,
                 length = codePoints.size,
             )
-            source += codePoints
+            chapterTexts += codePoints
+            sourceLength += codePoints.size
+        }
+        val source = IntArray(sourceLength)
+        var sourceOffset = 0
+        chapterTexts.forEach { chapterText ->
+            chapterText.copyInto(source, destinationOffset = sourceOffset)
+            sourceOffset += chapterText.size
         }
 
         val matchCues = cues.map { cue ->
-            MatchCue(cue = cue, text = cue.text.filteredReaderText().codePointsList())
+            MatchCue(cue = cue, text = cue.text.filteredReaderText().codePointsArray())
         }
         val start = selectStart(
             source = source,
@@ -90,9 +98,7 @@ object SasayakiMatcher {
                 end = minOf(source.size, cursor + chars.size + localSearchWindow),
             )
             val chapter = index?.let { position ->
-                chapters.firstOrNull {
-                    position >= it.start && position < it.end && position + chars.size <= it.end
-                }
+                findChapter(chapters = chapters, position = position, textLength = chars.size)
             }
             if (index == null || chapter == null) {
                 pendingUnmatched.addLast(cueIndex)
@@ -143,7 +149,7 @@ object SasayakiMatcher {
     }
 
     private fun selectStart(
-        source: List<Int>,
+        source: IntArray,
         chapters: List<ChapterRange>,
         cues: List<MatchCue>,
     ): Int =
@@ -160,7 +166,7 @@ object SasayakiMatcher {
         ) ?: 0
 
     private fun selectCoherentStart(
-        source: List<Int>,
+        source: IntArray,
         chapters: List<ChapterRange>,
         cues: List<MatchCue>,
         sourceStart: Int,
@@ -170,14 +176,14 @@ object SasayakiMatcher {
         validationCueLimit: Int,
         allowShortCoherentRun: Boolean,
     ): Int? {
-        val eligible = cues
-            .indices
-            .drop(cueStartIndex)
-            .take(cueScanLimit)
-            .map { index -> IndexedValue(index, cues[index]) }
-            .filter { (_, cue) ->
-                !cue.cue.text.startsWith("＊") && cue.text.size >= anchorMinimumCueLength
+        val eligible = mutableListOf<IndexedValue<MatchCue>>()
+        val cueEnd = minOf(cues.size, cueStartIndex + cueScanLimit)
+        for (index in cueStartIndex until cueEnd) {
+            val cue = cues[index]
+            if (!cue.cue.text.startsWith("＊") && cue.text.size >= anchorMinimumCueLength) {
+                eligible += IndexedValue(index = index, value = cue)
             }
+        }
         if (eligible.isEmpty()) return null
 
         val anchors = (
@@ -223,7 +229,7 @@ object SasayakiMatcher {
     }
 
     private fun scoreStart(
-        source: List<Int>,
+        source: IntArray,
         chapters: List<ChapterRange>,
         cues: List<MatchCue>,
         start: Int,
@@ -237,8 +243,10 @@ object SasayakiMatcher {
         var matchedCues = 0
         var firstMatchedCue = Int.MAX_VALUE
 
-        cues.drop(cueStartIndex).take(validationCueLimit).forEachIndexed { index, (cue, text) ->
-            if (text.isEmpty() || cue.text.startsWith("＊") && text.size < 5) return@forEachIndexed
+        val cueEnd = minOf(cues.size, cueStartIndex + validationCueLimit)
+        for (cuePosition in cueStartIndex until cueEnd) {
+            val (cue, text) = cues[cuePosition]
+            if (text.isEmpty() || cue.text.startsWith("＊") && text.size < 5) continue
             val match = findText(
                 source = source,
                 text = text,
@@ -246,11 +254,11 @@ object SasayakiMatcher {
                 end = minOf(source.size, cursor + text.size + localSearchWindow),
             )
             val chapter = match?.let { position ->
-                chapters.firstOrNull { position >= it.start && position < it.end && position + text.size <= it.end }
+                findChapter(chapters = chapters, position = position, textLength = text.size)
             }
             if (match == null || chapter == null) {
                 currentRun = 0
-                return@forEachIndexed
+                continue
             }
 
             cursor = match + text.size
@@ -258,7 +266,7 @@ object SasayakiMatcher {
             longestRun = maxOf(longestRun, currentRun)
             weightedCharacters += minOf(text.size, 24)
             matchedCues += 1
-            firstMatchedCue = minOf(firstMatchedCue, index)
+            firstMatchedCue = minOf(firstMatchedCue, cuePosition - cueStartIndex)
         }
 
         return AnchorScore(
@@ -269,7 +277,7 @@ object SasayakiMatcher {
         )
     }
 
-    private fun findText(source: List<Int>, text: List<Int>, start: Int, end: Int): Int? {
+    private fun findText(source: IntArray, text: IntArray, start: Int, end: Int): Int? {
         if (text.isEmpty()) return null
         var index = start
         val last = end - text.size
@@ -286,10 +294,30 @@ object SasayakiMatcher {
         }
         return null
     }
+
+    private fun findChapter(
+        chapters: List<ChapterRange>,
+        position: Int,
+        textLength: Int,
+    ): ChapterRange? {
+        var low = 0
+        var high = chapters.lastIndex
+        while (low <= high) {
+            val middle = (low + high).ushr(1)
+            val chapter = chapters[middle]
+            when {
+                position < chapter.start -> high = middle - 1
+                position >= chapter.end -> low = middle + 1
+                position + textLength <= chapter.end -> return chapter
+                else -> return null
+            }
+        }
+        return null
+    }
 }
 
-internal fun String.codePointsList(): List<Int> =
-    codePoints().toArray().toList()
+internal fun String.codePointsArray(): IntArray =
+    codePoints().toArray()
 
 private fun String?.hasManifestProperty(property: String): Boolean =
     this
