@@ -85,17 +85,31 @@ object SasayakiMatcher {
         val matchCues = cues.map { cue ->
             MatchCue(cue = cue, text = cue.text.filteredReaderText().codePointsArray())
         }
-        val start = selectStart(
+        val startAlignment = selectStartAlignment(
             source = source,
             chapters = chapters,
             cues = matchCues,
         )
 
         val matches = mutableListOf<SasayakiMatch>()
-        var cursor = start
+        var cursor = 0
         var cueIndex = 0
         var unresolvedStartIndex: Int? = null
         var searchableFailureCount = 0
+        startAlignment?.trustedRun?.firstOrNull()?.let { firstTrusted ->
+            alignAnchoredSegment(
+                source = source,
+                chapters = chapters,
+                cues = matchCues,
+                cueStartIndex = 0,
+                trustedRun = listOf(firstTrusted),
+                sourceStart = 0,
+            ).forEach { positioned ->
+                matches += positioned.toSasayakiMatch(matchCues[positioned.cueIndex])
+            }
+            cueIndex = firstTrusted.cueIndex + 1
+            cursor = firstTrusted.sourceIndex + matchCues[firstTrusted.cueIndex].text.size
+        }
 
         while (cueIndex < matchCues.size) {
             val (cue, chars) = matchCues[cueIndex]
@@ -163,11 +177,11 @@ object SasayakiMatcher {
         )
     }
 
-    private fun selectStart(
+    private fun selectStartAlignment(
         source: IntArray,
         chapters: List<ChapterRange>,
         cues: List<MatchCue>,
-    ): Int =
+    ): CoherentAlignment? =
         selectCoherentAlignment(
             source = source,
             chapters = chapters,
@@ -178,7 +192,7 @@ object SasayakiMatcher {
             cueScanLimit = anchorCueScanLimit,
             validationCueLimit = anchorValidationCueLimit,
             allowShortCoherentRun = true,
-        )?.start ?: 0
+        )
 
     private fun selectCoherentAlignment(
         source: IntArray,

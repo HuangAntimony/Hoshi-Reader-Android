@@ -388,8 +388,10 @@ Validate relevant sync/update/Sasayaki changes with:
   when those areas change. For subtitle matcher changes, include a
   combined-volume EPUB with separate per-volume SRT files: both volumes should
   align automatically, repeated text in the other volume must not capture the
-  starting cue sequence, and a large local text gap should recover only from a
-  coherent later cue sequence.
+  starting cue sequence, unique cues immediately before the selected starting
+  sequence should be recovered while repeated prefix text remains unmatched,
+  and a large local text gap should recover only from a coherent later cue
+  sequence.
 - Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
   Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
   current-chapter centering without first flashing the default list position

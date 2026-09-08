@@ -149,6 +149,68 @@ class SasayakiMatcherTest {
     }
 
     @Test
+    fun backfillsUniqueCuesBeforeTheFirstTrustedAnchor() {
+        val book = EpubBook(
+            title = "Book With Recoverable Opening",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = """
+                        <html><body>
+                          小説家は妹キチイお兄ちゃん。起っきっき。
+                          そんな声が聞こえて目を開けると、俺の目の前に妹が立っていた。
+                          それは文句のつけようのない朝だった。
+                        </body></html>
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val cues = listOf(
+            SasayakiCue("0", 0.0, 1.0, "＊音声だけの作品紹介"),
+            SasayakiCue("1", 1.0, 2.0, "＊小説家は妹キチ●イ「お兄ちゃん"),
+            SasayakiCue("2", 2.0, 3.0, "起っきっき～」"),
+            SasayakiCue("3", 3.0, 4.0, "そんな声が聞こえて目を開けると、"),
+            SasayakiCue("4", 4.0, 5.0, "俺の目の前に妹が立っていた。"),
+            SasayakiCue("5", 5.0, 6.0, "それは文句のつけようのない朝だった。"),
+        )
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("1", "2", "3", "4", "5"), match.matches.map { it.id })
+        assertEquals(1, match.unmatched)
+    }
+
+    @Test
+    fun doesNotBackfillAmbiguousCueBeforeTheFirstTrustedAnchor() {
+        val trustedLines = listOf(
+            "第一条稳定锚点正文",
+            "第二条稳定锚点正文",
+            "第三条稳定锚点正文",
+        )
+        val book = EpubBook(
+            title = "Book With Ambiguous Opening",
+            chapters = listOf(
+                EpubChapter(
+                    id = "chapter",
+                    href = "chapter.xhtml",
+                    mediaType = "application/xhtml+xml",
+                    html = "<html><body>重复开场。重复开场。${trustedLines.joinToString("。")}。</body></html>",
+                ),
+            ),
+        )
+        val cues = (listOf("重复开场") + trustedLines).mapIndexed { index, text ->
+            SasayakiCue(index.toString(), index.toDouble(), index + 1.0, text)
+        }
+
+        val match = SasayakiMatcher.match(book = book, cues = cues)
+
+        assertEquals(listOf("1", "2", "3"), match.matches.map { it.id })
+        assertEquals(1, match.unmatched)
+    }
+
+    @Test
     fun resynchronizesOnlyWhenMultipleLaterCuesFormACoherentSequence() {
         val openingLines = listOf(
             "最初の固有文章です",
