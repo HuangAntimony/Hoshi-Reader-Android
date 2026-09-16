@@ -39,6 +39,7 @@ class DictionarySettingsRepositoryTest {
                 scanNonJapaneseText = false,
                 maxResults = 100,
                 scanLength = 0,
+                searchTextSize = 100,
                 collapseMode = DictionaryCollapseMode.CollapseAll,
                 expandFirstDictionary = true,
                 collapsedDictionaries = setOf("JMdict"),
@@ -62,6 +63,7 @@ class DictionarySettingsRepositoryTest {
             assertFalse(migrated.scanNonJapaneseText)
             assertEquals(50, migrated.maxResults)
             assertEquals(1, migrated.scanLength)
+            assertEquals(48, migrated.searchTextSize)
             assertEquals(DictionaryCollapseMode.CollapseAll, migrated.collapseMode)
             assertTrue(migrated.expandFirstDictionary)
             assertEquals(setOf("JMdict"), migrated.collapsedDictionaries)
@@ -91,6 +93,7 @@ class DictionarySettingsRepositoryTest {
                     scanNonJapaneseText = false,
                     maxResults = 0,
                     scanLength = 100,
+                    searchTextSize = 31,
                     collapseMode = DictionaryCollapseMode.Custom,
                     expandFirstDictionary = true,
                     collapsedDictionaries = setOf("JMdict"),
@@ -113,6 +116,7 @@ class DictionarySettingsRepositoryTest {
             assertFalse(saved.scanNonJapaneseText)
             assertEquals(1, saved.maxResults)
             assertEquals(64, saved.scanLength)
+            assertEquals(31, saved.searchTextSize)
             assertEquals(DictionaryCollapseMode.Custom, saved.collapseMode)
             assertTrue(saved.expandFirstDictionary)
             assertEquals(setOf("JMdict"), saved.collapsedDictionaries)

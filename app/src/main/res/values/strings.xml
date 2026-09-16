@@ -272,10 +272,12 @@
     <string name="dictionary_delete_action">Delete Dictionary</string>
     <string name="dictionary_reorder_action">Reorder Dictionary</string>
     <string name="dictionary_settings_lookup">Lookup</string>
+    <string name="dictionary_settings_search_text">Search Text</string>
     <string name="dictionary_settings_import" comment="Dictionary settings section label, intentionally matching the Import action noun.">Import</string>
     <string name="dictionary_scan_non_japanese">Scan Non-Japanese Text</string>
     <string name="dictionary_max_results">Max Results</string>
     <string name="dictionary_scan_length">Scan Length</string>
+    <string name="dictionary_text_size">Text Size</string>
     <string name="dictionary_collapse_dictionaries">Collapse Dictionaries</string>
     <string name="dictionary_collapse_mode_expand_all">Expand All</string>
     <string name="dictionary_collapse_mode_collapse_all">Collapse All</string>

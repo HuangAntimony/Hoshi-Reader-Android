@@ -54,6 +54,7 @@ class ProfileDictionarySettingsRepositoryTest {
                 scanNonJapaneseText = false,
                 maxResults = 12,
                 scanLength = 20,
+                searchTextSize = 26,
                 collapseMode = DictionaryCollapseMode.Custom,
                 expandFirstDictionary = true,
                 collapsedDictionaries = setOf("JMdict"),
@@ -74,6 +75,7 @@ class ProfileDictionarySettingsRepositoryTest {
         assertFalse(copiedEnglishSettings.scanNonJapaneseText)
         assertEquals(12, copiedEnglishSettings.maxResults)
         assertEquals(20, copiedEnglishSettings.scanLength)
+        assertEquals(26, copiedEnglishSettings.searchTextSize)
         assertEquals(DictionaryCollapseMode.Custom, copiedEnglishSettings.collapseMode)
         assertTrue(copiedEnglishSettings.expandFirstDictionary)
         assertEquals(setOf("JMdict"), copiedEnglishSettings.collapsedDictionaries)
@@ -93,6 +95,7 @@ class ProfileDictionarySettingsRepositoryTest {
                 scanNonJapaneseText = true,
                 maxResults = 9,
                 scanLength = 10,
+                searchTextSize = 31,
                 collapseMode = DictionaryCollapseMode.CollapseAll,
                 expandFirstDictionary = false,
                 collapsedDictionaries = setOf("Oxford"),
@@ -116,6 +119,7 @@ class ProfileDictionarySettingsRepositoryTest {
         assertFalse(japaneseSettings.scanNonJapaneseText)
         assertEquals(12, japaneseSettings.maxResults)
         assertEquals(20, japaneseSettings.scanLength)
+        assertEquals(26, japaneseSettings.searchTextSize)
         assertEquals(DictionaryCollapseMode.Custom, japaneseSettings.collapseMode)
         assertTrue(japaneseSettings.expandFirstDictionary)
         assertEquals(setOf("JMdict"), japaneseSettings.collapsedDictionaries)
@@ -132,6 +136,7 @@ class ProfileDictionarySettingsRepositoryTest {
         assertTrue(englishSettings.scanNonJapaneseText)
         assertEquals(9, englishSettings.maxResults)
         assertEquals(10, englishSettings.scanLength)
+        assertEquals(31, englishSettings.searchTextSize)
         assertEquals(DictionaryCollapseMode.CollapseAll, englishSettings.collapseMode)
         assertFalse(englishSettings.expandFirstDictionary)
         assertEquals(setOf("Oxford"), englishSettings.collapsedDictionaries)
@@ -159,6 +164,7 @@ class ProfileDictionarySettingsRepositoryTest {
                     scanNonJapaneseText = false,
                     maxResults = 100,
                     scanLength = 0,
+                    searchTextSize = 100,
                     collapseMode = DictionaryCollapseMode.Custom,
                     expandFirstDictionary = true,
                     collapsedDictionaries = setOf("DataStore"),
@@ -184,6 +190,7 @@ class ProfileDictionarySettingsRepositoryTest {
             assertFalse(migrated.scanNonJapaneseText)
             assertEquals(50, migrated.maxResults)
             assertEquals(1, migrated.scanLength)
+            assertEquals(48, migrated.searchTextSize)
             assertEquals(DictionaryCollapseMode.Custom, migrated.collapseMode)
             assertTrue(migrated.expandFirstDictionary)
             assertEquals(setOf("DataStore"), migrated.collapsedDictionaries)
@@ -196,6 +203,20 @@ class ProfileDictionarySettingsRepositoryTest {
         } finally {
             scope.cancel()
         }
+    }
+
+    @Test
+    fun profileJsonWithoutSearchTextSizeUsesIosDefault() = runBlocking {
+        val profileRepository = ProfileRepository(tempFolder.newFolder("files"))
+        profileRepository.dictionarySettingsFile().writeProfileText(
+            """{"customCSS":".legacy { color: green; }"}""",
+        )
+        val repository = repository(profileRepository)
+
+        val settings = repository.settings.first()
+
+        assertEquals(22, settings.searchTextSize)
+        assertEquals(".legacy { color: green; }", settings.customCSS)
     }
 
     private fun repository(

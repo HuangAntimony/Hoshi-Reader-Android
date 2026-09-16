@@ -64,6 +64,7 @@ data class DictionarySettings(
     val scanNonJapaneseText: Boolean = true,
     val maxResults: Int = 16,
     val scanLength: Int = 16,
+    val searchTextSize: Int = 22,
     val collapseMode: DictionaryCollapseMode = DictionaryCollapseMode.ExpandAll,
     val expandFirstDictionary: Boolean = false,
     val collapsedDictionaries: Set<String> = emptySet(),
@@ -78,6 +79,7 @@ data class DictionarySettings(
     fun normalized(): DictionarySettings = copy(
         maxResults = maxResults.coerceIn(MIN_MAX_RESULTS, MAX_MAX_RESULTS),
         scanLength = scanLength.coerceIn(MIN_SCAN_LENGTH, MAX_SCAN_LENGTH),
+        searchTextSize = searchTextSize.coerceIn(MIN_SEARCH_TEXT_SIZE, MAX_SEARCH_TEXT_SIZE),
     )
 
     companion object {
@@ -85,6 +87,8 @@ data class DictionarySettings(
         const val MAX_MAX_RESULTS = 50
         const val MIN_SCAN_LENGTH = 1
         const val MAX_SCAN_LENGTH = 64
+        const val MIN_SEARCH_TEXT_SIZE = 12
+        const val MAX_SEARCH_TEXT_SIZE = 48
     }
 }
 
@@ -109,6 +113,7 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
         scanNonJapaneseText = preferences.getBoolean(KEY_SCAN_NON_JAPANESE_TEXT, true),
         maxResults = preferences.getInt(KEY_MAX_RESULTS, 16),
         scanLength = preferences.getInt(KEY_SCAN_LENGTH, 16),
+        searchTextSize = preferences.getInt(KEY_SEARCH_TEXT_SIZE, 22),
         collapseMode = DictionaryCollapseMode.fromRawValue(preferences.getString(KEY_COLLAPSE_MODE, null))
             ?: if (preferences.getBoolean(KEY_COLLAPSE_DICTIONARIES, false)) {
                 DictionaryCollapseMode.CollapseAll
@@ -146,6 +151,7 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
             .putBoolean(KEY_SCAN_NON_JAPANESE_TEXT, normalized.scanNonJapaneseText)
             .putInt(KEY_MAX_RESULTS, normalized.maxResults)
             .putInt(KEY_SCAN_LENGTH, normalized.scanLength)
+            .putInt(KEY_SEARCH_TEXT_SIZE, normalized.searchTextSize)
             .putString(KEY_COLLAPSE_MODE, normalized.collapseMode.rawValue)
             .putBoolean(KEY_EXPAND_FIRST_DICTIONARY, normalized.expandFirstDictionary)
             .putStringSet(KEY_COLLAPSED_DICTIONARIES, normalized.collapsedDictionaries)
@@ -167,6 +173,7 @@ class DictionarySettingsStore(context: Context) : DictionarySettingsLegacySource
         const val KEY_SCAN_NON_JAPANESE_TEXT = "scanNonJapaneseText"
         const val KEY_MAX_RESULTS = "maxResults"
         const val KEY_SCAN_LENGTH = "scanLength"
+        const val KEY_SEARCH_TEXT_SIZE = "searchTextSize"
         const val KEY_COLLAPSE_DICTIONARIES = "collapseDictionaries"
         const val KEY_COLLAPSE_MODE = "collapseMode"
         const val KEY_EXPAND_FIRST_DICTIONARY = "expandFirstDictionary"
@@ -297,6 +304,7 @@ class DictionarySettingsRepository(
             scanNonJapaneseText = this[KEY_SCAN_NON_JAPANESE_TEXT] ?: true,
             maxResults = this[KEY_MAX_RESULTS] ?: 16,
             scanLength = this[KEY_SCAN_LENGTH] ?: 16,
+            searchTextSize = this[KEY_SEARCH_TEXT_SIZE] ?: 22,
             collapseMode = DictionaryCollapseMode.fromRawValue(this[KEY_COLLAPSE_MODE])
                 ?: if (legacyCollapseDictionaries == true) {
                     DictionaryCollapseMode.CollapseAll
@@ -329,6 +337,7 @@ class DictionarySettingsRepository(
         this[KEY_SCAN_NON_JAPANESE_TEXT] = normalized.scanNonJapaneseText
         this[KEY_MAX_RESULTS] = normalized.maxResults
         this[KEY_SCAN_LENGTH] = normalized.scanLength
+        this[KEY_SEARCH_TEXT_SIZE] = normalized.searchTextSize
         this[KEY_COLLAPSE_MODE] = normalized.collapseMode.rawValue
         this[KEY_EXPAND_FIRST_DICTIONARY] = normalized.expandFirstDictionary
         this[KEY_COLLAPSED_DICTIONARIES] = normalized.collapsedDictionaries
@@ -410,6 +419,7 @@ class DictionarySettingsRepository(
         private val KEY_SCAN_NON_JAPANESE_TEXT = booleanPreferencesKey("scanNonJapaneseText")
         private val KEY_MAX_RESULTS = intPreferencesKey("maxResults")
         private val KEY_SCAN_LENGTH = intPreferencesKey("scanLength")
+        private val KEY_SEARCH_TEXT_SIZE = intPreferencesKey("searchTextSize")
         private val KEY_COLLAPSE_DICTIONARIES = booleanPreferencesKey("collapseDictionaries")
         private val KEY_COLLAPSE_MODE = stringPreferencesKey("collapseMode")
         private val KEY_EXPAND_FIRST_DICTIONARY = booleanPreferencesKey("expandFirstDictionary")
@@ -435,6 +445,7 @@ private data class ProfileDictionarySettings(
     val scanNonJapaneseText: Boolean = true,
     val maxResults: Int = 16,
     val scanLength: Int = 16,
+    val searchTextSize: Int = 22,
     val collapseMode: DictionaryCollapseMode = DictionaryCollapseMode.ExpandAll,
     val expandFirstDictionary: Boolean = false,
     val collapsedDictionaries: Set<String> = emptySet(),
@@ -448,6 +459,10 @@ private data class ProfileDictionarySettings(
     fun normalized(): ProfileDictionarySettings = copy(
         maxResults = maxResults.coerceIn(DictionarySettings.MIN_MAX_RESULTS, DictionarySettings.MAX_MAX_RESULTS),
         scanLength = scanLength.coerceIn(DictionarySettings.MIN_SCAN_LENGTH, DictionarySettings.MAX_SCAN_LENGTH),
+        searchTextSize = searchTextSize.coerceIn(
+            DictionarySettings.MIN_SEARCH_TEXT_SIZE,
+            DictionarySettings.MAX_SEARCH_TEXT_SIZE,
+        ),
     )
 }
 
@@ -458,6 +473,7 @@ private fun DictionarySettings.toProfileDictionarySettings(): ProfileDictionaryS
             scanNonJapaneseText = settings.scanNonJapaneseText,
             maxResults = settings.maxResults,
             scanLength = settings.scanLength,
+            searchTextSize = settings.searchTextSize,
             collapseMode = settings.collapseMode,
             expandFirstDictionary = settings.expandFirstDictionary,
             collapsedDictionaries = settings.collapsedDictionaries,
@@ -476,6 +492,7 @@ private fun DictionarySettings.withProfileDictionarySettings(profileSettings: Pr
         scanNonJapaneseText = profileSettings.scanNonJapaneseText,
         maxResults = profileSettings.maxResults,
         scanLength = profileSettings.scanLength,
+        searchTextSize = profileSettings.searchTextSize,
         collapseMode = profileSettings.collapseMode,
         expandFirstDictionary = profileSettings.expandFirstDictionary,
         collapsedDictionaries = profileSettings.collapsedDictionaries,

@@ -270,10 +270,12 @@
     <string name="dictionary_delete_action">删除辞典</string>
     <string name="dictionary_reorder_action">重新排序辞典</string>
     <string name="dictionary_settings_lookup">查词</string>
+    <string name="dictionary_settings_search_text">搜索文本</string>
     <string name="dictionary_settings_import" comment="Dictionary settings section label, intentionally matching the Import action noun.">导入</string>
     <string name="dictionary_scan_non_japanese">扫描非日语文本</string>
     <string name="dictionary_max_results">最大结果数</string>
     <string name="dictionary_scan_length">扫描长度</string>
+    <string name="dictionary_text_size">文本大小</string>
     <string name="dictionary_collapse_dictionaries">折叠辞典</string>
     <string name="dictionary_collapse_mode_expand_all">全部展开</string>
     <string name="dictionary_collapse_mode_collapse_all">全部折叠</string>

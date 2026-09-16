@@ -1167,6 +1167,21 @@ private fun DictionarySettingsView(
                         canIncrease = settings.scanLength < DictionarySettings.MAX_SCAN_LENGTH,
                     )
                 }
+                SectionLabel(stringResource(R.string.dictionary_settings_search_text))
+                SettingsGroup {
+                    StepperRow(
+                        title = stringResource(R.string.dictionary_text_size),
+                        value = settings.searchTextSize,
+                        onDecrease = {
+                            onSettingsChange { it.copy(searchTextSize = it.searchTextSize - 1) }
+                        },
+                        onIncrease = {
+                            onSettingsChange { it.copy(searchTextSize = it.searchTextSize + 1) }
+                        },
+                        canDecrease = settings.searchTextSize > DictionarySettings.MIN_SEARCH_TEXT_SIZE,
+                        canIncrease = settings.searchTextSize < DictionarySettings.MAX_SEARCH_TEXT_SIZE,
+                    )
+                }
                 SectionLabel(stringResource(R.string.dictionary_settings_import))
                 SettingsGroup {
                     ToggleRow(
