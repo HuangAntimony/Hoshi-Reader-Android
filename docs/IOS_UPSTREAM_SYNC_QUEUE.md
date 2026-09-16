@@ -289,42 +289,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 8. Dictionary search source text and click lookup
-
-Status: pending Android sync.
-
-Commits: `beb46ba`, `969b978`.
-
-Dependency/value reasoning:
-
-- Shared iframe result/history behavior depends on popup slice 7; preserve the
-  original query and selection offset together for correct Anki cloze context.
-
-iOS behavior to mirror:
-
-- Show the submitted query below the search bar; tapping a character looks up
-  its suffix and marks the matched span. Preserve the current result scroll
-  position on redirect. Search-text size defaults to 22, configurable 12...48.
-  Mining keeps the original sentence and UTF-16 cloze offset for suffix lookup.
-
-Android current gap:
-
-- `DictionarySearchIframe.kt` supplies result-only root frames;
-  `LookupPopupHtml.kt`/`popup.js` have no source-text spans or click redirect.
-  `DictionarySettings` has no `searchTextSize` and `DictionarySearchView.kt`
-  builds mining context from `lastQuery` without a source-text cloze offset.
-
-Suggested slice:
-
-- Add profile-aware size persistence and root iframe source-text payload,
-  suffix redirect/matched spans and explicit original sentence/offset state.
-
-Validation:
-
-- Long/multiline query, repeated words, supplementary characters, scrolling,
-  redirects/back/forward, Anki cloze offsets, profile changes and child popups.
-
-### 9. Popup audio candidate selection
+### 8. Popup audio candidate selection
 
 Status: pending Android sync.
 
@@ -362,7 +327,7 @@ Validation:
 - Local/remote mixed sources, exact/reading-only matches, duplicate names/URLs,
   empty/failing sources, autoplay, mining, recursive lookup and history resets.
 
-### 10. Frequency sorting controls and import/update feedback
+### 9. Frequency sorting controls and import/update feedback
 
 Status: partial native support; pending Android UI/bridge integration.
 
@@ -409,7 +374,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 11. Anki tag handlebars
+### 10. Anki tag handlebars
 
 Status: pending Android sync.
 
@@ -442,7 +407,7 @@ Validation:
 - Literal plus title/expression tags, whitespace/newlines, missing title,
   unknown handlebars, multiple formats, saved custom tags and both backends.
 
-### 12. Google Drive timeout and automatic-refresh error suppression
+### 11. Google Drive timeout and automatic-refresh error suppression
 
 Status: pending Android sync.
 
@@ -480,7 +445,7 @@ Validation:
 - Automatic refresh offline, slow token/list requests, and connection loss;
   manual connect/refresh/import/export/delete must still show actionable errors.
 
-### 13. Remote bookshelf last-access ordering
+### 12. Remote bookshelf last-access ordering
 
 Status: pending Android sync.
 
@@ -488,7 +453,7 @@ Commits: `e6e2b4b`.
 
 Dependency/value reasoning:
 
-- Independent of timeout slice 12; reuse the existing TTU filename timestamp
+- Independent of timeout slice 11; reuse the existing TTU filename timestamp
   parsers and grouped Drive file discovery.
 
 iOS behavior to mirror:
@@ -513,7 +478,7 @@ Validation:
 - Progress versus audio newest timestamp, bookdata fallback, missing/malformed
   names, multiple remote books, Recent/Title switch and refresh/import.
 
-### 14. Reader navigation and options toolbar
+### 13. Reader navigation and options toolbar
 
 Status: partial Android implementation; remaining visual/interaction parity.
 
@@ -552,7 +517,7 @@ Validation:
   routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
   continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
 
-### 15. Reader WebView line-box CSS parity
+### 14. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -585,7 +550,7 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 16. App accent and stroke-order font attribution
+### 15. App accent and stroke-order font attribution
 
 Status: pending Android sync.
 
@@ -630,7 +595,6 @@ Validation:
 | `b7f09ca` | 2026-08-13 | Book search and shared ruby normalization | Pending literal search, snippets, landing marks and rp cleanup |
 | `7d7321f` | 2026-08-05 | Restore after renderer termination | Pending WebView recreation/state restore |
 | `d8c086d`, `93ba3be` | 2026-08-09 / 08-21 | Statistics lifecycle/archive/editing and sync default | Pending remaining storage/editor/overview/default behavior |
-| `beb46ba`, `969b978` | 2026-08-05 / 08-14 | Search source text, sizing and redirect scroll | Pending source-text iframe and cloze context |
 | `baccc84` | 2026-08-09 | Choose popup audio candidate | Pending candidate API/menu/mining choice |
 | `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
@@ -645,17 +609,21 @@ Validation:
 2. Renderer recovery (2) and localized open-failure fallback (3).
 3. Statistics archive/restore, then daily editing and lifecycle/overview parity (4).
 4. Highlight sidecar/range editing (5), then book search remaining parity (6).
-5. Popup layout/CSS isolation (7), then dictionary search source text (8).
-6. Audio candidate API, then popup selection/mining (9).
+5. Popup layout/CSS isolation (7).
+6. Audio candidate API, then popup selection/mining (8).
 7. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (10).
-8. Anki tag handlebars (11).
-9. Drive timeout/error suppression (12) and remote Recent sorting (13).
-10. Reader navigation/options toolbar (14), after statistics availability (4).
-11. Reader line-box CSS parity (15), app accent and font attribution (16).
+   low-RAM update policy (9).
+8. Anki tag handlebars (10).
+9. Drive timeout/error suppression (11) and remote Recent sorting (12).
+10. Reader navigation/options toolbar (13), after statistics availability (4).
+11. Reader line-box CSS parity (14), app accent and font attribution (15).
 
 ## Covered Or No Android Action
 
+- `beb46ba`, `969b978`: Dictionary search now shows tappable source text with
+  profile-scoped 12–48 sizing, matched spans, preserved redirect scroll, and
+  original-sentence/UTF-16 Anki cloze context. The same root-only behavior also
+  covers Android Process Text/shared lookups, including an empty initial match.
 - `15d4a6e`, `23e0764`, `a4e16df`, `253a589`: Android now provides
   profile-scoped Off/Dimmed/Toggle/Hidden furigana modes, migrates legacy hide
   booleans, consumes Toggle reveal taps, reveals whitespace-adjacent ruby, and
@@ -714,7 +682,7 @@ Validation:
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
   pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 10.
+  remaining bridge gap described in slice 9.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct
@@ -781,17 +749,17 @@ Validation:
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
   transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 10 rather than queueing revision bumps.
+  in slice 9 rather than queueing revision bumps.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
   bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 10.
+  automatic low-RAM difference remains slice 9.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
   500/500 and permits height 1000, exceeding the iOS increase to 350/310. The
   unset statistics-sync default remains slice 4.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 16.
+  Attribution for the downloadable stroke-order font remains slice 15.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

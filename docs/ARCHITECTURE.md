@@ -217,6 +217,20 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- Shared iframe frame payloads accept optional root `sourceText` for Dictionary
+  search and Process Text; Reader and recursive child frames omit it. Shared
+  popup assets render character spans, look up exact suffixes on tap, mark the
+  match, and preserve scroll on successful source redirects. Profile-scoped
+  `DictionarySettings.searchTextSize` defaults to 22 and is normalized to 12–48.
+- Dictionary and Process Text root lookup state retain the complete original
+  query as the mining sentence. Successful redirects use the UTF-16 length
+  difference only when the requested query is an exact suffix, otherwise the
+  mining offset is null. Dictionary clears that offset on a new search; Process
+  Text initializes it to zero and also updates its root selection text/offset
+  after successful redirects. Failed redirects preserve native results,
+  selection/mining context, and history.
+  Process Text creates its root even with no initial match, so source taps can
+  recover a lookup; recursive popup creation still requires results.
 - The shared popup term payload carries pitch entries as a numeric downstep or
   explicit H/L pattern plus 1-based nasal/devoice mora positions. Popup JS owns
   effective-pattern deduplication and visual rendering. A single Kanji in a term

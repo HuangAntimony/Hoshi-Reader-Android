@@ -279,6 +279,19 @@ Validate relevant dictionary/audio changes with:
 - popup theme contrast for deinflection explanations and JMdict forms tables.
 - Dictionary tab and Process Text iframe popup cold paths after reader popup
   changes.
+- Source-text lookup in Dictionary and external `PROCESS_TEXT`, `SEND`, and
+  `TRANSLATE` entry points: use long/multiline text, leading punctuation with no
+  initial match, repeated words, and supplementary characters before the tapped
+  word. Verify the complete source stays visible; an empty Process Text root
+  remains open and tapping a later word finds results. Confirm successful taps
+  mark the matched span and preserve result scroll, while failed taps preserve
+  results, selection, mining context, and history. Exercise back/forward,
+  recursive children, Kanji, audio, outside dismissal, and swipe dismissal.
+  Repeat with source sizes 12/22/48, light/dark/E-ink themes and profile switching;
+  Reader and child popups must not gain source text. Mine through AnkiDroid and
+  AnkiConnect and verify the full original sentence and exact repeated-word
+  cloze position, including UTF-16 offsets after supplementary characters and
+  a successful non-suffix glossary redirect followed by a failed source tap.
 - Android AnkiConnect and AnkiDroid flows when Anki behavior changes, including
   duplicate checks, media references, add-note, and sync behavior.
 - Reader, Dictionary tab, and Process Text popups with one, two, and three Anki
