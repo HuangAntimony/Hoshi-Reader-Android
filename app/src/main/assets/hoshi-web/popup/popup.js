@@ -2179,6 +2179,8 @@ function renderSourceText(sourceText) {
     const generation = ++sourceTextGeneration;
     const container = document.getElementById('search-text');
     if (!container) return;
+    const entriesContainer = document.getElementById('entries-container');
+    if (entriesContainer) entriesContainer.style.minHeight = sourceText == null ? '' : '100vh';
     container.replaceChildren();
     container.hidden = sourceText == null;
     container.onclick = null;

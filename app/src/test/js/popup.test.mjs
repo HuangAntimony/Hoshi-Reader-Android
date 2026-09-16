@@ -317,6 +317,56 @@ test('source text touch target bypasses generic selection and outside dismissal'
     assert.deepEqual(setup.selectTextCalls, []);
 });
 
+test('source redirect retains scroll while browser clamps a temporarily empty delayed result container', async () => {
+    const entry = { expression: '猫', reading: 'ねこ', matched: '猫', glossaries: [], frequencies: [], pitches: [] };
+    let entryRequests = 0;
+    let finishRenderingEntry;
+    const setup = popupContext({
+        lookupRedirect: () => 1,
+        getEntry: () => ++entryRequests === 1 ? entry : new Promise(resolve => { finishRenderingEntry = resolve; }),
+    });
+    const viewportHeight = 600;
+    const sourceHeight = 240;
+    const entries = setup.entriesContainer;
+    const source = setup.searchTextContainer;
+    let top = 0;
+    function clamp(value) {
+        // Model browser scroll bounds from visible source and current/minimum entry height.
+        const minimumHeight = entries.style.minHeight === '100vh' ? viewportHeight : 0;
+        const entriesHeight = Math.max(entries.children.length ? 900 : 0, minimumHeight);
+        const contentHeight = (source.hidden ? 0 : sourceHeight) + entriesHeight;
+        return Math.max(0, Math.min(value, contentHeight - viewportHeight));
+    }
+    Object.defineProperty(setup.document.scrollingElement, 'scrollTop', {
+        get: () => top = clamp(top),
+        set: value => { top = clamp(value); },
+    });
+    Object.defineProperty(entries, 'innerHTML', {
+        set(value) {
+            if (value === '') entries.children = [];
+            top = clamp(top);
+        },
+    });
+
+    setup.context.window.replacePopupResults(0, [], '猫後');
+    entries.appendChild(new FakeElement());
+    setup.document.scrollingElement.scrollTop = 180;
+    await source.onclick({ target: source.children[0], stopPropagation() {} });
+    assert.equal(entryRequests, 2);
+    assert.equal(entries.children.length, 0);
+    assert.equal(setup.document.scrollingElement.scrollTop, 180);
+
+    finishRenderingEntry(entry);
+    await flushAsyncWork();
+    assert.equal(entries.children[0].dataset.entryIndex, '0');
+    assert.equal(setup.document.scrollingElement.scrollTop, 180);
+
+    setup.context.window.replacePopupResults(0, []);
+    setup.document.scrollingElement.scrollTop = 180;
+    assert.equal(setup.document.scrollingElement.scrollTop, 0);
+    assert.equal(entries.style.minHeight, '');
+});
+
 test('reset or replacement discards pending source redirect replies', async () => {
     for (const resetAt of ['lookup', 'entry']) {
         let resolveLookup;
