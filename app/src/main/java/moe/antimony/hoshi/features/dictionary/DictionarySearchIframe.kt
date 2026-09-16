@@ -18,6 +18,7 @@ internal fun dictionarySearchRootFramePayload(
     iframeUrl: String,
     clearSelectionSignal: Int = 0,
     rootHistory: ReaderPopupHistoryCounts = ReaderPopupHistoryCounts(),
+    sourceText: String? = null,
 ): ReaderLookupPopupFramePayload {
     val top = searchBarBottomDp.coerceIn(0.0, viewport.height)
     return ReaderLookupPopupFramePayload(
@@ -42,13 +43,18 @@ internal fun dictionarySearchRootFramePayload(
         clearSelectionSignal = clearSelectionSignal,
         selectionOffsetY = top,
         iframeUrl = iframeUrl,
-        contentKey = dictionarySearchResultsContentKey(results),
+        contentKey = dictionarySearchResultsContentKey(results, sourceText),
+        sourceText = sourceText,
     )
 }
 
-internal fun dictionarySearchResultsContentKey(results: List<LookupResult>): String? {
+internal fun dictionarySearchResultsContentKey(results: List<LookupResult>, sourceText: String? = null): String? {
     if (results.isEmpty()) return null
     val digest = MessageDigest.getInstance("SHA-256")
+    if (sourceText != null) {
+        digest.update(sourceText.toByteArray(Charsets.UTF_8))
+    }
+    digest.update(0)
     results.forEach { result ->
         val entry = LookupPopupHtml.entryJsonString(result).toByteArray(Charsets.UTF_8)
         digest.update(entry.size.toString().toByteArray(Charsets.UTF_8))
@@ -72,6 +78,7 @@ internal fun dictionarySearchIframePayloads(
     eInkMode: Boolean,
     iframeUrl: String,
     rootClearSelectionSignal: Int = 0,
+    sourceText: String? = null,
 ): List<ReaderLookupPopupFramePayload> {
     if (rootResults.isEmpty()) return emptyList()
     return listOf(
@@ -84,6 +91,7 @@ internal fun dictionarySearchIframePayloads(
             iframeUrl = iframeUrl,
             clearSelectionSignal = rootClearSelectionSignal,
             rootHistory = rootHistory,
+            sourceText = sourceText,
         ),
     ) + childPopups.mapIndexed { index, popup ->
         val history = childHistories[popup.id] ?: ReaderPopupHistoryCounts()

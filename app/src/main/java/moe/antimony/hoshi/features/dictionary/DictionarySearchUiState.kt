@@ -7,6 +7,7 @@ import moe.antimony.hoshi.ui.UiText
 internal data class DictionarySearchUiState(
     val query: String = "",
     val lastQuery: String = "",
+    val sentenceOffset: Int? = null,
     val results: List<LookupResult> = emptyList(),
     val hasSearched: Boolean = false,
     val isSearching: Boolean = false,

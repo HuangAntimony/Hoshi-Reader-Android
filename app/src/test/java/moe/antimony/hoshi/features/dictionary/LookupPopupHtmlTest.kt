@@ -27,6 +27,34 @@ import org.junit.Test
 
 class LookupPopupHtmlTest {
     @Test
+    fun sourceContainerPrecedesEntriesAndUsesNormalizedConfiguredSize() {
+        listOf(9 to 12, 31 to 31, 60 to 48).forEach { (configured, expected) ->
+            val html = LookupPopupHtml.renderIframeDocument(settings = DictionarySettings(searchTextSize = configured))
+            val containers = mutableListOf<Pair<String, String>>()
+            var sourceHidden = false
+            javax.swing.text.html.parser.ParserDelegator().parse(
+                java.io.StringReader(html),
+                object : javax.swing.text.html.HTMLEditorKit.ParserCallback() {
+                    override fun handleStartTag(tag: javax.swing.text.html.HTML.Tag, attributes: javax.swing.text.MutableAttributeSet, position: Int) {
+                        if (tag == javax.swing.text.html.HTML.Tag.DIV) {
+                            if (attributes.getAttribute(javax.swing.text.html.HTML.Attribute.ID) == "search-text") {
+                                sourceHidden = attributes.getAttribute("hidden") != null
+                            }
+                            containers += (attributes.getAttribute(javax.swing.text.html.HTML.Attribute.ID)?.toString() ?: "") to
+                                (attributes.getAttribute(javax.swing.text.html.HTML.Attribute.STYLE)?.toString() ?: "")
+                        }
+                    }
+                },
+                true,
+            )
+            org.junit.Assert.assertEquals("search-text", containers[0].first)
+            assertTrue(sourceHidden)
+            org.junit.Assert.assertEquals("entries-container", containers[1].first)
+            org.junit.Assert.assertEquals("--hoshi-search-text-size: ${expected}px;", containers[0].second)
+        }
+    }
+
+    @Test
     fun iframePopupShellUsesDomButtonsAndAbsoluteAssets() {
         val html = LookupPopupHtml.renderIframeDocument(
             assets = null,

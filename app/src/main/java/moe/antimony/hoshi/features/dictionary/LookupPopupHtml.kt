@@ -247,6 +247,7 @@ internal object LookupPopupHtml {
             </head>
             <body>
                 $popupGesturesJs
+                <div id="search-text" hidden style="--hoshi-search-text-size: ${normalizedSettings.searchTextSize}px;"></div>
                 <div id="entries-container"></div>
                 <div class="overlay">
                     <div class="overlay-close" onclick="closeOverlay()">×</div>
@@ -326,7 +327,7 @@ internal object LookupPopupHtml {
                                     }
                                 }
                                 if (window.replacePopupResults) {
-                                    window.replacePopupResults(window.entryCount, initialEntries);
+                                    window.replacePopupResults(window.entryCount, initialEntries, message.sourceText);
                                 } else {
                                     window.lookupEntries = initialEntries;
                                     window.hoshiPopupObserveContentReady?.();

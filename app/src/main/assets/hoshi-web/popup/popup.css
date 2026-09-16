@@ -40,6 +40,22 @@ body {
     padding: 0 10px;
 }
 
+#search-text {
+    padding: 8px 0 7px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.4);
+    font-size: var(--hoshi-search-text-size, 22px);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#search-text > span.matched {
+    background-color: rgba(160, 160, 160, 0.4);
+}
+
 .entry {
     padding: 4px 0;
 }

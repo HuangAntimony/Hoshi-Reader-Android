@@ -107,6 +107,7 @@ internal data class ReaderLookupPopupFramePayload(
     val selectionOffsetY: Double,
     val iframeUrl: String,
     val contentKey: String? = null,
+    val sourceText: String? = null,
 ) {
     companion object {
         fun fromPopup(
@@ -120,6 +121,7 @@ internal data class ReaderLookupPopupFramePayload(
             sasayakiIsPlaying: Boolean = false,
             iframeUrl: String = readerLookupPopupIframeUrl(),
             includeInitialEntryJson: Boolean = true,
+            sourceText: String? = null,
         ): ReaderLookupPopupFramePayload {
             val state = popup.state
             val selectionRect = state.selection.rect
@@ -170,6 +172,7 @@ internal data class ReaderLookupPopupFramePayload(
                     hasSasayakiCue = hasSasayakiCue,
                 ),
                 iframeUrl = iframeUrl,
+                sourceText = sourceText,
             )
         }
     }

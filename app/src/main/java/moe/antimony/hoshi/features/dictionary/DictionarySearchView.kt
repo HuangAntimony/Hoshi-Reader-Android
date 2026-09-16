@@ -288,6 +288,7 @@ fun DictionarySearchView(
     }
     val iframePayloads = remember(
         uiState.results,
+        uiState.lastQuery,
         themedPopups,
         childHistories,
         viewport,
@@ -301,6 +302,7 @@ fun DictionarySearchView(
     ) {
         dictionarySearchIframePayloads(
             rootResults = uiState.results,
+            sourceText = uiState.lastQuery,
             childPopups = themedPopups,
             childHistories = childHistories,
             rootHistory = ReaderPopupHistoryCounts(
@@ -451,7 +453,7 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val messageId = message.messageId ?: return
                 val miningContext = if (message.popupId == DictionarySearchRootPopupId) {
-                    AnkiMiningContext(sentence = uiState.lastQuery.ifBlank { uiState.query })
+                    AnkiMiningContext(sentence = uiState.lastQuery.ifBlank { uiState.query }, sentenceOffset = uiState.sentenceOffset)
                 } else {
                     popupById(message.popupId)?.state?.ankiContext ?: return
                 }

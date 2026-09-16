@@ -155,6 +155,7 @@ internal class DictionarySearchViewModel : ViewModel {
         _uiState.update { current ->
             current.copy(
                 lastQuery = "",
+                sentenceOffset = null,
                 results = emptyList(),
                 hasSearched = false,
                 isSearching = false,
@@ -180,7 +181,7 @@ internal class DictionarySearchViewModel : ViewModel {
         val dictionarySettings = _uiState.value.dictionarySettings.normalized()
         val lookupProfileVersion = profileChangeVersion
         scope.launch {
-            _uiState.update { it.copy(isSearching = true, errorMessage = null) }
+            _uiState.update { it.copy(isSearching = true, errorMessage = null, sentenceOffset = null) }
             runCatching {
                 withContext(ioDispatcher) {
                     val trimmed = query.trim()
@@ -204,6 +205,7 @@ internal class DictionarySearchViewModel : ViewModel {
                     _uiState.update {
                         it.copy(
                             lastQuery = state.lastQuery,
+                            sentenceOffset = null,
                             results = state.results,
                             hasSearched = true,
                             isSearching = false,
@@ -223,6 +225,7 @@ internal class DictionarySearchViewModel : ViewModel {
                     _uiState.update {
                         it.copy(
                             lastQuery = query.trim(),
+                            sentenceOffset = null,
                             results = emptyList(),
                             hasSearched = true,
                             isSearching = false,
@@ -260,14 +263,14 @@ internal class DictionarySearchViewModel : ViewModel {
     }
 
     fun lookupRootRedirect(query: String): List<LookupResult> {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) return emptyList()
+        if (query.isBlank()) return emptyList()
         val settings = _uiState.value.dictionarySettings.normalized()
-        val results = repository.lookup(trimmed, settings.maxResults, settings.scanLength)
+        val results = runCatching { repository.lookup(query, settings.maxResults, settings.scanLength) }
+            .getOrElse { return emptyList() }
         if (results.isNotEmpty()) {
             _uiState.update {
                 it.copy(
-                    lastQuery = trimmed,
+                    sentenceOffset = if (it.lastQuery.endsWith(query)) it.lastQuery.length - query.length else null,
                     results = results,
                     hasSearched = true,
                     isSearching = false,

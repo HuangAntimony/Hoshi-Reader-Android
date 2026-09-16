@@ -26,6 +26,7 @@ let renderGeneration = 0;
 let kanjiRedirectRequestId = 0;
 let hostEntrySetVersion = 0;
 let activeEntrySetVersion = 0;
+let sourceTextGeneration = 0;
 
 window.createPopupGeometry = function({
     documentRef = document,
@@ -2053,6 +2054,7 @@ function replaceHostEntrySet() {
 }
 
 window.resetPopupResults = function() {
+    renderSourceText(null);
     renderGeneration++;
     replaceHostEntrySet();
     popupTermNavigator.reset();
@@ -2094,7 +2096,7 @@ function flushPendingHistoryRestore() {
     appendPendingHistoryRestore(true);
 }
 
-function redirect(count) {
+function redirect(count, scrollTop = 0) {
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
     resetDictionaryMediaObserver();
@@ -2108,9 +2110,9 @@ function redirect(count) {
     document.getElementById('entries-container').innerHTML = '';
     window.renderPopup();
     requestAnimationFrame(() => {
-        popupGeometry.setScrollTop(0);
+        popupGeometry.setScrollTop(scrollTop);
         requestAnimationFrame(() => {
-            popupGeometry.setScrollTop(0);
+            popupGeometry.setScrollTop(scrollTop);
         });
     });
 }
@@ -2173,7 +2175,41 @@ function redirectKanji(data) {
     requestAnimationFrame(() => popupGeometry.setScrollTop(0));
 }
 
-window.replacePopupResults = function(count, initialEntries) {
+function renderSourceText(sourceText) {
+    const generation = ++sourceTextGeneration;
+    const container = document.getElementById('search-text');
+    if (!container) return;
+    container.replaceChildren();
+    container.hidden = sourceText == null;
+    container.onclick = null;
+    if (sourceText == null) return;
+    const chars = [...sourceText];
+    container.append(...chars.map((char, index) => {
+        const span = document.createElement('span');
+        span.textContent = char;
+        span.dataset.index = String(index);
+        return span;
+    }));
+    container.onclick = async (event) => {
+        event.stopPropagation();
+        const index = event.target.dataset.index;
+        if (index === undefined) return;
+        const start = Number(index);
+        const count = await webkit.messageHandlers.lookupRedirect.postMessage(chars.slice(start).join(''));
+        if (!count || generation !== sourceTextGeneration) return;
+        const entry = await webkit.messageHandlers.getEntry.postMessage(0);
+        if (generation !== sourceTextGeneration) return;
+        const scrollTop = popupGeometry.scrollTop();
+        redirect(count, scrollTop);
+        const length = [...(entry?.matched || '')].length;
+        [...container.children].forEach((span, i) => {
+            span.classList.toggle('matched', i >= start && i < start + length);
+        });
+    };
+}
+
+window.replacePopupResults = function(count, initialEntries, sourceText = null) {
+    renderSourceText(sourceText);
     closeOverlay();
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
@@ -2282,7 +2318,7 @@ function popupEventTarget(event) {
 }
 
 function isPopupInteractiveTapTarget(target) {
-    if (target?.closest('summary, a, button, .button-slot, .deinflection-tag, .frequency-group, .pitch-group, .overlay, .overlay-close, .overlay-content')) {
+    if (target?.closest('#search-text, summary, a, button, .button-slot, .deinflection-tag, .frequency-group, .pitch-group, .overlay, .overlay-close, .overlay-content')) {
         return true;
     }
     const tagRow = target?.closest('.tag-row');

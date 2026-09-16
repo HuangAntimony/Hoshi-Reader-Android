@@ -129,12 +129,14 @@
     }
 
     function iframeRenderMessage(payload) {
-        return {
+        const message = {
             type: 'renderPopup',
             popupId: payload.id,
             entriesCount: payload.entriesCount || 0,
             initialEntryJson: payload.initialEntryJson || null
         };
+        if (payload.sourceText != null) message.sourceText = payload.sourceText;
+        return message;
     }
 
     function renderIframe(record) {

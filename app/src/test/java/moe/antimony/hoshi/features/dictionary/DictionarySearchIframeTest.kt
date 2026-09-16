@@ -59,6 +59,7 @@ class DictionarySearchIframeTest {
 
         val payloads = dictionarySearchIframePayloads(
             rootResults = listOf(lookupResult("猫")),
+            sourceText = "猫と犬",
             childPopups = listOf(child),
             childHistories = mapOf("child" to ReaderPopupHistoryCounts(backCount = 1, forwardCount = 2)),
             viewport = ReaderLookupPopupViewport(width = 390.0, height = 700.0),
@@ -69,6 +70,8 @@ class DictionarySearchIframeTest {
         )
 
         assertEquals(listOf(DictionarySearchRootPopupId, "child"), payloads.map { it.id })
+        assertEquals("猫と犬", payloads[0].sourceText)
+        assertEquals(null, payloads[1].sourceText)
         assertEquals(1, payloads[1].backCount)
         assertEquals(2, payloads[1].forwardCount)
     }
@@ -89,6 +92,15 @@ class DictionarySearchIframeTest {
 
         assertEquals(2, payloads.single().backCount)
         assertEquals(1, payloads.single().forwardCount)
+    }
+
+    @Test
+    fun identicalResultsWithDifferentSourceTextReplaceIframeContent() {
+        val results = listOf(lookupResult("猫"))
+        assertNotEquals(
+            dictionarySearchResultsContentKey(results, "猫がいる"),
+            dictionarySearchResultsContentKey(results, "猫がいた"),
+        )
     }
 
     @Test
