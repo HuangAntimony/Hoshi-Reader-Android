@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,8 +82,18 @@ internal fun StatisticsHeatmap(
                 verticalArrangement = Arrangement.spacedBy(HeatmapSpacing),
             ) {
                 statisticsWeekdayLabels().forEachIndexed { index, label ->
-                    Box(Modifier.size(HeatmapCellSize), contentAlignment = Alignment.Center) {
-                        Text(if (index % 3 == 0) label else "", style = labelStyle)
+                    Box(
+                        Modifier.widthIn(min = HeatmapCellSize).height(HeatmapCellSize),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (index % 3 == 0) label else "",
+                            // Keep the row aligned to its cell without clipping the taller text line.
+                            modifier = Modifier.wrapContentHeight(unbounded = true),
+                            style = labelStyle,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
                 }
             }

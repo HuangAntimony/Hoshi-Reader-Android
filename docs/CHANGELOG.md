@@ -63,7 +63,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   autostart, reset time, Sync and Archive sections, with explanatory footers
   and the archived-book count below the clear action.
 - Simplify Statistics to daily goals and reading-time results. Include a
-  display-only reading-intensity heatmap in the daily card and a compact
+  display-only reading-intensity heatmap with fully visible, row-aligned weekday
+  labels in the daily card and a compact
   goal popup with a scrollable value picker. Show reading-time
   bars, summary rows and time-ranked books
   together instead of three tabs, with consistent section headings, grouped

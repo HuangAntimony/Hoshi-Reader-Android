@@ -317,6 +317,10 @@ Preserve existing app data when validating statistics:
   has a subtle outline and the Less/More legend matches. Taps have no action. Changing chart mode,
   page or bucket must not move or recolor the heatmap. Manual heatmap scrolling
   and settings/editor round trips preserve its position.
+- Heatmap weekday labels remain complete and centered on their corresponding
+  rows in English and Chinese, including larger system fonts and E-ink mode.
+  Their text height must not be clipped to the smaller heatmap cell height;
+  labels and cells follow the same locale-specific first day of the week.
 - Reading-time bars, summary rows and book rows display together. Within
   week/month a bar selects a day; within year/all it selects a month. The
   full chart remains while the headline, summary and books follow that bucket.
