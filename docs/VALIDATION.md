@@ -306,6 +306,10 @@ Preserve existing app data when validating statistics:
   Check empty buckets, the first partial month and future-bucket rejection.
   Book bars rank by time independently of goal type, five rows show initially,
   Show More expands the list, and no Books section appears for an empty result.
+- In light and dark E-ink modes, unselected reading-time bars are hollow and
+  only the selected bar is filled. Initial display and clearing selection leave
+  all bars hollow. Check switching between bars, short/narrow bars, and normal
+  color mode retaining its existing color-based selection.
 - Compare average duration and prior-period percentages with missing reading
   days/months, including prior average zero. Goal history spans active and
   archived books regardless of selected period, recalculates after goal changes,

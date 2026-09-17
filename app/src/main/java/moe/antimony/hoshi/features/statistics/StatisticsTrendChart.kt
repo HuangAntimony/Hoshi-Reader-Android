@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -22,6 +23,7 @@ import java.time.LocalDate
 import kotlin.math.ceil
 import kotlin.math.max
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
 @Composable
 internal fun StatisticsTrendChart(
@@ -36,6 +38,8 @@ internal fun StatisticsTrendChart(
     if (points.isEmpty()) return
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.outlineVariant
+    val surface = MaterialTheme.colorScheme.surface
+    val eInkMode = LocalHoshiEInkMode.current
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val averageStyle = labelStyle.copy(color = primary)
     val textMeasurer = rememberTextMeasurer()
@@ -74,13 +78,33 @@ internal fun StatisticsTrendChart(
         points.forEachIndexed { index, point ->
             val barHeight = plotBottom - y(point.readingSeconds)
             if (barHeight > 0f) {
-                val selected = selectedBucket == null || statisticsTrendBucket(mode, point.key) == selectedBucket
+                val selected = statisticsTrendBucket(mode, point.key) == selectedBucket
+                val hollow = eInkMode && !selected
+                val barWidth = bucketWidth * 0.6f
+                val topLeft = Offset((index + 0.2f) * bucketWidth, plotBottom - barHeight)
+                val radius = minOf(3.dp.toPx(), barWidth / 2f)
                 drawRoundRect(
-                    color = if (selected) primary else muted,
-                    topLeft = Offset((index + 0.2f) * bucketWidth, plotBottom - barHeight),
-                    size = Size(bucketWidth * 0.6f, barHeight),
-                    cornerRadius = CornerRadius(minOf(3.dp.toPx(), bucketWidth * 0.3f)),
+                    color = when {
+                        hollow -> surface
+                        selected || selectedBucket == null -> primary
+                        else -> muted
+                    },
+                    topLeft = topLeft,
+                    size = Size(barWidth, barHeight),
+                    cornerRadius = CornerRadius(radius),
                 )
+                if (hollow) {
+                    // Keep the outline inside the bar and leave its interior clear of grid lines.
+                    val strokeWidth = minOf(1.dp.toPx(), barWidth / 3f, barHeight / 3f)
+                    val inset = strokeWidth / 2f
+                    drawRoundRect(
+                        color = primary,
+                        topLeft = topLeft + Offset(inset, inset),
+                        size = Size(barWidth - strokeWidth, barHeight - strokeWidth),
+                        cornerRadius = CornerRadius((radius - inset).coerceAtLeast(0f)),
+                        style = Stroke(strokeWidth),
+                    )
+                }
             }
         }
         if (averageSeconds > 0.0) {

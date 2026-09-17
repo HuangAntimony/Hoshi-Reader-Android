@@ -64,8 +64,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   goal popup with a scrollable value picker. Show reading-time
   bars, summary rows and time-ranked books
   together instead of three tabs, with consistent section headings, grouped
-  cards and compact charts and rows. Remove the separate This Week card and weekly
-  goal; weekly totals and trends remain available through the reading-time chart.
+  cards and compact charts and rows. In E-ink mode, chart bars are hollow until
+  selected, making the filled selection distinct. Remove the separate This Week
+  card and weekly goal; weekly totals and trends remain available through the
+  reading-time chart.
 
 ### Fixed
 
