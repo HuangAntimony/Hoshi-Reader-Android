@@ -12,8 +12,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires
   confirmation.
-- Add natural calendar periods and all-time Statistics overview, elapsed-period
-  averages and comparisons, plus historical goal streaks and best-day summaries.
+- Add natural calendar periods and all-time Statistics overview, with compact
+  period controls in the reading calendar, elapsed-period averages and
+  comparisons, plus historical goal streaks and best-day summaries.
 - Support Anki tag handlebars such as `{document-title}` and `{expression}`,
   joining whitespace inside substituted values with underscores; new card
   formats default to the `hoshi` tag while saved tags stay unchanged.

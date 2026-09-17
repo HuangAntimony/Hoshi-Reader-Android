@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -90,7 +90,33 @@ internal fun StatisticsCalendarSection(
             selected = calendar.rangeMode,
             onSelect = { onEvent(StatisticsEvent.SelectRangeMode(it)) },
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (canNavigatePrevious) {
+                IconButton(onClick = { onEvent(StatisticsEvent.NavigatePeriod(-1)) }) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = null)
+                }
+            }
+            Text(
+                text = rangeTitle(calendar),
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            if (canNavigatePrevious) {
+                IconButton(
+                    onClick = { onEvent(StatisticsEvent.NavigatePeriod(1)) },
+                    enabled = canNavigateNext,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         CalendarHeatmap(
             calendar = calendar,
             scrollState = heatmapScrollState,
@@ -98,87 +124,8 @@ internal fun StatisticsCalendarSection(
             onAutoScrolled = onHeatmapAutoScrolled,
             onDateClick = { date -> onEvent(StatisticsEvent.SelectCalendarDate(date)) },
         )
-        Spacer(Modifier.height(12.dp))
-        val summaryColors = statisticsSelectedRangeSummaryColors(
-            colorScheme = MaterialTheme.colorScheme,
-            eInkMode = LocalHoshiEInkMode.current,
-        )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            color = summaryColors.container,
-            border = BorderStroke(1.dp, summaryColors.border),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (canNavigatePrevious) {
-                    IconButton(onClick = { onEvent(StatisticsEvent.NavigatePeriod(-1)) }) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                            contentDescription = null,
-                            tint = summaryColors.content,
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = rangeTitle(calendar),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = summaryColors.content,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        text = formatStatisticsDays(calendar.selectedRange.dayCount),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = summaryColors.content,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-                if (canNavigatePrevious) {
-                    IconButton(
-                        onClick = { onEvent(StatisticsEvent.NavigatePeriod(1)) },
-                        enabled = canNavigateNext,
-                    ) {
-                        if (canNavigateNext) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = summaryColors.content,
-                            )
-                        }
-                    }
-                }
-            }
-        }
     }
 }
-
-internal data class StatisticsSelectedRangeSummaryColors(
-    val container: Color,
-    val content: Color,
-    val border: Color,
-)
-
-internal fun statisticsSelectedRangeSummaryColors(
-    colorScheme: ColorScheme,
-    eInkMode: Boolean,
-): StatisticsSelectedRangeSummaryColors =
-    if (eInkMode) {
-        StatisticsSelectedRangeSummaryColors(
-            container = colorScheme.primaryContainer,
-            content = colorScheme.onPrimaryContainer,
-            border = colorScheme.primary,
-        )
-    } else {
-        StatisticsSelectedRangeSummaryColors(
-            container = colorScheme.primaryContainer.copy(alpha = 0.28f),
-            content = colorScheme.onPrimaryContainer,
-            border = colorScheme.primary.copy(alpha = 0.14f),
-        )
-    }
 
 @Composable
 private fun CalendarWindowDropdown(
