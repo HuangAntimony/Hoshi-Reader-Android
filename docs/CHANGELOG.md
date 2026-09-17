@@ -70,7 +70,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   cards and compact charts and rows, including a left-aligned Show More row
   with a divider above it. In E-ink mode, chart bars are hollow until selected,
   making the filled selection distinct; period and goal-type selectors use
-  outlined tracks with filled, inverse-text selections. Remove the separate This Week
+  outlined tracks with filled, inverse-text selections, and the goal value wheel
+  outlines its center selection. Remove the separate This Week
   card and weekly goal; weekly totals and trends remain available through the
   reading-time chart.
 

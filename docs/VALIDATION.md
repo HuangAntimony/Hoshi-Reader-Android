@@ -301,7 +301,9 @@ Preserve existing app data when validating statistics:
   It starts at the saved value, snaps after scrolling, and supports tapping a
   nearby value. Switching Characters/Duration preserves each saved target;
   outside tap and Back dismiss it. Cover both ends of each range, reopen,
-  E-ink contrast and persistence failure/retry.
+  E-ink contrast and persistence failure/retry. In light and dark E-ink modes,
+  both goal types have a visible fixed center outline enclosing the snapped
+  value; normal mode retains its filled selection band.
 - Check the current Week as the initial reading-time period, including while
   loading; returning from settings or a book editor preserves a manual selection.
   Week/Month/Year/All switching

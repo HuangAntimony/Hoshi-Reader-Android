@@ -1,7 +1,6 @@
 package moe.antimony.hoshi.features.statistics
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -136,7 +135,12 @@ private fun GoalValueWheel(values: List<Int>, value: Int, onSelect: (Int) -> Uni
         }
     }
     Box(Modifier.fillMaxWidth().height(180.dp).clipToBounds(), contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxWidth().height(36.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(12.dp)))
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(36.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = if (eInk) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+        ) {}
         LazyColumn(
             state = list,
             modifier = Modifier.fillMaxSize(),
