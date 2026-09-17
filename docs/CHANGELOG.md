@@ -74,7 +74,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   outlined tracks with filled, inverse-text selections, and the goal value wheel
   outlines its center selection. Remove the separate This Week
   card and weekly goal; weekly totals and trends remain available through the
-  reading-time chart.
+  reading-time chart. Keep dashboard cards in memory while scrolling to avoid
+  rebuilding the heatmap and charts during fast vertical swipes.
 
 ### Fixed
 

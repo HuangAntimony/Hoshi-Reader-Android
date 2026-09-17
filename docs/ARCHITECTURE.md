@@ -94,13 +94,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   and all-date book editors. The daily goal card combines a semicircular gauge,
   history metrics with shared text baselines, and a display-only reading-intensity
   heatmap. Sparse active dates back a lazy week grid with viewport-only drawing;
-  heatmap scrolling and data are independent of chart selection. Target editing
+  heatmap scrolling and data are independent of chart selection. The fixed
+  dashboard sections share a regular scrolling column, retaining their
+  compositions and draw caches when they move offscreen. Book distribution
+  still expands in five-row increments. Target editing
   uses an anchored popup with a snapping value wheel, independent remembered
   character/time goals, immediate tap selection and persistence when scrolling
   settles.
   There is no separate calendar picker or weekly goal.
-- The reading-time card owns Week/Month/Year/All selection, with All selected
-  initially. A horizontal pager browses natural periods from first activity to
+- The reading-time card owns Week/Month/Year/All selection, initially showing
+  the current Week. A horizontal pager browses natural periods from first activity to
   today, preparing chart data only for the selected and adjacent pages. Changing
   mode returns to the current period. Bars drill into a day for week/month or a
   month for year/all; paging or changing mode clears that selection. The headline,

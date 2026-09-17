@@ -4,14 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -44,6 +44,7 @@ internal fun StatisticsView(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scrollState = rememberScrollState()
     val heatmapScrollState = rememberLazyListState()
     var heatmapInitiallyScrolled by rememberSaveable { mutableStateOf(false) }
 
@@ -62,54 +63,51 @@ internal fun StatisticsView(
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = { StatisticsHeader(onOpenSettings = onOpenSettings) },
     ) { innerPadding ->
-        LazyColumn(
+        // These fixed dashboard sections stay composed when scrolled out of view.
+        // Recreating whole cards also recreates the heatmap and chart during a fling.
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = layoutSpec.pageHorizontalPaddingDp.dp,
-                end = layoutSpec.pageHorizontalPaddingDp.dp,
-                top = 16.dp,
-                bottom = statisticsListBottomPaddingDp().dp,
-            ),
+                .padding(innerPadding)
+                .verticalScroll(scrollState)
+                .padding(
+                    start = layoutSpec.pageHorizontalPaddingDp.dp,
+                    end = layoutSpec.pageHorizontalPaddingDp.dp,
+                    top = 16.dp,
+                    bottom = statisticsListBottomPaddingDp().dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             if (uiState.emptyState?.hasPartialReadError == true) {
-                item {
-                    CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                        Text(
-                            text = stringResource(R.string.statistics_partial_unavailable),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-            item {
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    TodayStatisticsSection(
-                        today = uiState.today,
-                        settings = uiState.settings.values,
-                        history = uiState.history,
-                        heatmap = uiState.heatmap,
-                        heatmapScrollState = heatmapScrollState,
-                        heatmapInitiallyScrolled = heatmapInitiallyScrolled,
-                        onHeatmapInitiallyScrolled = { heatmapInitiallyScrolled = true },
-                        targetEditor = uiState.settings,
-                        onEvent = viewModel::onEvent,
+                    Text(
+                        text = stringResource(R.string.statistics_partial_unavailable),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    StatisticsReadingTimeSection(
-                        currentRange = uiState.currentRange,
-                        today = uiState.today.date,
-                        onEvent = viewModel::onEvent,
-                    )
-                }
+            CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                TodayStatisticsSection(
+                    today = uiState.today,
+                    settings = uiState.settings.values,
+                    history = uiState.history,
+                    heatmap = uiState.heatmap,
+                    heatmapScrollState = heatmapScrollState,
+                    heatmapInitiallyScrolled = heatmapInitiallyScrolled,
+                    onHeatmapInitiallyScrolled = { heatmapInitiallyScrolled = true },
+                    targetEditor = uiState.settings,
+                    onEvent = viewModel::onEvent,
+                )
             }
-            if (uiState.currentRange.distributionRows.isNotEmpty()) item {
+            CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                StatisticsReadingTimeSection(
+                    currentRange = uiState.currentRange,
+                    today = uiState.today.date,
+                    onEvent = viewModel::onEvent,
+                )
+            }
+            if (uiState.currentRange.distributionRows.isNotEmpty()) {
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
                     StatisticsBooksSection(
                         rows = uiState.currentRange.distributionRows,

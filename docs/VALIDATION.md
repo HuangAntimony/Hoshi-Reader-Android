@@ -321,6 +321,10 @@ Preserve existing app data when validating statistics:
   rows in English and Chinese, including larger system fonts and E-ink mode.
   Their text height must not be clipped to the smaller heatmap cell height;
   labels and cells follow the same locale-specific first day of the week.
+- Fast vertical dashboard swipes retain the fixed cards rather than recreating
+  their charts on re-entry; use the Statistics flow in `docs/PERFORMANCE.md` for
+  frame and trace comparisons. Heatmap horizontal position, chart selection,
+  expanded book count and vertical position survive settings/editor round trips.
 - Reading-time bars, summary rows and book rows display together. Within
   week/month a bar selects a day; within year/all it selects a month. The
   full chart remains while the headline, summary and books follow that bucket.

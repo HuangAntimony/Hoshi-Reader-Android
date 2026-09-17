@@ -99,6 +99,23 @@ Do not infer a root cause from wall-clock timing alone. A slow flow with low
 sampled CPU often means waiting, lifecycle retention, IO, binder, or scheduling,
 not an expensive loop.
 
+## Statistics Dashboard Scrolling
+
+Keep the selected period, expanded book count, heatmap position, theme and font
+scale the same when comparing vertical scroll runs. Warm the entire dashboard,
+then record at least three identical sets of fast down/up swipes with
+`dumpsys gfxinfo`; collect sampling or system traces separately so profiling
+overhead does not contaminate frame timings. Record whether timings came from
+Debug or an R8-optimized release build; Debug comparisons describe only that
+build, not release performance.
+
+Distinguish horizontal heatmap drawing from whole-card recreation during
+vertical scrolling. With unchanged data, moving the fixed dashboard sections
+offscreen and back must not repeatedly compose `TodayStatisticsSection`,
+`StatisticsHeatmap` or the reading-time card. Horizontal heatmap scrolling must
+still draw only visible weeks, without expanding all history into UI nodes.
+Check first entry and expanded book lists as well as the warm three-card case.
+
 ## Repeated-Entry Slowdowns
 
 For bugs that get worse after leaving and re-entering Reader, measure resource
