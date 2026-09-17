@@ -32,7 +32,7 @@ class StatisticsRepositoryTest {
             statistics = listOf(ReadingStatistics("Beta", "2026-06-30", charactersRead = 2_000, readingTime = 900.0)),
         )
 
-        val snapshot = AndroidStatisticsRepository(bookRepository, Dispatchers.IO).loadSnapshot()
+        val snapshot = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot()
         val day = snapshot.days.single()
 
         assertEquals(alpha.name, "alpha")
@@ -62,7 +62,7 @@ class StatisticsRepositoryTest {
             """.trimIndent(),
         )
 
-        val day = AndroidStatisticsRepository(bookRepository, Dispatchers.IO).loadSnapshot().days.single()
+        val day = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot().days.single()
 
         assertEquals(300, day.totalCharacters)
         assertEquals(30.0, day.readingSeconds, 0.0)
@@ -91,7 +91,7 @@ class StatisticsRepositoryTest {
             statistics = emptyList(),
         ).resolve("statistics.json").delete()
 
-        val snapshot = AndroidStatisticsRepository(bookRepository, Dispatchers.IO).loadSnapshot()
+        val snapshot = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot()
 
         assertEquals(listOf("2025-12-31"), snapshot.days.map { it.date.toString() })
         assertEquals(setOf(InvalidId), snapshot.skippedCorruptBookIds)
@@ -111,7 +111,7 @@ class StatisticsRepositoryTest {
             ),
         )
 
-        val snapshot = AndroidStatisticsRepository(bookRepository, Dispatchers.IO).loadSnapshot()
+        val snapshot = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot()
 
         assertEquals(listOf(2026, 2025, 2024), snapshot.availableYears)
     }
@@ -136,10 +136,51 @@ class StatisticsRepositoryTest {
             """.trimIndent(),
         )
 
-        val snapshot = AndroidStatisticsRepository(bookRepository, Dispatchers.IO).loadSnapshot()
+        val snapshot = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot()
 
         assertEquals(listOf("2026-06-30"), snapshot.days.map { it.date.toString() })
         assertTrue(snapshot.skippedCorruptBookIds.isEmpty())
+    }
+
+    @Test
+    fun archiveAndActiveDuplicateAreCoalescedUsingActiveIdentity() = runBlocking {
+        val files = tempFolder.newFolder("app")
+        val books = BookRepository(files)
+        val active = books.createStoredBook("active-id", "book", "Current title", listOf(ReadingStatistics("Book", "2026-06-30", charactersRead = 20, lastStatisticModified = 10)))
+        val archive = files.resolve("Books/statistics_archive/book").apply { mkdirs() }
+        books.saveMetadata(archive, BookMetadata("archive-id", "Old title", null, "book", 0.0))
+        books.saveStatistics(archive, listOf(
+            ReadingStatistics("Book", "2026-06-30", charactersRead = 99, lastStatisticModified = 10),
+            ReadingStatistics("Book", "2026-06-29", charactersRead = 5),
+        ))
+        val repository = AndroidStatisticsRepository(books.statisticsStore)
+        val snapshot = repository.loadSnapshot()
+        assertEquals(listOf(5, 20), snapshot.days.map { it.totalCharacters })
+        assertTrue(snapshot.days.all { it.activeBookCount == 1 })
+        assertTrue(snapshot.days.flatMap { it.bookContributions }.all { it.bookId == "active-id" && it.folder == "book" && !it.isArchived })
+        repository.deleteDay("book", "2026-06-30")
+        assertEquals(listOf("2026-06-29"), books.loadStatistics(active).map { it.dateKey })
+        assertTrue(!archive.exists())
+    }
+
+    @Test
+    fun archivedBooksAreEditableAndCorruptArchiveDoesNotHideOtherBooks() = runBlocking {
+        val files = tempFolder.newFolder("app")
+        val books = BookRepository(files)
+        val root = books.createStoredBook("active-id", "book", "Archived title", listOf(ReadingStatistics("Book", "2026-06-30", charactersRead = 20)))
+        books.deleteBook(root)
+        val corrupt = files.resolve("Books/statistics_archive/corrupt").apply { mkdirs() }
+        corrupt.resolve("statistics.json").writeText("broken")
+        val repository = AndroidStatisticsRepository(books.statisticsStore)
+        assertEquals(1, repository.loadArchiveSummary())
+        assertEquals(setOf("corrupt"), repository.loadSnapshot().skippedCorruptBookIds)
+        assertTrue(repository.loadBookStatistics("book")!!.isArchived)
+        repository.updateDay("book", "2026-06-30", 60, 2)
+        assertEquals(120.0, repository.loadBookStatistics("book")!!.statistics.single().readingTime, 0.0)
+        repository.deleteAll("book")
+        assertEquals(null, repository.loadBookStatistics("book"))
+        repository.clearArchive()
+        assertEquals(0, repository.loadArchiveSummary())
     }
 
     private suspend fun BookRepository.createStoredBook(

@@ -29,6 +29,51 @@ class ReaderSettingsRepositoryTest {
     val tempFolder = TemporaryFolder()
 
     @Test
+    fun statisticsSyncDefaultsOnWithoutStartingTrackingOrChangingDisplayPreferences() = runBlocking {
+        repository().use { repository ->
+            val settings = repository.settings.first()
+            assertTrue(settings.statisticsSyncEnabled)
+            assertFalse(settings.statisticsAutostartOnBookOpen)
+            assertFalse(settings.statisticsAutostartOnPageTurn)
+            assertFalse(settings.showStatisticsToggle)
+            assertFalse(settings.showReadingSpeed)
+            assertFalse(settings.showReadingTime)
+        }
+    }
+
+    @Test
+    fun obsoleteDisabledStatisticsPreferencesDoNotChangeOtherPreferences() = runBlocking {
+        repository().use { repository ->
+            repository.editPreferences {
+                this[booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")] = true
+                this[booleanPreferencesKey("enableStatistics")] = false
+                this[booleanPreferencesKey("showStatisticsTab")] = false
+                this[booleanPreferencesKey("statisticsEnableSync")] = false
+                this[booleanPreferencesKey("readerShowReadingSpeed")] = true
+            }
+            val before = repository.settings.first()
+            assertFalse(before.statisticsSyncEnabled)
+            assertTrue(before.showReadingSpeed)
+            assertFalse(before.showReadingTime)
+            repository.update { it.copy(statisticsResetMinutes = 270) }
+            val after = repository.settings.first()
+            assertEquals(270, after.statisticsResetMinutes)
+            assertFalse(after.statisticsSyncEnabled)
+            assertTrue(after.showReadingSpeed)
+            assertFalse(after.showReadingTime)
+        }
+    }
+
+    @Test
+    fun storedStatisticsSyncOptOutSurvivesUnrelatedSettingsUpdates() = runBlocking {
+        repository().use { repository ->
+            repository.update { it.copy(statisticsSyncEnabled = false) }
+            repository.update { it.copy(fontSize = 28) }
+            assertFalse(repository.settings.first().statisticsSyncEnabled)
+        }
+    }
+
+    @Test
     fun profileAppearanceReadsAndWritesUseInjectedIoDispatcher() = runBlocking {
         CountingCoroutineDispatcher().use { ioDispatcher ->
             val profileRepository = ProfileRepository(
@@ -78,8 +123,6 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.visualNovelClickAdvance)
             assertFalse(settings.visualNovelMergeCrossScreenSasayakiCues)
             assertFalse(settings.blurImages)
-            assertFalse(settings.enableStatistics)
-            assertTrue(settings.showStatisticsTab)
             assertFalse(settings.statisticsAutostartOnBookOpen)
             assertFalse(settings.statisticsAutostartOnPageTurn)
             assertEquals(0, settings.statisticsResetMinutes)
@@ -289,8 +332,6 @@ class ReaderSettingsRepositoryTest {
                     visualNovelClickAdvance = false,
                     visualNovelMergeCrossScreenSasayakiCues = true,
                     blurImages = true,
-                    enableStatistics = true,
-                    showStatisticsTab = false,
                     statisticsAutostartOnBookOpen = true,
                     statisticsAutostartOnPageTurn = true,
                     showStatisticsToggle = true,
@@ -358,8 +399,6 @@ class ReaderSettingsRepositoryTest {
             assertFalse(saved.visualNovelClickAdvance)
             assertTrue(saved.visualNovelMergeCrossScreenSasayakiCues)
             assertTrue(saved.blurImages)
-            assertTrue(saved.enableStatistics)
-            assertFalse(saved.showStatisticsTab)
             assertTrue(saved.statisticsAutostartOnBookOpen)
             assertTrue(saved.statisticsAutostartOnPageTurn)
             assertTrue(saved.showStatisticsToggle)
@@ -423,27 +462,6 @@ class ReaderSettingsRepositoryTest {
     }
 
     @Test
-    fun falseToTrueStatisticsRepositoryUpdateEnablesDisplayControls() = runBlocking {
-        repository().use { repository ->
-            repository.update {
-                it.copy(
-                    enableStatistics = true,
-                    showStatisticsToggle = false,
-                    showReadingSpeed = false,
-                    showReadingTime = false,
-                )
-            }
-
-            val saved = repository.settings.first()
-
-            assertTrue(saved.enableStatistics)
-            assertTrue(saved.showStatisticsToggle)
-            assertTrue(saved.showReadingSpeed)
-            assertTrue(saved.showReadingTime)
-        }
-    }
-
-    @Test
     fun profileModeScopesAppearanceFieldsButKeepsBehaviorFieldsGlobal() = runBlocking {
         val profileRepository = ProfileRepository(tempFolder.newFolder("files"))
         repository(profileRepository = profileRepository).use { repository ->
@@ -457,7 +475,6 @@ class ReaderSettingsRepositoryTest {
                     topSafeAreaDp = 46,
                     bottomSafeAreaDp = 44,
                     visualNovelMergeCrossScreenSasayakiCues = true,
-                    showStatisticsTab = false,
                     volumeKeysTurnPages = true,
                     volumeKeysNavigatePopupTerms = true,
                     lockCurrentOrientation = true,
@@ -476,7 +493,6 @@ class ReaderSettingsRepositoryTest {
             assertEquals(46, inherited.topSafeAreaDp)
             assertEquals(44, inherited.bottomSafeAreaDp)
             assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
-            assertFalse(inherited.showStatisticsTab)
             assertTrue(inherited.volumeKeysTurnPages)
             assertTrue(inherited.volumeKeysNavigatePopupTerms)
             assertTrue(inherited.lockCurrentOrientation)
@@ -492,7 +508,6 @@ class ReaderSettingsRepositoryTest {
                     topSafeAreaDp = 58,
                     bottomSafeAreaDp = 60,
                     visualNovelMergeCrossScreenSasayakiCues = false,
-                    showStatisticsTab = true,
                     volumeKeysTurnPages = false,
                     volumeKeysNavigatePopupTerms = false,
                     lockCurrentOrientation = false,
@@ -510,7 +525,6 @@ class ReaderSettingsRepositoryTest {
             assertEquals(46, japanese.topSafeAreaDp)
             assertEquals(44, japanese.bottomSafeAreaDp)
             assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)
-            assertTrue(japanese.showStatisticsTab)
             assertFalse(japanese.volumeKeysTurnPages)
             assertFalse(japanese.volumeKeysNavigatePopupTerms)
             assertFalse(japanese.lockCurrentOrientation)

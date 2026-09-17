@@ -24,20 +24,15 @@ class ReaderAppearanceSasayakiTest {
     }
 
     @Test
-    fun appearanceShowsStatisticsRowsWhenStatisticsAreEnabled() {
+    fun appearanceKeepsStatisticsDisplayPreferencesAvailable() {
         assertEquals(
             listOf(
                 ReaderAppearanceStatisticsRow.Toggle,
                 ReaderAppearanceStatisticsRow.ReadingSpeed,
                 ReaderAppearanceStatisticsRow.ReadingTime,
             ),
-            readerAppearanceStatisticsRows(ReaderSettings(enableStatistics = true)),
+            readerAppearanceStatisticsRows(),
         )
-    }
-
-    @Test
-    fun appearanceHidesStatisticsRowsWhenStatisticsAreDisabled() {
-        assertTrue(readerAppearanceStatisticsRows(ReaderSettings(enableStatistics = false)).isEmpty())
     }
 
     @Test

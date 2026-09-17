@@ -701,6 +701,23 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun failedArchiveKeepsBookAndShowsLocalizedDeletionError() {
+        val entry = bookEntry("book-a")
+        val repository = FakeBookshelfRepository(entries = listOf(entry), localDeleteError = java.io.IOException("disk full"))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        viewModel.deleteBook(entry)
+        assertEquals(listOf(entry), viewModel.uiState.value.bookEntries)
+        assertEquals(UiText.Resource(R.string.bookshelf_delete_failed), viewModel.uiState.value.errorMessage)
+        viewModel.startSelecting()
+        viewModel.toggleSelectedBook(entry)
+        viewModel.deleteSelectedBooks()
+        assertEquals(setOf("book-a"), viewModel.uiState.value.selectedBookIds)
+        assertEquals(UiText.Resource(R.string.bookshelf_delete_failed), viewModel.uiState.value.errorMessage)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
     fun selectionModeTogglesBooksAndBatchMovesSelectionToShelf() {
         val first = bookEntry("book-a")
         val second = bookEntry("book-b")
@@ -1194,6 +1211,7 @@ class BookshelfViewModelTest {
         var remoteLoadError: Throwable? = null,
         val remoteImportError: Throwable? = null,
         val remoteDeleteError: Throwable? = null,
+        val localDeleteError: Throwable? = null,
         val remoteImportGate: CompletableDeferred<Unit>? = null,
         val remoteDeleteGate: CompletableDeferred<Unit>? = null,
         val remoteImportProgress: List<Double> = emptyList(),
@@ -1287,6 +1305,7 @@ class BookshelfViewModelTest {
         }
 
         override suspend fun deleteBook(entry: BookEntry) {
+            localDeleteError?.let { throw it }
             deletedEntries += entry
         }
 
@@ -1297,6 +1316,7 @@ class BookshelfViewModelTest {
         }
 
         override suspend fun deleteBooks(entries: Collection<BookEntry>) {
+            localDeleteError?.let { throw it }
             deletedEntries += entries
         }
 

@@ -43,8 +43,6 @@ class ReaderSettingsTest {
         assertEquals(0xFF999999L, settings.customInfoColor)
         assertFalse(settings.continuousMode)
         assertFalse(settings.blurImages)
-        assertFalse(settings.enableStatistics)
-        assertTrue(settings.showStatisticsTab)
         assertFalse(settings.statisticsAutostartOnBookOpen)
         assertFalse(settings.statisticsAutostartOnPageTurn)
         assertFalse(settings.showStatisticsToggle)
@@ -92,53 +90,6 @@ class ReaderSettingsTest {
             assertEquals(expected.first, migrated.onBookOpen)
             assertEquals(expected.second, migrated.onPageTurn)
         }
-    }
-
-    @Test
-    fun enablingStatisticsTurnsOnReaderDisplayStatisticsControls() {
-        val settings = ReaderSettings(
-            enableStatistics = false,
-            showStatisticsToggle = false,
-            showReadingSpeed = false,
-            showReadingTime = false,
-        )
-
-        val enabled = settings.withStatisticsEnabled(true)
-
-        assertTrue(enabled.enableStatistics)
-        assertTrue(enabled.showStatisticsToggle)
-        assertTrue(enabled.showReadingSpeed)
-        assertTrue(enabled.showReadingTime)
-    }
-
-    @Test
-    fun statisticsDisplayControlsRemainUserControlledAfterAlreadyEnabled() {
-        val settings = ReaderSettings(
-            enableStatistics = true,
-            showStatisticsToggle = false,
-            showReadingSpeed = false,
-            showReadingTime = false,
-        )
-
-        val enabled = settings.withStatisticsEnabled(true)
-
-        assertTrue(enabled.enableStatistics)
-        assertFalse(enabled.showStatisticsToggle)
-        assertFalse(enabled.showReadingSpeed)
-        assertFalse(enabled.showReadingTime)
-    }
-
-    @Test
-    fun statisticsTabVisibilityRemainsUserControlledWhenEnablingStatistics() {
-        val settings = ReaderSettings(
-            enableStatistics = false,
-            showStatisticsTab = false,
-        )
-
-        val enabled = settings.withStatisticsEnabled(true)
-
-        assertTrue(enabled.enableStatistics)
-        assertFalse(enabled.showStatisticsTab)
     }
 
     @Test

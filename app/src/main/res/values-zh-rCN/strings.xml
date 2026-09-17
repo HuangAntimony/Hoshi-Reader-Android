@@ -371,7 +371,6 @@
     <string name="reader_statistics_words_read">已读单词：</string>
     <string name="reader_statistics_reading_speed">阅读速度：</string>
     <string name="reader_statistics_reading_time">阅读时间：</string>
-    <string name="reader_statistics_show_tab">显示统计标签页</string>
     <string name="reader_statistics_autostart_on_book_open">打开书籍时自动开始</string>
     <string name="reader_statistics_autostart_on_page_turn">翻页时自动开始</string>
     <string name="reader_statistics_reset_time">重置时间</string>
@@ -557,8 +556,6 @@
     <string name="backup_exporting">正在导出...</string>
     <string name="backup_importing" comment="ッツ backup import progress label, intentionally matching the generic importing progress text.">正在导入...</string>
     <string name="advanced_audio">音频</string>
-    <string name="advanced_statistics" comment="Advanced settings row label, intentionally matching reader statistics label.">统计</string>
-    <string name="advanced_statistics_subtitle">跟踪每本书的阅读时间、速度和已读字符数</string>
     <string name="advanced_sasayaki_audiobooks">有声书</string>
     <string name="advanced_sasayaki_subtitle">配合已匹配的有声书字幕阅读</string>
     <string name="audio_sources">来源</string>
@@ -783,4 +780,36 @@
     <string name="book_cover_scale_fill_summary">保持原始比例填满屏幕，并裁切超出的部分。</string>
     <string name="book_cover_scale_stretch">拉伸</string>
     <string name="book_cover_scale_stretch_summary">不保持封面原始比例，直接填满屏幕。</string>
+    <string name="statistics_clear_archive">清空归档</string>
+    <string name="statistics_clear_archive_confirmation">删除 %1$d 本归档书籍的统计？书架中现有书籍的统计会保留。</string>
+    <plurals name="statistics_archived_book_count">
+        <item quantity="one">%1$d 本归档书籍</item>
+        <item quantity="other">%1$d 本归档书籍</item>
+    </plurals>
+    <string name="statistics_operation_failed">无法更新或加载统计，请重试。</string>
+    <string name="statistics_book_unavailable">这本书的统计已不存在。</string>
+    <string name="statistics_archived_book">已归档</string>
+    <string name="statistics_delete_all">删除全部统计</string>
+    <string name="statistics_delete_all_confirmation">删除这本书的全部本地统计？与云端统计合并时，已删除的记录可能恢复。</string>
+    <string name="statistics_edit_hours">小时</string>
+    <string name="statistics_edit_minutes">分钟</string>
+    <string name="statistics_range_all">全部</string>
+    <string name="statistics_monthly_average_duration">月均阅读时长</string>
+    <string name="statistics_average_change_week_format">较上周 %1$s%%</string>
+    <string name="statistics_average_change_month_format">较上月 %1$s%%</string>
+    <string name="statistics_average_change_year_format">较上年 %1$s%%</string>
+    <string name="statistics_current_streak">当前连续达标</string>
+    <string name="statistics_longest_streak">最长连续达标</string>
+    <string name="statistics_best_day">最佳单日</string>
+    <string name="statistics_date_interval_format">%1$s至%2$s</string>
+    <string name="bookshelf_delete_failed">无法删除书籍或保存统计归档，书籍已保留。</string>
+    <plurals name="statistics_history_reading_days">
+        <item quantity="one">共阅读 %1$d 天</item>
+        <item quantity="other">共阅读 %1$d 天</item>
+    </plurals>
+    <string name="statistics_goal_clock_format">%1$d:%2$02d</string>
+    <string name="statistics_goal_characters_link_format">/ %1$s 字目标</string>
+    <string name="statistics_goal_minutes_link_format">/ %1$d 分钟目标</string>
+    <string name="statistics_history_short_date_pattern">M月d日</string>
+    <string name="statistics_history_since_format">始于 %1$s</string>
 </resources>

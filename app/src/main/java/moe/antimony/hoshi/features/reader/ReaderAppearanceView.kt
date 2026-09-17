@@ -741,7 +741,7 @@ private fun ReaderAppearanceContent(
                         checked = settings.showReaderBackButton,
                         onCheckedChange = { onSettingsChange(settings.copy(showReaderBackButton = it)) },
                     )
-                    readerAppearanceStatisticsRows(settings).forEach { row ->
+                    readerAppearanceStatisticsRows().forEach { row ->
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(row.labelRes),
@@ -1011,12 +1011,8 @@ internal fun readerAppearancePageSwipeThresholdFromSlider(value: Float): Int =
         .toInt()
         .coerceReaderPageSwipeThresholdPx()
 
-internal fun readerAppearanceStatisticsRows(settings: ReaderSettings): List<ReaderAppearanceStatisticsRow> =
-    if (settings.enableStatistics) {
-        ReaderAppearanceStatisticsRow.entries
-    } else {
-        emptyList()
-    }
+internal fun readerAppearanceStatisticsRows(): List<ReaderAppearanceStatisticsRow> =
+    ReaderAppearanceStatisticsRow.entries
 
 internal enum class ReaderAppearanceStatisticsRow(@get:StringRes val labelRes: Int) {
     Toggle(R.string.reader_appearance_show_statistics_toggle),

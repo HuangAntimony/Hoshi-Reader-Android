@@ -73,7 +73,7 @@ internal class ReaderRouteStateHolder(
             )
             repository.saveBookmark(state.bookRoot, bookmark)
             if (statistics != null) {
-                repository.saveStatistics(state.bookRoot, statistics)
+                repository.saveTrackedStatistics(state.bookRoot, statistics)
             }
         }
         onBookmarkSaved()

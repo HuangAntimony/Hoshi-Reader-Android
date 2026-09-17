@@ -373,7 +373,6 @@
     <string name="reader_statistics_words_read">Words Read:</string>
     <string name="reader_statistics_reading_speed">Reading Speed:</string>
     <string name="reader_statistics_reading_time">Reading Time:</string>
-    <string name="reader_statistics_show_tab">Show Statistics tab</string>
     <string name="reader_statistics_autostart_on_book_open">Start on Book Open</string>
     <string name="reader_statistics_autostart_on_page_turn">Start on Page Turn</string>
     <string name="reader_statistics_reset_time">Reset Time</string>
@@ -559,8 +558,6 @@
     <string name="backup_exporting">Exporting...</string>
     <string name="backup_importing" comment="ッツ backup import progress label, intentionally matching the generic importing progress text.">Importing...</string>
     <string name="advanced_audio">Audio</string>
-    <string name="advanced_statistics" comment="Advanced settings row label, intentionally matching reader statistics label.">Statistics</string>
-    <string name="advanced_statistics_subtitle">Track per-book reading time, speed, and characters read</string>
     <string name="advanced_sasayaki_audiobooks">Sasayaki (Audiobooks)</string>
     <string name="advanced_sasayaki_subtitle">Read along with matched audiobook subtitles</string>
     <string name="audio_sources">Sources</string>
@@ -785,4 +782,36 @@
     <string name="book_cover_scale_fill_summary">Fill the screen while preserving proportions, cropping overflow.</string>
     <string name="book_cover_scale_stretch">Stretch</string>
     <string name="book_cover_scale_stretch_summary">Fill the screen without preserving the cover’s proportions.</string>
+    <string name="statistics_clear_archive">Clear Archive</string>
+    <string name="statistics_clear_archive_confirmation">Delete statistics for %1$d archived books? Statistics for books in your library will be kept.</string>
+    <plurals name="statistics_archived_book_count">
+        <item quantity="one">%1$d archived book</item>
+        <item quantity="other">%1$d archived books</item>
+    </plurals>
+    <string name="statistics_operation_failed">Could not update or load statistics. Please try again.</string>
+    <string name="statistics_book_unavailable">Statistics for this book are no longer available.</string>
+    <string name="statistics_archived_book">Archived</string>
+    <string name="statistics_delete_all">Delete All Statistics</string>
+    <string name="statistics_delete_all_confirmation">Delete all local statistics for this book? Merging with synced statistics may restore deleted records.</string>
+    <string name="statistics_edit_hours">Hours</string>
+    <string name="statistics_edit_minutes">Minutes</string>
+    <string name="statistics_range_all">All</string>
+    <string name="statistics_monthly_average_duration">Average per month</string>
+    <string name="statistics_average_change_week_format">%1$s%% compared with the previous week</string>
+    <string name="statistics_average_change_month_format">%1$s%% compared with the previous month</string>
+    <string name="statistics_average_change_year_format">%1$s%% compared with the previous year</string>
+    <string name="statistics_current_streak">Current streak</string>
+    <string name="statistics_longest_streak">Longest streak</string>
+    <string name="statistics_best_day">Best day</string>
+    <string name="statistics_date_interval_format">%1$s – %2$s</string>
+    <string name="bookshelf_delete_failed">Could not delete the book or save its statistics archive. The book has been kept.</string>
+    <plurals name="statistics_history_reading_days">
+        <item quantity="one">of %1$d day read</item>
+        <item quantity="other">of %1$d days read</item>
+    </plurals>
+    <string name="statistics_goal_clock_format">%1$d:%2$02d</string>
+    <string name="statistics_goal_characters_link_format">/ %1$s character goal</string>
+    <string name="statistics_goal_minutes_link_format">/ %1$d minute goal</string>
+    <string name="statistics_history_short_date_pattern">MMM d</string>
+    <string name="statistics_history_since_format">since %1$s</string>
 </resources>

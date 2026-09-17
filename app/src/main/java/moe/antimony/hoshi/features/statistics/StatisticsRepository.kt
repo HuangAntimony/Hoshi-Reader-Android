@@ -4,19 +4,28 @@ import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.di.IoDispatcher
-import moe.antimony.hoshi.epub.BookEntry
-import moe.antimony.hoshi.epub.BookRepository
-import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.epub.BookStatisticsStore
 import moe.antimony.hoshi.epub.ReadingStatistics
-import moe.antimony.hoshi.epub.deduplicateReadingStatistics
 
 internal interface StatisticsRepository {
     suspend fun loadSnapshot(): StatisticsSnapshot
+    suspend fun loadBookStatistics(folder: String): StatisticsBookRecords?
+    suspend fun updateDay(folder: String, dateKey: String, characters: Int, totalMinutes: Int)
+    suspend fun deleteDay(folder: String, dateKey: String)
+    suspend fun deleteAll(folder: String)
+    suspend fun loadArchiveSummary(): Int
+    suspend fun clearArchive()
 }
+
+internal data class StatisticsBookRecords(
+    val folder: String,
+    val title: String,
+    val isArchived: Boolean,
+    val statistics: List<ReadingStatistics>,
+)
 
 internal data class StatisticsSnapshot(
     val days: List<StatisticsDayAggregate>,
@@ -26,72 +35,48 @@ internal data class StatisticsSnapshot(
 
 @Singleton
 internal class AndroidStatisticsRepository @Inject constructor(
-    private val bookRepository: BookRepository,
-    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val statisticsStore: BookStatisticsStore,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : StatisticsRepository {
-    private val json = Json {
-        ignoreUnknownKeys = true
-    }
-
     override suspend fun loadSnapshot(): StatisticsSnapshot = withContext(ioDispatcher) {
-        val skippedCorruptBookIds = linkedSetOf<String>()
+        val stored = statisticsStore.loadSnapshot()
         val contributionsByDate = linkedMapOf<LocalDate, MutableList<StatisticsBookContribution>>()
-        bookRepository.loadBookEntries(BookSortOption.Recent).forEach { entry ->
-            val statisticsFile = entry.root.resolve(StatisticsFileName)
-            if (!statisticsFile.isFile) {
-                return@forEach
-            }
-            val statistics = runCatching {
-                json.decodeFromString(
-                    ListSerializer(ReadingStatistics.serializer()),
-                    statisticsFile.readText(),
-                ).deduplicateReadingStatistics()
-            }.getOrElse {
-                skippedCorruptBookIds += entry.metadata.id
-                return@forEach
-            }
-            val coverPath = bookRepository.coverFile(entry)?.absolutePath
-            statistics.forEach { statistic ->
-                val date = statistic.dateKey.toLocalDateOrNull() ?: return@forEach
-                if (statistic.charactersRead <= 0 && statistic.readingTime <= 0.0) {
-                    return@forEach
-                }
+        stored.books.forEach { book ->
+            book.statistics.forEach statisticLoop@ { statistic ->
+                val date = runCatching { LocalDate.parse(statistic.dateKey) }.getOrNull() ?: return@statisticLoop
                 contributionsByDate.getOrPut(date) { mutableListOf() } += StatisticsBookContribution(
-                    bookId = entry.metadata.id,
-                    title = entry.statisticsTitle(statistic),
-                    coverPath = coverPath,
+                    bookId = book.metadata.id,
+                    title = book.metadata.displayTitle.ifBlank { statistic.title.ifBlank { book.folder } },
+                    coverPath = book.coverPath,
                     characters = statistic.charactersRead,
                     readingSeconds = statistic.readingTime,
+                    folder = book.folder,
+                    isArchived = book.isArchived,
                 )
             }
         }
-        val days = contributionsByDate
-            .toSortedMap()
-            .map { (date, contributions) ->
-                StatisticsDayAggregate(
-                    date = date,
-                    totalCharacters = contributions.sumOf { it.characters },
-                    readingSeconds = contributions.sumOf { it.readingSeconds },
-                    activeBookCount = contributions.count { it.characters > 0 || it.readingSeconds > 0.0 },
-                    bookContributions = contributions.sortedBy { it.title.lowercase() },
-                )
-            }
-        StatisticsSnapshot(
-            days = days,
-            availableYears = days.map { it.date.year }.distinct().sortedDescending(),
-            skippedCorruptBookIds = skippedCorruptBookIds,
-        )
+        val days = contributionsByDate.toSortedMap().map { (date, contributions) ->
+            StatisticsDayAggregate(
+                date = date,
+                totalCharacters = contributions.sumOf { it.characters },
+                readingSeconds = contributions.sumOf { it.readingSeconds },
+                activeBookCount = contributions.size,
+                bookContributions = contributions.sortedBy { it.title.lowercase() },
+            )
+        }
+        StatisticsSnapshot(days, days.map { it.date.year }.distinct().sortedDescending(), stored.corruptBookIds)
     }
 
-    private fun BookEntry.statisticsTitle(statistic: ReadingStatistics): String =
-        displayTitle.ifBlank {
-            statistic.title.ifBlank { root.name }
+    override suspend fun loadBookStatistics(folder: String): StatisticsBookRecords? =
+        statisticsStore.loadBook(folder)?.let { book ->
+            StatisticsBookRecords(book.folder, book.metadata.displayTitle.ifBlank { book.folder }, book.isArchived, book.statistics)
         }
+
+    override suspend fun updateDay(folder: String, dateKey: String, characters: Int, totalMinutes: Int) =
+        statisticsStore.updateDay(folder, dateKey, characters, totalMinutes)
+
+    override suspend fun deleteDay(folder: String, dateKey: String) = statisticsStore.deleteDay(folder, dateKey)
+    override suspend fun deleteAll(folder: String) = statisticsStore.deleteAll(folder)
+    override suspend fun loadArchiveSummary(): Int = statisticsStore.loadArchiveSummary()
+    override suspend fun clearArchive() = statisticsStore.clearArchive()
 }
-
-private fun String.toLocalDateOrNull(): LocalDate? =
-    takeIf { it.isNotBlank() }?.let { raw ->
-        runCatching { LocalDate.parse(raw) }.getOrNull()
-    }
-
-private const val StatisticsFileName = "statistics.json"

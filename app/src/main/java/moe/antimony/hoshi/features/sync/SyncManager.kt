@@ -188,10 +188,8 @@ class SyncManager private constructor(
 
         importProgress(entry, progress)
         if (syncStats) {
-            val localStats = bookRepository.loadStatistics(entry.root)
-            val merged = TtuSyncRules.mergeStatistics(localStats, remoteStats, statsSyncMode)
-            if (merged.isNotEmpty()) {
-                bookRepository.saveStatistics(entry.root, merged)
+            bookRepository.updateStatistics(entry.root) { localStats ->
+                TtuSyncRules.mergeStatistics(localStats, remoteStats, statsSyncMode).ifEmpty { localStats }
             }
         }
         if (remoteAudioBook != null) {

@@ -33,6 +33,42 @@ import java.util.zip.ZipOutputStream
 
 class HoshiBackupRepositoryTest {
     @Test
+    fun archivedStatisticsRoundTripThroughFullBooksBackup() = runBlocking {
+        val source = Files.createTempDirectory("hoshi-statistics-archive-backup").toFile()
+        val repository = BookRepository(source)
+        val root = repository.createBookDirectory("book")
+        repository.saveMetadata(root, BookMetadata("id", "Book", null, "book", 0.0, author = "Author"))
+        repository.saveStatistics(root, listOf(ReadingStatistics("Book", "2026-09-01", charactersRead = 25)))
+        repository.deleteBook(root)
+        val output = ByteArrayOutputStream()
+        HoshiBackupRepository(source).exportBooks(output)
+        val target = Files.createTempDirectory("hoshi-statistics-archive-restore").toFile()
+        HoshiBackupRepository(target).restoreBooks(ByteArrayInputStream(output.toByteArray()))
+        val restored = BookRepository(target)
+        assertTrue(restored.loadAllBooks().isEmpty())
+        assertEquals(25, restored.loadStatistics(target.resolve("Books/statistics_archive/book")).single().charactersRead)
+        assertEquals("Author", restored.loadMetadata(target.resolve("Books/statistics_archive/book"))?.author)
+    }
+
+    @Test
+    fun restoreBooksReconcilesLongArchivedFoldersAndCoverPaths() = runBlocking {
+        val files = Files.createTempDirectory("hoshi-long-archive").toFile()
+        val title = "長".repeat(100)
+        val archive = zipBytes(
+            "statistics_archive/$title/metadata.json" to """{"id":"archived","title":"$title","cover":"Books/statistics_archive/$title/cover.jpg","folder":"$title","lastAccess":0}""".toByteArray(),
+            "statistics_archive/$title/statistics.json" to """[{"title":"$title","dateKey":"2026-09-01","charactersRead":42}]""".toByteArray(),
+            "statistics_archive/$title/cover.jpg" to byteArrayOf(1, 2, 3),
+        )
+        HoshiBackupRepository(files).restoreBooks(ByteArrayInputStream(archive))
+        val root = files.resolve("Books/statistics_archive").listFiles()!!.single()
+        val metadata = BookRepository(files).loadMetadata(root)!!
+        assertTrue(root.name.toByteArray().size <= 250)
+        assertEquals(root.name, metadata.folder)
+        assertEquals("Books/statistics_archive/${root.name}/cover.jpg", metadata.cover)
+        assertEquals(title, metadata.title)
+    }
+
+    @Test
     fun exportBooksWritesIosCompatibleArchiveContentsWithoutTopLevelBooksDirectory() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-books-backup-export").toFile()
         val booksDir = filesDir.resolve("Books")
@@ -528,6 +564,28 @@ class HoshiBackupRepositoryTest {
         assertTrue(restored.root.resolve(restored.metadata.epub!!).isFile)
         assertEquals(5, targetRepository.loadBookmark(restored.root)?.characterCount)
         assertEquals(5, targetRepository.loadStatistics(restored.root).single().charactersRead)
+    }
+
+    @Test
+    fun ttuRestoreMergesArchiveAfterExternalStatisticsHaveBeenWritten() = runBlocking {
+        val sourceDir = Files.createTempDirectory("hoshi-ttu-archive-source").toFile()
+        val source = BookRepository(sourceDir)
+        val sourceBook = source.createPackedTestBook("Book")
+        source.saveStatistics(sourceBook.root, listOf(ReadingStatistics("Book", "2026-06-01", charactersRead = 20, lastStatisticModified = 10)))
+        val output = ByteArrayOutputStream()
+        HoshiBackupRepository(sourceDir).exportTtuBookData(output)
+        val targetDir = Files.createTempDirectory("hoshi-ttu-archive-target").toFile()
+        val target = BookRepository(targetDir)
+        val targetBook = target.createPackedTestBook("Book")
+        target.saveStatistics(targetBook.root, listOf(
+            ReadingStatistics("Book", "2026-06-01", charactersRead = 99, lastStatisticModified = 10),
+            ReadingStatistics("Book", "2026-06-02", charactersRead = 30, lastStatisticModified = 10),
+        ))
+        target.deleteBook(targetBook.root)
+        HoshiBackupRepository(targetDir).restoreTtuBookData(ByteArrayInputStream(output.toByteArray()))
+        val restored = target.loadBookEntries().single()
+        assertEquals(listOf(20, 30), target.loadStatistics(restored.root).map { it.charactersRead })
+        assertFalse(targetDir.resolve("Books/statistics_archive/Book").exists())
     }
 
     @Test

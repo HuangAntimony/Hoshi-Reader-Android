@@ -1,6 +1,10 @@
 package moe.antimony.hoshi.features.statistics
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +36,7 @@ import moe.antimony.hoshi.features.bookshelf.toBookCoverSource
 @Composable
 internal fun StatisticsDistributionList(
     rows: List<BookDistributionRow>,
+    onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (rows.isEmpty()) {
@@ -48,8 +53,8 @@ internal fun StatisticsDistributionList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         rows.forEach { row ->
-            key(row.bookId) {
-                DistributionRow(row = row)
+            key(row.folder) {
+                DistributionRow(row = row, modifier = Modifier.clickable { onOpenBook(row.folder) })
             }
         }
     }
@@ -74,6 +79,9 @@ private fun DistributionRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (row.isArchived) {
+                Icon(Icons.Rounded.Archive, contentDescription = null, modifier = Modifier.size(16.dp))
+            }
             Text(
                 text = row.title,
                 style = MaterialTheme.typography.bodyLarge,

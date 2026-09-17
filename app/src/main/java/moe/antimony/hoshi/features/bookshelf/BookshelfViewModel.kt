@@ -290,9 +290,12 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     fun deleteBook(entry: BookEntry) {
-        workScope.launch {
-            repository.deleteBook(entry)
-            reloadBookEntriesSync()
+        runLoading(errorPrefix = UiText.Resource(R.string.bookshelf_delete_failed), preferErrorPrefix = true) {
+            try {
+                repository.deleteBook(entry)
+            } finally {
+                reloadBookEntriesSync()
+            }
         }
     }
 
@@ -384,10 +387,13 @@ internal class BookshelfViewModel : ViewModel {
     fun deleteSelectedBooks() {
         val selectedEntries = _uiState.value.bookEntries.filter { it.metadata.id in _uiState.value.selectedBookIds }
         if (selectedEntries.isEmpty()) return
-        workScope.launch {
-            repository.deleteBooks(selectedEntries)
-            clearSelection()
-            reloadBookEntriesSync()
+        runLoading(errorPrefix = UiText.Resource(R.string.bookshelf_delete_failed), preferErrorPrefix = true) {
+            try {
+                repository.deleteBooks(selectedEntries)
+                clearSelection()
+            } finally {
+                reloadBookEntriesSync()
+            }
         }
     }
 

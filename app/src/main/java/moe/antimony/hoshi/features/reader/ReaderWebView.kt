@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -40,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -316,17 +320,20 @@ fun ReaderWebView(
     var persistedStatistics by remember(bookRoot) {
         mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
     }
-    LaunchedEffect(bookRoot, bookRepository, effectiveSettings.enableStatistics) {
-        persistedStatistics = if (bookRoot != null && effectiveSettings.enableStatistics) {
-            bookRepository.loadStatistics(bookRoot)
-        } else {
-            emptyList()
+    var statisticsLoadFailed by remember(bookRoot) { mutableStateOf(false) }
+    LaunchedEffect(bookRoot, bookRepository) {
+        try {
+            persistedStatistics = if (bookRoot != null) bookRepository.loadStatistics(bookRoot) else emptyList()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Leave the tracker unavailable so corrupt history cannot be overwritten.
+            statisticsLoadFailed = true
         }
     }
     val statisticsTracker = remember(
         bookRoot,
         book.title,
-        effectiveSettings.enableStatistics,
         effectiveSettings.statisticsResetMinutes,
         persistedStatistics,
     ) {
@@ -334,7 +341,6 @@ fun ReaderWebView(
             ReaderStatisticsTracker(
                 title = book.title,
                 initialStatistics = statistics,
-                enabled = effectiveSettings.enableStatistics,
                 resetMinutes = effectiveSettings.statisticsResetMinutes,
                 dateProvider = statisticsDateProvider,
             )
@@ -472,7 +478,7 @@ fun ReaderWebView(
         syncStatisticsState()
     }
     LaunchedEffect(statisticsTracker, effectiveSettings.statisticsAutostartOnBookOpen) {
-        if (effectiveSettings.enableStatistics && effectiveSettings.statisticsAutostartOnBookOpen) {
+        if (effectiveSettings.statisticsAutostartOnBookOpen) {
             statisticsTracker?.start(currentDisplayedCharacter())
             syncStatisticsState()
         }
@@ -1605,7 +1611,7 @@ fun ReaderWebView(
         state = chromeState,
         settings = effectiveSettings,
         showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
-        showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
+        showStatisticsToggle = effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
         topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
     )
@@ -1630,12 +1636,12 @@ fun ReaderWebView(
         effectiveSettings,
         progressDisplay = progressDisplay,
         showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
-        showStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
+        showStatisticsToggle = effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
     )
     val chromeVisibility = readerChromeVisibility(
         focusMode = focusMode,
-        hasStatisticsToggle = effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle,
+        hasStatisticsToggle = effectiveSettings.showStatisticsToggle,
         hasSasayakiToggle = onSasayakiTopToggle != null,
         hasBackJump = stateHolder.backTargetPosition != null,
         hasForwardJump = stateHolder.forwardTargetPosition != null,
@@ -1811,7 +1817,7 @@ fun ReaderWebView(
             settings = effectiveSettings,
             progressDisplay = progressDisplay,
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
-            onStatisticsToggle = if (effectiveSettings.enableStatistics && effectiveSettings.showStatisticsToggle) {
+            onStatisticsToggle = if (effectiveSettings.showStatisticsToggle) {
                 ::toggleStatisticsTracking
             } else {
                 null
@@ -1871,11 +1877,7 @@ fun ReaderWebView(
             onDismissMenu = stateHolder::dismissReaderMenu,
             onGoTo = stateHolder::openGoToFromMenu,
             onAppearance = stateHolder::openAppearanceFromMenu,
-            onStatistics = if (effectiveSettings.enableStatistics) {
-                stateHolder::openStatisticsFromMenu
-            } else {
-                null
-            },
+            onStatistics = stateHolder::openStatisticsFromMenu,
             onSasayaki = if (sasayakiSettings.enabled && bookRoot != null) {
                 {
                     stateHolder.openSasayakiFromMenu(
@@ -1968,6 +1970,15 @@ fun ReaderWebView(
                 },
                 onSettingsChange = ::updateSasayakiSettings,
                 onDismiss = stateHolder::dismissSasayaki,
+            )
+        }
+        if (statisticsLoadFailed) {
+            AlertDialog(
+                onDismissRequest = { statisticsLoadFailed = false },
+                text = { Text(stringResource(R.string.statistics_operation_failed)) },
+                confirmButton = {
+                    TextButton(onClick = { statisticsLoadFailed = false }) { Text(stringResource(R.string.action_ok)) }
+                },
             )
         }
         if (showStatistics && statisticsState != null) {

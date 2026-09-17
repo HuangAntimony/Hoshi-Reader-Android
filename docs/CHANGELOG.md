@@ -8,6 +8,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Preserve deleted books' reading statistics in an archive, restore them on
+  reimport, and edit daily records from book distribution rows. Single-day
+  deletion is available inside the day editor; deleting all records requires
+  confirmation.
+- Add natural calendar periods and all-time Statistics overview, elapsed-period
+  averages and comparisons, plus historical goal streaks and best-day summaries.
 - Support Anki tag handlebars such as `{document-title}` and `{expression}`,
   joining whitespace inside substituted values with underscores; new card
   formats default to the `hoshi` tag while saved tags stay unchanged.
@@ -43,8 +49,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
-- Split Reader statistics autostart into independent Book Open and Page Turn
-  options that can be enabled together.
+- Keep Statistics always available and move its settings to the Stats tab's
+  upper-right corner. Statistics sync defaults on only when unset; saved goals,
+  sync opt-outs and Reader display preferences are preserved. Book Open and
+  Page Turn autostart remain independent and default off.
 
 ### Fixed
 

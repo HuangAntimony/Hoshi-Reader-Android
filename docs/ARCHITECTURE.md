@@ -72,10 +72,34 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Android versions.
 - Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
   are persisted through book sidecar repositories and models.
-- The Statistics dashboard aggregates local book `statistics.json` sidecars
-  through a Hilt-backed repository and exposes dashboard state through a
-  Hilt-backed ViewModel. Reader tracking and the dashboard share an adjusted
-  local-date provider driven by the global minute-level statistics reset time.
+- Statistics is always available from its top-level tab. Its settings and
+  folder-keyed daily editor use that tab's Navigation3 back stack and
+  entry-scoped Hilt ViewModels. Reader display preferences remain in Appearance;
+  the Sync and Statistics settings screens share the global sync preference.
+- `BookStatisticsStore` is the shared Hilt singleton for reader statistics,
+  transactional sync imports, daily edits, archive/restore, and dashboard reads.
+  File operations run on the IO dispatcher behind one mutex and use atomic
+  replacement. Reader saves submit only changed days, merge by modification
+  timestamp, and respect in-process editor deletions so queued writes cannot
+  undo a later edit. No deletion markers are added to the sidecar/sync format.
+- Deleting a book first stores active dates and compatible metadata under
+  `Books/statistics_archive/<folder>/`, with an optional JPEG cover bounded to
+  240 px. Required archive failures preserve the source book. Import restores
+  after external sidecars are written; normalized folder identity joins active
+  and archived records by date without double counting. Equal timestamps keep
+  the first input: existing archive on deletion, current book on restore.
+  The archive directory is excluded from book discovery and TTU exports but is
+  included in Books `.hoshi` backups.
+- Statistics repositories combine local and archived sidecars for the dashboard
+  and all-date book editors. Pure calculations keep the heatmap display window
+  separate from natural day/week/month/year/all periods, zero-filled buckets,
+  elapsed-period averages, and all-history goal summaries. The daily goal card
+  combines a semicircular progress gauge with compact history metrics; target
+  editing stays in the dashboard. Range-mode selection and period navigation
+  stay with the interactive calendar, while the range card presents its results.
+  Calendar and weekly goals share the locale's first weekday. Reader tracking
+  and the dashboard share the adjusted local-date provider driven by the global minute-level
+  statistics reset time; saved historical date keys are not rewritten.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.

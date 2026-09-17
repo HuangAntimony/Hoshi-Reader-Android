@@ -37,6 +37,8 @@ import moe.antimony.hoshi.features.bookshelf.MainShellLayoutSpec
 @Composable
 internal fun StatisticsView(
     layoutSpec: MainShellLayoutSpec,
+    onOpenSettings: () -> Unit,
+    onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: StatisticsViewModel = hiltViewModel(),
 ) {
@@ -58,7 +60,7 @@ internal fun StatisticsView(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-        topBar = { StatisticsHeader() },
+        topBar = { StatisticsHeader(onOpenSettings = onOpenSettings) },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -88,7 +90,7 @@ internal fun StatisticsView(
                     TodayStatisticsSection(
                         today = uiState.today,
                         settings = uiState.settings.values,
-                        layoutSpec = layoutSpec,
+                        history = uiState.history,
                         targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Daily,
                         onToggleTargetSettings = {
                             viewModel.onEvent(
@@ -118,6 +120,8 @@ internal fun StatisticsView(
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
                     StatisticsCalendarSection(
                         calendar = uiState.calendar,
+                        canNavigatePrevious = uiState.currentRange.canNavigatePrevious,
+                        canNavigateNext = uiState.currentRange.canNavigateNext,
                         heatmapScrollState = heatmapScrollState,
                         heatmapAutoScrolledWindowKey = heatmapAutoScrolledWindowKey,
                         onHeatmapAutoScrolled = { key -> heatmapAutoScrolledWindowKey = key },
@@ -129,6 +133,7 @@ internal fun StatisticsView(
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
                     StatisticsRangeSection(
                         currentRange = uiState.currentRange,
+                        onOpenBook = onOpenBook,
                         calendar = uiState.calendar,
                         onEvent = viewModel::onEvent,
                     )

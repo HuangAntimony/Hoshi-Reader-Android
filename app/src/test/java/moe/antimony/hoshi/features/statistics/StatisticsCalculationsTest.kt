@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.statistics
 
 import java.time.LocalDate
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,16 +25,16 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun weekRangeStartsMondayAndClipsToWindow() {
-        val window = StatisticsDateRange(LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"))
+    fun weekRangeUsesLocaleAndKeepsFullNaturalPeriod() {
         val range = selectedStatisticsRange(
             mode = StatisticsRangeMode.Week,
             anchor = LocalDate.parse("2026-06-30"),
-            window = window,
+            today = LocalDate.parse("2026-06-30"),
+            locale = Locale.UK,
         )
 
         assertEquals(LocalDate.parse("2026-06-29"), range.start)
-        assertEquals(LocalDate.parse("2026-06-30"), range.end)
+        assertEquals(LocalDate.parse("2026-07-05"), range.end)
     }
 
     @Test
@@ -98,6 +99,7 @@ class StatisticsCalculationsTest {
             ),
             today = today,
             settings = StatisticsTargetSettings(),
+            locale = Locale.UK,
         )
 
         assertEquals(2, week.elapsedDays)
@@ -275,6 +277,143 @@ class StatisticsCalculationsTest {
         )
 
         assertEquals(listOf("alpha-id", "beta-id"), rows.map { it.bookId })
+    }
+
+    @Test
+    fun distributionGroupsByFolderAndPreservesArchivedRows() {
+        val rows = distributionRows(
+            listOf(day("2026-06-30", contributions = listOf(
+                contribution("same-id", "First", 100, 60.0).copy(folder = "first", isArchived = true),
+                contribution("same-id", "Second", 200, 120.0).copy(folder = "second"),
+            ))),
+            StatisticsTargetSettings(),
+        )
+        assertEquals(listOf("second", "first"), rows.map { it.folder })
+        assertEquals(listOf(false, true), rows.map { it.isArchived })
+    }
+
+    @Test
+    fun naturalYearAndLeapMonthIgnoreHeatmapWindow() {
+        val today = LocalDate.parse("2026-06-30")
+        assertEquals(StatisticsDateRange(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-12-31")),
+            selectedStatisticsRange(StatisticsRangeMode.Year, today, today))
+        val leap = selectedStatisticsRange(StatisticsRangeMode.Month, LocalDate.parse("2024-02-20"), today)
+        assertEquals(29, leap.dayCount)
+        assertEquals(LocalDate.parse("2024-02-29"), leap.end)
+    }
+
+    @Test
+    fun sundayFirstWeekCrossesYearAndMatchesWeeklyGoals() {
+        val today = LocalDate.parse("2025-01-01")
+        val range = selectedStatisticsRange(StatisticsRangeMode.Week, today, today, locale = Locale.US)
+        val week = currentWeekSummary(listOf(day("2024-12-29", 5_000)), today,
+            StatisticsTargetSettings(weeklyTargetDays = 1), locale = Locale.US)
+        assertEquals(LocalDate.parse("2024-12-29"), range.start)
+        assertEquals(LocalDate.parse("2025-01-04"), range.end)
+        assertEquals(range, week.range)
+        assertEquals(4, week.elapsedDays)
+        assertEquals(1, week.weeklyStreakWeeks)
+    }
+
+    @Test
+    fun weeklyAndMonthlyAveragesIncludeElapsedEmptyDaysAndPreviousFullPeriod() {
+        val today = LocalDate.parse("2026-06-03")
+        val days = listOf(day("2026-06-01", seconds = 600.0), day("2026-05-25", seconds = 700.0))
+        val week = overviewRangeSummary(days, StatisticsTargetSettings(), StatisticsRangeMode.Week,
+            today, today, locale = Locale.UK)
+        assertEquals(200.0, week.averageReadingSecondsPerBucket, 0.0)
+        assertEquals(100.0, week.averageReadingTimeChangePercent!!, 0.0)
+        val month = overviewRangeSummary(days, StatisticsTargetSettings(), StatisticsRangeMode.Month,
+            today, today)
+        assertEquals(200.0, month.averageReadingSecondsPerBucket, 0.0)
+        val historical = overviewRangeSummary(days, StatisticsTargetSettings(), StatisticsRangeMode.Month,
+            LocalDate.parse("2026-05-25"), today)
+        assertEquals(700.0 / 31.0, historical.averageReadingSecondsPerBucket, 0.0)
+    }
+
+    @Test
+    fun yearlyAverageIncludesEmptyElapsedMonthsAndAllStartsWithEarliestActivity() {
+        val today = LocalDate.parse("2026-03-20")
+        val days = listOf(day("2024-12-31", seconds = 120.0), day("2026-01-01", seconds = 180.0),
+            day("2000-01-01"), day("2027-01-01", seconds = 900.0))
+        val year = overviewRangeSummary(days, StatisticsTargetSettings(), StatisticsRangeMode.Year, today, today)
+        assertEquals(60.0, year.averageReadingSecondsPerBucket, 0.0)
+        assertEquals(null, year.averageReadingTimeChangePercent)
+        val allRange = selectedStatisticsRange(StatisticsRangeMode.All, today, today,
+            firstActivity = LocalDate.parse("2024-12-31"))
+        val all = overviewRangeSummary(days, StatisticsTargetSettings(), StatisticsRangeMode.All, today, today)
+        assertEquals(300.0 / 16.0, all.averageReadingSecondsPerBucket, 0.0)
+        assertEquals(null, all.averageReadingTimeChangePercent)
+        val points = trendPoints(StatisticsRangeMode.All, allRange, days)
+        assertEquals(16, points.size)
+        assertEquals("2024-12", points.first().label)
+        assertEquals("2026-03", points.last().label)
+        assertEquals(0, points[1].characters)
+        assertEquals(0.0, points[1].readingSeconds, 0.0)
+    }
+
+    @Test
+    fun dayHidesAverageComparisonAndEmptyYearKeepsTwelveZeroBuckets() {
+        val today = LocalDate.parse("2026-03-20")
+        val summary = overviewRangeSummary(listOf(day("2026-03-19", seconds = 60.0)),
+            StatisticsTargetSettings(), StatisticsRangeMode.Day, today, today)
+        assertEquals(null, summary.averageReadingTimeChangePercent)
+        val year = selectedStatisticsRange(StatisticsRangeMode.Year, today, today)
+        val points = trendPoints(StatisticsRangeMode.Year, year, emptyList())
+        assertEquals(12, points.size)
+        assertTrue(points.all { it.characters == 0 && it.readingSeconds == 0.0 })
+    }
+
+    @Test
+    fun historyUsesSparseAllTimeActivityAndEarliestTiesForBothMetrics() {
+        val today = LocalDate.parse("2026-06-30")
+        val days = listOf(day("2026-06-29", 5_000, 1_800.0), day("2020-01-02", 6_000, 2_400.0),
+            day("2020-01-01", 6_000, 2_400.0), day("2026-06-28", 5_000, 1_800.0),
+            day("2026-06-30", 10, 0.0), day("2010-01-01"), day("2027-01-01", 10_000, 9_000.0))
+        for (metric in DailyTargetType.entries) {
+            val history = statisticsHistorySummary(days, today, StatisticsTargetSettings(dailyTargetType = metric))
+            assertEquals(2, history.currentStreak.count)
+            assertEquals(LocalDate.parse("2026-06-28"), history.currentStreak.range?.start)
+            assertEquals(2, history.longestStreak.count)
+            assertEquals(LocalDate.parse("2020-01-01"), history.longestStreak.range?.start)
+            assertEquals(4, history.metDays)
+            assertEquals(5, history.readingDays)
+            assertEquals(LocalDate.parse("2020-01-01"), history.bestDay?.date)
+        }
+    }
+
+    @Test
+    fun historyChangesBestDayWithTargetMetricAndExpiresStreakAfterGap() {
+        val days = listOf(day("2026-06-27", 9_000, 60.0), day("2026-06-28", 500, 3_600.0))
+        val today = LocalDate.parse("2026-06-30")
+        val characters = statisticsHistorySummary(days, today, StatisticsTargetSettings())
+        val duration = statisticsHistorySummary(days, today, StatisticsTargetSettings(dailyTargetType = DailyTargetType.Duration))
+        assertEquals(LocalDate.parse("2026-06-27"), characters.bestDay?.date)
+        assertEquals(LocalDate.parse("2026-06-28"), duration.bestDay?.date)
+        assertEquals(0, duration.currentStreak.count)
+        assertEquals(1, duration.metDays)
+        assertEquals(null, statisticsHistorySummary(emptyList(), today, StatisticsTargetSettings()).bestDay)
+    }
+
+    @Test
+    fun yearlyComparisonUsesPreviousTwelveMonthAverage() {
+        val today = LocalDate.parse("2026-03-20")
+        val summary = overviewRangeSummary(
+            listOf(day("2025-04-01", seconds = 1_200.0), day("2026-02-01", seconds = 150.0)),
+            StatisticsTargetSettings(), StatisticsRangeMode.Year, today, today,
+        )
+        assertEquals(50.0, summary.averageReadingSecondsPerBucket, 0.0)
+        assertEquals(-50.0, summary.averageReadingTimeChangePercent!!, 0.0)
+    }
+
+    @Test
+    fun navigatingWeekUsesStartSoCurrentPartialWeekRemainsReachable() {
+        assertEquals(LocalDate.parse("2026-06-28"), shiftedStatisticsAnchor(
+            StatisticsRangeMode.Week, LocalDate.parse("2026-06-27"), 1, Locale.US,
+        ))
+        assertEquals(LocalDate.parse("2026-06-29"), shiftedStatisticsAnchor(
+            StatisticsRangeMode.Week, LocalDate.parse("2026-06-28"), 1, Locale.UK,
+        ))
     }
 
     private fun day(

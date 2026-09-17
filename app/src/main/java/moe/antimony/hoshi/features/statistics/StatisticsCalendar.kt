@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +56,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import kotlinx.coroutines.flow.first
@@ -62,6 +66,8 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 @Composable
 internal fun StatisticsCalendarSection(
     calendar: StatisticsCalendarUi,
+    canNavigatePrevious: Boolean,
+    canNavigateNext: Boolean,
     heatmapScrollState: ScrollState,
     heatmapAutoScrolledWindowKey: String?,
     onHeatmapAutoScrolled: (String) -> Unit,
@@ -82,8 +88,7 @@ internal fun StatisticsCalendarSection(
     ) {
         RangeModeSegmentedButtons(
             selected = calendar.rangeMode,
-            onSelect = { mode -> onEvent(StatisticsEvent.SelectRangeMode(mode)) },
-            modifier = Modifier.fillMaxWidth(),
+            onSelect = { onEvent(StatisticsEvent.SelectRangeMode(it)) },
         )
         Spacer(Modifier.height(16.dp))
         CalendarHeatmap(
@@ -94,38 +99,58 @@ internal fun StatisticsCalendarSection(
             onDateClick = { date -> onEvent(StatisticsEvent.SelectCalendarDate(date)) },
         )
         Spacer(Modifier.height(12.dp))
-        val selectedRangeSummaryColors = statisticsSelectedRangeSummaryColors(
+        val summaryColors = statisticsSelectedRangeSummaryColors(
             colorScheme = MaterialTheme.colorScheme,
             eInkMode = LocalHoshiEInkMode.current,
         )
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            color = selectedRangeSummaryColors.container,
-            border = BorderStroke(1.dp, selectedRangeSummaryColors.border),
+            color = summaryColors.container,
+            border = BorderStroke(1.dp, summaryColors.border),
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = stringResource(R.string.statistics_selected_range_format, rangeTitle(calendar)),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = selectedRangeSummaryColors.content,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = formatStatisticsDays(calendar.selectedRange.dayCount),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = selectedRangeSummaryColors.content,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                if (canNavigatePrevious) {
+                    IconButton(onClick = { onEvent(StatisticsEvent.NavigatePeriod(-1)) }) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                            contentDescription = null,
+                            tint = summaryColors.content,
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = rangeTitle(calendar),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = summaryColors.content,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = formatStatisticsDays(calendar.selectedRange.dayCount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = summaryColors.content,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (canNavigatePrevious) {
+                    IconButton(
+                        onClick = { onEvent(StatisticsEvent.NavigatePeriod(1)) },
+                        enabled = canNavigateNext,
+                    ) {
+                        if (canNavigateNext) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = summaryColors.content,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -208,7 +233,7 @@ private fun CalendarWindowDropdown(
 }
 
 @Composable
-private fun RangeModeSegmentedButtons(
+internal fun RangeModeSegmentedButtons(
     selected: StatisticsRangeMode,
     onSelect: (StatisticsRangeMode) -> Unit,
     modifier: Modifier = Modifier,
@@ -236,8 +261,8 @@ private fun CalendarHeatmap(
     onDateClick: (LocalDate) -> Unit,
 ) {
     val dayByDate = remember(calendar.days) { calendar.days.associateBy { it.date } }
-    val gridStart = mondayStartOfWeek(calendar.windowRange.start)
-    val weekStarts = remember(calendar.windowRange) {
+    val gridStart = statisticsStartOfWeek(calendar.windowRange.start)
+    val weekStarts = remember(calendar.windowRange, gridStart) {
         generateSequence(gridStart) { it.plusWeeks(1) }
             .takeWhile { weekStart -> !weekStart.isAfter(calendar.windowRange.end) }
             .toList()
@@ -429,35 +454,27 @@ internal fun rangeTitle(calendar: StatisticsCalendarUi): String =
     rangeTitle(
         mode = calendar.rangeMode,
         range = calendar.selectedRange,
-        windowSelection = calendar.windowSelection,
     )
 
 @Composable
 internal fun rangeTitle(
     mode: StatisticsRangeMode,
     range: StatisticsDateRange,
-    windowSelection: StatisticsCalendarWindowSelection,
 ): String =
     when (mode) {
-        StatisticsRangeMode.Year -> calendarWindowTitle(windowSelection)
+        StatisticsRangeMode.Year -> stringResource(R.string.statistics_range_fixed_year_format, range.start.year)
+        StatisticsRangeMode.All -> stringResource(R.string.statistics_range_all)
         StatisticsRangeMode.Month -> stringResource(
             R.string.statistics_range_month_title_format,
             range.start.year,
             range.start.monthValue,
         )
         StatisticsRangeMode.Week -> stringResource(
-            R.string.statistics_range_week_title_format,
-            range.start.monthValue,
-            range.start.dayOfMonth,
-            range.end.monthValue,
-            range.end.dayOfMonth,
+            R.string.statistics_date_interval_format,
+            formatStatisticsDate(range.start),
+            formatStatisticsDate(range.end),
         )
-        StatisticsRangeMode.Day -> stringResource(
-            R.string.statistics_range_day_title_format,
-            range.start.monthValue,
-            range.start.dayOfMonth,
-            statisticsWeekdayTitle(range.start.dayOfWeek.value),
-        )
+        StatisticsRangeMode.Day -> formatStatisticsDate(range.start)
     }
 
 @Composable
@@ -477,6 +494,7 @@ internal fun rangeModeLabel(mode: StatisticsRangeMode): String =
         StatisticsRangeMode.Month -> stringResource(R.string.statistics_range_month)
         StatisticsRangeMode.Week -> stringResource(R.string.statistics_range_week)
         StatisticsRangeMode.Day -> stringResource(R.string.statistics_range_day)
+        StatisticsRangeMode.All -> stringResource(R.string.statistics_range_all)
     }
 
 internal fun monthLabelForWeek(
@@ -590,7 +608,7 @@ internal fun shouldDrawHeatmapRangeOutline(
     rangeMode: StatisticsRangeMode,
     selectedCellCount: Int,
 ): Boolean =
-    selectedCellCount > 0 && rangeMode != StatisticsRangeMode.Year && rangeMode != StatisticsRangeMode.Day
+    selectedCellCount > 0 && (rangeMode == StatisticsRangeMode.Week || rangeMode == StatisticsRangeMode.Month)
 
 internal data class HeatmapCell(
     val weekIndex: Int,

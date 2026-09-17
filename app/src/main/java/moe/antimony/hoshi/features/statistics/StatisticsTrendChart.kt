@@ -40,7 +40,7 @@ internal fun StatisticsTrendChart(
     points: List<StatisticsTrendPoint>,
     modifier: Modifier = Modifier,
 ) {
-    if (points.size < 2) {
+    if (points.isEmpty()) {
         Text(
             text = stringResource(R.string.statistics_no_trend_data),
             style = MaterialTheme.typography.bodyMedium,
@@ -71,7 +71,7 @@ internal fun StatisticsTrendChart(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = if (mode == StatisticsRangeMode.Year) {
+                text = if (mode == StatisticsRangeMode.Year || mode == StatisticsRangeMode.All) {
                     stringResource(R.string.statistics_monthly_trend)
                 } else {
                     stringResource(R.string.statistics_daily_trend)
@@ -160,7 +160,7 @@ private fun DrawScope.drawTrendChart(
     labelColor: Color,
     axisLabels: TrendAxisLabels,
 ) {
-    if (points.size < 2) return
+    if (points.isEmpty()) return
     val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = labelColor.toArgb()
         textSize = 10.dp.toPx()
@@ -205,7 +205,7 @@ private fun DrawScope.drawTrendChart(
     val lineStroke = 2.25.dp.toPx()
     val pointRadius = 2.6.dp.toPx()
 
-    fun xFor(index: Int): Float = plotLeft + (index.toFloat() / points.lastIndex.toFloat()) * plotWidth
+    fun xFor(index: Int): Float = plotLeft + (if (points.size == 1) 0.5f else index.toFloat() / points.lastIndex.toFloat()) * plotWidth
     fun yFor(value: Double, maxValue: Double): Float =
         plotBottom - (value / maxValue).coerceIn(0.0, 1.0).toFloat() * plotHeight
 
@@ -296,11 +296,13 @@ private fun DrawScope.drawTrendPath(
 
 private fun trendLabelIndexes(count: Int, mode: StatisticsRangeMode): List<Int> {
     if (count <= 0) return emptyList()
-    if (mode == StatisticsRangeMode.Week || count <= 8) {
+    if (mode == StatisticsRangeMode.Week || (count <= 8 && mode != StatisticsRangeMode.All)) {
         return List(count) { it }
     }
-    if (mode == StatisticsRangeMode.Year) {
-        return List(count) { it }
+    if (mode == StatisticsRangeMode.Year) return List(count) { it }
+    if (mode == StatisticsRangeMode.All) {
+        val step = kotlin.math.ceil((count - 1) / 3.0).toInt().coerceAtLeast(1)
+        return ((0 until count step step) + (count - 1)).distinct()
     }
     val indexes = linkedSetOf(0, count - 1)
     var index = 6

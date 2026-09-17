@@ -1,18 +1,30 @@
 package moe.antimony.hoshi.features.statistics
 
 import java.time.LocalDate
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StatisticsCalendarTest {
     @Test
+    fun sundayFirstCrossYearGridHitReturnsCorrectDate() {
+        val window = StatisticsDateRange(LocalDate.parse("2025-01-01"), LocalDate.parse("2025-01-31"))
+        val start = statisticsStartOfWeek(window.start, Locale.US)
+        assertEquals(LocalDate.parse("2024-12-29"), start)
+        assertEquals(LocalDate.parse("2025-01-01"), heatmapDateForPosition(
+            offsetX = 5f, offsetY = 3 * 14f + 5f,
+            weekStarts = listOf(start), window = window, cellSizePx = 10f, spacingPx = 4f,
+        ))
+    }
+
+    @Test
     fun monthLabelsAppearOnlyOnWeeksContainingFirstDayOfMonth() {
         val window = StatisticsDateRange(
             start = LocalDate.parse("2026-01-01"),
             end = LocalDate.parse("2026-03-31"),
         )
-        val weekStarts = generateSequence(mondayStartOfWeek(window.start)) { it.plusWeeks(1) }
+        val weekStarts = generateSequence(statisticsStartOfWeek(window.start, Locale.UK)) { it.plusWeeks(1) }
             .takeWhile { weekStart -> !weekStart.isAfter(window.end) }
             .toList()
 
@@ -73,6 +85,7 @@ class StatisticsCalendarTest {
         assertEquals(true, shouldDrawHeatmapRangeOutline(StatisticsRangeMode.Month, selectedCellCount = 1))
         assertEquals(false, shouldDrawHeatmapRangeOutline(StatisticsRangeMode.Day, selectedCellCount = 1))
         assertEquals(false, shouldDrawHeatmapRangeOutline(StatisticsRangeMode.Year, selectedCellCount = 10))
+        assertEquals(false, shouldDrawHeatmapRangeOutline(StatisticsRangeMode.All, selectedCellCount = 10))
         assertEquals(false, shouldDrawHeatmapRangeOutline(StatisticsRangeMode.Week, selectedCellCount = 0))
     }
 

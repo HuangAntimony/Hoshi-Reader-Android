@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -16,6 +18,7 @@ internal fun StatisticsRangeSection(
     currentRange: CurrentRangeStatisticsUi,
     calendar: StatisticsCalendarUi,
     onEvent: (StatisticsEvent) -> Unit,
+    onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     StatisticsSection(
@@ -38,6 +41,7 @@ internal fun StatisticsRangeSection(
             )
             CurrentRangeTab.Distribution -> StatisticsDistributionList(
                 rows = currentRange.distributionRows,
+                onOpenBook = onOpenBook,
             )
         }
     }
@@ -80,6 +84,38 @@ private fun CurrentRangeOverview(
         )
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (range.mode != StatisticsRangeMode.Day) {
+            Text(
+                text = formatStatisticsDuration(summary.averageReadingSecondsPerBucket),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                text = stringResource(
+                    if (range.mode == StatisticsRangeMode.Year || range.mode == StatisticsRangeMode.All) {
+                        R.string.statistics_monthly_average_duration
+                    } else {
+                        R.string.statistics_daily_average_duration
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            summary.averageReadingTimeChangePercent?.let { change ->
+                Text(
+                    text = stringResource(
+                        when (range.mode) {
+                            StatisticsRangeMode.Week -> R.string.statistics_average_change_week_format
+                            StatisticsRangeMode.Month -> R.string.statistics_average_change_month_format
+                            else -> R.string.statistics_average_change_year_format
+                        },
+                        java.text.NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }
+                            .format(change).let { if (change > 0) "+$it" else it },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         MetricGrid(
             metrics = listOf(
                 StatisticMetric(

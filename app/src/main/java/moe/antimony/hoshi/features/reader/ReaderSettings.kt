@@ -94,12 +94,10 @@ data class ReaderSettings(
     val visualNovelPreserveDialogueBubbles: Boolean = false,
     val visualNovelClickAdvance: Boolean = false,
     val visualNovelMergeCrossScreenSasayakiCues: Boolean = false,
-    val enableStatistics: Boolean = false,
-    val showStatisticsTab: Boolean = true,
     val statisticsAutostartOnBookOpen: Boolean = false,
     val statisticsAutostartOnPageTurn: Boolean = false,
     val statisticsResetMinutes: Int = 0,
-    val statisticsSyncEnabled: Boolean = false,
+    val statisticsSyncEnabled: Boolean = true,
     val statisticsSyncMode: StatisticsSyncMode = StatisticsSyncMode.Merge,
     val showStatisticsToggle: Boolean = false,
     val showReadingSpeed: Boolean = false,
@@ -232,18 +230,6 @@ data class ReaderSettings(
             ReaderTheme.Sepia -> if (sepiaInvertInDark && systemDark) "#F2E2C9" else "#332A1B"
             ReaderTheme.Custom -> customTextColor.toReaderCssColor(includeAlpha = true)
         }
-    }
-
-    fun withStatisticsEnabled(enabled: Boolean): ReaderSettings {
-        if (enabled && !enableStatistics) {
-            return copy(
-                enableStatistics = true,
-                showStatisticsToggle = true,
-                showReadingSpeed = true,
-                showReadingTime = true,
-            )
-        }
-        return copy(enableStatistics = enabled)
     }
 }
 
@@ -408,8 +394,6 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             "visualNovelMergeCrossScreenSasayakiCues",
             false,
         ),
-        enableStatistics = preferences.getBoolean("enableStatistics", false),
-        showStatisticsTab = preferences.getBoolean("showStatisticsTab", true),
         statisticsAutostartOnBookOpen = if (preferences.contains("statisticsAutostartOnBookOpen")) {
             preferences.getBoolean("statisticsAutostartOnBookOpen", false)
         } else {
@@ -420,7 +404,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         } else {
             legacyStatisticsAutostart.onPageTurn
         },
-        statisticsSyncEnabled = preferences.getBoolean("statisticsEnableSync", false),
+        statisticsSyncEnabled = preferences.getBoolean("statisticsEnableSync", true),
         statisticsSyncMode = StatisticsSyncMode.fromRawValue(preferences.getString("statisticsSyncMode", null)),
         showStatisticsToggle = preferences.getBoolean("readerShowStatisticsToggle", false),
         showReadingSpeed = preferences.getBoolean("readerShowReadingSpeed", false),
@@ -497,8 +481,6 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("visualNovelPreserveDialogueBubbles", settings.visualNovelPreserveDialogueBubbles)
             .putBoolean("visualNovelClickAdvance", settings.visualNovelClickAdvance)
             .putBoolean("visualNovelMergeCrossScreenSasayakiCues", settings.visualNovelMergeCrossScreenSasayakiCues)
-            .putBoolean("enableStatistics", settings.enableStatistics)
-            .putBoolean("showStatisticsTab", settings.showStatisticsTab)
             .putBoolean("statisticsAutostartOnBookOpen", settings.statisticsAutostartOnBookOpen)
             .putBoolean("statisticsAutostartOnPageTurn", settings.statisticsAutostartOnPageTurn)
             .remove("statisticsAutostartMode")
@@ -595,7 +577,7 @@ class ReaderSettingsRepository(
                 val current = globalCurrent.withProfileAppearance(
                     readProfileAppearanceSettingsOrMigrate(globalCurrent),
                 )
-                transform(current).withStatisticsTransitionFrom(current).also { settings ->
+                transform(current).also { settings ->
                     saveProfileAppearanceSettings(settings.toProfileAppearanceSettings())
                 }
             }
@@ -608,7 +590,7 @@ class ReaderSettingsRepository(
         }
         dataStore.edit { preferences ->
             val current = preferences.toReaderSettings()
-            preferences.writeReaderSettings(transform(current).withStatisticsTransitionFrom(current))
+            preferences.writeReaderSettings(transform(current))
             preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
         }
     }
@@ -671,12 +653,10 @@ class ReaderSettingsRepository(
             visualNovelPreserveDialogueBubbles = this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] ?: false,
             visualNovelClickAdvance = this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] ?: false,
             visualNovelMergeCrossScreenSasayakiCues = this[KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES] ?: false,
-            enableStatistics = this[KEY_ENABLE_STATISTICS] ?: false,
-            showStatisticsTab = this[KEY_SHOW_STATISTICS_TAB] ?: true,
             statisticsAutostartOnBookOpen = this[KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN] ?: false,
             statisticsAutostartOnPageTurn = this[KEY_STATISTICS_AUTOSTART_ON_PAGE_TURN] ?: false,
             statisticsResetMinutes = this[KEY_STATISTICS_RESET_MINUTES] ?: 0,
-            statisticsSyncEnabled = this[KEY_STATISTICS_SYNC_ENABLED] ?: false,
+            statisticsSyncEnabled = this[KEY_STATISTICS_SYNC_ENABLED] ?: true,
             statisticsSyncMode = StatisticsSyncMode.fromRawValue(this[KEY_STATISTICS_SYNC_MODE]),
             showStatisticsToggle = this[KEY_SHOW_STATISTICS_TOGGLE] ?: false,
             showReadingSpeed = this[KEY_SHOW_READING_SPEED] ?: false,
@@ -752,8 +732,6 @@ class ReaderSettingsRepository(
         this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] = settings.visualNovelPreserveDialogueBubbles
         this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] = settings.visualNovelClickAdvance
         this[KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES] = settings.visualNovelMergeCrossScreenSasayakiCues
-        this[KEY_ENABLE_STATISTICS] = settings.enableStatistics
-        this[KEY_SHOW_STATISTICS_TAB] = settings.showStatisticsTab
         this[KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN] = settings.statisticsAutostartOnBookOpen
         this[KEY_STATISTICS_AUTOSTART_ON_PAGE_TURN] = settings.statisticsAutostartOnPageTurn
         remove(KEY_STATISTICS_AUTOSTART_MODE)
@@ -804,8 +782,6 @@ class ReaderSettingsRepository(
     }
 
     private fun MutablePreferences.writeGlobalReaderSettings(settings: ReaderSettings) {
-        this[KEY_ENABLE_STATISTICS] = settings.enableStatistics
-        this[KEY_SHOW_STATISTICS_TAB] = settings.showStatisticsTab
         this[KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN] = settings.statisticsAutostartOnBookOpen
         this[KEY_STATISTICS_AUTOSTART_ON_PAGE_TURN] = settings.statisticsAutostartOnPageTurn
         remove(KEY_STATISTICS_AUTOSTART_MODE)
@@ -881,8 +857,6 @@ class ReaderSettingsRepository(
         private val KEY_VISUAL_NOVEL_CLICK_ADVANCE = booleanPreferencesKey("visualNovelClickAdvance")
         private val KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES =
             booleanPreferencesKey("visualNovelMergeCrossScreenSasayakiCues")
-        private val KEY_ENABLE_STATISTICS = booleanPreferencesKey("enableStatistics")
-        private val KEY_SHOW_STATISTICS_TAB = booleanPreferencesKey("showStatisticsTab")
         private val KEY_STATISTICS_AUTOSTART_MODE = stringPreferencesKey("statisticsAutostartMode")
         private val KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN =
             booleanPreferencesKey("statisticsAutostartOnBookOpen")
@@ -1128,17 +1102,6 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         popupReducedMotionScrollPercent = appearance.popupReducedMotionScrollPercent.coerceIn(40, 100),
         popupReducedMotionSwipeThreshold = appearance.popupReducedMotionSwipeThreshold.coerceIn(0, 100),
     )
-
-private fun ReaderSettings.withStatisticsTransitionFrom(previous: ReaderSettings): ReaderSettings =
-    if (enableStatistics && !previous.enableStatistics) {
-        copy(
-            showStatisticsToggle = true,
-            showReadingSpeed = true,
-            showReadingTime = true,
-        )
-    } else {
-        this
-    }
 
 internal fun Double.cssNumber(): String =
     String.format(Locale.US, "%.1f", this)

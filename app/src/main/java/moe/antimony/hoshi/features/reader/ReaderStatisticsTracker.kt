@@ -25,12 +25,12 @@ internal object SystemReaderStatisticsClock : ReaderStatisticsClock {
 internal class ReaderStatisticsTracker(
     private val title: String,
     initialStatistics: List<ReadingStatistics>,
-    private val enabled: Boolean,
     private val resetMinutes: Int = 0,
     private val clock: ReaderStatisticsClock = SystemReaderStatisticsClock,
     private val dateProvider: StatisticsDateProvider = SystemStatisticsDateProvider(),
 ) {
     private var statistics = initialStatistics.deduplicateReadingStatistics()
+    private val initialDays = statistics.associateBy { it.dateKey }
     private var lastTimestampMillis: Long = clock.currentTimeMillis()
     private var lastCharacterCount: Int = 0
     private var hasUpdated = false
@@ -45,7 +45,6 @@ internal class ReaderStatisticsTracker(
         private set
 
     fun start(currentCharacter: Int) {
-        if (!enabled) return
         state = state.copy(isTracking = true)
         resetBaseline(currentCharacter)
     }
@@ -68,7 +67,7 @@ internal class ReaderStatisticsTracker(
     }
 
     fun update(currentCharacter: Int) {
-        if (!enabled || !state.isTracking || isModalPaused) return
+        if (!state.isTracking || isModalPaused) return
         rollTodayIfNeeded()
         val now = clock.currentTimeMillis()
         val timeDiff = (now - lastTimestampMillis).toDouble() / 1000.0
@@ -108,7 +107,7 @@ internal class ReaderStatisticsTracker(
     }
 
     fun statisticsForPersistenceOrNull(): List<ReadingStatistics>? =
-        if (enabled && (hasUpdated || statistics.isNotEmpty())) statisticsForPersistence() else null
+        if (hasUpdated) statisticsForPersistence().filter { initialDays[it.dateKey] != it } else null
 
     fun statisticsForPersistence(): List<ReadingStatistics> {
         val today = state.today

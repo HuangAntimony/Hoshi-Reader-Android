@@ -344,6 +344,14 @@ class EpubBookParserTest {
     }
 
     @Test
+    fun metadataWithoutOptionalCoverStillResolvesCustomPackedFilename() {
+        val root = tempFolder.newFolder("renamed-book")
+        writeMinimalEpubArchive(root.resolve("original.epub"), title = "Packed Book")
+        root.resolve("metadata.json").writeText("""{"id":"book","title":"Packed Book","folder":"renamed-book","lastAccess":0,"epub":"original.epub"}""")
+        assertEquals("Packed Book", EpubBookParser().parse(root).title)
+    }
+
+    @Test
     fun metadataEpubPathOutsideBookRootIsIgnored() {
         val root = tempFolder.newFolder("book-root")
         writeMinimalExtractedEpub(root, title = "Inside Book")

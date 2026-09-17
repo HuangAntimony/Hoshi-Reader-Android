@@ -188,7 +188,7 @@ class ReaderRouteStateHolderTest {
 
         override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> = emptyList()
 
-        override suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+        override suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
             savedStatistics = statistics
         }
 

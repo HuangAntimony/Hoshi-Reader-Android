@@ -30,6 +30,8 @@ import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.Bookmark
+import moe.antimony.hoshi.epub.STATISTICS_ARCHIVE_DIRECTORY
+import moe.antimony.hoshi.epub.fitBookStorageName
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.MAX_PATH_COMPONENT_UTF8_BYTES
@@ -199,6 +201,7 @@ class HoshiBackupRepository @Inject constructor(
                             ),
                         )
                     }
+                    bookRepository.restoreArchivedStatistics(entry.root.name)
                 }
                 restoredCount
             } finally {
@@ -279,7 +282,7 @@ class HoshiBackupRepository @Inject constructor(
             check(tempRoot.mkdirs()) { "Unable to create restore directory." }
             try {
                 archiveFile.outputStream().use { output -> input.copyTo(output) }
-                unzipInto(archiveFile, tempRoot)
+                unzipInto(archiveFile, tempRoot, ::remapBooksRestoreEntryName)
                 reconcileRestoredBookMetadata(tempRoot)
                 replaceDestinationWithRestoredFolder(target, tempRoot, destination)
             } catch (error: Throwable) {
@@ -292,8 +295,13 @@ class HoshiBackupRepository @Inject constructor(
     }
 
     private fun reconcileRestoredBookMetadata(restoredBooksRoot: File) {
+        val archive = restoredBooksRoot.resolve(STATISTICS_ARCHIVE_DIRECTORY)
+        val archivedRoots = archive.listFiles().orEmpty().filter(File::isDirectory)
+        archivedRoots.forEach { root ->
+            reconcileRestoredBookMetadataFile(root, archivedRoots.map(File::getName), archived = true)
+        }
         val bookRoots = restoredBooksRoot.listFiles().orEmpty()
-            .filter(File::isDirectory)
+            .filter { it.isDirectory && it.name != STATISTICS_ARCHIVE_DIRECTORY }
         val actualFolderNames = bookRoots.map(File::getName)
         bookRoots.forEach { bookRoot ->
             reconcileRestoredBookMetadataFile(bookRoot, actualFolderNames)
@@ -303,6 +311,7 @@ class HoshiBackupRepository @Inject constructor(
     private fun reconcileRestoredBookMetadataFile(
         bookRoot: File,
         actualFolderNames: List<String>,
+        archived: Boolean = false,
     ) {
         val metadataFile = bookRoot.resolve("metadata.json").takeIf(File::isFile) ?: return
         val rawMetadata = metadataFile.readText()
@@ -317,18 +326,25 @@ class HoshiBackupRepository @Inject constructor(
         val recordedFolderName = metadata.stringValue("folder")
         val resolvedFolderName = recordedFolderName?.let {
             resolveRestoredPathComponent(it, actualFolderNames)
+                ?: resolveRestoredPathComponent(it.fitBookStorageName(), actualFolderNames)
         }
         if (resolvedFolderName == bookRoot.name && recordedFolderName != bookRoot.name) {
             updated["folder"] = JsonPrimitive(bookRoot.name)
         }
 
         metadata.stringValue("epub")
-            ?.let { resolveRestoredPathComponent(it, actualFileNames) }
+            ?.let { resolveRestoredPathComponent(it, actualFileNames)
+                ?: resolveRestoredPathComponent(it.fitUtf8PathComponent(MAX_PATH_COMPONENT_UTF8_BYTES), actualFileNames) }
             ?.takeIf { it != metadata.stringValue("epub") }
             ?.let { updated["epub"] = JsonPrimitive(it) }
 
         metadata.stringValue("cover")
-            ?.let { resolveRestoredCoverPath(it, bookRoot.name, actualFolderNames, actualFileNames) }
+            ?.let { recorded ->
+                val prefix = "Books/$STATISTICS_ARCHIVE_DIRECTORY/"
+                val regularPath = if (archived && recorded.startsWith(prefix)) "Books/" + recorded.removePrefix(prefix) else recorded
+                resolveRestoredCoverPath(regularPath, bookRoot.name, actualFolderNames, actualFileNames)
+                    ?.let { if (archived) it.replaceFirst("Books/", prefix) else it }
+            }
             ?.takeIf { it != metadata.stringValue("cover") }
             ?.let { updated["cover"] = JsonPrimitive(it) }
 
@@ -570,8 +586,11 @@ private fun resolveRestoredCoverPath(
     if (segments.size != 3 || segments[0] != "Books") return null
     val recordedFolderName = segments[1]
     val resolvedFolderName = resolveRestoredPathComponent(recordedFolderName, actualFolderNames)
+        ?: resolveRestoredPathComponent(recordedFolderName.fitBookStorageName(), actualFolderNames)
     if (resolvedFolderName != actualFolderName) return null
-    val actualFileName = resolveRestoredPathComponent(segments[2], actualFileNames) ?: return null
+    val actualFileName = resolveRestoredPathComponent(segments[2], actualFileNames)
+        ?: resolveRestoredPathComponent(segments[2].fitUtf8PathComponent(MAX_PATH_COMPONENT_UTF8_BYTES), actualFileNames)
+        ?: return null
     return "Books/$actualFolderName/$actualFileName"
 }
 
@@ -645,4 +664,18 @@ private fun createStandaloneTtuConverter(
 ): TtuBookDataConverter {
     val repository = BookRepository(filesDir)
     return TtuBookDataConverter(repository, EpubBookParser(), filesDir, ioDispatcher)
+}
+
+internal fun remapBooksRestoreEntryName(entryName: String): String {
+    val directory = entryName.endsWith('/')
+    val segments = entryName.removeSuffix("/").split('/')
+    require(segments.none { it.isEmpty() || it == "." || it == ".." || '\\' in it || '\u0000' in it }) { "Unsafe backup entry: $entryName" }
+    val bookIndex = if (segments.first() == STATISTICS_ARCHIVE_DIRECTORY) 1 else 0
+    return segments.mapIndexed { index, component ->
+        when {
+            index < bookIndex -> component
+            index == bookIndex && (segments.size > index + 1 || directory) -> component.fitBookStorageName()
+            else -> component.fitUtf8PathComponent(MAX_PATH_COMPONENT_UTF8_BYTES)
+        }
+    }.joinToString("/") + if (directory) "/" else ""
 }

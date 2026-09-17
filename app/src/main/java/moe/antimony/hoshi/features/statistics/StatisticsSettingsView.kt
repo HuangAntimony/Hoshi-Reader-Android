@@ -1,4 +1,4 @@
-package moe.antimony.hoshi.features.reader
+package moe.antimony.hoshi.features.statistics
 
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
@@ -45,23 +45,66 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.runtime.DisposableEffect
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import moe.antimony.hoshi.ui.asString
+
+@Composable
+internal fun StatisticsSettingsView(
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: StatisticsSettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = StatisticsLifecycleReloader(viewModel::reload)
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    state.settings?.let { settings ->
+        StatisticsSettingsContent(
+            settings = settings,
+            syncEnabled = state.syncEnabled,
+            archivedBookCount = state.archivedBookCount,
+            isWorking = state.isWorking,
+            onSettingsChange = viewModel::update,
+            onClearArchive = viewModel::clearArchive,
+            onClose = onClose,
+            modifier = modifier,
+        )
+    }
+    state.error?.let { error ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            text = { Text(error.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderStatisticsSettingsView(
+private fun StatisticsSettingsContent(
     settings: ReaderSettings,
-    onSettingsChange: (ReaderSettings) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
+    syncEnabled: Boolean,
+    archivedBookCount: Int,
+    isWorking: Boolean,
+    onClearArchive: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val appContainer = LocalHoshiUiDependencies.current
-    val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
+    var showClearArchiveConfirmation by remember { mutableStateOf(false) }
     var syncModeMenuExpanded by remember { mutableStateOf(false) }
     var showResetTimePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -104,116 +147,87 @@ fun ReaderStatisticsSettingsView(
                 .padding(horizontal = 16.dp),
         ) {
             item {
-                val loadedSyncSettings = syncSettings ?: return@item
                 StatisticsSettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text(stringResource(R.string.action_enable)) },
+                        headlineContent = {
+                            Text(stringResource(R.string.reader_statistics_autostart_on_book_open))
+                        },
                         trailingContent = {
                             Switch(
-                                checked = settings.enableStatistics,
-                                onCheckedChange = { enabled ->
-                                    onSettingsChange(settings.withStatisticsEnabled(enabled))
+                                checked = settings.statisticsAutostartOnBookOpen,
+                                onCheckedChange = {
+                                    onSettingsChange { current -> current.copy(statisticsAutostartOnBookOpen = it) }
                                 },
                             )
                         },
                     )
-                    if (settings.enableStatistics) {
-                        StatisticsSettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.reader_statistics_show_tab)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = settings.showStatisticsTab,
-                                    onCheckedChange = {
-                                        onSettingsChange(settings.copy(showStatisticsTab = it))
-                                    },
-                                )
-                            },
-                        )
-                        StatisticsSettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = {
-                                Text(stringResource(R.string.reader_statistics_autostart_on_book_open))
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = settings.statisticsAutostartOnBookOpen,
-                                    onCheckedChange = {
-                                        onSettingsChange(settings.copy(statisticsAutostartOnBookOpen = it))
-                                    },
-                                )
-                            },
-                        )
-                        StatisticsSettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = {
-                                Text(stringResource(R.string.reader_statistics_autostart_on_page_turn))
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = settings.statisticsAutostartOnPageTurn,
-                                    onCheckedChange = {
-                                        onSettingsChange(settings.copy(statisticsAutostartOnPageTurn = it))
-                                    },
-                                )
-                            },
-                        )
-                        StatisticsSettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.reader_statistics_reset_time)) },
-                            trailingContent = {
-                                TextButton(onClick = { showResetTimePicker = true }) {
-                                    Text(resetTimeText)
-                                }
-                            },
-                            modifier = Modifier.clickable { showResetTimePicker = true },
-                        )
-                        if (loadedSyncSettings.enabled) {
-                            StatisticsSettingsDivider()
-                            ListItem(
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                headlineContent = { Text(stringResource(R.string.sync_ttu_sync)) },
-                                trailingContent = {
-                                    Switch(
-                                        checked = settings.statisticsSyncEnabled,
-                                        onCheckedChange = {
-                                            onSettingsChange(settings.copy(statisticsSyncEnabled = it))
-                                        },
-                                    )
+                    StatisticsSettingsDivider()
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = {
+                            Text(stringResource(R.string.reader_statistics_autostart_on_page_turn))
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = settings.statisticsAutostartOnPageTurn,
+                                onCheckedChange = {
+                                    onSettingsChange { current -> current.copy(statisticsAutostartOnPageTurn = it) }
                                 },
                             )
-                            StatisticsSettingsDivider()
-                            ListItem(
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                headlineContent = { Text(stringResource(R.string.reader_statistics_sync_behaviour)) },
-                                trailingContent = {
-                                    Box {
-                                        TextButton(onClick = { syncModeMenuExpanded = true }) {
-                                            Text(stringResource(settings.statisticsSyncMode.labelRes))
-                                        }
-                                        DropdownMenu(
-                                            expanded = syncModeMenuExpanded,
-                                            onDismissRequest = { syncModeMenuExpanded = false },
-                                        ) {
-                                            StatisticsSyncMode.entries.forEach { mode ->
-                                                DropdownMenuItem(
-                                                    text = { Text(stringResource(mode.labelRes)) },
-                                                    onClick = {
-                                                        syncModeMenuExpanded = false
-                                                        onSettingsChange(settings.copy(statisticsSyncMode = mode))
-                                                    },
-                                                )
-                                            }
+                        },
+                    )
+                    StatisticsSettingsDivider()
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(stringResource(R.string.reader_statistics_reset_time)) },
+                        trailingContent = {
+                            TextButton(onClick = { showResetTimePicker = true }) {
+                                Text(resetTimeText)
+                            }
+                        },
+                        modifier = Modifier.clickable { showResetTimePicker = true },
+                    )
+                    if (syncEnabled) {
+                        StatisticsSettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.sync_ttu_sync)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = settings.statisticsSyncEnabled,
+                                    onCheckedChange = {
+                                        onSettingsChange { current -> current.copy(statisticsSyncEnabled = it) }
+                                    },
+                                )
+                            },
+                        )
+                        StatisticsSettingsDivider()
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.reader_statistics_sync_behaviour)) },
+                            trailingContent = {
+                                Box {
+                                    TextButton(onClick = { syncModeMenuExpanded = true }) {
+                                        Text(stringResource(settings.statisticsSyncMode.labelRes))
+                                    }
+                                    DropdownMenu(
+                                        expanded = syncModeMenuExpanded,
+                                        onDismissRequest = { syncModeMenuExpanded = false },
+                                    ) {
+                                        StatisticsSyncMode.entries.forEach { mode ->
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(mode.labelRes)) },
+                                                onClick = {
+                                                    syncModeMenuExpanded = false
+                                                    onSettingsChange { current -> current.copy(statisticsSyncMode = mode) }
+                                                },
+                                            )
                                         }
                                     }
-                                },
-                            )
-                        }
+                                }
+                            },
+                        )
                     }
                 }
                 Text(
@@ -223,14 +237,48 @@ fun ReaderStatisticsSettingsView(
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                 )
             }
+            if (archivedBookCount > 0) {
+                item {
+                    StatisticsSettingsCard {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.statistics_clear_archive)) },
+                            supportingContent = {
+                                Text(androidx.compose.ui.res.pluralStringResource(
+                                    R.plurals.statistics_archived_book_count, archivedBookCount, archivedBookCount,
+                                ))
+                            },
+                            modifier = Modifier.clickable(enabled = !isWorking) { showClearArchiveConfirmation = true },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        )
+                    }
+                }
+            }
         }
+    }
+    if (showClearArchiveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearArchiveConfirmation = false },
+            title = { Text(stringResource(R.string.statistics_clear_archive)) },
+            text = { Text(stringResource(R.string.statistics_clear_archive_confirmation, archivedBookCount)) },
+            confirmButton = {
+                TextButton(enabled = !isWorking, onClick = {
+                    showClearArchiveConfirmation = false
+                    onClearArchive()
+                }) { Text(stringResource(R.string.action_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearArchiveConfirmation = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
     if (showResetTimePicker) {
         StatisticsResetTimePickerDialog(
             resetMinutes = settings.statisticsResetMinutes,
             onConfirm = { resetMinutes ->
                 showResetTimePicker = false
-                onSettingsChange(settings.copy(statisticsResetMinutes = resetMinutes))
+                onSettingsChange { current -> current.copy(statisticsResetMinutes = resetMinutes) }
             },
             onDismiss = { showResetTimePicker = false },
         )

@@ -11,6 +11,22 @@ import java.time.LocalDate
 
 class ReaderStatisticsTrackerTest {
     @Test
+    fun onlyChangedDaysAreReturnedForSaving() {
+        val old = ReadingStatistics("Book", "2020-01-01", charactersRead = 123, readingTime = 60.0)
+        val clock = FakeStatisticsClock()
+        val tracker = ReaderStatisticsTracker("Book", listOf(old), clock = clock)
+        assertNull(tracker.statisticsForPersistenceOrNull())
+        tracker.start(0)
+        clock.advance(seconds = 10)
+        tracker.update(20)
+        val changed = requireNotNull(tracker.statisticsForPersistenceOrNull())
+        assertEquals(1, changed.size)
+        assertEquals(20, changed.single().charactersRead)
+        assertFalse(changed.any { it.dateKey == old.dateKey })
+        assertEquals(143, tracker.state.allTime.charactersRead)
+    }
+
+    @Test
     fun forwardProgressUpdatesSessionTodayAndAllTimeSpeeds() {
         val clock = FakeStatisticsClock(
             millis = 1_778_623_200_000,
@@ -18,7 +34,6 @@ class ReaderStatisticsTrackerTest {
         val tracker = ReaderStatisticsTracker(
             title = "Book",
             initialStatistics = emptyList(),
-            enabled = true,
             clock = clock,
         )
 
@@ -39,7 +54,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun backwardProgressClampsAtNegativeSessionCharacters() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 100)
         clock.advance(seconds = 10)
@@ -59,7 +74,6 @@ class ReaderStatisticsTrackerTest {
         val tracker = ReaderStatisticsTracker(
             title = "Book",
             initialStatistics = emptyList(),
-            enabled = true,
             clock = clock,
             dateProvider = dateProvider,
         )
@@ -82,7 +96,6 @@ class ReaderStatisticsTrackerTest {
         val tracker = ReaderStatisticsTracker(
             title = "Book",
             initialStatistics = emptyList(),
-            enabled = true,
             resetMinutes = 105,
             dateProvider = object : StatisticsDateProvider {
                 override fun currentDate(resetMinutes: Int): LocalDate =
@@ -96,7 +109,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun idleTicksLowerMinSpeedButNotAltMinSpeed() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 0)
         clock.advance(seconds = 10)
@@ -113,7 +126,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun startStopUsesCurrentCharacterAsBaselineAndFlushesOnStop() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 50)
         clock.advance(seconds = 5)
@@ -127,7 +140,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun lifecyclePauseFlushesWithoutCountingBackgroundTimeAndResumeUsesCurrentBaseline() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 100)
         clock.advance(seconds = 5)
@@ -145,7 +158,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun modalPauseKeepsTrackingEnabledAndResumesFromCurrentBaseline() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 100)
         clock.advance(seconds = 5)
@@ -168,7 +181,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun lifecycleResumeDoesNotCountWhileModalRemainsOpen() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 100)
         tracker.setModalPaused(paused = true, currentCharacter = 100)
@@ -190,10 +203,9 @@ class ReaderStatisticsTrackerTest {
     }
 
     @Test
-    fun disabledTrackerDoesNotTrackOrPersist() {
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = false)
+    fun newTrackerDoesNotTrackOrPersistUntilStarted() {
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList())
 
-        tracker.start(currentCharacter = 0)
         tracker.update(currentCharacter = 100)
 
         assertFalse(tracker.state.isTracking)
@@ -204,7 +216,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun pageTurnAutostartStartsFromPreTurnDisplayedCharacter() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.startForPageTurnIfNeeded(currentCharacter = 100)
         clock.advance(seconds = 10)
@@ -217,7 +229,7 @@ class ReaderStatisticsTrackerTest {
     @Test
     fun sasayakiBackwardRestoreReanchorsWithoutCountingTargetChapter() {
         val clock = FakeStatisticsClock()
-        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), enabled = true, clock = clock)
+        val tracker = ReaderStatisticsTracker(title = "Book", initialStatistics = emptyList(), clock = clock)
 
         tracker.start(currentCharacter = 2_000)
         clock.advance(seconds = 1)

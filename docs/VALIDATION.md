@@ -246,6 +246,48 @@ Validate relevant bookshelf/import changes with:
 - bookmark restoration and bookshelf progress refresh after returning from
   Reader.
 
+## Statistics
+
+Preserve existing app data when validating statistics:
+
+- After upgrading with the former statistics and tab switches disabled, Stats
+  is still visible. Its upper-right Settings button opens the tab-local settings
+  route; returning from settings or a book editor preserves dashboard period,
+  selected panel, heatmap scroll and page scroll. Advanced has no Statistics row.
+- Unset statistics sync defaults on; an explicit opt-out remains off. Both
+  autostart options default off and work independently. Opening Stats does not
+  start tracking, and existing daily goals and Reader display preferences stay
+  unchanged. Check manual start/stop, modal pause, foreground/background and
+  close-save paths alongside the Reader matrix above.
+- Delete one book and a selected batch with active dates, no activity and an
+  undecodable cover. Active history remains visible with an archive marker;
+  required archive write/read failures keep the affected book and show an error.
+  Restore the same normalized folder via EPUB, Drive, TTU and Books `.hoshi`;
+  newer dates win, equal dates keep the specified first input, and interrupted
+  restore duplicates are counted once. Include NFC/NFD-equivalent paths and
+  iOS archives with omitted cover metadata or long folder names.
+- Open a distribution row from a short period and verify that the editor shows
+  all dates in ascending order. Check half-minute rounding, character/hour/minute
+  editing, cancel, zero removal, single-day deletion from inside the edit sheet
+  (no delete action on the date list), confirmed delete-all,
+  last-archive cleanup and confirmed archive clearing. Failures retain input;
+  return/resume refreshes aggregates. Merge may restore remote deleted records;
+  deleting locally does not claim to clear the remote copy.
+- Check year as the initial overview, natural weeks across year boundaries,
+  leap February, Sunday- and Monday-first locales, incomplete current periods,
+  zero buckets, monthly year/all buckets and cross-year labels. Heatmap window
+  selection must not clip or reset the overview. Range modes and period arrows
+  remain in the calendar card beside its selected range. Day taps change year/all to day
+  while week/month retain their modes; next cannot enter a future period.
+- Compare average duration and prior-period percentages with missing reading
+  days/months, including prior average zero. Goal history spans active and
+  archived books regardless of selected period, recalculates after goal changes,
+  and picks the earliest equal longest streak or best day.
+- Exercise the daily-goal semicircle and its compact history metrics with both
+  goal types, zero/partial/over-goal values, Chinese narrow screens, large values,
+  the edit keyboard and E-ink contrast. Archive JPEG decoding/scaling needs a device check in addition
+  to generated-file JVM tests.
+
 ## Dictionary, Audio, And Anki
 
 Validate relevant dictionary/audio changes with:

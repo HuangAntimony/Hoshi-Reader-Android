@@ -6,6 +6,15 @@ import org.junit.Test
 
 class AppRouteBackStackTest {
     @Test
+    fun statisticsDetailsPopBackToTheirExistingDashboardEntry() {
+        listOf(AppRoute.StatisticsSettingsRoute, AppRoute.StatisticsBookRoute("folder")).forEach { route ->
+            val backStack = mutableListOf<NavKey>(AppRoute.StatisticsRoute, route)
+            backStack.popAppRoute(onReaderRouteRemoved = { error("Statistics must not remove a reader") })
+            assertEquals(listOf(AppRoute.StatisticsRoute), backStack)
+        }
+    }
+
+    @Test
     fun duplicateCompletionReturnsFromTheSourceFormatToTheFormatList() {
         val backStack = mutableListOf<NavKey>(
             AppRoute.SettingsRoute,

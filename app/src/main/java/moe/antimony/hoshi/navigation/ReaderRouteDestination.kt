@@ -28,6 +28,7 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.reader.ReaderLoadingPage
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.LocalHoshiUiDependencies
@@ -52,6 +53,7 @@ internal fun ReaderRouteDestination(
     val appContainer = LocalHoshiUiDependencies.current
     val bookCoverWallpaperViewModel: BookCoverWallpaperViewModel = hiltViewModel()
     val bookCoverSnackbarHostState = remember { SnackbarHostState() }
+    val statisticsSaveFailedMessage = stringResource(R.string.statistics_operation_failed)
     val bookCoverPublishFailedMessage = stringResource(R.string.book_cover_wallpaper_publish_failed)
     val iReaderNotSelectedMessage =
         stringResource(R.string.book_cover_wallpaper_ireader_not_selected_error)
@@ -221,13 +223,19 @@ internal fun ReaderRouteDestination(
                     onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
                     onSaveBookmark = { chapterIndex, progress, statistics ->
                         autoSyncExportController.launchSave {
-                            stateHolder.saveBookmark(
-                                state = readyState,
-                                chapterIndex = chapterIndex,
-                                progress = progress,
-                                statistics = statistics,
-                                onBookmarkSaved = onBookmarkSaved,
-                            )
+                            try {
+                                stateHolder.saveBookmark(
+                                    state = readyState,
+                                    chapterIndex = chapterIndex,
+                                    progress = progress,
+                                    statistics = statistics,
+                                    onBookmarkSaved = onBookmarkSaved,
+                                )
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                bookmarkScope.launch { bookCoverSnackbarHostState.showSnackbar(statisticsSaveFailedMessage) }
+                            }
                         }
                         scheduleExport(readyState.entry)
                     },

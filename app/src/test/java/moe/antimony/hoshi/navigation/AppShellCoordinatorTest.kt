@@ -17,50 +17,14 @@ import org.junit.Test
 
 class AppShellCoordinatorTest {
     @Test
-    fun visibleMainTabsRequireStatisticsAndStatisticsTabSwitch() {
-        assertFalse(
-            appShellVisibleMainTabs(
-                ReaderSettings(enableStatistics = false, showStatisticsTab = true),
-            ).contains(MainTab.Statistics),
-        )
-        assertFalse(
-            appShellVisibleMainTabs(
-                ReaderSettings(enableStatistics = true, showStatisticsTab = false),
-            ).contains(MainTab.Statistics),
-        )
-        assertTrue(
-            appShellVisibleMainTabs(
-                ReaderSettings(enableStatistics = true, showStatisticsTab = true),
-            ).contains(MainTab.Statistics),
-        )
-        assertEquals(
-            MainTab.entries,
-            appShellVisibleMainTabs(
-                ReaderSettings(enableStatistics = true, showStatisticsTab = true),
-            ),
-        )
-    }
-
-    @Test
-    fun hiddenSelectedStatisticsTabFallsBackToBooks() {
-        assertEquals(
-            MainTab.Books,
-            coerceAvailableMainTab(
-                requestedTab = MainTab.Statistics,
-                visibleTabs = appShellVisibleMainTabs(
-                    ReaderSettings(enableStatistics = true, showStatisticsTab = false),
-                ),
-            ),
-        )
-    }
-
-    @Test
     fun mainShellPolicyAppliesOnlyToTopLevelRootRoutes() {
         assertTrue(appRouteUsesMainShell(AppRoute.MainRoute))
         assertTrue(appRouteUsesMainShell(AppRoute.BooksRoute))
         assertTrue(appRouteUsesMainShell(AppRoute.DictionaryRoute))
         assertTrue(appRouteUsesMainShell(AppRoute.StatisticsRoute))
         assertTrue(appRouteUsesMainShell(AppRoute.SettingsRoute))
+        assertFalse(appRouteUsesMainShell(AppRoute.StatisticsSettingsRoute))
+        assertFalse(appRouteUsesMainShell(AppRoute.StatisticsBookRoute("book-folder")))
         assertFalse(appRouteUsesMainShell(AppRoute.ReaderRoute("book-a")))
         assertFalse(appRouteUsesMainShell(AppRoute.SettingsDetailRoute(SettingsDetailSection.About)))
     }
@@ -119,42 +83,6 @@ class AppShellCoordinatorTest {
             appShellMainShellSceneKey(firstScene),
             appShellMainShellSceneKey(secondScene),
         )
-    }
-
-    @Test
-    fun hiddenStatisticsTabClearsStatisticsReaderRoutes() {
-        val backStack = mutableListOf<NavKey>(
-            AppRoute.StatisticsRoute,
-            AppRoute.ReaderRoute("book-a"),
-        )
-        var readerRouteRemoved = false
-
-        normalizeStatisticsBackStackForVisibleTabs(
-            visibleTabs = listOf(MainTab.Books, MainTab.Dictionary, MainTab.Settings),
-            statisticsBackStack = backStack,
-            onReaderRouteRemoved = { readerRouteRemoved = true },
-        )
-
-        assertEquals(listOf(AppRoute.StatisticsRoute), backStack)
-        assertTrue(readerRouteRemoved)
-    }
-
-    @Test
-    fun visibleStatisticsTabKeepsStatisticsReaderRoutes() {
-        val backStack = mutableListOf<NavKey>(
-            AppRoute.StatisticsRoute,
-            AppRoute.ReaderRoute("book-a"),
-        )
-        var readerRouteRemoved = false
-
-        normalizeStatisticsBackStackForVisibleTabs(
-            visibleTabs = MainTab.entries,
-            statisticsBackStack = backStack,
-            onReaderRouteRemoved = { readerRouteRemoved = true },
-        )
-
-        assertEquals(listOf(AppRoute.StatisticsRoute, AppRoute.ReaderRoute("book-a")), backStack)
-        assertFalse(readerRouteRemoved)
     }
 
     @Test

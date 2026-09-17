@@ -746,15 +746,13 @@ internal fun syncSettingsDataRows(
             checked = syncSettings.uploadBooks,
         ),
     )
-    if (readerSettings.enableStatistics) {
-        add(
-            SyncSettingsDataRow(
-                kind = SyncSettingsDataRowKind.SyncStats,
-                titleRes = R.string.sync_stats,
-                checked = readerSettings.statisticsSyncEnabled,
-            ),
-        )
-    }
+    add(
+        SyncSettingsDataRow(
+            kind = SyncSettingsDataRowKind.SyncStats,
+            titleRes = R.string.sync_stats,
+            checked = readerSettings.statisticsSyncEnabled,
+        ),
+    )
     if (sasayakiSettings.enabled) {
         add(
             SyncSettingsDataRow(

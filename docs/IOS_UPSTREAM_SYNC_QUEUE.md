@@ -86,57 +86,7 @@ Validation:
 - Missing/corrupt book, working Close, normal Reader open/close, Android Back,
   bookshelf state preservation, and bookmark refresh.
 
-### 3. Statistics lifecycle, archive, editing and overview parity
-
-Status: partial Android implementation; remaining parity work.
-
-Commits: `d8c086d`, `93ba3be` (sync default).
-
-Dependency/value reasoning:
-
-- Archive/restore storage must precede editing archived books and dashboard
-  aggregation. Android already has a dashboard, goals, calendar and trends;
-  retain only missing behavior rather than queueing a replacement dashboard.
-
-iOS behavior to mirror:
-
-- Statistics availability cannot be disabled, while tracking can still be
-  started/stopped. Sync defaults on for unset preferences.
-- Deleting a book archives active daily statistics, compatible metadata and a
-  small cover; reimport merges each date by latest modification and unarchives.
-  Archived statistics remain visible and can be cleared in settings.
-- Book rows open daily editors for characters and hours/minutes, daily delete
-  and confirmed delete-all. Empty archived records remove the archive entry.
-- Overview includes week/month/year/all-time selection, previous-period average
-  reading-time comparison and all-history goal summaries (longest streak,
-  days met and best day). Default goal is time, 20 minutes or 5000 characters.
-
-Android current gap:
-
-- `ReaderSettings.kt.enableStatistics` gates `AppShell.kt`, tracking and display
-  controls; `statisticsSyncEnabled` defaults false.
-- `BookRepository.deleteBook()` deletes the folder without archiving.
-  `AndroidStatisticsRepository.loadSnapshot()` enumerates only local book
-  folders. Its interface has no archive/restore/clear or daily mutation APIs.
-- `StatisticsEvent`/`StatisticsViewModel`/`StatisticsDistributionList.kt` have
-  no book daily editor or deletion actions. `StatisticsRangeMode` has no All
-  period, `StatisticsCalculations.kt` exposes current streaks but no all-history
-  longest/best-day summaries or previous-period time delta. Targets default to
-  Characters and 30 minutes in `StatisticsModels.kt`.
-
-Suggested slice:
-
-- Implement archive/restore and compatible deduplication behind repositories,
-  then daily editing, always-available statistics/unset-only defaults and the
-  missing overview calculations/UI. Preserve existing explicit user settings.
-
-Validation:
-
-- Delete/reimport local EPUB and TTU/Drive book, archived covers, newest-date
-  merge/ties, daily edits/deletes, empty archive cleanup, sync edits, goal/default
-  migration, all-time and previous-period results, reset-time and Chinese layouts.
-
-### 4. Reader highlight ruby text and exact-range editing
+### 3. Reader highlight ruby text and exact-range editing
 
 Status: pending Android sync.
 
@@ -171,7 +121,7 @@ Validation:
 - Legacy sidecars, ruby across styled nodes, repeated selection with same/new
   color, restart/sync, all reader modes, and raw versus normalized offsets.
 
-### 5. Book search literal matching and landing highlight
+### 4. Book search literal matching and landing highlight
 
 Status: partial Android implementation; remaining parity work.
 
@@ -180,7 +130,7 @@ Commits: `b7f09ca` (search behavior only).
 Dependency/value reasoning:
 
 - Build on the completed shared normalization and existing Contents search;
-  reuse highlight range projection after slice 4 without storing transient
+  reuse highlight range projection after slice 3 without storing transient
   search marks.
 
 iOS behavior to mirror:
@@ -211,7 +161,7 @@ Validation:
   bracketed complete sentences, 100-hit limit, jump/back/forward, page-turn
   clearing and supplementary-character offsets in all reader modes.
 
-### 6. Lookup popup two-column layout and dictionary CSS isolation
+### 5. Lookup popup two-column layout and dictionary CSS isolation
 
 Status: pending Android sync.
 
@@ -260,7 +210,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 7. Frequency sorting controls and import/update feedback
+### 6. Frequency sorting controls and import/update feedback
 
 Status: partial native support; pending Android UI/bridge integration.
 
@@ -307,7 +257,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 8. Google Drive timeout and automatic-refresh error suppression
+### 7. Google Drive timeout and automatic-refresh error suppression
 
 Status: pending Android sync.
 
@@ -345,7 +295,7 @@ Validation:
 - Automatic refresh offline, slow token/list requests, and connection loss;
   manual connect/refresh/import/export/delete must still show actionable errors.
 
-### 9. Remote bookshelf last-access ordering
+### 8. Remote bookshelf last-access ordering
 
 Status: pending Android sync.
 
@@ -353,7 +303,7 @@ Commits: `e6e2b4b`.
 
 Dependency/value reasoning:
 
-- Independent of timeout slice 8; reuse the existing TTU filename timestamp
+- Independent of timeout slice 7; reuse the existing TTU filename timestamp
   parsers and grouped Drive file discovery.
 
 iOS behavior to mirror:
@@ -378,7 +328,7 @@ Validation:
 - Progress versus audio newest timestamp, bookdata fallback, missing/malformed
   names, multiple remote books, Recent/Title switch and refresh/import.
 
-### 10. Reader navigation and options toolbar
+### 9. Reader navigation and options toolbar
 
 Status: partial Android implementation; remaining visual/interaction parity.
 
@@ -386,8 +336,8 @@ Commits: `42e7b81`.
 
 Dependency/value reasoning:
 
-- Uses existing Compose chrome/settings and should follow always-available
-  statistics in slice 3; UIKit itself is not an Android implementation target.
+- Builds on existing Compose chrome/settings and always-available statistics;
+  UIKit itself is not an Android implementation target.
 
 iOS behavior to mirror:
 
@@ -417,7 +367,7 @@ Validation:
   routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
   continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
 
-### 11. Reader WebView line-box CSS parity
+### 10. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -450,7 +400,7 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 12. App accent and stroke-order font attribution
+### 11. App accent and stroke-order font attribution
 
 Status: pending Android sync.
 
@@ -493,7 +443,6 @@ Validation:
 | `00f95c4`, `21971bb` | 2026-08-12 / 08-13 | Highlight ruby text and exact-range editing | Pending sidecar/bridge/range editing |
 | `b7f09ca` (search portion) | 2026-08-13 | Book search | Pending literal search, snippets and landing marks |
 | `7d7321f` | 2026-08-05 | Restore after renderer termination | Pending WebView recreation/state restore |
-| `d8c086d`, `93ba3be` | 2026-08-09 / 08-21 | Statistics lifecycle/archive/editing and sync default | Pending remaining storage/editor/overview/default behavior |
 | `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
 | `e6e2b4b` | 2026-08-19 | Remote book last access | Pending timestamp projection/Recent ordering |
@@ -503,23 +452,28 @@ Validation:
 ## Suggested Implementation Order
 
 1. Renderer recovery (1) and localized open-failure fallback (2).
-2. Statistics archive/restore, then daily editing and lifecycle/overview parity (3).
-3. Highlight sidecar/range editing (4), then book search remaining parity (5).
-4. Popup layout/CSS isolation (6).
-5. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (7).
-6. Drive timeout/error suppression (8) and remote Recent sorting (9).
-7. Reader navigation/options toolbar (10), after statistics availability (3).
-8. Reader line-box CSS parity (11), app accent and font attribution (12).
+2. Highlight sidecar/range editing (3), then book search remaining parity (4).
+3. Popup layout/CSS isolation (5).
+4. Native frequency options/import diagnostics, then settings and automatic
+   low-RAM update policy (6).
+5. Drive timeout/error suppression (7) and remote Recent sorting (8).
+6. Reader navigation/options toolbar (9), building on available statistics.
+7. Reader line-box CSS parity (10), app accent and font attribution (11).
 
 ## Covered Or No Android Action
 
+- `d8c086d`, `93ba3be` (statistics): Stats is always available, with tab-local
+  settings, archived deletion/reimport, folder-keyed daily editing and natural
+  calendar/all-time overview plus historical goals. Active/archive dates merge
+  by modification time using iOS-compatible sidecars and backup paths. Unset
+  sync defaults on; saved goals, opt-outs and Reader display preferences remain,
+  and Android keeps its two independent autostart settings and goal defaults.
 - `703347a`, `b7f09ca` (shared ruby normalization only): native
   `ReaderTextFilter` and shared `reader-text-semantics.js` include Korean text;
   native visible text excludes `rt`/`rp` contents. Reader-facts version 3
   refreshes cached counts and TOC offsets. Existing Sasayaki matches are retained;
   affected books need the SRT selected again. The search portion of `b7f09ca`
-  remains open in slice 5.
+  remains open in slice 4.
 - `7b9dda8`: both Anki backends resolve tag handlebars through the field resolver,
   replacing substitution whitespace with underscores. New/rebuilt formats use
   `hoshi`; saved tags retain their values.
@@ -590,7 +544,7 @@ Validation:
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
   pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 7.
+  remaining bridge gap described in slice 6.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct
@@ -657,17 +611,17 @@ Validation:
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
   transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 7 rather than queueing revision bumps.
+  in slice 6 rather than queueing revision bumps.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
   bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 7.
+  automatic low-RAM difference remains slice 6.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
-  500/500 and permits height 1000, exceeding the iOS increase to 350/310. The
-  unset statistics-sync default remains slice 3.
+  500/500 and permits height 1000, exceeding the iOS increase to 350/310.
+  Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 12.
+  Attribution for the downloadable stroke-order font remains slice 11.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

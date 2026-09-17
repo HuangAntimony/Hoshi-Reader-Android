@@ -35,7 +35,6 @@ import moe.antimony.hoshi.features.anki.AnkiConnectView
 import moe.antimony.hoshi.features.audio.AudioSettingsView
 import moe.antimony.hoshi.features.backup.BackupSettingsView
 import moe.antimony.hoshi.features.reader.ReaderSettings
-import moe.antimony.hoshi.features.reader.ReaderStatisticsSettingsView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsView
@@ -51,15 +50,6 @@ fun AdvancedSettingsView(
     var destination by remember { mutableStateOf<AdvancedDestination?>(null) }
     if (destination == AdvancedDestination.Audio) {
         AudioSettingsView(
-            onClose = { destination = null },
-            modifier = modifier,
-        )
-        return
-    }
-    if (destination == AdvancedDestination.Statistics) {
-        ReaderStatisticsSettingsView(
-            settings = readerSettings,
-            onSettingsChange = onReaderSettingsChange,
             onClose = { destination = null },
             modifier = modifier,
         )
@@ -151,7 +141,6 @@ fun AdvancedSettingsView(
 
 internal enum class AdvancedDestination {
     Audio,
-    Statistics,
     Sasayaki,
     Backup,
     Syncing,
@@ -161,7 +150,6 @@ internal enum class AdvancedDestination {
 
 internal enum class AdvancedSettingsIcon {
     Speaker,
-    Chart,
     Waveform,
     Cloud,
     AnkiConnect,
@@ -188,12 +176,6 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     titleRes = R.string.advanced_audio,
                     destination = AdvancedDestination.Audio,
                     icon = AdvancedSettingsIcon.Speaker,
-                ),
-                AdvancedSettingsRow(
-                    titleRes = R.string.advanced_statistics,
-                    destination = AdvancedDestination.Statistics,
-                    icon = AdvancedSettingsIcon.Chart,
-                    subtitleRes = R.string.advanced_statistics_subtitle,
                 ),
                 AdvancedSettingsRow(
                     titleRes = R.string.advanced_sasayaki_audiobooks,
@@ -241,7 +223,6 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
 private fun AdvancedSettingsIcon.imageVector(): ImageVector =
     when (this) {
         AdvancedSettingsIcon.Speaker -> Icons.AutoMirrored.Rounded.VolumeUp
-        AdvancedSettingsIcon.Chart -> Icons.AutoMirrored.Rounded.ShowChart
         AdvancedSettingsIcon.Waveform -> Icons.Rounded.GraphicEq
         AdvancedSettingsIcon.Cloud -> Icons.Rounded.Cloud
         AdvancedSettingsIcon.AnkiConnect -> Icons.Rounded.Link

@@ -51,6 +51,8 @@ import moe.antimony.hoshi.features.profiles.ProfilesView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.settings.AdvancedSettingsView
 import moe.antimony.hoshi.features.statistics.StatisticsView
+import moe.antimony.hoshi.features.statistics.StatisticsSettingsView
+import moe.antimony.hoshi.features.statistics.StatisticsBookView
 import moe.antimony.hoshi.features.update.AboutScreen
 import kotlinx.coroutines.launch
 
@@ -109,17 +111,7 @@ fun AppShell(
     var bookshelfRefreshKey by remember { mutableIntStateOf(0) }
     var dictionaryFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
     var sasayakiSettings by remember { mutableStateOf(SasayakiSettings()) }
-    val visibleMainTabs = appShellVisibleMainTabs(readerSettings)
-    val effectiveSelectedTab = coerceAvailableMainTab(
-        requestedTab = selectedTab,
-        visibleTabs = visibleMainTabs,
-    )
-
-    LaunchedEffect(selectedTab, effectiveSelectedTab) {
-        if (selectedTab != effectiveSelectedTab) {
-            selectedTab = effectiveSelectedTab
-        }
-    }
+    val visibleMainTabs = MainTab.entries
 
     LaunchedEffect(sasayakiSettingsRepository) {
         sasayakiSettingsRepository.settings.collect { settings ->
@@ -134,7 +126,7 @@ fun AppShell(
         }
     }
 
-    fun selectedBackStack(): MutableList<NavKey> = when (effectiveSelectedTab) {
+    fun selectedBackStack(): MutableList<NavKey> = when (selectedTab) {
         MainTab.Books -> booksBackStack
         MainTab.Dictionary -> dictionaryBackStack
         MainTab.Statistics -> statisticsBackStack
@@ -142,23 +134,16 @@ fun AppShell(
     }
 
     fun selectTopLevelRoute(route: AppRoute) {
-        selectedTab = coerceAvailableMainTab(
-            requestedTab = route.toMainTab(),
-            visibleTabs = visibleMainTabs,
-        )
+        selectedTab = route.toMainTab()
     }
 
     fun selectMainTab(tab: MainTab) {
-        val availableTab = coerceAvailableMainTab(
-            requestedTab = tab,
-            visibleTabs = visibleMainTabs,
-        )
         dictionaryFocusRequestKey = nextDictionaryFocusRequestKey(
-            selectedTab = effectiveSelectedTab,
-            requestedTab = availableTab,
+            selectedTab = selectedTab,
+            requestedTab = tab,
             currentKey = dictionaryFocusRequestKey,
         )
-        selectedTab = availableTab
+        selectedTab = tab
     }
 
     fun clearLoadedReaderProfile() {
@@ -167,14 +152,6 @@ fun AppShell(
 
     fun clearReaderRoutesOutsideBooks() {
         statisticsBackStack.removeReaderRoutes(onReaderRouteRemoved = ::clearLoadedReaderProfile)
-    }
-
-    LaunchedEffect(visibleMainTabs) {
-        normalizeStatisticsBackStackForVisibleTabs(
-            visibleTabs = visibleMainTabs,
-            statisticsBackStack = statisticsBackStack,
-            onReaderRouteRemoved = ::clearLoadedReaderProfile,
-        )
     }
 
     LaunchedEffect(dictionarySettingsRepository) {
@@ -307,6 +284,8 @@ fun AppShell(
                 )
                 AppRoute.StatisticsRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Statistics,
+                    onOpenStatisticsSettings = { statisticsBackStack.add(AppRoute.StatisticsSettingsRoute) },
+                    onOpenBookStatistics = { folder -> statisticsBackStack.add(AppRoute.StatisticsBookRoute(folder)) },
                     pendingImportUri = currentPendingImportUri,
                     onPendingImportConsumed = currentOnPendingImportConsumed,
                     readerSettings = currentReaderSettings,
@@ -337,6 +316,8 @@ fun AppShell(
                         }
                     },
                 )
+                AppRoute.StatisticsSettingsRoute -> StatisticsSettingsView(onClose = ::popRoute)
+                is AppRoute.StatisticsBookRoute -> StatisticsBookView(folder = route.folder, onClose = ::popRoute)
                 is AppRoute.SettingsDetailRoute -> SettingsDetailDestination(
                     route = route,
                     readerSettings = currentReaderSettings,
@@ -386,7 +367,7 @@ fun AppShell(
         }
     }
     val mainShellSceneDecorator = rememberMainShellSceneDecoratorStrategy(
-        selectedTab = effectiveSelectedTab,
+        selectedTab = selectedTab,
         visibleTabs = visibleMainTabs,
         onSelectedTabChange = ::selectMainTab,
     )
@@ -410,7 +391,7 @@ fun AppShell(
         entryDecorators = rememberAppNavEntryDecorators(),
         entryProvider = entryProvider,
     )
-    val currentEntries = when (effectiveSelectedTab) {
+    val currentEntries = when (selectedTab) {
         MainTab.Books -> booksEntries
         MainTab.Dictionary -> dictionaryEntries
         MainTab.Statistics -> statisticsEntries
@@ -461,6 +442,8 @@ private fun TopLevelRouteContent(
     pendingDictionaryLookupRequest: PendingDictionaryLookupRequest? = null,
     onPendingDictionaryLookupConsumed: () -> Unit = {},
     onSettingsDestination: (SettingsDestination) -> Unit = {},
+    onOpenStatisticsSettings: () -> Unit = {},
+    onOpenBookStatistics: (String) -> Unit = {},
 ) {
     val layoutSpec = currentMainShellLayoutSpec()
     when (selectedTab) {
@@ -480,6 +463,8 @@ private fun TopLevelRouteContent(
             modifier = Modifier.fillMaxSize(),
         )
         MainTab.Statistics -> StatisticsView(
+            onOpenSettings = onOpenStatisticsSettings,
+            onOpenBook = onOpenBookStatistics,
             layoutSpec = layoutSpec,
             modifier = Modifier.fillMaxSize(),
         )
@@ -571,35 +556,10 @@ internal fun nextDictionaryFocusRequestKey(
         currentKey
     }
 
-internal fun appShellVisibleMainTabs(readerSettings: ReaderSettings): List<MainTab> =
-    MainTab.entries.filter { tab ->
-        tab != MainTab.Statistics || readerSettings.enableStatistics && readerSettings.showStatisticsTab
-    }
-
-internal fun coerceAvailableMainTab(
-    requestedTab: MainTab,
-    visibleTabs: List<MainTab>,
-): MainTab =
-    if (requestedTab in visibleTabs) {
-        requestedTab
-    } else {
-        MainTab.Books
-    }
-
-internal fun normalizeStatisticsBackStackForVisibleTabs(
-    visibleTabs: List<MainTab>,
-    statisticsBackStack: MutableList<NavKey>,
-    onReaderRouteRemoved: () -> Unit = {},
-) {
-    if (MainTab.Statistics !in visibleTabs) {
-        statisticsBackStack.removeReaderRoutes(onReaderRouteRemoved = onReaderRouteRemoved)
-    }
-}
-
 private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.MainRoute, AppRoute.BooksRoute -> MainTab.Books
     AppRoute.DictionaryRoute -> MainTab.Dictionary
-    AppRoute.StatisticsRoute -> MainTab.Statistics
+    AppRoute.StatisticsRoute, AppRoute.StatisticsSettingsRoute, is AppRoute.StatisticsBookRoute -> MainTab.Statistics
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
     is AppRoute.SettingsDetailRoute -> MainTab.Settings

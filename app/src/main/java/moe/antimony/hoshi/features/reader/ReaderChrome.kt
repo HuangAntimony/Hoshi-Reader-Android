@@ -64,7 +64,6 @@ data class ReaderChromeState(
         progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
     ): String {
         val statistics = statistics ?: return ""
-        if (!settings.enableStatistics) return ""
         val parts = mutableListOf<String>()
         if (settings.showReadingSpeed) {
             parts += progressDisplay.speedText(statistics.readingSpeed)

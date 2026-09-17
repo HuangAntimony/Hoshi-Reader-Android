@@ -4,10 +4,11 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 internal enum class StatisticsRangeMode {
-    Year,
-    Month,
-    Week,
     Day,
+    Week,
+    Month,
+    Year,
+    All,
 }
 
 internal enum class StatisticsCalendarWindowKind {
@@ -79,6 +80,8 @@ internal object StatisticsTargetDefaults {
 
 internal data class StatisticsBookContribution(
     val bookId: String,
+    val folder: String = bookId,
+    val isArchived: Boolean = false,
     val title: String,
     val coverPath: String?,
     val characters: Int,
@@ -99,6 +102,8 @@ internal data class StatisticsRangeSummary(
     val averageSpeedPerHour: Int,
     val targetDays: Int,
     val targetProgressPercent: Int,
+    val averageReadingSecondsPerBucket: Double = 0.0,
+    val averageReadingTimeChangePercent: Double? = null,
 )
 
 internal data class WeekDayGoalUi(
@@ -142,6 +147,8 @@ internal data class StatisticsTrendPoint(
 
 internal data class BookDistributionRow(
     val bookId: String,
+    val folder: String = bookId,
+    val isArchived: Boolean = false,
     val title: String,
     val coverPath: String?,
     val characters: Int,
@@ -182,6 +189,8 @@ internal data class CurrentRangeStatisticsUi(
     val summary: StatisticsRangeSummary,
     val trendPoints: List<StatisticsTrendPoint> = emptyList(),
     val distributionRows: List<BookDistributionRow> = emptyList(),
+    val canNavigatePrevious: Boolean = false,
+    val canNavigateNext: Boolean = false,
 )
 
 internal data class StatisticsTargetSettingsUi(
@@ -194,6 +203,19 @@ internal data class StatisticsEmptyState(
     val hasPartialReadError: Boolean,
 )
 
+internal data class StatisticsGoalStreak(
+    val count: Int = 0,
+    val range: StatisticsDateRange? = null,
+)
+
+internal data class StatisticsHistoryUi(
+    val currentStreak: StatisticsGoalStreak = StatisticsGoalStreak(),
+    val longestStreak: StatisticsGoalStreak = StatisticsGoalStreak(),
+    val metDays: Int = 0,
+    val readingDays: Int = 0,
+    val bestDay: StatisticsDayAggregate? = null,
+)
+
 internal data class StatisticsUiState(
     val isLoading: Boolean = true,
     val today: TodayStatisticsUi,
@@ -202,6 +224,7 @@ internal data class StatisticsUiState(
     val calendar: StatisticsCalendarUi,
     val currentRange: CurrentRangeStatisticsUi,
     val emptyState: StatisticsEmptyState? = null,
+    val history: StatisticsHistoryUi = StatisticsHistoryUi(),
 )
 
 internal sealed interface StatisticsEvent {
@@ -213,5 +236,6 @@ internal sealed interface StatisticsEvent {
     data class SelectCalendarWindow(val window: StatisticsCalendarWindowSelection) : StatisticsEvent
     data class SelectRangeMode(val mode: StatisticsRangeMode) : StatisticsEvent
     data class SelectCalendarDate(val date: LocalDate) : StatisticsEvent
+    data class NavigatePeriod(val offset: Int) : StatisticsEvent
     data class SelectCurrentRangeTab(val tab: CurrentRangeTab) : StatisticsEvent
 }
