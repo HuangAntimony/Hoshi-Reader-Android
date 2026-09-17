@@ -263,8 +263,9 @@ Preserve existing app data when validating statistics:
   undecodable cover. Active history remains visible with an archive marker;
   required archive write/read failures keep the affected book and show an error.
   The distribution marks archived books with a small trash icon; their detail
-  page has the same compact book title and Days section as local books, without
-  an extra Archived label.
+  page has the same book title and Days section as local books, without an extra
+  Archived label. Dashboard and book-page titles keep the same size and weight
+  during navigation and loading; long book titles remain on one ellipsized line.
   Restore the same normalized folder via EPUB, Drive, TTU and Books `.hoshi`;
   newer dates win, equal dates keep the specified first input, and interrupted
   restore duplicates are counted once. Include NFC/NFD-equivalent paths and
@@ -278,6 +279,9 @@ Preserve existing app data when validating statistics:
   last-archive cleanup and confirmed archive clearing. Failures retain input;
   return/resume refreshes aggregates. Merge may restore remote deleted records;
   deleting locally does not claim to clear the remote copy.
+  In light/dark E-ink, the date rows have one continuous rounded outer outline,
+  inset internal dividers, and an outlined delete-all button. Check one record,
+  several records, and scrolling a long list; normal themes keep filled groups.
 - The dashboard contains Daily Goal (gauge, history and display-only heatmap),
   Reading Time, and Books, with uniform headings and grouped cards. There is no
   separate calendar, heatmap date selection, yearly dropdown, Day segment,
@@ -287,7 +291,9 @@ Preserve existing app data when validating statistics:
   nearby value. Switching Characters/Duration preserves each saved target;
   outside tap and Back dismiss it. Cover both ends of each range, reopen,
   E-ink contrast and persistence failure/retry.
-- Check All as the initial reading-time period. Week/Month/Year/All switching
+- Check the current Week as the initial reading-time period, including while
+  loading; returning from settings or a book editor preserves a manual selection.
+  Week/Month/Year/All switching
   lives in Reading Time; each mode starts at the current period. Swipe the chart
   to browse earlier natural periods, stopping at the first activity and today;
   All does not page. Check cross-year weeks, leap February, locale week starts,
@@ -305,11 +311,16 @@ Preserve existing app data when validating statistics:
   also clears it. Settings/editor round trips and refresh preserve selection.
   Check empty buckets, the first partial month and future-bucket rejection.
   Book bars rank by time independently of goal type, five rows show initially,
-  Show More expands the list, and no Books section appears for an empty result.
+  Show More is left-aligned with the card content, has the same inset divider
+  above it as the book rows, and expands the list. Once all books are visible,
+  both the button and its divider disappear.
+  No Books section appears for an empty result.
 - In light and dark E-ink modes, unselected reading-time bars are hollow and
   only the selected bar is filled. Initial display and clearing selection leave
   all bars hollow. Check switching between bars, short/narrow bars, and normal
   color mode retaining its existing color-based selection.
+  Period and goal-type selectors have outlined tracks; the selected segment
+  has a solid fill with inverse text in both light and dark E-ink.
 - Compare average duration and prior-period percentages with missing reading
   days/months, including prior average zero. Goal history spans active and
   archived books regardless of selected period, recalculates after goal changes,

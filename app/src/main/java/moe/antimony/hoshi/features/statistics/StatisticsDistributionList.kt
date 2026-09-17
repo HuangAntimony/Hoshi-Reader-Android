@@ -77,8 +77,16 @@ internal fun StatisticsBooksSection(
             }
         }
         if (visibleCount < rows.size) {
-            TextButton(onClick = { visibleCount += 5 }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.statistics_show_more_books))
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 46.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            TextButton(
+                onClick = { visibleCount += 5 },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                Text(stringResource(R.string.statistics_show_more_books), modifier = Modifier.fillMaxWidth())
             }
         }
     }

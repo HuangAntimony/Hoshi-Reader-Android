@@ -124,7 +124,7 @@ internal data class StatisticsChartPage(
 )
 
 internal data class CurrentRangeStatisticsUi(
-    val mode: StatisticsRangeMode = StatisticsRangeMode.All,
+    val mode: StatisticsRangeMode = StatisticsRangeMode.Week,
     val range: StatisticsDateRange,
     val pageCount: Int = 1,
     val selectedPage: Int = 0,

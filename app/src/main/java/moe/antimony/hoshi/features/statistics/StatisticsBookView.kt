@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.statistics
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +67,9 @@ import java.time.format.FormatStyle
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
+
+private val StatisticsDayGroupCornerRadius = 24.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +80,8 @@ internal fun StatisticsBookView(
     viewModel: StatisticsBookViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val eInkMode = LocalHoshiEInkMode.current
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
     var confirmDeleteAll by rememberSaveable { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel, folder) {
@@ -86,7 +99,7 @@ internal fun StatisticsBookView(
                 title = {
                     Text(
                         state.book?.title ?: stringResource(R.string.statistics_title),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -118,11 +131,12 @@ internal fun StatisticsBookView(
                     val first = index == 0
                     val last = index == book.statistics.lastIndex
                     Surface(
+                        modifier = if (eInkMode) Modifier.statisticsDayGroupBorder(first, last, outlineColor) else Modifier,
                         shape = RoundedCornerShape(
-                            topStart = if (first) 24.dp else 0.dp,
-                            topEnd = if (first) 24.dp else 0.dp,
-                            bottomStart = if (last) 24.dp else 0.dp,
-                            bottomEnd = if (last) 24.dp else 0.dp,
+                            topStart = if (first) StatisticsDayGroupCornerRadius else 0.dp,
+                            topEnd = if (first) StatisticsDayGroupCornerRadius else 0.dp,
+                            bottomStart = if (last) StatisticsDayGroupCornerRadius else 0.dp,
+                            bottomEnd = if (last) StatisticsDayGroupCornerRadius else 0.dp,
                         ),
                         color = MaterialTheme.colorScheme.surface,
                     ) {
@@ -133,7 +147,12 @@ internal fun StatisticsBookView(
                     }
                 }
                 if (book.statistics.isNotEmpty()) item {
-                    Surface(Modifier.fillMaxWidth().padding(top = 16.dp), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = if (eInkMode) BorderStroke(1.dp, outlineColor) else null,
+                    ) {
                         TextButton(enabled = !state.isSaving, onClick = { confirmDeleteAll = true }, contentPadding = PaddingValues(16.dp)) {
                             Text(stringResource(R.string.statistics_delete_all), modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error)
                         }
@@ -208,6 +227,25 @@ internal fun StatisticsBookView(
             onDismissRequest = viewModel::dismissError,
             text = { Text(error.asString()) },
             confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) } },
+        )
+    }
+}
+
+private fun Modifier.statisticsDayGroupBorder(first: Boolean, last: Boolean, color: Color): Modifier = drawWithContent {
+    drawContent()
+    val strokeWidth = 1.dp.toPx()
+    val inset = strokeWidth / 2f
+    val radius = StatisticsDayGroupCornerRadius.toPx()
+    // Extend past adjoining lazy rows so only the group's outer edges are drawn.
+    val top = if (first) inset else -radius
+    val bottom = if (last) size.height - inset else size.height + radius
+    clipRect {
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(inset, top),
+            size = Size(size.width - strokeWidth, bottom - top),
+            cornerRadius = CornerRadius(radius - inset),
+            style = Stroke(strokeWidth),
         )
     }
 }

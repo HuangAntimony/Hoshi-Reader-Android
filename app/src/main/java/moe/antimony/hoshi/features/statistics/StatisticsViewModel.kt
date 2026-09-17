@@ -158,7 +158,7 @@ internal class StatisticsViewModel internal constructor(
 }
 
 private data class StatisticsSelectionState(
-    val rangeMode: StatisticsRangeMode = StatisticsRangeMode.All,
+    val rangeMode: StatisticsRangeMode = StatisticsRangeMode.Week,
     val referenceDate: LocalDate? = null,
     val selectedBucketKey: String? = null,
     val isTargetEditorVisible: Boolean = false,

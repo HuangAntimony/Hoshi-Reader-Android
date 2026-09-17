@@ -13,10 +13,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   deletion is available inside the day editor; deleting all records requires
   confirmation. Daily records use compact grouped rows with dates and character
   counts on the left, durations and navigation arrows on the right. Archived
-  books have a small trash marker in the book list and share the same compact
-  detail header as local books.
+  books have a small trash marker in the book list. Local and archived book
+  headers use the dashboard title style, avoiding a font-size jump while loading.
+  E-ink mode outlines the daily-record group and its delete-all button.
 - Add natural calendar periods and all-time Statistics overview, with compact
-  period controls in the Reading Time card and all-time selected by default.
+  period controls in the Reading Time card and the current week selected by default.
   Tap chart bars to inspect a day within a week/month or a month within a
   year/all-time period. Include elapsed-period averages and comparisons,
   plus historical goal streaks and best-day summaries.
@@ -64,8 +65,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   goal popup with a scrollable value picker. Show reading-time
   bars, summary rows and time-ranked books
   together instead of three tabs, with consistent section headings, grouped
-  cards and compact charts and rows. In E-ink mode, chart bars are hollow until
-  selected, making the filled selection distinct. Remove the separate This Week
+  cards and compact charts and rows, including a left-aligned Show More row
+  with a divider above it. In E-ink mode, chart bars are hollow until selected,
+  making the filled selection distinct; period and goal-type selectors use
+  outlined tracks with filled, inverse-text selections. Remove the separate This Week
   card and weekly goal; weekly totals and trends remain available through the
   reading-time chart.
 

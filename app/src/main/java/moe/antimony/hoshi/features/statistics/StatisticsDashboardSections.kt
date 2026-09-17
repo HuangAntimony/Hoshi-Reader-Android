@@ -451,10 +451,13 @@ internal fun <T> StatisticsSegmentedControl(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val eInkMode = LocalHoshiEInkMode.current
+    val colors = MaterialTheme.colorScheme
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = colors.surfaceContainer,
+        border = if (eInkMode) BorderStroke(1.dp, colors.outlineVariant) else null,
     ) {
         Row(
             modifier = Modifier
@@ -466,7 +469,7 @@ internal fun <T> StatisticsSegmentedControl(
                 val isSelected = option.value == selected
                 val itemShape = RoundedCornerShape(8.dp)
                 val background = if (isSelected) {
-                    MaterialTheme.colorScheme.surface
+                    if (eInkMode) colors.onSurface else colors.surface
                 } else {
                     Color.Transparent
                 }
@@ -482,10 +485,10 @@ internal fun <T> StatisticsSegmentedControl(
                     Text(
                         text = option.label,
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (option.enabled) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        color = when {
+                            !option.enabled -> colors.onSurfaceVariant.copy(alpha = 0.45f)
+                            eInkMode && isSelected -> colors.surface
+                            else -> colors.onSurface
                         },
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         maxLines = 1,

@@ -17,16 +17,20 @@ import org.junit.Test
 
 class StatisticsViewModelTest {
     @Test
-    fun initialStateShowsAllHistoryAndBuildsChartAndBooksTogether() = runBlocking {
+    fun initialStateShowsCurrentWeekWhileHeatmapRetainsAllHistory() = runBlocking {
         viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 2_000))).use { vm ->
+            assertEquals(StatisticsRangeMode.Week, vm.uiState.value.currentRange.mode)
             vm.reload()
             val state = vm.uiState.value
-            assertEquals(StatisticsRangeMode.All, state.currentRange.mode)
+            val weekStart = statisticsStartOfWeek(LocalDate.parse("2026-06-30"))
+            assertEquals(StatisticsRangeMode.Week, state.currentRange.mode)
+            assertEquals(StatisticsDateRange(weekStart, weekStart.plusDays(6)), state.currentRange.range)
+            assertEquals(state.currentRange.pageCount - 1, state.currentRange.selectedPage)
             assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2025-12-20")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
             assertEquals(2, state.heatmap.days.size)
             assertEquals(LocalDate.parse("2026-06-30"), state.today.date)
             assertEquals(7, state.currentRange.trendPoints.size)
-            assertEquals(3_000, state.currentRange.summary.totalCharacters)
+            assertEquals(2_000, state.currentRange.summary.totalCharacters)
             assertEquals(null, state.currentRange.selectedBucket)
         }
     }
@@ -35,6 +39,7 @@ class StatisticsViewModelTest {
     fun emptyAllShowsTodayWithoutInventingActivity() = runBlocking {
         viewModel(snapshot = snapshot()).use { vm ->
             vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.All))
             val state = vm.uiState.value
             assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2026-06-30")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
             assertEquals(emptyList<StatisticsHeatmapDayUi>(), state.heatmap.days)
@@ -124,6 +129,7 @@ class StatisticsViewModelTest {
     fun longHistoryKeepsSparseHeatmapAndMonthlyChart() = runBlocking {
         viewModel(snapshot = snapshot(day("2001-01-01", 6_000), day("2026-06-30", 5_000))).use { vm ->
             vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.All))
             val state = vm.uiState.value
             assertEquals(2, state.heatmap.days.size)
             assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2001-01-01")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
