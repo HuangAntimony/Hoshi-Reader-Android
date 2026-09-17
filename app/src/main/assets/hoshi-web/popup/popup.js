@@ -2104,6 +2104,7 @@ function flushPendingHistoryRestore() {
 }
 
 function redirect(count, scrollTop = 0, query = null) {
+    sourceTextGeneration++;
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
     resetDictionaryMediaObserver();
@@ -2174,6 +2175,7 @@ function buildKanjiEntry(data) {
 }
 
 function redirectKanji(data) {
+    sourceTextGeneration++;
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
     resetDictionaryMediaObserver();
@@ -2219,10 +2221,10 @@ function renderSourceText(sourceText, sentenceOffset = null) {
         return span;
     }));
     container.onclick = async (event) => {
-        const generation = sourceTextGeneration;
         event.stopPropagation();
         const index = event.target.dataset.index;
         if (index === undefined) return;
+        const generation = ++sourceTextGeneration;
         const start = Number(index);
         const count = await webkit.messageHandlers.lookupRedirect.postMessage(chars.slice(start).join(''));
         if (!count || generation !== sourceTextGeneration) return;

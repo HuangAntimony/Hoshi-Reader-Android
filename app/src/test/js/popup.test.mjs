@@ -451,6 +451,95 @@ test('reset or replacement discards pending source redirect replies', async () =
     }
 });
 
+test('later source tap invalidates an earlier lookup awaiting redirect', async () => {
+    let resolveFirstLookup;
+    const entry = { expression: '犬', reading: 'いぬ', matched: '犬', glossaries: [], frequencies: [], pitches: [] };
+    const setup = popupContext({
+        lookupRedirect: query => query === '猫犬'
+            ? new Promise(resolve => { resolveFirstLookup = resolve; })
+            : 1,
+        getEntry: () => entry,
+    });
+    setup.context.window.replacePopupResults(0, [], '猫犬');
+    const source = setup.searchTextContainer;
+    const first = source.onclick({ target: source.children[0], stopPropagation() {} });
+    await flushAsyncWork();
+    const second = source.onclick({ target: source.children[1], stopPropagation() {} });
+    await second;
+    assert.deepEqual(source.children.map(span => span.classList.contains('matched')), [false, true]);
+
+    resolveFirstLookup(1);
+    await first;
+    assert.deepEqual(source.children.map(span => span.classList.contains('matched')), [false, true]);
+});
+
+test('later source tap invalidates an earlier lookup awaiting its entry', async () => {
+    let resolveFirstEntry;
+    let entryRequests = 0;
+    const entry = { expression: '犬', reading: 'いぬ', matched: '犬', glossaries: [], frequencies: [], pitches: [] };
+    const setup = popupContext({
+        lookupRedirect: () => 1,
+        getEntry: () => ++entryRequests === 1
+            ? new Promise(resolve => { resolveFirstEntry = resolve; })
+            : entry,
+    });
+    setup.context.window.replacePopupResults(0, [], '猫犬');
+    const source = setup.searchTextContainer;
+    const first = source.onclick({ target: source.children[0], stopPropagation() {} });
+    await flushAsyncWork();
+    const second = source.onclick({ target: source.children[1], stopPropagation() {} });
+    await second;
+    assert.deepEqual(source.children.map(span => span.classList.contains('matched')), [false, true]);
+
+    resolveFirstEntry(entry);
+    await first;
+    assert.deepEqual(source.children.map(span => span.classList.contains('matched')), [false, true]);
+});
+
+test('glossary redirect invalidates a source lookup awaiting its entry', async () => {
+    let resolveSourceEntry;
+    let entryRequests = 0;
+    const entry = { expression: '犬', reading: 'いぬ', matched: '犬', glossaries: [], frequencies: [], pitches: [] };
+    const setup = popupContext({
+        lookupRedirect: () => 1,
+        getEntry: () => ++entryRequests === 1
+            ? new Promise(resolve => { resolveSourceEntry = resolve; })
+            : entry,
+    });
+    setup.context.window.replacePopupResults(0, [], '猫犬');
+    const source = setup.searchTextContainer;
+    const pending = source.onclick({ target: source.children[0], stopPropagation() {} });
+    await flushAsyncWork();
+
+    setup.context.redirect(3, 0, '犬');
+    resolveSourceEntry(entry);
+    await pending;
+
+    assert.equal(setup.context.window.entryCount, 3);
+    assert.equal(source.children.some(span => span.classList.contains('matched')), false);
+});
+
+test('Kanji redirect invalidates a source lookup awaiting redirect', async () => {
+    let resolveLookup;
+    const entry = { expression: '猫', reading: 'ねこ', matched: '猫', glossaries: [], frequencies: [], pitches: [] };
+    const setup = popupContext({
+        lookupRedirect: () => new Promise(resolve => { resolveLookup = resolve; }),
+        getEntry: () => entry,
+    });
+    setup.context.window.replacePopupResults(0, [], '猫犬');
+    const pending = setup.searchTextContainer.onclick({
+        target: setup.searchTextContainer.children[0],
+        stopPropagation() {},
+    });
+    await flushAsyncWork();
+
+    setup.context.redirectKanji({ character: '犬', entries: [] });
+    resolveLookup(1);
+    await pending;
+
+    assert.equal(setup.entriesContainer.children[0].classList.contains('kanji-entry'), true);
+});
+
 test('source zero-result lookup preserves results highlight and scroll; replacement and reset clear source', async () => {
     let count = 1;
     let calls = 0;
