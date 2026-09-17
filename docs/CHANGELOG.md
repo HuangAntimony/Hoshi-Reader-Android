@@ -12,7 +12,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires
   confirmation. Daily records use compact grouped rows with dates and character
-  counts on the left, durations and navigation arrows on the right.
+  counts on the left, durations and navigation arrows on the right. Archived
+  books have a small trash marker in the book list and share the same compact
+  detail header as local books.
 - Add natural calendar periods and all-time Statistics overview, with compact
   period controls in the Reading Time card and all-time selected by default.
   Tap chart bars to inspect a day within a week/month or a month within a

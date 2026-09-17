@@ -765,7 +765,6 @@
     </plurals>
     <string name="statistics_operation_failed">无法更新或加载统计，请重试。</string>
     <string name="statistics_book_unavailable">这本书的统计已不存在。</string>
-    <string name="statistics_archived_book">已归档</string>
     <string name="statistics_delete_all">删除全部统计</string>
     <string name="statistics_delete_all_confirmation">删除这本书的全部本地统计？与云端统计合并时，已删除的记录可能恢复。</string>
     <string name="statistics_edit_hours">小时</string>

@@ -3,7 +3,7 @@ package moe.antimony.hoshi.features.statistics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
@@ -96,7 +96,10 @@ private fun DistributionRow(row: BookDistributionRow, onClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (row.isArchived) {
-                    Icon(Icons.Rounded.Archive, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Icon(
+                        Icons.Outlined.Delete, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp),
+                    )
                 }
                 Text(
                     text = row.title,

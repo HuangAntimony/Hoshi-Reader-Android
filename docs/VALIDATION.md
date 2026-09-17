@@ -262,6 +262,9 @@ Preserve existing app data when validating statistics:
 - Delete one book and a selected batch with active dates, no activity and an
   undecodable cover. Active history remains visible with an archive marker;
   required archive write/read failures keep the affected book and show an error.
+  The distribution marks archived books with a small trash icon; their detail
+  page has the same compact book title and Days section as local books, without
+  an extra Archived label.
   Restore the same normalized folder via EPUB, Drive, TTU and Books `.hoshi`;
   newer dates win, equal dates keep the specified first input, and interrupted
   restore duplicates are counted once. Include NFC/NFD-equivalent paths and

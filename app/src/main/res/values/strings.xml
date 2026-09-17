@@ -767,7 +767,6 @@
     </plurals>
     <string name="statistics_operation_failed">Could not update or load statistics. Please try again.</string>
     <string name="statistics_book_unavailable">Statistics for this book are no longer available.</string>
-    <string name="statistics_archived_book">Archived</string>
     <string name="statistics_delete_all">Delete All Statistics</string>
     <string name="statistics_delete_all_confirmation">Delete all local statistics for this book? Merging with synced statistics may restore deleted records.</string>
     <string name="statistics_edit_hours">Hours</string>

@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,7 +83,15 @@ internal fun StatisticsBookView(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(state.book?.title ?: stringResource(R.string.statistics_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    Text(
+                        state.book?.title ?: stringResource(R.string.statistics_title),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 navigationIcon = {
                     IconButton(enabled = !state.isSaving, onClick = onClose) {
@@ -101,9 +110,6 @@ internal fun StatisticsBookView(
             if (!state.isLoading && book == null) {
                 item { Text(stringResource(R.string.statistics_book_unavailable)) }
             } else if (book != null) {
-                if (book.isArchived) item {
-                    Text(stringResource(R.string.statistics_archived_book), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 if (book.statistics.isEmpty()) item { Text(stringResource(R.string.statistics_no_reading_records)) }
                 if (book.statistics.isNotEmpty()) item {
                     StatisticsSectionHeading(stringResource(R.string.statistics_days_heading), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
