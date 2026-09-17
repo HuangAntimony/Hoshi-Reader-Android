@@ -2,34 +2,18 @@ package moe.antimony.hoshi.features.statistics
 
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import moe.antimony.hoshi.ui.UiText
 
 internal enum class StatisticsRangeMode {
-    Day,
     Week,
     Month,
     Year,
     All,
 }
 
-internal enum class StatisticsCalendarWindowKind {
-    RecentYear,
-    FixedYear,
-}
-
-internal data class StatisticsCalendarWindowSelection(
-    val kind: StatisticsCalendarWindowKind,
-    val year: Int? = null,
-)
-
 internal enum class DailyTargetType {
     Characters,
     Duration,
-}
-
-internal enum class CurrentRangeTab {
-    Overview,
-    Trend,
-    Distribution,
 }
 
 internal data class StatisticsDateRange(
@@ -121,49 +105,42 @@ internal data class BookDistributionRow(
     val coverPath: String?,
     val characters: Int,
     val readingSeconds: Double,
-    val percent: Int,
+    val timeFraction: Float,
 )
 
-internal data class StatisticsCalendarDayUi(
+internal data class StatisticsHeatmapDayUi(
     val date: LocalDate,
     val heatLevel: Int,
-    val characters: Int,
-    val readingSeconds: Double,
-    val targetPercent: Int,
-    val targetMet: Boolean,
-    val inSelectedRange: Boolean,
-    val isAnchor: Boolean,
 )
 
-internal data class StatisticsCalendarUi(
-    val windowSelection: StatisticsCalendarWindowSelection = StatisticsCalendarWindowSelection(
-        StatisticsCalendarWindowKind.RecentYear,
-    ),
-    val availableWindows: List<StatisticsCalendarWindowSelection> = listOf(
-        StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.RecentYear),
-    ),
+internal data class StatisticsHeatmapUi(
     val windowRange: StatisticsDateRange,
-    val rangeMode: StatisticsRangeMode = StatisticsRangeMode.Year,
-    val anchorDate: LocalDate,
-    val selectedRange: StatisticsDateRange,
-    val selectedRangeTitle: String,
-    val days: List<StatisticsCalendarDayUi> = emptyList(),
+    val days: List<StatisticsHeatmapDayUi> = emptyList(),
+)
+
+internal data class StatisticsChartPage(
+    val points: List<StatisticsTrendPoint>,
+    val averageSeconds: Double,
 )
 
 internal data class CurrentRangeStatisticsUi(
-    val mode: StatisticsRangeMode = StatisticsRangeMode.Year,
-    val selectedTab: CurrentRangeTab = CurrentRangeTab.Overview,
-    val title: String,
+    val mode: StatisticsRangeMode = StatisticsRangeMode.All,
+    val range: StatisticsDateRange,
+    val pageCount: Int = 1,
+    val selectedPage: Int = 0,
+    val chartPages: Map<Int, StatisticsChartPage> = emptyMap(),
     val summary: StatisticsRangeSummary,
+    val selectedBucket: StatisticsDateRange? = null,
+    val trendAverageSeconds: Double = 0.0,
+    val periodChangePercent: Double? = null,
     val trendPoints: List<StatisticsTrendPoint> = emptyList(),
     val distributionRows: List<BookDistributionRow> = emptyList(),
-    val canNavigatePrevious: Boolean = false,
-    val canNavigateNext: Boolean = false,
 )
 
 internal data class StatisticsTargetSettingsUi(
     val values: StatisticsTargetSettings = StatisticsTargetSettings(),
-    val isEditorExpanded: Boolean = false,
+    val isEditorVisible: Boolean = false,
+    val error: UiText? = null,
 )
 
 internal data class StatisticsEmptyState(
@@ -188,20 +165,19 @@ internal data class StatisticsUiState(
     val isLoading: Boolean = true,
     val today: TodayStatisticsUi,
     val settings: StatisticsTargetSettingsUi,
-    val calendar: StatisticsCalendarUi,
+    val heatmap: StatisticsHeatmapUi,
     val currentRange: CurrentRangeStatisticsUi,
     val emptyState: StatisticsEmptyState? = null,
     val history: StatisticsHistoryUi = StatisticsHistoryUi(),
 )
 
 internal sealed interface StatisticsEvent {
-    data object ToggleTargetSettings : StatisticsEvent
+    data object OpenTargetSettings : StatisticsEvent
+    data object DismissTargetSettings : StatisticsEvent
     data class SelectDailyTargetType(val type: DailyTargetType) : StatisticsEvent
     data class UpdateDailyCharacterTarget(val characters: Int) : StatisticsEvent
     data class UpdateDailyDurationTargetMinutes(val minutes: Int) : StatisticsEvent
-    data class SelectCalendarWindow(val window: StatisticsCalendarWindowSelection) : StatisticsEvent
     data class SelectRangeMode(val mode: StatisticsRangeMode) : StatisticsEvent
-    data class SelectCalendarDate(val date: LocalDate) : StatisticsEvent
-    data class NavigatePeriod(val offset: Int) : StatisticsEvent
-    data class SelectCurrentRangeTab(val tab: CurrentRangeTab) : StatisticsEvent
+    data class SelectPeriodPage(val index: Int) : StatisticsEvent
+    data class SelectTrendBucket(val key: String?) : StatisticsEvent
 }

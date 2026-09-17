@@ -201,7 +201,7 @@ class HoshiBackupRepositoryTest {
         assertEquals(exactMetadata, filesDir.resolve("Books/exact-book/metadata.json").readText())
         assertEquals(crossBookMetadata, filesDir.resolve("Books/cross-book/metadata.json").readText())
 
-        val entry = BookRepository(filesDir).loadBookEntries().single { it.metadata.id.endsWith("1") }
+        val entry = BookRepository(filesDir).loadBookEntries().single { it.metadata.id == "00000000-0000-0000-0000-000000000001" }
         assertEquals(restoredRoot.resolve(nfcEpub).canonicalFile, BookRepository(filesDir).epubFile(entry)?.canonicalFile)
         assertEquals(restoredRoot.resolve(nfcCover).canonicalFile, BookRepository(filesDir).coverFile(entry)?.canonicalFile)
     }

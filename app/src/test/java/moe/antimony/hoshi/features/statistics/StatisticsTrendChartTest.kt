@@ -1,34 +1,34 @@
 package moe.antimony.hoshi.features.statistics
 
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StatisticsTrendChartTest {
     @Test
-    fun axisMarginsGrowToFitMeasuredAxisLabels() {
-        val margins = trendChartAxisMargins(
-            leftLabelWidthsPx = listOf(72f, 44f, 8f),
-            rightLabelWidthsPx = listOf(96f, 48f, 8f),
-            minLeftPx = 32f,
-            minRightPx = 38f,
-            labelPaddingPx = 6f,
-        )
-
-        assertEquals(78f, margins.leftPx, 0.0f)
-        assertEquals(102f, margins.rightPx, 0.0f)
+    fun tapsUseBucketWidthIncludingEmptyBucketsAndExcludeYAxis() {
+        assertEquals(0, trendBucketIndex(0f, 300f, 12))
+        assertEquals(1, trendBucketIndex(25f, 300f, 12))
+        assertEquals(11, trendBucketIndex(299f, 300f, 12))
+        assertEquals(null, trendBucketIndex(300f, 300f, 12))
+        assertEquals(null, trendBucketIndex(-1f, 300f, 12))
+        assertEquals(null, trendBucketIndex(10f, 0f, 0))
     }
 
     @Test
-    fun axisMarginsKeepMinimumForShortAxisLabels() {
-        val margins = trendChartAxisMargins(
-            leftLabelWidthsPx = listOf(12f, 10f, 8f),
-            rightLabelWidthsPx = listOf(14f, 12f, 8f),
-            minLeftPx = 32f,
-            minRightPx = 38f,
-            labelPaddingPx = 6f,
-        )
+    fun chartBucketsResolveDailyAndMonthlyRanges() {
+        val leapDay = LocalDate.parse("2024-02-29")
+        assertEquals(StatisticsDateRange(leapDay, leapDay), statisticsTrendBucket(StatisticsRangeMode.Week, "2024-02-29"))
+        assertEquals(StatisticsDateRange(LocalDate.parse("2024-02-01"), leapDay), statisticsTrendBucket(StatisticsRangeMode.All, "2024-02"))
+        assertEquals(null, statisticsTrendBucket(StatisticsRangeMode.Year, "invalid"))
+    }
 
-        assertEquals(32f, margins.leftPx, 0.0f)
-        assertEquals(38f, margins.rightPx, 0.0f)
+    @Test
+    fun longHistoryHasBoundedAxisLabelsAndWeekShowsEveryDay() {
+        assertEquals((0..6).toList(), trendLabelIndexes(7, StatisticsRangeMode.Week))
+        assertTrue(trendLabelIndexes(306, StatisticsRangeMode.All).size <= 3)
+        assertTrue(trendLabelIndexes(31, StatisticsRangeMode.Month).size <= 6)
+        assertEquals(emptyList<Int>(), trendLabelIndexes(0, StatisticsRangeMode.All))
     }
 }

@@ -253,7 +253,7 @@ Preserve existing app data when validating statistics:
 - After upgrading with the former statistics and tab switches disabled, Stats
   is still visible. Its upper-right Settings button opens the tab-local settings
   route; returning from settings or a book editor preserves dashboard period,
-  selected panel, heatmap scroll and page scroll. Advanced has no Statistics row.
+  selected chart bucket, heatmap scroll and page scroll. Advanced has no Statistics row.
 - Unset statistics sync defaults on; an explicit opt-out remains off. Both
   autostart options default off and work independently. Opening Stats does not
   start tracking, and existing daily goals and Reader display preferences stay
@@ -267,28 +267,52 @@ Preserve existing app data when validating statistics:
   restore duplicates are counted once. Include NFC/NFD-equivalent paths and
   iOS archives with omitted cover metadata or long folder names.
 - Open a distribution row from a short period and verify that the editor shows
-  all dates in ascending order. Check half-minute rounding, character/hour/minute
+  all dates in ascending order. Verify grouped row dividers, date and character
+  count on the left, duration and chevron on the right, and matching chevrons in
+  the book distribution. Check half-minute rounding, character/hour/minute
   editing, cancel, zero removal, single-day deletion from inside the edit sheet
   (no delete action on the date list), confirmed delete-all,
   last-archive cleanup and confirmed archive clearing. Failures retain input;
   return/resume refreshes aggregates. Merge may restore remote deleted records;
   deleting locally does not claim to clear the remote copy.
-- The dashboard flows from daily goals to calendar and selected-period results,
-  with no This Week card or weekly target editor. Upgrades ignore legacy weekly
-  targets while preserving daily goals and reading records.
-- Check year as the initial overview, natural weeks across year boundaries,
-  leap February, Sunday- and Monday-first locales, incomplete current periods,
-  zero buckets, monthly year/all buckets and cross-year labels. Heatmap window
-  selection must not clip or reset the overview. Range modes and period arrows
-  remain in the calendar card beside its selected range. Day taps change year/all to day
-  while week/month retain their modes; next cannot enter a future period.
+- The dashboard contains Daily Goal (gauge, history and display-only heatmap),
+  Reading Time, and Books, with uniform headings and grouped cards. There is no
+  separate calendar, heatmap date selection, yearly dropdown, Day segment,
+  This Week card or weekly target editor. Upgrades preserve daily goals and data.
+- Tap the daily goal to open the anchored value wheel without moving the page.
+  It starts at the saved value, snaps after scrolling, and supports tapping a
+  nearby value. Switching Characters/Duration preserves each saved target;
+  outside tap and Back dismiss it. Cover both ends of each range, reopen,
+  E-ink contrast and persistence failure/retry.
+- Check All as the initial reading-time period. Week/Month/Year/All switching
+  lives in Reading Time; each mode starts at the current period. Swipe the chart
+  to browse earlier natural periods, stopping at the first activity and today;
+  All does not page. Check cross-year weeks, leap February, locale week starts,
+  empty buckets and incomplete periods. Only selected/adjacent chart pages are
+  prepared even with decades of sparse history.
+- The heatmap shows all history and initially scrolls to the latest dates.
+  Reading intensity grows with character counts across all history; today
+  has a subtle outline and the Less/More legend matches. Taps have no action. Changing chart mode,
+  page or bucket must not move or recolor the heatmap. Manual heatmap scrolling
+  and settings/editor round trips preserve its position.
+- Reading-time bars, summary rows and book rows display together. Within
+  week/month a bar selects a day; within year/all it selects a month. The
+  full chart remains while the headline, summary and books follow that bucket.
+  Re-tapping the bar or the close button clears it; paging or changing mode
+  also clears it. Settings/editor round trips and refresh preserve selection.
+  Check empty buckets, the first partial month and future-bucket rejection.
+  Book bars rank by time independently of goal type, five rows show initially,
+  Show More expands the list, and no Books section appears for an empty result.
 - Compare average duration and prior-period percentages with missing reading
   days/months, including prior average zero. Goal history spans active and
   archived books regardless of selected period, recalculates after goal changes,
   and picks the earliest equal longest streak or best day.
 - Exercise the daily-goal semicircle and its compact history metrics with both
   goal types, zero/partial/over-goal values, Chinese narrow screens, large values,
-  the edit keyboard and E-ink contrast. Archive JPEG decoding/scaling needs a device check in addition
+  the day-edit keyboard and E-ink contrast. Check that all section headings share
+  the same style and inset, that compact chart/summary/book rows stay legible,
+  and that history metric values and their detail rows align across both columns.
+  Archive JPEG decoding/scaling needs a device check in addition
   to generated-file JVM tests.
 
 ## Dictionary, Audio, And Anki

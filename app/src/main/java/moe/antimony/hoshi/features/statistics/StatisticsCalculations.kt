@@ -7,18 +7,6 @@ import java.time.temporal.WeekFields
 import java.util.Locale
 import kotlin.math.roundToInt
 
-internal fun recentYearStatisticsWindow(today: LocalDate): StatisticsDateRange =
-    StatisticsDateRange(
-        start = today.minusYears(1).plusDays(1),
-        end = today,
-    )
-
-internal fun fixedYearStatisticsWindow(year: Int, today: LocalDate): StatisticsDateRange =
-    StatisticsDateRange(
-        start = LocalDate.of(year, 1, 1),
-        end = if (year == today.year) today else LocalDate.of(year, 12, 31),
-    )
-
 internal fun selectedStatisticsRange(
     mode: StatisticsRangeMode,
     anchor: LocalDate,
@@ -37,7 +25,6 @@ internal fun selectedStatisticsRange(
         StatisticsRangeMode.Week -> statisticsStartOfWeek(boundedAnchor, locale).let { start ->
             StatisticsDateRange(start, start.plusDays(6))
         }
-        StatisticsRangeMode.Day -> StatisticsDateRange(boundedAnchor, boundedAnchor)
         StatisticsRangeMode.All -> StatisticsDateRange(minOf(firstActivity ?: today, today), today)
     }
 }
@@ -57,7 +44,7 @@ internal fun shiftedStatisticsAnchor(
         StatisticsRangeMode.Week -> statisticsStartOfWeek(anchor, locale).plusWeeks(offset.toLong())
         StatisticsRangeMode.Month -> anchor.withDayOfMonth(1).plusMonths(offset.toLong())
         StatisticsRangeMode.Year -> anchor.withDayOfYear(1).plusYears(offset.toLong())
-        StatisticsRangeMode.Day, StatisticsRangeMode.All -> null
+        StatisticsRangeMode.All -> null
     }
 
 internal fun overviewRangeSummary(
@@ -134,35 +121,6 @@ internal fun StatisticsDayAggregate.targetRatio(settings: StatisticsTargetSettin
 internal fun StatisticsDayAggregate.isActiveReadingDay(): Boolean =
     totalCharacters > 0 || readingSeconds > 0.0
 
-internal const val ReadingHeatActiveLevelCount = 7
-
-internal fun readingHeatLevels(days: List<StatisticsDayAggregate>): Map<LocalDate, Int> {
-    val activeCharacterValues = days
-        .map { day -> day.totalCharacters }
-        .filter { characters -> characters > 0 }
-        .distinct()
-        .sorted()
-    val levelByCharacters = activeCharacterValues.adaptiveHeatLevels()
-    return days.associate { day ->
-        day.date to (levelByCharacters[day.totalCharacters] ?: 0)
-    }
-}
-
-private fun List<Int>.adaptiveHeatLevels(): Map<Int, Int> {
-    if (isEmpty()) {
-        return emptyMap()
-    }
-    if (size == 1) {
-        return mapOf(single() to ReadingHeatActiveLevelCount)
-    }
-    val maxIndex = lastIndex.toDouble()
-    return mapIndexed { index, characters ->
-        val normalizedRank = index.toDouble() / maxIndex
-        val level = 1 + (normalizedRank * (ReadingHeatActiveLevelCount - 1)).roundToInt()
-        characters to level.coerceIn(1, ReadingHeatActiveLevelCount)
-    }.toMap()
-}
-
 internal fun aggregateRange(
     days: List<StatisticsDayAggregate>,
     settings: StatisticsTargetSettings,
@@ -222,7 +180,6 @@ internal fun trendPoints(
     days: List<StatisticsDayAggregate>,
 ): List<StatisticsTrendPoint> =
     when (rangeMode) {
-        StatisticsRangeMode.Day -> emptyList()
         StatisticsRangeMode.Year, StatisticsRangeMode.All -> {
             val daysByMonth = days.filter { range.contains(it.date) }.groupBy { YearMonth.from(it.date) }
             val startMonth = YearMonth.from(range.start)
@@ -233,7 +190,7 @@ internal fun trendPoints(
                 val groupedDays = daysByMonth[month].orEmpty()
                 StatisticsTrendPoint(
                     key = month.toString(),
-                    label = if (range.start.year != range.end.year) month.toString() else "${month.monthValue}",
+                    label = if (rangeMode == StatisticsRangeMode.All || range.start.year != range.end.year) month.toString() else "${month.monthValue}",
                     characters = groupedDays.sumOf { it.totalCharacters },
                     readingSeconds = groupedDays.sumOf { it.readingSeconds },
                 )
@@ -258,7 +215,6 @@ internal fun trendPoints(
 
 internal fun distributionRows(
     days: List<StatisticsDayAggregate>,
-    settings: StatisticsTargetSettings,
 ): List<BookDistributionRow> {
     val grouped = linkedMapOf<String, MutableList<StatisticsBookContribution>>()
     days.flatMap { it.bookContributions }
@@ -278,24 +234,10 @@ internal fun distributionRows(
             readingSeconds = contributions.sumOf { it.readingSeconds },
         )
     }
-    val percentBase = when (settings.dailyTargetType) {
-        DailyTargetType.Characters -> totals.sumOf { it.characters }.toDouble()
-        DailyTargetType.Duration -> totals.sumOf { it.readingSeconds }
-    }
+    val maxReadingSeconds = totals.maxOfOrNull { it.readingSeconds } ?: 0.0
     return totals
-        .sortedWith(
-            compareByDescending<StatisticsBookContribution> {
-                when (settings.dailyTargetType) {
-                    DailyTargetType.Characters -> it.characters.toDouble()
-                    DailyTargetType.Duration -> it.readingSeconds
-                }
-            }.thenBy { it.title.lowercase() },
-        )
+        .sortedWith(compareByDescending<StatisticsBookContribution> { it.readingSeconds }.thenBy { it.title.lowercase() })
         .map { contribution ->
-            val percentValue = when (settings.dailyTargetType) {
-                DailyTargetType.Characters -> contribution.characters.toDouble()
-                DailyTargetType.Duration -> contribution.readingSeconds
-            }
             BookDistributionRow(
                 bookId = contribution.bookId,
                 folder = contribution.folder,
@@ -304,10 +246,10 @@ internal fun distributionRows(
                 coverPath = contribution.coverPath,
                 characters = contribution.characters,
                 readingSeconds = contribution.readingSeconds,
-                percent = if (percentBase > 0.0) {
-                    ((percentValue / percentBase) * 100.0).roundToInt().coerceIn(0, 100)
+                timeFraction = if (maxReadingSeconds > 0.0) {
+                    (contribution.readingSeconds / maxReadingSeconds).toFloat().coerceIn(0f, 1f)
                 } else {
-                    0
+                    0f
                 },
             )
         }
@@ -331,3 +273,54 @@ internal fun averageSpeedPerHour(characters: Int, readingSeconds: Double): Int =
     } else {
         0
     }
+
+/** Chart selection drills into a bucket without changing the enclosing reading-time period. */
+internal fun statisticsTrendBucket(mode: StatisticsRangeMode, key: String): StatisticsDateRange? =
+    runCatching {
+        when (mode) {
+            StatisticsRangeMode.Week, StatisticsRangeMode.Month -> LocalDate.parse(key).let { StatisticsDateRange(it, it) }
+            StatisticsRangeMode.Year, StatisticsRangeMode.All -> YearMonth.parse(key).let {
+                StatisticsDateRange(it.atDay(1), it.atEndOfMonth())
+            }
+        }
+    }.getOrNull()
+
+internal fun statisticsPeriodPageCount(mode: StatisticsRangeMode, firstDate: LocalDate, today: LocalDate): Int =
+    when (mode) {
+        StatisticsRangeMode.All -> 1
+        StatisticsRangeMode.Week -> ChronoUnit.WEEKS.between(statisticsStartOfWeek(firstDate), statisticsStartOfWeek(today)).toInt() + 1
+        StatisticsRangeMode.Month -> ChronoUnit.MONTHS.between(YearMonth.from(firstDate), YearMonth.from(today)).toInt() + 1
+        StatisticsRangeMode.Year -> today.year - firstDate.year + 1
+    }.coerceAtLeast(1)
+
+internal fun statisticsPeriodPageAnchor(mode: StatisticsRangeMode, page: Int, pageCount: Int, today: LocalDate): LocalDate =
+    shiftedStatisticsAnchor(mode, today, page - pageCount + 1) ?: today
+
+internal const val ReadingHeatActiveLevelCount = 7
+
+internal fun readingHeatLevels(days: List<StatisticsDayAggregate>): Map<LocalDate, Int> {
+    val activeCharacterValues = days
+        .map { day -> day.totalCharacters }
+        .filter { characters -> characters > 0 }
+        .distinct()
+        .sorted()
+    val levelByCharacters = activeCharacterValues.adaptiveHeatLevels()
+    return days.associate { day ->
+        day.date to (levelByCharacters[day.totalCharacters] ?: 0)
+    }
+}
+
+private fun List<Int>.adaptiveHeatLevels(): Map<Int, Int> {
+    if (isEmpty()) {
+        return emptyMap()
+    }
+    if (size == 1) {
+        return mapOf(single() to ReadingHeatActiveLevelCount)
+    }
+    val maxIndex = lastIndex.toDouble()
+    return mapIndexed { index, characters ->
+        val normalizedRank = index.toDouble() / maxIndex
+        val level = 1 + (normalizedRank * (ReadingHeatActiveLevelCount - 1)).roundToInt()
+        characters to level.coerceIn(1, ReadingHeatActiveLevelCount)
+    }.toMap()
+}

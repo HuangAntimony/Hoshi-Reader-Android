@@ -9,24 +9,31 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,9 +43,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +56,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.ui.asString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,9 +79,11 @@ internal fun StatisticsBookView(
     BackHandler(enabled = state.isSaving) { }
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(state.book?.title ?: stringResource(R.string.statistics_title)) },
+                title = { Text(state.book?.title ?: stringResource(R.string.statistics_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 navigationIcon = {
                     IconButton(enabled = !state.isSaving, onClick = onClose) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
@@ -92,19 +105,32 @@ internal fun StatisticsBookView(
                     Text(stringResource(R.string.statistics_archived_book), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (book.statistics.isEmpty()) item { Text(stringResource(R.string.statistics_no_reading_records)) }
-                items(book.statistics, key = { it.dateKey }) { statistic ->
-                    ListItem(
-                        modifier = Modifier.clickable(enabled = !state.isSaving) { viewModel.edit(statistic.dateKey) },
-                        headlineContent = { Text(statisticsEditorDate(statistic.dateKey)) },
-                        supportingContent = {
-                            Text(stringResource(R.string.statistics_distribution_meta_format,
-                                formatStatisticsDuration(statistic.readingTime), formatStatisticsCharacters(statistic.charactersRead)))
-                        },
-                    )
+                if (book.statistics.isNotEmpty()) item {
+                    StatisticsSectionHeading(stringResource(R.string.statistics_days_heading), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                }
+                itemsIndexed(book.statistics, key = { _, statistic -> statistic.dateKey }) { index, statistic ->
+                    val first = index == 0
+                    val last = index == book.statistics.lastIndex
+                    Surface(
+                        shape = RoundedCornerShape(
+                            topStart = if (first) 24.dp else 0.dp,
+                            topEnd = if (first) 24.dp else 0.dp,
+                            bottomStart = if (last) 24.dp else 0.dp,
+                            bottomEnd = if (last) 24.dp else 0.dp,
+                        ),
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        Column {
+                            StatisticsDayRow(statistic, enabled = !state.isSaving, onClick = { viewModel.edit(statistic.dateKey) })
+                            if (!last) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
                 }
                 if (book.statistics.isNotEmpty()) item {
-                    TextButton(enabled = !state.isSaving, onClick = { confirmDeleteAll = true }) {
-                        Text(stringResource(R.string.statistics_delete_all), color = MaterialTheme.colorScheme.error)
+                    Surface(Modifier.fillMaxWidth().padding(top = 16.dp), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                        TextButton(enabled = !state.isSaving, onClick = { confirmDeleteAll = true }, contentPadding = PaddingValues(16.dp)) {
+                            Text(stringResource(R.string.statistics_delete_all), modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -177,6 +203,29 @@ internal fun StatisticsBookView(
             text = { Text(error.asString()) },
             confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) } },
         )
+    }
+}
+
+@Composable
+private fun StatisticsDayRow(statistic: ReadingStatistics, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                statisticsEditorDate(statistic.dateKey), style = MaterialTheme.typography.bodyLarge,
+                autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp), maxLines = 1,
+            )
+            Text(formatStatisticsGroupedCount(statistic.charactersRead), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            formatStatisticsDuration(statistic.readingTime), modifier = Modifier.widthIn(max = 124.dp),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 14.sp), maxLines = 1,
+        )
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }
 }
 

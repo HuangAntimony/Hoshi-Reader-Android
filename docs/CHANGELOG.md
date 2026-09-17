@@ -11,10 +11,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Preserve deleted books' reading statistics in an archive, restore them on
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires
-  confirmation.
+  confirmation. Daily records use compact grouped rows with dates and character
+  counts on the left, durations and navigation arrows on the right.
 - Add natural calendar periods and all-time Statistics overview, with compact
-  period controls in the reading calendar, elapsed-period averages and
-  comparisons, plus historical goal streaks and best-day summaries.
+  period controls in the Reading Time card and all-time selected by default.
+  Tap chart bars to inspect a day within a week/month or a month within a
+  year/all-time period. Include elapsed-period averages and comparisons,
+  plus historical goal streaks and best-day summaries.
 - Support Anki tag handlebars such as `{document-title}` and `{expression}`,
   joining whitespace inside substituted values with underscores; new card
   formats default to the `hoshi` tag while saved tags stay unchanged.
@@ -54,9 +57,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and
   Page Turn autostart remain independent and default off.
-- Simplify Statistics to daily goals, the reading calendar, and the selected
-  period overview. Remove the separate This Week card and weekly goal; weekly
-  totals and trends remain available through the calendar.
+- Simplify Statistics to daily goals and reading-time results. Include a
+  display-only reading-intensity heatmap in the daily card and a compact
+  goal popup with a scrollable value picker. Show reading-time
+  bars, summary rows and time-ranked books
+  together instead of three tabs, with consistent section headings, grouped
+  cards and compact charts and rows. Remove the separate This Week card and weekly
+  goal; weekly totals and trends remain available through the reading-time chart.
 
 ### Fixed
 

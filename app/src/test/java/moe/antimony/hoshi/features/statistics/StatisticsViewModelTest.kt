@@ -11,35 +11,197 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class StatisticsViewModelTest {
     @Test
-    fun initialStateUsesRecentYearHeatmapAndNaturalYearAnchoredToToday() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day("2026-06-28", characters = 1_000),
-                day("2026-06-29", characters = 2_000),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsCalendarWindowKind.RecentYear, state.calendar.windowSelection.kind)
-            assertEquals(StatisticsRangeMode.Year, state.calendar.rangeMode)
-            assertEquals(LocalDate.parse("2026-06-30"), state.calendar.anchorDate)
-            assertEquals(CurrentRangeTab.Overview, state.currentRange.selectedTab)
+    fun initialStateShowsAllHistoryAndBuildsChartAndBooksTogether() = runBlocking {
+        viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 2_000))).use { vm ->
+            vm.reload()
+            val state = vm.uiState.value
+            assertEquals(StatisticsRangeMode.All, state.currentRange.mode)
+            assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2025-12-20")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
+            assertEquals(2, state.heatmap.days.size)
+            assertEquals(LocalDate.parse("2026-06-30"), state.today.date)
+            assertEquals(7, state.currentRange.trendPoints.size)
+            assertEquals(3_000, state.currentRange.summary.totalCharacters)
+            assertEquals(null, state.currentRange.selectedBucket)
         }
     }
 
     @Test
-    fun recentYearWithNoRecordsAnchorsToWindowEnd() = runBlocking {
-        viewModel(snapshot = snapshot()).use { viewModel ->
-            viewModel.reload()
-
-            assertEquals(LocalDate.parse("2026-06-30"), viewModel.uiState.value.calendar.anchorDate)
+    fun emptyAllShowsTodayWithoutInventingActivity() = runBlocking {
+        viewModel(snapshot = snapshot()).use { vm ->
+            vm.reload()
+            val state = vm.uiState.value
+            assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2026-06-30")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
+            assertEquals(emptyList<StatisticsHeatmapDayUi>(), state.heatmap.days)
+            assertEquals(1, state.currentRange.trendPoints.size)
+            assertEquals(0, state.currentRange.summary.totalCharacters)
         }
     }
+
+    @Test
+    fun monthAndWeekChartSelectionFiltersSummaryAndBooksWithoutChangingOuterRange() = runBlocking {
+        val data = snapshot(
+            day("2026-06-29", contributions = listOf(contribution("a", "A", 1_000, 600.0))),
+            day("2026-06-30", contributions = listOf(contribution("b", "B", 2_000, 900.0))),
+        )
+        viewModel(snapshot = data).use { vm ->
+            vm.reload()
+            listOf(StatisticsRangeMode.Month, StatisticsRangeMode.Week).forEach { mode ->
+                vm.onEvent(StatisticsEvent.SelectRangeMode(mode))
+                val outer = vm.uiState.value
+                vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-06-29"))
+                val detail = vm.uiState.value
+                assertEquals(outer.heatmap, detail.heatmap)
+                assertEquals(outer.currentRange.trendPoints, detail.currentRange.trendPoints)
+                assertEquals(outer.currentRange.trendAverageSeconds, detail.currentRange.trendAverageSeconds, 0.0)
+                assertEquals(range("2026-06-29", "2026-06-29"), detail.currentRange.selectedBucket)
+                assertEquals(1_000, detail.currentRange.summary.totalCharacters)
+                assertEquals(600.0, detail.currentRange.summary.readingSeconds, 0.0)
+                assertEquals(listOf("A"), detail.currentRange.distributionRows.map { it.title })
+                assertEquals(null, detail.currentRange.summary.averageReadingTimeChangePercent)
+                vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-06-29"))
+                assertEquals(null, vm.uiState.value.currentRange.selectedBucket)
+                assertEquals(3_000, vm.uiState.value.currentRange.summary.totalCharacters)
+                assertEquals(listOf("B", "A"), vm.uiState.value.currentRange.distributionRows.map { it.title })
+            }
+        }
+    }
+
+    @Test
+    fun yearAndAllAllowMonthlyDrilldownIncludingPartialFirstMonth() = runBlocking {
+        viewModel(snapshot = snapshot(day("2026-02-15", 1_000), day("2026-06-30", 2_000))).use { vm ->
+            vm.reload()
+            listOf(StatisticsRangeMode.All, StatisticsRangeMode.Year).forEach { mode ->
+                vm.onEvent(StatisticsEvent.SelectRangeMode(mode))
+                val outer = vm.uiState.value.heatmap
+                vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-02"))
+                assertEquals(range("2026-02-01", "2026-02-28"), vm.uiState.value.currentRange.selectedBucket)
+                assertEquals(1_000, vm.uiState.value.currentRange.summary.totalCharacters)
+                assertEquals(outer, vm.uiState.value.heatmap)
+                vm.onEvent(StatisticsEvent.SelectTrendBucket(null))
+                assertEquals(3_000, vm.uiState.value.currentRange.summary.totalCharacters)
+            }
+        }
+    }
+
+    @Test
+    fun chartSupportsEmptyBucketsAndIgnoresFutureOrInvalidBuckets() = runBlocking {
+        viewModel(snapshot = snapshot(day("2026-02-15", 1_000))).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Year))
+            vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-03"))
+            assertEquals(range("2026-03-01", "2026-03-31"), vm.uiState.value.currentRange.selectedBucket)
+            assertEquals(0, vm.uiState.value.currentRange.summary.totalCharacters)
+            val current = vm.uiState.value.currentRange
+            listOf("2026-07", "2025-01", "invalid").forEach { key ->
+                vm.onEvent(StatisticsEvent.SelectTrendBucket(key))
+                assertEquals(current, vm.uiState.value.currentRange)
+            }
+        }
+    }
+
+    @Test
+    fun goalChangesDoNotChangeTimeBasedBookOrder() = runBlocking {
+        viewModel(snapshot = snapshot(day("2026-06-30", contributions = listOf(
+            contribution("fast", "Fast", 4_000, 600.0), contribution("slow", "Slow", 1_000, 1_800.0),
+        )))).use { vm ->
+            vm.reload()
+            assertEquals(100, vm.uiState.value.today.targetPercent)
+            val rows = vm.uiState.value.currentRange.distributionRows
+            assertEquals(listOf("Slow", "Fast"), rows.map { it.title })
+            vm.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
+            assertEquals(133, vm.uiState.value.today.targetPercent)
+            assertEquals(rows, vm.uiState.value.currentRange.distributionRows)
+        }
+    }
+
+    @Test
+    fun longHistoryKeepsSparseHeatmapAndMonthlyChart() = runBlocking {
+        viewModel(snapshot = snapshot(day("2001-01-01", 6_000), day("2026-06-30", 5_000))).use { vm ->
+            vm.reload()
+            val state = vm.uiState.value
+            assertEquals(2, state.heatmap.days.size)
+            assertEquals(StatisticsDateRange(statisticsStartOfWeek(LocalDate.parse("2001-01-01")), LocalDate.parse("2026-06-30")), state.heatmap.windowRange)
+            assertEquals(306, state.currentRange.trendPoints.size)
+            assertEquals(11_000, state.currentRange.summary.totalCharacters)
+        }
+    }
+
+    @Test
+    fun chartPeriodPagingIsBoundedAndDoesNotChangeHeatmap() = runBlocking {
+        viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 2_000))).use { vm ->
+            vm.reload()
+            val heatmap = vm.uiState.value.heatmap
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            assertEquals(7, vm.uiState.value.currentRange.pageCount)
+            assertEquals(6, vm.uiState.value.currentRange.selectedPage)
+            assertEquals(2_000, vm.uiState.value.currentRange.summary.totalCharacters)
+            vm.onEvent(StatisticsEvent.SelectPeriodPage(0))
+            assertEquals(range("2025-12-01", "2025-12-31"), vm.uiState.value.currentRange.range)
+            assertEquals(1_000, vm.uiState.value.currentRange.summary.totalCharacters)
+            assertEquals(heatmap, vm.uiState.value.heatmap)
+            listOf(-1, 7).forEach { index ->
+                vm.onEvent(StatisticsEvent.SelectPeriodPage(index))
+                assertEquals(0, vm.uiState.value.currentRange.selectedPage)
+            }
+        }
+    }
+
+    @Test
+    fun periodChangesResetToCurrentPeriodAndClearBucketWhileReloadPreservesIt() = runBlocking {
+        viewModel(snapshot = snapshot(day("2026-02-15", 1_000), day("2026-06-29", 2_000))).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-06-29"))
+            vm.reload()
+            assertEquals(range("2026-06-29", "2026-06-29"), vm.uiState.value.currentRange.selectedBucket)
+            vm.onEvent(StatisticsEvent.SelectPeriodPage(0))
+            assertEquals(null, vm.uiState.value.currentRange.selectedBucket)
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Year))
+            assertEquals(range("2026-01-01", "2026-12-31"), vm.uiState.value.currentRange.range)
+            assertEquals(null, vm.uiState.value.currentRange.selectedBucket)
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.All))
+            assertEquals(1, vm.uiState.value.currentRange.pageCount)
+            assertEquals(0, vm.uiState.value.currentRange.selectedPage)
+        }
+    }
+
+    @Test
+    fun heatmapIntensityUsesAllHistoryIndependentOfPeriod() = runBlocking {
+        viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 6_000))).use { vm ->
+            vm.reload()
+            val heatmap = vm.uiState.value.heatmap
+            assertEquals(listOf(1, 7), heatmap.days.map { it.heatLevel })
+            StatisticsRangeMode.entries.forEach { mode ->
+                vm.onEvent(StatisticsEvent.SelectRangeMode(mode))
+                assertEquals(heatmap, vm.uiState.value.heatmap)
+            }
+        }
+    }
+
+    @Test
+    fun deletingEarliestHistoryClampsPagerAndSummaryToRemainingPeriod() = runBlocking {
+        val first = CompletableDeferred(snapshot(day("2026-02-15", 1_000), day("2026-06-29", 2_000)))
+        val second = CompletableDeferred(snapshot(day("2026-06-29", 2_000)))
+        viewModel(repository = DeferredStatisticsRepository(first, second)).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            vm.onEvent(StatisticsEvent.SelectPeriodPage(0))
+            assertEquals(2, vm.uiState.value.currentRange.range.start.monthValue)
+            vm.reload()
+            assertEquals(1, vm.uiState.value.currentRange.pageCount)
+            assertEquals(0, vm.uiState.value.currentRange.selectedPage)
+            assertEquals(range("2026-06-01", "2026-06-30"), vm.uiState.value.currentRange.range)
+            assertEquals(2_000, vm.uiState.value.currentRange.summary.totalCharacters)
+        }
+    }
+
+    private fun range(start: String, end: String) = StatisticsDateRange(LocalDate.parse(start), LocalDate.parse(end))
 
     @Test
     fun dashboardUsesConfiguredResetTimeForCurrentStatisticsDay() = runBlocking {
@@ -57,250 +219,7 @@ class StatisticsViewModelTest {
         ).use { viewModel ->
             viewModel.reload()
 
-            assertEquals(LocalDate.parse("2026-06-29"), viewModel.uiState.value.calendar.anchorDate)
-        }
-    }
-
-    @Test
-    fun clickingDateFromYearModeSwitchesToDay() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
-
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsRangeMode.Day, state.calendar.rangeMode)
-            assertEquals(LocalDate.parse("2026-06-29"), state.calendar.anchorDate)
-        }
-    }
-
-    @Test
-    fun clickingDateFromWeekModeKeepsModeAndMovesAnchor() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Week))
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
-
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsRangeMode.Week, state.calendar.rangeMode)
-            assertEquals(LocalDate.parse("2026-06-29"), state.calendar.anchorDate)
-        }
-    }
-
-    @Test
-    fun switchingHeatmapWindowPreservesOverviewModeAndAnchor() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day("2025-02-01", characters = 1_000),
-                day("2026-06-29", characters = 2_000),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
-            viewModel.onEvent(
-                StatisticsEvent.SelectCalendarWindow(
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2025),
-                ),
-            )
-
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsRangeMode.Month, state.calendar.rangeMode)
-            assertEquals(LocalDate.parse("2026-06-30"), state.calendar.anchorDate)
-            assertEquals(StatisticsDateRange(LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30")), state.calendar.selectedRange)
-        }
-    }
-
-    @Test
-    fun availableWindowsKeepRecentYearFirstAndFixedYearsDescending() = runBlocking {
-        viewModel(
-            snapshot = StatisticsSnapshot(
-                days = listOf(day("2024-01-01", characters = 1_000)),
-                availableYears = listOf(2024, 2026, 2025),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-
-            assertEquals(
-                listOf(
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.RecentYear),
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2026),
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2025),
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2024),
-                ),
-                viewModel.uiState.value.calendar.availableWindows,
-            )
-        }
-    }
-
-    @Test
-    fun fixedWindowWithoutRecordsDoesNotMoveOverviewAnchor() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(
-                StatisticsEvent.SelectCalendarWindow(
-                    StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2025),
-                ),
-            )
-
-            assertEquals(LocalDate.parse("2026-06-30"), viewModel.uiState.value.calendar.anchorDate)
-        }
-    }
-
-    @Test
-    fun dayRangeForcesTrendTabBackToOverview() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Trend))
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Day))
-
-            assertEquals(CurrentRangeTab.Overview, viewModel.uiState.value.currentRange.selectedTab)
-        }
-    }
-
-    @Test
-    fun calendarHeatLevelsUseWindowWhenShortRangeIsSelected() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day("2026-06-01", characters = 6_000),
-                day("2026-06-15", characters = 7_000),
-                day("2026-06-29", characters = 8_000),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Week))
-
-            val state = viewModel.uiState.value
-            val daysByDate = state.calendar.days.associateBy { it.date }
-
-            assertEquals(StatisticsRangeMode.Week, state.calendar.rangeMode)
-            assertEquals(false, daysByDate.getValue(LocalDate.parse("2026-06-01")).inSelectedRange)
-            assertEquals(1, daysByDate.getValue(LocalDate.parse("2026-06-01")).heatLevel)
-            assertEquals(4, daysByDate.getValue(LocalDate.parse("2026-06-15")).heatLevel)
-            assertEquals(7, daysByDate.getValue(LocalDate.parse("2026-06-29")).heatLevel)
-        }
-    }
-
-    @Test
-    fun clickingDateFromTrendYearModeSwitchesToDayAndReturnsToOverview() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 2_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Trend))
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
-
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsRangeMode.Day, state.calendar.rangeMode)
-            assertEquals(CurrentRangeTab.Overview, state.currentRange.selectedTab)
-        }
-    }
-
-    @Test
-    fun dayRangeSummaryKeepsTargetProgressForOverviewMetric() = runBlocking {
-        viewModel(snapshot = snapshot(day("2026-06-29", characters = 6_250))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
-
-            val summary = viewModel.uiState.value.currentRange.summary
-            assertEquals(1, summary.targetDays)
-            assertEquals(125, summary.targetProgressPercent)
-        }
-    }
-
-    @Test
-    fun targetSettingsUpdatesRecomputeTodayHistoryCurrentRangeAndDistribution() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day(
-                    "2026-06-30",
-                    contributions = listOf(
-                        contribution("fast", "Fast", characters = 4_000, seconds = 600.0),
-                        contribution("slow", "Slow", characters = 1_000, seconds = 1_800.0),
-                    ),
-                ),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-
-            assertEquals(100, viewModel.uiState.value.today.targetPercent)
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Distribution))
-            assertEquals(listOf("Fast", "Slow"), viewModel.uiState.value.currentRange.distributionRows.map { it.title })
-
-            viewModel.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
-            viewModel.onEvent(StatisticsEvent.UpdateDailyDurationTargetMinutes(30))
-
-            val state = viewModel.uiState.value
-            assertEquals(133, state.today.targetPercent)
-            assertEquals(1, state.history.metDays)
-            assertEquals(1, state.currentRange.summary.targetDays)
-            assertEquals(listOf("Slow", "Fast"), state.currentRange.distributionRows.map { it.title })
-        }
-    }
-
-    @Test
-    fun distributionRowsAreOnlyBuiltForDistributionTab() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day(
-                    "2026-06-30",
-                    contributions = listOf(
-                        contribution("fast", "Fast", characters = 4_000, seconds = 600.0),
-                        contribution("slow", "Slow", characters = 1_000, seconds = 1_800.0),
-                    ),
-                ),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-
-            assertEquals(CurrentRangeTab.Overview, viewModel.uiState.value.currentRange.selectedTab)
-            assertEquals(emptyList<BookDistributionRow>(), viewModel.uiState.value.currentRange.distributionRows)
-
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Distribution))
-
-            assertEquals(
-                listOf("Fast", "Slow"),
-                viewModel.uiState.value.currentRange.distributionRows.map { it.title },
-            )
-
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Overview))
-
-            assertEquals(emptyList<BookDistributionRow>(), viewModel.uiState.value.currentRange.distributionRows)
-        }
-    }
-
-    @Test
-    fun trendPointsAreOnlyBuiltForTrendTab() = runBlocking {
-        viewModel(
-            snapshot = snapshot(
-                day("2026-06-01", characters = 1_000, seconds = 600.0),
-                day("2026-06-30", characters = 2_000, seconds = 900.0),
-            ),
-        ).use { viewModel ->
-            viewModel.reload()
-
-            assertEquals(CurrentRangeTab.Overview, viewModel.uiState.value.currentRange.selectedTab)
-            assertEquals(emptyList<StatisticsTrendPoint>(), viewModel.uiState.value.currentRange.trendPoints)
-
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Trend))
-
-            assertEquals(
-                listOf(
-                    "2026-01",
-                    "2026-02",
-                    "2026-03",
-                    "2026-04",
-                    "2026-05",
-                    "2026-06",
-                    "2026-07",
-                    "2026-08",
-                    "2026-09",
-                    "2026-10",
-                    "2026-11",
-                    "2026-12",
-                ),
-                viewModel.uiState.value.currentRange.trendPoints.map { it.key },
-            )
-
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Overview))
-
-            assertEquals(emptyList<StatisticsTrendPoint>(), viewModel.uiState.value.currentRange.trendPoints)
+            assertEquals(LocalDate.parse("2026-06-29"), viewModel.uiState.value.today.date)
         }
     }
 
@@ -327,16 +246,51 @@ class StatisticsViewModelTest {
     }
 
     @Test
-    fun dailyTargetEditorTogglesInline() = runBlocking {
+    fun goalPickerOpenAndDismissPreserveDashboardSelection() = runBlocking {
         viewModel(snapshot = snapshot()).use { viewModel ->
             viewModel.reload()
-            assertEquals(false, viewModel.uiState.value.settings.isEditorExpanded)
+            assertEquals(false, viewModel.uiState.value.settings.isEditorVisible)
 
-            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings)
-            assertEquals(true, viewModel.uiState.value.settings.isEditorExpanded)
+            viewModel.onEvent(StatisticsEvent.OpenTargetSettings)
+            assertEquals(true, viewModel.uiState.value.settings.isEditorVisible)
 
-            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings)
-            assertEquals(false, viewModel.uiState.value.settings.isEditorExpanded)
+            viewModel.onEvent(StatisticsEvent.DismissTargetSettings)
+            assertEquals(false, viewModel.uiState.value.settings.isEditorVisible)
+        }
+    }
+
+    @Test
+    fun changingGoalMetricKeepsIndependentValuesAndHeatmap() = runBlocking {
+        viewModel(snapshot = snapshot(day("2026-06-30", characters = 5_000))).use { vm ->
+            vm.reload()
+            val heatmap = vm.uiState.value.heatmap
+            vm.onEvent(StatisticsEvent.OpenTargetSettings)
+            vm.onEvent(StatisticsEvent.UpdateDailyCharacterTarget(12_500))
+            vm.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Duration))
+            vm.onEvent(StatisticsEvent.UpdateDailyDurationTargetMinutes(45))
+            vm.onEvent(StatisticsEvent.SelectDailyTargetType(DailyTargetType.Characters))
+            vm.onEvent(StatisticsEvent.DismissTargetSettings)
+            assertEquals(12_500, vm.uiState.value.settings.values.dailyCharacterTarget)
+            assertEquals(45, vm.uiState.value.settings.values.dailyDurationTargetMinutes)
+            assertEquals(heatmap, vm.uiState.value.heatmap)
+        }
+    }
+
+    @Test
+    fun failedGoalUpdateKeepsPickerOpenAndCanRetry() = runBlocking {
+        var fail = true
+        viewModel(repository = FakeStatisticsRepository(snapshot()), beforeUpdate = {
+            if (fail) throw java.io.IOException("write failed")
+        }).use { vm ->
+            vm.onEvent(StatisticsEvent.OpenTargetSettings)
+            vm.onEvent(StatisticsEvent.UpdateDailyCharacterTarget(12_500))
+            assertEquals(5_000, vm.uiState.value.settings.values.dailyCharacterTarget)
+            assertEquals(true, vm.uiState.value.settings.isEditorVisible)
+            assertNotNull(vm.uiState.value.settings.error)
+            fail = false
+            vm.onEvent(StatisticsEvent.UpdateDailyCharacterTarget(12_500))
+            assertEquals(12_500, vm.uiState.value.settings.values.dailyCharacterTarget)
+            assertNull(vm.uiState.value.settings.error)
         }
     }
 
@@ -355,7 +309,7 @@ class StatisticsViewModelTest {
             firstLoad.complete(snapshot(day("2026-06-29", characters = 1_000)))
             yield()
 
-            assertEquals(LocalDate.parse("2026-06-30"), viewModel.uiState.value.calendar.anchorDate)
+            assertEquals(LocalDate.parse("2026-06-30"), viewModel.uiState.value.today.date)
         }
     }
 
@@ -384,63 +338,6 @@ class StatisticsViewModelTest {
         }
     }
 
-    @Test
-    fun periodNavigationPreservesHeatmapAndStopsBeforeFuturePeriod() = runBlocking {
-        viewModel(snapshot = snapshot(day("2024-02-29", 5_000))).use { viewModel ->
-            viewModel.reload()
-            val heatmap = viewModel.uiState.value.calendar.windowRange
-            assertEquals(false, viewModel.uiState.value.currentRange.canNavigateNext)
-            viewModel.onEvent(StatisticsEvent.NavigatePeriod(1))
-            assertEquals(2026, viewModel.uiState.value.calendar.selectedRange.start.year)
-            viewModel.onEvent(StatisticsEvent.NavigatePeriod(-1))
-            assertEquals(2025, viewModel.uiState.value.calendar.selectedRange.start.year)
-            assertEquals(true, viewModel.uiState.value.currentRange.canNavigateNext)
-            assertEquals(heatmap, viewModel.uiState.value.calendar.windowRange)
-            viewModel.onEvent(StatisticsEvent.NavigatePeriod(1))
-            assertEquals(2026, viewModel.uiState.value.calendar.selectedRange.start.year)
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.All))
-            assertEquals(false, viewModel.uiState.value.currentRange.canNavigatePrevious)
-            assertEquals(false, viewModel.uiState.value.currentRange.canNavigateNext)
-        }
-    }
-
-    @Test
-    fun allUsesCompleteHistoryAndDateClickSwitchesToDay() = runBlocking {
-        viewModel(snapshot = snapshot(day("2001-01-01", 6_000), day("2026-06-30", 5_000))).use { viewModel ->
-            viewModel.reload()
-            val history = viewModel.uiState.value.history
-            assertEquals(2, history.metDays)
-            assertEquals(LocalDate.parse("2001-01-01"), history.bestDay?.date)
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.All))
-            assertEquals(11_000, viewModel.uiState.value.currentRange.summary.totalCharacters)
-            assertEquals(LocalDate.parse("2001-01-01"), viewModel.uiState.value.calendar.selectedRange.start)
-            assertEquals(365, viewModel.uiState.value.calendar.days.size)
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2026-06-29")))
-            assertEquals(StatisticsRangeMode.Day, viewModel.uiState.value.currentRange.mode)
-            assertEquals(0, viewModel.uiState.value.currentRange.summary.totalCharacters)
-            assertEquals(history, viewModel.uiState.value.history)
-        }
-    }
-
-    @Test
-    fun monthDateSelectionChangesAnchorAndHeatmapWindowKeepsTrendTab() = runBlocking {
-        viewModel(snapshot = snapshot(day("2024-02-29", 5_000))).use { viewModel ->
-            viewModel.reload()
-            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
-            viewModel.onEvent(StatisticsEvent.SelectCalendarDate(LocalDate.parse("2024-02-29")))
-            viewModel.onEvent(StatisticsEvent.SelectCurrentRangeTab(CurrentRangeTab.Trend))
-            viewModel.onEvent(StatisticsEvent.SelectCalendarWindow(
-                StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, 2025),
-            ))
-            val state = viewModel.uiState.value
-            assertEquals(StatisticsRangeMode.Month, state.currentRange.mode)
-            assertEquals(CurrentRangeTab.Trend, state.currentRange.selectedTab)
-            assertEquals(LocalDate.parse("2024-02-29"), state.calendar.anchorDate)
-            assertEquals(29, state.currentRange.trendPoints.size)
-            assertEquals(5_000, state.currentRange.summary.totalCharacters)
-        }
-    }
-
     private fun viewModel(
         snapshot: StatisticsSnapshot,
         settings: StatisticsTargetSettings = StatisticsTargetSettings(),
@@ -459,6 +356,7 @@ class StatisticsViewModelTest {
         settings: StatisticsTargetSettings = StatisticsTargetSettings(),
         resetMinutes: Int = 0,
         dateProvider: StatisticsDateProvider = FakeStatisticsDateProvider(LocalDate.parse("2026-06-30")),
+        beforeUpdate: () -> Unit = {},
     ): ViewModelHandle {
         val scope = CoroutineScope(Dispatchers.Unconfined + Job())
         val settingsFlow = MutableStateFlow(settings)
@@ -467,7 +365,7 @@ class StatisticsViewModelTest {
             StatisticsViewModel(
                 repository = repository,
                 settings = settingsFlow,
-                updateSettings = { transform -> settingsFlow.value = transform(settingsFlow.value) },
+                updateSettings = { transform -> beforeUpdate(); settingsFlow.value = transform(settingsFlow.value) },
                 resetMinutes = resetMinutesFlow,
                 dateProvider = dateProvider,
                 calculationDispatcher = Dispatchers.Unconfined,
@@ -526,8 +424,8 @@ class StatisticsViewModelTest {
     ): StatisticsDayAggregate =
         StatisticsDayAggregate(
             date = LocalDate.parse(date),
-            totalCharacters = if (contributions.size == 1) characters else contributions.sumOf { it.characters },
-            readingSeconds = if (contributions.size == 1) seconds else contributions.sumOf { it.readingSeconds },
+            totalCharacters = contributions.sumOf { it.characters },
+            readingSeconds = contributions.sumOf { it.readingSeconds },
             activeBookCount = contributions.count { it.characters > 0 || it.readingSeconds > 0.0 },
             bookContributions = contributions,
         )

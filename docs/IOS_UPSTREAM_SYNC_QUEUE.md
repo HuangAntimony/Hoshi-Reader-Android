@@ -468,7 +468,10 @@ Validation:
   by modification time using iOS-compatible sidecars and backup paths. Unset
   sync defaults on; saved daily goals, opt-outs and Reader display preferences
   remain, and Android keeps its two independent autostart settings and daily
-  goal defaults. Weekly summaries use the calendar instead of a separate goal.
+  goal defaults. Weekly summaries use the reading-time chart instead of a separate goal.
+  All-time opens by default; period paging and chart day/month drilldown drive
+  continuously displayed reading-time and book sections. The daily goal heatmap
+  is display-only and independent of chart selection.
 - `703347a`, `b7f09ca` (shared ruby normalization only): native
   `ReaderTextFilter` and shared `reader-text-semantics.js` include Korean text;
   native visible text excludes `rt`/`rp` contents. Reader-facts version 3

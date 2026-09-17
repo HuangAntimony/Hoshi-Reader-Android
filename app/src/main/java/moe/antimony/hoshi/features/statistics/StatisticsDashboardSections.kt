@@ -5,6 +5,9 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,10 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.clip
@@ -31,11 +32,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -84,8 +81,8 @@ internal fun StatisticsHeader(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.background,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
     )
 }
@@ -94,177 +91,96 @@ internal fun StatisticsHeader(
 internal fun TodayStatisticsSection(
     today: TodayStatisticsUi,
     history: StatisticsHistoryUi,
+    heatmap: StatisticsHeatmapUi,
+    heatmapScrollState: LazyListState,
+    heatmapInitiallyScrolled: Boolean,
+    onHeatmapInitiallyScrolled: () -> Unit,
     settings: StatisticsTargetSettings,
-    targetEditorExpanded: Boolean,
-    onToggleTargetSettings: () -> Unit,
+    targetEditor: StatisticsTargetSettingsUi,
     onEvent: (StatisticsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    StatisticsSection(
+        title = stringResource(R.string.statistics_daily_target),
+        modifier = modifier,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(R.string.statistics_daily_target),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(14.dp))
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                if (maxWidth >= 640.dp) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DailyGoalGauge(
-                            today = today,
-                            settings = settings,
-                            onOpenTarget = onToggleTargetSettings,
-                            modifier = Modifier.width(320.dp),
-                        )
-                        StatisticsHistoryGrid(
-                            history = history,
-                            settings = settings,
-                            today = today.date,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        DailyGoalGauge(
-                            today = today,
-                            settings = settings,
-                            onOpenTarget = onToggleTargetSettings,
-                            modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(18.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Spacer(Modifier.height(14.dp))
-                        StatisticsHistoryGrid(history = history, settings = settings, today = today.date)
-                    }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            if (maxWidth >= 640.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DailyGoalGauge(
+                        today = today,
+                        settings = settings,
+                        targetEditor = targetEditor,
+                        onEvent = onEvent,
+                        modifier = Modifier.width(320.dp),
+                    )
+                    StatisticsHistoryGrid(
+                        history = history,
+                        settings = settings,
+                        today = today.date,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    DailyGoalGauge(
+                        today = today,
+                        settings = settings,
+                        targetEditor = targetEditor,
+                        onEvent = onEvent,
+                        modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(14.dp))
+                    StatisticsHistoryGrid(history = history, settings = settings, today = today.date)
                 }
             }
-            if (targetEditorExpanded) {
-                Spacer(Modifier.height(18.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(Modifier.height(14.dp))
-                DailyTargetSettingsSection(settings = settings, onEvent = onEvent)
-            }
         }
-    }
-}
-
-@Composable
-private fun DailyTargetSettingsSection(
-    settings: StatisticsTargetSettings,
-    onEvent: (StatisticsEvent) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = stringResource(R.string.statistics_daily_target),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(12.dp))
+        StatisticsHeatmap(
+            heatmap = heatmap,
+            scrollState = heatmapScrollState,
+            initiallyScrolled = heatmapInitiallyScrolled,
+            onInitiallyScrolled = onHeatmapInitiallyScrolled,
         )
-        TargetTypeSegmentedButtons(
-            selected = settings.dailyTargetType,
-            onSelect = { type -> onEvent(StatisticsEvent.SelectDailyTargetType(type)) },
-        )
-        if (settings.dailyTargetType == DailyTargetType.Characters) {
-            StepperRow(
-                label = stringResource(R.string.statistics_current_target),
-                value = stringResource(
-                    R.string.statistics_character_target_format,
-                    formatInteger(settings.dailyCharacterTarget),
-                ),
-                canDecrease = settings.dailyCharacterTarget > StatisticsTargetDefaults.MinDailyCharacterTarget,
-                canIncrease = settings.dailyCharacterTarget < StatisticsTargetDefaults.MaxDailyCharacterTarget,
-                onDecrease = {
-                    onEvent(
-                        StatisticsEvent.UpdateDailyCharacterTarget(
-                            settings.dailyCharacterTarget - StatisticsTargetDefaults.DailyCharacterTargetStep,
-                        ),
-                    )
-                },
-                onIncrease = {
-                    onEvent(
-                        StatisticsEvent.UpdateDailyCharacterTarget(
-                            settings.dailyCharacterTarget + StatisticsTargetDefaults.DailyCharacterTargetStep,
-                        ),
-                    )
-                },
-            )
-        } else {
-            StepperRow(
-                label = stringResource(R.string.statistics_current_target),
-                value = formatStatisticsDuration(settings.dailyDurationTargetMinutes * 60.0),
-                canDecrease = settings.dailyDurationTargetMinutes > StatisticsTargetDefaults.MinDailyDurationTargetMinutes,
-                canIncrease = settings.dailyDurationTargetMinutes < StatisticsTargetDefaults.MaxDailyDurationTargetMinutes,
-                onDecrease = {
-                    onEvent(
-                        StatisticsEvent.UpdateDailyDurationTargetMinutes(
-                            settings.dailyDurationTargetMinutes - StatisticsTargetDefaults.DailyDurationTargetStepMinutes,
-                        ),
-                    )
-                },
-                onIncrease = {
-                    onEvent(
-                        StatisticsEvent.UpdateDailyDurationTargetMinutes(
-                            settings.dailyDurationTargetMinutes + StatisticsTargetDefaults.DailyDurationTargetStepMinutes,
-                        ),
-                    )
-                },
-            )
-        }
     }
 }
 
 @Composable
 internal fun StatisticsSection(
     title: String,
-    trailing: String?,
     modifier: Modifier = Modifier,
-    trailingContent: (@Composable () -> Unit)? = null,
-    content: @Composable () -> Unit,
+    contentPadding: PaddingValues = PaddingValues(16.dp),
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 1.dp,
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (trailingContent != null) {
-                    trailingContent()
-                } else if (trailing != null) {
-                    Text(
-                        text = trailing,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            content()
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatisticsSectionHeading(title, Modifier.padding(horizontal = 16.dp))
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = if (LocalHoshiEInkMode.current) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(contentPadding), content = content)
         }
     }
+}
+
+@Composable
+internal fun StatisticsSectionHeading(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        modifier = modifier,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 internal data class StatisticMetric(
@@ -381,7 +297,8 @@ private fun MetricCard(
 private fun DailyGoalGauge(
     today: TodayStatisticsUi,
     settings: StatisticsTargetSettings,
-    onOpenTarget: () -> Unit,
+    targetEditor: StatisticsTargetSettingsUi,
+    onEvent: (StatisticsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val progress = statisticsDailyGoalProgress(today, settings)
@@ -395,10 +312,10 @@ private fun DailyGoalGauge(
         }
     }
     val secondary = when (settings.dailyTargetType) {
-        DailyTargetType.Characters -> formatStatisticsDuration(today.readingSeconds)
+        DailyTargetType.Characters -> stringResource(R.string.statistics_duration_minutes_format, (today.readingSeconds / 60).roundToInt())
         DailyTargetType.Duration -> formatStatisticsCharacters(today.totalCharacters)
     }
-    BoxWithConstraints(modifier = modifier) {
+    BoxWithConstraints(modifier = modifier.padding(horizontal = 20.dp)) {
         val gaugeHeight = maxWidth / 2 + 5.dp
         Box(modifier = Modifier.fillMaxWidth().height(gaugeHeight), contentAlignment = Alignment.BottomCenter) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -459,47 +376,48 @@ private fun DailyGoalGauge(
                     maxLines = 1,
                 )
                 Text(
-                    text = stringResource(
-                        R.string.statistics_distribution_meta_format,
-                        secondary,
-                        formatStatisticsSpeed(today.averageSpeedPerHour),
-                    ),
+                    text = secondary,
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                 )
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(onClick = onOpenTarget)
-                        .padding(horizontal = 6.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = when (settings.dailyTargetType) {
-                            DailyTargetType.Characters -> stringResource(
-                                R.string.statistics_goal_characters_link_format,
-                                formatStatisticsGroupedCount(settings.dailyCharacterTarget),
-                            )
-                            DailyTargetType.Duration -> stringResource(
-                                R.string.statistics_goal_minutes_link_format,
-                                settings.dailyDurationTargetMinutes,
-                            )
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        color = colors.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f, fill = false),
-                        maxLines = 2,
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = colors.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onEvent(StatisticsEvent.OpenTargetSettings) }
+                            .padding(horizontal = 6.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = when (settings.dailyTargetType) {
+                                DailyTargetType.Characters -> stringResource(
+                                    R.string.statistics_goal_characters_link_format,
+                                    formatStatisticsGroupedCount(settings.dailyCharacterTarget),
+                                )
+                                DailyTargetType.Duration -> stringResource(
+                                    R.string.statistics_goal_minutes_link_format,
+                                    settings.dailyDurationTargetMinutes,
+                                )
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 2,
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    if (targetEditor.isEditorVisible) {
+                        StatisticsGoalPicker(targetEditor, onEvent)
+                    }
                 }
             }
         }
@@ -540,8 +458,8 @@ internal fun <T> StatisticsSegmentedControl(
     ) {
         Row(
             modifier = Modifier
-                .height(56.dp)
-                .padding(4.dp),
+                .height(36.dp)
+                .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             options.forEach { option ->
@@ -563,7 +481,7 @@ internal fun <T> StatisticsSegmentedControl(
                 ) {
                     Text(
                         text = option.label,
-                        style = if (options.size >= 5) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = if (option.enabled) {
                             MaterialTheme.colorScheme.onSurface
                         } else {
@@ -575,82 +493,6 @@ internal fun <T> StatisticsSegmentedControl(
                         modifier = Modifier
                             .padding(horizontal = if (options.size >= 5) 3.dp else 6.dp)
                             .widthIn(min = 0.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TargetTypeSegmentedButtons(
-    selected: DailyTargetType,
-    onSelect: (DailyTargetType) -> Unit,
-) {
-    val entries = DailyTargetType.entries
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        entries.forEachIndexed { index, type ->
-            SegmentedButton(
-                selected = selected == type,
-                onClick = { onSelect(type) },
-                shape = SegmentedButtonDefaults.itemShape(index, entries.size),
-            ) {
-                Text(
-                    text = when (type) {
-                        DailyTargetType.Characters -> stringResource(R.string.statistics_target_type_characters)
-                        DailyTargetType.Duration -> stringResource(R.string.statistics_target_type_duration)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StepperRow(
-    label: String,
-    value: String,
-    canDecrease: Boolean,
-    canIncrease: Boolean,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = onDecrease, enabled = canDecrease) {
-                    Icon(
-                        imageVector = Icons.Rounded.Remove,
-                        contentDescription = stringResource(R.string.action_decrease),
-                    )
-                }
-                IconButton(onClick = onIncrease, enabled = canIncrease) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = stringResource(R.string.action_increase),
                     )
                 }
             }

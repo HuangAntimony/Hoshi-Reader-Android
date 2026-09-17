@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -29,8 +28,8 @@ internal fun StatisticsHistoryGrid(
 ) {
     val shortDatePattern = stringResource(R.string.statistics_history_short_date_pattern)
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            HistoryMetric(
+        HistoryMetricRow(
+            HistoryMetricValue(
                 title = stringResource(R.string.statistics_current_streak),
                 value = formatStatisticsDays(history.currentStreak.count),
                 detail = history.currentStreak.range?.let {
@@ -39,9 +38,8 @@ internal fun StatisticsHistoryGrid(
                         formatStatisticsHistoryDate(it.start, today, shortDatePattern),
                     )
                 },
-                modifier = Modifier.weight(1f),
-            )
-            HistoryMetric(
+            ),
+            HistoryMetricValue(
                 title = stringResource(R.string.statistics_longest_streak),
                 value = formatStatisticsDays(history.longestStreak.count),
                 detail = history.longestStreak.range?.let { range ->
@@ -56,53 +54,68 @@ internal fun StatisticsHistoryGrid(
                         ),
                     )
                 },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            HistoryMetric(
+            ),
+        )
+        HistoryMetricRow(
+            HistoryMetricValue(
                 title = stringResource(R.string.statistics_target_days),
                 value = formatStatisticsDays(history.metDays),
                 detail = androidx.compose.ui.res.pluralStringResource(
                     R.plurals.statistics_history_reading_days, history.readingDays, history.readingDays,
                 ),
-                modifier = Modifier.weight(1f),
-            )
-            HistoryMetric(
+            ),
+            HistoryMetricValue(
                 title = stringResource(R.string.statistics_best_day),
                 value = when (settings.dailyTargetType) {
                     DailyTargetType.Characters -> formatStatisticsGroupedCount(history.bestDay?.totalCharacters ?: 0)
                     DailyTargetType.Duration -> formatStatisticsDuration(history.bestDay?.readingSeconds ?: 0.0)
                 },
                 detail = history.bestDay?.let { formatStatisticsHistoryDate(it.date, today, shortDatePattern) },
-                modifier = Modifier.weight(1f),
-            )
-        }
+            ),
+        )
     }
 }
 
+private data class HistoryMetricValue(val title: String, val value: String, val detail: String?)
+
 @Composable
-private fun HistoryMetric(title: String, value: String, detail: String?, modifier: Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"),
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        if (detail != null) {
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+private fun HistoryMetricRow(first: HistoryMetricValue, second: HistoryMetricValue) {
+    val metrics = listOf(first, second)
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            metrics.forEach { metric ->
+                Text(
+                    text = metric.title,
+                    modifier = Modifier.weight(1f).alignByBaseline(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            metrics.forEach { metric ->
+                Text(
+                    text = metric.value,
+                    modifier = Modifier.weight(1f).alignByBaseline(),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        if (metrics.any { it.detail != null }) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                metrics.forEach { metric ->
+                    Text(
+                        text = metric.detail.orEmpty(),
+                        modifier = Modifier.weight(1f).alignByBaseline(),
+                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
         }
     }
 }

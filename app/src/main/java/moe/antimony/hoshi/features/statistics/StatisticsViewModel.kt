@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,6 +20,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.DefaultDispatcher
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
 
 @HiltViewModel
 internal class StatisticsViewModel internal constructor(
@@ -106,11 +109,8 @@ internal class StatisticsViewModel internal constructor(
 
     fun onEvent(event: StatisticsEvent) {
         when (event) {
-            StatisticsEvent.ToggleTargetSettings -> selection.update {
-                it.copy(
-                    isTargetEditorExpanded = !it.isTargetEditorExpanded,
-                )
-            }
+            StatisticsEvent.OpenTargetSettings -> selection.update { it.copy(isTargetEditorVisible = true, targetError = null) }
+            StatisticsEvent.DismissTargetSettings -> selection.update { it.copy(isTargetEditorVisible = false, targetError = null) }
             is StatisticsEvent.SelectDailyTargetType -> updateTargets {
                 it.copy(dailyTargetType = event.type)
             }
@@ -120,41 +120,23 @@ internal class StatisticsViewModel internal constructor(
             is StatisticsEvent.UpdateDailyDurationTargetMinutes -> updateTargets {
                 it.copy(dailyDurationTargetMinutes = event.minutes).coerceStatisticsTargetSettings()
             }
-            is StatisticsEvent.SelectCalendarWindow -> selection.update { current ->
-                current.copy(
-                    windowSelection = event.window,
-                )
-            }
             is StatisticsEvent.SelectRangeMode -> selection.update { current ->
-                current.copy(
-                    rangeMode = event.mode,
-                    currentRangeTab = current.currentRangeTab.availableFor(event.mode),
+                current.copy(rangeMode = event.mode, referenceDate = null, selectedBucketKey = null)
+            }
+            is StatisticsEvent.SelectPeriodPage -> selection.update { current ->
+                val pageCount = uiState.value.currentRange.pageCount
+                if (event.index !in 0 until pageCount) current else current.copy(
+                    referenceDate = statisticsPeriodPageAnchor(current.rangeMode, event.index, pageCount, currentDate()),
+                    selectedBucketKey = null,
                 )
             }
-            is StatisticsEvent.SelectCalendarDate -> selection.update { current ->
-                val nextMode = if (current.rangeMode == StatisticsRangeMode.Year || current.rangeMode == StatisticsRangeMode.All) {
-                    StatisticsRangeMode.Day
-                } else {
-                    current.rangeMode
+            is StatisticsEvent.SelectTrendBucket -> selection.update { current ->
+                val valid = event.key == null || uiState.value.currentRange.trendPoints.any {
+                    it.key == event.key && statisticsTrendBucket(current.rangeMode, it.key)?.start?.isAfter(currentDate()) == false
                 }
-                current.copy(
-                    rangeMode = nextMode,
-                    anchorDate = minOf(event.date, currentDate()),
-                    currentRangeTab = current.currentRangeTab.availableFor(nextMode),
-                )
-            }
-            is StatisticsEvent.NavigatePeriod -> selection.update { current ->
-                val today = currentDate()
-                val anchor = current.anchorDate ?: today
-                val next = shiftedStatisticsAnchor(current.rangeMode, anchor, event.offset)
-                if (next == null || next.isAfter(today)) current else current.copy(anchorDate = next)
-            }
-            is StatisticsEvent.SelectCurrentRangeTab -> selection.update { current ->
-                if (event.tab == CurrentRangeTab.Trend && current.rangeMode == StatisticsRangeMode.Day) {
-                    current
-                } else {
-                    current.copy(currentRangeTab = event.tab)
-                }
+                if (valid) current.copy(
+                    selectedBucketKey = event.key.takeUnless { it == current.selectedBucketKey },
+                ) else current
             }
         }
     }
@@ -163,19 +145,24 @@ internal class StatisticsViewModel internal constructor(
 
     private fun updateTargets(transform: (StatisticsTargetSettings) -> StatisticsTargetSettings) {
         scope.launch {
-            updateSettings { current -> transform(current).coerceStatisticsTargetSettings() }
+            try {
+                updateSettings { current -> transform(current).coerceStatisticsTargetSettings() }
+                selection.update { it.copy(targetError = null) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                selection.update { it.copy(targetError = UiText.Resource(R.string.statistics_goal_save_failed)) }
+            }
         }
     }
 }
 
 private data class StatisticsSelectionState(
-    val windowSelection: StatisticsCalendarWindowSelection = StatisticsCalendarWindowSelection(
-        StatisticsCalendarWindowKind.RecentYear,
-    ),
-    val rangeMode: StatisticsRangeMode = StatisticsRangeMode.Year,
-    val anchorDate: LocalDate? = null,
-    val currentRangeTab: CurrentRangeTab = CurrentRangeTab.Overview,
-    val isTargetEditorExpanded: Boolean = false,
+    val rangeMode: StatisticsRangeMode = StatisticsRangeMode.All,
+    val referenceDate: LocalDate? = null,
+    val selectedBucketKey: String? = null,
+    val isTargetEditorVisible: Boolean = false,
+    val targetError: UiText? = null,
 )
 
 private fun buildStatisticsUiState(
@@ -186,74 +173,53 @@ private fun buildStatisticsUiState(
     isLoading: Boolean,
 ): StatisticsUiState {
     val daysByDate = snapshot.days.associateBy { it.date }
-    val windowSelection = selection.windowSelection
-    val windowRange = windowRange(windowSelection, today)
-    val anchor = minOf(selection.anchorDate ?: today, today)
     val rangeMode = selection.rangeMode
-    val selectedRange = selectedStatisticsRange(
-        rangeMode, anchor, today,
-        firstActivity = snapshot.days.filter { it.isActiveReadingDay() && !it.date.isAfter(today) }.minOfOrNull { it.date },
-    )
-    val currentTab = selection.currentRangeTab.availableFor(rangeMode)
-    val rangeDays = snapshot.days.filter { selectedRange.contains(it.date) && !it.date.isAfter(today) }
-    val windowDays = datesInRange(windowRange).map { date -> daysByDate[date] ?: emptyDayAggregate(date) }
-    val heatLevelsByDate = readingHeatLevels(windowDays)
-    val availableWindows = listOf(StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.RecentYear)) +
-        snapshot.availableYears
-            .distinct()
-            .sortedDescending()
-            .map { year ->
-                StatisticsCalendarWindowSelection(StatisticsCalendarWindowKind.FixedYear, year)
-            }
+    val activity = snapshot.days.filter { it.isActiveReadingDay() && !it.date.isAfter(today) }
+    val firstDate = activity.minOfOrNull { it.date } ?: today
+    val earliestPeriod = selectedStatisticsRange(rangeMode, firstDate, today, firstDate).start
+    val anchor = minOf(selection.referenceDate ?: today, today).coerceAtLeast(earliestPeriod)
+    val selectedRange = selectedStatisticsRange(rangeMode, anchor, today, firstDate)
+    val pageCount = statisticsPeriodPageCount(rangeMode, firstDate, today)
+    val selectedPage = (pageCount - statisticsPeriodPageCount(rangeMode, anchor, today)).coerceIn(0, pageCount - 1)
+    val heatLevels = readingHeatLevels(activity)
+    val rangeDays = activity.filter { selectedRange.contains(it.date) }
     val rangeSummary = overviewRangeSummary(snapshot.days, settings, rangeMode, anchor, today)
-    val trendPoints = if (currentTab == CurrentRangeTab.Trend) {
-        trendPoints(rangeMode, selectedRange, rangeDays)
-    } else {
-        emptyList()
-    }
-    val distributionRows = if (currentTab == CurrentRangeTab.Distribution) {
-        distributionRows(rangeDays, settings)
-    } else {
-        emptyList()
-    }
+    val trendPoints = trendPoints(rangeMode, selectedRange, rangeDays)
+    val selectedBucket = selection.selectedBucketKey?.let { statisticsTrendBucket(rangeMode, it) }
+        ?.takeIf { !it.end.isBefore(selectedRange.start) && !it.start.isAfter(selectedRange.end) && !it.start.isAfter(today) }
+    val detailDays = selectedBucket?.let { bucket -> rangeDays.filter { bucket.contains(it.date) } } ?: rangeDays
+    val distributionRows = distributionRows(detailDays)
     return StatisticsUiState(
         isLoading = isLoading,
         today = todaySummary(daysByDate, today, settings),
         settings = StatisticsTargetSettingsUi(
             values = settings.coerceStatisticsTargetSettings(),
-            isEditorExpanded = selection.isTargetEditorExpanded,
+            isEditorVisible = selection.isTargetEditorVisible,
+            error = selection.targetError,
         ),
-        calendar = StatisticsCalendarUi(
-            windowSelection = windowSelection,
-            availableWindows = availableWindows,
-            windowRange = windowRange,
-            rangeMode = rangeMode,
-            anchorDate = anchor,
-            selectedRange = selectedRange,
-            selectedRangeTitle = selectedRange.dateTitle(rangeMode),
-            days = windowDays.map { aggregate ->
-                val ratio = aggregate.targetRatio(settings)
-                StatisticsCalendarDayUi(
-                    date = aggregate.date,
-                    heatLevel = heatLevelsByDate[aggregate.date] ?: 0,
-                    characters = aggregate.totalCharacters,
-                    readingSeconds = aggregate.readingSeconds,
-                    targetPercent = (ratio * 100.0).toInt(),
-                    targetMet = ratio >= 1.0,
-                    inSelectedRange = rangeMode != StatisticsRangeMode.Year && rangeMode != StatisticsRangeMode.All && selectedRange.contains(aggregate.date),
-                    isAnchor = rangeMode != StatisticsRangeMode.Year && rangeMode != StatisticsRangeMode.All && aggregate.date == anchor,
-                )
-            },
+        heatmap = StatisticsHeatmapUi(
+            windowRange = StatisticsDateRange(statisticsStartOfWeek(firstDate), today),
+            days = activity.map { StatisticsHeatmapDayUi(it.date, heatLevels[it.date] ?: 0) },
         ),
         currentRange = CurrentRangeStatisticsUi(
             mode = rangeMode,
-            selectedTab = currentTab,
-            title = selectedRange.dateTitle(rangeMode),
-            summary = rangeSummary,
+            range = selectedRange,
+            pageCount = pageCount,
+            selectedPage = selectedPage,
+            chartPages = (maxOf(0, selectedPage - 1)..minOf(pageCount - 1, selectedPage + 1)).associateWith { page ->
+                val pageAnchor = statisticsPeriodPageAnchor(rangeMode, page, pageCount, today)
+                val pageRange = selectedStatisticsRange(rangeMode, pageAnchor, today, firstDate)
+                StatisticsChartPage(
+                    points = trendPoints(rangeMode, pageRange, activity.filter { pageRange.contains(it.date) }),
+                    averageSeconds = overviewRangeSummary(activity, settings, rangeMode, pageAnchor, today).averageReadingSecondsPerBucket,
+                )
+            },
+            summary = if (selectedBucket != null) aggregateRange(detailDays, settings) else rangeSummary,
+            selectedBucket = selectedBucket,
+            trendAverageSeconds = rangeSummary.averageReadingSecondsPerBucket,
+            periodChangePercent = rangeSummary.averageReadingTimeChangePercent,
             trendPoints = trendPoints,
             distributionRows = distributionRows,
-            canNavigatePrevious = shiftedStatisticsAnchor(rangeMode, anchor, -1) != null,
-            canNavigateNext = shiftedStatisticsAnchor(rangeMode, anchor, 1)?.let { !it.isAfter(today) } == true,
         ),
         history = statisticsHistorySummary(snapshot.days, today, settings),
         emptyState = StatisticsEmptyState(
@@ -261,27 +227,4 @@ private fun buildStatisticsUiState(
             hasPartialReadError = snapshot.skippedCorruptBookIds.isNotEmpty(),
         ),
     )
-}
-
-private fun windowRange(
-    selection: StatisticsCalendarWindowSelection,
-    today: LocalDate,
-): StatisticsDateRange =
-    when (selection.kind) {
-        StatisticsCalendarWindowKind.RecentYear -> recentYearStatisticsWindow(today)
-        StatisticsCalendarWindowKind.FixedYear -> fixedYearStatisticsWindow(selection.year ?: today.year, today)
-    }
-
-private fun CurrentRangeTab.availableFor(mode: StatisticsRangeMode): CurrentRangeTab =
-    if (mode == StatisticsRangeMode.Day && this == CurrentRangeTab.Trend) {
-        CurrentRangeTab.Overview
-    } else {
-        this
-    }
-
-private fun StatisticsDateRange.dateTitle(mode: StatisticsRangeMode): String = when (mode) {
-    StatisticsRangeMode.Year -> start.year.toString()
-    StatisticsRangeMode.Month -> java.time.YearMonth.from(start).toString()
-    StatisticsRangeMode.Week, StatisticsRangeMode.All -> "$start – $end"
-    StatisticsRangeMode.Day -> start.toString()
 }

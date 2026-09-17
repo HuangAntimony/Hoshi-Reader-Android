@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -44,8 +44,8 @@ internal fun StatisticsView(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
-    val heatmapScrollState = rememberScrollState()
-    var heatmapAutoScrolledWindowKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val heatmapScrollState = rememberLazyListState()
+    var heatmapInitiallyScrolled by rememberSaveable { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = StatisticsLifecycleReloader(viewModel::reload)
@@ -57,7 +57,7 @@ internal fun StatisticsView(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = { StatisticsHeader(onOpenSettings = onOpenSettings) },
@@ -72,7 +72,7 @@ internal fun StatisticsView(
                 top = 16.dp,
                 bottom = statisticsListBottomPaddingDp().dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             if (uiState.emptyState?.hasPartialReadError == true) {
                 item {
@@ -91,36 +91,31 @@ internal fun StatisticsView(
                         today = uiState.today,
                         settings = uiState.settings.values,
                         history = uiState.history,
-                        targetEditorExpanded = uiState.settings.isEditorExpanded,
-                        onToggleTargetSettings = {
-                            viewModel.onEvent(
-                                StatisticsEvent.ToggleTargetSettings,
-                            )
-                        },
-                        onEvent = viewModel::onEvent,
-                    )
-                }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    StatisticsCalendarSection(
-                        calendar = uiState.calendar,
-                        canNavigatePrevious = uiState.currentRange.canNavigatePrevious,
-                        canNavigateNext = uiState.currentRange.canNavigateNext,
+                        heatmap = uiState.heatmap,
                         heatmapScrollState = heatmapScrollState,
-                        heatmapAutoScrolledWindowKey = heatmapAutoScrolledWindowKey,
-                        onHeatmapAutoScrolled = { key -> heatmapAutoScrolledWindowKey = key },
+                        heatmapInitiallyScrolled = heatmapInitiallyScrolled,
+                        onHeatmapInitiallyScrolled = { heatmapInitiallyScrolled = true },
+                        targetEditor = uiState.settings,
                         onEvent = viewModel::onEvent,
                     )
                 }
             }
             item {
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    StatisticsRangeSection(
+                    StatisticsReadingTimeSection(
                         currentRange = uiState.currentRange,
-                        onOpenBook = onOpenBook,
-                        calendar = uiState.calendar,
+                        today = uiState.today.date,
                         onEvent = viewModel::onEvent,
+                    )
+                }
+            }
+            if (uiState.currentRange.distributionRows.isNotEmpty()) item {
+                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
+                    StatisticsBooksSection(
+                        rows = uiState.currentRange.distributionRows,
+                        range = uiState.currentRange.range,
+                        selectedBucket = uiState.currentRange.selectedBucket,
+                        onOpenBook = onOpenBook,
                     )
                 }
             }

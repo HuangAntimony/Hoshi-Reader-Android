@@ -8,20 +8,84 @@ import org.junit.Test
 
 class StatisticsCalculationsTest {
     @Test
-    fun recentYearWindowEndsTodayAndStartsOneYearAgoPlusOneDay() {
-        val window = recentYearStatisticsWindow(LocalDate.parse("2026-06-30"))
+    fun readingHeatLevelsStayWithinRangeForSparseDistinctCounts() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 100),
+                day("2026-06-02", characters = 10_000),
+                day("2026-06-03", characters = 50_000),
+            ),
+        )
 
-        assertEquals(LocalDate.parse("2025-07-01"), window.start)
-        assertEquals(LocalDate.parse("2026-06-30"), window.end)
-        assertEquals(365, window.dayCount)
+        assertEquals(listOf(1, 4, 7), levels.values.toList())
     }
 
     @Test
-    fun fixedYearWindowClipsCurrentYearToToday() {
-        val window = fixedYearStatisticsWindow(2026, LocalDate.parse("2026-06-30"))
+    fun readingHeatLevelsUseStrongestLevelForSingleActiveCharacterCount() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 4_000),
+                day("2026-06-03", characters = 4_000),
+            ),
+        )
 
-        assertEquals(LocalDate.parse("2026-01-01"), window.start)
-        assertEquals(LocalDate.parse("2026-06-30"), window.end)
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
+    }
+
+    @Test
+    fun readingHeatLevelsKeepRepeatedCharacterCountsTogether() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 1_000),
+                day("2026-06-02", characters = 1_000),
+                day("2026-06-03", characters = 2_000),
+            ),
+        )
+
+        assertEquals(levels.getValue(LocalDate.parse("2026-06-01")), levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
+    }
+
+    @Test
+    fun readingHeatLevelsKeepEmptyDaysAtZero() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 0),
+            ),
+        )
+
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-02")))
+    }
+
+    @Test
+    fun readingHeatLevelsSpreadActiveDaysAcrossTheVisibleWindow() {
+        val levels = readingHeatLevels(
+            listOf(
+                day("2026-06-01", characters = 0),
+                day("2026-06-02", characters = 6_000),
+                day("2026-06-03", characters = 7_000),
+                day("2026-06-04", characters = 8_000),
+                day("2026-06-05", characters = 9_000),
+                day("2026-06-06", characters = 10_000),
+                day("2026-06-07", characters = 11_000),
+                day("2026-06-08", characters = 12_000),
+            ),
+        )
+
+        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
+        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-02")))
+        assertEquals(2, levels.getValue(LocalDate.parse("2026-06-03")))
+        assertEquals(3, levels.getValue(LocalDate.parse("2026-06-04")))
+        assertEquals(4, levels.getValue(LocalDate.parse("2026-06-05")))
+        assertEquals(5, levels.getValue(LocalDate.parse("2026-06-06")))
+        assertEquals(6, levels.getValue(LocalDate.parse("2026-06-07")))
+        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-08")))
     }
 
     @Test
@@ -109,87 +173,6 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun readingHeatLevelsSpreadActiveDaysAcrossTheVisibleWindow() {
-        val levels = readingHeatLevels(
-            listOf(
-                day("2026-06-01", characters = 0),
-                day("2026-06-02", characters = 6_000),
-                day("2026-06-03", characters = 7_000),
-                day("2026-06-04", characters = 8_000),
-                day("2026-06-05", characters = 9_000),
-                day("2026-06-06", characters = 10_000),
-                day("2026-06-07", characters = 11_000),
-                day("2026-06-08", characters = 12_000),
-            ),
-        )
-
-        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
-        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-02")))
-        assertEquals(2, levels.getValue(LocalDate.parse("2026-06-03")))
-        assertEquals(3, levels.getValue(LocalDate.parse("2026-06-04")))
-        assertEquals(4, levels.getValue(LocalDate.parse("2026-06-05")))
-        assertEquals(5, levels.getValue(LocalDate.parse("2026-06-06")))
-        assertEquals(6, levels.getValue(LocalDate.parse("2026-06-07")))
-        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-08")))
-    }
-
-    @Test
-    fun readingHeatLevelsKeepEmptyDaysAtZero() {
-        val levels = readingHeatLevels(
-            listOf(
-                day("2026-06-01", characters = 0),
-                day("2026-06-02", characters = 0),
-            ),
-        )
-
-        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
-        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-02")))
-    }
-
-    @Test
-    fun readingHeatLevelsKeepRepeatedCharacterCountsTogether() {
-        val levels = readingHeatLevels(
-            listOf(
-                day("2026-06-01", characters = 1_000),
-                day("2026-06-02", characters = 1_000),
-                day("2026-06-03", characters = 2_000),
-            ),
-        )
-
-        assertEquals(levels.getValue(LocalDate.parse("2026-06-01")), levels.getValue(LocalDate.parse("2026-06-02")))
-        assertEquals(1, levels.getValue(LocalDate.parse("2026-06-01")))
-        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
-    }
-
-    @Test
-    fun readingHeatLevelsUseStrongestLevelForSingleActiveCharacterCount() {
-        val levels = readingHeatLevels(
-            listOf(
-                day("2026-06-01", characters = 0),
-                day("2026-06-02", characters = 4_000),
-                day("2026-06-03", characters = 4_000),
-            ),
-        )
-
-        assertEquals(0, levels.getValue(LocalDate.parse("2026-06-01")))
-        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-02")))
-        assertEquals(7, levels.getValue(LocalDate.parse("2026-06-03")))
-    }
-
-    @Test
-    fun readingHeatLevelsStayWithinRangeForSparseDistinctCounts() {
-        val levels = readingHeatLevels(
-            listOf(
-                day("2026-06-01", characters = 100),
-                day("2026-06-02", characters = 10_000),
-                day("2026-06-03", characters = 50_000),
-            ),
-        )
-
-        assertEquals(listOf(1, 4, 7), levels.values.toList())
-    }
-
-    @Test
     fun trendPointsUseMonthsForYearAndDaysForShorterRanges() {
         val days = listOf(
             day("2026-01-15", characters = 1_000, seconds = 600.0),
@@ -203,7 +186,6 @@ class StatisticsCalculationsTest {
 
         val year = trendPoints(StatisticsRangeMode.Year, range, days)
         val month = trendPoints(StatisticsRangeMode.Month, range, days.take(2))
-        val day = trendPoints(StatisticsRangeMode.Day, range, days.take(1))
 
         assertEquals(listOf("2026-01", "2026-02"), year.map { it.key })
         assertEquals(3_000, year.first().characters)
@@ -232,11 +214,10 @@ class StatisticsCalculationsTest {
         )
         assertEquals(0, month[2].characters)
         assertEquals(0.0, month[2].readingSeconds, 0.0)
-        assertTrue(day.isEmpty())
     }
 
     @Test
-    fun distributionRowsSortAndPercentByActiveTargetType() {
+    fun distributionRowsSortByTimeAndScaleToLongestBook() {
         val days = listOf(
             day(
                 "2026-06-30",
@@ -247,19 +228,10 @@ class StatisticsCalculationsTest {
             ),
         )
 
-        val byCharacters = distributionRows(
-            days,
-            StatisticsTargetSettings(dailyTargetType = DailyTargetType.Characters),
-        )
-        val byDuration = distributionRows(
-            days,
-            StatisticsTargetSettings(dailyTargetType = DailyTargetType.Duration),
-        )
-
-        assertEquals(listOf("Fast", "Slow"), byCharacters.map { it.title })
-        assertEquals(80, byCharacters.first().percent)
-        assertEquals(listOf("Slow", "Fast"), byDuration.map { it.title })
-        assertEquals(75, byDuration.first().percent)
+        val rows = distributionRows(days)
+        assertEquals(listOf("Slow", "Fast"), rows.map { it.title })
+        assertEquals(1f, rows.first().timeFraction, 0.0f)
+        assertEquals(1f / 3f, rows.last().timeFraction, 0.0001f)
     }
 
     @Test
@@ -274,7 +246,6 @@ class StatisticsCalculationsTest {
                     ),
                 ),
             ),
-            StatisticsTargetSettings(),
         )
 
         assertEquals(listOf("alpha-id", "beta-id"), rows.map { it.bookId })
@@ -287,7 +258,6 @@ class StatisticsCalculationsTest {
                 contribution("same-id", "First", 100, 60.0).copy(folder = "first", isArchived = true),
                 contribution("same-id", "Second", 200, 120.0).copy(folder = "second"),
             ))),
-            StatisticsTargetSettings(),
         )
         assertEquals(listOf("second", "first"), rows.map { it.folder })
         assertEquals(listOf(false, true), rows.map { it.isArchived })
@@ -355,11 +325,8 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun dayHidesAverageComparisonAndEmptyYearKeepsTwelveZeroBuckets() {
+    fun emptyYearKeepsTwelveZeroBuckets() {
         val today = LocalDate.parse("2026-03-20")
-        val summary = overviewRangeSummary(listOf(day("2026-03-19", seconds = 60.0)),
-            StatisticsTargetSettings(), StatisticsRangeMode.Day, today, today)
-        assertEquals(null, summary.averageReadingTimeChangePercent)
         val year = selectedStatisticsRange(StatisticsRangeMode.Year, today, today)
         val points = trendPoints(StatisticsRangeMode.Year, year, emptyList())
         assertEquals(12, points.size)

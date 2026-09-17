@@ -91,16 +91,25 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   The archive directory is excluded from book discovery and TTU exports but is
   included in Books `.hoshi` backups.
 - Statistics repositories combine local and archived sidecars for the dashboard
-  and all-date book editors. Pure calculations keep the heatmap display window
-  separate from natural day/week/month/year/all periods, zero-filled buckets,
-  elapsed-period averages, and all-history goal summaries. The daily goal card
-  combines a semicircular progress gauge with compact history metrics; target
-  editing stays in the dashboard. Range-mode selection and period navigation
-  stay with the interactive calendar, while the range card presents its results.
-  The calendar and natural week periods use the locale's first weekday. There
-  is no separate weekly target or weekly dashboard card. Reader tracking and
-  the dashboard share the adjusted local-date provider driven by the global
-  minute-level statistics reset time; saved historical date keys are not rewritten.
+  and all-date book editors. The daily goal card combines a semicircular gauge,
+  history metrics with shared text baselines, and a display-only reading-intensity
+  heatmap. Sparse active dates back a lazy week grid with viewport-only drawing;
+  heatmap scrolling and data are independent of chart selection. Target editing
+  uses an anchored popup with a snapping value wheel, independent remembered
+  character/time goals, immediate tap selection and persistence when scrolling
+  settles.
+  There is no separate calendar picker or weekly goal.
+- The reading-time card owns Week/Month/Year/All selection, with All selected
+  initially. A horizontal pager browses natural periods from first activity to
+  today, preparing chart data only for the selected and adjacent pages. Changing
+  mode returns to the current period. Bars drill into a day for week/month or a
+  month for year/all; paging or changing mode clears that selection. The headline,
+  summary and time-ranked books follow the selected bucket, or the whole period
+  when none is selected. Calculations zero-fill buckets, use elapsed-period
+  averages and recompute historical goals across the entire history.
+  Heatmap and week periods follow the locale's first weekday. Reader tracking
+  and the dashboard share the reset-time local-date provider; historical date
+  keys are not rewritten.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.
