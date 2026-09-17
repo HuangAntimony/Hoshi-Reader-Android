@@ -46,6 +46,11 @@ For localization changes, run:
 ./gradlew :app:testDebugUnitTest --tests moe.antimony.hoshi.LocalizationResourceTest
 ```
 
+When separate translation contexts intentionally share an English string value,
+add a `comment` explaining the context to every duplicate entry, including the
+existing entry, and mirror those comments in Chinese resources.
+`DuplicateCrowdInStrings` still fails if only the new entry has a comment.
+
 For reader web asset changes, run the focused JavaScript tests:
 
 ```bash
@@ -254,6 +259,12 @@ Preserve existing app data when validating statistics:
   is still visible. Its upper-right Settings button opens the tab-local settings
   route; returning from settings or a book editor preserves dashboard period,
   selected chart bucket, heatmap scroll and page scroll. Advanced has no Statistics row.
+- Statistics settings groups both autostart switches together with the Reader
+  access hint below, then reset time in its own group. Sync has a heading and
+  Merge/Replace explanation below its two rows; Archive has a heading, a clear
+  action and a book-count footer. Verify Sync is absent when global sync is off,
+  Archive is absent when empty, and clear still requires confirmation. Check
+  English/Chinese narrow layouts, light/dark and E-ink borders.
 - Unset statistics sync defaults on; an explicit opt-out remains off. Both
   autostart options default off and work independently. Opening Stats does not
   start tracking, and existing daily goals and Reader display preferences stay

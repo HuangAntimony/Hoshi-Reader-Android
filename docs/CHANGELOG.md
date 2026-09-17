@@ -59,7 +59,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep Statistics always available and move its settings to the Stats tab's
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and
-  Page Turn autostart remain independent and default off.
+  Page Turn autostart remain independent and default off. Group settings into
+  autostart, reset time, Sync and Archive sections, with explanatory footers
+  and the archived-book count below the clear action.
 - Simplify Statistics to daily goals and reading-time results. Include a
   display-only reading-intensity heatmap in the daily card and a compact
   goal popup with a scrollable value picker. Show reading-time

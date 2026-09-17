@@ -5,8 +5,10 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
@@ -143,11 +146,12 @@ private fun StatisticsSettingsContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
+                .padding(innerPadding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            item {
-                StatisticsSettingsCard {
+            item(key = "autostart") {
+                StatisticsSettingsSection(footer = stringResource(R.string.reader_statistics_settings_hint)) {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
@@ -177,7 +181,10 @@ private fun StatisticsSettingsContent(
                             )
                         },
                     )
-                    StatisticsSettingsDivider()
+                }
+            }
+            item(key = "reset_time") {
+                StatisticsSettingsSection {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text(stringResource(R.string.reader_statistics_reset_time)) },
@@ -188,8 +195,14 @@ private fun StatisticsSettingsContent(
                         },
                         modifier = Modifier.clickable { showResetTimePicker = true },
                     )
-                    if (syncEnabled) {
-                        StatisticsSettingsDivider()
+                }
+            }
+            if (syncEnabled) {
+                item(key = "sync") {
+                    StatisticsSettingsSection(
+                        title = stringResource(R.string.statistics_sync_heading),
+                        footer = stringResource(R.string.reader_statistics_sync_behaviour_hint),
+                    ) {
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             headlineContent = { Text(stringResource(R.string.sync_ttu_sync)) },
@@ -230,25 +243,20 @@ private fun StatisticsSettingsContent(
                         )
                     }
                 }
-                Text(
-                    text = stringResource(R.string.reader_statistics_settings_hint),
-                    color = colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                )
             }
             if (archivedBookCount > 0) {
-                item {
-                    StatisticsSettingsCard {
+                item(key = "archive") {
+                    StatisticsSettingsSection(
+                        title = stringResource(R.string.statistics_archive_heading),
+                        footer = pluralStringResource(R.plurals.statistics_archived_book_count, archivedBookCount, archivedBookCount),
+                    ) {
                         ListItem(
                             headlineContent = { Text(stringResource(R.string.statistics_clear_archive)) },
-                            supportingContent = {
-                                Text(androidx.compose.ui.res.pluralStringResource(
-                                    R.plurals.statistics_archived_book_count, archivedBookCount, archivedBookCount,
-                                ))
-                            },
                             modifier = Modifier.clickable(enabled = !isWorking) { showClearArchiveConfirmation = true },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent,
+                                headlineColor = colorScheme.error,
+                            ),
                         )
                     }
                 }
@@ -314,15 +322,30 @@ private fun StatisticsResetTimePickerDialog(
 }
 
 @Composable
-private fun StatisticsSettingsCard(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        tonalElevation = 0.dp,
-    ) {
-        Column(content = { content() })
+private fun StatisticsSettingsSection(
+    title: String? = null,
+    footer: String? = null,
+    content: @Composable () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        title?.let { StatisticsSectionHeading(it, Modifier.padding(horizontal = 16.dp)) }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            tonalElevation = 0.dp,
+        ) {
+            Column(content = { content() })
+        }
+        footer?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
     }
 }
 

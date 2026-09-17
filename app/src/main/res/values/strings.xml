@@ -168,7 +168,7 @@
     <string name="bookshelf_cover_mode_blur">Blur</string>
     <string name="bookshelf_cover_mode_hide">Hide</string>
     <string name="bookshelf_import_epub">Import EPUB</string>
-    <string name="bookshelf_sync">Sync</string>
+    <string name="bookshelf_sync" comment="Bookshelf sync action, intentionally matching the Statistics settings Sync heading.">Sync</string>
     <string name="bookshelf_move">Move</string>
     <string name="bookshelf_mark_read">Mark Read</string>
     <string name="bookshelf_export_epub">Export EPUB</string>
@@ -354,6 +354,7 @@
     <string name="reader_statistics_autostart_on_page_turn">Start on Page Turn</string>
     <string name="reader_statistics_reset_time">Reset Time</string>
     <string name="reader_statistics_sync_behaviour">Sync Behaviour</string>
+    <string name="reader_statistics_sync_behaviour_hint">Determines whether statistics are merged entry by entry or replaced completely during sync.</string>
     <string name="reader_statistics_sync_mode_merge">Merge</string>
     <string name="reader_statistics_sync_mode_replace">Replace</string>
     <string name="reader_statistics_settings_hint">Statistics can be accessed from the Reader\'s context menu.</string>
@@ -759,11 +760,13 @@
     <string name="book_cover_scale_fill_summary">Fill the screen while preserving proportions, cropping overflow.</string>
     <string name="book_cover_scale_stretch">Stretch</string>
     <string name="book_cover_scale_stretch_summary">Fill the screen without preserving the cover’s proportions.</string>
+    <string name="statistics_sync_heading" comment="Statistics settings section heading, intentionally matching the bookshelf Sync action.">Sync</string>
+    <string name="statistics_archive_heading">Archive</string>
     <string name="statistics_clear_archive">Clear Archive</string>
     <string name="statistics_clear_archive_confirmation">Delete statistics for %1$d archived books? Statistics for books in your library will be kept.</string>
     <plurals name="statistics_archived_book_count">
-        <item quantity="one">%1$d archived book</item>
-        <item quantity="other">%1$d archived books</item>
+        <item quantity="one">%1$d book</item>
+        <item quantity="other">%1$d books</item>
     </plurals>
     <string name="statistics_operation_failed">Could not update or load statistics. Please try again.</string>
     <string name="statistics_book_unavailable">Statistics for this book are no longer available.</string>
