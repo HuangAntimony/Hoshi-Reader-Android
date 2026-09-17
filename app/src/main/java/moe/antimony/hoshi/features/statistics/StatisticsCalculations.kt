@@ -198,51 +198,6 @@ internal fun todaySummary(
     )
 }
 
-internal fun currentWeekSummary(
-    days: List<StatisticsDayAggregate>,
-    today: LocalDate,
-    settings: StatisticsTargetSettings,
-    locale: Locale = Locale.getDefault(),
-): WeekStatisticsUi {
-    val daysByDate = days.associateBy { it.date }
-    val start = statisticsStartOfWeek(today, locale)
-    val end = start.plusDays(6)
-    val weekRange = StatisticsDateRange(start, end)
-    val weekDates = (0L..6L).map { start.plusDays(it) }
-    val aggregates = weekDates.filter { !it.isAfter(today) }.map { date -> daysByDate[date] ?: emptyDayAggregate(date) }
-    val elapsedDays = (ChronoUnit.DAYS.between(start, today).toInt() + 1).coerceIn(1, 7)
-    val summary = aggregateRange(aggregates, settings)
-    return WeekStatisticsUi(
-        range = weekRange,
-        elapsedDays = elapsedDays,
-        totalCharacters = summary.totalCharacters,
-        readingSeconds = summary.readingSeconds,
-        averageSpeedPerHour = summary.averageSpeedPerHour,
-        targetDays = settings.weeklyTargetDays,
-        metTargetDays = aggregates.count { it.targetRatio(settings) >= 1.0 },
-        dailyStreakDays = dailyGoalStreak(daysByDate, today, settings),
-        weeklyStreakWeeks = weeklyGoalStreak(daysByDate.filterKeys { !it.isAfter(today) }, today, settings, locale),
-        averageCharactersPerElapsedDay = (summary.totalCharacters.toDouble() / elapsedDays.toDouble()).roundToInt(),
-        averageReadingSecondsPerElapsedDay = summary.readingSeconds / elapsedDays.toDouble(),
-        days = weekDates.map { date ->
-            val aggregate = daysByDate[date]
-            val isFuture = date.isAfter(today)
-            val ratio = aggregate?.targetRatio(settings) ?: 0.0
-            WeekDayGoalUi(
-                date = date,
-                isToday = date == today,
-                isFuture = isFuture,
-                percent = if (aggregate != null && aggregate.isActiveReadingDay() && !isFuture) {
-                    (ratio * 100.0).roundToInt()
-                } else {
-                    null
-                },
-                metTarget = !isFuture && ratio >= 1.0,
-            )
-        },
-    )
-}
-
 internal fun dailyGoalStreak(
     daysByDate: Map<LocalDate, StatisticsDayAggregate>,
     today: LocalDate,
@@ -257,24 +212,6 @@ internal fun dailyGoalStreak(
     while ((daysByDate[cursor]?.targetRatio(settings) ?: 0.0) >= 1.0) {
         streak += 1
         cursor = cursor.minusDays(1)
-    }
-    return streak
-}
-
-internal fun weeklyGoalStreak(
-    daysByDate: Map<LocalDate, StatisticsDayAggregate>,
-    today: LocalDate,
-    settings: StatisticsTargetSettings,
-    locale: Locale = Locale.getDefault(),
-): Int {
-    var weekStart = statisticsStartOfWeek(today, locale)
-    if (!weekMet(daysByDate, weekStart, settings)) {
-        weekStart = weekStart.minusWeeks(1)
-    }
-    var streak = 0
-    while (weekMet(daysByDate, weekStart, settings)) {
-        streak += 1
-        weekStart = weekStart.minusWeeks(1)
     }
     return streak
 }
@@ -394,12 +331,3 @@ internal fun averageSpeedPerHour(characters: Int, readingSeconds: Double): Int =
     } else {
         0
     }
-
-private fun weekMet(
-    daysByDate: Map<LocalDate, StatisticsDayAggregate>,
-    weekStart: LocalDate,
-    settings: StatisticsTargetSettings,
-): Boolean =
-    (0L..6L).count { offset ->
-        (daysByDate[weekStart.plusDays(offset)]?.targetRatio(settings) ?: 0.0) >= 1.0
-    } >= settings.weeklyTargetDays

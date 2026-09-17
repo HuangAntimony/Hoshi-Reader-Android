@@ -22,7 +22,6 @@ internal class StatisticsSettingsRepository(
             preferences[KEY_DAILY_TARGET_TYPE] = next.dailyTargetType.name
             preferences[KEY_DAILY_CHARACTER_TARGET] = next.dailyCharacterTarget
             preferences[KEY_DAILY_DURATION_TARGET_MINUTES] = next.dailyDurationTargetMinutes
-            preferences[KEY_WEEKLY_TARGET_DAYS] = next.weeklyTargetDays
         }
     }
 
@@ -34,15 +33,12 @@ internal class StatisticsSettingsRepository(
                 ?: StatisticsTargetDefaults.DailyCharacterTarget,
             dailyDurationTargetMinutes = this[KEY_DAILY_DURATION_TARGET_MINUTES]
                 ?: StatisticsTargetDefaults.DailyDurationTargetMinutes,
-            weeklyTargetDays = this[KEY_WEEKLY_TARGET_DAYS]
-                ?: StatisticsTargetDefaults.WeeklyTargetDays,
         ).coerceStatisticsTargetSettings()
 
     private companion object {
         val KEY_DAILY_TARGET_TYPE = stringPreferencesKey("statisticsDailyTargetType")
         val KEY_DAILY_CHARACTER_TARGET = intPreferencesKey("statisticsDailyCharacterTarget")
         val KEY_DAILY_DURATION_TARGET_MINUTES = intPreferencesKey("statisticsDailyDurationTargetMinutes")
-        val KEY_WEEKLY_TARGET_DAYS = intPreferencesKey("statisticsWeeklyTargetDays")
     }
 }
 
@@ -57,10 +53,6 @@ internal fun StatisticsTargetSettings.coerceStatisticsTargetSettings(): Statisti
             min = StatisticsTargetDefaults.MinDailyDurationTargetMinutes,
             max = StatisticsTargetDefaults.MaxDailyDurationTargetMinutes,
             step = StatisticsTargetDefaults.DailyDurationTargetStepMinutes,
-        ),
-        weeklyTargetDays = weeklyTargetDays.coerceIn(
-            StatisticsTargetDefaults.MinWeeklyTargetDays,
-            StatisticsTargetDefaults.MaxWeeklyTargetDays,
         ),
     )
 

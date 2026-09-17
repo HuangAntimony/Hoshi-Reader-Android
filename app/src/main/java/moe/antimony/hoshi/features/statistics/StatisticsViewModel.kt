@@ -106,9 +106,9 @@ internal class StatisticsViewModel internal constructor(
 
     fun onEvent(event: StatisticsEvent) {
         when (event) {
-            is StatisticsEvent.ToggleTargetSettings -> selection.update {
+            StatisticsEvent.ToggleTargetSettings -> selection.update {
                 it.copy(
-                    expandedTargetEditor = if (it.expandedTargetEditor == event.focus) null else event.focus,
+                    isTargetEditorExpanded = !it.isTargetEditorExpanded,
                 )
             }
             is StatisticsEvent.SelectDailyTargetType -> updateTargets {
@@ -119,9 +119,6 @@ internal class StatisticsViewModel internal constructor(
             }
             is StatisticsEvent.UpdateDailyDurationTargetMinutes -> updateTargets {
                 it.copy(dailyDurationTargetMinutes = event.minutes).coerceStatisticsTargetSettings()
-            }
-            is StatisticsEvent.UpdateWeeklyTargetDays -> updateTargets {
-                it.copy(weeklyTargetDays = event.days).coerceStatisticsTargetSettings()
             }
             is StatisticsEvent.SelectCalendarWindow -> selection.update { current ->
                 current.copy(
@@ -178,7 +175,7 @@ private data class StatisticsSelectionState(
     val rangeMode: StatisticsRangeMode = StatisticsRangeMode.Year,
     val anchorDate: LocalDate? = null,
     val currentRangeTab: CurrentRangeTab = CurrentRangeTab.Overview,
-    val expandedTargetEditor: StatisticsTargetSettingsFocus? = null,
+    val isTargetEditorExpanded: Boolean = false,
 )
 
 private fun buildStatisticsUiState(
@@ -222,10 +219,9 @@ private fun buildStatisticsUiState(
     return StatisticsUiState(
         isLoading = isLoading,
         today = todaySummary(daysByDate, today, settings),
-        week = currentWeekSummary(snapshot.days, today, settings),
         settings = StatisticsTargetSettingsUi(
             values = settings.coerceStatisticsTargetSettings(),
-            expandedEditor = selection.expandedTargetEditor,
+            isEditorExpanded = selection.isTargetEditorExpanded,
         ),
         calendar = StatisticsCalendarUi(
             windowSelection = windowSelection,

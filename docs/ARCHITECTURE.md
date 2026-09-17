@@ -97,9 +97,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   combines a semicircular progress gauge with compact history metrics; target
   editing stays in the dashboard. Range-mode selection and period navigation
   stay with the interactive calendar, while the range card presents its results.
-  Calendar and weekly goals share the locale's first weekday. Reader tracking
-  and the dashboard share the adjusted local-date provider driven by the global minute-level
-  statistics reset time; saved historical date keys are not rewritten.
+  The calendar and natural week periods use the locale's first weekday. There
+  is no separate weekly target or weekly dashboard card. Reader tracking and
+  the dashboard share the adjusted local-date provider driven by the global
+  minute-level statistics reset time; saved historical date keys are not rewritten.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.
@@ -132,7 +133,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   sync settings remain global DataStore settings.
 - Reader font selections retain the legacy display-name field and additionally
   persist stable family/variant IDs plus each profile's last variant per family.
-- Statistics dashboard target settings are global DataStore settings behind a
+- Statistics daily target settings are global DataStore settings behind a
   repository.
 - Profile-scoped Reader Appearance, Dictionary, and Anki settings JSON reads and
   writes use injected IO dispatchers and repository-owned serialization locks.

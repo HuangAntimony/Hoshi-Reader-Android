@@ -205,7 +205,7 @@ class StatisticsViewModelTest {
     }
 
     @Test
-    fun targetSettingsUpdatesRecomputeTodayWeekCurrentRangeAndDistribution() = runBlocking {
+    fun targetSettingsUpdatesRecomputeTodayHistoryCurrentRangeAndDistribution() = runBlocking {
         viewModel(
             snapshot = snapshot(
                 day(
@@ -228,7 +228,7 @@ class StatisticsViewModelTest {
 
             val state = viewModel.uiState.value
             assertEquals(133, state.today.targetPercent)
-            assertEquals(1, state.week.metTargetDays)
+            assertEquals(1, state.history.metDays)
             assertEquals(1, state.currentRange.summary.targetDays)
             assertEquals(listOf("Slow", "Fast"), state.currentRange.distributionRows.map { it.title })
         }
@@ -305,7 +305,7 @@ class StatisticsViewModelTest {
     }
 
     @Test
-    fun weeklyTargetChangesRecomputeCurrentWeekGoal() = runBlocking {
+    fun weekOverviewUsesDailyGoalAndRetainsReadingTotalsAfterGoalChanges() = runBlocking {
         viewModel(
             snapshot = snapshot(
                 day("2026-06-29", characters = 5_000),
@@ -313,30 +313,30 @@ class StatisticsViewModelTest {
             ),
         ).use { viewModel ->
             viewModel.reload()
-            assertEquals(4, viewModel.uiState.value.week.targetDays)
-            assertEquals(0, viewModel.uiState.value.week.weeklyStreakWeeks)
+            viewModel.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Week))
+            assertEquals(10_000, viewModel.uiState.value.currentRange.summary.totalCharacters)
+            assertEquals(2, viewModel.uiState.value.currentRange.summary.targetDays)
+            assertEquals(2, viewModel.uiState.value.history.currentStreak.count)
 
-            viewModel.onEvent(StatisticsEvent.UpdateWeeklyTargetDays(2))
+            viewModel.onEvent(StatisticsEvent.UpdateDailyCharacterTarget(6_000))
 
-            assertEquals(2, viewModel.uiState.value.week.targetDays)
-            assertEquals(1, viewModel.uiState.value.week.weeklyStreakWeeks)
+            assertEquals(10_000, viewModel.uiState.value.currentRange.summary.totalCharacters)
+            assertEquals(0, viewModel.uiState.value.currentRange.summary.targetDays)
+            assertEquals(0, viewModel.uiState.value.history.currentStreak.count)
         }
     }
 
     @Test
-    fun targetSettingsGoalButtonsToggleOneInlineEditorAtATime() = runBlocking {
+    fun dailyTargetEditorTogglesInline() = runBlocking {
         viewModel(snapshot = snapshot()).use { viewModel ->
             viewModel.reload()
-            assertEquals(null, viewModel.uiState.value.settings.expandedEditor)
+            assertEquals(false, viewModel.uiState.value.settings.isEditorExpanded)
 
-            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Weekly))
-            assertEquals(StatisticsTargetSettingsFocus.Weekly, viewModel.uiState.value.settings.expandedEditor)
+            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings)
+            assertEquals(true, viewModel.uiState.value.settings.isEditorExpanded)
 
-            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Daily))
-            assertEquals(StatisticsTargetSettingsFocus.Daily, viewModel.uiState.value.settings.expandedEditor)
-
-            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Daily))
-            assertEquals(null, viewModel.uiState.value.settings.expandedEditor)
+            viewModel.onEvent(StatisticsEvent.ToggleTargetSettings)
+            assertEquals(false, viewModel.uiState.value.settings.isEditorExpanded)
         }
     }
 
@@ -373,7 +373,7 @@ class StatisticsViewModelTest {
             yield()
             assertEquals(true, viewModel.uiState.value.isLoading)
 
-            viewModel.onEvent(StatisticsEvent.UpdateWeeklyTargetDays(2))
+            viewModel.onEvent(StatisticsEvent.UpdateDailyCharacterTarget(6_000))
             yield()
             assertEquals(true, viewModel.uiState.value.isLoading)
 

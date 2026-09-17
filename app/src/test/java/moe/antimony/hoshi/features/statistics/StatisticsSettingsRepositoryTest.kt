@@ -35,14 +35,13 @@ class StatisticsSettingsRepositoryTest {
     }
 
     @Test
-    fun readsStoredTargetsAheadOfDefaults() = runBlocking {
+    fun readsStoredDailyTargetsWithLegacyWeeklyGoalPresent() = runBlocking {
         repository().use { repository ->
             repository.writeStoredTargetSettings(
                 StatisticsTargetSettings(
                     dailyTargetType = DailyTargetType.Duration,
                     dailyCharacterTarget = 2_000,
                     dailyDurationTargetMinutes = 15,
-                    weeklyTargetDays = 3,
                 ),
             )
 
@@ -51,7 +50,6 @@ class StatisticsSettingsRepositoryTest {
                     dailyTargetType = DailyTargetType.Duration,
                     dailyCharacterTarget = 2_000,
                     dailyDurationTargetMinutes = 15,
-                    weeklyTargetDays = 3,
                 ),
                 repository.settings.first(),
             )
@@ -66,7 +64,6 @@ class StatisticsSettingsRepositoryTest {
                     dailyTargetType = DailyTargetType.Duration,
                     dailyCharacterTarget = 42,
                     dailyDurationTargetMinutes = 999,
-                    weeklyTargetDays = 9,
                 )
             }
 
@@ -75,7 +72,6 @@ class StatisticsSettingsRepositoryTest {
                     dailyTargetType = DailyTargetType.Duration,
                     dailyCharacterTarget = 500,
                     dailyDurationTargetMinutes = 720,
-                    weeklyTargetDays = 7,
                 ),
                 repository.settings.first(),
             )
@@ -109,7 +105,6 @@ class StatisticsSettingsRepositoryTest {
                 it.copy(
                     dailyCharacterTarget = 1_260,
                     dailyDurationTargetMinutes = 17,
-                    weeklyTargetDays = 3,
                 )
             }
 
@@ -117,7 +112,6 @@ class StatisticsSettingsRepositoryTest {
                 StatisticsTargetSettings(
                     dailyCharacterTarget = 1_500,
                     dailyDurationTargetMinutes = 15,
-                    weeklyTargetDays = 3,
                 ),
                 repository.settings.first(),
             )
@@ -150,7 +144,7 @@ class StatisticsSettingsRepositoryTest {
                 preferences[intPreferencesKey("statisticsDailyCharacterTarget")] = settings.dailyCharacterTarget
                 preferences[intPreferencesKey("statisticsDailyDurationTargetMinutes")] =
                     settings.dailyDurationTargetMinutes
-                preferences[intPreferencesKey("statisticsWeeklyTargetDays")] = settings.weeklyTargetDays
+                preferences[intPreferencesKey("statisticsWeeklyTargetDays")] = 3 // Old versions stored a separate weekly goal.
             }
         }
 

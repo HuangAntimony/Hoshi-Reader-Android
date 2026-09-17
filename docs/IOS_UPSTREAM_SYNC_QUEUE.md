@@ -466,8 +466,9 @@ Validation:
   settings, archived deletion/reimport, folder-keyed daily editing and natural
   calendar/all-time overview plus historical goals. Active/archive dates merge
   by modification time using iOS-compatible sidecars and backup paths. Unset
-  sync defaults on; saved goals, opt-outs and Reader display preferences remain,
-  and Android keeps its two independent autostart settings and goal defaults.
+  sync defaults on; saved daily goals, opt-outs and Reader display preferences
+  remain, and Android keeps its two independent autostart settings and daily
+  goal defaults. Weekly summaries use the calendar instead of a separate goal.
 - `703347a`, `b7f09ca` (shared ruby normalization only): native
   `ReaderTextFilter` and shared `reader-text-semantics.js` include Korean text;
   native visible text excludes `rt`/`rp` contents. Reader-facts version 3

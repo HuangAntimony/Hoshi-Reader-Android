@@ -191,18 +191,14 @@ class LocalizationResourceTest {
     }
 
     @Test
-    fun statisticsDurationUnitsUseFullWords() {
+    fun statisticsDayUnitsUseFullWords() {
         val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
         val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
 
         assertEquals("%1\$d day", defaultResources.plurals.getValue("statistics_days_value").items.getValue("one"))
         assertEquals("%1\$d days", defaultResources.plurals.getValue("statistics_days_value").items.getValue("other"))
-        assertEquals("%1\$d week", defaultResources.plurals.getValue("statistics_weeks_value").items.getValue("one"))
-        assertEquals("%1\$d weeks", defaultResources.plurals.getValue("statistics_weeks_value").items.getValue("other"))
         assertEquals("%1\$d 天", zhResources.plurals.getValue("statistics_days_value").items.getValue("one"))
         assertEquals("%1\$d 天", zhResources.plurals.getValue("statistics_days_value").items.getValue("other"))
-        assertEquals("%1\$d 周", zhResources.plurals.getValue("statistics_weeks_value").items.getValue("one"))
-        assertEquals("%1\$d 周", zhResources.plurals.getValue("statistics_weeks_value").items.getValue("other"))
     }
 
     @Test

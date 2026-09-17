@@ -51,9 +51,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Changed
 
 - Keep Statistics always available and move its settings to the Stats tab's
-  upper-right corner. Statistics sync defaults on only when unset; saved goals,
+  upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and
   Page Turn autostart remain independent and default off.
+- Simplify Statistics to daily goals, the reading calendar, and the selected
+  period overview. Remove the separate This Week card and weekly goal; weekly
+  totals and trends remain available through the calendar.
 
 ### Fixed
 

@@ -26,11 +26,6 @@ internal enum class DailyTargetType {
     Duration,
 }
 
-internal enum class StatisticsTargetSettingsFocus {
-    Daily,
-    Weekly,
-}
-
 internal enum class CurrentRangeTab {
     Overview,
     Trend,
@@ -61,7 +56,6 @@ internal data class StatisticsTargetSettings(
     val dailyTargetType: DailyTargetType = DailyTargetType.Characters,
     val dailyCharacterTarget: Int = StatisticsTargetDefaults.DailyCharacterTarget,
     val dailyDurationTargetMinutes: Int = StatisticsTargetDefaults.DailyDurationTargetMinutes,
-    val weeklyTargetDays: Int = StatisticsTargetDefaults.WeeklyTargetDays,
 )
 
 internal object StatisticsTargetDefaults {
@@ -73,9 +67,6 @@ internal object StatisticsTargetDefaults {
     const val MinDailyDurationTargetMinutes = 5
     const val MaxDailyDurationTargetMinutes = 720
     const val DailyDurationTargetStepMinutes = 5
-    const val WeeklyTargetDays = 4
-    const val MinWeeklyTargetDays = 1
-    const val MaxWeeklyTargetDays = 7
 }
 
 internal data class StatisticsBookContribution(
@@ -104,29 +95,6 @@ internal data class StatisticsRangeSummary(
     val targetProgressPercent: Int,
     val averageReadingSecondsPerBucket: Double = 0.0,
     val averageReadingTimeChangePercent: Double? = null,
-)
-
-internal data class WeekDayGoalUi(
-    val date: LocalDate,
-    val isToday: Boolean,
-    val isFuture: Boolean,
-    val percent: Int?,
-    val metTarget: Boolean,
-)
-
-internal data class WeekStatisticsUi(
-    val range: StatisticsDateRange,
-    val elapsedDays: Int,
-    val totalCharacters: Int,
-    val readingSeconds: Double,
-    val averageSpeedPerHour: Int,
-    val targetDays: Int,
-    val metTargetDays: Int,
-    val dailyStreakDays: Int,
-    val weeklyStreakWeeks: Int,
-    val averageCharactersPerElapsedDay: Int,
-    val averageReadingSecondsPerElapsedDay: Double,
-    val days: List<WeekDayGoalUi>,
 )
 
 internal data class TodayStatisticsUi(
@@ -195,7 +163,7 @@ internal data class CurrentRangeStatisticsUi(
 
 internal data class StatisticsTargetSettingsUi(
     val values: StatisticsTargetSettings = StatisticsTargetSettings(),
-    val expandedEditor: StatisticsTargetSettingsFocus? = null,
+    val isEditorExpanded: Boolean = false,
 )
 
 internal data class StatisticsEmptyState(
@@ -219,7 +187,6 @@ internal data class StatisticsHistoryUi(
 internal data class StatisticsUiState(
     val isLoading: Boolean = true,
     val today: TodayStatisticsUi,
-    val week: WeekStatisticsUi,
     val settings: StatisticsTargetSettingsUi,
     val calendar: StatisticsCalendarUi,
     val currentRange: CurrentRangeStatisticsUi,
@@ -228,11 +195,10 @@ internal data class StatisticsUiState(
 )
 
 internal sealed interface StatisticsEvent {
-    data class ToggleTargetSettings(val focus: StatisticsTargetSettingsFocus) : StatisticsEvent
+    data object ToggleTargetSettings : StatisticsEvent
     data class SelectDailyTargetType(val type: DailyTargetType) : StatisticsEvent
     data class UpdateDailyCharacterTarget(val characters: Int) : StatisticsEvent
     data class UpdateDailyDurationTargetMinutes(val minutes: Int) : StatisticsEvent
-    data class UpdateWeeklyTargetDays(val days: Int) : StatisticsEvent
     data class SelectCalendarWindow(val window: StatisticsCalendarWindowSelection) : StatisticsEvent
     data class SelectRangeMode(val mode: StatisticsRangeMode) : StatisticsEvent
     data class SelectCalendarDate(val date: LocalDate) : StatisticsEvent

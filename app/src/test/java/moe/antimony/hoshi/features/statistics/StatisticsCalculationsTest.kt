@@ -90,21 +90,22 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun currentWeekAverageUsesElapsedDaysIncludingToday() {
+    fun currentWeekOverviewAverageUsesElapsedDaysIncludingToday() {
         val today = LocalDate.parse("2026-06-30")
-        val week = currentWeekSummary(
+        val week = overviewRangeSummary(
             days = listOf(
                 day("2026-06-29", characters = 2_000, seconds = 600.0),
                 day("2026-06-30", characters = 4_000, seconds = 1_200.0),
             ),
-            today = today,
             settings = StatisticsTargetSettings(),
+            mode = StatisticsRangeMode.Week,
+            anchor = today,
+            today = today,
             locale = Locale.UK,
         )
 
-        assertEquals(2, week.elapsedDays)
-        assertEquals(3_000, week.averageCharactersPerElapsedDay)
-        assertEquals(900.0, week.averageReadingSecondsPerElapsedDay, 0.0)
+        assertEquals(6_000, week.totalCharacters)
+        assertEquals(900.0, week.averageReadingSecondsPerBucket, 0.0)
     }
 
     @Test
@@ -303,16 +304,17 @@ class StatisticsCalculationsTest {
     }
 
     @Test
-    fun sundayFirstWeekCrossesYearAndMatchesWeeklyGoals() {
+    fun sundayFirstWeekOverviewCrossesYearAndCountsDailyGoals() {
         val today = LocalDate.parse("2025-01-01")
         val range = selectedStatisticsRange(StatisticsRangeMode.Week, today, today, locale = Locale.US)
-        val week = currentWeekSummary(listOf(day("2024-12-29", 5_000)), today,
-            StatisticsTargetSettings(weeklyTargetDays = 1), locale = Locale.US)
+        val week = overviewRangeSummary(
+            listOf(day("2024-12-29", characters = 5_000, seconds = 600.0)),
+            StatisticsTargetSettings(), StatisticsRangeMode.Week, today, today, locale = Locale.US,
+        )
         assertEquals(LocalDate.parse("2024-12-29"), range.start)
         assertEquals(LocalDate.parse("2025-01-04"), range.end)
-        assertEquals(range, week.range)
-        assertEquals(4, week.elapsedDays)
-        assertEquals(1, week.weeklyStreakWeeks)
+        assertEquals(150.0, week.averageReadingSecondsPerBucket, 0.0)
+        assertEquals(1, week.targetDays)
     }
 
     @Test

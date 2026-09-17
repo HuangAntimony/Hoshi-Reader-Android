@@ -273,6 +273,9 @@ Preserve existing app data when validating statistics:
   last-archive cleanup and confirmed archive clearing. Failures retain input;
   return/resume refreshes aggregates. Merge may restore remote deleted records;
   deleting locally does not claim to clear the remote copy.
+- The dashboard flows from daily goals to calendar and selected-period results,
+  with no This Week card or weekly target editor. Upgrades ignore legacy weekly
+  targets while preserving daily goals and reading records.
 - Check year as the initial overview, natural weeks across year boundaries,
   leap February, Sunday- and Monday-first locales, incomplete current periods,
   zero buckets, monthly year/all buckets and cross-year labels. Heatmap window

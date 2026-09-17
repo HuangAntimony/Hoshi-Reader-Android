@@ -91,25 +91,10 @@ internal fun StatisticsView(
                         today = uiState.today,
                         settings = uiState.settings.values,
                         history = uiState.history,
-                        targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Daily,
+                        targetEditorExpanded = uiState.settings.isEditorExpanded,
                         onToggleTargetSettings = {
                             viewModel.onEvent(
-                                StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Daily),
-                            )
-                        },
-                        onEvent = viewModel::onEvent,
-                    )
-                }
-            }
-            item {
-                CenteredStatisticsColumn(layoutSpec = layoutSpec) {
-                    WeekStatisticsSection(
-                        week = uiState.week,
-                        settings = uiState.settings.values,
-                        targetEditorExpanded = uiState.settings.expandedEditor == StatisticsTargetSettingsFocus.Weekly,
-                        onToggleTargetSettings = {
-                            viewModel.onEvent(
-                                StatisticsEvent.ToggleTargetSettings(StatisticsTargetSettingsFocus.Weekly),
+                                StatisticsEvent.ToggleTargetSettings,
                             )
                         },
                         onEvent = viewModel::onEvent,

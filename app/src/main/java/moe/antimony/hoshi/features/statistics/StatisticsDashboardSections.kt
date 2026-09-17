@@ -18,14 +18,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.clip
@@ -162,93 +160,6 @@ internal fun TodayStatisticsSection(
 }
 
 @Composable
-internal fun WeekStatisticsSection(
-    week: WeekStatisticsUi,
-    settings: StatisticsTargetSettings,
-    targetEditorExpanded: Boolean,
-    onToggleTargetSettings: () -> Unit,
-    onEvent: (StatisticsEvent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val averageMetric = if (settings.dailyTargetType == DailyTargetType.Duration) {
-        StatisticMetric(
-            label = stringResource(R.string.statistics_daily_average_duration),
-            value = formatStatisticsDuration(week.averageReadingSecondsPerElapsedDay),
-        )
-    } else {
-        StatisticMetric(
-            label = stringResource(R.string.statistics_daily_average_characters),
-            value = formatStatisticsCharacterCount(week.averageCharactersPerElapsedDay),
-        )
-    }
-    StatisticsSection(
-        title = stringResource(R.string.statistics_this_week),
-        trailing = null,
-        modifier = modifier,
-        trailingContent = {
-            TargetGoalText(
-                text = stringResource(R.string.statistics_target_format, formatStatisticsDays(week.targetDays)),
-                onClick = onToggleTargetSettings,
-            )
-        },
-    ) {
-        MetricGrid(
-            metrics = weekStatisticsMetricsInDisplayOrder(
-                durationMetric = StatisticMetric(
-                    label = stringResource(R.string.statistics_reading_duration),
-                    value = formatStatisticsDuration(week.readingSeconds),
-                ),
-                charactersMetric = StatisticMetric(
-                    label = stringResource(R.string.statistics_characters_read),
-                    value = formatStatisticsCharacterCount(week.totalCharacters),
-                ),
-                speedMetric = StatisticMetric(
-                    label = stringResource(R.string.statistics_average_speed),
-                    value = formatStatisticsSpeed(week.averageSpeedPerHour),
-                ),
-                targetDaysMetric = StatisticMetric(
-                    label = stringResource(R.string.statistics_target_days),
-                    value = formatStatisticsDays(week.metTargetDays),
-                ),
-                streakMetric = StatisticMetric(
-                    label = stringResource(R.string.statistics_streak),
-                    value = formatStatisticsWeeks(week.weeklyStreakWeeks),
-                ),
-                averageMetric = averageMetric,
-            ),
-            columns = 3,
-        )
-        Spacer(Modifier.height(18.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.statistics_week_goal_days),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(R.string.statistics_week_status_format, week.metTargetDays),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        WeekGoalRow(days = week.days)
-        if (targetEditorExpanded) {
-            Spacer(Modifier.height(18.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(14.dp))
-            WeeklyTargetSettingsSection(settings = settings, onEvent = onEvent)
-        }
-    }
-}
-
-@Composable
 private fun DailyTargetSettingsSection(
     settings: StatisticsTargetSettings,
     onEvent: (StatisticsEvent) -> Unit,
@@ -313,64 +224,6 @@ private fun DailyTargetSettingsSection(
 }
 
 @Composable
-private fun WeeklyTargetSettingsSection(
-    settings: StatisticsTargetSettings,
-    onEvent: (StatisticsEvent) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = stringResource(R.string.statistics_weekly_target),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        StepperRow(
-            label = stringResource(R.string.statistics_week_status),
-            value = formatStatisticsDays(settings.weeklyTargetDays),
-            canDecrease = settings.weeklyTargetDays > StatisticsTargetDefaults.MinWeeklyTargetDays,
-            canIncrease = settings.weeklyTargetDays < StatisticsTargetDefaults.MaxWeeklyTargetDays,
-            onDecrease = { onEvent(StatisticsEvent.UpdateWeeklyTargetDays(settings.weeklyTargetDays - 1)) },
-            onIncrease = { onEvent(StatisticsEvent.UpdateWeeklyTargetDays(settings.weeklyTargetDays + 1)) },
-        )
-    }
-}
-
-@Composable
-private fun TargetGoalText(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Icon(
-                imageVector = Icons.Rounded.Tune,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-@Composable
 internal fun StatisticsSection(
     title: String,
     trailing: String?,
@@ -418,23 +271,6 @@ internal data class StatisticMetric(
     val label: String,
     val value: String,
 )
-
-internal fun weekStatisticsMetricsInDisplayOrder(
-    durationMetric: StatisticMetric,
-    charactersMetric: StatisticMetric,
-    speedMetric: StatisticMetric,
-    targetDaysMetric: StatisticMetric,
-    streakMetric: StatisticMetric,
-    averageMetric: StatisticMetric,
-): List<StatisticMetric> =
-    listOf(
-        durationMetric,
-        charactersMetric,
-        speedMetric,
-        averageMetric,
-        targetDaysMetric,
-        streakMetric,
-    )
 
 internal data class MetricCardTextSpec(
     val valueFontSizeSp: Int,
@@ -684,58 +520,6 @@ internal fun statisticsDailyGoalProgress(
 internal fun formatStatisticsGroupedCount(value: Int): String =
     java.text.NumberFormat.getIntegerInstance().format(value)
 
-@Composable
-private fun WeekGoalRow(days: List<WeekDayGoalUi>) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        days.forEach { day ->
-            Column(
-                modifier = Modifier
-                    .weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                val containerColor = when {
-                    day.isToday && day.metTarget -> MaterialTheme.colorScheme.primary
-                    day.metTarget -> MaterialTheme.colorScheme.primaryContainer
-                    day.isToday -> MaterialTheme.colorScheme.secondaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceContainerLow
-                }
-                val contentColor = when {
-                    day.isToday && day.metTarget -> MaterialTheme.colorScheme.onPrimary
-                    day.metTarget -> MaterialTheme.colorScheme.onPrimaryContainer
-                    day.isToday -> MaterialTheme.colorScheme.onSecondaryContainer
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                Surface(
-                    modifier = Modifier.size(32.dp),
-                    shape = CircleShape,
-                    color = containerColor,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = statisticsWeekdayLabel(day.date.dayOfWeek.value),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = contentColor,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = day.percent?.let { stringResource(R.string.statistics_percent_format, it) }
-                        ?: stringResource(R.string.statistics_empty_goal_value),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
-}
-
 internal data class StatisticsSegmentedOption<T>(
     val value: T,
     val label: String,
@@ -900,10 +684,6 @@ internal fun formatStatisticsCharacterCount(characters: Int): String =
 @Composable
 internal fun formatStatisticsDays(days: Int): String =
     pluralStringResource(R.plurals.statistics_days_value, days, days)
-
-@Composable
-internal fun formatStatisticsWeeks(weeks: Int): String =
-    pluralStringResource(R.plurals.statistics_weeks_value, weeks, weeks)
 
 @Composable
 internal fun formatStatisticsSpeed(speedPerHour: Int): String =
