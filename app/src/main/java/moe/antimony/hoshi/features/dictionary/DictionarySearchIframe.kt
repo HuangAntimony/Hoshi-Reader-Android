@@ -19,6 +19,7 @@ internal fun dictionarySearchRootFramePayload(
     clearSelectionSignal: Int = 0,
     rootHistory: ReaderPopupHistoryCounts = ReaderPopupHistoryCounts(),
     sourceText: String? = null,
+    sourceSentenceOffset: Int? = null,
 ): ReaderLookupPopupFramePayload {
     val top = searchBarBottomDp.coerceIn(0.0, viewport.height)
     return ReaderLookupPopupFramePayload(
@@ -45,6 +46,7 @@ internal fun dictionarySearchRootFramePayload(
         iframeUrl = iframeUrl,
         contentKey = dictionarySearchResultsContentKey(results, sourceText),
         sourceText = sourceText,
+        sourceSentenceOffset = sourceSentenceOffset,
     )
 }
 
@@ -79,6 +81,7 @@ internal fun dictionarySearchIframePayloads(
     iframeUrl: String,
     rootClearSelectionSignal: Int = 0,
     sourceText: String? = null,
+    sourceSentenceOffset: Int? = null,
 ): List<ReaderLookupPopupFramePayload> {
     if (rootResults.isEmpty()) return emptyList()
     return listOf(
@@ -92,6 +95,7 @@ internal fun dictionarySearchIframePayloads(
             clearSelectionSignal = rootClearSelectionSignal,
             rootHistory = rootHistory,
             sourceText = sourceText,
+            sourceSentenceOffset = sourceSentenceOffset,
         ),
     ) + childPopups.mapIndexed { index, popup ->
         val history = childHistories[popup.id] ?: ReaderPopupHistoryCounts()

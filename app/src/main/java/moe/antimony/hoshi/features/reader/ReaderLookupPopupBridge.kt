@@ -108,6 +108,7 @@ internal data class ReaderLookupPopupFramePayload(
     val iframeUrl: String,
     val contentKey: String? = null,
     val sourceText: String? = null,
+    val sourceSentenceOffset: Int? = null,
 ) {
     companion object {
         fun fromPopup(
@@ -258,6 +259,12 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         val query: String,
     ) : ReaderLookupPopupBridgeMessage()
 
+    data class SourceHistoryRestored(
+        override val popupId: String,
+        override val messageId: String?,
+        val sentenceOffset: Int?,
+    ) : ReaderLookupPopupBridgeMessage()
+
     data class KanjiRedirect(
         override val popupId: String,
         override val messageId: String?,
@@ -373,6 +380,12 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                     messageId = messageId ?: return null,
                     query = payload.string("body") ?: return null,
                 )
+                "sourceHistoryRestored" -> {
+                    val body = payload.obj("body") ?: return null
+                    val offset = if (body["sentenceOffset"] is JsonNull) null else
+                        body.int("sentenceOffset")?.takeIf { it >= 0 } ?: return null
+                    SourceHistoryRestored(popupId, messageId, offset)
+                }
                 "kanjiRedirect" -> KanjiRedirect(
                     popupId = popupId,
                     messageId = messageId ?: return null,

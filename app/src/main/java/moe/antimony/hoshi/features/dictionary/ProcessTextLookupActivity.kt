@@ -471,6 +471,15 @@ private fun ProcessTextLookupOverlay(
                             )
                     }
                 }
+                is ReaderLookupPopupBridgeMessage.SourceHistoryRestored -> {
+                    if (popupIndex(message.popupId) == 0) {
+                        setIframePopups(
+                            popups.map { popup ->
+                                processTextRestoreSourceHistory(popup, message.sentenceOffset, popup.id == message.popupId)
+                            },
+                        )
+                    }
+                }
                 is ReaderLookupPopupBridgeMessage.ContentReady,
                 is ReaderLookupPopupBridgeMessage.ScrollState,
                 is ReaderLookupPopupBridgeMessage.SasayakiReplayCue,
@@ -624,6 +633,26 @@ internal fun processTextLookupRedirect(
     )
 }
 
+internal fun processTextRestoreSourceHistory(
+    popup: LookupPopupItem,
+    sentenceOffset: Int?,
+    isRoot: Boolean,
+): LookupPopupItem {
+    if (!isRoot) return popup
+    val state = popup.state
+    val sentence = state.selection.sentence
+    if (sentenceOffset != null && sentenceOffset !in 0..sentence.length) return popup
+    return popup.copy(
+        state = state.copy(
+            selection = state.selection.copy(
+                text = sentenceOffset?.let(sentence::substring) ?: state.selection.text,
+                sentenceOffset = sentenceOffset,
+            ),
+            ankiContext = state.ankiContext.copy(sentenceOffset = sentenceOffset),
+        ),
+    )
+}
+
 internal fun processTextLookupFramePayloads(
     query: String,
     popups: List<LookupPopupItem>,
@@ -639,7 +668,10 @@ internal fun processTextLookupFramePayloads(
     iframeUrl = iframeUrl,
     rootSelectionHighlight = null,
 ).mapIndexed { index, payload ->
-    if (index == 0) payload.copy(sourceText = query) else payload
+    if (index == 0) payload.copy(
+        sourceText = query,
+        sourceSentenceOffset = popups[index].state.ankiContext.sentenceOffset,
+    ) else payload
 }
 
 internal object ProcessTextLookupOverlayLayout {

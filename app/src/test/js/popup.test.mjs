@@ -141,6 +141,7 @@ function popupContext({
     kanjiResult = null,
     getEntry = null,
     lookupRedirect = () => 0,
+    sourceHistoryRestored = () => {},
 } = {}) {
     const documentElement = new FakeElement();
     documentElement.childProbeWidth = htmlProbeWidth;
@@ -215,6 +216,7 @@ function popupContext({
         webkit: {
             messageHandlers: {
                 lookupRedirect: { postMessage: lookupRedirect },
+                sourceHistoryRestored: { postMessage: sourceHistoryRestored },
                 tapOutside: {
                     postMessage(message) {
                         tapOutsideMessages.push(message);
@@ -317,11 +319,12 @@ test('source text touch target bypasses generic selection and outside dismissal'
     assert.deepEqual(setup.selectTextCalls, []);
 });
 
-test('source redirect retains scroll while browser clamps a temporarily empty delayed result container', async () => {
+for (const popupScale of [0.8, 1, 2]) test(`source redirect retains visual scroll at scale ${popupScale} while delayed results clamp`, async () => {
     const entry = { expression: '猫', reading: 'ねこ', matched: '猫', glossaries: [], frequencies: [], pitches: [] };
     let entryRequests = 0;
     let finishRenderingEntry;
     const setup = popupContext({
+        htmlZoom: String(popupScale),
         lookupRedirect: () => 1,
         getEntry: () => ++entryRequests === 1 ? entry : new Promise(resolve => { finishRenderingEntry = resolve; }),
     });
@@ -332,7 +335,7 @@ test('source redirect retains scroll while browser clamps a temporarily empty de
     let top = 0;
     function clamp(value) {
         // Model browser scroll bounds from visible source and current/minimum entry height.
-        const minimumHeight = entries.style.minHeight === '100vh' ? viewportHeight : 0;
+        const minimumHeight = (parseFloat(entries.style.minHeight) || 0) / 100 * viewportHeight * popupScale;
         const entriesHeight = Math.max(entries.children.length ? 900 : 0, minimumHeight);
         const contentHeight = (source.hidden ? 0 : sourceHeight) + entriesHeight;
         return Math.max(0, Math.min(value, contentHeight - viewportHeight));
@@ -365,6 +368,60 @@ test('source redirect retains scroll while browser clamps a temporarily empty de
     setup.document.scrollingElement.scrollTop = 180;
     assert.equal(setup.document.scrollingElement.scrollTop, 0);
     assert.equal(entries.style.minHeight, '');
+});
+
+for (const [text, firstIndex, secondIndex, offsets] of [
+    ['猫と猫', 0, 2, [0, 2]],
+    ['𠮟猫と猫', 1, 3, [2, 4]],
+]) test(`source history restores repeated-word highlights and UTF-16 mining offsets for ${text}`, async () => {
+    const entry = { expression: '猫', reading: 'ねこ', matched: '猫', glossaries: [], frequencies: [], pitches: [] };
+    const restored = [];
+    const setup = popupContext({ lookupRedirect: () => 1, getEntry: () => entry, sourceHistoryRestored: offset => restored.push(offset) });
+    setup.context.window.replacePopupResults(0, [], text);
+    const source = setup.searchTextContainer;
+    const highlighted = () => source.children.flatMap((span, index) => span.classList.contains('matched') ? [index] : []);
+    await source.onclick({ target: source.children[firstIndex], stopPropagation() {} });
+    await flushAsyncWork();
+    await source.onclick({ target: source.children[secondIndex], stopPropagation() {} });
+    await flushAsyncWork();
+    assert.deepEqual(highlighted(), [secondIndex]);
+    setup.context.window.navigateBack();
+    assert.deepEqual(highlighted(), [firstIndex]);
+    assert.deepEqual(restored, [offsets[0]]);
+    setup.context.window.navigateForward();
+    assert.deepEqual(highlighted(), [secondIndex]);
+    assert.deepEqual(restored, offsets);
+});
+
+test('ordinary popup history does not emit source restoration messages', () => {
+    const restored = [];
+    const setup = popupContext({ sourceHistoryRestored: offset => restored.push(offset) });
+    setup.context.window.replacePopupResults(0, []);
+    setup.context.redirect(0);
+    setup.context.window.navigateBack();
+    assert.deepEqual(restored, []);
+});
+
+test('source history restores initial mining offset and null after a non-suffix glossary redirect', async () => {
+    const entry = { expression: '猫', reading: 'ねこ', matched: '猫', glossaries: [], frequencies: [], pitches: [] };
+    const restored = [];
+    const setup = popupContext({ lookupRedirect: () => 1, getEntry: () => entry, sourceHistoryRestored: offset => restored.push(offset) });
+    setup.context.window.replacePopupResults(0, [], '猫と猫', 0);
+    const source = setup.searchTextContainer;
+    await source.onclick({ target: source.children[2], stopPropagation() {} });
+    await flushAsyncWork();
+    setup.context.window.navigateBack();
+    assert.deepEqual(restored, [0]);
+    setup.context.window.navigateForward();
+    setup.context.redirect(0);
+    assert.equal(source.children.some(span => span.classList.contains('matched')), false);
+    setup.context.window.navigateBack();
+    setup.context.window.navigateForward();
+    assert.deepEqual(restored, [0, 2, 2, null]);
+    setup.context.redirect(0, 0, '猫');
+    setup.context.redirect(0, 0, '犬');
+    setup.context.window.navigateBack();
+    assert.equal(restored.at(-1), 2);
 });
 
 test('reset or replacement discards pending source redirect replies', async () => {

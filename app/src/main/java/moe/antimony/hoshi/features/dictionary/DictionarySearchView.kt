@@ -80,7 +80,6 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
-import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
@@ -289,6 +288,7 @@ fun DictionarySearchView(
     val iframePayloads = remember(
         uiState.results,
         uiState.lastQuery,
+        uiState.sentenceOffset,
         themedPopups,
         childHistories,
         viewport,
@@ -303,6 +303,7 @@ fun DictionarySearchView(
         dictionarySearchIframePayloads(
             rootResults = uiState.results,
             sourceText = uiState.lastQuery,
+            sourceSentenceOffset = uiState.sentenceOffset,
             childPopups = themedPopups,
             childHistories = childHistories,
             rootHistory = ReaderPopupHistoryCounts(
@@ -453,7 +454,7 @@ fun DictionarySearchView(
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val messageId = message.messageId ?: return
                 val miningContext = if (message.popupId == DictionarySearchRootPopupId) {
-                    AnkiMiningContext(sentence = uiState.lastQuery.ifBlank { uiState.query }, sentenceOffset = uiState.sentenceOffset)
+                    searchViewModel.rootMiningContext()
                 } else {
                     popupById(message.popupId)?.state?.ankiContext ?: return
                 }
@@ -580,6 +581,11 @@ fun DictionarySearchView(
                             )
                             )
                     }
+                }
+            }
+            is ReaderLookupPopupBridgeMessage.SourceHistoryRestored -> {
+                if (message.popupId == DictionarySearchRootPopupId) {
+                    searchViewModel.restoreRootSourceHistory(message.sentenceOffset)
                 }
             }
             is ReaderLookupPopupBridgeMessage.SasayakiReplayCue,

@@ -362,14 +362,18 @@ test('process text iframe host outside pointer dismisses the top popup', () => {
 test('iframe render messages forward only non-null source text', () => {
     for (const sourceText of ['前𠮟る後', '', null, undefined]) {
         const scene = popupHost();
-        scene.host.renderStack({ popups: [{ ...rootPopupPayload(), sourceText }] });
+        scene.host.renderStack({ popups: [{ ...rootPopupPayload(), sourceText, sourceSentenceOffset: 0 }] });
         const iframe = scene.document.getElementById('hoshi-reader-popup-layer').children[0].querySelector('.hoshi-reader-popup-iframe');
         const messages = [];
         iframe.contentWindow.postMessage = message => messages.push(message);
         iframe.dispatchEvent('load');
         const message = messages.find(message => message.type === 'renderPopup');
         assert.equal(Object.hasOwn(message, 'sourceText'), sourceText != null);
-        if (sourceText != null) assert.equal(message.sourceText, sourceText);
+        assert.equal(Object.hasOwn(message, 'sourceSentenceOffset'), sourceText != null);
+        if (sourceText != null) {
+            assert.equal(message.sourceText, sourceText);
+            assert.equal(message.sourceSentenceOffset, 0);
+        }
     }
 });
 

@@ -27,6 +27,7 @@ let kanjiRedirectRequestId = 0;
 let hostEntrySetVersion = 0;
 let activeEntrySetVersion = 0;
 let sourceTextGeneration = 0;
+let sourceTextContext = null;
 
 window.createPopupGeometry = function({
     documentRef = document,
@@ -58,6 +59,11 @@ window.createPopupGeometry = function({
             scrollRoot()?.clientHeight,
         ];
         return candidates.find(value => Number.isFinite(value) && value > 0) || 0;
+    }
+
+    function viewportMinHeightCss() {
+        const zoom = Number.parseFloat(computedStyle(documentRef.documentElement).zoom);
+        return `${100 / (Number.isFinite(zoom) && zoom > 0 ? zoom : 1)}vh`;
     }
 
     function scrollByViewport(direction, scale = 1) {
@@ -135,6 +141,7 @@ window.createPopupGeometry = function({
         selectionCoordinates,
         setScrollTop,
         viewportHeight,
+        viewportMinHeightCss,
     });
 };
 
@@ -1286,7 +1293,7 @@ function renderStructuredContent(parent, node, language = null, dictName = null,
                 const query = i < 0 ? null : new URLSearchParams(node.href.slice(i + 1)).get('query');
                 const count = query ? await webkit.messageHandlers.lookupRedirect.postMessage(query) : 0;
                 if (count > 0) {
-                    redirect(count);
+                    redirect(count, 0, query);
                 }
             }
         };
@@ -2096,11 +2103,19 @@ function flushPendingHistoryRestore() {
     appendPendingHistoryRestore(true);
 }
 
-function redirect(count, scrollTop = 0) {
+function redirect(count, scrollTop = 0, query = null) {
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
     resetDictionaryMediaObserver();
     backStack.push(snapshot());
+    if (sourceTextContext) {
+        applySourceTextContext({
+            ...sourceTextContext,
+            matchStart: null,
+            matchLength: 0,
+            sentenceOffset: query && sourceTextContext.text.endsWith(query) ? sourceTextContext.text.length - query.length : null,
+        });
+    }
     forwardStack.length = 0;
     replaceHostEntrySet();
     window.lookupEntries = undefined;
@@ -2175,12 +2190,23 @@ function redirectKanji(data) {
     requestAnimationFrame(() => popupGeometry.setScrollTop(0));
 }
 
-function renderSourceText(sourceText) {
-    const generation = ++sourceTextGeneration;
+function applySourceTextContext(context) {
+    sourceTextContext = context;
+    const container = document.getElementById('search-text');
+    if (!container) return;
+    [...container.children].forEach((span, index) => {
+        span.classList.toggle('matched', context?.matchStart != null
+            && index >= context.matchStart && index < context.matchStart + context.matchLength);
+    });
+}
+
+function renderSourceText(sourceText, sentenceOffset = null) {
+    sourceTextGeneration++;
     const container = document.getElementById('search-text');
     if (!container) return;
     const entriesContainer = document.getElementById('entries-container');
-    if (entriesContainer) entriesContainer.style.minHeight = sourceText == null ? '' : '100vh';
+    if (entriesContainer) entriesContainer.style.minHeight = sourceText == null ? '' : popupGeometry.viewportMinHeightCss();
+    sourceTextContext = sourceText == null ? null : { text: sourceText, matchStart: null, matchLength: 0, sentenceOffset };
     container.replaceChildren();
     container.hidden = sourceText == null;
     container.onclick = null;
@@ -2193,6 +2219,7 @@ function renderSourceText(sourceText) {
         return span;
     }));
     container.onclick = async (event) => {
+        const generation = sourceTextGeneration;
         event.stopPropagation();
         const index = event.target.dataset.index;
         if (index === undefined) return;
@@ -2203,15 +2230,17 @@ function renderSourceText(sourceText) {
         if (generation !== sourceTextGeneration) return;
         const scrollTop = popupGeometry.scrollTop();
         redirect(count, scrollTop);
-        const length = [...(entry?.matched || '')].length;
-        [...container.children].forEach((span, i) => {
-            span.classList.toggle('matched', i >= start && i < start + length);
+        applySourceTextContext({
+            ...sourceTextContext,
+            matchStart: start,
+            matchLength: [...(entry?.matched || '')].length,
+            sentenceOffset: chars.slice(0, start).join('').length,
         });
     };
 }
 
-window.replacePopupResults = function(count, initialEntries, sourceText = null) {
-    renderSourceText(sourceText);
+window.replacePopupResults = function(count, initialEntries, sourceText = null, sentenceOffset = null) {
+    renderSourceText(sourceText, sentenceOffset);
     closeOverlay();
     popupTermNavigator.reset();
     flushPendingHistoryRestore();
@@ -2244,6 +2273,7 @@ function snapshot() {
         lookupEntries: window.lookupEntries?.slice(),
         entryCount: window.entryCount,
         entrySetVersion: activeEntrySetVersion,
+        sourceTextContext,
     };
 }
 
@@ -2256,6 +2286,11 @@ function hasRenderedEntry(container, index) {
 }
 
 function restore(snapshot) {
+    sourceTextGeneration++;
+    applySourceTextContext(snapshot.sourceTextContext);
+    if (sourceTextContext) {
+        webkit.messageHandlers.sourceHistoryRestored.postMessage(sourceTextContext.sentenceOffset);
+    }
     renderGeneration++;
     popupTermNavigator.reset();
     flushPendingHistoryRestore();

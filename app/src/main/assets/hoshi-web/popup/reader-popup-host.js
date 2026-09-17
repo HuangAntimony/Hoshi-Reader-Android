@@ -135,7 +135,10 @@
             entriesCount: payload.entriesCount || 0,
             initialEntryJson: payload.initialEntryJson || null
         };
-        if (payload.sourceText != null) message.sourceText = payload.sourceText;
+        if (payload.sourceText != null) {
+            message.sourceText = payload.sourceText;
+            message.sourceSentenceOffset = payload.sourceSentenceOffset ?? null;
+        }
         return message;
     }
 

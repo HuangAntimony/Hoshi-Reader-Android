@@ -286,7 +286,13 @@ Validate relevant dictionary/audio changes with:
   remains open and tapping a later word finds results. Confirm successful taps
   mark the matched span and preserve result scroll, while failed taps preserve
   results, selection, mining context, and history. Exercise back/forward,
-  recursive children, Kanji, audio, outside dismissal, and swipe dismissal.
+  including `猫と猫` and `𠮟猫と猫`: tap the first then second occurrence and
+  verify Back/Forward restores both the marked occurrence and mined cloze
+  position. Test popup scales 0.8/1/2 with delayed result rendering while the
+  source is partially scrolled; the visual scroll position must survive the
+  temporarily empty entries container.
+  Also exercise recursive children, Kanji, audio, outside dismissal, and swipe
+  dismissal.
   Repeat with source sizes 12/22/48, light/dark/E-ink themes and profile switching;
   Reader and child popups must not gain source text. Mine through AnkiDroid and
   AnkiConnect and verify the full original sentence and exact repeated-word

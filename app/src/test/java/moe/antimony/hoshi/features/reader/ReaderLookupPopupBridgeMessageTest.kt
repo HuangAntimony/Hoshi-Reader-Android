@@ -8,6 +8,23 @@ import org.junit.Test
 
 class ReaderLookupPopupBridgeMessageTest {
     @Test
+    fun parsesRestoredSourceOffsetsIncludingZeroAndNullButRejectsInvalidOffsets() {
+        listOf(0, 4, null).forEach { offset ->
+            assertEquals(
+                ReaderLookupPopupBridgeMessage.SourceHistoryRestored("root", null, offset),
+                ReaderLookupPopupBridgeMessage.fromJson(
+                    """{"name":"sourceHistoryRestored","popupId":"root","body":{"sentenceOffset":$offset}}""",
+                ),
+            )
+        }
+        listOf("-1", "1.5", "\"bad\"").forEach { offset ->
+            assertNull(ReaderLookupPopupBridgeMessage.fromJson(
+                """{"name":"sourceHistoryRestored","popupId":"root","body":{"sentenceOffset":$offset}}""",
+            ))
+        }
+    }
+
+    @Test
     fun parsesReaderPopupBridgeMessages() {
         assertEquals(
             ReaderLookupPopupBridgeMessage.OpenLink(

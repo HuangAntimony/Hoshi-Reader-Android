@@ -220,7 +220,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Shared iframe frame payloads accept optional root `sourceText` for Dictionary
   search and Process Text; Reader and recursive child frames omit it. Shared
   popup assets render character spans, look up exact suffixes on tap, mark the
-  match, and preserve scroll on successful source redirects. Profile-scoped
+  match, and preserve scroll on successful source redirects. Popup geometry
+  converts the source-enabled entries minimum height to one visual viewport
+  under HTML zoom; keep that reserve while replacement entries load, and clear
+  it for ordinary/reset payloads. Profile-scoped
   `DictionarySettings.searchTextSize` defaults to 22 and is normalized to 12–48.
 - Dictionary and Process Text root lookup state retain the complete original
   query as the mining sentence. Successful redirects use the UTF-16 length
@@ -229,6 +232,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Text initializes it to zero and also updates its root selection text/offset
   after successful redirects. Failed redirects preserve native results,
   selection/mining context, and history.
+  Shared popup history snapshots retain source match ranges and UTF-16 mining
+  offsets. Restoring a snapshot sends `sourceHistoryRestored` to update only the
+  Dictionary or Process Text root mining context; Reader and child popups ignore
+  this message. Source payloads also carry the initial `sourceSentenceOffset`
+  so restoring the initial Process Text snapshot preserves its zero offset.
   Process Text creates its root even with no initial match, so source taps can
   recover a lookup; recursive popup creation still requires results.
 - The shared popup term payload carries pitch entries as a numeric downstep or

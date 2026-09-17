@@ -15,6 +15,24 @@ import org.junit.Test
 
 class ProcessTextLookupStateTest {
     @Test
+    fun rootHistoryRestoresRepeatedWordMiningAndSelectionOffsetsWithoutChangingChildren() {
+        listOf("猫と猫" to listOf(0, 2), "𠮟猫と猫" to listOf(2, 4)).forEach { (sentence, offsets) ->
+            val original = root(sentence, listOf(result("猫")))
+            val first = processTextLookupRedirect(original, sentence.substring(offsets[0]), listOf(result("猫")), true)
+            val second = processTextLookupRedirect(first, sentence.substring(offsets[1]), listOf(result("猫")), true)
+            val back = processTextRestoreSourceHistory(second, offsets[0], isRoot = true)
+            assertEquals(sentence, back.state.ankiContext.sentence)
+            assertEquals(offsets[0], back.state.ankiContext.sentenceOffset)
+            assertEquals(offsets[0], back.state.selection.sentenceOffset)
+            val forward = processTextRestoreSourceHistory(back, offsets[1], isRoot = true)
+            assertEquals(offsets[1], forward.state.ankiContext.sentenceOffset)
+            assertEquals(offsets[1], forward.state.selection.sentenceOffset)
+            assertNull(processTextRestoreSourceHistory(forward, null, true).state.ankiContext.sentenceOffset)
+            assertSame(second, processTextRestoreSourceHistory(second, offsets[0], isRoot = false))
+        }
+    }
+
+    @Test
     fun emptyInitialLookupKeepsOriginalSourceAndMiningContext() {
         val popup = root("。😀猫\n猫")
 
@@ -85,10 +103,12 @@ class ProcessTextLookupStateTest {
         )
 
         assertEquals("。😀猫\n猫", payloads[0].sourceText)
+        assertEquals(0, payloads[0].sourceSentenceOffset)
         assertEquals(1, payloads[0].entriesCount)
         assertEquals(2, payloads[0].backCount)
         assertEquals(1, payloads[0].forwardCount)
         assertNull(payloads[1].sourceText)
+        assertNull(payloads[1].sourceSentenceOffset)
     }
 
     private fun root(query: String, results: List<LookupResult> = emptyList()): LookupPopupItem =

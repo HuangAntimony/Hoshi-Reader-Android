@@ -10,7 +10,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Show source text above Dictionary and externally shared lookup results; tap a
   character to look up from that position while keeping the full sentence for
-  Anki cards. Source text size is adjustable from 12 to 48.
+  Anki cards. Back/Forward restores the selected occurrence for mining, and
+  source text size is adjustable from 12 to 48.
 - Add Off, Dimmed, Toggle, and Hidden furigana modes in Reader Appearance;
   Toggle reveals whitespace-adjacent ruby annotations together on the first tap.
 

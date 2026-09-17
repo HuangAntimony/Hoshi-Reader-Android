@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.R
@@ -251,6 +252,20 @@ internal class DictionarySearchViewModel : ViewModel {
     }
 
     fun lookupKanji(kanji: String): KanjiResult = repository.lookupKanji(kanji)
+
+    fun restoreRootSourceHistory(sentenceOffset: Int?) {
+        _uiState.update { state ->
+            if (sentenceOffset != null && sentenceOffset !in 0..state.lastQuery.length) {
+                state
+            } else {
+                state.copy(sentenceOffset = sentenceOffset)
+            }
+        }
+    }
+
+    fun rootMiningContext(): AnkiMiningContext = _uiState.value.let {
+        AnkiMiningContext(sentence = it.lastQuery.ifBlank { it.query }, sentenceOffset = it.sentenceOffset)
+    }
 
     fun entryForPopup(popupId: String, index: Int): LookupResult? {
         if (index < 0) return null

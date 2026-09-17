@@ -21,6 +21,28 @@ import moe.antimony.hoshi.ui.UiText
 
 class DictionarySearchViewModelTest {
     @Test
+    fun restoredSourceHistoryUpdatesRootMiningContextInBothDirections() {
+        listOf("猫と猫" to listOf(0, 2), "𠮟猫と猫" to listOf(2, 4)).forEach { (sentence, offsets) ->
+            val repository = FakeDictionarySearchRepository(lookupResults = listOf(lookupResult("猫")))
+            val viewModel = viewModel(repository)
+            viewModel.applyExternalLookup(sentence)
+            viewModel.lookupRootRedirect(sentence.substring(offsets[0]))
+            viewModel.lookupRootRedirect(sentence.substring(offsets[1]))
+            viewModel.navigateBack()
+            viewModel.restoreRootSourceHistory(offsets[0])
+            assertEquals(offsets[0], viewModel.uiState.value.sentenceOffset)
+            assertEquals(sentence, viewModel.rootMiningContext().sentence)
+            assertEquals(offsets[0], viewModel.rootMiningContext().sentenceOffset)
+            viewModel.navigateForward()
+            viewModel.restoreRootSourceHistory(offsets[1])
+            assertEquals(offsets[1], viewModel.rootMiningContext().sentenceOffset)
+            viewModel.restoreRootSourceHistory(null)
+            assertNull(viewModel.rootMiningContext().sentenceOffset)
+            assertEquals(sentence, viewModel.uiState.value.lastQuery)
+        }
+    }
+
+    @Test
     fun sourceRedirectPreservesOriginalQueryAndTracksUtf16SuffixForMining() {
         val repository = FakeDictionarySearchRepository(lookupResults = listOf(lookupResult("前")))
         val viewModel = viewModel(repository)

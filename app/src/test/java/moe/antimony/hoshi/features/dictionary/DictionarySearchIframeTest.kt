@@ -60,6 +60,7 @@ class DictionarySearchIframeTest {
         val payloads = dictionarySearchIframePayloads(
             rootResults = listOf(lookupResult("猫")),
             sourceText = "猫と犬",
+            sourceSentenceOffset = 2,
             childPopups = listOf(child),
             childHistories = mapOf("child" to ReaderPopupHistoryCounts(backCount = 1, forwardCount = 2)),
             viewport = ReaderLookupPopupViewport(width = 390.0, height = 700.0),
@@ -71,6 +72,8 @@ class DictionarySearchIframeTest {
 
         assertEquals(listOf(DictionarySearchRootPopupId, "child"), payloads.map { it.id })
         assertEquals("猫と犬", payloads[0].sourceText)
+        assertEquals(2, payloads[0].sourceSentenceOffset)
+        assertEquals(null, payloads[1].sourceSentenceOffset)
         assertEquals(null, payloads[1].sourceText)
         assertEquals(1, payloads[1].backCount)
         assertEquals(2, payloads[1].forwardCount)
