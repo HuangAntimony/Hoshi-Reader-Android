@@ -879,14 +879,12 @@ class ReaderSettingsTest {
             surfaceVariant = Color.White,
             primaryContainer = Color.Black,
             onPrimaryContainer = Color.White,
-            outlineVariant = Color.Black,
         )
 
         assertEquals(Color.White, colors.container)
         assertEquals(Color.Black, colors.selected)
         assertEquals(Color.White, colors.selectedContent)
         assertEquals(Color.Black, colors.unselectedContent)
-        assertEquals(Color.Black, colors.border)
     }
 
     private fun cssDeclarationsForSelector(css: String, selector: String): Map<String, String> {

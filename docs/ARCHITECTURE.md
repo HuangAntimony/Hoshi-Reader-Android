@@ -18,6 +18,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Bottom/side navigation uses `surfaceContainer`; page and top-bar backgrounds
   remain continuous through the status-bar inset, including Dictionary search.
   The search field uses `surfaceContainerHigh` to remain distinct on that page.
+  Reading Settings segments use inset rounded selections with the shared
+  `selected`/`onSelected` colors inside a continuous neutral nested track.
+  The full segment remains clickable; E-ink uses inverse black/white fills and
+  text with explicit outlines around the track and selected capsule.
 - Native accents default to Android 12+ dynamic color with the existing fixed
   fallback on older Android. Manual opaque seeds use the standalone Material Color
   Utilities 4.1.1 Tonal Spot algorithm to generate a complete Material 3 scheme;

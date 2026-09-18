@@ -74,6 +74,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Bottom and side navigation use a subtle theme tint, and Dictionary search
   shares the page background through the status bar for a continuous top area.
   Display & Theme uses the same inset row dividers as other settings pages.
+  Reading Settings uses inset rounded selections inside continuous neutral
+  segment tracks, keeping the current choice clear without vertical separators.
 - Keep Statistics always available and move its settings to the Stats tab's
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and

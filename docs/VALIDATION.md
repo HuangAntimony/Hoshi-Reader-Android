@@ -106,6 +106,14 @@ panels, dialogs, menus, and Process Text lookup:
 - Compare Display & Theme with other grouped settings, including its Reader
   panel: palette, accent and E-ink rows use the same 16dp inset dividers; E-ink
   keeps the enclosing group outline continuous.
+- Reading Settings selected segments form rounded capsules with a visible neutral
+  track around every edge and no vertical separators. Check text orientation,
+  furigana mode, reading mode, VN screen content and progress position in light/dark themes
+  with system/manual accents, and inverse selection in both E-ink modes.
+  Selecting another option must move the highlight without changing row size or
+  reducing the original clickable area. `ReaderAppearanceSelectionTest` checks
+  rendered fills, text and the visible track above selections for all five
+  controls, using temporary font storage and in-memory reading preferences.
 - System dynamic colors on Android 12+, the fixed fallback on older Android,
   all eight accent seeds and extreme custom seeds. Reader background/text retain
   their own colors while controls and native containers use the accent scheme.

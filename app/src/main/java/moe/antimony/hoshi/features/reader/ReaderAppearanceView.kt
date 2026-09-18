@@ -1113,16 +1113,24 @@ private fun IosSegmentedControl(
         tonalElevation = 0.dp,
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            options.forEachIndexed { index, option ->
+            options.forEach { option ->
+                val selectedShape = RoundedCornerShape(percent = 50)
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
-                        .background(if (option == selected) palette.segmentSelected else Color.Transparent)
-                        .then(if (option == selected) Modifier.hoshiContainerOutline(androidx.compose.ui.graphics.RectangleShape) else Modifier)
                         .clickable(enabled = option != selected) { onSelected(option) },
                     contentAlignment = Alignment.Center,
                 ) {
+                    if (option == selected) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .padding(2.dp)
+                                .background(palette.segmentSelected, selectedShape)
+                                .hoshiContainerOutline(selectedShape),
+                        )
+                    }
                     Text(
                         text = option,
                         style = MaterialTheme.typography.labelLarge,
@@ -1133,14 +1141,6 @@ private fun IosSegmentedControl(
                         },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (index < options.lastIndex) {
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .fillMaxSize()
-                            .background(palette.segmentBorder),
                     )
                 }
             }
@@ -1571,7 +1571,6 @@ private data class AppearancePalette(
     val segmentSelected: Color,
     val segmentSelectedContent: Color,
     val segmentUnselectedContent: Color,
-    val segmentBorder: Color,
     val stepperContainer: Color,
     val stepperDivider: Color,
 )
@@ -1585,8 +1584,7 @@ private fun appearancePalette(): AppearancePalette {
         content = colorScheme.onBackground,
         surfaceVariant = hoshiSurfaces.nested,
         primaryContainer = hoshiSurfaces.selected,
-        onPrimaryContainer = colorScheme.onSurface,
-        outlineVariant = colorScheme.outlineVariant,
+        onPrimaryContainer = hoshiSurfaces.onSelected,
     )
     return AppearancePalette(
         background = hoshiSurfaces.page,
@@ -1599,7 +1597,6 @@ private fun appearancePalette(): AppearancePalette {
         segmentSelected = segmentedControlColors.selected,
         segmentSelectedContent = segmentedControlColors.selectedContent,
         segmentUnselectedContent = segmentedControlColors.unselectedContent,
-        segmentBorder = segmentedControlColors.border,
         stepperContainer = hoshiSurfaces.nested,
         stepperDivider = colorScheme.outline,
     )
@@ -1610,7 +1607,6 @@ internal data class ReaderSegmentedControlColors(
     val selected: Color,
     val selectedContent: Color,
     val unselectedContent: Color,
-    val border: Color,
 )
 
 internal fun readerSegmentedControlColors(
@@ -1620,7 +1616,6 @@ internal fun readerSegmentedControlColors(
     surfaceVariant: Color,
     primaryContainer: Color,
     onPrimaryContainer: Color,
-    outlineVariant: Color,
 ): ReaderSegmentedControlColors =
     if (eInkMode) {
         ReaderSegmentedControlColors(
@@ -1628,7 +1623,6 @@ internal fun readerSegmentedControlColors(
             selected = content,
             selectedContent = background,
             unselectedContent = content,
-            border = content,
         )
     } else {
         ReaderSegmentedControlColors(
@@ -1636,6 +1630,5 @@ internal fun readerSegmentedControlColors(
             selected = primaryContainer,
             selectedContent = onPrimaryContainer,
             unselectedContent = content,
-            border = outlineVariant,
         )
     }
