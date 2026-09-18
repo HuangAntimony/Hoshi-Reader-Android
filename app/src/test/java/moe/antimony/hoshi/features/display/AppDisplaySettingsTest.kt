@@ -7,108 +7,130 @@ import org.junit.Test
 
 class AppDisplaySettingsTest {
     @Test
-    fun standardPalettesResolveTheirReaderColorsAndBrightness() {
-        val expected = listOf(
-            DisplayPalettePreset.Light to Triple(0xFFFFFFFFL, 0xFF000000L, false),
-            DisplayPalettePreset.Sepia to Triple(0xFFF2E2C9L, 0xFF332A1BL, false),
-            DisplayPalettePreset.Dark to Triple(0xFF000000L, 0xFFFFFFFFL, true),
-            DisplayPalettePreset.DarkSepia to Triple(0xFF17150FL, 0xFFF2E2C9L, true),
+    fun manualModeSelectsOneOfSixPalettesRegardlessOfSystemBrightness() {
+        val choices = listOf(
+            DisplayPaletteSlot.Light to listOf(DisplayPalettePreset.Light, DisplayPalettePreset.Sepia, DisplayPalettePreset.Custom),
+            DisplayPaletteSlot.Dark to listOf(DisplayPalettePreset.Dark, DisplayPalettePreset.DarkSepia, DisplayPalettePreset.Custom),
         )
-
-        expected.forEach { (preset, colors) ->
-            val resolved = resolveDisplaySettings(
-                AppDisplaySettings(
-                    autoSwitch = false,
-                    singlePalette = DisplayPaletteSelection(preset = preset),
-                ),
-                systemDark = false,
-            )
-            assertEquals(preset, resolved.palette)
-            assertEquals(colors.first, resolved.backgroundColor)
-            assertEquals(colors.second, resolved.textColor)
-            assertEquals(colors.third, resolved.isDark)
+        var settings = AppDisplaySettings(autoSwitch = false)
+        choices.forEach { (slot, presets) ->
+            presets.forEach { preset ->
+                settings = settings.withSelectedPreset(slot, preset)
+                for (systemDark in listOf(false, true)) {
+                    val resolved = resolveDisplaySettings(settings, systemDark)
+                    assertEquals(slot, settings.activePaletteSlot(systemDark))
+                    assertEquals(preset, resolved.palette)
+                    assertEquals(slot == DisplayPaletteSlot.Dark, resolved.isDark)
+                }
+            }
         }
     }
 
     @Test
-    fun customPalettePreservesAlphaButComputesBrightnessFromRgb() {
-        val dark = resolveDisplaySettings(
-            AppDisplaySettings(
-                autoSwitch = false,
-                singlePalette = DisplayPaletteSelection(
-                    preset = DisplayPalettePreset.Custom,
-                    customBackgroundColor = 0xCC102030L,
-                    customTextColor = 0x80445566L,
-                    customInfoColor = 0x40778899L,
-                ),
-            ),
-            systemDark = false,
+    fun standardPalettesKeepTheirReaderColors() {
+        val expected = listOf(
+            DisplayPalettePreset.Light to Triple(DisplayPaletteSlot.Light, 0xFFFFFFFFL, 0xFF000000L),
+            DisplayPalettePreset.Sepia to Triple(DisplayPaletteSlot.Light, 0xFFF2E2C9L, 0xFF332A1BL),
+            DisplayPalettePreset.Dark to Triple(DisplayPaletteSlot.Dark, 0xFF000000L, 0xFFFFFFFFL),
+            DisplayPalettePreset.DarkSepia to Triple(DisplayPaletteSlot.Dark, 0xFF17150FL, 0xFFF2E2C9L),
         )
-
-        assertEquals(0xCC102030L, dark.backgroundColor)
-        assertEquals(0x80445566L, dark.textColor)
-        assertEquals(0x40778899L, dark.infoColor)
-        assertTrue(dark.isDark)
-
-        val light = resolveDisplaySettings(
-            AppDisplaySettings(
-                autoSwitch = false,
-                singlePalette = dark.selection.copy(customBackgroundColor = 0x01F0E0D0L),
-            ),
-            systemDark = true,
-        )
-        assertFalse(light.isDark)
+        expected.forEach { (preset, colors) ->
+            val settings = AppDisplaySettings(autoSwitch = false).withSelectedPreset(colors.first, preset)
+            val resolved = resolveDisplaySettings(settings, false)
+            assertEquals(colors.second, resolved.backgroundColor)
+            assertEquals(colors.third, resolved.textColor)
+        }
     }
 
     @Test
-    fun eInkChangesOnlyResolvedColors() {
-        val stored = AppDisplaySettings(
-            autoSwitch = false,
-            eInkMode = true,
-            singlePalette = DisplayPaletteSelection(
-                preset = DisplayPalettePreset.Custom,
-                customBackgroundColor = 0x44112233L,
-                customTextColor = 0x88445566L,
-                customInfoColor = 0xCC778899L,
-            ),
+    fun customInterfaceBrightnessBelongsToItsGroupAndColorsKeepAlpha() {
+        val settings = AppDisplaySettings(
+            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0x80111111, 0xAAEEEEEE, 0x40778899),
+            darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xCCEEEEEE, 0xFF111111, 0x7F445566),
         )
-
-        val resolved = resolveDisplaySettings(stored, systemDark = false)
-
-        assertEquals(0xFF000000L, resolved.backgroundColor)
-        assertEquals(0xFFFFFFFFL, resolved.textColor)
-        assertEquals(0xFFFFFFFFL, resolved.infoColor)
-        assertEquals(0x44112233L, stored.singlePalette.customBackgroundColor)
-        assertTrue(resolved.eInkMode)
+        for (systemDark in listOf(false, true)) {
+            val automatic = resolveDisplaySettings(settings, systemDark)
+            val selected = if (systemDark) settings.darkPalette else settings.lightPalette
+            assertEquals(systemDark, automatic.isDark)
+            assertEquals(selected.customBackgroundColor, automatic.backgroundColor)
+            assertEquals(selected.customTextColor, automatic.textColor)
+            assertEquals(selected.customInfoColor, automatic.infoColor)
+            val manual = settings.withAutoSwitch(false, systemDark)
+            assertEquals(automatic, resolveDisplaySettings(manual, !systemDark))
+        }
     }
 
     @Test
-    fun manualEInkBrightnessIsIndependentOfSavedPaletteAndRestoresItOnExit() {
+    fun automaticToggleSharesBothSavedSelectionsAndKeepsCurrentPaletteOnDisable() {
         val original = AppDisplaySettings(
             autoSwitch = false,
-            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
-            accentSource = DisplayAccentSource.Custom,
-            accentSeed = 0xFF00796B,
+            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFFABCDEF, 0xFF123456, 0xFF654321),
+            darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF123456, 0xFFABCDEF, 0xFFAAAAAA),
         )
-        val eInk = original.copy(eInkMode = true, eInkDarkTheme = true)
         for (systemDark in listOf(false, true)) {
-            val resolved = resolveDisplaySettings(eInk, systemDark)
-            assertTrue(resolved.isDark)
-            assertEquals(0xFF000000L, resolved.backgroundColor)
-            assertEquals(0xFFFFFFFFL, resolved.textColor)
-            assertEquals(original.singlePalette, eInk.singlePalette)
-            assertEquals(
-                resolveDisplaySettings(original, systemDark),
-                resolveDisplaySettings(eInk.copy(eInkMode = false), systemDark),
-            )
+            val automatic = original.withAutoSwitch(true, systemDark)
+            assertEquals(original.lightPalette, automatic.lightPalette)
+            assertEquals(original.darkPalette, automatic.darkPalette)
+            val manual = automatic.withAutoSwitch(false, systemDark)
+            assertEquals(resolveDisplaySettings(automatic, systemDark), resolveDisplaySettings(manual, !systemDark))
+            val changed = manual.withSelectedPreset(DisplayPaletteSlot.Light, DisplayPalettePreset.Sepia)
+            val restored = changed.withAutoSwitch(true, true)
+            assertEquals(DisplayPalettePreset.Sepia, resolveDisplaySettings(restored, false).palette)
+            assertEquals(original.darkPalette, resolveDisplaySettings(restored, true).selection)
+            assertEquals(original.lightPalette.customBackgroundColor, restored.lightPalette.customBackgroundColor)
         }
     }
 
     @Test
-    fun automaticEInkFollowsSystemEvenWithOppositeCustomPaletteBrightness() {
+    fun customColorsAreIndependentAndSurvivePresetChangesInBothModes() {
+        var settings = AppDisplaySettings(autoSwitch = false)
+            .withCustomPalette(DisplayPaletteSlot.Light, 0x12112233, 0x34445566, 0x56778899)
+            .withCustomPalette(DisplayPaletteSlot.Dark, 0xCCABCDEF, 0xDD123456, 0xEE654321)
+        val light = settings.lightPalette
+        val dark = settings.darkPalette
+        for (auto in listOf(false, true)) {
+            settings = settings.withAutoSwitch(auto, false)
+                .withSelectedPreset(DisplayPaletteSlot.Light, DisplayPalettePreset.Sepia)
+                .withSelectedPreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.DarkSepia)
+                .withSelectedPreset(DisplayPaletteSlot.Light, DisplayPalettePreset.Custom)
+                .withSelectedPreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.Custom)
+            assertEquals(light.copy(preset = DisplayPalettePreset.Custom), settings.lightPalette)
+            assertEquals(dark.copy(preset = DisplayPalettePreset.Custom), settings.darkPalette)
+        }
+    }
+
+    @Test
+    fun editingInactiveAutomaticSlotDoesNotChangeCurrentDisplay() {
+        val original = AppDisplaySettings()
+        val changed = original.withCustomPalette(DisplayPaletteSlot.Dark, 0xFFFFFFFF, 0xFF000000, 0xFFAAAAAA)
+            .withSelectedPreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.Custom)
+        assertEquals(resolveDisplaySettings(original, false), resolveDisplaySettings(changed, false))
+        assertTrue(resolveDisplaySettings(changed, true).isDark)
+    }
+
+    @Test
+    fun manualEInkBrightnessIsIndependentAndRestoresPaletteOnExit() {
+        val original = AppDisplaySettings(autoSwitch = false)
+            .withSelectedPreset(DisplayPaletteSlot.Light, DisplayPalettePreset.Sepia)
+            .copy(accentSource = DisplayAccentSource.Custom, accentSeed = 0xFF00796B)
+        for (dark in listOf(false, true)) {
+            val eInk = original.copy(eInkMode = true, eInkDarkTheme = dark)
+            for (systemDark in listOf(false, true)) {
+                val resolved = resolveDisplaySettings(eInk, systemDark)
+                assertEquals(dark, resolved.isDark)
+                assertEquals(if (dark) 0xFF000000L else 0xFFFFFFFFL, resolved.backgroundColor)
+                assertEquals(if (dark) 0xFFFFFFFFL else 0xFF000000L, resolved.textColor)
+                assertEquals(resolved.textColor, resolved.infoColor)
+                assertEquals(original.lightPalette, eInk.lightPalette)
+                assertEquals(resolveDisplaySettings(original, systemDark), resolveDisplaySettings(eInk.copy(eInkMode = false), systemDark))
+            }
+        }
+    }
+
+    @Test
+    fun automaticEInkFollowsSystemAndRetainsDisplayedBrightnessWhenDisabled() {
         val settings = AppDisplaySettings(
             eInkMode = true,
-            eInkDarkTheme = true,
             lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF000000),
             darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFFFFFFFF),
         )
@@ -125,77 +147,14 @@ class AppDisplaySettingsTest {
     }
 
     @Test
-    fun firstAutomaticEnableSeedsMatchingSideAndLaterTogglesRestoreBothSides() {
-        val custom = DisplayPaletteSelection(
-            preset = DisplayPalettePreset.Custom,
-            customBackgroundColor = 0xFF101010L,
-            customTextColor = 0xFFEFEFEFL,
-            customInfoColor = 0xFFAAAAAAL,
-        )
-        val firstAutomatic = AppDisplaySettings(
-            autoSwitch = false,
-            automaticInitialized = false,
-            singlePalette = custom,
-        ).withAutoSwitch(enabled = true, systemDark = false)
-
-        assertEquals(custom, firstAutomatic.darkPalette)
-        assertEquals(DisplayPalettePreset.Light, firstAutomatic.lightPalette.preset)
-        assertTrue(firstAutomatic.automaticInitialized)
-
-        val editedDual = firstAutomatic.copy(
-            lightPalette = DisplayPaletteSelection(preset = DisplayPalettePreset.Sepia),
-            darkPalette = DisplayPaletteSelection(preset = DisplayPalettePreset.DarkSepia),
-        )
-        val manual = editedDual.withAutoSwitch(enabled = false, systemDark = false)
-        assertEquals(DisplayPalettePreset.Sepia, manual.singlePalette.preset)
-
-        val restored = manual.withAutoSwitch(enabled = true, systemDark = true)
-        assertEquals(DisplayPalettePreset.Sepia, restored.lightPalette.preset)
-        assertEquals(DisplayPalettePreset.DarkSepia, restored.darkPalette.preset)
-    }
-
-    @Test
-    fun customBrightnessUsesLinearSrgbLuminance() {
-        val resolved = resolveDisplaySettings(
-            AppDisplaySettings(
-                autoSwitch = false,
-                singlePalette = DisplayPaletteSelection(
-                    preset = DisplayPalettePreset.Custom,
-                    customBackgroundColor = 0xFF999999L,
-                ),
-            ),
-            systemDark = false,
-        )
-
-        assertTrue(resolved.isDark)
-    }
-
-    @Test
-    fun defaultDarkSlotStartsWithUsefulDarkCustomColors() {
-        val darkCustom = AppDisplaySettings().darkPalette.copy(preset = DisplayPalettePreset.Custom)
-        val resolved = resolveDisplaySettings(
-            AppDisplaySettings(autoSwitch = false, singlePalette = darkCustom),
-            systemDark = false,
-        )
-
-        assertEquals(0xFF000000L, resolved.backgroundColor)
-        assertEquals(0xFFFFFFFFL, resolved.textColor)
-        assertTrue(resolved.isDark)
-    }
-
-    @Test
-    fun choosingPresetDoesNotDiscardSlotCustomColors() {
-        val custom = DisplayPaletteSelection(
-            preset = DisplayPalettePreset.Custom,
-            customBackgroundColor = 0x12112233L,
-            customTextColor = 0x34445566L,
-            customInfoColor = 0x56778899L,
-        )
-
-        val changed = AppDisplaySettings(singlePalette = custom)
-            .withSelectedPreset(DisplayPaletteSlot.Single, DisplayPalettePreset.Sepia)
-            .withSelectedPreset(DisplayPaletteSlot.Single, DisplayPalettePreset.Custom)
-
-        assertEquals(custom, changed.singlePalette)
+    fun darkCustomDefaultsAreUsefulAndLightCustomUsesLightInterface() {
+        val settings = AppDisplaySettings()
+            .withSelectedPreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.Custom)
+            .withSelectedPreset(DisplayPaletteSlot.Light, DisplayPalettePreset.Custom)
+        val dark = resolveDisplaySettings(settings, true)
+        assertEquals(0xFF000000L, dark.backgroundColor)
+        assertEquals(0xFFFFFFFFL, dark.textColor)
+        assertTrue(dark.isDark)
+        assertFalse(resolveDisplaySettings(settings, false).isDark)
     }
 }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 enum class LegacyDisplayTheme {
@@ -116,7 +117,15 @@ class AppDisplaySettingsRepository(
     }
 
     private fun Preferences.readSettings(): AppDisplaySettings? = this[KEY_SETTINGS]?.let { encoded ->
-        json.decodeFromString(AppDisplaySettings.serializer(), encoded)
+        val settings = json.decodeFromString(AppDisplaySettings.serializer(), encoded)
+        if (settings.migrationVersion in 1..2 && !settings.autoSwitch) {
+            val previous = json.decodeFromString(PreviousDisplaySettings.serializer(), encoded).singlePalette
+            val slot = previous.legacySlot()
+            val selected = settings.withSelectedPreset(slot, previous.preset)
+            if (previous.preset == DisplayPalettePreset.Custom) {
+                selected.withCustomPalette(slot, previous.customBackgroundColor, previous.customTextColor, previous.customInfoColor)
+            } else selected
+        } else settings
     }
 
     private fun migrate(payload: AppDisplayMigrationPayload?): AppDisplaySettings =
@@ -135,8 +144,6 @@ class AppDisplaySettingsRepository(
                 lightPalette = DisplayPaletteSelection(
                     preset = if (legacy.systemLightSepia) DisplayPalettePreset.Sepia else DisplayPalettePreset.Light,
                 ),
-                darkPalette = DisplayPaletteSelection(preset = DisplayPalettePreset.Dark),
-                automaticInitialized = true,
             )
             LegacyDisplayTheme.Light -> manualSettings(DisplayPaletteSelection(DisplayPalettePreset.Light))
             LegacyDisplayTheme.Dark -> manualSettings(DisplayPaletteSelection(DisplayPalettePreset.Dark))
@@ -144,8 +151,7 @@ class AppDisplaySettingsRepository(
                 AppDisplaySettings(
                     autoSwitch = true,
                     lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
-                    darkPalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
-                    automaticInitialized = true,
+                    darkPalette = AppDisplaySettings().darkPalette.copy(preset = DisplayPalettePreset.DarkSepia),
                 )
             } else {
                 manualSettings(DisplayPaletteSelection(DisplayPalettePreset.Sepia))
@@ -155,15 +161,22 @@ class AppDisplaySettingsRepository(
         return settings.copy(eInkMode = legacy.eInkMode)
     }
 
-    private fun manualSettings(palette: DisplayPaletteSelection): AppDisplaySettings = AppDisplaySettings(
-        autoSwitch = false,
-        singlePalette = palette,
-        automaticInitialized = false,
+    private fun manualSettings(palette: DisplayPaletteSelection): AppDisplaySettings {
+        val slot = palette.legacySlot()
+        val selected = AppDisplaySettings(autoSwitch = false).withSelectedPreset(slot, palette.preset)
+        return if (palette.preset == DisplayPalettePreset.Custom) {
+            selected.withCustomPalette(slot, palette.customBackgroundColor, palette.customTextColor, palette.customInfoColor)
+        } else selected
+    }
+
+    @Serializable
+    private data class PreviousDisplaySettings(
+        val singlePalette: DisplayPaletteSelection = DisplayPaletteSelection(),
     )
 
     companion object {
         const val DataStoreName = "app-display-settings"
-        const val CurrentMigrationVersion = 2
+        const val CurrentMigrationVersion = 3
 
         private val KEY_SETTINGS = stringPreferencesKey("settings")
         private val json = Json {

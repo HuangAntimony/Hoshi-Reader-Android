@@ -167,13 +167,17 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are stored per active/effective profile in `Profiles/<profileId>/reader_settings.json`.
   Reader Behavior and statistics sync settings remain global DataStore settings.
 - `AppDisplaySettingsRepository` owns global Display & Theme settings in a separate
-  DataStore: system-driven switching, independent single/light/dark reading palettes
-  and remembered custom colors, accent source/seed, E-ink mode and its independent
-  manual brightness, and migration version.
+  DataStore: system-driven switching, independent light/dark reading palettes
+  with remembered custom colors, the manually selected slot, accent source/seed,
+  E-ink mode and its independent manual brightness, and migration version.
   `resolveDisplaySettings(settings, systemDark)` is the pure source for active
-  reading colors and native interface brightness. Custom colors preserve alpha;
-  native brightness follows the background's linear sRGB luminance. E-ink follows
-  system brightness when automatic switching is enabled; otherwise its remembered
+  reading colors and native interface brightness. Both switching modes share the
+  same six choices in two groups: automatic mode selects one per group, manual
+  mode selects one across both. Disabling automatic switching keeps the active
+  slot; re-enabling retains both stored selections. Custom colors preserve alpha;
+  interface and popup brightness come from the selected group, never the custom
+  background's luminance. E-ink follows system brightness when automatic switching
+  is enabled; otherwise its remembered
   manual brightness takes precedence, defaulting to the palette's brightness until
   chosen. This override never changes stored palette or accent colors. Disabling
   automatic switching in E-ink keeps the currently displayed brightness.
@@ -183,8 +187,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Initial display migration reads the global active profile before Reader profile
   initialization or book-specific profile activation. Other profiles are not read
   for display migration. Upgrading existing global display storage preserves its
-  settings and removes obsolete imported-palette records. Legacy JSON color fields
-  remain readable and are preserved on writes, but no longer control runtime
+  accent and E-ink settings and removes obsolete imported-palette records.
+  The former manual selection moves into its matching light/dark group, with
+  the active custom colors taking precedence on that side; the other side is
+  retained. Background luminance is used only to migrate a former manual custom
+  palette. Legacy Profile JSON color fields remain readable and are preserved on
+  writes, but no longer control runtime
   display. Book sidecars, sync, and backup formats are unchanged.
 - `ReaderSettingsRepository` combines global display state with profile reading
   preferences. Both MainActivity and Process Text use `ReaderSettingsHostViewModel`

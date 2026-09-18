@@ -32,7 +32,6 @@ import moe.antimony.hoshi.features.display.AppDisplayMigrationPayload
 import moe.antimony.hoshi.features.display.AppDisplaySettings
 import moe.antimony.hoshi.features.display.AppDisplaySettingsMigrationSource
 import moe.antimony.hoshi.features.display.DisplayPalettePreset
-import moe.antimony.hoshi.features.display.DisplayPaletteSelection
 import moe.antimony.hoshi.features.display.LegacyDisplaySettingsSnapshot
 import moe.antimony.hoshi.features.display.LegacyDisplayTheme
 import moe.antimony.hoshi.features.display.resolveDisplaySettings
@@ -1290,7 +1289,7 @@ private fun ProfileReaderAppearanceSettings.withLegacyDisplayFrom(
 
 private fun ReaderSettings.withDisplaySettingsProjection(display: AppDisplaySettings): ReaderSettings {
     if (!display.autoSwitch) {
-        return projectLegacySelection(display.singlePalette, display.eInkMode).copy(displaySettings = display)
+        return projectLegacyDisplay(display).copy(displaySettings = display)
     }
     val light = display.lightPalette.preset
     val dark = display.darkPalette.preset
@@ -1319,17 +1318,9 @@ private fun ReaderSettings.withDisplaySettingsProjection(display: AppDisplaySett
     return legacy.copy(eInkMode = display.eInkMode, displaySettings = display)
 }
 
-private fun ReaderSettings.projectLegacySelection(
-    selection: DisplayPaletteSelection,
-    eInk: Boolean,
-): ReaderSettings {
-    val single = AppDisplaySettings(
-        autoSwitch = false,
-        singlePalette = selection,
-        eInkMode = false,
-    )
-    val resolved = resolveDisplaySettings(single, systemDark = false)
-    val legacyTheme = when (selection.preset) {
+private fun ReaderSettings.projectLegacyDisplay(display: AppDisplaySettings): ReaderSettings {
+    val resolved = resolveDisplaySettings(display.copy(eInkMode = false), systemDark = false)
+    val legacyTheme = when (resolved.palette) {
         DisplayPalettePreset.Light -> ReaderTheme.Light
         DisplayPalettePreset.Sepia -> ReaderTheme.Sepia
         DisplayPalettePreset.Dark -> ReaderTheme.Dark
@@ -1339,7 +1330,7 @@ private fun ReaderSettings.projectLegacySelection(
     }
     return copy(
         theme = legacyTheme,
-        eInkMode = eInk,
+        eInkMode = display.eInkMode,
         uiTheme = if (resolved.isDark) ReaderInterfaceTheme.Dark else ReaderInterfaceTheme.Light,
         systemLightSepia = false,
         sepiaInvertInDark = false,

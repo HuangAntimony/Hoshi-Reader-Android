@@ -808,11 +808,13 @@
     <string name="display_settings_load_failed">无法加载显示与阅读设置，请重试。</string>
     <string name="display_settings_save_failed">无法保存设置，已保留原来的设置。</string>
     <string name="display_settings_auto_switch">跟随系统自动切换</string>
-    <string name="display_settings_palette">配色</string>
     <string name="display_settings_light_palette">浅色配色</string>
     <string name="display_settings_dark_palette">深色配色</string>
     <string name="display_settings_palette_dark_sepia">深色棕褐</string>
-    <string name="display_settings_custom_palette">自定义配色</string>
+    <string name="display_settings_custom_light_palette">自定义浅色</string>
+    <string name="display_settings_custom_dark_palette">自定义深色</string>
+    <string name="display_settings_custom_light_explanation">应用界面使用浅色，辞典弹窗为白底黑字。阅读颜色由下方设置决定。</string>
+    <string name="display_settings_custom_dark_explanation">应用界面使用深色，辞典弹窗为黑底白字。阅读颜色由下方设置决定。</string>
     <string name="display_settings_palette_preview_title">阅读预览</string>
     <string name="display_settings_palette_preview_info">次要信息</string>
     <string name="display_settings_accent">强调色</string>

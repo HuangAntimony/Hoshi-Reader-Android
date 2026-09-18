@@ -14,10 +14,31 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class DisplaySettingsViewModelTest {
     @Test
+    fun manualCustomSelectionActivatesItsGroupOnlyOnSuccessfulSave() = runTest {
+        val stored = MutableStateFlow(AppDisplaySettings(autoSwitch = false))
+        val model = viewModel(stored)
+        runCurrent()
+        model.selectPalettePreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.Custom)
+        model.updatePaletteDraft(backgroundColor = 0xFFEEEEEE, textColor = 0xFF111111)
+        assertEquals(DisplayPaletteSlot.Light, stored.value.manualPaletteSlot)
+        model.dismissPaletteEditor()
+        assertEquals(DisplayPaletteSlot.Light, stored.value.manualPaletteSlot)
+
+        model.selectPalettePreset(DisplayPaletteSlot.Dark, DisplayPalettePreset.Custom)
+        model.updatePaletteDraft(backgroundColor = 0xFFEEEEEE, textColor = 0xFF111111)
+        model.savePaletteDraft()
+        runCurrent()
+        assertEquals(DisplayPaletteSlot.Dark, stored.value.manualPaletteSlot)
+        assertEquals(true, resolveDisplaySettings(stored.value, false).isDark)
+        assertEquals(0xFFEEEEEEL, stored.value.darkPalette.customBackgroundColor)
+        assertEquals(0xFFFFFFFFL, stored.value.lightPalette.customBackgroundColor)
+    }
+
+    @Test
     fun eInkBrightnessChangesLeaveReadingPalettesAndAccentIntact() = runTest {
         val original = AppDisplaySettings(
             autoSwitch = false,
-            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
+            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
             accentSource = DisplayAccentSource.Custom,
             accentSeed = 0xFF00796B,
         )
@@ -86,13 +107,13 @@ class DisplaySettingsViewModelTest {
         )
         runCurrent()
 
-        model.openPaletteEditor(DisplayPaletteSlot.Single)
+        model.openPaletteEditor(DisplayPaletteSlot.Light)
         model.updatePaletteDraft(backgroundColor = 0x7F123456L)
         model.savePaletteDraft()
         runCurrent()
 
-        assertEquals(DisplayPalettePreset.Light, stored.value.singlePalette.preset)
-        assertEquals(0xFFFFFFFFL, stored.value.singlePalette.customBackgroundColor)
+        assertEquals(DisplayPalettePreset.Light, stored.value.lightPalette.preset)
+        assertEquals(0xFFFFFFFFL, stored.value.lightPalette.customBackgroundColor)
         assertEquals(0x7F123456L, model.uiState.value.paletteDraft?.backgroundColor)
         assertNotNull(model.uiState.value.error)
     }

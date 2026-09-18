@@ -208,10 +208,4 @@ internal class DisplaySettingsViewModel internal constructor(
     }
 }
 
-private fun AppDisplaySettings.selection(slot: DisplayPaletteSlot): DisplayPaletteSelection = when (slot) {
-    DisplayPaletteSlot.Single -> singlePalette
-    DisplayPaletteSlot.Light -> lightPalette
-    DisplayPaletteSlot.Dark -> darkPalette
-}
-
 private fun Long.opaque(): Long = (this and 0x00FFFFFFL) or 0xFF000000L

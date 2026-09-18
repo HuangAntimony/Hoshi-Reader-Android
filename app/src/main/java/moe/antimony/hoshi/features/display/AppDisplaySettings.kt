@@ -11,8 +11,8 @@ enum class DisplayPalettePreset {
     Custom,
 }
 
+@Serializable
 enum class DisplayPaletteSlot {
-    Single,
     Light,
     Dark,
 }
@@ -34,7 +34,7 @@ data class DisplayPaletteSelection(
 @Serializable
 data class AppDisplaySettings(
     val autoSwitch: Boolean = true,
-    val singlePalette: DisplayPaletteSelection = DisplayPaletteSelection(),
+    val manualPaletteSlot: DisplayPaletteSlot = DisplayPaletteSlot.Light,
     val lightPalette: DisplayPaletteSelection = DisplayPaletteSelection(
         preset = DisplayPalettePreset.Light,
     ),
@@ -43,7 +43,6 @@ data class AppDisplaySettings(
         customBackgroundColor = 0xFF000000L,
         customTextColor = 0xFFFFFFFFL,
     ),
-    val automaticInitialized: Boolean = true,
     val accentSource: DisplayAccentSource = DisplayAccentSource.System,
     val accentSeed: Long = DefaultAccentSeed,
     val eInkMode: Boolean = false,
@@ -69,13 +68,10 @@ fun resolveDisplaySettings(
     settings: AppDisplaySettings,
     systemDark: Boolean,
 ): ResolvedDisplaySettings {
-    val selection = when {
-        !settings.autoSwitch -> settings.singlePalette
-        systemDark -> settings.darkPalette
-        else -> settings.lightPalette
-    }
+    val slot = settings.activePaletteSlot(systemDark)
+    val selection = settings.selection(slot)
     val colors = selection.resolvedColors()
-    val isDark = resolvePaletteIsDark(selection)
+    val isDark = slot == DisplayPaletteSlot.Dark
     if (settings.eInkMode) {
         val eInkDark = if (settings.autoSwitch) systemDark else settings.eInkDarkTheme ?: isDark
         val text = if (eInkDark) OpaqueWhite else OpaqueBlack
@@ -105,35 +101,33 @@ fun AppDisplaySettings.withAutoSwitch(enabled: Boolean, systemDark: Boolean): Ap
     if (!enabled) {
         return copy(
             autoSwitch = false,
-            singlePalette = if (systemDark) darkPalette else lightPalette,
+            manualPaletteSlot = if (systemDark) DisplayPaletteSlot.Dark else DisplayPaletteSlot.Light,
             eInkDarkTheme = if (eInkMode) systemDark else eInkDarkTheme,
         )
     }
-    if (automaticInitialized) return copy(autoSwitch = true)
-    return if (resolvePaletteIsDark(singlePalette)) {
-        copy(
-            autoSwitch = true,
-            darkPalette = singlePalette,
-            lightPalette = defaultLightPalette(),
-            automaticInitialized = true,
-        )
-    } else {
-        copy(
-            autoSwitch = true,
-            lightPalette = singlePalette,
-            darkPalette = defaultDarkPalette(),
-            automaticInitialized = true,
-        )
-    }
+    return copy(autoSwitch = true)
+}
+
+fun AppDisplaySettings.activePaletteSlot(systemDark: Boolean): DisplayPaletteSlot = when {
+    !autoSwitch -> manualPaletteSlot
+    systemDark -> DisplayPaletteSlot.Dark
+    else -> DisplayPaletteSlot.Light
+}
+
+fun AppDisplaySettings.selection(slot: DisplayPaletteSlot): DisplayPaletteSelection = when (slot) {
+    DisplayPaletteSlot.Light -> lightPalette
+    DisplayPaletteSlot.Dark -> darkPalette
 }
 
 fun AppDisplaySettings.withSelectedPreset(
     slot: DisplayPaletteSlot,
     preset: DisplayPalettePreset,
-): AppDisplaySettings = when (slot) {
-    DisplayPaletteSlot.Single -> copy(singlePalette = singlePalette.copy(preset = preset))
-    DisplayPaletteSlot.Light -> copy(lightPalette = lightPalette.copy(preset = preset))
-    DisplayPaletteSlot.Dark -> copy(darkPalette = darkPalette.copy(preset = preset))
+): AppDisplaySettings {
+    val updated = when (slot) {
+        DisplayPaletteSlot.Light -> copy(lightPalette = lightPalette.copy(preset = preset))
+        DisplayPaletteSlot.Dark -> copy(darkPalette = darkPalette.copy(preset = preset))
+    }
+    return if (autoSwitch) updated else updated.copy(manualPaletteSlot = slot)
 }
 
 fun AppDisplaySettings.withCustomPalette(
@@ -148,14 +142,12 @@ fun AppDisplaySettings.withCustomPalette(
         customInfoColor = infoColor.argbColor(),
     )
     return when (slot) {
-        DisplayPaletteSlot.Single -> copy(singlePalette = singlePalette.updated())
         DisplayPaletteSlot.Light -> copy(lightPalette = lightPalette.updated())
         DisplayPaletteSlot.Dark -> copy(darkPalette = darkPalette.updated())
     }
 }
 
 internal fun AppDisplaySettings.normalized(): AppDisplaySettings = copy(
-    singlePalette = singlePalette.normalized(),
     lightPalette = lightPalette.normalized(),
     darkPalette = darkPalette.normalized(),
     accentSeed = accentSeed.opaqueColor(),
@@ -200,25 +192,16 @@ private fun Long.rgbLuminance(): Double {
     return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
-private fun resolvePaletteIsDark(selection: DisplayPaletteSelection): Boolean = when (selection.preset) {
+/** Used only when migrating the former single palette; runtime brightness belongs to the slot. */
+internal fun DisplayPaletteSelection.legacySlot(): DisplayPaletteSlot = if (when (preset) {
     DisplayPalettePreset.Light,
     DisplayPalettePreset.Sepia,
     -> false
     DisplayPalettePreset.Dark,
     DisplayPalettePreset.DarkSepia,
     -> true
-    DisplayPalettePreset.Custom -> selection.customBackgroundColor.rgbLuminance() < 0.5
-}
-
-private fun defaultLightPalette(): DisplayPaletteSelection = DisplayPaletteSelection(
-    preset = DisplayPalettePreset.Light,
-)
-
-private fun defaultDarkPalette(): DisplayPaletteSelection = DisplayPaletteSelection(
-    preset = DisplayPalettePreset.Dark,
-    customBackgroundColor = OpaqueBlack,
-    customTextColor = OpaqueWhite,
-)
+    DisplayPalettePreset.Custom -> customBackgroundColor.rgbLuminance() < 0.5
+}) DisplayPaletteSlot.Dark else DisplayPaletteSlot.Light
 
 private const val OpaqueBlack = 0xFF000000L
 private const val OpaqueWhite = 0xFFFFFFFFL

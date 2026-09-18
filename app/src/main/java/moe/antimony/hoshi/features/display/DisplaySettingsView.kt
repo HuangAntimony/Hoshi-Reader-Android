@@ -182,37 +182,22 @@ private fun DisplaySettingsContent(
                     }
                 }
             } else {
-                if (settings.autoSwitch) {
+                for (slot in DisplayPaletteSlot.entries) {
+                    val light = slot == DisplayPaletteSlot.Light
                     PaletteSlotSection(
-                        title = stringResource(R.string.display_settings_light_palette),
-                        slot = DisplayPaletteSlot.Light,
-                        selection = settings.lightPalette,
-                        presets = listOf(
+                        title = stringResource(if (light) R.string.display_settings_light_palette else R.string.display_settings_dark_palette),
+                        slot = slot,
+                        selection = settings.selection(slot),
+                        hasSelection = settings.autoSwitch || settings.manualPaletteSlot == slot,
+                        presets = if (light) listOf(
                             DisplayPalettePreset.Light,
                             DisplayPalettePreset.Sepia,
                             DisplayPalettePreset.Custom,
-                        ),
-                        interactionEnabled = !state.isSaving,
-                        onSelect = viewModel::selectPalettePreset,
-                    )
-                    PaletteSlotSection(
-                        title = stringResource(R.string.display_settings_dark_palette),
-                        slot = DisplayPaletteSlot.Dark,
-                        selection = settings.darkPalette,
-                        presets = listOf(
+                        ) else listOf(
                             DisplayPalettePreset.Dark,
                             DisplayPalettePreset.DarkSepia,
                             DisplayPalettePreset.Custom,
                         ),
-                        interactionEnabled = !state.isSaving,
-                        onSelect = viewModel::selectPalettePreset,
-                    )
-                } else {
-                    PaletteSlotSection(
-                        title = stringResource(R.string.display_settings_palette),
-                        slot = DisplayPaletteSlot.Single,
-                        selection = settings.singlePalette,
-                        presets = DisplayPalettePreset.entries,
                         interactionEnabled = !state.isSaving,
                         onSelect = viewModel::selectPalettePreset,
                     )
@@ -274,6 +259,7 @@ private fun PaletteSlotSection(
     title: String,
     slot: DisplayPaletteSlot,
     selection: DisplayPaletteSelection,
+    hasSelection: Boolean,
     presets: List<DisplayPalettePreset>,
     interactionEnabled: Boolean,
     onSelect: (DisplayPaletteSlot, DisplayPalettePreset) -> Unit,
@@ -282,10 +268,10 @@ private fun PaletteSlotSection(
         presets.forEachIndexed { index, preset ->
             if (index > 0) GroupDivider()
             DisplayChoiceRow(
-                label = stringResource(preset.labelRes),
-                selected = selection.preset == preset,
+                label = stringResource(if (preset == DisplayPalettePreset.Custom) slot.customLabelRes else preset.labelRes),
+                selected = hasSelection && selection.preset == preset,
                 interactionEnabled = interactionEnabled,
-                previewColors = palettePreviewColors(preset, selection),
+                previewColors = palettePreviewColors(slot, preset, selection),
                 onClick = { onSelect(slot, preset) },
             )
         }
@@ -481,12 +467,16 @@ private fun PaletteEditorDialog(
     var editing by remember { mutableStateOf<PaletteColorField?>(null) }
     HoshiAlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text(stringResource(R.string.display_settings_custom_palette)) },
+        title = { Text(stringResource(draft.slot.customLabelRes)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                Text(
+                    text = stringResource(if (draft.slot == DisplayPaletteSlot.Light) R.string.display_settings_custom_light_explanation else R.string.display_settings_custom_dark_explanation),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 PalettePreview(draft)
                 ReaderColorSettingRow(
                     label = stringResource(R.string.reader_appearance_background_color),
@@ -695,12 +685,24 @@ private val DisplayPalettePreset.labelRes: Int
     }
 
 private fun palettePreviewColors(
+    slot: DisplayPaletteSlot,
     preset: DisplayPalettePreset,
     selection: DisplayPaletteSelection,
 ): Triple<Long, Long, Long> {
     val display = resolveDisplaySettings(
-        AppDisplaySettings(autoSwitch = false, singlePalette = selection.copy(preset = preset)),
+        AppDisplaySettings(
+            autoSwitch = false,
+            manualPaletteSlot = slot,
+            lightPalette = selection.copy(preset = preset),
+            darkPalette = selection.copy(preset = preset),
+        ),
         systemDark = false,
     )
     return Triple(display.backgroundColor, display.textColor, display.infoColor)
 }
+
+private val DisplayPaletteSlot.customLabelRes: Int
+    get() = when (this) {
+        DisplayPaletteSlot.Light -> R.string.display_settings_custom_light_palette
+        DisplayPaletteSlot.Dark -> R.string.display_settings_custom_dark_palette
+    }

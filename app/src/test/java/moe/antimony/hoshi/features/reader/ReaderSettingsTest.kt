@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.reader
 import androidx.compose.ui.graphics.Color
 import moe.antimony.hoshi.features.display.AppDisplaySettings
 import moe.antimony.hoshi.features.display.DisplayPalettePreset
+import moe.antimony.hoshi.features.display.DisplayPaletteSlot
 import moe.antimony.hoshi.features.display.DisplayPaletteSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,9 +18,7 @@ class ReaderSettingsTest {
             val settings = ReaderSettings(
                 displaySettings = AppDisplaySettings(
                     autoSwitch = false,
-                    singlePalette = DisplayPaletteSelection(
-                        if (dark) DisplayPalettePreset.Light else DisplayPalettePreset.Dark,
-                    ),
+                    manualPaletteSlot = if (dark) DisplayPaletteSlot.Light else DisplayPaletteSlot.Dark,
                     eInkMode = true,
                     eInkDarkTheme = dark,
                 ),
@@ -84,7 +83,8 @@ class ReaderSettingsTest {
         val projected = ReaderSettings(
             displaySettings = AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
+                manualPaletteSlot = DisplayPaletteSlot.Dark,
+                darkPalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
             ),
         ).resolvedForDisplay(systemDark = false)
 

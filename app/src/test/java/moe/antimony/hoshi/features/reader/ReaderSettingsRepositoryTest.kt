@@ -30,6 +30,7 @@ import moe.antimony.hoshi.profiles.ProfileRepository
 import moe.antimony.hoshi.testing.CountingCoroutineDispatcher
 import moe.antimony.hoshi.features.display.AppDisplaySettings
 import moe.antimony.hoshi.features.display.DisplayPalettePreset
+import moe.antimony.hoshi.features.display.DisplayPaletteSlot
 import moe.antimony.hoshi.features.display.DisplayPaletteSelection
 
 class ReaderSettingsRepositoryTest {
@@ -63,17 +64,18 @@ class ReaderSettingsRepositoryTest {
         val display = MutableStateFlow(
             AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
+                manualPaletteSlot = DisplayPaletteSlot.Dark,
+                darkPalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
             ),
         )
         repository(displaySettings = display).use { repository ->
-            assertEquals(DisplayPalettePreset.DarkSepia, repository.settings.first().displaySettings?.singlePalette?.preset)
+            assertEquals(DisplayPalettePreset.DarkSepia, moe.antimony.hoshi.features.display.resolveDisplaySettings(repository.settings.first().displaySettings!!, false).palette)
 
             display.value = display.value.copy(
-                singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Light),
+                manualPaletteSlot = DisplayPaletteSlot.Light,
             )
 
-            assertEquals(DisplayPalettePreset.Light, repository.settings.first().displaySettings?.singlePalette?.preset)
+            assertEquals(DisplayPalettePreset.Light, moe.antimony.hoshi.features.display.resolveDisplaySettings(repository.settings.first().displaySettings!!, false).palette)
         }
     }
 
@@ -88,7 +90,7 @@ class ReaderSettingsRepositoryTest {
         val display = MutableStateFlow(
             AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = DisplayPaletteSelection(
+                lightPalette = DisplayPaletteSelection(
                     preset = DisplayPalettePreset.Custom,
                     customBackgroundColor = 0xFFABCDEF,
                     customTextColor = 0xFF123456,

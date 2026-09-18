@@ -8,6 +8,8 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TravelExplore
+import moe.antimony.hoshi.features.display.DisplayPaletteSlot
+import moe.antimony.hoshi.features.display.DisplayPalettePreset
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,7 +24,9 @@ class ReaderChromeTest {
         for (preset in moe.antimony.hoshi.features.display.DisplayPalettePreset.entries.filter { it != moe.antimony.hoshi.features.display.DisplayPalettePreset.Custom }) {
             val display = moe.antimony.hoshi.features.display.AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(preset),
+                manualPaletteSlot = if (preset in listOf(DisplayPalettePreset.Dark, DisplayPalettePreset.DarkSepia)) DisplayPaletteSlot.Dark else DisplayPaletteSlot.Light,
+                lightPalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(preset),
+                darkPalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(preset),
             )
             assertEquals(
                 readerChromeColors(ReaderSettings(displaySettings = display), false).infoText,
@@ -35,7 +39,8 @@ class ReaderChromeTest {
     fun globalWarmDarkPaletteKeepsWarmChromeEvenWhenSystemIsLight() {
         val settings = ReaderSettings(displaySettings = moe.antimony.hoshi.features.display.AppDisplaySettings(
             autoSwitch = false,
-            singlePalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
+            manualPaletteSlot = DisplayPaletteSlot.Dark,
+                darkPalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
                 moe.antimony.hoshi.features.display.DisplayPalettePreset.DarkSepia,
             ),
         ))
@@ -49,7 +54,8 @@ class ReaderChromeTest {
         val settings = ReaderSettings(theme = ReaderTheme.Light, displaySettings =
             moe.antimony.hoshi.features.display.AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
+                manualPaletteSlot = DisplayPaletteSlot.Dark,
+                darkPalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
                     preset = moe.antimony.hoshi.features.display.DisplayPalettePreset.Custom,
                     customBackgroundColor = 0xFF000000,
                     customInfoColor = 0x80332211,

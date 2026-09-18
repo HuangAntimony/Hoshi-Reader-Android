@@ -33,7 +33,7 @@ class AppDisplaySettingsRepositoryTest {
             val settings = repository.settings.first()
 
             assertTrue(settings.autoSwitch)
-            assertTrue(settings.automaticInitialized)
+            assertEquals(DisplayPaletteSlot.Light, settings.manualPaletteSlot)
             assertEquals(DisplayPalettePreset.Light, settings.lightPalette.preset)
             assertEquals(DisplayPalettePreset.Dark, settings.darkPalette.preset)
             assertEquals(DisplayAccentSource.System, settings.accentSource)
@@ -54,13 +54,13 @@ class AppDisplaySettingsRepositoryTest {
                     accentSource = DisplayAccentSource.Custom,
                     accentSeed = 0x12654321L,
                     eInkDarkTheme = true,
-                    singlePalette = it.singlePalette.copy(customBackgroundColor = 0x44112233L),
+                    lightPalette = it.lightPalette.copy(customBackgroundColor = 0x44112233L),
                 )
             }
 
             val restored = AppDisplaySettingsRepository(dataStore).settings.first()
             assertEquals(0xFF654321L, restored.accentSeed)
-            assertEquals(0x44112233L, restored.singlePalette.customBackgroundColor)
+            assertEquals(0x44112233L, restored.lightPalette.customBackgroundColor)
             assertEquals(true, restored.eInkDarkTheme)
         } finally {
             scope.cancel()
@@ -91,12 +91,13 @@ class AppDisplaySettingsRepositoryTest {
             ).use { repository ->
                 val migrated = repository.settings.first()
                 assertEquals(expected.first, migrated.autoSwitch)
+                assertEquals(0xFF000000L, migrated.darkPalette.customBackgroundColor)
+                assertEquals(0xFFFFFFFFL, migrated.darkPalette.customTextColor)
                 if (migrated.autoSwitch) {
                     assertEquals(expected.second, migrated.lightPalette.preset)
                     assertEquals(expected.third, migrated.darkPalette.preset)
                 } else {
-                    assertEquals(expected.second, migrated.singlePalette.preset)
-                    assertFalse(migrated.automaticInitialized)
+                    assertEquals(expected.second, migrated.selection(migrated.manualPaletteSlot).preset)
                 }
             }
         }
@@ -121,10 +122,10 @@ class AppDisplaySettingsRepositoryTest {
 
             assertFalse(migrated.autoSwitch)
             assertTrue(migrated.eInkMode)
-            assertEquals(DisplayPalettePreset.Custom, migrated.singlePalette.preset)
-            assertEquals(0x44112233L, migrated.singlePalette.customBackgroundColor)
-            assertEquals(0x88445566L, migrated.singlePalette.customTextColor)
-            assertEquals(0xCC778899L, migrated.singlePalette.customInfoColor)
+            assertEquals(DisplayPalettePreset.Custom, migrated.selection(migrated.manualPaletteSlot).preset)
+            assertEquals(0x44112233L, migrated.selection(migrated.manualPaletteSlot).customBackgroundColor)
+            assertEquals(0x88445566L, migrated.selection(migrated.manualPaletteSlot).customTextColor)
+            assertEquals(0xCC778899L, migrated.selection(migrated.manualPaletteSlot).customInfoColor)
         }
     }
 
@@ -138,11 +139,9 @@ class AppDisplaySettingsRepositoryTest {
         val key = stringPreferencesKey("settings")
         val json = Json { encodeDefaults = true }
         val saved = AppDisplaySettings(
-            autoSwitch = false,
-            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0x44112233L, 0x88445566L, 0xCC778899L),
+            autoSwitch = true,
             lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia, 0xFFABCDEF, 0xFF123456, 0xFF654321),
             darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF112233, 0xFFEEEEEE, 0xFFAAAAAA),
-            automaticInitialized = true,
             accentSource = DisplayAccentSource.Custom,
             accentSeed = 0xFF00796B,
             eInkMode = true,
@@ -187,6 +186,61 @@ class AppDisplaySettingsRepositoryTest {
     }
 
     @Test
+    fun upgradeMovesManualSelectionIntoMatchingGroupAndPersistsItOnlyOnce() = runBlocking {
+        val choices = listOf(
+            DisplayPaletteSelection(DisplayPalettePreset.Light) to DisplayPaletteSlot.Light,
+            DisplayPaletteSelection(DisplayPalettePreset.Sepia) to DisplayPaletteSlot.Light,
+            DisplayPaletteSelection(DisplayPalettePreset.Dark) to DisplayPaletteSlot.Dark,
+            DisplayPaletteSelection(DisplayPalettePreset.DarkSepia) to DisplayPaletteSlot.Dark,
+            DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xAAEEEEEE, 0x44112233, 0x88999999) to DisplayPaletteSlot.Light,
+            DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xCC999999, 0xDDFFFFFF, 0xEEAAAAAA) to DisplayPaletteSlot.Dark,
+        )
+        for ((index, choice) in choices.withIndex()) {
+            val (previous, expectedSlot) = choice
+            val scope = CoroutineScope(Dispatchers.IO + Job())
+            val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = {
+                tempFolder.newFile("display-manual-upgrade-$index.preferences_pb")
+            })
+            val key = stringPreferencesKey("settings")
+            val json = Json { encodeDefaults = true }
+            val saved = AppDisplaySettings(
+                autoSwitch = false,
+                lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFFAABBCC, 0xFF223344, 0xFF778899),
+                darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF223344, 0xFFAABBCC, 0xFF778899),
+                migrationVersion = 2,
+            )
+            val oldJson = JsonObject(
+                (json.parseToJsonElement(json.encodeToString(saved)).jsonObject - "manualPaletteSlot") +
+                    ("singlePalette" to json.parseToJsonElement(json.encodeToString(previous))),
+            ).toString()
+            try {
+                dataStore.edit { it[key] = oldJson }
+                val repository = AppDisplaySettingsRepository(dataStore)
+                val upgraded = repository.settings.first()
+                assertEquals(expectedSlot, upgraded.manualPaletteSlot)
+                val active = resolveDisplaySettings(upgraded, false)
+                assertEquals(previous.preset, active.palette)
+                assertEquals(expectedSlot == DisplayPaletteSlot.Dark, active.isDark)
+                assertEquals(active, resolveDisplaySettings(upgraded, true))
+                if (previous.preset == DisplayPalettePreset.Custom) {
+                    assertEquals(previous.customBackgroundColor, active.backgroundColor)
+                    assertEquals(previous.customTextColor, active.textColor)
+                    assertEquals(previous.customInfoColor, active.infoColor)
+                }
+                val other = if (expectedSlot == DisplayPaletteSlot.Light) DisplayPaletteSlot.Dark else DisplayPaletteSlot.Light
+                assertEquals(saved.selection(other), upgraded.selection(other))
+                val persisted = dataStore.data.first()[key]
+                assertFalse(json.parseToJsonElement(persisted!!).jsonObject.containsKey("singlePalette"))
+                repository.ensureMigrated()
+                assertEquals(persisted, dataStore.data.first()[key])
+                assertEquals(upgraded, AppDisplaySettingsRepository(dataStore).settings.first())
+            } finally {
+                scope.cancel()
+            }
+        }
+    }
+
+    @Test
     fun failedMigrationIsRetriedWithoutMarkingItComplete() = runBlocking {
         var attempts = 0
         val source = object : AppDisplaySettingsMigrationSource {
@@ -205,7 +259,7 @@ class AppDisplaySettingsRepositoryTest {
             val migrated = repository.settings.first()
 
             assertEquals(2, attempts)
-            assertEquals(DisplayPalettePreset.Dark, migrated.singlePalette.preset)
+            assertEquals(DisplayPalettePreset.Dark, migrated.selection(migrated.manualPaletteSlot).preset)
             assertEquals(AppDisplaySettingsRepository.CurrentMigrationVersion, migrated.migrationVersion)
         }
     }

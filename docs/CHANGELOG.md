@@ -9,8 +9,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Add global Display & Theme settings in Settings and Reader. Follow system
-  brightness with independent light/dark reading palettes, or keep one fixed
-  palette; customize background, text and secondary text colors with previews.
+  brightness with one palette selected in each light/dark group, or choose one
+  of the same six options manually. Custom Light and Custom Dark retain separate
+  reading colors and explicitly select light/dark interfaces and dictionary
+  popups. Customize background, text and secondary text colors with previews.
   Choose system, preset or custom interface accents, and apply E-ink optimization
   across the app. Existing display settings migrate from the active profile.
   E-ink optimization sits below automatic switching and hides palette/accent

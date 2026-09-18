@@ -46,7 +46,8 @@ class ReaderSettingsHostViewModelTest {
         stored.value = ReaderSettings(
             displaySettings = moe.antimony.hoshi.features.display.AppDisplaySettings(
                 autoSwitch = false,
-                singlePalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
+                manualPaletteSlot = moe.antimony.hoshi.features.display.DisplayPaletteSlot.Dark,
+                darkPalette = moe.antimony.hoshi.features.display.DisplayPaletteSelection(
                     moe.antimony.hoshi.features.display.DisplayPalettePreset.DarkSepia,
                 ),
             ),

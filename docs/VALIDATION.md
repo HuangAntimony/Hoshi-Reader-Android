@@ -91,18 +91,26 @@ node --test app/src/test/js/*.test.mjs
 Preserve app data and cover all four tabs, every settings category, native Reader
 panels, dialogs, menus, and Process Text lookup:
 
-- Fixed Light, Sepia, Dark, Warm Dark and Custom; automatic preset/custom pairs
-  and two different custom palettes. Change system night mode while foregrounded
-  and backgrounded. Editing the inactive slot must not change the current theme.
-- First enabling automatic switching places the current palette on its matching
-  brightness side; disabling keeps the currently displayed palette. Re-enabling
-  restores both saved slots. Each slot retains its custom colors after preset
-  changes. Canceling any editor keeps the previous settings, including alpha.
+- Both switching modes show Light / Sepia / Custom Light and Dark / Warm Dark /
+  Custom Dark. Automatic mode has one selection per group; manual mode has one
+  selection across all six options. Change system night mode while foregrounded
+  and backgrounded: only automatic mode changes the active group. Editing the
+  inactive automatic slot must not change the current theme.
+  Use identical custom colors, and backgrounds opposite to their group's brightness:
+  Custom Light must use a light native interface and black-on-white dictionary
+  popups; Custom Dark must use a dark interface and white-on-black popups. Check
+  Reader, Dictionary, recursive lookup and Process Text, preserving reading
+  colors, position, selection and lookup history when switching groups.
+- Disabling automatic switching keeps the currently displayed palette. Re-enabling
+  uses both saved slots, including edits made in manual mode. Each of the two
+  slots retains its custom colors after preset changes. Canceling any editor
+  keeps the previous settings, including alpha.
   Change palettes/accents while scrolled to the bottom, including delayed and
   failed saves: swatches, preview, text brightness, row positions and scroll offset
   must remain stable while saving; only confirmed settings change the theme.
-  `DisplaySettingsViewTest` covers layout preservation during a suspended save
-  using in-memory settings, without writing the installed app's preferences.
+  `DisplaySettingsViewTest` covers the one-versus-two palette selections and
+  layout preservation during a suspended save using in-memory settings, without
+  writing the installed app's preferences.
 - Compare Display & Theme with other grouped settings, including its Reader
   panel: palette, accent and E-ink rows use the same 16dp inset dividers; E-ink
   keeps the enclosing group outline continuous.
@@ -142,9 +150,11 @@ panels, dialogs, menus, and Process Text lookup:
   book opening enabled: migration must use the global profile before opening the
   book. Reopen, change language/profile, and create/copy profiles; colors and E-ink
   must stay global. The custom editor has no legacy-palette import list. Upgrading
-  existing global settings clears obsolete imported palettes without resetting
-  the three saved slots, accent, switching mode, or E-ink setting. Failed storage
-  upgrades must leave the previous data intact and retry successfully.
+  existing global settings clears obsolete imported palettes and maps the former
+  manual selection to its matching group. Its active custom colors take precedence
+  on that side, while the other side, accent, switching mode and E-ink setting
+  remain intact. Existing automatic pairs retain both saved configurations.
+  Failed storage upgrades must leave the previous data intact and retry successfully.
 - Test narrow Chinese layouts and enlarged fonts, empty/loading/error/disabled
   states, cold launch, restart, foreground/background, and opening both Reader
   settings panels. Reading Settings identifies the effective profile. Changing

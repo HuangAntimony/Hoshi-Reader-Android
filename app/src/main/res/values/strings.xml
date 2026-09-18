@@ -810,11 +810,13 @@
     <string name="display_settings_load_failed">Could not load display and reading settings. Please try again.</string>
     <string name="display_settings_save_failed">Could not save the settings. Your previous settings have been kept.</string>
     <string name="display_settings_auto_switch">Automatically Switch with System</string>
-    <string name="display_settings_palette">Color Palette</string>
     <string name="display_settings_light_palette">Light Palette</string>
     <string name="display_settings_dark_palette">Dark Palette</string>
     <string name="display_settings_palette_dark_sepia">Dark Sepia</string>
-    <string name="display_settings_custom_palette">Custom Palette</string>
+    <string name="display_settings_custom_light_palette">Custom Light</string>
+    <string name="display_settings_custom_dark_palette">Custom Dark</string>
+    <string name="display_settings_custom_light_explanation">Uses a light interface and dictionary popups with black text on white. Reading colors are set below.</string>
+    <string name="display_settings_custom_dark_explanation">Uses a dark interface and dictionary popups with white text on black. Reading colors are set below.</string>
     <string name="display_settings_palette_preview_title">Reading preview</string>
     <string name="display_settings_palette_preview_info">Secondary information</string>
     <string name="display_settings_accent">Accent Color</string>
