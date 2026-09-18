@@ -615,9 +615,9 @@ internal fun HoshiMainShell(
                 modifier = Modifier.fillMaxSize(),
                 layoutType = layoutSpec.toNavigationSuiteType(),
                 navigationSuiteColors = androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults.colors(
-                    navigationBarContainerColor = hoshiSurfaces.group,
-                    navigationRailContainerColor = hoshiSurfaces.group,
-                    navigationDrawerContainerColor = hoshiSurfaces.group,
+                    navigationBarContainerColor = hoshiSurfaces.navigation,
+                    navigationRailContainerColor = hoshiSurfaces.navigation,
+                    navigationDrawerContainerColor = hoshiSurfaces.navigation,
                 ),
                 navigationSuiteItems = {
                     visibleTabs.forEach { tab ->
@@ -651,7 +651,7 @@ private fun HoshiCompactBottomNavigation(
     visibleTabs: List<MainTab>,
     layoutSpec: MainShellLayoutSpec,
 ) {
-    val containerColor = hoshiSurfaces.group
+    val containerColor = hoshiSurfaces.navigation
     Surface(
         modifier = Modifier
             .fillMaxWidth()

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 @Immutable
 data class HoshiSurfaceRoles(
     val page: Color,
+    val navigation: Color,
     val group: Color,
     val nested: Color,
     val overlay: Color,
@@ -35,6 +36,7 @@ data class HoshiSurfaceRoles(
 
 internal fun hoshiSurfaceRoles(colors: ColorScheme, dark: Boolean, eInk: Boolean) = HoshiSurfaceRoles(
     page = if (dark) colors.surface else colors.surfaceContainerLow,
+    navigation = colors.surfaceContainer,
     group = if (dark) colors.surfaceContainerLow else colors.surfaceContainerLowest,
     nested = colors.surfaceContainer,
     overlay = colors.surfaceContainerHigh,

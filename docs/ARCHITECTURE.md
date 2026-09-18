@@ -10,11 +10,14 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 - The app is a single Android application module under `app`.
 - UI is Jetpack Compose + Material 3.
-- `HoshiSurfaceRoles` owns native page, group, nested, and overlay colors derived
+- `HoshiSurfaceRoles` owns native page, navigation, group, nested, and overlay colors derived
   from Material 3 and the resolved brightness. Shared container helpers provide
   E-ink outlines (including continuous lazy group edges) while ordinary groups
   use tonal separation without decorative borders or elevation. Reader content
   and dictionary HTML retain their existing color/style systems.
+  Bottom/side navigation uses `surfaceContainer`; page and top-bar backgrounds
+  remain continuous through the status-bar inset, including Dictionary search.
+  The search field uses `surfaceContainerHigh` to remain distinct on that page.
 - Native accents default to Android 12+ dynamic color with the existing fixed
   fallback on older Android. Manual opaque seeds use the standalone Material Color
   Utilities 4.1.1 Tonal Spot algorithm to generate a complete Material 3 scheme;

@@ -694,7 +694,7 @@ fun DictionarySearchView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(hoshiSurfaces.group),
+                .background(hoshiSurfaces.page),
         )
     }
 }
@@ -922,7 +922,9 @@ private fun DictionarySearchTopBar(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (LocalHoshiEInkMode.current) {
+            HorizontalDivider(color = hoshiSurfaces.outline)
+        }
     }
 }
 
@@ -942,7 +944,7 @@ private fun DictionarySearchBar(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = hoshiSurfaces.nested,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = hoshiContainerBorder(),
         shadowElevation = 0.dp,

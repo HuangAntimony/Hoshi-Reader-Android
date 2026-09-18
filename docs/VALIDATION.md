@@ -101,6 +101,10 @@ panels, dialogs, menus, and Process Text lookup:
 - System dynamic colors on Android 12+, the fixed fallback on older Android,
   all eight accent seeds and extreme custom seeds. Reader background/text retain
   their own colors while controls and native containers use the accent scheme.
+  Across all four tabs, check that bottom/side navigation has a consistent tint
+  and that the status-bar inset matches its page. Dictionary search must retain
+  this continuity both with the keyboard open and after showing results; its
+  field remains distinguishable, with explicit field/top-bar outlines in E-ink.
 - Light and dark E-ink: compare every tonal container with ordinary mode and
   verify actual outlines on groups, nested controls, filled buttons, segmented
   tracks/selections, popups, panels and navigation boundaries. Lazy groups need a
