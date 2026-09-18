@@ -810,4 +810,5 @@
     <string name="statistics_chart_day_pattern">d日</string>
     <string name="statistics_chart_month_pattern">MMMMM</string>
     <string name="statistics_chart_month_year_pattern">yy年M月</string>
+    <string name="reader_appearance_page_turn_animation">翻页动画</string>
 </resources>

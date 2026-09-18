@@ -455,6 +455,14 @@ private fun ReaderAppearanceContent(
                         },
                         palette = palette,
                     )
+                    if (settings.viewMode == ReaderViewMode.Paginated && !settings.eInkMode) {
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_appearance_page_turn_animation),
+                            checked = settings.pageTurnAnimation,
+                            onCheckedChange = { onSettingsChange(settings.copy(pageTurnAnimation = it)) },
+                        )
+                    }
                     if (settings.viewMode == ReaderViewMode.Continuous) {
                         AppearanceDivider(palette)
                         SliderRow(

@@ -161,6 +161,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 ## Reader
 
+- `ReaderPageTurnAnimation` composites an outgoing viewport snapshot over the live
+  WebView for optional paginated page transitions. Navigation and bookmark progress
+  remain on complete DOM pages; visual-state callbacks start transitions only after
+  the destination is drawable. Chapter restore keeps the outgoing snapshot visible.
+  E-ink, disabled system animations, resize and view teardown bypass or cancel it.
+
 - `ReaderFontManager` owns the app-private font library under `Fonts/`, exposes
   an immutable revisioned family/variant state, groups user TTF/OTF files by
   bounded SFNT metadata, and keeps legacy basename-only WOFF/WOFF2 and malformed

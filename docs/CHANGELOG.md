@@ -8,6 +8,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add optional sliding page-turn transitions in paginated reading, including chapter
+  boundaries; disable them in e-ink mode or when system animations are disabled (#91).
+
 - Preserve deleted books' reading statistics in an archive, restore them on
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires

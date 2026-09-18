@@ -812,4 +812,5 @@
     <string name="statistics_chart_day_pattern">d</string>
     <string name="statistics_chart_month_pattern">MMMMM</string>
     <string name="statistics_chart_month_year_pattern">MMM yy</string>
+    <string name="reader_appearance_page_turn_animation">Page-turn animation</string>
 </resources>

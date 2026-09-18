@@ -86,6 +86,13 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
+For paginated page-turn animation, check both writing directions with taps, swipes
+and volume keys, rapid forward/backward input, chapter boundaries and book limits.
+Verify progress/bookmarks after each turn and reopening. During a transition, rotate
+the device, exit Reader and start native selection; no snapshot should remain.
+Check the Appearance toggle persists per profile and that e-ink or disabled system
+animations produce immediate turns. Continuous and VN navigation remain unchanged.
+
 Reader work should compare against
 `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift`
 and the matching JS/CSS before adding Android-specific behavior.

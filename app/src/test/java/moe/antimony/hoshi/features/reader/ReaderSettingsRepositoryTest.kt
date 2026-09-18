@@ -29,6 +29,26 @@ class ReaderSettingsRepositoryTest {
     val tempFolder = TemporaryFolder()
 
     @Test
+    fun pageTurnAnimationPersistsAcrossProfileReloadAndEInkChanges() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("page-turn-profiles"))
+        profiles.readerSettingsFile().apply {
+            parentFile?.mkdirs()
+            writeText("{}")
+        }
+        repository(profileRepository = profiles).use { repository ->
+            assertTrue(repository.settings.first().pageTurnAnimation)
+            repository.update { it.copy(pageTurnAnimation = false, eInkMode = true) }
+        }
+        repository(profileRepository = profiles, fileName = "page-turn-reopened.preferences_pb").use { repository ->
+            assertFalse(repository.settings.first().pageTurnAnimation)
+            repository.update { it.copy(eInkMode = false) }
+            assertFalse(repository.settings.first().pageTurnAnimation)
+            repository.update { it.copy(pageTurnAnimation = true) }
+            assertTrue(repository.settings.first().pageTurnAnimation)
+        }
+    }
+
+    @Test
     fun statisticsSyncDefaultsOnWithoutStartingTrackingOrChangingDisplayPreferences() = runBlocking {
         repository().use { repository ->
             val settings = repository.settings.first()

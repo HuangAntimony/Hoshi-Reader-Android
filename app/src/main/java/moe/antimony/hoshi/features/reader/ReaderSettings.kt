@@ -74,6 +74,7 @@ internal fun Int.coerceReaderBottomSafeAreaDp(): Int {
 data class ReaderSettings(
     val theme: ReaderTheme = ReaderTheme.System,
     val eInkMode: Boolean = false,
+    val pageTurnAnimation: Boolean = true,
     val uiTheme: ReaderInterfaceTheme = ReaderInterfaceTheme.System,
     val systemLightSepia: Boolean = false,
     val sepiaInvertInDark: Boolean = false,
@@ -363,6 +364,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
             ?: ReaderTheme.System,
         eInkMode = preferences.getBoolean("eInkMode", false),
+        pageTurnAnimation = preferences.getBoolean("pageTurnAnimation", true),
         uiTheme = ReaderInterfaceTheme.fromStorage(preferences.getString("uiTheme", null)),
         systemLightSepia = preferences.getBoolean("systemLightSepia", false),
         sepiaInvertInDark = preferences.getBoolean("sepiaInvertInDark", false),
@@ -459,6 +461,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         preferences.edit()
             .putString("theme", settings.theme.label)
             .putBoolean("eInkMode", settings.eInkMode)
+            .putBoolean("pageTurnAnimation", settings.pageTurnAnimation)
             .putString("uiTheme", settings.uiTheme.label)
             .putBoolean("systemLightSepia", settings.systemLightSepia)
             .putBoolean("sepiaInvertInDark", settings.sepiaInvertInDark)
@@ -628,6 +631,7 @@ class ReaderSettingsRepository(
                 ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
                 ?: ReaderTheme.System,
             eInkMode = this[KEY_E_INK_MODE] ?: false,
+            pageTurnAnimation = this[KEY_PAGE_TURN_ANIMATION] ?: true,
             uiTheme = ReaderInterfaceTheme.fromStorage(this[KEY_UI_THEME]),
             systemLightSepia = this[KEY_SYSTEM_LIGHT_SEPIA] ?: false,
             sepiaInvertInDark = this[KEY_SEPIA_INVERT_IN_DARK] ?: false,
@@ -708,6 +712,7 @@ class ReaderSettingsRepository(
     private fun MutablePreferences.writeReaderSettings(settings: ReaderSettings) {
         this[KEY_THEME] = settings.theme.label
         this[KEY_E_INK_MODE] = settings.eInkMode
+        this[KEY_PAGE_TURN_ANIMATION] = settings.pageTurnAnimation
         this[KEY_UI_THEME] = settings.uiTheme.label
         this[KEY_SYSTEM_LIGHT_SEPIA] = settings.systemLightSepia
         this[KEY_SEPIA_INVERT_IN_DARK] = settings.sepiaInvertInDark
@@ -833,6 +838,7 @@ class ReaderSettingsRepository(
             booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")
         private val KEY_THEME = stringPreferencesKey("theme")
         private val KEY_E_INK_MODE = booleanPreferencesKey("eInkMode")
+        private val KEY_PAGE_TURN_ANIMATION = booleanPreferencesKey("pageTurnAnimation")
         private val KEY_UI_THEME = stringPreferencesKey("uiTheme")
         private val KEY_SYSTEM_LIGHT_SEPIA = booleanPreferencesKey("systemLightSepia")
         private val KEY_SEPIA_INVERT_IN_DARK = booleanPreferencesKey("sepiaInvertInDark")
@@ -919,6 +925,7 @@ class ReaderSettingsRepository(
 private data class ProfileReaderAppearanceSettings(
     val theme: ReaderTheme = ReaderTheme.System,
     val eInkMode: Boolean = false,
+    val pageTurnAnimation: Boolean = true,
     val uiTheme: ReaderInterfaceTheme = ReaderInterfaceTheme.System,
     val systemLightSepia: Boolean = false,
     val sepiaInvertInDark: Boolean = false,
@@ -981,6 +988,7 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
     ProfileReaderAppearanceSettings(
         theme = theme,
         eInkMode = eInkMode,
+        pageTurnAnimation = pageTurnAnimation,
         uiTheme = uiTheme,
         systemLightSepia = systemLightSepia,
         sepiaInvertInDark = sepiaInvertInDark,
@@ -1043,6 +1051,7 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
     copy(
         theme = appearance.theme,
         eInkMode = appearance.eInkMode,
+        pageTurnAnimation = appearance.pageTurnAnimation,
         uiTheme = appearance.uiTheme,
         systemLightSepia = appearance.systemLightSepia,
         sepiaInvertInDark = appearance.sepiaInvertInDark,

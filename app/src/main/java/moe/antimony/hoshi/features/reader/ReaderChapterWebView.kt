@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.reader
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
@@ -291,6 +292,11 @@ internal fun ChapterWebView(
             }
         },
         update = { webView ->
+            webView.pageTurnAnimation.apply {
+                enabled = readerSettings.shouldAnimatePageTurns()
+                verticalWriting = readerSettings.verticalWriting
+                backgroundColor = readerSettings.backgroundColor(systemDark).toInt()
+            }
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
@@ -577,6 +583,27 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
     settings.normalized().scanLength
 
 private class HoshiReaderWebView(context: Context) : WebView(context) {
+    val pageTurnAnimation = ReaderPageTurnAnimation(this) { super.onDraw(it) }
+
+    override fun onDraw(canvas: Canvas) {
+        pageTurnAnimation.draw(canvas)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        pageTurnAnimation.cancel()
+        super.onSizeChanged(w, h, oldw, oldh)
+    }
+
+    override fun onDetachedFromWindow() {
+        pageTurnAnimation.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    override fun destroy() {
+        pageTurnAnimation.cancel()
+        super.destroy()
+    }
+
     var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
     private var nativeSelectionActionModeActive = false
     private var nativeSelectionActionMode: ActionMode? = null
@@ -585,6 +612,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
     fun setNativeSelectionActionMode(mode: ActionMode?) {
+        if (mode != null) pageTurnAnimation.cancel()
         nativeSelectionActionMode = mode
         nativeSelectionActionModeActive = mode != null
         evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
@@ -717,6 +745,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         super.startActionMode(ReaderHighlightActionModeCallback(this, callback), type)
 
     fun releaseForDestroy() {
+        pageTurnAnimation.cancel()
         dismissHighlightColorPopup()
         setNativeSelectionActionMode(null)
         onHighlightCreated = { _, _, _ -> }
@@ -1002,6 +1031,8 @@ internal fun WebView.navigatePage(
     onDisplayedProgress: (progress: Double) -> Unit,
     onSaveProgress: (progress: Double) -> Unit,
 ) {
+    val transition = (this as? HoshiReaderWebView)?.pageTurnAnimation
+    val animationTicket = transition?.begin(direction)
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
         when (ReaderPaginationScripts.navigationResult(result)) {
             ReaderNavigationResult.Advanced -> {
@@ -1013,6 +1044,7 @@ internal fun WebView.navigatePage(
                     object : WebView.VisualStateCallback() {
                         override fun onComplete(requestId: Long) {
                             if (readerPageTurnProgressRequestIds[webView] != requestId) return
+                            animationTicket?.let { transition?.ready(it) }
                             webView.postOnAnimation {
                                 webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
                                     if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
@@ -1030,11 +1062,12 @@ internal fun WebView.navigatePage(
                 )
             }
             ReaderNavigationResult.Revealed -> {
+                animationTicket?.let { transition?.cancel(it) }
                 readerPageTurnProgressRequestIds.remove(this)
             }
             ReaderNavigationResult.Limit -> {
                 readerPageTurnProgressRequestIds.remove(this)
-                onLimit()
+                if (!onLimit()) animationTicket?.let { transition?.cancel(it) }
             }
         }
     }
@@ -1309,7 +1342,7 @@ private class ReaderImageTapBridge(
 private fun WebView.hideForReaderRestore() {
     animate().cancel()
     readerRestoreGenerations[this] = (readerRestoreGenerations[this] ?: 0L) + 1L
-    alpha = 0f
+    alpha = if ((this as? HoshiReaderWebView)?.pageTurnAnimation?.isWaiting == true) 1f else 0f
 }
 
 private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompletionAction) {
@@ -1325,6 +1358,7 @@ private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompl
                             if (readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
                                 animate().cancel()
                                 alpha = 1f
+                                (this@showAfterReaderRestore as? HoshiReaderWebView)?.pageTurnAnimation?.ready()
                                 true
                             } else {
                                 false
