@@ -35,7 +35,6 @@ data class LegacyDisplaySettingsSnapshot(
 
 data class AppDisplayMigrationPayload(
     val activeSettings: LegacyDisplaySettingsSnapshot? = null,
-    val importedPalettes: List<NamedDisplayPalette> = emptyList(),
 )
 
 interface AppDisplaySettingsMigrationSource {
@@ -72,12 +71,18 @@ class AppDisplaySettingsRepository(
             val current = dataStore.data.first().readSettings()
             if (current != null && current.migrationVersion >= CurrentMigrationVersion) return
 
-            val payload = migrationSource?.loadMigrationPayload()
-            val migrated = migrate(payload).normalized()
+            val migrated = if (current == null || current.migrationVersion < 1) {
+                migrate(migrationSource?.loadMigrationPayload())
+            } else {
+                current
+            }
             dataStore.edit { preferences ->
                 val latest = preferences.readSettings()
                 if (latest == null || latest.migrationVersion < CurrentMigrationVersion) {
-                    preferences[KEY_SETTINGS] = json.encodeToString(migrated)
+                    val base = latest?.takeIf { it.migrationVersion >= 1 } ?: migrated
+                    preferences[KEY_SETTINGS] = json.encodeToString(
+                        base.copy(migrationVersion = CurrentMigrationVersion).normalized(),
+                    )
                 }
             }
         }
@@ -114,18 +119,8 @@ class AppDisplaySettingsRepository(
         json.decodeFromString(AppDisplaySettings.serializer(), encoded)
     }
 
-    private fun migrate(payload: AppDisplayMigrationPayload?): AppDisplaySettings {
-        val active = payload?.activeSettings
-        val base = if (active == null) {
-            defaultSettings()
-        } else {
-            migrateLegacy(active)
-        }
-        return base.copy(
-            migrationVersion = CurrentMigrationVersion,
-            importedPalettes = payload?.importedPalettes.orEmpty(),
-        )
-    }
+    private fun migrate(payload: AppDisplayMigrationPayload?): AppDisplaySettings =
+        payload?.activeSettings?.let(::migrateLegacy) ?: defaultSettings()
 
     private fun migrateLegacy(legacy: LegacyDisplaySettingsSnapshot): AppDisplaySettings {
         val custom = DisplayPaletteSelection(
@@ -168,7 +163,7 @@ class AppDisplaySettingsRepository(
 
     companion object {
         const val DataStoreName = "app-display-settings"
-        const val CurrentMigrationVersion = 1
+        const val CurrentMigrationVersion = 2
 
         private val KEY_SETTINGS = stringPreferencesKey("settings")
         private val json = Json {

@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -55,6 +54,7 @@ import moe.antimony.hoshi.features.reader.withReaderColorBlue
 import moe.antimony.hoshi.features.reader.withReaderColorGreen
 import moe.antimony.hoshi.features.reader.withReaderColorRed
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.asString
@@ -139,65 +139,20 @@ private fun DisplaySettingsContent(
                 DisplaySwitchRow(
                     label = stringResource(R.string.display_settings_auto_switch),
                     checked = settings.autoSwitch,
-                    enabled = !state.isSaving,
+                    interactionEnabled = !state.isSaving,
                     onCheckedChange = { viewModel.setAutoSwitch(it, systemDark) },
                 )
             }
-
-            if (settings.autoSwitch) {
-                PaletteSlotSection(
-                    title = stringResource(R.string.display_settings_light_palette),
-                    slot = DisplayPaletteSlot.Light,
-                    selection = settings.lightPalette,
-                    presets = listOf(
-                        DisplayPalettePreset.Light,
-                        DisplayPalettePreset.Sepia,
-                        DisplayPalettePreset.Custom,
-                    ),
-                    enabled = !settings.eInkMode && !state.isSaving,
-                    onSelect = viewModel::selectPalettePreset,
-                )
-                PaletteSlotSection(
-                    title = stringResource(R.string.display_settings_dark_palette),
-                    slot = DisplayPaletteSlot.Dark,
-                    selection = settings.darkPalette,
-                    presets = listOf(
-                        DisplayPalettePreset.Dark,
-                        DisplayPalettePreset.DarkSepia,
-                        DisplayPalettePreset.Custom,
-                    ),
-                    enabled = !settings.eInkMode && !state.isSaving,
-                    onSelect = viewModel::selectPalettePreset,
-                )
-            } else {
-                PaletteSlotSection(
-                    title = stringResource(R.string.display_settings_palette),
-                    slot = DisplayPaletteSlot.Single,
-                    selection = settings.singlePalette,
-                    presets = DisplayPalettePreset.entries,
-                    enabled = !settings.eInkMode && !state.isSaving,
-                    onSelect = viewModel::selectPalettePreset,
-                )
-            }
-
-            AccentSection(
-                settings = settings,
-                enabled = !settings.eInkMode && !state.isSaving,
-                resolvedDark = resolveDisplaySettings(settings, systemDark).isDark,
-                onSystem = viewModel::selectSystemAccent,
-                onPreset = viewModel::selectAccentPreset,
-                onCustom = viewModel::openAccentEditor,
-            )
 
             DisplaySettingsGroup {
                 DisplaySwitchRow(
                     label = stringResource(R.string.display_settings_eink_mode),
                     checked = settings.eInkMode,
-                    enabled = !state.isSaving,
+                    interactionEnabled = !state.isSaving,
                     onCheckedChange = viewModel::setEInkMode,
                 )
                 if (settings.eInkMode) {
-                    HorizontalDivider(color = hoshiSurfaces.divider)
+                    GroupDivider()
                     Text(
                         text = stringResource(R.string.display_settings_eink_explanation),
                         style = MaterialTheme.typography.bodyMedium,
@@ -206,15 +161,79 @@ private fun DisplaySettingsContent(
                     )
                 }
             }
+
+            if (settings.eInkMode) {
+                if (!settings.autoSwitch) {
+                    val dark = resolveDisplaySettings(settings, systemDark).isDark
+                    DisplaySettingsGroup(title = stringResource(R.string.display_settings_eink_appearance)) {
+                        DisplayChoiceRow(
+                            label = stringResource(R.string.reader_appearance_theme_light),
+                            selected = !dark,
+                            interactionEnabled = !state.isSaving,
+                            onClick = { viewModel.setEInkDarkTheme(false) },
+                        )
+                        GroupDivider()
+                        DisplayChoiceRow(
+                            label = stringResource(R.string.reader_appearance_theme_dark),
+                            selected = dark,
+                            interactionEnabled = !state.isSaving,
+                            onClick = { viewModel.setEInkDarkTheme(true) },
+                        )
+                    }
+                }
+            } else {
+                if (settings.autoSwitch) {
+                    PaletteSlotSection(
+                        title = stringResource(R.string.display_settings_light_palette),
+                        slot = DisplayPaletteSlot.Light,
+                        selection = settings.lightPalette,
+                        presets = listOf(
+                            DisplayPalettePreset.Light,
+                            DisplayPalettePreset.Sepia,
+                            DisplayPalettePreset.Custom,
+                        ),
+                        interactionEnabled = !state.isSaving,
+                        onSelect = viewModel::selectPalettePreset,
+                    )
+                    PaletteSlotSection(
+                        title = stringResource(R.string.display_settings_dark_palette),
+                        slot = DisplayPaletteSlot.Dark,
+                        selection = settings.darkPalette,
+                        presets = listOf(
+                            DisplayPalettePreset.Dark,
+                            DisplayPalettePreset.DarkSepia,
+                            DisplayPalettePreset.Custom,
+                        ),
+                        interactionEnabled = !state.isSaving,
+                        onSelect = viewModel::selectPalettePreset,
+                    )
+                } else {
+                    PaletteSlotSection(
+                        title = stringResource(R.string.display_settings_palette),
+                        slot = DisplayPaletteSlot.Single,
+                        selection = settings.singlePalette,
+                        presets = DisplayPalettePreset.entries,
+                        interactionEnabled = !state.isSaving,
+                        onSelect = viewModel::selectPalettePreset,
+                    )
+                }
+
+                AccentSection(
+                    settings = settings,
+                    interactionEnabled = !state.isSaving,
+                    resolvedDark = resolveDisplaySettings(settings, systemDark).isDark,
+                    onSystem = viewModel::selectSystemAccent,
+                    onPreset = viewModel::selectAccentPreset,
+                    onCustom = viewModel::openAccentEditor,
+                )
+            }
         }
     }
 
     state.paletteDraft?.let { draft ->
         PaletteEditorDialog(
             draft = draft,
-            importedPalettes = settings?.importedPalettes.orEmpty(),
             isSaving = state.isSaving,
-            onUseImported = viewModel::useImportedPalette,
             onUpdate = viewModel::updatePaletteDraft,
             onSave = viewModel::savePaletteDraft,
             onDismiss = viewModel::dismissPaletteEditor,
@@ -256,17 +275,17 @@ private fun PaletteSlotSection(
     slot: DisplayPaletteSlot,
     selection: DisplayPaletteSelection,
     presets: List<DisplayPalettePreset>,
-    enabled: Boolean,
+    interactionEnabled: Boolean,
     onSelect: (DisplayPaletteSlot, DisplayPalettePreset) -> Unit,
 ) {
-    DisplaySettingsGroup(title = title, enabled = enabled) {
+    DisplaySettingsGroup(title = title) {
         presets.forEachIndexed { index, preset ->
-            if (index > 0) HorizontalDivider(color = hoshiSurfaces.divider)
+            if (index > 0) GroupDivider()
             DisplayChoiceRow(
                 label = stringResource(preset.labelRes),
                 selected = selection.preset == preset,
-                enabled = enabled,
-                previewColors = if (enabled) palettePreviewColors(preset, selection) else null,
+                interactionEnabled = interactionEnabled,
+                previewColors = palettePreviewColors(preset, selection),
                 onClick = { onSelect(slot, preset) },
             )
         }
@@ -276,45 +295,43 @@ private fun PaletteSlotSection(
 @Composable
 private fun AccentSection(
     settings: AppDisplaySettings,
-    enabled: Boolean,
+    interactionEnabled: Boolean,
     resolvedDark: Boolean,
     onSystem: () -> Unit,
     onPreset: (Long) -> Unit,
     onCustom: () -> Unit,
 ) {
     val matchingPreset = AccentPreset.entries.firstOrNull { it.color == settings.accentSeed }
-    DisplaySettingsGroup(title = stringResource(R.string.display_settings_accent), enabled = enabled) {
+    DisplaySettingsGroup(title = stringResource(R.string.display_settings_accent)) {
         DisplayChoiceRow(
             label = stringResource(R.string.display_settings_accent_system),
             selected = settings.accentSource == DisplayAccentSource.System,
-            enabled = enabled,
+            interactionEnabled = interactionEnabled,
             onClick = onSystem,
         )
         AccentPreset.entries.forEach { preset ->
-            HorizontalDivider(color = hoshiSurfaces.divider)
+            GroupDivider()
             DisplayChoiceRow(
                 label = stringResource(preset.labelRes),
                 selected = settings.accentSource == DisplayAccentSource.Custom && matchingPreset == preset,
-                enabled = enabled,
-                previewColor = preset.color.takeIf { enabled },
+                interactionEnabled = interactionEnabled,
+                previewColor = preset.color,
                 onClick = { onPreset(preset.color) },
             )
         }
-        HorizontalDivider(color = hoshiSurfaces.divider)
+        GroupDivider()
         DisplayChoiceRow(
             label = stringResource(R.string.reader_appearance_theme_custom),
             selected = settings.accentSource == DisplayAccentSource.Custom && matchingPreset == null,
-            enabled = enabled,
-            previewColor = settings.accentSeed.takeIf { enabled },
+            interactionEnabled = interactionEnabled,
+            previewColor = settings.accentSeed,
             onClick = onCustom,
         )
-        if (enabled) {
-            HorizontalDivider(color = hoshiSurfaces.divider)
-            AccentControlPreview(
-                seed = settings.accentSeed.takeIf { settings.accentSource == DisplayAccentSource.Custom },
-                dark = resolvedDark,
-            )
-        }
+        GroupDivider()
+        AccentControlPreview(
+            seed = settings.accentSeed.takeIf { settings.accentSource == DisplayAccentSource.Custom },
+            dark = resolvedDark,
+        )
     }
 }
 
@@ -352,7 +369,6 @@ private fun AccentControlPreviewContent() {
 @Composable
 private fun DisplaySettingsGroup(
     title: String? = null,
-    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -360,7 +376,7 @@ private fun DisplaySettingsGroup(
             Text(
                 text = it,
                 style = MaterialTheme.typography.titleSmall,
-                color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted,
+                color = hoshiSurfaces.content,
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
@@ -381,19 +397,22 @@ private fun DisplaySettingsGroup(
 private fun DisplaySwitchRow(
     label: String,
     checked: Boolean,
-    enabled: Boolean,
+    interactionEnabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .clickable(enabled = interactionEnabled) { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(label, modifier = Modifier.weight(1f), color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted)
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        Text(label, modifier = Modifier.weight(1f), color = hoshiSurfaces.content)
+        Switch(
+            checked = checked,
+            onCheckedChange = { if (interactionEnabled) onCheckedChange(it) },
+        )
     }
 }
 
@@ -401,7 +420,7 @@ private fun DisplaySwitchRow(
 private fun DisplayChoiceRow(
     label: String,
     selected: Boolean,
-    enabled: Boolean,
+    interactionEnabled: Boolean,
     onClick: () -> Unit,
     previewColor: Long? = null,
     previewColors: Triple<Long, Long, Long>? = null,
@@ -409,7 +428,7 @@ private fun DisplayChoiceRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = interactionEnabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -421,9 +440,9 @@ private fun DisplayChoiceRow(
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted,
+            color = hoshiSurfaces.content,
         )
-        RadioButton(selected = selected, onClick = null, enabled = enabled)
+        RadioButton(selected = selected, onClick = null)
     }
 }
 
@@ -454,9 +473,7 @@ private fun ColorSwatch(color: Long) {
 @Composable
 private fun PaletteEditorDialog(
     draft: DisplayPaletteDraft,
-    importedPalettes: List<NamedDisplayPalette>,
     isSaving: Boolean,
-    onUseImported: (DisplayPaletteSelection) -> Unit,
     onUpdate: (Long?, Long?, Long?) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
@@ -489,31 +506,6 @@ private fun PaletteEditorDialog(
                     onClick = { if (!isSaving) editing = PaletteColorField.Info },
                     horizontalPadding = 0.dp,
                 )
-                if (importedPalettes.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.display_settings_imported_palettes),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    importedPalettes.forEach { named ->
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !isSaving) { onUseImported(named.palette) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = hoshiSurfaces.nested,
-                            border = hoshiContainerBorder(),
-                            tonalElevation = 0.dp,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(named.name, modifier = Modifier.weight(1f))
-                                PaletteSwatch(palettePreviewColors(DisplayPalettePreset.Custom, named.palette))
-                            }
-                        }
-                    }
-                }
             }
         },
         confirmButton = {

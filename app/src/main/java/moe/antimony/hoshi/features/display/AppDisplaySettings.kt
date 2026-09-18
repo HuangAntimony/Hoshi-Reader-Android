@@ -32,13 +32,6 @@ data class DisplayPaletteSelection(
 )
 
 @Serializable
-data class NamedDisplayPalette(
-    val id: String,
-    val name: String,
-    val palette: DisplayPaletteSelection,
-)
-
-@Serializable
 data class AppDisplaySettings(
     val autoSwitch: Boolean = true,
     val singlePalette: DisplayPaletteSelection = DisplayPaletteSelection(),
@@ -54,8 +47,8 @@ data class AppDisplaySettings(
     val accentSource: DisplayAccentSource = DisplayAccentSource.System,
     val accentSeed: Long = DefaultAccentSeed,
     val eInkMode: Boolean = false,
+    val eInkDarkTheme: Boolean? = null,
     val migrationVersion: Int = 0,
-    val importedPalettes: List<NamedDisplayPalette> = emptyList(),
 ) {
     companion object {
         const val DefaultAccentSeed: Long = 0xFF6650A4L
@@ -84,14 +77,15 @@ fun resolveDisplaySettings(
     val colors = selection.resolvedColors()
     val isDark = resolvePaletteIsDark(selection)
     if (settings.eInkMode) {
-        val text = if (isDark) OpaqueWhite else OpaqueBlack
+        val eInkDark = if (settings.autoSwitch) systemDark else settings.eInkDarkTheme ?: isDark
+        val text = if (eInkDark) OpaqueWhite else OpaqueBlack
         return ResolvedDisplaySettings(
             palette = selection.preset,
             selection = selection,
-            backgroundColor = if (isDark) OpaqueBlack else OpaqueWhite,
+            backgroundColor = if (eInkDark) OpaqueBlack else OpaqueWhite,
             textColor = text,
             infoColor = text,
-            isDark = isDark,
+            isDark = eInkDark,
             eInkMode = true,
         )
     }
@@ -112,6 +106,7 @@ fun AppDisplaySettings.withAutoSwitch(enabled: Boolean, systemDark: Boolean): Ap
         return copy(
             autoSwitch = false,
             singlePalette = if (systemDark) darkPalette else lightPalette,
+            eInkDarkTheme = if (eInkMode) systemDark else eInkDarkTheme,
         )
     }
     if (automaticInitialized) return copy(autoSwitch = true)
@@ -164,9 +159,6 @@ internal fun AppDisplaySettings.normalized(): AppDisplaySettings = copy(
     lightPalette = lightPalette.normalized(),
     darkPalette = darkPalette.normalized(),
     accentSeed = accentSeed.opaqueColor(),
-    importedPalettes = importedPalettes
-        .map { named -> named.copy(palette = named.palette.normalized().copy(preset = DisplayPalettePreset.Custom)) }
-        .distinctBy { named -> named.palette.customColorKey() },
 )
 
 private data class DisplayColors(
@@ -191,12 +183,6 @@ private fun DisplayPaletteSelection.normalized(): DisplayPaletteSelection = copy
     customBackgroundColor = customBackgroundColor.argbColor(),
     customTextColor = customTextColor.argbColor(),
     customInfoColor = customInfoColor.argbColor(),
-)
-
-internal fun DisplayPaletteSelection.customColorKey(): Triple<Long, Long, Long> = Triple(
-    customBackgroundColor.argbColor(),
-    customTextColor.argbColor(),
-    customInfoColor.argbColor(),
 )
 
 private fun Long.argbColor(): Long = this and 0xFFFFFFFFL

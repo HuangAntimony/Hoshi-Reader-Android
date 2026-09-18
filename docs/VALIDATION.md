@@ -98,6 +98,14 @@ panels, dialogs, menus, and Process Text lookup:
   brightness side; disabling keeps the currently displayed palette. Re-enabling
   restores both saved slots. Each slot retains its custom colors after preset
   changes. Canceling any editor keeps the previous settings, including alpha.
+  Change palettes/accents while scrolled to the bottom, including delayed and
+  failed saves: swatches, preview, text brightness, row positions and scroll offset
+  must remain stable while saving; only confirmed settings change the theme.
+  `DisplaySettingsViewTest` covers layout preservation during a suspended save
+  using in-memory settings, without writing the installed app's preferences.
+- Compare Display & Theme with other grouped settings, including its Reader
+  panel: palette, accent and E-ink rows use the same 16dp inset dividers; E-ink
+  keeps the enclosing group outline continuous.
 - System dynamic colors on Android 12+, the fixed fallback on older Android,
   all eight accent seeds and extreme custom seeds. Reader background/text retain
   their own colors while controls and native containers use the accent scheme.
@@ -109,13 +117,21 @@ panels, dialogs, menus, and Process Text lookup:
   verify actual outlines on groups, nested controls, filled buttons, segmented
   tracks/selections, popups, panels and navigation boundaries. Lazy groups need a
   continuous closed outline with one row, multiple rows and during scrolling.
-  Palette/accent editing is disabled with an explanation; automatic switching
-  stays available and disabling E-ink restores all saved colors.
+  E-ink optimization sits directly below automatic switching. Enabling it hides
+  palette/accent choices and shows an explanation; automatic switching stays available. With
+  automatic switching off, only the light/dark choice appears below the switches.
+  Its selection survives restart without changing any stored palette or accent.
+  With automatic switching on, E-ink follows the system even if a custom palette
+  has the opposite brightness. Disabling automatic switching keeps the displayed
+  brightness; disabling E-ink restores the normal palette/accent choices and colors.
 - Upgrade every legacy theme, including Sepia inversion and alpha custom colors.
   Start with a global profile and a different last-book profile, with automatic
   book opening enabled: migration must use the global profile before opening the
   book. Reopen, change language/profile, and create/copy profiles; colors and E-ink
-  must stay global. Distinct old custom colors remain importable.
+  must stay global. The custom editor has no legacy-palette import list. Upgrading
+  existing global settings clears obsolete imported palettes without resetting
+  the three saved slots, accent, switching mode, or E-ink setting. Failed storage
+  upgrades must leave the previous data intact and retry successfully.
 - Test narrow Chinese layouts and enlarged fonts, empty/loading/error/disabled
   states, cold launch, restart, foreground/background, and opening both Reader
   settings panels. Reading Settings identifies the effective profile. Changing

@@ -24,7 +24,7 @@ class ReaderDisplaySettingsMigrationSourceTest {
     val tempFolder = TemporaryFolder()
 
     @Test
-    fun migrationReadsGlobalActiveProfileInsteadOfLoadedBookProfile() = runBlocking {
+    fun migrationReadsOnlyGlobalActiveProfileEvenWhenLoadedBookProfileIsInvalid() = runBlocking {
         val filesDir = tempFolder.newFolder("global-profile-files")
         val profiles = ProfileRepository(filesDir)
         profiles.readerSettingsFile().writeProfileSettings(
@@ -48,6 +48,7 @@ class ReaderDisplaySettingsMigrationSourceTest {
                 profileId = profiles.state.value.defaultProfileId,
             ),
         )
+        profiles.readerSettingsFile(profiles.state.value.defaultProfileId).writeText("not valid JSON")
         dataStore("global-profile").use { handle ->
             val payload = ReaderDisplaySettingsMigrationSource(
                 dataStore = handle.dataStore,
@@ -57,7 +58,6 @@ class ReaderDisplaySettingsMigrationSourceTest {
 
             assertEquals(LegacyDisplayTheme.Dark, payload.activeSettings?.theme)
             assertEquals(0xFF222222L, payload.activeSettings?.customBackgroundColor)
-            assertEquals(listOf("Japanese", "English"), payload.importedPalettes.map { it.name })
         }
     }
 

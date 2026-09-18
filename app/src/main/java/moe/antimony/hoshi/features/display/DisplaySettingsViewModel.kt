@@ -83,6 +83,10 @@ internal class DisplaySettingsViewModel internal constructor(
         updateSettings { it.copy(eInkMode = enabled) }
     }
 
+    fun setEInkDarkTheme(dark: Boolean) = save {
+        updateSettings { it.copy(eInkDarkTheme = dark) }
+    }
+
     fun selectPalettePreset(slot: DisplayPaletteSlot, preset: DisplayPalettePreset) {
         if (preset == DisplayPalettePreset.Custom) {
             openPaletteEditor(slot)
@@ -103,20 +107,6 @@ internal class DisplaySettingsViewModel internal constructor(
                 ),
                 error = null,
             )
-        }
-    }
-
-    fun useImportedPalette(palette: DisplayPaletteSelection) {
-        _uiState.update { state ->
-            state.paletteDraft?.let { draft ->
-                state.copy(
-                    paletteDraft = draft.copy(
-                        backgroundColor = palette.customBackgroundColor,
-                        textColor = palette.customTextColor,
-                        infoColor = palette.customInfoColor,
-                    ),
-                )
-            } ?: state
         }
     }
 

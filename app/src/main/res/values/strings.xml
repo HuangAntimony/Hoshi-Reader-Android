@@ -815,7 +815,6 @@
     <string name="display_settings_dark_palette">Dark Palette</string>
     <string name="display_settings_palette_dark_sepia">Dark Sepia</string>
     <string name="display_settings_custom_palette">Custom Palette</string>
-    <string name="display_settings_imported_palettes">Imported Palettes</string>
     <string name="display_settings_palette_preview_title">Reading preview</string>
     <string name="display_settings_palette_preview_info">Secondary information</string>
     <string name="display_settings_accent">Accent Color</string>
@@ -834,6 +833,7 @@
     <string name="display_settings_accent_preview">Control preview</string>
     <string name="display_settings_accent_preview_action">Button</string>
     <string name="display_settings_eink_mode">E-ink Optimization</string>
+    <string name="display_settings_eink_appearance">E-ink Appearance</string>
     <string name="display_settings_eink_explanation">E-ink optimization uses a black-and-white palette. Turning it off restores your saved palette and accent color.</string>
     <string name="reader_settings_profile_title">Reading Settings · %1$s</string>
 </resources>

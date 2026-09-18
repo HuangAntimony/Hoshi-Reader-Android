@@ -14,6 +14,28 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class DisplaySettingsViewModelTest {
     @Test
+    fun eInkBrightnessChangesLeaveReadingPalettesAndAccentIntact() = runTest {
+        val original = AppDisplaySettings(
+            autoSwitch = false,
+            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
+            accentSource = DisplayAccentSource.Custom,
+            accentSeed = 0xFF00796B,
+        )
+        val stored = MutableStateFlow(original)
+        val model = viewModel(stored)
+        runCurrent()
+        model.setEInkMode(true)
+        runCurrent()
+        model.setEInkDarkTheme(true)
+        runCurrent()
+        assertEquals(true, resolveDisplaySettings(model.uiState.value.settings!!, false).isDark)
+        model.setEInkMode(false)
+        runCurrent()
+        assertEquals(original.copy(eInkDarkTheme = true), stored.value)
+        assertEquals(resolveDisplaySettings(original, false), resolveDisplaySettings(stored.value, false))
+    }
+
+    @Test
     fun customPaletteDraftDoesNotChangeConfirmedSettingsUntilSave() = runTest {
         val stored = MutableStateFlow(AppDisplaySettings())
         val model = viewModel(stored)

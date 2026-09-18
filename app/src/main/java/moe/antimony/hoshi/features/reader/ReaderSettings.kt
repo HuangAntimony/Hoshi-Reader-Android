@@ -35,7 +35,6 @@ import moe.antimony.hoshi.features.display.DisplayPalettePreset
 import moe.antimony.hoshi.features.display.DisplayPaletteSelection
 import moe.antimony.hoshi.features.display.LegacyDisplaySettingsSnapshot
 import moe.antimony.hoshi.features.display.LegacyDisplayTheme
-import moe.antimony.hoshi.features.display.NamedDisplayPalette
 import moe.antimony.hoshi.features.display.resolveDisplaySettings
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.profiles.ProfileRepository
@@ -384,7 +383,9 @@ fun ReaderSettings.resolvedForDisplay(systemDark: Boolean): ReaderSettings {
     val resolved = resolveDisplaySettings(global, systemDark)
     val baseColors = resolveDisplaySettings(global.copy(eInkMode = false), systemDark)
     val selection = resolved.selection
-    val projectedTheme = when (selection.preset) {
+    val projectedTheme = if (resolved.eInkMode) {
+        if (resolved.isDark) ReaderTheme.Dark else ReaderTheme.Light
+    } else when (selection.preset) {
         DisplayPalettePreset.Light -> ReaderTheme.Light
         DisplayPalettePreset.Sepia -> ReaderTheme.Sepia
         DisplayPalettePreset.Dark -> ReaderTheme.Dark
@@ -1009,29 +1010,7 @@ internal class ReaderDisplaySettingsMigrationSource(
             preferences.toLegacyDisplaySnapshotOrNull()
                 ?: legacySource?.load()?.toLegacyDisplaySnapshot()
         }
-        val imported = buildList {
-            state.profiles.forEach { profile ->
-                val file = profileRepository.readerSettingsFile(profile.id)
-                val snapshot = when {
-                    file.isFile -> migrationJson
-                        .decodeFromString<ProfileReaderAppearanceSettings>(file.readText())
-                        .toLegacyDisplaySnapshot()
-                    profile.id == globalProfile.id -> active
-                    else -> null
-                } ?: return@forEach
-                add(
-                    NamedDisplayPalette(
-                        id = "legacy-${profile.id}",
-                        name = profile.name,
-                        palette = snapshot.toCustomPalette(),
-                    ),
-                )
-            }
-        }
-        AppDisplayMigrationPayload(
-            activeSettings = active,
-            importedPalettes = imported,
-        )
+        AppDisplayMigrationPayload(activeSettings = active)
     }
 
     private fun Preferences.toLegacyDisplaySnapshotOrNull(): LegacyDisplaySettingsSnapshot? {
@@ -1107,14 +1086,6 @@ private fun ReaderTheme.toLegacyDisplayTheme(): LegacyDisplayTheme = when (this)
 
 private fun String?.toLegacyDisplayTheme(): LegacyDisplayTheme =
     LegacyDisplayTheme.entries.firstOrNull { it.name == this } ?: LegacyDisplayTheme.System
-
-private fun LegacyDisplaySettingsSnapshot.toCustomPalette(): DisplayPaletteSelection =
-    DisplayPaletteSelection(
-        preset = DisplayPalettePreset.Custom,
-        customBackgroundColor = customBackgroundColor,
-        customTextColor = customTextColor,
-        customInfoColor = customInfoColor,
-    )
 
 @Serializable
 private data class ProfileReaderAppearanceSettings(

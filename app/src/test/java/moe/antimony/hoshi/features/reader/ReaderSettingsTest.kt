@@ -12,6 +12,26 @@ import java.io.File
 
 class ReaderSettingsTest {
     @Test
+    fun projectedReaderUsesIndependentEInkBrightness() {
+        for (dark in listOf(false, true)) {
+            val settings = ReaderSettings(
+                displaySettings = AppDisplaySettings(
+                    autoSwitch = false,
+                    singlePalette = DisplayPaletteSelection(
+                        if (dark) DisplayPalettePreset.Light else DisplayPalettePreset.Dark,
+                    ),
+                    eInkMode = true,
+                    eInkDarkTheme = dark,
+                ),
+            )
+            val projected = settings.resolvedForDisplay(systemDark = !dark)
+            assertEquals(dark, projected.usesDarkInterface(!dark))
+            assertEquals(settings.backgroundColor(!dark), projected.backgroundColor(!dark))
+            assertEquals(settings.textColorCss(!dark), projected.textColorCss(!dark))
+        }
+    }
+
+    @Test
     fun globalDisplaySettingsDriveExistingReaderColorAndThemeHelpers() {
         val settings = ReaderSettings(
             theme = ReaderTheme.Light,
@@ -37,7 +57,7 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun resolvedForDisplayProjectsGlobalSelectionIntoLegacyReaderShape() {
+    fun resolvedForDisplayProjectsEInkBrightnessAndRetainsUnderlyingCustomColors() {
         val global = AppDisplaySettings(
             autoSwitch = true,
             eInkMode = true,
@@ -51,7 +71,7 @@ class ReaderSettingsTest {
 
         val projected = ReaderSettings(displaySettings = global).resolvedForDisplay(systemDark = true)
 
-        assertEquals(ReaderTheme.Custom, projected.theme)
+        assertEquals(ReaderTheme.Dark, projected.theme)
         assertEquals(ReaderInterfaceTheme.Dark, projected.uiTheme)
         assertEquals(0xFF101820L, projected.customBackgroundColor)
         assertEquals(0xFFE0E8F0L, projected.customTextColor)

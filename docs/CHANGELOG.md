@@ -12,8 +12,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   brightness with independent light/dark reading palettes, or keep one fixed
   palette; customize background, text and secondary text colors with previews.
   Choose system, preset or custom interface accents, and apply E-ink optimization
-  across the app. Existing display settings migrate from the active profile, and
-  saved colors from other profiles remain available to import.
+  across the app. Existing display settings migrate from the active profile.
+  E-ink optimization sits below automatic switching and hides palette/accent
+  choices while enabled; follow system brightness or choose light/dark
+  independently of saved colors.
+  Color changes preserve the visible controls and scroll position while saving.
 - Preserve deleted books' reading statistics in an archive, restore them on
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires
@@ -70,6 +73,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   uses visible outlines and selection shapes, including continuous lazy lists.
   Bottom and side navigation use a subtle theme tint, and Dictionary search
   shares the page background through the status bar for a continuous top area.
+  Display & Theme uses the same inset row dividers as other settings pages.
 - Keep Statistics always available and move its settings to the Stats tab's
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and

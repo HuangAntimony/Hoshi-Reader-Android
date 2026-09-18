@@ -83,6 +83,48 @@ class AppDisplaySettingsTest {
     }
 
     @Test
+    fun manualEInkBrightnessIsIndependentOfSavedPaletteAndRestoresItOnExit() {
+        val original = AppDisplaySettings(
+            autoSwitch = false,
+            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
+            accentSource = DisplayAccentSource.Custom,
+            accentSeed = 0xFF00796B,
+        )
+        val eInk = original.copy(eInkMode = true, eInkDarkTheme = true)
+        for (systemDark in listOf(false, true)) {
+            val resolved = resolveDisplaySettings(eInk, systemDark)
+            assertTrue(resolved.isDark)
+            assertEquals(0xFF000000L, resolved.backgroundColor)
+            assertEquals(0xFFFFFFFFL, resolved.textColor)
+            assertEquals(original.singlePalette, eInk.singlePalette)
+            assertEquals(
+                resolveDisplaySettings(original, systemDark),
+                resolveDisplaySettings(eInk.copy(eInkMode = false), systemDark),
+            )
+        }
+    }
+
+    @Test
+    fun automaticEInkFollowsSystemEvenWithOppositeCustomPaletteBrightness() {
+        val settings = AppDisplaySettings(
+            eInkMode = true,
+            eInkDarkTheme = true,
+            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF000000),
+            darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFFFFFFFF),
+        )
+        for (systemDark in listOf(false, true)) {
+            assertEquals(systemDark, resolveDisplaySettings(settings, systemDark).isDark)
+            val manual = settings.withAutoSwitch(false, systemDark)
+            assertEquals(systemDark, resolveDisplaySettings(manual, !systemDark).isDark)
+            assertEquals(systemDark, manual.eInkDarkTheme)
+            val automatic = manual.withAutoSwitch(true, !systemDark)
+            assertEquals(!systemDark, resolveDisplaySettings(automatic, !systemDark).isDark)
+            assertEquals(settings.lightPalette, automatic.lightPalette)
+            assertEquals(settings.darkPalette, automatic.darkPalette)
+        }
+    }
+
+    @Test
     fun firstAutomaticEnableSeedsMatchingSideAndLaterTogglesRestoreBothSides() {
         val custom = DisplayPaletteSelection(
             preset = DisplayPalettePreset.Custom,

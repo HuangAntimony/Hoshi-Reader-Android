@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.display
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.Closeable
 import kotlinx.coroutines.CoroutineScope
@@ -8,6 +12,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,6 +53,7 @@ class AppDisplaySettingsRepositoryTest {
                 it.copy(
                     accentSource = DisplayAccentSource.Custom,
                     accentSeed = 0x12654321L,
+                    eInkDarkTheme = true,
                     singlePalette = it.singlePalette.copy(customBackgroundColor = 0x44112233L),
                 )
             }
@@ -52,6 +61,7 @@ class AppDisplaySettingsRepositoryTest {
             val restored = AppDisplaySettingsRepository(dataStore).settings.first()
             assertEquals(0xFF654321L, restored.accentSeed)
             assertEquals(0x44112233L, restored.singlePalette.customBackgroundColor)
+            assertEquals(true, restored.eInkDarkTheme)
         } finally {
             scope.cancel()
         }
@@ -119,33 +129,60 @@ class AppDisplaySettingsRepositoryTest {
     }
 
     @Test
-    fun migrationDeduplicatesImportedCustomPalettesByColors() = runBlocking {
-        val palette = DisplayPaletteSelection(
-            preset = DisplayPalettePreset.Custom,
-            customBackgroundColor = 0xFF010203L,
-            customTextColor = 0xFF040506L,
-            customInfoColor = 0xFF070809L,
+    fun upgradeRemovesImportedPalettesWithoutResettingSavedDisplaySettingsAndRetriesFailures() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.IO + Job())
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = scope,
+            produceFile = { tempFolder.newFile("display-upgrade.preferences_pb") },
         )
-        repository(
-            migrationSource = StaticMigrationSource(
-                AppDisplayMigrationPayload(
-                    importedPalettes = listOf(
-                        NamedDisplayPalette(id = "a", name = "Japanese", palette = palette),
-                        NamedDisplayPalette(id = "b", name = "English", palette = palette),
-                        NamedDisplayPalette(
-                            id = "c",
-                            name = "Korean",
-                            palette = palette.copy(customTextColor = 0xFF111111L),
-                        ),
-                    ),
-                ),
-            ),
-        ).use { repository ->
-            val imported = repository.settings.first().importedPalettes
+        val key = stringPreferencesKey("settings")
+        val json = Json { encodeDefaults = true }
+        val saved = AppDisplaySettings(
+            autoSwitch = false,
+            singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0x44112233L, 0x88445566L, 0xCC778899L),
+            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia, 0xFFABCDEF, 0xFF123456, 0xFF654321),
+            darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF112233, 0xFFEEEEEE, 0xFFAAAAAA),
+            automaticInitialized = true,
+            accentSource = DisplayAccentSource.Custom,
+            accentSeed = 0xFF00796B,
+            eInkMode = true,
+            migrationVersion = 1,
+        )
+        val oldJson = JsonObject(
+            json.parseToJsonElement(json.encodeToString(saved)).jsonObject +
+                ("importedPalettes" to json.parseToJsonElement(
+                    """[{"id":"legacy-profile","name":"Japanese","palette":{"preset":"Custom","customBackgroundColor":4278256131}}]""",
+                )),
+        ).toString()
+        try {
+            dataStore.edit { it[key] = oldJson }
+            var rejectNextWrite = true
+            val failingStore = object : DataStore<Preferences> by dataStore {
+                override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                    if (rejectNextWrite) {
+                        rejectNextWrite = false
+                        throw java.io.IOException("storage unavailable")
+                    }
+                    return dataStore.updateData(transform)
+                }
+            }
+            val repository = AppDisplaySettingsRepository(failingStore, object : AppDisplaySettingsMigrationSource {
+                override suspend fun loadMigrationPayload(): AppDisplayMigrationPayload =
+                    error("Existing global display settings must not be read again from profiles")
+            })
 
-            assertEquals(2, imported.size)
-            assertEquals("Japanese", imported[0].name)
-            assertEquals("Korean", imported[1].name)
+            assertTrue(runCatching { repository.settings.first() }.isFailure)
+            assertEquals(oldJson, dataStore.data.first()[key])
+
+            val upgraded = repository.settings.first()
+            assertEquals(saved.copy(migrationVersion = AppDisplaySettingsRepository.CurrentMigrationVersion), upgraded)
+            val persisted = requireNotNull(dataStore.data.first()[key])
+            assertFalse(json.parseToJsonElement(persisted).jsonObject.containsKey("importedPalettes"))
+            repository.ensureMigrated()
+            assertEquals(persisted, dataStore.data.first()[key])
+            assertEquals(upgraded, AppDisplaySettingsRepository(dataStore).settings.first())
+        } finally {
+            scope.cancel()
         }
     }
 

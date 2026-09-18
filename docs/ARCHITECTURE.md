@@ -159,15 +159,24 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Reader Behavior and statistics sync settings remain global DataStore settings.
 - `AppDisplaySettingsRepository` owns global Display & Theme settings in a separate
   DataStore: system-driven switching, independent single/light/dark reading palettes
-  and remembered custom colors, accent source/seed, E-ink mode, and migration version.
+  and remembered custom colors, accent source/seed, E-ink mode and its independent
+  manual brightness, and migration version.
   `resolveDisplaySettings(settings, systemDark)` is the pure source for active
   reading colors and native interface brightness. Custom colors preserve alpha;
-  native brightness follows the background's linear sRGB luminance.
+  native brightness follows the background's linear sRGB luminance. E-ink follows
+  system brightness when automatic switching is enabled; otherwise its remembered
+  manual brightness takes precedence, defaulting to the palette's brightness until
+  chosen. This override never changes stored palette or accent colors. Disabling
+  automatic switching in E-ink keeps the currently displayed brightness.
+  Display settings block repeated interactions while saving without removing
+  previews, dimming the page, or changing list geometry; colors come from confirmed
+  settings. The full settings page and Reader panel share this content.
 - Initial display migration reads the global active profile before Reader profile
-  initialization or book-specific profile activation. Distinct legacy custom colors
-  are retained as named imports; legacy JSON color fields remain readable and are
-  preserved on writes, but no longer control runtime display. Book sidecars, sync,
-  and backup formats are unchanged.
+  initialization or book-specific profile activation. Other profiles are not read
+  for display migration. Upgrading existing global display storage preserves its
+  settings and removes obsolete imported-palette records. Legacy JSON color fields
+  remain readable and are preserved on writes, but no longer control runtime
+  display. Book sidecars, sync, and backup formats are unchanged.
 - `ReaderSettingsRepository` combines global display state with profile reading
   preferences. Both MainActivity and Process Text use `ReaderSettingsHostViewModel`
   and wait for its first confirmed value before rendering content. ViewModels expose

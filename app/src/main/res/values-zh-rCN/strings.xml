@@ -813,7 +813,6 @@
     <string name="display_settings_dark_palette">深色配色</string>
     <string name="display_settings_palette_dark_sepia">深色棕褐</string>
     <string name="display_settings_custom_palette">自定义配色</string>
-    <string name="display_settings_imported_palettes">已导入的配色</string>
     <string name="display_settings_palette_preview_title">阅读预览</string>
     <string name="display_settings_palette_preview_info">次要信息</string>
     <string name="display_settings_accent">强调色</string>
@@ -832,6 +831,7 @@
     <string name="display_settings_accent_preview">控件预览</string>
     <string name="display_settings_accent_preview_action">按钮</string>
     <string name="display_settings_eink_mode">墨水屏优化</string>
+    <string name="display_settings_eink_appearance">墨水屏明暗</string>
     <string name="display_settings_eink_explanation">墨水屏优化期间使用黑白配色。关闭后恢复已保存的配色和强调色。</string>
     <string name="reader_settings_profile_title">阅读设置 · %1$s</string>
 </resources>
