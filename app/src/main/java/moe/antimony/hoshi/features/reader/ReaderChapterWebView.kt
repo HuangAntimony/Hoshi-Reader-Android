@@ -298,6 +298,7 @@ internal fun ChapterWebView(
                 backgroundColor = readerSettings.backgroundColor(systemDark).toInt()
             }
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
+                webView.pageTurnAnimation.cancel()
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
                     ReaderSelectionCommand.SelectText(
@@ -1342,7 +1343,7 @@ private class ReaderImageTapBridge(
 private fun WebView.hideForReaderRestore() {
     animate().cancel()
     readerRestoreGenerations[this] = (readerRestoreGenerations[this] ?: 0L) + 1L
-    alpha = if ((this as? HoshiReaderWebView)?.pageTurnAnimation?.isWaiting == true) 1f else 0f
+    alpha = if ((this as? HoshiReaderWebView)?.pageTurnAnimation?.holdForRestore() == true) 1f else 0f
 }
 
 private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompletionAction) {

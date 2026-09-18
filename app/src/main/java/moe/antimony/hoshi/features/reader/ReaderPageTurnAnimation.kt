@@ -35,9 +35,15 @@ internal class ReaderPageTurnAnimation(
     private var fraction = 0f
     private var sign = 1
     private var generation = 0L
+    private var restoringChapter = false
     private val timeout = Runnable { cancel() }
 
     val isWaiting: Boolean get() = snapshot != null && animator == null
+
+    fun holdForRestore(): Boolean {
+        restoringChapter = isWaiting
+        return restoringChapter
+    }
 
     fun begin(direction: ReaderNavigationDirection): Long {
         if (!enabled || !ValueAnimator.areAnimatorsEnabled() || view.alpha < 1f ||
@@ -78,6 +84,7 @@ internal class ReaderPageTurnAnimation(
 
     fun ready(ticket: Long = generation) {
         if (ticket != generation || !isWaiting) return
+        restoringChapter = false
         view.removeCallbacks(timeout)
         if (!ValueAnimator.areAnimatorsEnabled()) {
             cancel()
@@ -101,6 +108,8 @@ internal class ReaderPageTurnAnimation(
 
     fun cancel(ticket: Long = generation) {
         if (ticket != generation) return
+        if (restoringChapter) view.alpha = 0f
+        restoringChapter = false
         generation += 1
         animator?.removeAllListeners()
         animator?.cancel()
