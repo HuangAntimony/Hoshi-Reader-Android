@@ -166,7 +166,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reading Settings (font, layout, reading information, and lookup panel options)
   are stored per active/effective profile in `Profiles/<profileId>/reader_settings.json`.
   Reader Behavior and statistics sync settings remain global DataStore settings.
-- `AppDisplaySettingsRepository` owns global Display & Theme settings in a separate
+- `AppDisplaySettingsRepository` owns global Theme settings in a separate
   DataStore: system-driven switching, independent light/dark reading palettes
   with remembered custom colors, the manually selected slot, accent source/seed,
   E-ink mode and its independent manual brightness, and migration version.

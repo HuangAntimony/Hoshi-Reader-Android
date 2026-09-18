@@ -106,7 +106,7 @@
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">Dictionaries</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profiles</string>
-    <string name="settings_display">Display &amp; Theme</string>
+    <string name="settings_display">Theme</string>
     <string name="settings_appearance">Reading Settings</string>
     <string name="settings_behavior">Behavior</string>
     <string name="settings_advanced">Advanced</string>

@@ -86,7 +86,7 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
-### Display & Theme
+### Theme
 
 Preserve app data and cover all four tabs, every settings category, native Reader
 panels, dialogs, menus, and Process Text lookup:
@@ -111,7 +111,7 @@ panels, dialogs, menus, and Process Text lookup:
   `DisplaySettingsViewTest` covers the one-versus-two palette selections and
   layout preservation during a suspended save using in-memory settings, without
   writing the installed app's preferences.
-- Compare Display & Theme with other grouped settings, including its Reader
+- Compare Theme with other grouped settings, including its Reader
   panel: palette, accent and E-ink rows use the same 16dp inset dividers; E-ink
   keeps the enclosing group outline continuous.
 - Reading Settings selected segments form rounded capsules with a visible neutral

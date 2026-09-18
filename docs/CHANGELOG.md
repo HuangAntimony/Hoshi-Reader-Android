@@ -8,7 +8,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Add global Display & Theme settings in Settings and Reader. Follow system
+- Add global Theme settings in Settings and Reader. Follow system
   brightness with one palette selected in each light/dark group, or choose one
   of the same six options manually. Custom Light and Custom Dark retain separate
   reading colors and explicitly select light/dark interfaces and dictionary
@@ -77,7 +77,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   shares the page background through the status bar for a continuous top area.
   Native backgrounds use a softer, more neutral tint and lighter separators,
   while buttons and active states retain the selected accent color.
-  Display & Theme uses the same inset row dividers as other settings pages.
+  Theme uses the same inset row dividers as other settings pages.
   Reading Settings uses inset rounded selections inside continuous neutral
   segment tracks, keeping the current choice clear without vertical separators.
 - Keep Statistics always available and move its settings to the Stats tab's
