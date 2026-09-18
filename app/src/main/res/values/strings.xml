@@ -798,7 +798,8 @@
     <string name="statistics_chart_hours_format">%1$sh</string>
     <string name="statistics_show_more_books">Show More</string>
     <string name="statistics_heatmap_month_year_pattern">yyyy/M</string>
-    <string name="statistics_period_average_format">%1$s Average</string>
+    <string name="statistics_period_daily_average_format">%1$s Daily Average</string>
+    <string name="statistics_period_monthly_average_format">%1$s Monthly Average</string>
     <string name="statistics_range_all_time" comment="Dashboard period caption, independent of the Reader statistics summary.">All Time</string>
     <string name="statistics_heatmap_less">Less</string>
     <string name="statistics_heatmap_more" comment="Upper endpoint of the reading intensity scale, distinct from the More action.">More</string>

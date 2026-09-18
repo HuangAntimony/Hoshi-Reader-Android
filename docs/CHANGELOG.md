@@ -69,7 +69,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   bars with calendar-aligned dashed grid lines, summary rows labeled Characters
   Read and Reading Speed, and time-ranked books with per-book character counts
   and reading times together instead of three tabs,
-  with consistent section headings, grouped cards and compact charts and rows. Show complete period comparisons with
+  with consistent section headings, grouped cards and compact charts and rows.
+  Identify daily averages in Week/Month and monthly averages in Year/All.
+  Show complete period comparisons with
   direction arrows and rounded percentages; keep Show More left-aligned with
   a divider above it. In E-ink mode, chart bars are hollow until selected,
   making the filled selection distinct; period and goal-type selectors use

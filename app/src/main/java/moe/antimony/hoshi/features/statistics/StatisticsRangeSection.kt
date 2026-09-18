@@ -63,7 +63,10 @@ internal fun StatisticsReadingTimeSection(
         ) {
             Text(
                 text = selectedBucket?.let { statisticsBucketTitle(currentRange.mode, it) } ?: stringResource(
-                    R.string.statistics_period_average_format,
+                    when (currentRange.mode) {
+                        StatisticsRangeMode.Week, StatisticsRangeMode.Month -> R.string.statistics_period_daily_average_format
+                        StatisticsRangeMode.Year, StatisticsRangeMode.All -> R.string.statistics_period_monthly_average_format
+                    },
                     statisticsCompactRangeTitle(currentRange, today),
                 ),
                 modifier = Modifier.weight(1f),

@@ -796,7 +796,8 @@
     <string name="statistics_chart_hours_format">%1$s小时</string>
     <string name="statistics_show_more_books">显示更多</string>
     <string name="statistics_heatmap_month_year_pattern">yyyy/M</string>
-    <string name="statistics_period_average_format">%1$s 平均</string>
+    <string name="statistics_period_daily_average_format">%1$s 日均</string>
+    <string name="statistics_period_monthly_average_format">%1$s 月均</string>
     <string name="statistics_range_all_time">全部时期</string>
     <string name="statistics_heatmap_less">少</string>
     <string name="statistics_heatmap_more">多</string>

@@ -322,6 +322,9 @@ Preserve existing app data when validating statistics:
   direction arrow, and Characters Read / Reading Speed rows in English, Chinese,
   narrow layouts and enlarged fonts. Long comparisons may move below the value,
   but must not truncate. E-ink retains hollow unselected and filled selected bars.
+  The unselected headline explicitly labels Week/Month as Daily Average and
+  Year/All as Monthly Average in both languages. Selecting a bar shows that
+  day's or month's total without an average label; clearing restores the label.
 - The heatmap shows all history and initially scrolls to the latest dates.
   Reading intensity grows with character counts across all history; today
   has a subtle outline and the Less/More legend matches. Taps have no action. Changing chart mode,
