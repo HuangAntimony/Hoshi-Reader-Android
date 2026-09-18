@@ -900,6 +900,12 @@ class ReaderWebViewStateHolderTest {
 
         holder.dismissAppearance()
         holder.showReaderMenu()
+        holder.openDisplaySettingsFromMenu()
+        assertFalse(holder.showReaderMenu)
+        assertTrue(holder.showDisplaySettings)
+
+        holder.dismissDisplaySettings()
+        holder.showReaderMenu()
         holder.openGoToFromMenu()
         assertFalse(holder.showReaderMenu)
         assertTrue(holder.showGoTo)

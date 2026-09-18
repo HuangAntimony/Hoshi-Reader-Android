@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
@@ -382,7 +383,8 @@ internal fun BoxScope.ReaderBottomChrome(
     menuExpanded: Boolean,
     onDismissMenu: () -> Unit,
     onGoTo: () -> Unit,
-    onAppearance: () -> Unit,
+    onDisplaySettings: () -> Unit,
+    onReadingSettings: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
     metrics: ReaderBottomChromeMetrics,
@@ -411,7 +413,8 @@ internal fun BoxScope.ReaderBottomChrome(
             colors = colors,
             metrics = metrics,
             onGoTo = onGoTo,
-            onAppearance = onAppearance,
+            onDisplaySettings = onDisplaySettings,
+            onReadingSettings = onReadingSettings,
             onStatistics = onStatistics,
             onSasayaki = onSasayaki,
             modifier = Modifier
@@ -639,7 +642,8 @@ private fun ReaderMenuCard(
     colors: ReaderChromeColors,
     metrics: ReaderBottomChromeMetrics,
     onGoTo: () -> Unit,
-    onAppearance: () -> Unit,
+    onDisplaySettings: () -> Unit,
+    onReadingSettings: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -680,18 +684,32 @@ private fun ReaderMenuCard(
                     )
                 }
                 when (destination) {
-                    ReaderMenuDestination.Appearance -> ReaderMenuItem(
-                        text = stringResource(R.string.settings_appearance),
+                    ReaderMenuDestination.Display -> ReaderMenuItem(
+                        text = stringResource(R.string.settings_display),
                         icon = {
                             Icon(
-                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.Appearance),
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.Display),
                                 contentDescription = null,
                                 tint = Color(colors.menuContent),
                             )
                         },
                         colors = colors,
                         metrics = metrics,
-                        onClick = onAppearance,
+                        onClick = onDisplaySettings,
+                    )
+
+                    ReaderMenuDestination.ReadingSettings -> ReaderMenuItem(
+                        text = stringResource(R.string.settings_appearance),
+                        icon = {
+                            Icon(
+                                imageVector = readerBottomMenuIcon(ReaderMenuDestination.ReadingSettings),
+                                contentDescription = null,
+                                tint = Color(colors.menuContent),
+                            )
+                        },
+                        colors = colors,
+                        metrics = metrics,
+                        onClick = onReadingSettings,
                     )
 
                     ReaderMenuDestination.GoTo -> ReaderMenuItem(
@@ -743,7 +761,8 @@ private fun ReaderMenuCard(
 
 internal fun readerBottomMenuIcon(destination: ReaderMenuDestination): ImageVector =
     when (destination) {
-        ReaderMenuDestination.Appearance -> Icons.Rounded.Palette
+        ReaderMenuDestination.Display -> Icons.Rounded.Palette
+        ReaderMenuDestination.ReadingSettings -> Icons.Rounded.FormatSize
         ReaderMenuDestination.GoTo -> Icons.Rounded.TravelExplore
         ReaderMenuDestination.Statistics -> Icons.AutoMirrored.Rounded.ShowChart
         ReaderMenuDestination.Sasayaki -> Icons.Rounded.GraphicEq

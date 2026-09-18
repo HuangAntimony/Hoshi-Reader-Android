@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.update
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
 import android.content.res.Resources
 import android.net.Uri
@@ -19,8 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CleaningServices
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -180,7 +182,7 @@ fun AboutScreen(
             item {
                 AboutCard {
                     ListItem(
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text("Hoshi Reader") },
                         supportingContent = {
                             Text(
@@ -428,8 +430,8 @@ private fun AboutCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = hoshiSurfaces.group,
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         content()

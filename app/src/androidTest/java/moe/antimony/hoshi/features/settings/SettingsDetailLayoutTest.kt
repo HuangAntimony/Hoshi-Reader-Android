@@ -68,6 +68,7 @@ class SettingsDetailLayoutTest {
                 ) {
                     ReaderAppearanceScreen(
                         settings = ReaderSettings(),
+                        profileName = "Japanese",
                         onSettingsChange = {},
                         sasayakiSettings = moe.antimony.hoshi.features.sasayaki.SasayakiSettings(),
                         onSasayakiSettingsChange = {},
@@ -81,7 +82,7 @@ class SettingsDetailLayoutTest {
             }
         }
 
-        val themeBounds = composeRule.onNodeWithText("Theme").getUnclippedBoundsInRoot()
+        val themeBounds = composeRule.onNodeWithText("Text").getUnclippedBoundsInRoot()
 
         composeRule.onAllNodesWithText("Appearance").assertCountEquals(2)
         assertTrue(

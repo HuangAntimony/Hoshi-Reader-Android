@@ -8,6 +8,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add global Display & Theme settings in Settings and Reader. Follow system
+  brightness with independent light/dark reading palettes, or keep one fixed
+  palette; customize background, text and secondary text colors with previews.
+  Choose system, preset or custom interface accents, and apply E-ink optimization
+  across the app. Existing display settings migrate from the active profile, and
+  saved colors from other profiles remain available to import.
 - Preserve deleted books' reading statistics in an archive, restore them on
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires
@@ -30,7 +36,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   character to look up from that position while keeping the full sentence for
   Anki cards. Back/Forward restores the selected occurrence for mining, and
   source text size is adjustable from 12 to 48.
-- Add Off, Dimmed, Toggle, and Hidden furigana modes in Reader Appearance;
+- Add Off, Dimmed, Toggle, and Hidden furigana modes in Reading Settings;
   Toggle reveals whitespace-adjacent ruby annotations together on the first tap.
 
 - Add Show, Blur, and Hide privacy modes for bookshelf covers, plus deterministic
@@ -43,7 +49,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   import/management and popup lookup, a verified one-tap
   stroke-order font download for Kanji users, plus complete pitch data with H/L
   patterns and nasal/devoice markers.
-- Add downloadable recommended Japanese font families to Reader Appearance,
+- Add downloadable recommended Japanese font families to Reading Settings,
   including separate family and named variant selectors, real static and
   variable weight selection, verified app-private downloads, and family/variant
   grouping for imported TTF and OTF fonts, with compact one-level type grouping
@@ -56,6 +62,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Separate global display settings from profile Reading Settings, which now show
+  the edited profile name. Opening books or switching profiles keeps the same
+  colors and E-ink setting.
+- Unify page, grouped card, nested control and popup colors across tabs, settings
+  and native Reader panels. Ordinary groups use tonal backgrounds, while E-ink
+  uses visible outlines and selection shapes, including continuous lazy lists.
 - Keep Statistics always available and move its settings to the Stats tab's
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
   sync opt-outs and Reader display preferences are preserved. Book Open and

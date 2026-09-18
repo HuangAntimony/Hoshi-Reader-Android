@@ -106,7 +106,8 @@
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">辞典</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profile</string>
-    <string name="settings_appearance">外观</string>
+    <string name="settings_display">显示与主题</string>
+    <string name="settings_appearance">阅读设置</string>
     <string name="settings_behavior">行为</string>
     <string name="settings_advanced">高级</string>
     <string name="settings_report_issue">反馈问题</string>
@@ -355,30 +356,24 @@
     <string name="reader_statistics_sync_mode_merge">合并</string>
     <string name="reader_statistics_sync_mode_replace">替换</string>
     <string name="reader_statistics_settings_hint">可从阅读器菜单访问统计。</string>
-    <string name="reader_appearance_theme">主题</string>
     <string name="reader_appearance_text">文本</string>
     <string name="reader_appearance_layout">布局</string>
     <string name="reader_appearance_display">显示</string>
     <string name="reader_appearance_progress">进度</string>
     <string name="reader_appearance_popup">弹窗</string>
-    <string name="reader_appearance_theme_system" comment="Reader theme option, distinct from the font-library System section label.">跟随系统</string>
     <string name="reader_appearance_theme_light">浅色</string>
     <string name="reader_appearance_theme_dark">深色</string>
     <string name="reader_appearance_theme_sepia">护眼色</string>
     <string name="reader_appearance_theme_custom" comment="Reader Appearance theme option, distinct from dictionary collapse custom mode.">自定义</string>
-    <string name="reader_appearance_eink_mode">墨水屏模式</string>
-    <string name="reader_appearance_use_sepia_light_theme">浅色主题使用护眼色</string>
-    <string name="reader_appearance_invert_sepia_dark">系统深色时反转护眼色</string>
-    <string name="reader_appearance_interface">界面</string>
     <string name="reader_appearance_background_color">背景颜色</string>
     <string name="reader_appearance_text_color">文字颜色</string>
     <string name="reader_appearance_info_color">信息颜色</string>
     <string name="reader_appearance_color_hex">十六进制</string>
     <string name="reader_appearance_color_invalid">请使用 #RRGGBB 或 #RRGGBBAA。</string>
     <string name="reader_appearance_color_alpha">透明度</string>
-    <string name="reader_appearance_color_red">红色</string>
-    <string name="reader_appearance_color_green">绿色</string>
-    <string name="reader_appearance_color_blue">蓝色</string>
+    <string name="reader_appearance_color_red" comment="RGB color editor channel label; distinct from interface accent preset names.">红色</string>
+    <string name="reader_appearance_color_green" comment="RGB color editor channel label; distinct from interface accent preset names.">绿色</string>
+    <string name="reader_appearance_color_blue" comment="RGB color editor channel label; distinct from interface accent preset names.">蓝色</string>
     <string name="reader_appearance_text_orientation">文字方向</string>
     <string name="reader_appearance_vertical">竖排</string>
     <string name="reader_appearance_horizontal">横排</string>
@@ -810,4 +805,33 @@
     <string name="statistics_chart_day_pattern">d日</string>
     <string name="statistics_chart_month_pattern">MMMMM</string>
     <string name="statistics_chart_month_year_pattern">yy年M月</string>
+    <string name="display_settings_load_failed">无法加载显示与阅读设置，请重试。</string>
+    <string name="display_settings_save_failed">无法保存设置，已保留原来的设置。</string>
+    <string name="display_settings_auto_switch">跟随系统自动切换</string>
+    <string name="display_settings_palette">配色</string>
+    <string name="display_settings_light_palette">浅色配色</string>
+    <string name="display_settings_dark_palette">深色配色</string>
+    <string name="display_settings_palette_dark_sepia">深色棕褐</string>
+    <string name="display_settings_custom_palette">自定义配色</string>
+    <string name="display_settings_imported_palettes">已导入的配色</string>
+    <string name="display_settings_palette_preview_title">阅读预览</string>
+    <string name="display_settings_palette_preview_info">次要信息</string>
+    <string name="display_settings_accent">强调色</string>
+    <string name="display_settings_accent_system">系统默认</string>
+    <string name="display_settings_accent_purple">紫色</string>
+    <string name="display_settings_accent_blue" comment="Interface accent preset name; distinct from RGB editor channel labels.">蓝色</string>
+    <string name="display_settings_accent_teal">青色</string>
+    <string name="display_settings_accent_green" comment="Interface accent preset name; distinct from RGB editor channel labels.">绿色</string>
+    <string name="display_settings_accent_yellow">黄色</string>
+    <string name="display_settings_accent_orange">橙色</string>
+    <string name="display_settings_accent_red" comment="Interface accent preset name; distinct from RGB editor channel labels.">红色</string>
+    <string name="display_settings_accent_pink">粉色</string>
+    <string name="display_settings_custom_accent">自定义强调色</string>
+    <string name="display_settings_accent_hex">RGB 十六进制颜色</string>
+    <string name="display_settings_accent_hex_invalid">请输入正好六位十六进制数字。</string>
+    <string name="display_settings_accent_preview">控件预览</string>
+    <string name="display_settings_accent_preview_action">按钮</string>
+    <string name="display_settings_eink_mode">墨水屏优化</string>
+    <string name="display_settings_eink_explanation">墨水屏优化期间使用黑白配色。关闭后恢复已保存的配色和强调色。</string>
+    <string name="reader_settings_profile_title">阅读设置 · %1$s</string>
 </resources>

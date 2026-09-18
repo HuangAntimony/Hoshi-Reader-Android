@@ -12,7 +12,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,10 +28,96 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import moe.antimony.hoshi.profiles.ProfileRepository
 import moe.antimony.hoshi.testing.CountingCoroutineDispatcher
+import moe.antimony.hoshi.features.display.AppDisplaySettings
+import moe.antimony.hoshi.features.display.DisplayPalettePreset
+import moe.antimony.hoshi.features.display.DisplayPaletteSelection
 
 class ReaderSettingsRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
+
+    @Test
+    fun displayMigrationFinishesBeforeCreatingProfileAppearanceFile() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("migration-order"))
+        val displayReady = CompletableDeferred<Unit>()
+        val displayStarted = CompletableDeferred<Unit>()
+        val display = flow {
+            displayStarted.complete(Unit)
+            displayReady.await()
+            emit(AppDisplaySettings())
+        }
+        repository(profileRepository = profiles, displaySettings = display).use { repository ->
+            val first = async { repository.settings.first() }
+            displayStarted.await()
+            delay(150)
+            val prematurelyCreated = profiles.readerSettingsFile().exists()
+            displayReady.complete(Unit)
+            first.await()
+            assertFalse(prematurelyCreated)
+            assertTrue(profiles.readerSettingsFile().exists())
+        }
+    }
+
+    @Test
+    fun productionStyleRepositoryCombinesGlobalDisplaySettingsIntoEveryEmission() = runBlocking {
+        val display = MutableStateFlow(
+            AppDisplaySettings(
+                autoSwitch = false,
+                singlePalette = DisplayPaletteSelection(DisplayPalettePreset.DarkSepia),
+            ),
+        )
+        repository(displaySettings = display).use { repository ->
+            assertEquals(DisplayPalettePreset.DarkSepia, repository.settings.first().displaySettings?.singlePalette?.preset)
+
+            display.value = display.value.copy(
+                singlePalette = DisplayPaletteSelection(DisplayPalettePreset.Light),
+            )
+
+            assertEquals(DisplayPalettePreset.Light, repository.settings.first().displaySettings?.singlePalette?.preset)
+        }
+    }
+
+    @Test
+    fun profileUpdateDoesNotWriteGlobalDisplayProjectionIntoLegacyProfileColors() = runBlocking {
+        val profileRepository = ProfileRepository(tempFolder.newFolder("projection-profiles"))
+        val profileFile = profileRepository.readerSettingsFile()
+        profileFile.parentFile?.mkdirs()
+        profileFile.writeText(
+            """{"theme":"Custom","customBackgroundColor":4279312947,"customTextColor":4282668390,"customInfoColor":4286023833,"fontSize":22}""",
+        )
+        val display = MutableStateFlow(
+            AppDisplaySettings(
+                autoSwitch = false,
+                singlePalette = DisplayPaletteSelection(
+                    preset = DisplayPalettePreset.Custom,
+                    customBackgroundColor = 0xFFABCDEF,
+                    customTextColor = 0xFF123456,
+                    customInfoColor = 0xFF654321,
+                ),
+            ),
+        )
+        repository(
+            profileRepository = profileRepository,
+            displaySettings = display,
+            fileName = "projection-reader.preferences_pb",
+        ).use { repository ->
+            val runtime = repository.settings.first()
+            assertEquals(0xFFABCDEFL, runtime.customBackgroundColor)
+
+            repository.update { it.copy(fontSize = 27) }
+        }
+
+        repository(
+            profileRepository = profileRepository,
+            fileName = "projection-reopen.preferences_pb",
+        ).use { repository ->
+            val storedProfile = repository.settings.first()
+            assertEquals(27, storedProfile.fontSize)
+            assertEquals(0xFF112233L, storedProfile.customBackgroundColor)
+            assertEquals(0xFF445566L, storedProfile.customTextColor)
+            assertEquals(0xFF778899L, storedProfile.customInfoColor)
+        }
+    }
 
     @Test
     fun statisticsSyncDefaultsOnWithoutStartingTrackingOrChangingDisplayPreferences() = runBlocking {
@@ -571,6 +662,7 @@ class ReaderSettingsRepositoryTest {
     private fun repository(
         legacySource: ReaderSettingsLegacySource? = null,
         profileRepository: ProfileRepository? = null,
+        displaySettings: Flow<AppDisplaySettings>? = null,
         ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
         fileName: String = "reader-settings.preferences_pb",
     ): RepositoryHandle {
@@ -584,6 +676,7 @@ class ReaderSettingsRepositoryTest {
                 dataStore = dataStore,
                 legacySource = legacySource,
                 profileRepository = profileRepository,
+                displaySettings = displaySettings,
                 ioDispatcher = ioDispatcher,
             ),
             dataStore = dataStore,

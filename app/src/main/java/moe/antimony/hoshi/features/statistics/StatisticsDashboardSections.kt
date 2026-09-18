@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.statistics
 
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.compose.material.icons.rounded.Settings
 
 import androidx.compose.foundation.Canvas
@@ -81,8 +84,8 @@ internal fun StatisticsHeader(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = hoshiSurfaces.page,
+            scrolledContainerColor = hoshiSurfaces.page,
         ),
     )
 }
@@ -164,8 +167,8 @@ internal fun StatisticsSection(
         StatisticsSectionHeading(title, Modifier.padding(horizontal = 16.dp))
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = if (LocalHoshiEInkMode.current) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+            color = hoshiSurfaces.group,
+            border = hoshiContainerBorder(),
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(contentPadding), content = content)
         }
@@ -257,7 +260,8 @@ private fun MetricCard(
             .height(68.dp)
             .semantics(mergeDescendants = true) {},
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = hoshiSurfaces.nested,
+        border = hoshiContainerBorder(),
     ) {
         Column(
             modifier = Modifier
@@ -456,8 +460,8 @@ internal fun <T> StatisticsSegmentedControl(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        color = colors.surfaceContainer,
-        border = if (eInkMode) BorderStroke(1.dp, colors.outlineVariant) else null,
+        color = hoshiSurfaces.nested,
+        border = hoshiContainerBorder(),
     ) {
         Row(
             modifier = Modifier
@@ -469,7 +473,7 @@ internal fun <T> StatisticsSegmentedControl(
                 val isSelected = option.value == selected
                 val itemShape = RoundedCornerShape(8.dp)
                 val background = if (isSelected) {
-                    if (eInkMode) colors.onSurface else colors.surface
+                    hoshiSurfaces.selected
                 } else {
                     Color.Transparent
                 }
@@ -479,6 +483,7 @@ internal fun <T> StatisticsSegmentedControl(
                         .fillMaxHeight()
                         .clip(itemShape)
                         .background(background)
+                        .then(if (isSelected) Modifier.hoshiContainerOutline(itemShape) else Modifier)
                         .clickable(enabled = option.enabled) { onSelect(option.value) },
                     contentAlignment = Alignment.Center,
                 ) {

@@ -70,21 +70,6 @@ class ReaderAppearanceSasayakiTest {
     }
 
     @Test
-    fun appearanceShowsCustomThemeControlsOnlyForCustomTheme() {
-        assertTrue(readerAppearanceShowsCustomInterfaceTheme(ReaderSettings(theme = ReaderTheme.Custom)))
-        assertTrue(!readerAppearanceShowsCustomInterfaceTheme(ReaderSettings(theme = ReaderTheme.Sepia)))
-        assertEquals(
-            listOf(
-                ReaderAppearanceCustomColorRow.Background,
-                ReaderAppearanceCustomColorRow.Text,
-                ReaderAppearanceCustomColorRow.Info,
-            ),
-            readerAppearanceCustomColorRows(ReaderSettings(theme = ReaderTheme.Custom)),
-        )
-        assertTrue(readerAppearanceCustomColorRows(ReaderSettings(theme = ReaderTheme.Light)).isEmpty())
-    }
-
-    @Test
     fun topSafeAreaSliderUsesTwoDpSteps() {
         assertEquals(20, readerAppearanceTopSafeAreaSliderSteps())
         assertEquals(30, readerAppearanceTopSafeAreaFromSlider(29.2f))

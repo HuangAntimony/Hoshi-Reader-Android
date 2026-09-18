@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +82,7 @@ import moe.antimony.hoshi.features.dictionary.createLookupPopupItem
 import moe.antimony.hoshi.features.dictionary.dismissPopupAt
 import moe.antimony.hoshi.features.dictionary.openPopupExternalLink
 import moe.antimony.hoshi.features.dictionary.withLookupPopupVisualOptions
+import moe.antimony.hoshi.features.display.DisplaySettingsSheet
 import moe.antimony.hoshi.features.sasayaki.BookSasayakiPlaybackRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudioRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiAudiobookInfo
@@ -107,7 +108,7 @@ fun ReaderWebView(
     initialChapterIndex: Int = 0,
     initialProgress: Double = 0.0,
     readerSettings: ReaderSettings = ReaderSettings(),
-    onReaderSettingsChange: (ReaderSettings) -> Unit = {},
+    onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
     onFlushAutoSyncExport: () -> Unit = {},
@@ -120,6 +121,7 @@ fun ReaderWebView(
     var webView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
     val appContainer = LocalHoshiUiDependencies.current
+    val profileState by appContainer.profileRepository.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val fontManager = appContainer.readerFontManager
     val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
@@ -312,6 +314,7 @@ fun ReaderWebView(
     }
     val showReaderMenu = stateHolder.showReaderMenu
     val showAppearance = stateHolder.showAppearance
+    val showDisplaySettings = stateHolder.showDisplaySettings
     val showGoTo = stateHolder.showGoTo
     val showSasayaki = stateHolder.showSasayaki
     val showStatistics = stateHolder.showStatistics
@@ -1876,7 +1879,8 @@ fun ReaderWebView(
             menuExpanded = showReaderMenu,
             onDismissMenu = stateHolder::dismissReaderMenu,
             onGoTo = stateHolder::openGoToFromMenu,
-            onAppearance = stateHolder::openAppearanceFromMenu,
+            onDisplaySettings = stateHolder::openDisplaySettingsFromMenu,
+            onReadingSettings = stateHolder::openAppearanceFromMenu,
             onStatistics = stateHolder::openStatisticsFromMenu,
             onSasayaki = if (sasayakiSettings.enabled && bookRoot != null) {
                 {
@@ -1896,16 +1900,20 @@ fun ReaderWebView(
         if (showAppearance) {
             ReaderAppearanceSheet(
                 settings = effectiveSettings,
+                profileName = profileState.effectiveProfile.name,
                 progressDisplay = progressDisplay,
-                onSettingsChange = {
-                    stateHolder.applySettings(it)
-                    onReaderSettingsChange(it)
+                onSettingsChange = { transform ->
+                    stateHolder.applySettings(transform(stateHolder.effectiveSettings))
+                    onReaderSettingsChange(transform)
                 },
                 sasayakiSettings = sasayakiSettings,
                 onSasayakiSettingsChange = ::updateSasayakiSettings,
                 fontManager = fontManager,
                 onDismiss = stateHolder::dismissAppearance,
             )
+        }
+        if (showDisplaySettings) {
+            DisplaySettingsSheet(onDismiss = stateHolder::dismissDisplaySettings)
         }
         if (showGoTo) {
             ReaderGoToSheet(

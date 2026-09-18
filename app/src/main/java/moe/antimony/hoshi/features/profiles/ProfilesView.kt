@@ -16,8 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -392,6 +392,9 @@ private fun ProfileEditDialog(
                             .fillMaxWidth(),
                     )
                     ExposedDropdownMenu(
+                        containerColor = moe.antimony.hoshi.ui.theme.hoshiSurfaces.overlay,
+                        border = moe.antimony.hoshi.ui.theme.hoshiContainerBorder(),
+                        tonalElevation = 0.dp,
                         expanded = languageExpanded,
                         onDismissRequest = { languageExpanded = false },
                     ) {

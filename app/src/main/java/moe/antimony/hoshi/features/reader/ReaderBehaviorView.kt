@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,7 +31,7 @@ import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
 @Composable
 fun ReaderBehaviorScreen(
     settings: ReaderSettings,
-    onSettingsChange: (ReaderSettings) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,7 +56,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.VolumeKeysTurnPages.labelRes),
                         checked = settings.volumeKeysTurnPages,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(volumeKeysTurnPages = it))
+                            onSettingsChange { current -> current.copy(volumeKeysTurnPages = it) }
                         },
                     )
                     BehaviorDivider()
@@ -62,7 +64,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.VolumeKeysNavigatePopupTerms.labelRes),
                         checked = settings.volumeKeysNavigatePopupTerms,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(volumeKeysNavigatePopupTerms = it))
+                            onSettingsChange { current -> current.copy(volumeKeysNavigatePopupTerms = it) }
                         },
                     )
                     readerBehaviorSasayakiRows().forEach { labelRes ->
@@ -71,7 +73,7 @@ fun ReaderBehaviorScreen(
                             label = stringResource(labelRes),
                             checked = settings.volumeKeysSeekSasayaki,
                             onCheckedChange = {
-                                onSettingsChange(settings.copy(volumeKeysSeekSasayaki = it))
+                                onSettingsChange { current -> current.copy(volumeKeysSeekSasayaki = it) }
                             },
                         )
                     }
@@ -80,7 +82,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.ReverseVolumeKeyDirection.labelRes),
                         checked = settings.reverseVolumeKeyDirection,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(reverseVolumeKeyDirection = it))
+                            onSettingsChange { current -> current.copy(reverseVolumeKeyDirection = it) }
                         },
                     )
                     BehaviorDivider()
@@ -88,7 +90,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.KeepScreenOn.labelRes),
                         checked = settings.keepScreenOnWhileReading,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(keepScreenOnWhileReading = it))
+                            onSettingsChange { current -> current.copy(keepScreenOnWhileReading = it) }
                         },
                     )
                     BehaviorDivider()
@@ -96,7 +98,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.LockCurrentOrientation.labelRes),
                         checked = settings.lockCurrentOrientation,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(lockCurrentOrientation = it))
+                            onSettingsChange { current -> current.copy(lockCurrentOrientation = it) }
                         },
                     )
                     BehaviorDivider()
@@ -104,7 +106,7 @@ fun ReaderBehaviorScreen(
                         label = stringResource(ReaderBehaviorRow.OpenLastReadBookOnLaunch.labelRes),
                         checked = settings.openLastReadBookOnLaunch,
                         onCheckedChange = {
-                            onSettingsChange(settings.copy(openLastReadBookOnLaunch = it))
+                            onSettingsChange { current -> current.copy(openLastReadBookOnLaunch = it) }
                         },
                     )
                     BehaviorDivider()
@@ -152,8 +154,8 @@ private fun BehaviorSettingsCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = hoshiSurfaces.group,
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         Column(content = { content() })
@@ -167,7 +169,7 @@ private fun BehaviorSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
         headlineContent = {
             Text(
                 text = label,

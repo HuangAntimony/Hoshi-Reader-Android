@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -164,7 +166,7 @@ internal fun ReaderChapterListRow(
     val isCurrentEInkRow = eInkMode && row.isCurrent
     val currentRowColor = when {
         isCurrentEInkRow -> MaterialTheme.colorScheme.onSurface
-        row.isCurrent -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+        row.isCurrent -> hoshiSurfaces.nested
         else -> Color.Transparent
     }
     val rowContentColor = if (isCurrentEInkRow) {
@@ -185,6 +187,7 @@ internal fun ReaderChapterListRow(
                 color = currentRowColor,
                 shape = RoundedCornerShape(metrics.chapterRowCornerRadiusDp.dp),
             )
+            .then(if (row.isCurrent) Modifier.hoshiContainerOutline(RoundedCornerShape(metrics.chapterRowCornerRadiusDp.dp)) else Modifier)
             .clickable(onClick = onClick)
             .padding(
                 start = (row.indentLevel * 18).dp,

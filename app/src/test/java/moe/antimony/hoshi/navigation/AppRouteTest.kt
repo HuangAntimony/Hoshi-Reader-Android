@@ -72,6 +72,7 @@ class AppRouteTest {
                 "Dictionaries",
                 "Anki",
                 "Profiles",
+                "Display",
                 "Appearance",
                 "Behavior",
                 "Advanced",

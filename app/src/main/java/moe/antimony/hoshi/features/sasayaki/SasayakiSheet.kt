@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -31,8 +35,8 @@ import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
+import moe.antimony.hoshi.ui.HoshiButton as Button
+import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -460,7 +464,8 @@ private fun SasayakiSheetTabs(
         modifier = modifier
             .fillMaxWidth()
             .selectableGroup()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .background(hoshiSurfaces.nested, RoundedCornerShape(12.dp))
+            .hoshiContainerOutline(RoundedCornerShape(12.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -470,9 +475,10 @@ private fun SasayakiSheetTabs(
                 modifier = Modifier
                     .weight(1f)
                     .background(
-                        color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                        color = if (selected) hoshiSurfaces.selected else Color.Transparent,
                         shape = RoundedCornerShape(10.dp),
                     )
+                    .then(if (selected) Modifier.hoshiContainerOutline(RoundedCornerShape(10.dp)) else Modifier)
                     .selectable(
                         selected = selected,
                         role = SasayakiSheetTabRole,
@@ -485,7 +491,7 @@ private fun SasayakiSheetTabs(
                     text = stringResource(tab.labelRes),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) hoshiSurfaces.onSelected else hoshiSurfaces.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -867,8 +873,8 @@ internal fun SasayakiResourceCard(content: @Composable () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 6.dp),
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = hoshiSurfaces.group,
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         Column(

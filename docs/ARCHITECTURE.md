@@ -1,6 +1,6 @@
 # Hoshi Android Current Architecture
 
-Date: 2026-08-24
+Date: 2026-09-18
 
 This document describes the current architecture that exists in the Android
 repo. It is not a future plan and should not track task status. Long-lived
@@ -10,6 +10,15 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 - The app is a single Android application module under `app`.
 - UI is Jetpack Compose + Material 3.
+- `HoshiSurfaceRoles` owns native page, group, nested, and overlay colors derived
+  from Material 3 and the resolved brightness. Shared container helpers provide
+  E-ink outlines (including continuous lazy group edges) while ordinary groups
+  use tonal separation without decorative borders or elevation. Reader content
+  and dictionary HTML retain their existing color/style systems.
+- Native accents default to Android 12+ dynamic color with the existing fixed
+  fallback on older Android. Manual opaque seeds use the standalone Material Color
+  Utilities 4.1.1 Tonal Spot algorithm to generate a complete Material 3 scheme;
+  E-ink overrides the result without overwriting the stored seed or palettes.
 - Navigation uses Navigation3 typed route keys, `AppShell`, and `NavDisplay`.
   Top-level Books, Dictionary, Statistics, and Settings tabs each own an
   independent Nav3 back stack with its own saveable entry state and per-entry
@@ -74,7 +83,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are persisted through book sidecar repositories and models.
 - Statistics is always available from its top-level tab. Its settings and
   folder-keyed daily editor use that tab's Navigation3 back stack and
-  entry-scoped Hilt ViewModels. Reader display preferences remain in Appearance;
+  entry-scoped Hilt ViewModels. Reader statistics display preferences remain in Reading Settings;
   the Sync and Statistics settings screens share the global sync preference.
 - `BookStatisticsStore` is the shared Hilt singleton for reader statistics,
   transactional sync imports, daily edits, archive/restore, and dashboard reads.
@@ -142,14 +151,35 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   restores merge the profile index and profile dictionary config/settings while
   preserving profile-owned Anki and Reader settings that are outside the
   dictionary payload.
-- Reader Appearance settings are stored per active/effective profile in
-  `Profiles/<profileId>/reader_settings.json`; Reader Behavior and statistics
-  sync settings remain global DataStore settings.
+- Reading Settings (font, layout, reading information, and lookup panel options)
+  are stored per active/effective profile in `Profiles/<profileId>/reader_settings.json`.
+  Reader Behavior and statistics sync settings remain global DataStore settings.
+- `AppDisplaySettingsRepository` owns global Display & Theme settings in a separate
+  DataStore: system-driven switching, independent single/light/dark reading palettes
+  and remembered custom colors, accent source/seed, E-ink mode, and migration version.
+  `resolveDisplaySettings(settings, systemDark)` is the pure source for active
+  reading colors and native interface brightness. Custom colors preserve alpha;
+  native brightness follows the background's linear sRGB luminance.
+- Initial display migration reads the global active profile before Reader profile
+  initialization or book-specific profile activation. Distinct legacy custom colors
+  are retained as named imports; legacy JSON color fields remain readable and are
+  preserved on writes, but no longer control runtime display. Book sidecars, sync,
+  and backup formats are unchanged.
+- `ReaderSettingsRepository` combines global display state with profile reading
+  preferences. Both MainActivity and Process Text use `ReaderSettingsHostViewModel`
+  and wait for its first confirmed value before rendering content. ViewModels expose
+  immutable state and localized load/save errors; profile changes never overwrite
+  global display settings. Reading setting events submit transformations against
+  the latest stored value, preserving successive edits during delayed persistence.
+  Display updates use the existing WebView appearance
+  bridge without rebuilding Reader content or lookup state. Both Activity hosts
+  handle `uiMode` changes in place; Compose observes the updated system
+  configuration and the existing WebViews receive the resolved appearance update.
 - Reader font selections retain the legacy display-name field and additionally
   persist stable family/variant IDs plus each profile's last variant per family.
 - Statistics daily target settings are global DataStore settings behind a
   repository.
-- Profile-scoped Reader Appearance, Dictionary, and Anki settings JSON reads and
+- Profile-scoped Reading Settings, Dictionary, and Anki settings JSON reads and
   writes use injected IO dispatchers and repository-owned serialization locks.
 - Frequency and pitch dictionaries are type-specific and are not treated as term
   fallback dictionaries.

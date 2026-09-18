@@ -8,12 +8,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -46,9 +48,16 @@ private val LightColorScheme = lightColorScheme(
 val LocalHoshiEInkMode = staticCompositionLocalOf { false }
 val LocalHoshiDarkTheme = staticCompositionLocalOf { false }
 
-internal fun hoshiColorScheme(darkTheme: Boolean, eInkMode: Boolean) = when {
+internal fun hoshiColorScheme(
+    darkTheme: Boolean,
+    eInkMode: Boolean,
+    accentSeed: Long? = null,
+    systemColorScheme: ColorScheme? = null,
+) = when {
     eInkMode && darkTheme -> eInkColorScheme(dark = true)
     eInkMode -> eInkColorScheme(dark = false)
+    accentSeed != null -> hoshiSeedColorScheme(accentSeed, darkTheme)
+    systemColorScheme != null -> systemColorScheme
     darkTheme -> DarkColorScheme
     else -> LightColorScheme
 }
@@ -133,16 +142,16 @@ fun HoshiReaderTheme(
     useDarkSystemBarIcons: Boolean = !darkTheme,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    accentSeed: Long? = null,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val colorScheme = when {
-        dynamicColor && !eInkMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        else -> hoshiColorScheme(darkTheme = darkTheme, eInkMode = eInkMode)
+    val systemColorScheme = if (dynamicColor && !eInkMode && accentSeed == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else null
+    val colorScheme = remember(darkTheme, eInkMode, accentSeed, systemColorScheme) {
+        hoshiColorScheme(darkTheme, eInkMode, accentSeed, systemColorScheme)
     }
 
     SideEffect {

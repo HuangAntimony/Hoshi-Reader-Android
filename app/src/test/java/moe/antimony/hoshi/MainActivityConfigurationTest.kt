@@ -13,6 +13,14 @@ import javax.inject.Inject
 
 class MainActivityConfigurationTest {
     @Test
+    fun displayHostsHandleNightModeChangesWithoutDestroyingReaderOrLookup() {
+        listOf(mainActivityManifestElement(), processTextLookupActivityManifestElement()).forEach { activity ->
+            val changes = activity.getAttribute("android:configChanges").split('|').toSet()
+            assertTrue("${activity.getAttribute("android:name")} must preserve its WebView on a system theme change.", "uiMode" in changes)
+        }
+    }
+
+    @Test
     fun appLabelsComeFromBuildVariantPlaceholder() {
         val expectedLabel = "\${appLabel}"
 

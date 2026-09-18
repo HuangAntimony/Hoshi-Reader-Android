@@ -1,5 +1,10 @@
 package moe.antimony.hoshi
 
+import moe.antimony.hoshi.features.display.DisplayAccentSource
+import moe.antimony.hoshi.features.reader.ReaderSettingsHostError
+import moe.antimony.hoshi.features.reader.ReaderSettingsHostViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -15,14 +20,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.dictionary.PendingDictionaryLookupRequest
-import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.usesDarkInterface
 import moe.antimony.hoshi.features.reader.usesDarkSystemBarIcons
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackReturnAction
@@ -51,14 +52,9 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         setContent {
-            val readerSettingsRepository = uiDependencies.readerSettingsRepository
-            val scope = rememberCoroutineScope()
-            var readerSettings by remember { mutableStateOf<ReaderSettings?>(null) }
-            LaunchedEffect(readerSettingsRepository) {
-                readerSettingsRepository.settings.collect { settings ->
-                    readerSettings = settings
-                }
-            }
+            val settingsViewModel: ReaderSettingsHostViewModel = hiltViewModel()
+            val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+            val readerSettings = settingsState.settings
             val systemDark = isSystemInDarkTheme()
             val loadedReaderSettings = readerSettings
             LaunchedEffect(loadedReaderSettings?.lockCurrentOrientation) {
@@ -72,7 +68,9 @@ class MainActivity : ComponentActivity() {
                     darkTheme = darkTheme,
                     eInkMode = loadedReaderSettings?.eInkMode ?: false,
                     useDarkSystemBarIcons = useDarkSystemBarIcons,
+                    accentSeed = loadedReaderSettings?.displaySettings?.takeIf { it.accentSource == DisplayAccentSource.Custom }?.accentSeed,
                 ) {
+                    ReaderSettingsHostError(settingsState, settingsViewModel)
                     val loadedReaderSettings = readerSettings ?: return@HoshiReaderTheme
                     AppShell(
                         pendingImportUri = pendingImportUri,
@@ -82,12 +80,7 @@ class MainActivity : ComponentActivity() {
                         pendingDictionaryLookupRequest = pendingDictionaryLookupRequest,
                         onPendingDictionaryLookupConsumed = { pendingDictionaryLookupRequest = null },
                         readerSettings = loadedReaderSettings,
-                        onReaderSettingsChange = { settings ->
-                            readerSettings = settings
-                            scope.launch {
-                                readerSettingsRepository.update { settings }
-                            }
-                        },
+                        onReaderSettingsChange = settingsViewModel::update,
                         onReaderKeyEventHandlerChange = { handler ->
                             readerKeyEventHandler = handler
                         }

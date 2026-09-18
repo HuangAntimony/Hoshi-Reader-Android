@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.dictionary
 
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.webkit.WebView
@@ -208,7 +211,7 @@ fun DictionarySearchView(
     val fontFaceCss = remember(fontManager, fontLibraryState.revision) { fontManager.popupFontFaceCss() }
     val rootContentLanguageProfile = profileState.effectiveContentLanguageProfile
     val readerPopupBridgeHolder = remember { ReaderLookupPopupBridgeCallbackHolder() }
-    val popupDarkMode = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val popupDarkMode = hoshiSurfaces.page.luminance() < 0.5f
     val popupOptions = dictionarySearchPopupOptions(
         readerSettings = readerSettings,
         dictionarySettings = uiState.dictionarySettings,
@@ -602,7 +605,7 @@ fun DictionarySearchView(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(hoshiSurfaces.page)
             .onSizeChanged { viewportSize = it },
     ) {
         when {
@@ -691,7 +694,7 @@ fun DictionarySearchView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(hoshiSurfaces.group),
         )
     }
 }
@@ -828,10 +831,10 @@ private fun DictionaryPullResetIndicator(
     Surface(
         modifier = modifier.padding(top = topPaddingDp.dp + 8.dp),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
+        color = hoshiSurfaces.group,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp,
+        border = hoshiContainerBorder(),
+        shadowElevation = if (LocalHoshiEInkMode.current) 0.dp else 2.dp,
     ) {
         Text(
             text = stringResource(label),
@@ -919,7 +922,7 @@ private fun DictionarySearchTopBar(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -939,9 +942,9 @@ private fun DictionarySearchBar(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = hoshiSurfaces.nested,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = hoshiContainerBorder(),
         shadowElevation = 0.dp,
     ) {
         Row(

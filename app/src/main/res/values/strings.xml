@@ -106,7 +106,8 @@
     <string name="settings_dictionaries" comment="Settings row label, intentionally matching the backup Dictionaries section.">Dictionaries</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profiles</string>
-    <string name="settings_appearance">Appearance</string>
+    <string name="settings_display">Display &amp; Theme</string>
+    <string name="settings_appearance">Reading Settings</string>
     <string name="settings_behavior">Behavior</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_report_issue">Report an Issue</string>
@@ -357,30 +358,24 @@
     <string name="reader_statistics_sync_mode_merge">Merge</string>
     <string name="reader_statistics_sync_mode_replace">Replace</string>
     <string name="reader_statistics_settings_hint">Statistics can be accessed from the Reader\'s context menu.</string>
-    <string name="reader_appearance_theme">Theme</string>
     <string name="reader_appearance_text">Text</string>
     <string name="reader_appearance_layout">Layout</string>
     <string name="reader_appearance_display">Display</string>
     <string name="reader_appearance_progress">Progress</string>
     <string name="reader_appearance_popup">Popup</string>
-    <string name="reader_appearance_theme_system" comment="Reader theme option, intentionally matching the font-library System section label.">System</string>
     <string name="reader_appearance_theme_light">Light</string>
     <string name="reader_appearance_theme_dark">Dark</string>
     <string name="reader_appearance_theme_sepia">Sepia</string>
     <string name="reader_appearance_theme_custom" comment="Reader Appearance theme option, distinct from dictionary collapse custom mode.">Custom</string>
-    <string name="reader_appearance_eink_mode">E-ink Mode</string>
-    <string name="reader_appearance_use_sepia_light_theme">Use Sepia as Light Theme</string>
-    <string name="reader_appearance_invert_sepia_dark">Invert in System Dark Theme</string>
-    <string name="reader_appearance_interface">Interface</string>
     <string name="reader_appearance_background_color">Background Color</string>
     <string name="reader_appearance_text_color">Text Color</string>
     <string name="reader_appearance_info_color">Info Color</string>
     <string name="reader_appearance_color_hex">Hex</string>
     <string name="reader_appearance_color_invalid">Use #RRGGBB or #RRGGBBAA.</string>
     <string name="reader_appearance_color_alpha">Alpha</string>
-    <string name="reader_appearance_color_red">Red</string>
-    <string name="reader_appearance_color_green">Green</string>
-    <string name="reader_appearance_color_blue">Blue</string>
+    <string name="reader_appearance_color_red" comment="RGB color editor channel label; distinct from interface accent preset names.">Red</string>
+    <string name="reader_appearance_color_green" comment="RGB color editor channel label; distinct from interface accent preset names.">Green</string>
+    <string name="reader_appearance_color_blue" comment="RGB color editor channel label; distinct from interface accent preset names.">Blue</string>
     <string name="reader_appearance_text_orientation">Text Orientation</string>
     <string name="reader_appearance_vertical">Vertical</string>
     <string name="reader_appearance_horizontal">Horizontal</string>
@@ -812,4 +807,33 @@
     <string name="statistics_chart_day_pattern">d</string>
     <string name="statistics_chart_month_pattern">MMMMM</string>
     <string name="statistics_chart_month_year_pattern">MMM yy</string>
+    <string name="display_settings_load_failed">Could not load display and reading settings. Please try again.</string>
+    <string name="display_settings_save_failed">Could not save the settings. Your previous settings have been kept.</string>
+    <string name="display_settings_auto_switch">Automatically Switch with System</string>
+    <string name="display_settings_palette">Color Palette</string>
+    <string name="display_settings_light_palette">Light Palette</string>
+    <string name="display_settings_dark_palette">Dark Palette</string>
+    <string name="display_settings_palette_dark_sepia">Dark Sepia</string>
+    <string name="display_settings_custom_palette">Custom Palette</string>
+    <string name="display_settings_imported_palettes">Imported Palettes</string>
+    <string name="display_settings_palette_preview_title">Reading preview</string>
+    <string name="display_settings_palette_preview_info">Secondary information</string>
+    <string name="display_settings_accent">Accent Color</string>
+    <string name="display_settings_accent_system">System Default</string>
+    <string name="display_settings_accent_purple">Purple</string>
+    <string name="display_settings_accent_blue" comment="Interface accent preset name; distinct from RGB editor channel labels.">Blue</string>
+    <string name="display_settings_accent_teal">Teal</string>
+    <string name="display_settings_accent_green" comment="Interface accent preset name; distinct from RGB editor channel labels.">Green</string>
+    <string name="display_settings_accent_yellow">Yellow</string>
+    <string name="display_settings_accent_orange">Orange</string>
+    <string name="display_settings_accent_red" comment="Interface accent preset name; distinct from RGB editor channel labels.">Red</string>
+    <string name="display_settings_accent_pink">Pink</string>
+    <string name="display_settings_custom_accent">Custom Accent Color</string>
+    <string name="display_settings_accent_hex">RGB hex color</string>
+    <string name="display_settings_accent_hex_invalid">Enter exactly six hexadecimal digits.</string>
+    <string name="display_settings_accent_preview">Control preview</string>
+    <string name="display_settings_accent_preview_action">Button</string>
+    <string name="display_settings_eink_mode">E-ink Optimization</string>
+    <string name="display_settings_eink_explanation">E-ink optimization uses a black-and-white palette. Turning it off restores your saved palette and accent color.</string>
+    <string name="reader_settings_profile_title">Reading Settings · %1$s</string>
 </resources>

@@ -28,6 +28,15 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.display.AppDisplayMigrationPayload
+import moe.antimony.hoshi.features.display.AppDisplaySettings
+import moe.antimony.hoshi.features.display.AppDisplaySettingsMigrationSource
+import moe.antimony.hoshi.features.display.DisplayPalettePreset
+import moe.antimony.hoshi.features.display.DisplayPaletteSelection
+import moe.antimony.hoshi.features.display.LegacyDisplaySettingsSnapshot
+import moe.antimony.hoshi.features.display.LegacyDisplayTheme
+import moe.antimony.hoshi.features.display.NamedDisplayPalette
+import moe.antimony.hoshi.features.display.resolveDisplaySettings
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.profiles.ProfileRepository
 import java.util.Locale
@@ -140,6 +149,7 @@ data class ReaderSettings(
     val keepScreenOnWhileReading: Boolean = false,
     val lockCurrentOrientation: Boolean = false,
     val openLastReadBookOnLaunch: Boolean = false,
+    val displaySettings: AppDisplaySettings? = null,
 ) {
     val continuousMode: Boolean
         get() = viewMode == ReaderViewMode.Continuous
@@ -204,6 +214,7 @@ data class ReaderSettings(
         get() = if (verticalWriting) "0" else "${(horizontalPadding / 2.0).cssNumber()}vw"
 
     fun backgroundColor(systemDark: Boolean): Long {
+        displaySettings?.let { return resolveDisplaySettings(it, systemDark).backgroundColor }
         if (eInkMode) {
             return if (usesDarkInterface(systemDark)) 0xFF000000 else 0xFFFFFFFF
         }
@@ -217,9 +228,20 @@ data class ReaderSettings(
     }
 
     fun backgroundColorCss(systemDark: Boolean): String =
-        backgroundColor(systemDark).toReaderCssColor(includeAlpha = !eInkMode && theme == ReaderTheme.Custom)
+        backgroundColor(systemDark).toReaderCssColor(
+            includeAlpha = displaySettings?.let {
+                val resolved = resolveDisplaySettings(it, systemDark)
+                !resolved.eInkMode && resolved.palette == DisplayPalettePreset.Custom
+            } ?: (!eInkMode && theme == ReaderTheme.Custom),
+        )
 
     fun textColorCss(systemDark: Boolean): String {
+        displaySettings?.let { global ->
+            val resolved = resolveDisplaySettings(global, systemDark)
+            return resolved.textColor.toDisplayCssColor(
+                includeAlpha = !resolved.eInkMode && resolved.palette == DisplayPalettePreset.Custom,
+            )
+        }
         if (eInkMode) {
             return if (usesDarkInterface(systemDark)) "#fff" else "#000"
         }
@@ -231,6 +253,12 @@ data class ReaderSettings(
             ReaderTheme.Custom -> customTextColor.toReaderCssColor(includeAlpha = true)
         }
     }
+}
+
+private fun Long.toDisplayCssColor(includeAlpha: Boolean): String = when (this) {
+    0xFF332A1BL -> "#332A1B"
+    0xFFF2E2C9L -> "#F2E2C9"
+    else -> toReaderCssColor(includeAlpha)
 }
 
 internal fun ReaderSettings.withFontSelection(
@@ -330,22 +358,52 @@ internal fun migrateLegacyStatisticsAutostart(rawValue: String?): LegacyStatisti
         else -> LegacyStatisticsAutostart(onBookOpen = false, onPageTurn = false)
     }
 
-fun ReaderSettings.usesDarkInterface(systemDark: Boolean): Boolean = when (theme) {
-    ReaderTheme.System -> systemDark
-    ReaderTheme.Light -> false
-    ReaderTheme.Dark -> true
-    ReaderTheme.Sepia -> sepiaInvertInDark && systemDark
-    ReaderTheme.Custom -> uiTheme.usesDarkInterface(systemDark)
-}
+fun ReaderSettings.usesDarkInterface(systemDark: Boolean): Boolean =
+    displaySettings?.let { resolveDisplaySettings(it, systemDark).isDark } ?: when (theme) {
+        ReaderTheme.System -> systemDark
+        ReaderTheme.Light -> false
+        ReaderTheme.Dark -> true
+        ReaderTheme.Sepia -> sepiaInvertInDark && systemDark
+        ReaderTheme.Custom -> uiTheme.usesDarkInterface(systemDark)
+    }
 
 fun ReaderSettings.usesDarkSystemBarIcons(systemDark: Boolean): Boolean =
     !usesDarkInterface(systemDark)
 
 fun ReaderSettings.usesSepiaLightContent(systemDark: Boolean): Boolean =
-    !eInkMode && (
+    displaySettings?.let { global ->
+        val resolved = resolveDisplaySettings(global, systemDark)
+        !resolved.eInkMode && resolved.palette == DisplayPalettePreset.Sepia
+    } ?: (!eInkMode && (
         theme == ReaderTheme.Sepia && !(sepiaInvertInDark && systemDark) ||
             theme == ReaderTheme.System && systemLightSepia && !systemDark
-        )
+        ))
+
+fun ReaderSettings.resolvedForDisplay(systemDark: Boolean): ReaderSettings {
+    val global = displaySettings ?: return this
+    val resolved = resolveDisplaySettings(global, systemDark)
+    val baseColors = resolveDisplaySettings(global.copy(eInkMode = false), systemDark)
+    val selection = resolved.selection
+    val projectedTheme = when (selection.preset) {
+        DisplayPalettePreset.Light -> ReaderTheme.Light
+        DisplayPalettePreset.Sepia -> ReaderTheme.Sepia
+        DisplayPalettePreset.Dark -> ReaderTheme.Dark
+        DisplayPalettePreset.DarkSepia,
+        DisplayPalettePreset.Custom,
+        -> ReaderTheme.Custom
+    }
+    return copy(
+        theme = projectedTheme,
+        eInkMode = global.eInkMode,
+        uiTheme = if (resolved.isDark) ReaderInterfaceTheme.Dark else ReaderInterfaceTheme.Light,
+        systemLightSepia = false,
+        sepiaInvertInDark = false,
+        customBackgroundColor = baseColors.backgroundColor,
+        customTextColor = baseColors.textColor,
+        customInfoColor = baseColors.infoColor,
+        displaySettings = null,
+    )
+}
 
 interface ReaderSettingsLegacySource {
     fun load(): ReaderSettings
@@ -535,12 +593,14 @@ private val Context.readerSettingsDataStore by preferencesDataStore(name = Reade
 
 fun Context.readerSettingsRepository(
     profileRepository: ProfileRepository? = null,
+    displaySettings: Flow<AppDisplaySettings>? = null,
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ): ReaderSettingsRepository =
     ReaderSettingsRepository(
         dataStore = readerSettingsDataStore,
         legacySource = ReaderSettingsStore(this),
         profileRepository = profileRepository,
+        displaySettings = displaySettings,
         ioDispatcher = ioDispatcher,
     )
 
@@ -548,12 +608,13 @@ class ReaderSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val legacySource: ReaderSettingsLegacySource? = null,
     private val profileRepository: ProfileRepository? = null,
+    private val displaySettings: Flow<AppDisplaySettings>? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val profileSettingsVersion = MutableStateFlow(0)
     private val profileSettingsLock = Mutex()
 
-    val settings: Flow<ReaderSettings> =
+    private val profileSettings: Flow<ReaderSettings> =
         if (profileRepository == null) {
             dataStore.data
                 .onStart { migrateSettingsIfNeeded() }
@@ -569,16 +630,31 @@ class ReaderSettingsRepository(
             }
         }
 
+    val settings: Flow<ReaderSettings> = displaySettings?.let { globalDisplay ->
+        combine(profileSettings, globalDisplay) { reader, display ->
+            reader.withDisplaySettingsProjection(display)
+        }.onStart {
+            // Snapshot legacy colors before profile initialization can create its JSON file.
+            globalDisplay.first()
+        }
+    } ?: profileSettings
+
     suspend fun update(transform: (ReaderSettings) -> ReaderSettings) {
         migrateSettingsIfNeeded()
         if (profileRepository != null) {
             val globalCurrent = dataStore.data.first().toReaderSettings()
             val updated = profileSettingsLock.withLock {
-                val current = globalCurrent.withProfileAppearance(
-                    readProfileAppearanceSettingsOrMigrate(globalCurrent),
-                )
+                val appearance = readProfileAppearanceSettingsOrMigrate(globalCurrent)
+                val current = globalCurrent.withProfileAppearance(appearance).let { reader ->
+                    displaySettings?.first()?.let(reader::withDisplaySettingsProjection) ?: reader
+                }
                 transform(current).also { settings ->
-                    saveProfileAppearanceSettings(settings.toProfileAppearanceSettings())
+                    val appearanceToSave = settings.toProfileAppearanceSettings().let { updatedAppearance ->
+                        if (displaySettings == null) updatedAppearance else updatedAppearance.withLegacyDisplayFrom(appearance)
+                    }
+                    saveProfileAppearanceSettings(
+                        appearanceToSave,
+                    )
                 }
             }
             dataStore.edit { preferences ->
@@ -915,6 +991,131 @@ class ReaderSettingsRepository(
     }
 }
 
+internal class ReaderDisplaySettingsMigrationSource(
+    private val dataStore: DataStore<Preferences>,
+    private val legacySource: ReaderSettingsLegacySource?,
+    private val profileRepository: ProfileRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : AppDisplaySettingsMigrationSource {
+    override suspend fun loadMigrationPayload(): AppDisplayMigrationPayload = withContext(ioDispatcher) {
+        val state = profileRepository.state.value
+        val globalProfile = state.globalActiveProfile
+        val globalFile = profileRepository.readerSettingsFile(globalProfile.id)
+        val active = if (globalFile.isFile) {
+            migrationJson.decodeFromString<ProfileReaderAppearanceSettings>(globalFile.readText())
+                .toLegacyDisplaySnapshot()
+        } else {
+            val preferences = dataStore.data.first()
+            preferences.toLegacyDisplaySnapshotOrNull()
+                ?: legacySource?.load()?.toLegacyDisplaySnapshot()
+        }
+        val imported = buildList {
+            state.profiles.forEach { profile ->
+                val file = profileRepository.readerSettingsFile(profile.id)
+                val snapshot = when {
+                    file.isFile -> migrationJson
+                        .decodeFromString<ProfileReaderAppearanceSettings>(file.readText())
+                        .toLegacyDisplaySnapshot()
+                    profile.id == globalProfile.id -> active
+                    else -> null
+                } ?: return@forEach
+                add(
+                    NamedDisplayPalette(
+                        id = "legacy-${profile.id}",
+                        name = profile.name,
+                        palette = snapshot.toCustomPalette(),
+                    ),
+                )
+            }
+        }
+        AppDisplayMigrationPayload(
+            activeSettings = active,
+            importedPalettes = imported,
+        )
+    }
+
+    private fun Preferences.toLegacyDisplaySnapshotOrNull(): LegacyDisplaySettingsSnapshot? {
+        val hasStoredDisplay = this[DISPLAY_MIGRATED_KEY] != null ||
+            this[DISPLAY_THEME_KEY] != null ||
+            this[DISPLAY_CUSTOM_BACKGROUND_KEY] != null ||
+            this[DISPLAY_CUSTOM_TEXT_KEY] != null ||
+            this[DISPLAY_CUSTOM_INFO_KEY] != null
+        if (!hasStoredDisplay) return null
+        return LegacyDisplaySettingsSnapshot(
+            theme = this[DISPLAY_THEME_KEY].toLegacyDisplayTheme(),
+            eInkMode = this[DISPLAY_E_INK_KEY] ?: false,
+            systemLightSepia = this[DISPLAY_SYSTEM_LIGHT_SEPIA_KEY] ?: false,
+            sepiaInvertInDark = this[DISPLAY_SEPIA_INVERT_KEY] ?: false,
+            customBackgroundColor = this[DISPLAY_CUSTOM_BACKGROUND_KEY] ?: 0xFFFFFFFFL,
+            customTextColor = this[DISPLAY_CUSTOM_TEXT_KEY] ?: 0xFF000000L,
+            customInfoColor = this[DISPLAY_CUSTOM_INFO_KEY] ?: 0xFF999999L,
+        )
+    }
+
+    companion object {
+        private val DISPLAY_MIGRATED_KEY = booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")
+        private val DISPLAY_THEME_KEY = stringPreferencesKey("theme")
+        private val DISPLAY_E_INK_KEY = booleanPreferencesKey("eInkMode")
+        private val DISPLAY_SYSTEM_LIGHT_SEPIA_KEY = booleanPreferencesKey("systemLightSepia")
+        private val DISPLAY_SEPIA_INVERT_KEY = booleanPreferencesKey("sepiaInvertInDark")
+        private val DISPLAY_CUSTOM_BACKGROUND_KEY = longPreferencesKey("customBackgroundColor")
+        private val DISPLAY_CUSTOM_TEXT_KEY = longPreferencesKey("customTextColor")
+        private val DISPLAY_CUSTOM_INFO_KEY = longPreferencesKey("customInfoColor")
+        private val migrationJson = Json { ignoreUnknownKeys = true }
+    }
+}
+
+internal fun Context.readerDisplaySettingsMigrationSource(
+    profileRepository: ProfileRepository,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+): AppDisplaySettingsMigrationSource = ReaderDisplaySettingsMigrationSource(
+    dataStore = readerSettingsDataStore,
+    legacySource = ReaderSettingsStore(this),
+    profileRepository = profileRepository,
+    ioDispatcher = ioDispatcher,
+)
+
+private fun ProfileReaderAppearanceSettings.toLegacyDisplaySnapshot(): LegacyDisplaySettingsSnapshot =
+    LegacyDisplaySettingsSnapshot(
+        theme = theme.toLegacyDisplayTheme(),
+        eInkMode = eInkMode,
+        systemLightSepia = systemLightSepia,
+        sepiaInvertInDark = sepiaInvertInDark,
+        customBackgroundColor = customBackgroundColor,
+        customTextColor = customTextColor,
+        customInfoColor = customInfoColor,
+    )
+
+private fun ReaderSettings.toLegacyDisplaySnapshot(): LegacyDisplaySettingsSnapshot =
+    LegacyDisplaySettingsSnapshot(
+        theme = theme.toLegacyDisplayTheme(),
+        eInkMode = eInkMode,
+        systemLightSepia = systemLightSepia,
+        sepiaInvertInDark = sepiaInvertInDark,
+        customBackgroundColor = customBackgroundColor,
+        customTextColor = customTextColor,
+        customInfoColor = customInfoColor,
+    )
+
+private fun ReaderTheme.toLegacyDisplayTheme(): LegacyDisplayTheme = when (this) {
+    ReaderTheme.System -> LegacyDisplayTheme.System
+    ReaderTheme.Light -> LegacyDisplayTheme.Light
+    ReaderTheme.Dark -> LegacyDisplayTheme.Dark
+    ReaderTheme.Sepia -> LegacyDisplayTheme.Sepia
+    ReaderTheme.Custom -> LegacyDisplayTheme.Custom
+}
+
+private fun String?.toLegacyDisplayTheme(): LegacyDisplayTheme =
+    LegacyDisplayTheme.entries.firstOrNull { it.name == this } ?: LegacyDisplayTheme.System
+
+private fun LegacyDisplaySettingsSnapshot.toCustomPalette(): DisplayPaletteSelection =
+    DisplayPaletteSelection(
+        preset = DisplayPalettePreset.Custom,
+        customBackgroundColor = customBackgroundColor,
+        customTextColor = customTextColor,
+        customInfoColor = customInfoColor,
+    )
+
 @Serializable
 private data class ProfileReaderAppearanceSettings(
     val theme: ReaderTheme = ReaderTheme.System,
@@ -1102,6 +1303,80 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         popupReducedMotionScrollPercent = appearance.popupReducedMotionScrollPercent.coerceIn(40, 100),
         popupReducedMotionSwipeThreshold = appearance.popupReducedMotionSwipeThreshold.coerceIn(0, 100),
     )
+
+private fun ProfileReaderAppearanceSettings.withLegacyDisplayFrom(
+    original: ProfileReaderAppearanceSettings,
+): ProfileReaderAppearanceSettings = copy(
+    theme = original.theme,
+    eInkMode = original.eInkMode,
+    uiTheme = original.uiTheme,
+    systemLightSepia = original.systemLightSepia,
+    sepiaInvertInDark = original.sepiaInvertInDark,
+    customBackgroundColor = original.customBackgroundColor,
+    customTextColor = original.customTextColor,
+    customInfoColor = original.customInfoColor,
+)
+
+private fun ReaderSettings.withDisplaySettingsProjection(display: AppDisplaySettings): ReaderSettings {
+    if (!display.autoSwitch) {
+        return projectLegacySelection(display.singlePalette, display.eInkMode).copy(displaySettings = display)
+    }
+    val light = display.lightPalette.preset
+    val dark = display.darkPalette.preset
+    val legacy = when {
+        light == DisplayPalettePreset.Light && dark == DisplayPalettePreset.Dark -> copy(
+            theme = ReaderTheme.System,
+            systemLightSepia = false,
+            sepiaInvertInDark = false,
+        )
+        light == DisplayPalettePreset.Sepia && dark == DisplayPalettePreset.Dark -> copy(
+            theme = ReaderTheme.System,
+            systemLightSepia = true,
+            sepiaInvertInDark = false,
+        )
+        light == DisplayPalettePreset.Sepia && dark == DisplayPalettePreset.DarkSepia -> copy(
+            theme = ReaderTheme.Sepia,
+            systemLightSepia = false,
+            sepiaInvertInDark = true,
+        )
+        else -> copy(
+            theme = ReaderTheme.System,
+            systemLightSepia = false,
+            sepiaInvertInDark = false,
+        )
+    }
+    return legacy.copy(eInkMode = display.eInkMode, displaySettings = display)
+}
+
+private fun ReaderSettings.projectLegacySelection(
+    selection: DisplayPaletteSelection,
+    eInk: Boolean,
+): ReaderSettings {
+    val single = AppDisplaySettings(
+        autoSwitch = false,
+        singlePalette = selection,
+        eInkMode = false,
+    )
+    val resolved = resolveDisplaySettings(single, systemDark = false)
+    val legacyTheme = when (selection.preset) {
+        DisplayPalettePreset.Light -> ReaderTheme.Light
+        DisplayPalettePreset.Sepia -> ReaderTheme.Sepia
+        DisplayPalettePreset.Dark -> ReaderTheme.Dark
+        DisplayPalettePreset.DarkSepia,
+        DisplayPalettePreset.Custom,
+        -> ReaderTheme.Custom
+    }
+    return copy(
+        theme = legacyTheme,
+        eInkMode = eInk,
+        uiTheme = if (resolved.isDark) ReaderInterfaceTheme.Dark else ReaderInterfaceTheme.Light,
+        systemLightSepia = false,
+        sepiaInvertInDark = false,
+        customBackgroundColor = resolved.backgroundColor,
+        customTextColor = resolved.textColor,
+        customInfoColor = resolved.infoColor,
+    )
+}
 
 internal fun Double.cssNumber(): String =
     String.format(Locale.US, "%.1f", this)

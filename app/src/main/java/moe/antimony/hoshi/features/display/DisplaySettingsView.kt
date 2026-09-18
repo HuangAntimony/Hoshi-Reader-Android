@@ -1,0 +1,714 @@
+package moe.antimony.hoshi.features.display
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.reader.ReaderBottomPanel
+import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
+import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
+import moe.antimony.hoshi.features.reader.readerColorFromHexInput
+import moe.antimony.hoshi.features.reader.readerColorBlue
+import moe.antimony.hoshi.features.reader.readerColorGreen
+import moe.antimony.hoshi.features.reader.readerColorRed
+import moe.antimony.hoshi.features.reader.readerSheetStyle
+import moe.antimony.hoshi.features.reader.toReaderColorHexInput
+import moe.antimony.hoshi.features.reader.withReaderColorBlue
+import moe.antimony.hoshi.features.reader.withReaderColorGreen
+import moe.antimony.hoshi.features.reader.withReaderColorRed
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import moe.antimony.hoshi.ui.HoshiButton
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiSeedColorScheme
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import kotlin.math.roundToInt
+
+@Composable
+internal fun DisplaySettingsScreen(
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: DisplaySettingsViewModel = hiltViewModel(),
+) {
+    SettingsDetailScaffold(
+        title = stringResource(R.string.settings_display),
+        onClose = onClose,
+        modifier = modifier,
+    ) { padding ->
+        DisplaySettingsContent(
+            viewModel = viewModel,
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = padding.calculateTopPadding() + 12.dp,
+                end = 20.dp,
+                bottom = 96.dp,
+            ),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+internal fun DisplaySettingsSheet(
+    onDismiss: () -> Unit,
+    viewModel: DisplaySettingsViewModel = hiltViewModel(),
+) {
+    ReaderBottomPanel(
+        sheetStyle = readerSheetStyle(),
+        onDismiss = onDismiss,
+    ) {
+        Text(
+            text = stringResource(R.string.settings_display),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        DisplaySettingsContent(
+            viewModel = viewModel,
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun DisplaySettingsContent(
+    viewModel: DisplaySettingsViewModel,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settings = state.settings
+    val systemDark = isSystemInDarkTheme()
+
+    if (settings == null) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            if (state.error == null) CircularProgressIndicator()
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .verticalScroll(rememberScrollState())
+                .padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            DisplaySettingsGroup {
+                DisplaySwitchRow(
+                    label = stringResource(R.string.display_settings_auto_switch),
+                    checked = settings.autoSwitch,
+                    enabled = !state.isSaving,
+                    onCheckedChange = { viewModel.setAutoSwitch(it, systemDark) },
+                )
+            }
+
+            if (settings.autoSwitch) {
+                PaletteSlotSection(
+                    title = stringResource(R.string.display_settings_light_palette),
+                    slot = DisplayPaletteSlot.Light,
+                    selection = settings.lightPalette,
+                    presets = listOf(
+                        DisplayPalettePreset.Light,
+                        DisplayPalettePreset.Sepia,
+                        DisplayPalettePreset.Custom,
+                    ),
+                    enabled = !settings.eInkMode && !state.isSaving,
+                    onSelect = viewModel::selectPalettePreset,
+                )
+                PaletteSlotSection(
+                    title = stringResource(R.string.display_settings_dark_palette),
+                    slot = DisplayPaletteSlot.Dark,
+                    selection = settings.darkPalette,
+                    presets = listOf(
+                        DisplayPalettePreset.Dark,
+                        DisplayPalettePreset.DarkSepia,
+                        DisplayPalettePreset.Custom,
+                    ),
+                    enabled = !settings.eInkMode && !state.isSaving,
+                    onSelect = viewModel::selectPalettePreset,
+                )
+            } else {
+                PaletteSlotSection(
+                    title = stringResource(R.string.display_settings_palette),
+                    slot = DisplayPaletteSlot.Single,
+                    selection = settings.singlePalette,
+                    presets = DisplayPalettePreset.entries,
+                    enabled = !settings.eInkMode && !state.isSaving,
+                    onSelect = viewModel::selectPalettePreset,
+                )
+            }
+
+            AccentSection(
+                settings = settings,
+                enabled = !settings.eInkMode && !state.isSaving,
+                resolvedDark = resolveDisplaySettings(settings, systemDark).isDark,
+                onSystem = viewModel::selectSystemAccent,
+                onPreset = viewModel::selectAccentPreset,
+                onCustom = viewModel::openAccentEditor,
+            )
+
+            DisplaySettingsGroup {
+                DisplaySwitchRow(
+                    label = stringResource(R.string.display_settings_eink_mode),
+                    checked = settings.eInkMode,
+                    enabled = !state.isSaving,
+                    onCheckedChange = viewModel::setEInkMode,
+                )
+                if (settings.eInkMode) {
+                    HorizontalDivider(color = hoshiSurfaces.divider)
+                    Text(
+                        text = stringResource(R.string.display_settings_eink_explanation),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = hoshiSurfaces.muted,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    state.paletteDraft?.let { draft ->
+        PaletteEditorDialog(
+            draft = draft,
+            importedPalettes = settings?.importedPalettes.orEmpty(),
+            isSaving = state.isSaving,
+            onUseImported = viewModel::useImportedPalette,
+            onUpdate = viewModel::updatePaletteDraft,
+            onSave = viewModel::savePaletteDraft,
+            onDismiss = viewModel::dismissPaletteEditor,
+        )
+    }
+    state.accentDraft?.let { draft ->
+        AccentEditorDialog(
+            draft = draft,
+            systemDark = settings?.let { resolveDisplaySettings(it, systemDark).isDark } ?: systemDark,
+            isSaving = state.isSaving,
+            onUpdate = viewModel::updateAccentDraft,
+            onSave = viewModel::saveAccentDraft,
+            onDismiss = viewModel::dismissAccentEditor,
+        )
+    }
+    state.error?.let { error ->
+        HoshiAlertDialog(
+            onDismissRequest = {
+                if (settings != null) viewModel.dismissError()
+            },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { Text(error.asString()) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (settings == null) viewModel.retryLoad() else viewModel.dismissError()
+                    },
+                ) {
+                    Text(stringResource(if (settings == null) R.string.reader_appearance_font_retry else R.string.action_ok))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PaletteSlotSection(
+    title: String,
+    slot: DisplayPaletteSlot,
+    selection: DisplayPaletteSelection,
+    presets: List<DisplayPalettePreset>,
+    enabled: Boolean,
+    onSelect: (DisplayPaletteSlot, DisplayPalettePreset) -> Unit,
+) {
+    DisplaySettingsGroup(title = title, enabled = enabled) {
+        presets.forEachIndexed { index, preset ->
+            if (index > 0) HorizontalDivider(color = hoshiSurfaces.divider)
+            DisplayChoiceRow(
+                label = stringResource(preset.labelRes),
+                selected = selection.preset == preset,
+                enabled = enabled,
+                previewColors = if (enabled) palettePreviewColors(preset, selection) else null,
+                onClick = { onSelect(slot, preset) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentSection(
+    settings: AppDisplaySettings,
+    enabled: Boolean,
+    resolvedDark: Boolean,
+    onSystem: () -> Unit,
+    onPreset: (Long) -> Unit,
+    onCustom: () -> Unit,
+) {
+    val matchingPreset = AccentPreset.entries.firstOrNull { it.color == settings.accentSeed }
+    DisplaySettingsGroup(title = stringResource(R.string.display_settings_accent), enabled = enabled) {
+        DisplayChoiceRow(
+            label = stringResource(R.string.display_settings_accent_system),
+            selected = settings.accentSource == DisplayAccentSource.System,
+            enabled = enabled,
+            onClick = onSystem,
+        )
+        AccentPreset.entries.forEach { preset ->
+            HorizontalDivider(color = hoshiSurfaces.divider)
+            DisplayChoiceRow(
+                label = stringResource(preset.labelRes),
+                selected = settings.accentSource == DisplayAccentSource.Custom && matchingPreset == preset,
+                enabled = enabled,
+                previewColor = preset.color.takeIf { enabled },
+                onClick = { onPreset(preset.color) },
+            )
+        }
+        HorizontalDivider(color = hoshiSurfaces.divider)
+        DisplayChoiceRow(
+            label = stringResource(R.string.reader_appearance_theme_custom),
+            selected = settings.accentSource == DisplayAccentSource.Custom && matchingPreset == null,
+            enabled = enabled,
+            previewColor = settings.accentSeed.takeIf { enabled },
+            onClick = onCustom,
+        )
+        if (enabled) {
+            HorizontalDivider(color = hoshiSurfaces.divider)
+            AccentControlPreview(
+                seed = settings.accentSeed.takeIf { settings.accentSource == DisplayAccentSource.Custom },
+                dark = resolvedDark,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentControlPreview(seed: Long?, dark: Boolean) {
+    if (seed == null) {
+        AccentControlPreviewContent()
+    } else {
+        val scheme = remember(seed, dark) { hoshiSeedColorScheme(seed, dark) }
+        MaterialTheme(colorScheme = scheme) { AccentControlPreviewContent() }
+    }
+}
+
+@Composable
+private fun AccentControlPreviewContent() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.display_settings_accent_preview),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        HoshiButton(onClick = {}) {
+            Text(stringResource(R.string.display_settings_accent_preview_action))
+        }
+    }
+}
+
+@Composable
+private fun DisplaySettingsGroup(
+    title: String? = null,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        title?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = hoshiSurfaces.group,
+            contentColor = hoshiSurfaces.content,
+            border = hoshiContainerBorder(),
+            tonalElevation = 0.dp,
+        ) {
+            Column { content() }
+        }
+    }
+}
+
+@Composable
+private fun DisplaySwitchRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(label, modifier = Modifier.weight(1f), color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    }
+}
+
+@Composable
+private fun DisplayChoiceRow(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    previewColor: Long? = null,
+    previewColors: Triple<Long, Long, Long>? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when {
+            previewColors != null -> PaletteSwatch(previewColors)
+            previewColor != null -> ColorSwatch(previewColor)
+        }
+        if (previewColor != null || previewColors != null) Spacer(Modifier.size(10.dp))
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            color = if (enabled) hoshiSurfaces.content else hoshiSurfaces.muted,
+        )
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
+    }
+}
+
+@Composable
+private fun PaletteSwatch(colors: Triple<Long, Long, Long>) {
+    Row(
+        modifier = Modifier
+            .size(width = 50.dp, height = 28.dp)
+            .hoshiContainerOutline(RoundedCornerShape(8.dp)),
+    ) {
+        Box(Modifier.weight(1f).height(28.dp).background(Color(colors.first)))
+        Box(Modifier.weight(1f).height(28.dp).background(Color(colors.second)))
+        Box(Modifier.weight(1f).height(28.dp).background(Color(colors.third)))
+    }
+}
+
+@Composable
+private fun ColorSwatch(color: Long) {
+    Surface(
+        modifier = Modifier.size(28.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(color),
+        border = BorderStroke(1.dp, hoshiSurfaces.outline),
+        tonalElevation = 0.dp,
+    ) {}
+}
+
+@Composable
+private fun PaletteEditorDialog(
+    draft: DisplayPaletteDraft,
+    importedPalettes: List<NamedDisplayPalette>,
+    isSaving: Boolean,
+    onUseImported: (DisplayPaletteSelection) -> Unit,
+    onUpdate: (Long?, Long?, Long?) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var editing by remember { mutableStateOf<PaletteColorField?>(null) }
+    HoshiAlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text(stringResource(R.string.display_settings_custom_palette)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                PalettePreview(draft)
+                ReaderColorSettingRow(
+                    label = stringResource(R.string.reader_appearance_background_color),
+                    color = draft.backgroundColor,
+                    onClick = { if (!isSaving) editing = PaletteColorField.Background },
+                    horizontalPadding = 0.dp,
+                )
+                ReaderColorSettingRow(
+                    label = stringResource(R.string.reader_appearance_text_color),
+                    color = draft.textColor,
+                    onClick = { if (!isSaving) editing = PaletteColorField.Text },
+                    horizontalPadding = 0.dp,
+                )
+                ReaderColorSettingRow(
+                    label = stringResource(R.string.reader_appearance_info_color),
+                    color = draft.infoColor,
+                    onClick = { if (!isSaving) editing = PaletteColorField.Info },
+                    horizontalPadding = 0.dp,
+                )
+                if (importedPalettes.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.display_settings_imported_palettes),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    importedPalettes.forEach { named ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isSaving) { onUseImported(named.palette) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = hoshiSurfaces.nested,
+                            border = hoshiContainerBorder(),
+                            tonalElevation = 0.dp,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(named.name, modifier = Modifier.weight(1f))
+                                PaletteSwatch(palettePreviewColors(DisplayPalettePreset.Custom, named.palette))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave, enabled = !isSaving) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+    editing?.let { field ->
+        val color = when (field) {
+            PaletteColorField.Background -> draft.backgroundColor
+            PaletteColorField.Text -> draft.textColor
+            PaletteColorField.Info -> draft.infoColor
+        }
+        ReaderColorPickerDialog(
+            title = stringResource(field.labelRes),
+            initialColor = color,
+            defaultColor = color,
+            onColorChange = { updated ->
+                if (!isSaving) {
+                    when (field) {
+                        PaletteColorField.Background -> onUpdate(updated, null, null)
+                        PaletteColorField.Text -> onUpdate(null, updated, null)
+                        PaletteColorField.Info -> onUpdate(null, null, updated)
+                    }
+                }
+                editing = null
+            },
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+@Composable
+private fun PalettePreview(draft: DisplayPaletteDraft) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(draft.backgroundColor),
+        border = BorderStroke(1.dp, hoshiSurfaces.outline),
+        tonalElevation = 0.dp,
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.display_settings_palette_preview_title), color = Color(draft.textColor))
+            Text(
+                stringResource(R.string.display_settings_palette_preview_info),
+                color = Color(draft.infoColor),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentEditorDialog(
+    draft: DisplayAccentDraft,
+    systemDark: Boolean,
+    isSaving: Boolean,
+    onUpdate: (Long) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var input by remember(draft.color) { mutableStateOf(draft.color.toReaderColorHexInput(includeAlpha = false)) }
+    val parsed = input.takeIf { it.trim().removePrefix("#").length == 6 }?.let(::readerColorFromHexInput)
+    val invalid = input.isNotBlank() && parsed == null
+    HoshiAlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text(stringResource(R.string.display_settings_custom_accent)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AccentControlPreview(draft.color, systemDark)
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { value ->
+                        input = value
+                        val raw = value.trim().removePrefix("#")
+                        if (raw.length == 6) readerColorFromHexInput(value)?.let(onUpdate)
+                    },
+                    label = { Text(stringResource(R.string.display_settings_accent_hex)) },
+                    supportingText = if (invalid) {
+                        { Text(stringResource(R.string.display_settings_accent_hex_invalid)) }
+                    } else {
+                        null
+                    },
+                    isError = invalid,
+                    singleLine = true,
+                    enabled = !isSaving,
+                    colors = hoshiOutlinedTextFieldColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AccentChannelSlider(
+                    label = stringResource(R.string.reader_appearance_color_red),
+                    value = draft.color.readerColorRed(),
+                    enabled = !isSaving,
+                    onValueChange = { color ->
+                        onUpdate(draft.color.withReaderColorRed(color))
+                        input = draft.color.withReaderColorRed(color).toReaderColorHexInput(includeAlpha = false)
+                    },
+                )
+                AccentChannelSlider(
+                    label = stringResource(R.string.reader_appearance_color_green),
+                    value = draft.color.readerColorGreen(),
+                    enabled = !isSaving,
+                    onValueChange = { color ->
+                        onUpdate(draft.color.withReaderColorGreen(color))
+                        input = draft.color.withReaderColorGreen(color).toReaderColorHexInput(includeAlpha = false)
+                    },
+                )
+                AccentChannelSlider(
+                    label = stringResource(R.string.reader_appearance_color_blue),
+                    value = draft.color.readerColorBlue(),
+                    enabled = !isSaving,
+                    onValueChange = { color ->
+                        onUpdate(draft.color.withReaderColorBlue(color))
+                        input = draft.color.withReaderColorBlue(color).toReaderColorHexInput(includeAlpha = false)
+                    },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onSave, enabled = !isSaving && parsed != null) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun AccentChannelSlider(
+    label: String,
+    value: Int,
+    enabled: Boolean,
+    onValueChange: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(value.toString(), style = MaterialTheme.typography.bodyMedium)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.roundToInt()) },
+            enabled = enabled,
+            valueRange = 0f..255f,
+            steps = 254,
+        )
+    }
+}
+
+private enum class PaletteColorField(val labelRes: Int) {
+    Background(R.string.reader_appearance_background_color),
+    Text(R.string.reader_appearance_text_color),
+    Info(R.string.reader_appearance_info_color),
+}
+
+private enum class AccentPreset(val color: Long, val labelRes: Int) {
+    Purple(0xFF6750A4L, R.string.display_settings_accent_purple),
+    Blue(0xFF1565C0L, R.string.display_settings_accent_blue),
+    Teal(0xFF00796BL, R.string.display_settings_accent_teal),
+    Green(0xFF2E7D32L, R.string.display_settings_accent_green),
+    Yellow(0xFFF9A825L, R.string.display_settings_accent_yellow),
+    Orange(0xFFEF6C00L, R.string.display_settings_accent_orange),
+    Red(0xFFC62828L, R.string.display_settings_accent_red),
+    Pink(0xFFAD1457L, R.string.display_settings_accent_pink),
+}
+
+private val DisplayPalettePreset.labelRes: Int
+    get() = when (this) {
+        DisplayPalettePreset.Light -> R.string.reader_appearance_theme_light
+        DisplayPalettePreset.Sepia -> R.string.reader_appearance_theme_sepia
+        DisplayPalettePreset.Dark -> R.string.reader_appearance_theme_dark
+        DisplayPalettePreset.DarkSepia -> R.string.display_settings_palette_dark_sepia
+        DisplayPalettePreset.Custom -> R.string.reader_appearance_theme_custom
+    }
+
+private fun palettePreviewColors(
+    preset: DisplayPalettePreset,
+    selection: DisplayPaletteSelection,
+): Triple<Long, Long, Long> {
+    val display = resolveDisplaySettings(
+        AppDisplaySettings(autoSwitch = false, singlePalette = selection.copy(preset = preset)),
+        systemDark = false,
+    )
+    return Triple(display.backgroundColor, display.textColor, display.infoColor)
+}

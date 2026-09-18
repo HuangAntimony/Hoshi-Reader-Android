@@ -50,6 +50,7 @@ enum class SettingsDetailSection {
     Dictionaries,
     Anki,
     Profiles,
+    Display,
     Appearance,
     Behavior,
     Advanced,

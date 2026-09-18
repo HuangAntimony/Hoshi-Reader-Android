@@ -19,6 +19,8 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -265,7 +267,8 @@ private fun ReaderFullscreenImageButton(
 ) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        color = hoshiSurfaces.overlay,
+        border = hoshiContainerBorder(),
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         IconButton(onClick = onClick) {

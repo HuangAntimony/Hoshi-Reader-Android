@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.statistics
 
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
+import moe.antimony.hoshi.ui.theme.hoshiGroupOutline
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -20,7 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material3.AlertDialog
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -93,7 +97,7 @@ internal fun StatisticsBookView(
     BackHandler(enabled = state.isSaving) { }
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = hoshiSurfaces.page,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -105,7 +109,7 @@ internal fun StatisticsBookView(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = hoshiSurfaces.page, scrolledContainerColor = hoshiSurfaces.page),
                 navigationIcon = {
                     IconButton(enabled = !state.isSaving, onClick = onClose) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
@@ -131,14 +135,14 @@ internal fun StatisticsBookView(
                     val first = index == 0
                     val last = index == book.statistics.lastIndex
                     Surface(
-                        modifier = if (eInkMode) Modifier.statisticsDayGroupBorder(first, last, outlineColor) else Modifier,
+                        modifier = if (eInkMode) Modifier.hoshiGroupOutline(first, last, outlineColor, StatisticsDayGroupCornerRadius) else Modifier,
                         shape = RoundedCornerShape(
                             topStart = if (first) StatisticsDayGroupCornerRadius else 0.dp,
                             topEnd = if (first) StatisticsDayGroupCornerRadius else 0.dp,
                             bottomStart = if (last) StatisticsDayGroupCornerRadius else 0.dp,
                             bottomEnd = if (last) StatisticsDayGroupCornerRadius else 0.dp,
                         ),
-                        color = MaterialTheme.colorScheme.surface,
+                        color = hoshiSurfaces.group,
                     ) {
                         Column {
                             StatisticsDayRow(statistic, enabled = !state.isSaving, onClick = { viewModel.edit(statistic.dateKey) })
@@ -150,7 +154,7 @@ internal fun StatisticsBookView(
                     Surface(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.surface,
+                        color = hoshiSurfaces.group,
                         border = if (eInkMode) BorderStroke(1.dp, outlineColor) else null,
                     ) {
                         TextButton(enabled = !state.isSaving, onClick = { confirmDeleteAll = true }, contentPadding = PaddingValues(16.dp)) {
@@ -176,6 +180,9 @@ internal fun StatisticsBookView(
     )
     state.draft?.let { draft ->
         ModalBottomSheet(
+            modifier = Modifier.hoshiContainerOutline(androidx.compose.material3.BottomSheetDefaults.ExpandedShape),
+            containerColor = hoshiSurfaces.overlay,
+            tonalElevation = 0.dp,
             onDismissRequest = viewModel::cancelEdit,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !state.isSaving }),
         ) {
@@ -227,25 +234,6 @@ internal fun StatisticsBookView(
             onDismissRequest = viewModel::dismissError,
             text = { Text(error.asString()) },
             confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) } },
-        )
-    }
-}
-
-private fun Modifier.statisticsDayGroupBorder(first: Boolean, last: Boolean, color: Color): Modifier = drawWithContent {
-    drawContent()
-    val strokeWidth = 1.dp.toPx()
-    val inset = strokeWidth / 2f
-    val radius = StatisticsDayGroupCornerRadius.toPx()
-    // Extend past adjoining lazy rows so only the group's outer edges are drawn.
-    val top = if (first) inset else -radius
-    val bottom = if (last) size.height - inset else size.height + radius
-    clipRect {
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(inset, top),
-            size = Size(size.width - strokeWidth, bottom - top),
-            cornerRadius = CornerRadius(radius - inset),
-            style = Stroke(strokeWidth),
         )
     }
 }

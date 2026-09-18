@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
@@ -31,9 +34,9 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Remove
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiButton as Button
+import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -81,7 +84,8 @@ import kotlin.math.round
 @Composable
 internal fun ReaderAppearanceScreen(
     settings: ReaderSettings,
-    onSettingsChange: (ReaderSettings) -> Unit,
+    profileName: String,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     sasayakiSettings: SasayakiSettings,
     onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
@@ -91,7 +95,7 @@ internal fun ReaderAppearanceScreen(
 ) {
     val palette = appearancePalette()
     SettingsDetailScaffold(
-        title = stringResource(R.string.settings_appearance),
+        title = stringResource(R.string.reader_settings_profile_title, profileName),
         onClose = {
             viewModel.cancelDownload()
             onClose()
@@ -102,6 +106,7 @@ internal fun ReaderAppearanceScreen(
     ) { padding ->
         ReaderAppearanceContent(
             settings = settings,
+            profileName = profileName,
             onSettingsChange = onSettingsChange,
             sasayakiSettings = sasayakiSettings,
             onSasayakiSettingsChange = onSasayakiSettingsChange,
@@ -122,8 +127,9 @@ internal fun ReaderAppearanceScreen(
 @Composable
 internal fun ReaderAppearanceSheet(
     settings: ReaderSettings,
+    profileName: String,
     progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
-    onSettingsChange: (ReaderSettings) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     sasayakiSettings: SasayakiSettings,
     onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
@@ -145,6 +151,7 @@ internal fun ReaderAppearanceSheet(
     ) {
         ReaderAppearanceContent(
             settings = settings,
+            profileName = profileName,
             progressDisplay = progressDisplay,
             onSettingsChange = onSettingsChange,
             sasayakiSettings = sasayakiSettings,
@@ -152,7 +159,7 @@ internal fun ReaderAppearanceSheet(
             fontManager = fontManager,
             viewModel = viewModel,
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            showTitle = false,
+            showTitle = true,
             showDone = true,
             onDone = dismissWithDownloadCancel,
             modifier = Modifier
@@ -165,9 +172,10 @@ internal fun ReaderAppearanceSheet(
 @Composable
 private fun ReaderAppearanceContent(
     settings: ReaderSettings,
+    profileName: String,
     modifier: Modifier = Modifier,
     progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
-    onSettingsChange: (ReaderSettings) -> Unit,
+    onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     sasayakiSettings: SasayakiSettings,
     onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
@@ -184,7 +192,6 @@ private fun ReaderAppearanceContent(
     var fontMenuExpanded by remember { mutableStateOf(false) }
     var fontVariantMenuExpanded by remember { mutableStateOf(false) }
     var fontToDelete by remember { mutableStateOf<ReaderFontFamily?>(null) }
-    var colorDialogRow by remember { mutableStateOf<ReaderAppearanceCustomColorRow?>(null) }
     val fontImporter = rememberLauncherForActivityResult(FileImportContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         runCatching {
@@ -216,7 +223,7 @@ private fun ReaderAppearanceContent(
         val family = fontManager.fontFamilies().firstOrNull { it.id == selection.familyId }
         val variant = family?.variants?.firstOrNull { it.id == selection.variantId }
         if (family != null && variant != null) {
-            currentOnSettingsChange(currentSettings.withFontSelection(family, variant))
+            currentOnSettingsChange { current -> current.withFontSelection(family, variant) }
             fontMenuExpanded = false
             fontVariantMenuExpanded = false
         }
@@ -240,71 +247,12 @@ private fun ReaderAppearanceContent(
             ) {
                 if (showTitle) {
                     Text(
-                        text = stringResource(R.string.settings_appearance),
+                        text = stringResource(R.string.reader_settings_profile_title, profileName),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = palette.onBackground,
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
                     )
-                }
-                AppearanceSection(title = stringResource(R.string.reader_appearance_theme), palette = palette) {
-                    val themeLabels = ReaderTheme.entries.associateWith { stringResource(it.labelRes) }
-                    SegmentedRow(
-                        label = stringResource(R.string.settings_appearance),
-                        options = ReaderTheme.entries.map { themeLabels.getValue(it) },
-                        selected = themeLabels.getValue(settings.theme),
-                        onSelected = { label ->
-                            ReaderTheme.entries.firstOrNull { themeLabels.getValue(it) == label }?.let {
-                                onSettingsChange(settings.copy(theme = it))
-                            }
-                        },
-                        palette = palette,
-                    )
-                    AppearanceDivider(palette)
-                    SwitchRow(
-                        label = stringResource(R.string.reader_appearance_eink_mode),
-                        checked = settings.eInkMode,
-                        onCheckedChange = { onSettingsChange(settings.copy(eInkMode = it)) },
-                    )
-                    if (settings.theme == ReaderTheme.System) {
-                        AppearanceDivider(palette)
-                        SwitchRow(
-                            label = stringResource(R.string.reader_appearance_use_sepia_light_theme),
-                            checked = settings.systemLightSepia,
-                            onCheckedChange = { onSettingsChange(settings.copy(systemLightSepia = it)) },
-                        )
-                    }
-                    if (settings.theme == ReaderTheme.Sepia) {
-                        AppearanceDivider(palette)
-                        SwitchRow(
-                            label = stringResource(R.string.reader_appearance_invert_sepia_dark),
-                            checked = settings.sepiaInvertInDark,
-                            onCheckedChange = { onSettingsChange(settings.copy(sepiaInvertInDark = it)) },
-                        )
-                    }
-                    if (readerAppearanceShowsCustomInterfaceTheme(settings)) {
-                        AppearanceDivider(palette)
-                        val interfaceLabels = ReaderInterfaceTheme.entries.associateWith { stringResource(it.labelRes) }
-                        SegmentedRow(
-                            label = stringResource(R.string.reader_appearance_interface),
-                            options = ReaderInterfaceTheme.entries.map { interfaceLabels.getValue(it) },
-                            selected = interfaceLabels.getValue(settings.uiTheme),
-                            onSelected = { label ->
-                                ReaderInterfaceTheme.entries.firstOrNull { interfaceLabels.getValue(it) == label }?.let {
-                                    onSettingsChange(settings.copy(uiTheme = it))
-                                }
-                            },
-                            palette = palette,
-                        )
-                        readerAppearanceCustomColorRows(settings).forEach { row ->
-                            AppearanceDivider(palette)
-                            ReaderColorSettingRow(
-                                label = stringResource(row.labelRes),
-                                color = row.color(settings),
-                                onClick = { colorDialogRow = row },
-                            )
-                        }
-                    }
                 }
                 AppearanceSection(title = stringResource(R.string.reader_appearance_text), palette = palette) {
                     val verticalLabel = stringResource(R.string.reader_appearance_vertical)
@@ -314,7 +262,7 @@ private fun ReaderAppearanceContent(
                         options = listOf(verticalLabel, horizontalLabel),
                         selected = if (settings.verticalWriting) verticalLabel else horizontalLabel,
                         onSelected = { label ->
-                            onSettingsChange(settings.copy(verticalWriting = label == verticalLabel))
+                            onSettingsChange { current -> current.copy(verticalWriting = label == verticalLabel) }
                         },
                         palette = palette,
                     )
@@ -412,8 +360,8 @@ private fun ReaderAppearanceContent(
                     StepperRow(
                         label = stringResource(R.string.reader_appearance_font_size),
                         value = settings.fontSize.toString(),
-                        onDecrease = { onSettingsChange(settings.copy(fontSize = (settings.fontSize - 1).coerceAtLeast(10))) },
-                        onIncrease = { onSettingsChange(settings.copy(fontSize = (settings.fontSize + 1).coerceAtMost(60))) },
+                        onDecrease = { onSettingsChange { current -> current.copy(fontSize = (current.fontSize - 1).coerceAtLeast(10)) } },
+                        onIncrease = { onSettingsChange { current -> current.copy(fontSize = (current.fontSize + 1).coerceAtMost(60)) } },
                         palette = palette,
                     )
                     AppearanceDivider(palette)
@@ -423,9 +371,9 @@ private fun ReaderAppearanceContent(
                         options = furiganaLabels,
                         selected = stringResource(settings.furiganaMode.labelResId),
                         onSelected = { label ->
-                            onSettingsChange(
-                                settings.copy(furiganaMode = FuriganaMode.entries[furiganaLabels.indexOf(label)]),
-                            )
+                            onSettingsChange { current ->
+                                current.copy(furiganaMode = FuriganaMode.entries[furiganaLabels.indexOf(label)])
+                            }
                         },
                         palette = palette,
                     )
@@ -443,15 +391,15 @@ private fun ReaderAppearanceContent(
                             ReaderViewMode.VisualNovel -> visualNovelLabel
                         },
                         onSelected = { label ->
-                            onSettingsChange(
-                                settings.copy(
+                            onSettingsChange { current ->
+                                current.copy(
                                     viewMode = when (label) {
                                         continuousLabel -> ReaderViewMode.Continuous
                                         visualNovelLabel -> ReaderViewMode.VisualNovel
                                         else -> ReaderViewMode.Paginated
                                     },
-                                ),
-                            )
+                                )
+                            }
                         },
                         palette = palette,
                     )
@@ -464,7 +412,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 10f..60f,
                             steps = 9,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(chapterSwipeDistance = (round(value / 5) * 5).toInt()))
+                                onSettingsChange { current ->
+                                    current.copy(chapterSwipeDistance = (round(value / 5) * 5).toInt())
+                                }
                             },
                         )
                     } else if (readerAppearanceShowsPageSwipeThreshold(settings.viewMode)) {
@@ -484,11 +434,11 @@ private fun ReaderAppearanceContent(
                                 ReaderPageSwipeThresholdMaxPx.toFloat(),
                             steps = readerAppearancePageSwipeThresholdSliderSteps(),
                             onValueChange = { value ->
-                                onSettingsChange(
-                                    settings.copy(
+                                onSettingsChange { current ->
+                                    current.copy(
                                         pageSwipeThresholdPx = readerAppearancePageSwipeThresholdFromSlider(value),
-                                    ),
-                                )
+                                    )
+                                }
                             },
                         )
                     }
@@ -505,7 +455,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 0f..120f,
                             steps = 23,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(visualNovelRevealSpeed = (round(value / 5) * 5).toInt()))
+                                onSettingsChange { current ->
+                                    current.copy(visualNovelRevealSpeed = (round(value / 5) * 5).toInt())
+                                }
                             },
                         )
                         AppearanceDivider(palette)
@@ -519,15 +471,15 @@ private fun ReaderAppearanceContent(
                                 VisualNovelScreenMode.Sentences -> sentencesLabel
                             },
                             onSelected = { label ->
-                                onSettingsChange(
-                                    settings.copy(
+                                onSettingsChange { current ->
+                                    current.copy(
                                         visualNovelScreenMode = if (label == sentencesLabel) {
                                             VisualNovelScreenMode.Sentences
                                         } else {
                                             VisualNovelScreenMode.Block
                                         },
-                                    ),
-                                )
+                                    )
+                                }
                             },
                             palette = palette,
                         )
@@ -537,18 +489,20 @@ private fun ReaderAppearanceContent(
                                 label = stringResource(R.string.reader_visual_novel_sentences_per_screen),
                                 value = settings.visualNovelSentencesPerScreen.toString(),
                                 onDecrease = {
-                                    onSettingsChange(
-                                        settings.copy(
-                                            visualNovelSentencesPerScreen = (settings.visualNovelSentencesPerScreen - 1).coerceAtLeast(1),
-                                        ),
-                                    )
+                                    onSettingsChange { current ->
+                                        current.copy(
+                                            visualNovelSentencesPerScreen =
+                                                (current.visualNovelSentencesPerScreen - 1).coerceAtLeast(1),
+                                        )
+                                    }
                                 },
                                 onIncrease = {
-                                    onSettingsChange(
-                                        settings.copy(
-                                            visualNovelSentencesPerScreen = (settings.visualNovelSentencesPerScreen + 1).coerceAtMost(12),
-                                        ),
-                                    )
+                                    onSettingsChange { current ->
+                                        current.copy(
+                                            visualNovelSentencesPerScreen =
+                                                (current.visualNovelSentencesPerScreen + 1).coerceAtMost(12),
+                                        )
+                                    }
                                 },
                                 palette = palette,
                             )
@@ -556,21 +510,29 @@ private fun ReaderAppearanceContent(
                             SwitchRow(
                                 label = stringResource(R.string.reader_visual_novel_preserve_dialogue),
                                 checked = settings.visualNovelPreserveDialogueBubbles,
-                                onCheckedChange = { onSettingsChange(settings.copy(visualNovelPreserveDialogueBubbles = it)) },
+                                onCheckedChange = { checked ->
+                                    onSettingsChange { current ->
+                                        current.copy(visualNovelPreserveDialogueBubbles = checked)
+                                    }
+                                },
                             )
                         }
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_visual_novel_click_advance),
                             checked = settings.visualNovelClickAdvance,
-                            onCheckedChange = { onSettingsChange(settings.copy(visualNovelClickAdvance = it)) },
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current -> current.copy(visualNovelClickAdvance = checked) }
+                            },
                         )
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_visual_novel_merge_cross_screen_sasayaki_cues),
                             checked = settings.visualNovelMergeCrossScreenSasayakiCues,
-                            onCheckedChange = {
-                                onSettingsChange(settings.copy(visualNovelMergeCrossScreenSasayakiCues = it))
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current ->
+                                    current.copy(visualNovelMergeCrossScreenSasayakiCues = checked)
+                                }
                             },
                         )
                     }
@@ -578,16 +540,16 @@ private fun ReaderAppearanceContent(
                     StepperRow(
                         label = stringResource(R.string.reader_appearance_horizontal_padding),
                         value = "${settings.horizontalPadding}%",
-                        onDecrease = { onSettingsChange(settings.copy(horizontalPadding = (settings.horizontalPadding - 1).coerceAtLeast(0))) },
-                        onIncrease = { onSettingsChange(settings.copy(horizontalPadding = (settings.horizontalPadding + 1).coerceAtMost(50))) },
+                        onDecrease = { onSettingsChange { current -> current.copy(horizontalPadding = (current.horizontalPadding - 1).coerceAtLeast(0)) } },
+                        onIncrease = { onSettingsChange { current -> current.copy(horizontalPadding = (current.horizontalPadding + 1).coerceAtMost(50)) } },
                         palette = palette,
                     )
                     AppearanceDivider(palette)
                     StepperRow(
                         label = stringResource(R.string.reader_appearance_vertical_padding),
                         value = "${settings.verticalPadding}%",
-                        onDecrease = { onSettingsChange(settings.copy(verticalPadding = (settings.verticalPadding - 1).coerceAtLeast(0))) },
-                        onIncrease = { onSettingsChange(settings.copy(verticalPadding = (settings.verticalPadding + 1).coerceAtMost(50))) },
+                        onDecrease = { onSettingsChange { current -> current.copy(verticalPadding = (current.verticalPadding - 1).coerceAtLeast(0)) } },
+                        onIncrease = { onSettingsChange { current -> current.copy(verticalPadding = (current.verticalPadding + 1).coerceAtMost(50)) } },
                         palette = palette,
                     )
                     AppearanceDivider(palette)
@@ -598,9 +560,9 @@ private fun ReaderAppearanceContent(
                         valueRange = ReaderTopSafeAreaMinDp.toFloat()..ReaderTopSafeAreaMaxDp.toFloat(),
                         steps = readerAppearanceTopSafeAreaSliderSteps(),
                         onValueChange = { value ->
-                            onSettingsChange(
-                                settings.copy(topSafeAreaDp = readerAppearanceTopSafeAreaFromSlider(value)),
-                            )
+                            onSettingsChange { current ->
+                                current.copy(topSafeAreaDp = readerAppearanceTopSafeAreaFromSlider(value))
+                            }
                         },
                     )
                     AppearanceDivider(palette)
@@ -611,9 +573,9 @@ private fun ReaderAppearanceContent(
                         valueRange = ReaderBottomSafeAreaMinDp.toFloat()..ReaderBottomSafeAreaMaxDp.toFloat(),
                         steps = readerAppearanceBottomSafeAreaSliderSteps(),
                         onValueChange = { value ->
-                            onSettingsChange(
-                                settings.copy(bottomSafeAreaDp = readerAppearanceBottomSafeAreaFromSlider(value)),
-                            )
+                            onSettingsChange { current ->
+                                current.copy(bottomSafeAreaDp = readerAppearanceBottomSafeAreaFromSlider(value))
+                            }
                         },
                     )
                     if (settings.viewMode != ReaderViewMode.VisualNovel) {
@@ -621,26 +583,34 @@ private fun ReaderAppearanceContent(
                         SwitchRow(
                             label = stringResource(R.string.reader_appearance_avoid_page_break),
                             checked = settings.avoidPageBreak,
-                            onCheckedChange = { onSettingsChange(settings.copy(avoidPageBreak = it)) },
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current -> current.copy(avoidPageBreak = checked) }
+                            },
                         )
                     }
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_justify_text),
                         checked = settings.justifyText,
-                        onCheckedChange = { onSettingsChange(settings.copy(justifyText = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(justifyText = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_blur_images),
                         checked = settings.blurImages,
-                        onCheckedChange = { onSettingsChange(settings.copy(blurImages = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(blurImages = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.settings_advanced),
                         checked = settings.layoutAdvanced,
-                        onCheckedChange = { onSettingsChange(settings.copy(layoutAdvanced = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(layoutAdvanced = checked) }
+                        },
                     )
                     if (settings.layoutAdvanced) {
                         AppearanceDivider(palette)
@@ -651,7 +621,7 @@ private fun ReaderAppearanceContent(
                             valueRange = 1.0f..2.5f,
                             steps = 29,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(lineHeight = round(value * 20) / 20.0))
+                                onSettingsChange { current -> current.copy(lineHeight = round(value * 20) / 20.0) }
                             },
                         )
                         AppearanceDivider(palette)
@@ -662,7 +632,7 @@ private fun ReaderAppearanceContent(
                             valueRange = -10f..10f,
                             steps = 19,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(characterSpacing = round(value).toDouble()))
+                                onSettingsChange { current -> current.copy(characterSpacing = round(value).toDouble()) }
                             },
                         )
                         AppearanceDivider(palette)
@@ -673,7 +643,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 0f..3f,
                             steps = 29,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(paragraphSpacing = round(value * 10) / 10.0))
+                                onSettingsChange { current ->
+                                    current.copy(paragraphSpacing = round(value * 10) / 10.0)
+                                }
                             },
                         )
                     }
@@ -682,13 +654,17 @@ private fun ReaderAppearanceContent(
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_progress),
                         checked = settings.showProgress,
-                        onCheckedChange = { onSettingsChange(settings.copy(showProgress = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(showProgress = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_chapter_progress),
                         checked = settings.showChapterProgress,
-                        onCheckedChange = { onSettingsChange(settings.copy(showChapterProgress = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(showChapterProgress = checked) }
+                        },
                     )
                     if (readerAppearanceShowsAlwaysShowProgress(settings)) {
                         AppearanceDivider(palette)
@@ -701,19 +677,25 @@ private fun ReaderAppearanceContent(
                                 },
                             ),
                             checked = settings.showCharacters,
-                            onCheckedChange = { onSettingsChange(settings.copy(showCharacters = it)) },
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current -> current.copy(showCharacters = checked) }
+                            },
                         )
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_appearance_show_percentage),
                             checked = settings.showPercentage,
-                            onCheckedChange = { onSettingsChange(settings.copy(showPercentage = it)) },
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current -> current.copy(showPercentage = checked) }
+                            },
                         )
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_appearance_always_show_progress),
                             checked = settings.alwaysShowProgress,
-                            onCheckedChange = { onSettingsChange(settings.copy(alwaysShowProgress = it)) },
+                            onCheckedChange = { checked ->
+                                onSettingsChange { current -> current.copy(alwaysShowProgress = checked) }
+                            },
                         )
                     }
                     if (readerAppearanceShowsProgressPosition(settings)) {
@@ -724,7 +706,9 @@ private fun ReaderAppearanceContent(
                             label = stringResource(R.string.reader_appearance_progress_position),
                             options = listOf(topLabel, bottomLabel),
                             selected = if (settings.showProgressTop) topLabel else bottomLabel,
-                            onSelected = { label -> onSettingsChange(settings.copy(showProgressTop = label == topLabel)) },
+                            onSelected = { label ->
+                                onSettingsChange { current -> current.copy(showProgressTop = label == topLabel) }
+                            },
                             palette = palette,
                         )
                     }
@@ -733,13 +717,17 @@ private fun ReaderAppearanceContent(
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_title),
                         checked = settings.showTitle,
-                        onCheckedChange = { onSettingsChange(settings.copy(showTitle = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(showTitle = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_back_button),
                         checked = settings.showReaderBackButton,
-                        onCheckedChange = { onSettingsChange(settings.copy(showReaderBackButton = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(showReaderBackButton = checked) }
+                        },
                     )
                     readerAppearanceStatisticsRows().forEach { row ->
                         AppearanceDivider(palette)
@@ -747,7 +735,7 @@ private fun ReaderAppearanceContent(
                             label = stringResource(row.labelRes),
                             checked = row.checked(settings),
                             onCheckedChange = { checked ->
-                                onSettingsChange(row.updated(settings, checked))
+                                onSettingsChange { current -> row.updated(current, checked) }
                             },
                         )
                     }
@@ -770,7 +758,9 @@ private fun ReaderAppearanceContent(
                         valueRange = 100f..700f,
                         steps = 59,
                         onValueChange = { value ->
-                            onSettingsChange(settings.copy(popupWidth = (round(value / 10) * 10).toInt()))
+                            onSettingsChange { current ->
+                                current.copy(popupWidth = (round(value / 10) * 10).toInt())
+                            }
                         },
                     )
                     AppearanceDivider(palette)
@@ -781,7 +771,9 @@ private fun ReaderAppearanceContent(
                         valueRange = 100f..1000f,
                         steps = 89,
                         onValueChange = { value ->
-                            onSettingsChange(settings.copy(popupHeight = (round(value / 10) * 10).toInt()))
+                            onSettingsChange { current ->
+                                current.copy(popupHeight = (round(value / 10) * 10).toInt())
+                            }
                         },
                     )
                     AppearanceDivider(palette)
@@ -794,14 +786,16 @@ private fun ReaderAppearanceContent(
                         onValueChange = { value ->
                             val step = ReaderPopupScaleStep.toFloat()
                             val roundedScale = (round(value / step) * step).toDouble()
-                            onSettingsChange(settings.copy(popupScale = roundedScale))
+                            onSettingsChange { current -> current.copy(popupScale = roundedScale) }
                         },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_reduced_motion_scrolling),
                         checked = settings.popupReducedMotionScrolling,
-                        onCheckedChange = { onSettingsChange(settings.copy(popupReducedMotionScrolling = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(popupReducedMotionScrolling = checked) }
+                        },
                     )
                     if (settings.popupReducedMotionScrolling) {
                         AppearanceDivider(palette)
@@ -812,7 +806,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 40f..100f,
                             steps = 5,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(popupReducedMotionScrollPercent = (round(value / 10) * 10).toInt()))
+                                onSettingsChange { current ->
+                                    current.copy(popupReducedMotionScrollPercent = (round(value / 10) * 10).toInt())
+                                }
                             },
                         )
                         AppearanceDivider(palette)
@@ -823,7 +819,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 0f..100f,
                             steps = 9,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(popupReducedMotionSwipeThreshold = (round(value / 10) * 10).toInt()))
+                                onSettingsChange { current ->
+                                    current.copy(popupReducedMotionSwipeThreshold = (round(value / 10) * 10).toInt())
+                                }
                             },
                         )
                     }
@@ -831,19 +829,25 @@ private fun ReaderAppearanceContent(
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_show_action_bar),
                         checked = settings.popupActionBar,
-                        onCheckedChange = { onSettingsChange(settings.copy(popupActionBar = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(popupActionBar = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_full_width),
                         checked = settings.popupFullWidth,
-                        onCheckedChange = { onSettingsChange(settings.copy(popupFullWidth = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(popupFullWidth = checked) }
+                        },
                     )
                     AppearanceDivider(palette)
                     SwitchRow(
                         label = stringResource(R.string.reader_appearance_swipe_to_dismiss),
                         checked = settings.popupSwipeToDismiss,
-                        onCheckedChange = { onSettingsChange(settings.copy(popupSwipeToDismiss = it)) },
+                        onCheckedChange = { checked ->
+                            onSettingsChange { current -> current.copy(popupSwipeToDismiss = checked) }
+                        },
                     )
                     if (settings.popupSwipeToDismiss) {
                         AppearanceDivider(palette)
@@ -854,7 +858,9 @@ private fun ReaderAppearanceContent(
                             valueRange = 20f..60f,
                             steps = 7,
                             onValueChange = { value ->
-                                onSettingsChange(settings.copy(popupSwipeThreshold = (round(value / 5) * 5).toInt()))
+                                onSettingsChange { current ->
+                                    current.copy(popupSwipeThreshold = (round(value / 5) * 5).toInt())
+                                }
                             },
                         )
                     }
@@ -886,7 +892,7 @@ private fun ReaderAppearanceContent(
                     onClick = {
                         viewModel.deleteFamily(family.id)
                         if (selectedFontSpec.familyId == family.id) {
-                            onSettingsChange(settings.withDefaultFont())
+                            onSettingsChange { current -> current.withDefaultFont() }
                         }
                         fontToDelete = null
                     },
@@ -943,20 +949,6 @@ private fun ReaderAppearanceContent(
             },
         )
     }
-    colorDialogRow?.let { row ->
-        ReaderColorPickerDialog(
-            title = stringResource(row.labelRes),
-            initialColor = row.color(settings),
-            defaultColor = row.defaultColor,
-            onColorChange = { color ->
-                onSettingsChange(row.updated(settings, color))
-                colorDialogRow = null
-            },
-            onDismiss = { colorDialogRow = null },
-            previewBorderColor = palette.divider,
-            cursorColor = palette.onGroup,
-        )
-    }
 }
 
 internal fun readerAppearanceSasayakiRows(settings: SasayakiSettings): List<Int> =
@@ -966,16 +958,6 @@ internal fun readerAppearanceFontOptions(importedFontNames: List<String>, select
     (listOf(ReaderFontManager.publisherFont) + ReaderFontManager.defaultFonts + importedFontNames + selectedFont)
         .filter { it.isNotBlank() }
         .distinct()
-
-internal fun readerAppearanceShowsCustomInterfaceTheme(settings: ReaderSettings): Boolean =
-    settings.theme == ReaderTheme.Custom
-
-internal fun readerAppearanceCustomColorRows(settings: ReaderSettings): List<ReaderAppearanceCustomColorRow> =
-    if (settings.theme == ReaderTheme.Custom) {
-        ReaderAppearanceCustomColorRow.entries
-    } else {
-        emptyList()
-    }
 
 internal fun readerAppearanceShowsAlwaysShowProgress(settings: ReaderSettings): Boolean =
     settings.showProgress || settings.showChapterProgress
@@ -1034,44 +1016,6 @@ internal enum class ReaderAppearanceStatisticsRow(@get:StringRes val labelRes: I
         }
 }
 
-internal enum class ReaderAppearanceCustomColorRow(@get:StringRes val labelRes: Int, val defaultColor: Long) {
-    Background(R.string.reader_appearance_background_color, 0xFFFFFFFF),
-    Text(R.string.reader_appearance_text_color, 0xFF000000),
-    Info(R.string.reader_appearance_info_color, 0xFF999999);
-
-    fun color(settings: ReaderSettings): Long =
-        when (this) {
-            Background -> settings.customBackgroundColor
-            Text -> settings.customTextColor
-            Info -> settings.customInfoColor
-        }
-
-    fun updated(settings: ReaderSettings, color: Long): ReaderSettings =
-        when (this) {
-            Background -> settings.copy(customBackgroundColor = color)
-            Text -> settings.copy(customTextColor = color)
-            Info -> settings.copy(customInfoColor = color)
-        }
-}
-
-@get:StringRes
-private val ReaderTheme.labelRes: Int
-    get() = when (this) {
-        ReaderTheme.System -> R.string.reader_appearance_theme_system
-        ReaderTheme.Light -> R.string.reader_appearance_theme_light
-        ReaderTheme.Dark -> R.string.reader_appearance_theme_dark
-        ReaderTheme.Sepia -> R.string.reader_appearance_theme_sepia
-        ReaderTheme.Custom -> R.string.reader_appearance_theme_custom
-    }
-
-@get:StringRes
-private val ReaderInterfaceTheme.labelRes: Int
-    get() = when (this) {
-        ReaderInterfaceTheme.System -> R.string.reader_appearance_theme_system
-        ReaderInterfaceTheme.Light -> R.string.reader_appearance_theme_light
-        ReaderInterfaceTheme.Dark -> R.string.reader_appearance_theme_dark
-    }
-
 @Composable
 private fun AppearanceSection(
     title: String,
@@ -1092,7 +1036,7 @@ private fun AppearanceSection(
             shape = RoundedCornerShape(metrics.appearanceSectionCornerRadiusDp.dp),
             color = palette.group,
             contentColor = palette.onGroup,
-            border = BorderStroke(1.dp, palette.divider),
+            border = hoshiContainerBorder(),
             tonalElevation = 0.dp,
         ) {
             Column(content = content)
@@ -1165,7 +1109,7 @@ private fun IosSegmentedControl(
         shape = RoundedCornerShape(17.dp),
         color = palette.segmentContainer,
         contentColor = palette.onGroup,
-        border = BorderStroke(1.dp, palette.segmentBorder),
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -1175,6 +1119,7 @@ private fun IosSegmentedControl(
                         .weight(1f)
                         .fillMaxSize()
                         .background(if (option == selected) palette.segmentSelected else Color.Transparent)
+                        .then(if (option == selected) Modifier.hoshiContainerOutline(androidx.compose.ui.graphics.RectangleShape) else Modifier)
                         .clickable(enabled = option != selected) { onSelected(option) },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1572,6 +1517,7 @@ private fun StepperRow(
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = palette.stepperContainer,
+                border = hoshiContainerBorder(),
                 contentColor = palette.onGroup,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1635,16 +1581,16 @@ private fun appearancePalette(): AppearancePalette {
     val colorScheme = MaterialTheme.colorScheme
     val segmentedControlColors = readerSegmentedControlColors(
         eInkMode = LocalHoshiEInkMode.current,
-        background = colorScheme.background,
+        background = hoshiSurfaces.page,
         content = colorScheme.onBackground,
-        surfaceVariant = colorScheme.surfaceVariant,
-        primaryContainer = colorScheme.primaryContainer,
-        onPrimaryContainer = colorScheme.onPrimaryContainer,
+        surfaceVariant = hoshiSurfaces.nested,
+        primaryContainer = hoshiSurfaces.selected,
+        onPrimaryContainer = colorScheme.onSurface,
         outlineVariant = colorScheme.outlineVariant,
     )
     return AppearancePalette(
-        background = colorScheme.background,
-        group = colorScheme.surface,
+        background = hoshiSurfaces.page,
+        group = hoshiSurfaces.group,
         onBackground = colorScheme.onBackground,
         onGroup = colorScheme.onSurface,
         onMuted = colorScheme.onSurfaceVariant,
@@ -1654,7 +1600,7 @@ private fun appearancePalette(): AppearancePalette {
         segmentSelectedContent = segmentedControlColors.selectedContent,
         segmentUnselectedContent = segmentedControlColors.unselectedContent,
         segmentBorder = segmentedControlColors.border,
-        stepperContainer = colorScheme.surfaceVariant,
+        stepperContainer = hoshiSurfaces.nested,
         stepperDivider = colorScheme.outline,
     )
 }
@@ -1686,7 +1632,7 @@ internal fun readerSegmentedControlColors(
         )
     } else {
         ReaderSegmentedControlColors(
-            container = surfaceVariant.copy(alpha = 0.5f),
+            container = surfaceVariant,
             selected = primaryContainer,
             selectedContent = onPrimaryContainer,
             unselectedContent = content,

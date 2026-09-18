@@ -86,6 +86,49 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
+### Display & Theme
+
+Preserve app data and cover all four tabs, every settings category, native Reader
+panels, dialogs, menus, and Process Text lookup:
+
+- Fixed Light, Sepia, Dark, Warm Dark and Custom; automatic preset/custom pairs
+  and two different custom palettes. Change system night mode while foregrounded
+  and backgrounded. Editing the inactive slot must not change the current theme.
+- First enabling automatic switching places the current palette on its matching
+  brightness side; disabling keeps the currently displayed palette. Re-enabling
+  restores both saved slots. Each slot retains its custom colors after preset
+  changes. Canceling any editor keeps the previous settings, including alpha.
+- System dynamic colors on Android 12+, the fixed fallback on older Android,
+  all eight accent seeds and extreme custom seeds. Reader background/text retain
+  their own colors while controls and native containers use the accent scheme.
+- Light and dark E-ink: compare every tonal container with ordinary mode and
+  verify actual outlines on groups, nested controls, filled buttons, segmented
+  tracks/selections, popups, panels and navigation boundaries. Lazy groups need a
+  continuous closed outline with one row, multiple rows and during scrolling.
+  Palette/accent editing is disabled with an explanation; automatic switching
+  stays available and disabling E-ink restores all saved colors.
+- Upgrade every legacy theme, including Sepia inversion and alpha custom colors.
+  Start with a global profile and a different last-book profile, with automatic
+  book opening enabled: migration must use the global profile before opening the
+  book. Reopen, change language/profile, and create/copy profiles; colors and E-ink
+  must stay global. Distinct old custom colors remain importable.
+- Test narrow Chinese layouts and enlarged fonts, empty/loading/error/disabled
+  states, cold launch, restart, foreground/background, and opening both Reader
+  settings panels. Reading Settings identifies the effective profile. Changing
+  display settings preserves reading position, selection, and an open lookup.
+- Check initial loading/migration failures and retriable persistence failures:
+  no default-theme content flash, no lost confirmed setting, and localized errors.
+  Rapidly change two independent reading settings during delayed storage and
+  confirm that both survive; repeated stepper taps must accumulate every increment.
+  MainActivity and Process Text must agree on theme.
+
+Automated display regressions live in `features/display`, Reader settings/host
+tests, Reader display-update tests, and `ui/theme/HoshiSurfaceRolesTest`.
+Device inspection remains necessary for outlines and transitions; passing JVM
+tests does not establish visual acceptance.
+
+### Reading And Lookup Flows
+
 Reader work should compare against
 `reference/Hoshi-Reader-iOS/Features/Reader/ReaderWebView/ReaderWebView.swift`
 and the matching JS/CSS before adding Android-specific behavior.

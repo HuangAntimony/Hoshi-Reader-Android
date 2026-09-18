@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,10 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
+import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -135,7 +137,7 @@ fun AnkiView(
             item {
                 AnkiCard {
                     ListItem(
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text(if (uiState.settings.backendKind == AnkiBackendKind.AnkiConnect) "AnkiConnect" else "AnkiDroid") },
                         supportingContent = {
                             Column {
@@ -178,7 +180,7 @@ fun AnkiView(
                     uiState.settings.cardFormats.forEachIndexed { index, format ->
                         ListItem(
                             modifier = Modifier.clickable { onOpenFormat(format.id) },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                             leadingContent = { AnkiFormatIconView(format.icon) },
                             headlineContent = { Text(format.name) },
                             supportingContent = {
@@ -209,7 +211,7 @@ fun AnkiView(
                             modifier = Modifier.clickable {
                                 viewModel.addCardFormat(nextFormatName)
                             },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                             leadingContent = { Icon(Icons.Default.Add, contentDescription = null) },
                             headlineContent = { Text(stringResource(R.string.anki_add_format)) },
                         )
@@ -249,7 +251,7 @@ fun AnkiView(
                     AnkiDivider()
                     ListItem(
                         modifier = Modifier.clickable(onClick = onOpenAdvanced),
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text(stringResource(R.string.settings_advanced)) },
                         trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
                     )
@@ -351,7 +353,7 @@ fun AnkiCardFormatView(
                 AnkiCard {
                     AnkiTextValueRow(stringResource(R.string.anki_format_name), format.name, { viewModel.updateFormatName(formatId, it) }, stringResource(R.string.anki_format_name))
                     ListItem(
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text(stringResource(R.string.anki_format_icon)) },
                         supportingContent = { AnkiFormatIconView(format.icon) },
                         trailingContent = {
@@ -634,7 +636,7 @@ private fun <T> AnkiDropdownRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
         headlineContent = { Text(label) },
         supportingContent = { Text(value) },
         trailingContent = {
@@ -664,7 +666,7 @@ private fun AnkiSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
         headlineContent = { Text(label) },
         supportingContent = supportingText?.let { text -> { Text(text) } },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
@@ -841,8 +843,8 @@ private fun AnkiCard(content: @Composable () -> Unit) {
             .fillMaxWidth()
             .padding(bottom = 12.dp),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = hoshiSurfaces.group,
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         Column(content = { content() })

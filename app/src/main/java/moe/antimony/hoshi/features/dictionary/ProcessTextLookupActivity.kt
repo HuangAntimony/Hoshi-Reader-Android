@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.dictionary
 
+import moe.antimony.hoshi.features.display.DisplayAccentSource
+import moe.antimony.hoshi.features.reader.ReaderSettingsHostError
+import moe.antimony.hoshi.features.reader.ReaderSettingsHostViewModel
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
@@ -116,20 +119,19 @@ class ProcessTextLookupActivity : ComponentActivity() {
         setFinishOnTouchOutside(true)
 
         setContent {
-            var readerSettings by remember { mutableStateOf<ReaderSettings?>(null) }
-            LaunchedEffect(dependencies) {
-                dependencies.readerSettingsRepository.settings.collect { settings ->
-                    readerSettings = settings
-                }
-            }
-            val loadedReaderSettings = readerSettings ?: return@setContent
+            val settingsViewModel: ReaderSettingsHostViewModel = hiltViewModel()
+            val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+            val loadedReaderSettings = settingsState.settings
             val profileState by dependencies.profileRepository.state.collectAsStateWithLifecycle()
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             HoshiReaderTheme(
-                darkTheme = loadedReaderSettings.usesDarkInterface(systemDark),
-                eInkMode = loadedReaderSettings.eInkMode,
-                useDarkSystemBarIcons = loadedReaderSettings.usesDarkSystemBarIcons(systemDark),
+                darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark,
+                eInkMode = loadedReaderSettings?.eInkMode ?: false,
+                useDarkSystemBarIcons = loadedReaderSettings?.usesDarkSystemBarIcons(systemDark) ?: !systemDark,
+                accentSeed = loadedReaderSettings?.displaySettings?.takeIf { it.accentSource == DisplayAccentSource.Custom }?.accentSeed,
             ) {
+                ReaderSettingsHostError(settingsState, settingsViewModel)
+                if (loadedReaderSettings == null) return@HoshiReaderTheme
                 ProcessTextLookupOverlay(
                     query = request.query,
                     readerSettings = loadedReaderSettings,

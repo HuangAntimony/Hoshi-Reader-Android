@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.settings
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
@@ -27,7 +29,7 @@ fun SettingsDetailScaffold(
     title: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.background,
+    containerColor: Color = hoshiSurfaces.page,
     contentColor: Color = MaterialTheme.colorScheme.onBackground,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,

@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ScrollState
@@ -235,7 +238,8 @@ private fun ReaderGoToTabs(
         modifier = modifier
             .fillMaxWidth()
             .selectableGroup()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .background(hoshiSurfaces.nested, RoundedCornerShape(12.dp))
+            .hoshiContainerOutline(RoundedCornerShape(12.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -251,9 +255,10 @@ private fun ReaderGoToTabs(
                 modifier = Modifier
                     .weight(1f)
                     .background(
-                        color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                        color = if (selected) hoshiSurfaces.selected else Color.Transparent,
                         shape = RoundedCornerShape(10.dp),
                     )
+                    .then(if (selected) Modifier.hoshiContainerOutline(RoundedCornerShape(10.dp)) else Modifier)
                     .selectable(
                         selected = selected,
                         role = ReaderGoToTabRole,
@@ -266,7 +271,7 @@ private fun ReaderGoToTabs(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) hoshiSurfaces.onSelected else hoshiSurfaces.muted,
                 )
             }
         }
@@ -339,7 +344,8 @@ private fun ReaderCompactSearchField(
             .fillMaxWidth()
             .heightIn(min = 40.dp),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = hoshiSurfaces.group,
+        border = hoshiContainerBorder(),
         tonalElevation = 0.dp,
     ) {
         Row(
@@ -468,7 +474,7 @@ private fun ReaderSearchResultsContent(
                         chapterLabel = label.ifBlank { stringResource(R.string.reader_untitled_chapter) },
                         onClick = { onJump(result) },
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -550,7 +556,7 @@ private fun ReaderGoToChaptersTab(
                     onJump(ReaderChapterPosition(index = row.spineIndex, progress = 0.0), row.fragment)
                 },
             )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -602,7 +608,7 @@ private fun ReaderGoToHighlightsTab(
                         onJump = { onJump(highlight) },
                         onDelete = { onDelete(highlight) },
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }

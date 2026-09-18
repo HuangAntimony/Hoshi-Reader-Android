@@ -23,7 +23,10 @@ import moe.antimony.hoshi.features.bookshelf.BookshelfSettingsRepository
 import moe.antimony.hoshi.features.bookshelf.bookshelfSettingsRepository
 import moe.antimony.hoshi.features.dictionary.DictionarySettingsRepository
 import moe.antimony.hoshi.features.dictionary.dictionarySettingsRepository
+import moe.antimony.hoshi.features.display.AppDisplaySettingsRepository
+import moe.antimony.hoshi.features.display.appDisplaySettingsRepository
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
+import moe.antimony.hoshi.features.reader.readerDisplaySettingsMigrationSource
 import moe.antimony.hoshi.features.reader.readerSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.sasayaki.sasayakiSettingsRepository
@@ -94,12 +97,27 @@ internal object HoshiAppModule {
 
     @Provides
     @Singleton
-    fun provideReaderSettingsRepository(
+    fun provideAppDisplaySettingsRepository(
         @ApplicationContext context: Context,
         profileRepository: ProfileRepository,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ): AppDisplaySettingsRepository = context.appDisplaySettingsRepository(
+        migrationSource = context.readerDisplaySettingsMigrationSource(profileRepository, ioDispatcher),
+    )
+
+    @Provides
+    @Singleton
+    fun provideReaderSettingsRepository(
+        @ApplicationContext context: Context,
+        profileRepository: ProfileRepository,
+        appDisplaySettingsRepository: AppDisplaySettingsRepository,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): ReaderSettingsRepository =
-        context.readerSettingsRepository(profileRepository, ioDispatcher)
+        context.readerSettingsRepository(
+            profileRepository = profileRepository,
+            displaySettings = appDisplaySettingsRepository.settings,
+            ioDispatcher = ioDispatcher,
+        )
 
     @Provides
     @Singleton

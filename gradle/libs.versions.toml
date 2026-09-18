@@ -24,6 +24,7 @@ androidxHilt = "1.3.0"
 ksp = "2.3.9"
 
 [libraries]
+material-color-utilities = { module = "com.materialkolor:material-color-utilities", version = "4.1.1" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-media3-datasource = { group = "androidx.media3", name = "media3-datasource", version.ref = "media3" }

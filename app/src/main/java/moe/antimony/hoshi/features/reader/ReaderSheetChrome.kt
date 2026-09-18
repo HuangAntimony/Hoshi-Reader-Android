@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -90,7 +92,7 @@ internal data class ReaderSheetStyle(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun readerSheetStyle(eInkMode: Boolean = LocalHoshiEInkMode.current): ReaderSheetStyle {
-    val containerColor = if (eInkMode) MaterialTheme.colorScheme.surface else BottomSheetDefaults.ContainerColor
+    val containerColor = hoshiSurfaces.overlay
     return ReaderSheetStyle(
         containerColor = containerColor,
         contentColor = if (eInkMode) MaterialTheme.colorScheme.onSurface else contentColorFor(containerColor),
@@ -133,6 +135,7 @@ internal fun ReaderBottomPanel(
             shape = BottomSheetDefaults.ExpandedShape,
             color = sheetStyle.containerColor,
             contentColor = sheetStyle.contentColor,
+            border = hoshiContainerBorder(),
             tonalElevation = 0.dp,
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -215,7 +218,6 @@ internal fun ReaderSheetDragHandle(
             modifier = modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ReaderSheetTopOutline()
             BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {

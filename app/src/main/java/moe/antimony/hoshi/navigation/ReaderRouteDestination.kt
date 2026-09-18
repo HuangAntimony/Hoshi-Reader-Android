@@ -44,7 +44,7 @@ internal fun ReaderRouteDestination(
     bookId: String,
     stateHolder: ReaderRouteStateHolder,
     readerSettings: ReaderSettings,
-    onReaderSettingsChange: (ReaderSettings) -> Unit,
+    onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit,
     onBookmarkSaved: () -> Unit,
     onClose: () -> Unit,
@@ -216,9 +216,9 @@ internal fun ReaderRouteDestination(
                     initialChapterIndex = readyState.bookmark?.chapterIndex ?: 0,
                     initialProgress = readyState.bookmark?.progress ?: 0.0,
                     readerSettings = routeReaderSettings,
-                    onReaderSettingsChange = { settings ->
-                        routeReaderSettings = settings
-                        onReaderSettingsChange(settings)
+                    onReaderSettingsChange = { transform ->
+                        routeReaderSettings = transform(routeReaderSettings)
+                        onReaderSettingsChange(transform)
                     },
                     onReaderKeyEventHandlerChange = onReaderKeyEventHandlerChange,
                     onSaveBookmark = { chapterIndex, progress, statistics ->

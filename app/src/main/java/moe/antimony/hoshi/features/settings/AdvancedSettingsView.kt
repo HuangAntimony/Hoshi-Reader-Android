@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.settings
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +44,7 @@ import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsView
 @Composable
 fun AdvancedSettingsView(
     readerSettings: ReaderSettings,
-    onReaderSettingsChange: (ReaderSettings) -> Unit,
+    onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -97,7 +99,7 @@ fun AdvancedSettingsView(
         title = stringResource(R.string.settings_advanced),
         onClose = onClose,
         modifier = modifier.fillMaxSize(),
-        containerColor = colorScheme.background,
+        containerColor = hoshiSurfaces.page,
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier

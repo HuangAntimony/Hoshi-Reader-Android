@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.statistics
 
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -69,9 +71,9 @@ internal fun StatisticsGoalPicker(
         Surface(
             modifier = Modifier.width(260.dp),
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = hoshiSurfaces.overlay,
             shadowElevation = if (eInk) 0.dp else 8.dp,
-            border = if (eInk) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+            border = hoshiContainerBorder(),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -138,8 +140,8 @@ private fun GoalValueWheel(values: List<Int>, value: Int, onSelect: (Int) -> Uni
         Surface(
             modifier = Modifier.fillMaxWidth().height(36.dp),
             shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            border = if (eInk) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+            color = hoshiSurfaces.nested,
+            border = hoshiContainerBorder(),
         ) {}
         LazyColumn(
             state = list,

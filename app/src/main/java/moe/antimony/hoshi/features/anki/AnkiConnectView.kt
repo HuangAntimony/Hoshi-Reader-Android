@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -15,8 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ReportProblem
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
+import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -151,7 +153,7 @@ fun AnkiConnectView(
             item {
                 AnkiConnectCard {
                     ListItem(
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text(stringResource(R.string.anki_connect_use)) },
                         supportingContent = {
                             Text(stringResource(R.string.anki_connect_use_description))
@@ -202,7 +204,7 @@ fun AnkiConnectView(
                 item {
                     AnkiConnectCard {
                         ListItem(
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                             headlineContent = { Text(stringResource(R.string.anki_connect_address)) },
                             supportingContent = {
                                 val noneLabel = stringResource(R.string.none)
@@ -228,7 +230,7 @@ fun AnkiConnectView(
                         )
                         HorizontalDivider()
                         ListItem(
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                             headlineContent = { Text(stringResource(R.string.anki_connect_api_key)) },
                             supportingContent = {
                                 Text(
@@ -252,7 +254,7 @@ fun AnkiConnectView(
                         )
                         HorizontalDivider()
                         ListItem(
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                             headlineContent = { Text(stringResource(R.string.anki_connect_connection)) },
                             supportingContent = {
                                 Text(
@@ -313,9 +315,9 @@ internal fun shouldShowAnkiConnectSetupWarning(backendKind: AnkiBackendKind): Bo
 private fun AnkiConnectCard(content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = hoshiSurfaces.group,
+        tonalElevation = 0.dp,
+        border = hoshiContainerBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp),
@@ -333,7 +335,7 @@ private fun AnkiConnectSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
         headlineContent = { Text(label) },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
     )
@@ -346,7 +348,7 @@ private fun AnkiConnectDuplicateScopeRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
     ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
         headlineContent = { Text(stringResource(R.string.anki_connect_duplicate_scope)) },
         supportingContent = { Text(stringResource(scope.labelRes)) },
         trailingContent = {

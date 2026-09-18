@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.ui
 
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,13 +53,13 @@ fun HoshiBlockingProgressOverlay(
                 .padding(24.dp)
                 .widthIn(max = 320.dp),
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = hoshiSurfaces.overlay,
             border = if (eInkMode) {
                 BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
             } else {
                 null
             },
-            tonalElevation = if (eInkMode) 0.dp else 4.dp,
+            tonalElevation = 0.dp,
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
