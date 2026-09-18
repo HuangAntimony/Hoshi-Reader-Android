@@ -342,6 +342,10 @@ Preserve existing app data when validating statistics:
   also clears it. Settings/editor round trips and refresh preserve selection.
   Check empty buckets, the first partial month and future-bucket rejection.
   Book bars rank by time independently of goal type, five rows show initially,
+  and each row shows grouped character counts and duration for the current
+  period or selected bucket above its time bar. Check local and archived books,
+  English/Chinese, large counts and larger fonts: metadata wraps when needed
+  without clipping or squeezing the bar, and the whole row still opens the editor.
   Show More is left-aligned with the card content, has the same inset divider
   above it as the book rows, and expands the list. Once all books are visible,
   both the button and its divider disappear.

@@ -8,8 +8,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
@@ -34,10 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
@@ -117,19 +114,28 @@ private fun DistributionRow(row: BookDistributionRow, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            val duration = formatStatisticsDuration(row.readingSeconds)
-            val durationStyle = MaterialTheme.typography.labelMedium
-            val durationWidth = with(LocalDensity.current) { rememberTextMeasurer().measure(duration, durationStyle).size.width.toDp() }
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val barWidth = (maxWidth - durationWidth - 8.dp).coerceAtLeast(0.dp) * row.timeFraction
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Spacer(
-                        Modifier.width(barWidth).height(5.dp)
-                            .clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
-                    )
-                    Text(text = duration, style = durationStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                }
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.statistics_characters_value_format, formatStatisticsGroupedCount(row.characters)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text(
+                    text = formatStatisticsDuration(row.readingSeconds),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+            Spacer(
+                Modifier.fillMaxWidth(row.timeFraction).height(5.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+            )
         }
         Icon(
             Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
