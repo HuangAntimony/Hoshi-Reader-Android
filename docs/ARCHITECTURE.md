@@ -26,6 +26,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   fallback on older Android. Manual opaque seeds use the standalone Material Color
   Utilities 4.1.1 Tonal Spot algorithm to generate a complete Material 3 scheme;
   E-ink overrides the result without overwriting the stored seed or palettes.
+  `withHoshiSurfaceColors` caps native surface HCT chroma at 4 while retaining
+  the source hue and tone. It softens `outlineVariant` toward the group fill;
+  accent, text and input `outline` roles retain their source colors. System,
+  manual, fallback and accent-preview schemes share this treatment. E-ink
+  bypasses it to retain pure black/white fills and boundaries.
 - Navigation uses Navigation3 typed route keys, `AppShell`, and `NavDisplay`.
   Top-level Books, Dictionary, Statistics, and Settings tabs each own an
   independent Nav3 back stack with its own saveable entry state and per-entry

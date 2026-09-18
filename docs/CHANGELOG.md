@@ -73,6 +73,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   uses visible outlines and selection shapes, including continuous lazy lists.
   Bottom and side navigation use a subtle theme tint, and Dictionary search
   shares the page background through the status bar for a continuous top area.
+  Native backgrounds use a softer, more neutral tint and lighter separators,
+  while buttons and active states retain the selected accent color.
   Display & Theme uses the same inset row dividers as other settings pages.
   Reading Settings uses inset rounded selections inside continuous neutral
   segment tracks, keeping the current choice clear without vertical separators.

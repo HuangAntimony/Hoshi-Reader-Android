@@ -53,13 +53,15 @@ internal fun hoshiColorScheme(
     eInkMode: Boolean,
     accentSeed: Long? = null,
     systemColorScheme: ColorScheme? = null,
-) = when {
-    eInkMode && darkTheme -> eInkColorScheme(dark = true)
-    eInkMode -> eInkColorScheme(dark = false)
-    accentSeed != null -> hoshiSeedColorScheme(accentSeed, darkTheme)
-    systemColorScheme != null -> systemColorScheme
-    darkTheme -> DarkColorScheme
-    else -> LightColorScheme
+): ColorScheme {
+    if (eInkMode) return eInkColorScheme(dark = darkTheme)
+    val source = when {
+        accentSeed != null -> hoshiSeedColorScheme(accentSeed, darkTheme)
+        systemColorScheme != null -> systemColorScheme
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+    return source.withHoshiSurfaceColors(darkTheme)
 }
 
 private fun eInkColorScheme(dark: Boolean) = if (dark) {

@@ -121,6 +121,11 @@ panels, dialogs, menus, and Process Text lookup:
   and that the status-bar inset matches its page. Dictionary search must retain
   this continuity both with the keyboard open and after showing results; its
   field remains distinguishable, with explicit field/top-bar outlines in E-ink.
+  Compare strongly tinted system palettes and manual blue/red/green accents:
+  page, navigation, nested controls and overlays should keep a subtle neutral
+  tint and distinct tonal levels. Group dividers should remain visible without
+  dominating white cards; input outlines and active accents retain their contrast.
+  Repeat in dark mode and confirm E-ink still uses full black/white boundaries.
 - Light and dark E-ink: compare every tonal container with ordinary mode and
   verify actual outlines on groups, nested controls, filled buttons, segmented
   tracks/selections, popups, panels and navigation boundaries. Lazy groups need a

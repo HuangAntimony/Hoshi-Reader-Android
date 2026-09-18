@@ -61,7 +61,7 @@ import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
-import moe.antimony.hoshi.ui.theme.hoshiSeedColorScheme
+import moe.antimony.hoshi.ui.theme.hoshiColorScheme
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import kotlin.math.roundToInt
 
@@ -340,7 +340,7 @@ private fun AccentControlPreview(seed: Long?, dark: Boolean) {
     if (seed == null) {
         AccentControlPreviewContent()
     } else {
-        val scheme = remember(seed, dark) { hoshiSeedColorScheme(seed, dark) }
+        val scheme = remember(seed, dark) { hoshiColorScheme(dark, eInkMode = false, accentSeed = seed) }
         MaterialTheme(colorScheme = scheme) { AccentControlPreviewContent() }
     }
 }
