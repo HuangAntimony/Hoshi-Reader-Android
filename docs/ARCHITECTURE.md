@@ -105,7 +105,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - The reading-time card owns Week/Month/Year/All selection, initially showing
   the current Week. A horizontal pager browses natural periods from first activity to
   today, preparing chart data only for the selected and adjacent pages. Changing
-  mode returns to the current period. Bars drill into a day for week/month or a
+  mode returns to the current period. The chart uses a shared continuous calendar
+  scale for bar geometry and hit testing, locale week-aligned month ticks, and
+  cached draw geometry/text. Bars drill into a day for week/month or a
   month for year/all; paging or changing mode clears that selection. The headline,
   summary and time-ranked books follow the selected bucket, or the whole period
   when none is selected. Calculations zero-fill buckets, use elapsed-period

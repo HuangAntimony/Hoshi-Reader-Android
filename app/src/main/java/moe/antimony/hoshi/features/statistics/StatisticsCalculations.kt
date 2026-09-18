@@ -190,7 +190,6 @@ internal fun trendPoints(
                 val groupedDays = daysByMonth[month].orEmpty()
                 StatisticsTrendPoint(
                     key = month.toString(),
-                    label = if (rangeMode == StatisticsRangeMode.All || range.start.year != range.end.year) month.toString() else "${month.monthValue}",
                     characters = groupedDays.sumOf { it.totalCharacters },
                     readingSeconds = groupedDays.sumOf { it.readingSeconds },
                 )
@@ -205,7 +204,6 @@ internal fun trendPoints(
                 val day = daysByDate[date]
                 StatisticsTrendPoint(
                     key = date.toString(),
-                    label = date.dayOfMonth.toString(),
                     characters = day?.totalCharacters ?: 0,
                     readingSeconds = day?.readingSeconds ?: 0.0,
                 )

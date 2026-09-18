@@ -51,10 +51,9 @@
     <string name="statistics_title" comment="Statistics page title, intentionally matching the main tab label.">统计</string>
     <string name="statistics_today" comment="Statistics dashboard section title, intentionally matching reader statistics today label.">今天</string>
     <string name="statistics_reading_duration" comment="Dashboard metric label, intentionally matching the duration legend and target type label.">时长</string>
-    <string name="statistics_characters_read" comment="Dashboard metric label, intentionally matching the characters legend and target type label.">字数</string>
-    <string name="statistics_average_speed" comment="Dashboard metric label, intentionally matching the Sasayaki speed setting noun.">速度</string>
+    <string name="statistics_characters_read">阅读字数</string>
+    <string name="statistics_average_speed">阅读速度</string>
     <string name="statistics_target_days">达标天数</string>
-    <string name="statistics_daily_average_duration">日均时长</string>
     <string name="statistics_range_year">年</string>
     <string name="statistics_range_month">月</string>
     <string name="statistics_range_week">周</string>
@@ -81,7 +80,7 @@
     <string name="statistics_duration_hours_format">%1$d小时</string>
     <string name="statistics_duration_hours_minutes_format">%1$d小时%2$d分钟</string>
     <string name="statistics_range_fixed_year_format">%1$d 年</string>
-    <string name="statistics_range_month_title_format">%1$d 年 %2$d 月</string>
+    <string name="statistics_range_month_title_pattern">yyyy年M月</string>
     <string name="statistics_range_week_title_format">%1$d月%2$d日-%3$d月%4$d日</string>
     <string name="statistics_range_day_title_format">%1$d月%2$d日 %3$s</string>
     <string name="statistics_distribution_meta_format">%1$s · %2$s</string>
@@ -773,7 +772,6 @@
     <string name="statistics_edit_hours">小时</string>
     <string name="statistics_edit_minutes">分钟</string>
     <string name="statistics_range_all">全部</string>
-    <string name="statistics_monthly_average_duration">月均阅读时长</string>
     <string name="statistics_average_change_week_format">较上周 %1$s%%</string>
     <string name="statistics_average_change_month_format">较上月 %1$s%%</string>
     <string name="statistics_average_change_year_format">较上年 %1$s%%</string>
@@ -798,7 +796,7 @@
     <string name="statistics_chart_hours_format">%1$s小时</string>
     <string name="statistics_show_more_books">显示更多</string>
     <string name="statistics_heatmap_month_year_pattern">yyyy/M</string>
-    <string name="statistics_period_average_format" comment="Period and average metric label, intentionally sharing the statistics metadata separator.">%1$s · %2$s</string>
+    <string name="statistics_period_average_format">%1$s 平均</string>
     <string name="statistics_range_all_time">全部时期</string>
     <string name="statistics_heatmap_less">少</string>
     <string name="statistics_heatmap_more">多</string>
@@ -807,4 +805,8 @@
     <string name="statistics_goal_minutes_per_day">每日分钟数</string>
     <string name="statistics_goal_save_failed">无法保存目标，请重试。</string>
     <string name="statistics_days_heading">日期</string>
+    <string name="statistics_chart_weekday_pattern">EEEEE</string>
+    <string name="statistics_chart_day_pattern">d日</string>
+    <string name="statistics_chart_month_pattern">MMMMM</string>
+    <string name="statistics_chart_month_year_pattern">yy年M月</string>
 </resources>

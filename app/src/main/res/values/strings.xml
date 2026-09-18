@@ -51,10 +51,9 @@
     <string name="statistics_title" comment="Statistics page title, intentionally matching the main tab label.">Statistics</string>
     <string name="statistics_today" comment="Statistics dashboard section title, intentionally matching reader statistics today label.">Today</string>
     <string name="statistics_reading_duration" comment="Dashboard metric label, intentionally matching the duration legend and target type label.">Duration</string>
-    <string name="statistics_characters_read" comment="Dashboard metric label, intentionally matching the characters legend and target type label.">Characters</string>
-    <string name="statistics_average_speed" comment="Dashboard metric label, intentionally matching the Sasayaki speed setting noun.">Speed</string>
+    <string name="statistics_characters_read">Characters Read</string>
+    <string name="statistics_average_speed">Reading Speed</string>
     <string name="statistics_target_days">Days Met</string>
-    <string name="statistics_daily_average_duration">Average per day</string>
     <string name="statistics_range_year">Year</string>
     <string name="statistics_range_month">Month</string>
     <string name="statistics_range_week">Week</string>
@@ -81,7 +80,7 @@
     <string name="statistics_duration_hours_format">%1$dh</string>
     <string name="statistics_duration_hours_minutes_format">%1$dh %2$dm</string>
     <string name="statistics_range_fixed_year_format">%1$d</string>
-    <string name="statistics_range_month_title_format">%1$d-%2$d</string>
+    <string name="statistics_range_month_title_pattern">MMMM yyyy</string>
     <string name="statistics_range_week_title_format">%1$d/%2$d-%3$d/%4$d</string>
     <string name="statistics_range_day_title_format">%1$d/%2$d %3$s</string>
     <string name="statistics_distribution_meta_format" comment="Book editor character and duration metadata, sharing the separator with the overview caption.">%1$s · %2$s</string>
@@ -775,10 +774,9 @@
     <string name="statistics_edit_hours">Hours</string>
     <string name="statistics_edit_minutes">Minutes</string>
     <string name="statistics_range_all">All</string>
-    <string name="statistics_monthly_average_duration">Average per month</string>
-    <string name="statistics_average_change_week_format">%1$s%% compared with the previous week</string>
-    <string name="statistics_average_change_month_format">%1$s%% compared with the previous month</string>
-    <string name="statistics_average_change_year_format">%1$s%% compared with the previous year</string>
+    <string name="statistics_average_change_week_format">%1$s%% from previous week</string>
+    <string name="statistics_average_change_month_format">%1$s%% from previous month</string>
+    <string name="statistics_average_change_year_format">%1$s%% from previous year</string>
     <string name="statistics_current_streak">Current streak</string>
     <string name="statistics_longest_streak">Longest streak</string>
     <string name="statistics_best_day">Best day</string>
@@ -800,7 +798,7 @@
     <string name="statistics_chart_hours_format">%1$sh</string>
     <string name="statistics_show_more_books">Show More</string>
     <string name="statistics_heatmap_month_year_pattern">yyyy/M</string>
-    <string name="statistics_period_average_format" comment="Period and average metric label, intentionally sharing the statistics metadata separator.">%1$s · %2$s</string>
+    <string name="statistics_period_average_format">%1$s Average</string>
     <string name="statistics_range_all_time" comment="Dashboard period caption, independent of the Reader statistics summary.">All Time</string>
     <string name="statistics_heatmap_less">Less</string>
     <string name="statistics_heatmap_more" comment="Upper endpoint of the reading intensity scale, distinct from the More action.">More</string>
@@ -809,4 +807,8 @@
     <string name="statistics_goal_minutes_per_day">minutes per day</string>
     <string name="statistics_goal_save_failed">Could not save the goal. Please try again.</string>
     <string name="statistics_days_heading">Days</string>
+    <string name="statistics_chart_weekday_pattern">EEEEE</string>
+    <string name="statistics_chart_day_pattern">d</string>
+    <string name="statistics_chart_month_pattern">MMMMM</string>
+    <string name="statistics_chart_month_year_pattern">MMM yy</string>
 </resources>

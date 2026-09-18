@@ -312,6 +312,16 @@ Preserve existing app data when validating statistics:
   All does not page. Check cross-year weeks, leap February, locale week starts,
   empty buckets and incomplete periods. Only selected/adjacent chart pages are
   prepared even with decades of sparse history.
+- Reading-time axes follow the calendar: Week shows narrow weekday names,
+  Month marks locale week starts (April 2026 is 5/12/19/26 for Sunday-first
+  locales), Year marks every two months, and All starts at the earliest month
+  with three-month intervals, thinned for long histories. Dashed vertical grid
+  lines align with tick dates; bars and tap targets share the date scale,
+  including leap February and unequal month lengths. Bars have flat baselines.
+  Verify the average line, 0/top-hour labels, complete rounded comparison with
+  direction arrow, and Characters Read / Reading Speed rows in English, Chinese,
+  narrow layouts and enlarged fonts. Long comparisons may move below the value,
+  but must not truncate. E-ink retains hollow unselected and filled selected bars.
 - The heatmap shows all history and initially scrolls to the latest dates.
   Reading intensity grows with character counts across all history; today
   has a subtle outline and the Less/More legend matches. Taps have no action. Changing chart mode,

@@ -92,7 +92,6 @@ internal data class TodayStatisticsUi(
 
 internal data class StatisticsTrendPoint(
     val key: String,
-    val label: String,
     val characters: Int,
     val readingSeconds: Double,
 )

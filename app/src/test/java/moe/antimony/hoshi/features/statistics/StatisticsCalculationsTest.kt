@@ -318,8 +318,8 @@ class StatisticsCalculationsTest {
         assertEquals(null, all.averageReadingTimeChangePercent)
         val points = trendPoints(StatisticsRangeMode.All, allRange, days)
         assertEquals(16, points.size)
-        assertEquals("2024-12", points.first().label)
-        assertEquals("2026-03", points.last().label)
+        assertEquals("2024-12", points.first().key)
+        assertEquals("2026-03", points.last().key)
         assertEquals(0, points[1].characters)
         assertEquals(0.0, points[1].readingSeconds, 0.0)
     }

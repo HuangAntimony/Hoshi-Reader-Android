@@ -1,29 +1,39 @@
 package moe.antimony.hoshi.features.statistics
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowCircleDown
+import androidx.compose.material.icons.rounded.ArrowCircleUp
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.time.format.DateTimeFormatter
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import moe.antimony.hoshi.R
 
 @Composable
@@ -55,16 +65,9 @@ internal fun StatisticsReadingTimeSection(
                 text = selectedBucket?.let { statisticsBucketTitle(currentRange.mode, it) } ?: stringResource(
                     R.string.statistics_period_average_format,
                     statisticsCompactRangeTitle(currentRange, today),
-                    stringResource(
-                        if (currentRange.mode == StatisticsRangeMode.Year || currentRange.mode == StatisticsRangeMode.All) {
-                            R.string.statistics_monthly_average_duration
-                        } else {
-                            R.string.statistics_daily_average_duration
-                        },
-                    ),
                 ),
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (selectedBucket != null) {
@@ -74,37 +77,21 @@ internal fun StatisticsReadingTimeSection(
             }
         }
         Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = formatStatisticsDuration(if (showTotal) summary.readingSeconds else summary.averageReadingSecondsPerBucket),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineLarge,
-                autoSize = TextAutoSize.StepBased(minFontSize = 22.sp, maxFontSize = 34.sp, stepSize = 1.sp),
-                maxLines = 1,
-            )
-            currentRange.periodChangePercent?.takeIf { selectedBucket == null }?.let { change ->
-                Text(
-                    text = stringResource(
-                        when (currentRange.mode) {
-                            StatisticsRangeMode.Week -> R.string.statistics_average_change_week_format
-                            StatisticsRangeMode.Month -> R.string.statistics_average_change_month_format
-                            else -> R.string.statistics_average_change_year_format
-                        },
-                        java.text.NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }
-                            .format(change).let { if (change > 0) "+$it" else it },
-                    ),
-                    modifier = Modifier.widthIn(max = 100.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        val change = currentRange.periodChangePercent?.takeIf { selectedBucket == null }
+        StatisticsReadingTimeHeadline(
+            duration = formatStatisticsDuration(if (showTotal) summary.readingSeconds else summary.averageReadingSecondsPerBucket),
+            change = change,
+            comparison = change?.let {
+                stringResource(
+                    when (currentRange.mode) {
+                        StatisticsRangeMode.Week -> R.string.statistics_average_change_week_format
+                        StatisticsRangeMode.Month -> R.string.statistics_average_change_month_format
+                        else -> R.string.statistics_average_change_year_format
+                    },
+                    formatStatisticsGroupedCount(abs(it).roundToInt()),
                 )
-            }
-        }
+            },
+        )
         Spacer(Modifier.height(12.dp))
         StatisticsChartPager(
             range = currentRange,
@@ -117,6 +104,45 @@ internal fun StatisticsReadingTimeSection(
         StatisticsSummaryRow(stringResource(R.string.statistics_average_speed), stringResource(R.string.statistics_speed_value_format, formatStatisticsGroupedCount(summary.averageSpeedPerHour)))
         if (!showTotal) {
             StatisticsSummaryRow(stringResource(R.string.statistics_total_time), formatStatisticsDuration(summary.readingSeconds))
+        }
+    }
+}
+
+@Composable
+private fun StatisticsReadingTimeHeadline(duration: String, change: Double?, comparison: String?) {
+    val durationStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 38.sp, fontWeight = FontWeight.Normal)
+    val comparisonStyle = MaterialTheme.typography.bodySmall
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val durationWidth = measurer.measure(duration, durationStyle, softWrap = false).size.width
+        val comparisonWidth = comparison?.let { measurer.measure(it, comparisonStyle, softWrap = false).size.width } ?: 0
+        val fitsOneRow = comparison == null || durationWidth + comparisonWidth + with(density) { 28.dp.toPx() } <= constraints.maxWidth
+        val durationContent: @Composable (Modifier) -> Unit = { modifier ->
+            Text(duration, modifier, style = durationStyle, maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 22.sp, maxFontSize = 38.sp, stepSize = 1.sp))
+        }
+        val comparisonContent: @Composable (Modifier) -> Unit = { modifier ->
+            if (comparison != null && change != null) {
+                Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (change >= 0) Icons.Rounded.ArrowCircleUp else Icons.Rounded.ArrowCircleDown,
+                        contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+                    Text(comparison, style = comparisonStyle, color = color, modifier = Modifier.alignByBaseline())
+                }
+            }
+        }
+        if (fitsOneRow) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                durationContent(Modifier.weight(1f).alignByBaseline())
+                comparisonContent(Modifier.alignByBaseline())
+            }
+        } else {
+            // Preserve the complete comparison on narrow screens and with larger system text.
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                durationContent(Modifier.fillMaxWidth())
+                comparisonContent(Modifier.align(Alignment.End))
+            }
         }
     }
 }
@@ -157,7 +183,12 @@ private fun statisticsCompactRangeTitle(current: CurrentRangeStatisticsUi, today
 internal fun rangeTitle(mode: StatisticsRangeMode, range: StatisticsDateRange): String = when (mode) {
     StatisticsRangeMode.Year -> stringResource(R.string.statistics_range_fixed_year_format, range.start.year)
     StatisticsRangeMode.All -> stringResource(R.string.statistics_range_all_time)
-    StatisticsRangeMode.Month -> stringResource(R.string.statistics_range_month_title_format, range.start.year, range.start.monthValue)
+    StatisticsRangeMode.Month -> {
+        val pattern = stringResource(R.string.statistics_range_month_title_pattern)
+        val locale = LocalConfiguration.current.locales[0]
+        val formatter = remember(pattern, locale) { DateTimeFormatter.ofPattern(pattern, locale) }
+        formatter.format(range.start)
+    }
     StatisticsRangeMode.Week -> stringResource(R.string.statistics_date_interval_format, formatStatisticsDate(range.start), formatStatisticsDate(range.end))
 }
 
