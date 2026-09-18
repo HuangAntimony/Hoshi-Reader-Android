@@ -148,16 +148,18 @@ panels, dialogs, menus, and Process Text lookup:
   With automatic switching on, E-ink follows the system even if a custom palette
   has the opposite brightness. Disabling automatic switching keeps the displayed
   brightness; disabling E-ink restores the normal palette/accent choices and colors.
-- Upgrade every legacy theme, including Sepia inversion and alpha custom colors.
+- Upgrade from the v1.3.3 release settings format for every theme, including Sepia
+  inversion and alpha custom colors. Do not use intermediate development schemas
+  as upgrade baselines.
   Start with a global profile and a different last-book profile, with automatic
   book opening enabled: migration must use the global profile before opening the
   book. Reopen, change language/profile, and create/copy profiles; colors and E-ink
-  must stay global. The custom editor has no legacy-palette import list. Upgrading
-  existing global settings clears obsolete imported palettes and maps the former
-  manual selection to its matching group. Its active custom colors take precedence
-  on that side, while the other side, accent, switching mode and E-ink setting
-  remain intact. Existing automatic pairs retain both saved configurations.
-  Failed storage upgrades must leave the previous data intact and retry successfully.
+  must stay global. The custom editor has no legacy-palette import list.
+  Missing, empty, truncated or invalid profile settings must fall back to Reader
+  DataStore, then legacy SharedPreferences, then defaults, so both Activity hosts
+  can finish loading. Preserve source files. Failed migration writes must remain
+  unmarked and retry successfully; after migration, restart must preserve the user's
+  new global settings without reading or reapplying old profile colors.
 - Test narrow Chinese layouts and enlarged fonts, empty/loading/error/disabled
   states, cold launch, restart, foreground/background, and opening both Reader
   settings panels. Reading Settings identifies the effective profile. Changing

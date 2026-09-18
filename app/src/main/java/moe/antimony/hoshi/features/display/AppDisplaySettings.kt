@@ -192,7 +192,7 @@ private fun Long.rgbLuminance(): Double {
     return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
-/** Used only when migrating the former single palette; runtime brightness belongs to the slot. */
+/** Used only for v1.3.3 migration; runtime brightness belongs to the selected slot. */
 internal fun DisplayPaletteSelection.legacySlot(): DisplayPaletteSlot = if (when (preset) {
     DisplayPalettePreset.Light,
     DisplayPalettePreset.Sepia,

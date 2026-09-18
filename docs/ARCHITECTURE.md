@@ -185,14 +185,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   previews, dimming the page, or changing list geometry; colors come from confirmed
   settings. The full settings page and Reader panel share this content. The Reader
   panel title is inside its scrollable content; the drag handle remains outside.
-- Initial display migration reads the global active profile before Reader profile
-  initialization or book-specific profile activation. Other profiles are not read
-  for display migration. Upgrading existing global display storage preserves its
-  accent and E-ink settings and removes obsolete imported-palette records.
-  The former manual selection moves into its matching light/dark group, with
-  the active custom colors taking precedence on that side; the other side is
-  retained. Background luminance is used only to migrate a former manual custom
-  palette. Legacy Profile JSON color fields remain readable and are preserved on
+- Display migration targets the settings format shipped in Android v1.3.3. It reads
+  the global active profile before Reader profile initialization or book-specific
+  profile activation. If that profile's settings file is missing or unreadable,
+  it falls back to Reader DataStore, then legacy SharedPreferences, then defaults.
+  Other profiles are not read, and source settings are not rewritten by migration.
+  The new global display schema starts at migration version 1; only a successful
+  write marks migration complete. Completed migration never reapplies old profile
+  settings. Unreleased development schemas have no dedicated migration paths.
+  Background luminance is used only to assign v1.3.3 custom colors to a light/dark
+  group. Legacy Profile JSON color fields remain readable and are preserved on
   writes, but no longer control runtime
   display. Book sidecars, sync, and backup formats are unchanged.
 - `ReaderSettingsRepository` combines global display state with profile reading

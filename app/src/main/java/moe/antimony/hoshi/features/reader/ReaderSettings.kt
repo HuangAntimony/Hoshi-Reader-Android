@@ -1001,10 +1001,13 @@ internal class ReaderDisplaySettingsMigrationSource(
         val state = profileRepository.state.value
         val globalProfile = state.globalActiveProfile
         val globalFile = profileRepository.readerSettingsFile(globalProfile.id)
-        val active = if (globalFile.isFile) {
-            migrationJson.decodeFromString<ProfileReaderAppearanceSettings>(globalFile.readText())
-                .toLegacyDisplaySnapshot()
-        } else {
+        val profileSettings = globalFile.takeIf { it.isFile }?.let { file ->
+            runCatching {
+                migrationJson.decodeFromString<ProfileReaderAppearanceSettings>(file.readText())
+                    .toLegacyDisplaySnapshot()
+            }.getOrNull()
+        }
+        val active = profileSettings ?: run {
             val preferences = dataStore.data.first()
             preferences.toLegacyDisplaySnapshotOrNull()
                 ?: legacySource?.load()?.toLegacyDisplaySnapshot()

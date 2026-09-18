@@ -14,7 +14,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   reading colors and explicitly select light/dark interfaces and dictionary
   popups. Customize background, text and secondary text colors with previews.
   Choose system, preset or custom interface accents, and apply E-ink optimization
-  across the app. Existing display settings migrate from the active profile.
+  across the app. v1.3.3 display settings migrate from the active profile; missing
+  or unreadable profile settings fall back to legacy global preferences or defaults.
   E-ink optimization sits below automatic switching and hides palette/accent
   choices while enabled; follow system brightness or choose light/dark
   independently of saved colors.

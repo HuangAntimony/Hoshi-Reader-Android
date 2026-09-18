@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 enum class LegacyDisplayTheme {
@@ -72,17 +71,12 @@ class AppDisplaySettingsRepository(
             val current = dataStore.data.first().readSettings()
             if (current != null && current.migrationVersion >= CurrentMigrationVersion) return
 
-            val migrated = if (current == null || current.migrationVersion < 1) {
-                migrate(migrationSource?.loadMigrationPayload())
-            } else {
-                current
-            }
+            val migrated = migrate(migrationSource?.loadMigrationPayload())
             dataStore.edit { preferences ->
                 val latest = preferences.readSettings()
                 if (latest == null || latest.migrationVersion < CurrentMigrationVersion) {
-                    val base = latest?.takeIf { it.migrationVersion >= 1 } ?: migrated
                     preferences[KEY_SETTINGS] = json.encodeToString(
-                        base.copy(migrationVersion = CurrentMigrationVersion).normalized(),
+                        migrated.copy(migrationVersion = CurrentMigrationVersion).normalized(),
                     )
                 }
             }
@@ -117,15 +111,7 @@ class AppDisplaySettingsRepository(
     }
 
     private fun Preferences.readSettings(): AppDisplaySettings? = this[KEY_SETTINGS]?.let { encoded ->
-        val settings = json.decodeFromString(AppDisplaySettings.serializer(), encoded)
-        if (settings.migrationVersion in 1..2 && !settings.autoSwitch) {
-            val previous = json.decodeFromString(PreviousDisplaySettings.serializer(), encoded).singlePalette
-            val slot = previous.legacySlot()
-            val selected = settings.withSelectedPreset(slot, previous.preset)
-            if (previous.preset == DisplayPalettePreset.Custom) {
-                selected.withCustomPalette(slot, previous.customBackgroundColor, previous.customTextColor, previous.customInfoColor)
-            } else selected
-        } else settings
+        json.decodeFromString(AppDisplaySettings.serializer(), encoded)
     }
 
     private fun migrate(payload: AppDisplayMigrationPayload?): AppDisplaySettings =
@@ -169,14 +155,9 @@ class AppDisplaySettingsRepository(
         } else selected
     }
 
-    @Serializable
-    private data class PreviousDisplaySettings(
-        val singlePalette: DisplayPaletteSelection = DisplayPaletteSelection(),
-    )
-
     companion object {
         const val DataStoreName = "app-display-settings"
-        const val CurrentMigrationVersion = 3
+        const val CurrentMigrationVersion = 1
 
         private val KEY_SETTINGS = stringPreferencesKey("settings")
         private val json = Json {

@@ -2,7 +2,6 @@ package moe.antimony.hoshi.features.display
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.io.Closeable
@@ -12,12 +11,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -104,57 +100,88 @@ class AppDisplaySettingsRepositoryTest {
     }
 
     @Test
-    fun customMigrationKeepsColorsAndEInk() = runBlocking {
-        repository(
-            migrationSource = StaticMigrationSource(
-                AppDisplayMigrationPayload(
-                    activeSettings = LegacyDisplaySettingsSnapshot(
-                        theme = LegacyDisplayTheme.Custom,
-                        eInkMode = true,
-                        customBackgroundColor = 0x44112233L,
-                        customTextColor = 0x88445566L,
-                        customInfoColor = 0xCC778899L,
+    fun releaseCustomColorsChooseMatchingGroupAndKeepAlphaAndEInk() = runBlocking {
+        val cases = listOf(
+            0xAAEEEEEEL to DisplayPaletteSlot.Light,
+            0xCC999999L to DisplayPaletteSlot.Dark,
+            0x44112233L to DisplayPaletteSlot.Dark,
+        )
+        for ((background, expectedSlot) in cases) {
+            repository(
+                migrationSource = StaticMigrationSource(
+                    AppDisplayMigrationPayload(
+                        activeSettings = LegacyDisplaySettingsSnapshot(
+                            theme = LegacyDisplayTheme.Custom,
+                            eInkMode = true,
+                            customBackgroundColor = background,
+                            customTextColor = 0x88445566L,
+                            customInfoColor = 0xCC778899L,
+                        ),
                     ),
                 ),
-            ),
-        ).use { repository ->
-            val migrated = repository.settings.first()
-
-            assertFalse(migrated.autoSwitch)
-            assertTrue(migrated.eInkMode)
-            assertEquals(DisplayPalettePreset.Custom, migrated.selection(migrated.manualPaletteSlot).preset)
-            assertEquals(0x44112233L, migrated.selection(migrated.manualPaletteSlot).customBackgroundColor)
-            assertEquals(0x88445566L, migrated.selection(migrated.manualPaletteSlot).customTextColor)
-            assertEquals(0xCC778899L, migrated.selection(migrated.manualPaletteSlot).customInfoColor)
+            ).use { repository ->
+                val migrated = repository.settings.first()
+                val selected = migrated.selection(expectedSlot)
+                assertFalse(migrated.autoSwitch)
+                assertTrue(migrated.eInkMode)
+                assertEquals(expectedSlot, migrated.manualPaletteSlot)
+                assertEquals(DisplayPalettePreset.Custom, selected.preset)
+                assertEquals(background, selected.customBackgroundColor)
+                assertEquals(0x88445566L, selected.customTextColor)
+                assertEquals(0xCC778899L, selected.customInfoColor)
+            }
         }
     }
 
     @Test
-    fun upgradeRemovesImportedPalettesWithoutResettingSavedDisplaySettingsAndRetriesFailures() = runBlocking {
+    fun completedReleaseMigrationKeepsUserChangesAcrossRestart() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO + Job())
         val dataStore = PreferenceDataStoreFactory.create(
             scope = scope,
-            produceFile = { tempFolder.newFile("display-upgrade.preferences_pb") },
+            produceFile = { tempFolder.newFile("release-migration.preferences_pb") },
         )
         val key = stringPreferencesKey("settings")
-        val json = Json { encodeDefaults = true }
-        val saved = AppDisplaySettings(
-            autoSwitch = true,
-            lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia, 0xFFABCDEF, 0xFF123456, 0xFF654321),
-            darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF112233, 0xFFEEEEEE, 0xFFAAAAAA),
-            accentSource = DisplayAccentSource.Custom,
-            accentSeed = 0xFF00796B,
-            eInkMode = true,
-            migrationVersion = 1,
-        )
-        val oldJson = JsonObject(
-            json.parseToJsonElement(json.encodeToString(saved)).jsonObject +
-                ("importedPalettes" to json.parseToJsonElement(
-                    """[{"id":"legacy-profile","name":"Japanese","palette":{"preset":"Custom","customBackgroundColor":4278256131}}]""",
-                )),
-        ).toString()
         try {
-            dataStore.edit { it[key] = oldJson }
+            val source = StaticMigrationSource(
+                AppDisplayMigrationPayload(activeSettings = LegacyDisplaySettingsSnapshot(theme = LegacyDisplayTheme.Dark)),
+            )
+            val repository = AppDisplaySettingsRepository(dataStore, source)
+            assertEquals(DisplayPaletteSlot.Dark, repository.settings.first().manualPaletteSlot)
+            repository.update {
+                it.copy(
+                    manualPaletteSlot = DisplayPaletteSlot.Light,
+                    lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Sepia),
+                    accentSource = DisplayAccentSource.Custom,
+                    accentSeed = 0xFF00796BL,
+                    eInkMode = true,
+                )
+            }
+            val persisted = dataStore.data.first()[key]
+            val restored = AppDisplaySettingsRepository(dataStore, object : AppDisplaySettingsMigrationSource {
+                override suspend fun loadMigrationPayload(): AppDisplayMigrationPayload =
+                    error("Completed migration must not reread legacy settings")
+            })
+            restored.ensureMigrated()
+            val settings = restored.settings.first()
+            assertEquals(DisplayPaletteSlot.Light, settings.manualPaletteSlot)
+            assertEquals(DisplayPalettePreset.Sepia, settings.lightPalette.preset)
+            assertEquals(DisplayAccentSource.Custom, settings.accentSource)
+            assertEquals(0xFF00796BL, settings.accentSeed)
+            assertTrue(settings.eInkMode)
+            assertEquals(persisted, dataStore.data.first()[key])
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun failedReleaseMigrationWriteCanRetryFromUnmodifiedLegacySettings() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.IO + Job())
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = scope,
+            produceFile = { tempFolder.newFile("failed-release-migration.preferences_pb") },
+        )
+        try {
             var rejectNextWrite = true
             val failingStore = object : DataStore<Preferences> by dataStore {
                 override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
@@ -165,78 +192,22 @@ class AppDisplaySettingsRepositoryTest {
                     return dataStore.updateData(transform)
                 }
             }
-            val repository = AppDisplaySettingsRepository(failingStore, object : AppDisplaySettingsMigrationSource {
-                override suspend fun loadMigrationPayload(): AppDisplayMigrationPayload =
-                    error("Existing global display settings must not be read again from profiles")
-            })
-
+            val repository = AppDisplaySettingsRepository(
+                failingStore,
+                StaticMigrationSource(AppDisplayMigrationPayload(
+                    activeSettings = LegacyDisplaySettingsSnapshot(theme = LegacyDisplayTheme.Sepia, sepiaInvertInDark = true),
+                )),
+            )
             assertTrue(runCatching { repository.settings.first() }.isFailure)
-            assertEquals(oldJson, dataStore.data.first()[key])
+            assertNull(dataStore.data.first()[stringPreferencesKey("settings")])
 
-            val upgraded = repository.settings.first()
-            assertEquals(saved.copy(migrationVersion = AppDisplaySettingsRepository.CurrentMigrationVersion), upgraded)
-            val persisted = requireNotNull(dataStore.data.first()[key])
-            assertFalse(json.parseToJsonElement(persisted).jsonObject.containsKey("importedPalettes"))
-            repository.ensureMigrated()
-            assertEquals(persisted, dataStore.data.first()[key])
-            assertEquals(upgraded, AppDisplaySettingsRepository(dataStore).settings.first())
+            val migrated = repository.settings.first()
+            assertTrue(migrated.autoSwitch)
+            assertEquals(DisplayPalettePreset.Sepia, migrated.lightPalette.preset)
+            assertEquals(DisplayPalettePreset.DarkSepia, migrated.darkPalette.preset)
+            assertEquals(migrated, AppDisplaySettingsRepository(dataStore).settings.first())
         } finally {
             scope.cancel()
-        }
-    }
-
-    @Test
-    fun upgradeMovesManualSelectionIntoMatchingGroupAndPersistsItOnlyOnce() = runBlocking {
-        val choices = listOf(
-            DisplayPaletteSelection(DisplayPalettePreset.Light) to DisplayPaletteSlot.Light,
-            DisplayPaletteSelection(DisplayPalettePreset.Sepia) to DisplayPaletteSlot.Light,
-            DisplayPaletteSelection(DisplayPalettePreset.Dark) to DisplayPaletteSlot.Dark,
-            DisplayPaletteSelection(DisplayPalettePreset.DarkSepia) to DisplayPaletteSlot.Dark,
-            DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xAAEEEEEE, 0x44112233, 0x88999999) to DisplayPaletteSlot.Light,
-            DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xCC999999, 0xDDFFFFFF, 0xEEAAAAAA) to DisplayPaletteSlot.Dark,
-        )
-        for ((index, choice) in choices.withIndex()) {
-            val (previous, expectedSlot) = choice
-            val scope = CoroutineScope(Dispatchers.IO + Job())
-            val dataStore = PreferenceDataStoreFactory.create(scope = scope, produceFile = {
-                tempFolder.newFile("display-manual-upgrade-$index.preferences_pb")
-            })
-            val key = stringPreferencesKey("settings")
-            val json = Json { encodeDefaults = true }
-            val saved = AppDisplaySettings(
-                autoSwitch = false,
-                lightPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFFAABBCC, 0xFF223344, 0xFF778899),
-                darkPalette = DisplayPaletteSelection(DisplayPalettePreset.Custom, 0xFF223344, 0xFFAABBCC, 0xFF778899),
-                migrationVersion = 2,
-            )
-            val oldJson = JsonObject(
-                (json.parseToJsonElement(json.encodeToString(saved)).jsonObject - "manualPaletteSlot") +
-                    ("singlePalette" to json.parseToJsonElement(json.encodeToString(previous))),
-            ).toString()
-            try {
-                dataStore.edit { it[key] = oldJson }
-                val repository = AppDisplaySettingsRepository(dataStore)
-                val upgraded = repository.settings.first()
-                assertEquals(expectedSlot, upgraded.manualPaletteSlot)
-                val active = resolveDisplaySettings(upgraded, false)
-                assertEquals(previous.preset, active.palette)
-                assertEquals(expectedSlot == DisplayPaletteSlot.Dark, active.isDark)
-                assertEquals(active, resolveDisplaySettings(upgraded, true))
-                if (previous.preset == DisplayPalettePreset.Custom) {
-                    assertEquals(previous.customBackgroundColor, active.backgroundColor)
-                    assertEquals(previous.customTextColor, active.textColor)
-                    assertEquals(previous.customInfoColor, active.infoColor)
-                }
-                val other = if (expectedSlot == DisplayPaletteSlot.Light) DisplayPaletteSlot.Dark else DisplayPaletteSlot.Light
-                assertEquals(saved.selection(other), upgraded.selection(other))
-                val persisted = dataStore.data.first()[key]
-                assertFalse(json.parseToJsonElement(persisted!!).jsonObject.containsKey("singlePalette"))
-                repository.ensureMigrated()
-                assertEquals(persisted, dataStore.data.first()[key])
-                assertEquals(upgraded, AppDisplaySettingsRepository(dataStore).settings.first())
-            } finally {
-                scope.cancel()
-            }
         }
     }
 
