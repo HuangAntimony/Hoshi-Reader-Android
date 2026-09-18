@@ -319,8 +319,8 @@ Preserve existing app data when validating statistics:
   lines align with tick dates; bars and tap targets share the date scale,
   including leap February and unequal month lengths. Bars have flat baselines.
   Verify the average line, 0/top-hour labels, complete rounded comparison with
-  direction arrow, and Characters Read / Reading Speed rows in English, Chinese,
-  narrow layouts and enlarged fonts. Long comparisons may move below the value,
+  clearly distinguishable up/down arrows, and Characters Read / Reading Speed
+  rows in English, Chinese, narrow layouts and enlarged fonts. Long comparisons may move below the value,
   but must not truncate. E-ink retains hollow unselected and filled selected bars.
   The unselected headline explicitly labels Week/Month as Daily Average and
   Year/All as Monthly Average in both languages. Selecting a bar shows that

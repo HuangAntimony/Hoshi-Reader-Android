@@ -71,8 +71,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and reading times together instead of three tabs,
   with consistent section headings, grouped cards and compact charts and rows.
   Identify daily averages in Week/Month and monthly averages in Year/All.
-  Show complete period comparisons with
-  direction arrows and rounded percentages; keep Show More left-aligned with
+  Show complete period comparisons with larger text and direction arrows
+  alongside rounded percentages; keep Show More left-aligned with
   a divider above it. In E-ink mode, chart bars are hollow until selected,
   making the filled selection distinct; period and goal-type selectors use
   outlined tracks with filled, inverse-text selections, and the goal value wheel

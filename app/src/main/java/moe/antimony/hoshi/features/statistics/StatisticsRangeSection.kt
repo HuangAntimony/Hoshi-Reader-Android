@@ -114,29 +114,33 @@ internal fun StatisticsReadingTimeSection(
 @Composable
 private fun StatisticsReadingTimeHeadline(duration: String, change: Double?, comparison: String?) {
     val durationStyle = MaterialTheme.typography.headlineLarge.copy(fontSize = 38.sp, fontWeight = FontWeight.Normal)
-    val comparisonStyle = MaterialTheme.typography.bodySmall
+    val comparisonStyle = MaterialTheme.typography.bodyMedium
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    val comparisonIconSize = with(density) { 18.sp.toDp() }
+    val comparisonSpacing = 4.dp
+    val headlineSpacing = 10.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val durationWidth = measurer.measure(duration, durationStyle, softWrap = false).size.width
         val comparisonWidth = comparison?.let { measurer.measure(it, comparisonStyle, softWrap = false).size.width } ?: 0
-        val fitsOneRow = comparison == null || durationWidth + comparisonWidth + with(density) { 28.dp.toPx() } <= constraints.maxWidth
+        val fitsOneRow = comparison == null || durationWidth + comparisonWidth +
+            with(density) { (comparisonIconSize + comparisonSpacing + headlineSpacing).toPx() } <= constraints.maxWidth
         val durationContent: @Composable (Modifier) -> Unit = { modifier ->
             Text(duration, modifier, style = durationStyle, maxLines = 1,
                 autoSize = TextAutoSize.StepBased(minFontSize = 22.sp, maxFontSize = 38.sp, stepSize = 1.sp))
         }
         val comparisonContent: @Composable (Modifier) -> Unit = { modifier ->
             if (comparison != null && change != null) {
-                Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier, horizontalArrangement = Arrangement.spacedBy(comparisonSpacing), verticalAlignment = Alignment.CenterVertically) {
                     Icon(if (change >= 0) Icons.Rounded.ArrowCircleUp else Icons.Rounded.ArrowCircleDown,
-                        contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+                        contentDescription = null, tint = color, modifier = Modifier.size(comparisonIconSize))
                     Text(comparison, style = comparisonStyle, color = color, modifier = Modifier.alignByBaseline())
                 }
             }
         }
         if (fitsOneRow) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(headlineSpacing)) {
                 durationContent(Modifier.weight(1f).alignByBaseline())
                 comparisonContent(Modifier.alignByBaseline())
             }
