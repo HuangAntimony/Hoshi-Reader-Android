@@ -19,6 +19,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   choices while enabled; follow system brightness or choose light/dark
   independently of saved colors.
   Color changes preserve the visible controls and scroll position while saving.
+  The Reader Theme panel's title scrolls with its settings.
 - Preserve deleted books' reading statistics in an archive, restore them on
   reimport, and edit daily records from book distribution rows. Single-day
   deletion is available inside the day editor; deleting all records requires

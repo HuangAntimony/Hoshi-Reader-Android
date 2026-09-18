@@ -98,18 +98,20 @@ internal fun DisplaySettingsSheet(
         sheetStyle = readerSheetStyle(),
         onDismiss = onDismiss,
     ) {
-        Text(
-            text = stringResource(R.string.settings_display),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-        )
         DisplaySettingsContent(
             viewModel = viewModel,
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
+            header = {
+                Text(
+                    text = stringResource(R.string.settings_display),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            },
         )
     }
 }
@@ -119,22 +121,24 @@ private fun DisplaySettingsContent(
     viewModel: DisplaySettingsViewModel,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val settings = state.settings
     val systemDark = isSystemInDarkTheme()
 
-    if (settings == null) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            if (state.error == null) CircularProgressIndicator()
-        }
-    } else {
-        Column(
-            modifier = modifier
-                .verticalScroll(rememberScrollState())
-                .padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = modifier
+            .then(if (settings != null) Modifier.verticalScroll(scrollState) else Modifier)
+            .padding(contentPadding),
+    ) {
+        header?.invoke()
+        if (settings == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (state.error == null) CircularProgressIndicator()
+            }
+        } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             DisplaySettingsGroup {
                 DisplaySwitchRow(
                     label = stringResource(R.string.display_settings_auto_switch),

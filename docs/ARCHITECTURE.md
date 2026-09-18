@@ -183,7 +183,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   automatic switching in E-ink keeps the currently displayed brightness.
   Display settings block repeated interactions while saving without removing
   previews, dimming the page, or changing list geometry; colors come from confirmed
-  settings. The full settings page and Reader panel share this content.
+  settings. The full settings page and Reader panel share this content. The Reader
+  panel title is inside its scrollable content; the drag handle remains outside.
 - Initial display migration reads the global active profile before Reader profile
   initialization or book-specific profile activation. Other profiles are not read
   for display migration. Upgrading existing global display storage preserves its

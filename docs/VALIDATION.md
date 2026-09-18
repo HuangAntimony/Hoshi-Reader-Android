@@ -114,6 +114,9 @@ panels, dialogs, menus, and Process Text lookup:
 - Compare Theme with other grouped settings, including its Reader
   panel: palette, accent and E-ink rows use the same 16dp inset dividers; E-ink
   keeps the enclosing group outline continuous.
+  Open Theme from the Reader's bottom-right menu: the title scrolls away with
+  the settings and returns when scrolled to the top, while the drag handle stays
+  available. The full Theme settings page keeps its top app bar fixed.
 - Reading Settings selected segments form rounded capsules with a visible neutral
   track around every edge and no vertical separators. Check text orientation,
   furigana mode, reading mode, VN screen content and progress position in light/dark themes
