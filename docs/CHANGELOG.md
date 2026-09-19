@@ -22,6 +22,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   E-ink optimization sits below automatic switching and hides palette/accent
   choices while enabled; follow system brightness or choose light/dark
   independently of saved colors.
+  Bottom/side tabs and the Dictionary search header have no extra separator in E-ink mode.
   Color changes preserve the visible controls and scroll position while saving.
   The Reader Theme panel's title scrolls with its settings.
 - Preserve deleted books' reading statistics in an archive, restore them on

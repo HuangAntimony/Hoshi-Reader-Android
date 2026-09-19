@@ -29,7 +29,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -921,9 +920,6 @@ private fun DictionarySearchTopBar(
                 contentLanguageProfile = contentLanguageProfile,
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
-        if (LocalHoshiEInkMode.current) {
-            HorizontalDivider(color = hoshiSurfaces.outline)
         }
     }
 }

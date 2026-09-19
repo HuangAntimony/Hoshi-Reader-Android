@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.bookshelf
 
-import moe.antimony.hoshi.ui.theme.hoshiLeadingBoundary
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
@@ -605,12 +604,6 @@ internal fun HoshiMainShell(
                             .padding(innerPadding),
                         layoutSpec,
                     )
-                    if (LocalHoshiEInkMode.current) HorizontalDivider(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = innerPadding.calculateBottomPadding()),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
                 }
             }
         } else {
@@ -636,7 +629,7 @@ internal fun HoshiMainShell(
                 contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
                 content(
-                    Modifier.fillMaxSize().hoshiLeadingBoundary(),
+                    Modifier.fillMaxSize(),
                     layoutSpec,
                 )
             }

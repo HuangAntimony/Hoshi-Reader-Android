@@ -78,14 +78,3 @@ fun Modifier.hoshiGroupOutline(first: Boolean, last: Boolean, color: Color, radi
         )
     }
 }
-
-@Composable
-fun Modifier.hoshiLeadingBoundary(): Modifier {
-    val outline = hoshiSurfaces.outline
-    if (!LocalHoshiEInkMode.current) return this
-    return drawWithContent {
-        drawContent()
-        val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) 0f else size.width
-        drawLine(outline, Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
-    }
-}

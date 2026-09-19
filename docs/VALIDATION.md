@@ -131,7 +131,10 @@ panels, dialogs, menus, and Process Text lookup:
   Across all four tabs, check that bottom/side navigation has a consistent tint
   and that the status-bar inset matches its page. Dictionary search must retain
   this continuity both with the keyboard open and after showing results; its
-  field remains distinguishable, with explicit field/top-bar outlines in E-ink.
+  field remains distinguishable, with an explicit field outline in E-ink and no
+  extra separator below the search header, above the bottom tabs, or beside the
+  navigation rail. Verify both portrait bottom tabs and landscape side navigation
+  on a device; they use separate shell layouts.
   Compare strongly tinted system palettes and manual blue/red/green accents:
   page, navigation, nested controls and overlays should keep a subtle neutral
   tint and distinct tonal levels. Group dividers should remain visible without
@@ -139,7 +142,7 @@ panels, dialogs, menus, and Process Text lookup:
   Repeat in dark mode and confirm E-ink still uses full black/white boundaries.
 - Light and dark E-ink: compare every tonal container with ordinary mode and
   verify actual outlines on groups, nested controls, filled buttons, segmented
-  tracks/selections, popups, panels and navigation boundaries. Lazy groups need a
+  tracks/selections, popups and panels. Lazy groups need a
   continuous closed outline with one row, multiple rows and during scrolling.
   E-ink optimization sits directly below automatic switching. Enabling it hides
   palette/accent choices and shows an explanation; automatic switching stays available. With
