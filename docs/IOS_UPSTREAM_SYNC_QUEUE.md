@@ -257,45 +257,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 7. Google Drive timeout and automatic-refresh error suppression
-
-Status: pending Android sync.
-
-Commits:
-
-- `4dae37c` - use 10-second Drive timeouts and suppress transient automatic
-  refresh errors.
-
-Dependency/value reasoning:
-
-- This belongs behind the existing Drive data-source/repository boundary and is
-  independent of reader work.
-
-iOS behavior to mirror:
-
-- OAuth and Drive requests time out after 10 seconds. Automatic remote bookshelf
-  refresh suppresses offline, timeout, and connection-lost failures while
-  explicit user operations still report failures.
-
-Android current gap:
-
-- `DeviceCodeDriveAuthorizer` uses 15 seconds; `GoogleDriveClient` uses 15-second
-  connect and 30-second read timeouts.
-- `BookshelfViewModel.isOfflineRemoteLoadError()` suppresses only the normalized
-  no-internet message, not socket/read timeout or connection-lost IO failures.
-
-Suggested slice:
-
-- Normalize transient failures at the Drive boundary using current Android
-  networking guidance; suppress them only for automatic refresh and test manual
-  operation errors separately.
-
-Validation:
-
-- Automatic refresh offline, slow token/list requests, and connection loss;
-  manual connect/refresh/import/export/delete must still show actionable errors.
-
-### 8. Reader navigation and options toolbar
+### 7. Reader navigation and options toolbar
 
 Status: partial Android implementation; remaining visual/interaction parity.
 
@@ -334,7 +296,7 @@ Validation:
   routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
   continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
 
-### 9. Reader WebView line-box CSS parity
+### 8. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -367,7 +329,7 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 10. App accent and stroke-order font attribution
+### 9. App accent and stroke-order font attribution
 
 Status: pending Android sync.
 
@@ -405,7 +367,6 @@ Validation:
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `53fdb72` | 2026-06-15 | Closeable Reader open-failure view | Pending localized route error UI |
-| `4dae37c` | 2026-06-13 | Drive timeouts and transient refresh suppression | Pending timeout/error normalization |
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
 | `00f95c4`, `21971bb` | 2026-08-12 / 08-13 | Highlight ruby text and exact-range editing | Pending sidecar/bridge/range editing |
 | `b7f09ca` (search portion) | 2026-08-13 | Book search | Pending literal search, snippets and landing marks |
@@ -422,11 +383,15 @@ Validation:
 3. Popup layout/CSS isolation (5).
 4. Native frequency options/import diagnostics, then settings and automatic
    low-RAM update policy (6).
-5. Drive timeout/error suppression (7).
-6. Reader navigation/options toolbar (8), building on available statistics.
-7. Reader line-box CSS parity (9), app accent and font attribution (10).
+5. Reader navigation/options toolbar (7), building on available statistics.
+6. Reader line-box CSS parity (8), app accent and font attribution (9).
 
 ## Covered Or No Android Action
+
+- `4dae37c`: `DeviceCodeDriveAuthorizer` and `GoogleDriveClient` use 10-second
+  connect/read timeouts. Sync-layer network failure classification lets
+  `BookshelfViewModel` suppress offline, timeout and connection failures only
+  during automatic refresh; explicit operations retain localized errors.
 
 - `e6e2b4b`: `DriveSyncFiles.lastAccessMillis` projects the newest progress/audio
   timestamp, falling back to bookdata last access. Bookshelf ViewModel applies
@@ -596,7 +561,7 @@ Validation:
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 10.
+  Attribution for the downloadable stroke-order font remains slice 9.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

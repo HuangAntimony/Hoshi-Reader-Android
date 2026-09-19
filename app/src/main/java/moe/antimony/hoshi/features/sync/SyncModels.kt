@@ -124,3 +124,14 @@ internal fun shouldAttemptDriveRequest(
     @Suppress("UNUSED_PARAMETER") hasValidatedCapability: Boolean,
 ): Boolean =
     hasActiveNetwork && hasInternetCapability
+
+/** Network failures that may be ignored by an automatic bookshelf refresh. */
+internal fun Throwable.isTransientDriveNetworkFailure(): Boolean = when (this) {
+    is GoogleDriveApiException -> statusCode == null &&
+        message == GoogleDriveApiException.NoInternetConnectionMessage
+    is java.net.SocketTimeoutException,
+    is java.net.SocketException,
+    is java.net.UnknownHostException -> true
+    // Keep HTTP, TLS, parsing, and local file IO failures visible.
+    else -> false
+}

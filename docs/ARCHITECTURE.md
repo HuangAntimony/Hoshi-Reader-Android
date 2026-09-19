@@ -400,7 +400,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   repository/sync boundary. The Drive data source owns paginated folder listing,
   grouped sync-file discovery, bookdata upload/download, trash, cache clearing,
   and network preflight; Books keeps remote-only Google Drive books as
-  `RemoteBookEntry` models rather than local `BookEntry` placeholders.
+  `RemoteBookEntry` models rather than local `BookEntry` placeholders. OAuth
+  and Drive HTTP connections use 10-second connect/read timeouts. Sync-layer
+  network failure classification lets automatic bookshelf refresh ignore
+  offline, timeout and socket connection failures; manual operations still
+  report errors, as do HTTP, TLS and non-network failures.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
 - Sasayaki accepts MP3, M4B, and Ogg Opus audiobook sources. One repository
   inspection returns format, metadata, chapters, and static duration for

@@ -517,8 +517,8 @@ class GoogleDriveClient @Inject constructor(
         private const val FolderMimeType = "application/vnd.google-apps.folder"
         private const val RootFolderName = "ttu-reader-data"
         private const val MaxParentsPerSyncFileQuery = 50
-        private const val HttpConnectTimeoutMillis = 15_000
-        private const val HttpReadTimeoutMillis = 30_000
+        private const val HttpConnectTimeoutMillis = 10_000
+        private const val HttpReadTimeoutMillis = 10_000
     }
 }
 

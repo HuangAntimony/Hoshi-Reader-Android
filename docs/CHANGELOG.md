@@ -121,6 +121,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Use 10-second Google Drive connection/read timeouts and suppress transient
+  network errors during automatic bookshelf refresh. Manual operations still
+  report failures, and cached books remain visible.
+
 - Count Korean text consistently in Reader progress, book search, and new
   Sasayaki subtitle matches, and exclude ruby fallback text from native counts
   and search. Existing books refresh their cached counts when reopened.

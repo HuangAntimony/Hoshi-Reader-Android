@@ -154,6 +154,55 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun automaticRefreshSuppressesTransientNetworkFailuresButManualRefreshReportsThem() {
+        listOf(
+            java.net.SocketTimeoutException("Read timed out"),
+            java.net.SocketException("Connection reset"),
+            java.net.UnknownHostException("oauth2.googleapis.com"),
+        ).forEach { error ->
+            val local = bookEntry("local-book")
+            val remote = remoteEntry("drive-folder", "Remote Book")
+            val repository = FakeBookshelfRepository(
+                entries = listOf(local),
+                remoteEntries = listOf(remote),
+            )
+            val viewModel = BookshelfViewModel(repository, testScope())
+            viewModel.reloadBookEntries()
+            repository.remoteLoadError = error
+
+            viewModel.reloadBookEntries()
+
+            assertNull(error.toString(), viewModel.uiState.value.errorMessage.testString())
+            assertEquals(listOf(local), viewModel.uiState.value.bookEntries)
+            assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+
+            viewModel.refreshRemoteBooks()
+
+            assertEquals("Failed to fetch books from Google Drive.", viewModel.uiState.value.errorMessage.testString())
+            assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+        }
+    }
+
+    @Test
+    fun automaticRefreshReportsHttpTlsAndNonNetworkFailures() {
+        listOf(
+            GoogleDriveApiException("Unauthorized", statusCode = 401),
+            GoogleDriveApiException("Forbidden", statusCode = 403),
+            GoogleDriveApiException("Server error", statusCode = 500),
+            javax.net.ssl.SSLHandshakeException("Certificate rejected"),
+            java.io.IOException("Disk read failed"),
+            IllegalArgumentException("Invalid response"),
+        ).forEach { error ->
+            val repository = FakeBookshelfRepository(remoteLoadError = error)
+            val viewModel = BookshelfViewModel(repository, testScope())
+
+            viewModel.reloadBookEntries()
+
+            assertEquals("Failed to fetch books from Google Drive.", viewModel.uiState.value.errorMessage.testString())
+        }
+    }
+
+    @Test
     fun refreshRemoteBooksReportsOfflineRemoteLoadErrorLikeIos() {
         val local = bookEntry("local-book")
         val remote = remoteEntry("drive-folder", "Remote Book")
