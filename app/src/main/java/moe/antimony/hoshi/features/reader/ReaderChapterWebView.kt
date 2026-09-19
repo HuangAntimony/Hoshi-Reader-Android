@@ -23,6 +23,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.ValueCallback
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -65,6 +66,7 @@ internal fun ChapterWebView(
     webViewViewportSize: IntSize,
     onReaderViewportSizeChanged: (IntSize) -> Unit,
     onWebViewReady: (WebView) -> Unit,
+    onRendererTerminated: (WebView) -> Unit,
     isWebViewRestoring: Boolean,
     webViewRestoreEpoch: Int,
     onRestoreStarted: () -> Unit,
@@ -98,6 +100,7 @@ internal fun ChapterWebView(
     onBeforeRestoreVisible: (WebView) -> ReaderRestoreBeforeVisibleAction? = { null },
     modifier: Modifier = Modifier,
 ) {
+    val currentOnRendererTerminated = rememberUpdatedState(onRendererTerminated)
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
     val currentOnSaveBookmark = rememberUpdatedState(onSaveBookmark)
     val currentOnDisplayProgress = rememberUpdatedState(onDisplayProgress)
@@ -224,7 +227,7 @@ internal fun ChapterWebView(
         )
     }
     val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> ReaderRestoreCompletionAction?> { restoredWebView, reportedRestoreToken ->
-        if (reportedRestoreToken != restoreToken) return@rememberUpdatedState null
+        if (restoredWebView != readerWebView || reportedRestoreToken != restoreToken) return@rememberUpdatedState null
         readerRestoreCompletionAfterVisibleAction(
             chapterFragment = chapterFragment,
             evaluateProgress = { callback ->
@@ -242,6 +245,15 @@ internal fun ChapterWebView(
         if (webView.tag != restoreToken) return@LaunchedEffect
         webView.applyReaderSasayakiCues(restoreToken, cuesJson)
     }
+    val handleRendererTerminated: (WebView) -> Unit = { view ->
+        val readerView = view as HoshiReaderWebView
+        if (!readerView.isReleased) {
+            continuousScrollProgressScheduler.reset(view::removeCallbacks)
+            if (readerWebView === view) readerWebView = null
+            currentOnRendererTerminated.value(view)
+            releaseReaderWebView(readerView)
+        }
+    }
     AndroidView(
         modifier = modifier
             .onSizeChanged(onReaderViewportSizeChanged)
@@ -258,7 +270,7 @@ internal fun ChapterWebView(
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
                     ReaderSelectionBridge(this) { selection, selectionRects ->
-                        currentOnTextSelected.value(selection, selectionRects)
+                        if (!isReleased) currentOnTextSelected.value(selection, selectionRects)
                     },
                     "HoshiTextSelection",
                 )
@@ -270,16 +282,17 @@ internal fun ChapterWebView(
                 )
                 addJavascriptInterface(
                     ReaderImageTapBridge(this) { sourceUrl ->
-                        currentOnImageTapped.value(sourceUrl)
+                        if (!isReleased) currentOnImageTapped.value(sourceUrl)
                     },
                     "HoshiReaderImage",
                 )
-                ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder)
+                ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder, isActive = { !isReleased })
                 webViewClient = EpubWebViewClient(
                     book = book,
                     fontManager = fontManager,
                     onInternalLink = onInternalLink,
                     popupResourceHandler = { currentReaderPopupResourceHandler.value },
+                    onRendererTerminated = handleRendererTerminated,
                 ) { view ->
                     view.evaluateReaderSetupScript(
                         source = readerSetupScript,
@@ -291,6 +304,7 @@ internal fun ChapterWebView(
             }
         },
         update = { webView ->
+            if (webView.isReleased) return@AndroidView
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
@@ -467,6 +481,7 @@ internal fun ChapterWebView(
                     fontManager = fontManager,
                     onInternalLink = onInternalLink,
                     popupResourceHandler = { currentReaderPopupResourceHandler.value },
+                    onRendererTerminated = handleRendererTerminated,
                 ) { view ->
                     view.evaluateReaderSetupScript(
                         source = readerSetupScript,
@@ -577,6 +592,16 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
     settings.normalized().scanLength
 
 private class HoshiReaderWebView(context: Context) : WebView(context) {
+    var isReleased = false
+        private set
+
+    override fun evaluateJavascript(script: String, resultCallback: ValueCallback<String?>?) {
+        if (isReleased) return
+        super.evaluateJavascript(script, resultCallback?.let { callback ->
+            ValueCallback { result -> if (!isReleased) callback.onReceiveValue(result) }
+        })
+    }
+
     var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
     private var nativeSelectionActionModeActive = false
     private var nativeSelectionActionMode: ActionMode? = null
@@ -609,6 +634,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     }
 
     fun showHighlightColorPicker(anchorRect: Rect? = nativeSelectionContentRect) {
+        if (isReleased) return
         dismissHighlightColorPopup()
         val density = resources.displayMetrics.density
         val popupContent = LinearLayout(context).apply {
@@ -717,6 +743,8 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         super.startActionMode(ReaderHighlightActionModeCallback(this, callback), type)
 
     fun releaseForDestroy() {
+        isReleased = true
+        nativeSelectionActionMode?.finish()
         dismissHighlightColorPopup()
         setNativeSelectionActionMode(null)
         onHighlightCreated = { _, _, _ -> }
@@ -787,17 +815,20 @@ private class EpubWebViewClient(
     private val fontManager: ReaderFontManager,
     private val onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     private val popupResourceHandler: () -> ReaderLookupPopupResourceHandler?,
+    private val onRendererTerminated: (WebView) -> Unit,
     private val onReaderPageFinished: (WebView) -> Unit,
 ) : WebViewClient() {
     private val resourceBridge = ReaderWebResourceBridge(book, fontManager)
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        if ((view as? HoshiReaderWebView)?.isReleased == true) return true
         val target = book.resolveInternalReaderLink(request.url?.toString().orEmpty()) ?: return false
         onInternalLink(target)
         return true
     }
 
     override fun onPageFinished(view: WebView, url: String?) {
+        if ((view as? HoshiReaderWebView)?.isReleased == true) return
         super.onPageFinished(view, url)
         if (Uri.parse(url ?: return).host == "appassets.androidplatform.net") {
             onReaderPageFinished(view)
@@ -811,7 +842,7 @@ private class EpubWebViewClient(
     }
 
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-        view.destroy()
+        onRendererTerminated(view)
         return true
     }
 }
@@ -1353,6 +1384,7 @@ private fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String) {
 }
 
 private fun releaseReaderWebView(webView: HoshiReaderWebView) {
+    if (webView.isReleased) return
     webView.animate().cancel()
     readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
     readerRestoreGenerations.remove(webView)
@@ -1366,6 +1398,7 @@ private fun releaseReaderWebView(webView: HoshiReaderWebView) {
     webView.removeJavascriptInterface("HoshiReaderRestore")
     webView.removeJavascriptInterface("HoshiReaderImage")
     webView.stopLoading()
+    (webView.parent as? ViewGroup)?.removeView(webView)
     webView.destroy()
 }
 

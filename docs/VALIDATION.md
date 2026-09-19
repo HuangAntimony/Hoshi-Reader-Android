@@ -204,6 +204,16 @@ text must open a cleared, focused Dictionary search instead of an empty popup.
 
 Manual reader validation should cover:
 
+- Renderer termination in paginated, continuous and VN modes: after moving
+  beyond the saved bookmark (including a continuous scroll before its idle
+  save), terminate the renderer and verify the loading frame restores the latest
+  accepted position, settings, highlights and Sasayaki cue. Repeat during
+  restore and after an internal fragment jump. Open lookup and native selection
+  before termination; neither may survive or reappear from a stale callback.
+  Check paused and playing Sasayaki, including an image auto-page hold, then
+  verify navigation and Close during/after recovery. Trigger renderer exit only
+  on the intended test WebView; do not force-stop the app or clear its data.
+
 - cover image pages and multi-image illustration pages.
 - paginated, continuous, and VN modes in vertical and horizontal writing.
 - VN block and sentence screens, reveal speed 0/45/120, blank-area click

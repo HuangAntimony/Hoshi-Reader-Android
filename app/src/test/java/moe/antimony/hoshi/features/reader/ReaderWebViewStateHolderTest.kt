@@ -10,6 +10,7 @@ import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.dictionary.LookupPopupState
+import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheetTab
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import org.junit.Assert.assertEquals
@@ -19,6 +20,55 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderWebViewStateHolderTest {
+    @Test
+    fun rendererRecoveryPreservesUnfinishedCueLandingButDoesNotRevealCompletedCue() {
+        val cue = PendingSasayakiCue(sasayakiProgressCue(80), true, SasayakiCueRevealSource.DirectJump)
+        val queued = cue.copy(cue = sasayakiProgressCue(120))
+        assertEquals(cue, readerSasayakiCueAfterRendererTermination(null, cue, null, cue))
+        assertEquals(cue, readerSasayakiCueAfterRendererTermination(null, null, cue.cue, cue))
+        assertEquals(queued, readerSasayakiCueAfterRendererTermination(queued, cue, null, cue))
+        assertEquals(cue.copy(reveal = false), readerSasayakiCueAfterRendererTermination(null, null, null, cue))
+        assertNull(readerSasayakiCueAfterRendererTermination(null, null, null, null))
+    }
+
+    @Test
+    fun rendererTerminationRestoresLatestAcceptedPositionAndKeepsHistory() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.jumpToWithHistory(ReaderChapterPosition(3, 0.1))
+        holder.markWebViewRestored()
+        val oldEpoch = holder.webViewRestoreEpoch
+        holder.recordContinuousScrollDisplayProgress(0.67, oldEpoch)
+
+        assertTrue(holder.onRendererTerminated(ReaderRendererTermination(0)))
+
+        assertEquals(ReaderChapterPosition(3, 0.67), holder.readerPosition.loadPosition)
+        assertEquals(ReaderChapterPosition(2, 0.0), holder.backTargetPosition)
+        assertEquals(1, holder.webViewGeneration)
+        assertTrue(holder.isWebViewRestoring)
+        assertFalse(holder.canAcceptReaderNavigationInput())
+        assertNull(holder.recordContinuousScrollProgress(0.9, oldEpoch))
+        assertFalse(holder.onRendererTerminated(ReaderRendererTermination(0)))
+        assertEquals(1, holder.webViewGeneration)
+        holder.markWebViewRestored()
+        assertNull(holder.recordContinuousScrollProgress(0.9, oldEpoch))
+        assertEquals(ReaderChapterPosition(3, 0.67), holder.readerPosition.displayedPosition)
+    }
+
+    @Test
+    fun repeatedTerminationDuringRestoreKeepsPendingNavigationTarget() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.jumpTo(ReaderChapterPosition(4, 0.3), "section")
+        assertTrue(holder.onRendererTerminated(ReaderRendererTermination(0)))
+        assertEquals("section", holder.readerPosition.loadFragment)
+        assertTrue(holder.onRendererTerminated(ReaderRendererTermination(1)))
+        assertEquals(ReaderChapterPosition(4, 0.3), holder.readerPosition.loadPosition)
+        holder.markWebViewRestored()
+        holder.recordDisplayedProgress(0.55)
+        assertTrue(holder.onRendererTerminated(ReaderRendererTermination(2)))
+        assertNull(holder.readerPosition.loadFragment)
+        assertEquals(ReaderChapterPosition(4, 0.55), holder.readerPosition.loadPosition)
+    }
+
     @Test
     fun recordsDisplayedProgressWithoutChangingLoadTarget() {
         val holder = stateHolder(initialIndex = 2)

@@ -64,6 +64,9 @@ internal class ReaderWebViewStateHolder(
     var isWebViewRestoring by mutableStateOf(true)
         private set
 
+    var webViewGeneration by mutableStateOf(0)
+        private set
+
     var webViewRestoreEpoch by mutableStateOf(0)
         private set
 
@@ -278,6 +281,18 @@ internal class ReaderWebViewStateHolder(
         }
     }
 
+    fun onRendererTerminated(event: ReaderRendererTermination): Boolean {
+        if (event.generation != webViewGeneration) return false
+        // An unfinished navigation still owns its fragment/target. Otherwise recover
+        // the latest accepted display position, including scrolls not yet persisted.
+        if (!isWebViewRestoring) {
+            readerPosition = readerPosition.prepareReloadAtDisplayedPosition()
+        }
+        webViewGeneration += 1
+        markWebViewRestoring()
+        return true
+    }
+
     fun markWebViewRestoring() {
         webViewRestoreEpoch += 1
         isWebViewRestoring = true
@@ -361,3 +376,5 @@ internal fun ReaderSettings.readerContentReloadKey(): ReaderContentReloadKey =
         characterSpacing = characterSpacing,
         paragraphSpacing = paragraphSpacing,
     )
+
+internal data class ReaderRendererTermination(val generation: Int)

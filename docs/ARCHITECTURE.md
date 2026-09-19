@@ -253,7 +253,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Noto display-name values remain compatibility keys only. Publisher leaves EPUB
   family, style, and weight declarations intact.
 - Reader rendering and lookup remain WebView-based to preserve iOS-aligned
-  visible behavior.
+  visible behavior. Renderer termination advances `ReaderWebViewStateHolder`'s
+  WebView generation, preserving the latest accepted display position or pending
+  navigation target. The host clears the dead view reference, popup state and
+  auto-page work; the chapter view removes/destroys the old WebView and Compose
+  creates a replacement. Existing restore setup replays settings, highlights
+  and cues, then releases queued Sasayaki presentation. Released WebViews reject
+  late JS results and popup/selection bridge events.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and
   VN reading. Kotlin selects the asset, injects typed settings, and keeps
   persisted progress as chapter progress mapped to whole-book character count.

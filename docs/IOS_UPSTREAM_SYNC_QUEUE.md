@@ -16,43 +16,7 @@ This document tracks open Android work after checking iOS upstream `develop`.
 Only open work is listed below. After removing completed slices, renumber the
 remaining slices consecutively from 1 and update all slice references.
 
-### 1. Reader renderer termination recovery
-
-Status: pending Android sync.
-
-Commits: `7d7321f`.
-
-Dependency/value reasoning:
-
-- Independent route/runtime reliability improvement with high value when the
-  OS terminates a background renderer. Use the closeable fallback in slice 2
-  if recovery cannot complete.
-
-iOS behavior to mirror:
-
-- Retain the latest progress, re-enter loading/restore, reload the chapter,
-  restore cues/highlights, and resume Sasayaki transition handling after restore.
-
-Android current gap:
-
-- `ReaderChapterWebView.kt.EpubWebViewClient.onRenderProcessGone()`
-  only calls `view.destroy()` and returns true. It does not notify the state
-  holder, remove/recreate the view or replay chapter/progress/settings/cues and
-  highlights. `ReaderWebView.kt` has no renderer-recovery generation.
-
-Suggested slice:
-
-- Add a typed termination event and recreate the WebView through its existing
-  host/state lifecycle, restoring from the latest accepted state. Confirm the
-  replacement lifecycle against Android WebView official guidance during
-  implementation.
-
-Validation:
-
-- Background renderer exit/crash, latest position, loading frame, popup/native
-  selection cleanup, highlight/Sasayaki restore, repeated termination and Close.
-
-### 2. Reader route open-failure fallback
+### 1. Reader route open-failure fallback
 
 Status: pending Android sync.
 
@@ -86,7 +50,7 @@ Validation:
 - Missing/corrupt book, working Close, normal Reader open/close, Android Back,
   bookshelf state preservation, and bookmark refresh.
 
-### 3. Reader highlight ruby text and exact-range editing
+### 2. Reader highlight ruby text and exact-range editing
 
 Status: pending Android sync.
 
@@ -121,7 +85,7 @@ Validation:
 - Legacy sidecars, ruby across styled nodes, repeated selection with same/new
   color, restart/sync, all reader modes, and raw versus normalized offsets.
 
-### 4. Book search literal matching and landing highlight
+### 3. Book search literal matching and landing highlight
 
 Status: partial Android implementation; remaining parity work.
 
@@ -130,7 +94,7 @@ Commits: `b7f09ca` (search behavior only).
 Dependency/value reasoning:
 
 - Build on the completed shared normalization and existing Contents search;
-  reuse highlight range projection after slice 3 without storing transient
+  reuse highlight range projection after slice 2 without storing transient
   search marks.
 
 iOS behavior to mirror:
@@ -161,7 +125,7 @@ Validation:
   bracketed complete sentences, 100-hit limit, jump/back/forward, page-turn
   clearing and supplementary-character offsets in all reader modes.
 
-### 5. Lookup popup two-column layout and dictionary CSS isolation
+### 4. Lookup popup two-column layout and dictionary CSS isolation
 
 Status: pending Android sync.
 
@@ -210,7 +174,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 6. Frequency sorting controls and import/update feedback
+### 5. Frequency sorting controls and import/update feedback
 
 Status: partial native support; pending Android UI/bridge integration.
 
@@ -257,7 +221,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 7. Reader navigation and options toolbar
+### 6. Reader navigation and options toolbar
 
 Status: partial Android implementation; remaining visual/interaction parity.
 
@@ -296,7 +260,7 @@ Validation:
   routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
   continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
 
-### 8. Reader WebView line-box CSS parity
+### 7. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -329,7 +293,7 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 9. App accent and stroke-order font attribution
+### 8. App accent and stroke-order font attribution
 
 Status: pending Android sync.
 
@@ -370,7 +334,6 @@ Validation:
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
 | `00f95c4`, `21971bb` | 2026-08-12 / 08-13 | Highlight ruby text and exact-range editing | Pending sidecar/bridge/range editing |
 | `b7f09ca` (search portion) | 2026-08-13 | Book search | Pending literal search, snippets and landing marks |
-| `7d7321f` | 2026-08-05 | Restore after renderer termination | Pending WebView recreation/state restore |
 | `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
 | `42e7b81` | 2026-09-14 | Reader navigation/options toolbar | Pending final Compose action/information layout |
@@ -378,15 +341,21 @@ Validation:
 
 ## Suggested Implementation Order
 
-1. Renderer recovery (1) and localized open-failure fallback (2).
-2. Highlight sidecar/range editing (3), then book search remaining parity (4).
-3. Popup layout/CSS isolation (5).
+1. Localized open-failure fallback (1).
+2. Highlight sidecar/range editing (2), then book search remaining parity (3).
+3. Popup layout/CSS isolation (4).
 4. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (6).
-5. Reader navigation/options toolbar (7), building on available statistics.
-6. Reader line-box CSS parity (8), app accent and font attribution (9).
+   low-RAM update policy (5).
+5. Reader navigation/options toolbar (6), building on available statistics.
+6. Reader line-box CSS parity (7), app accent and font attribution (8).
 
 ## Covered Or No Android Action
+
+- `7d7321f`: Reader renderer termination recreates the WebView through a
+  generation in `ReaderWebViewStateHolder`, restores the latest accepted
+  position (or unfinished navigation target), reloads settings/highlights/cues,
+  and resumes queued Sasayaki handling after restore. The dead view is removed
+  and destroyed; its selection, popup and JS callbacks are invalidated.
 
 - `4dae37c`: `DeviceCodeDriveAuthorizer` and `GoogleDriveClient` use 10-second
   connect/read timeouts. Sync-layer network failure classification lets
@@ -413,7 +382,7 @@ Validation:
   native visible text excludes `rt`/`rp` contents. Reader-facts version 3
   refreshes cached counts and TOC offsets. Existing Sasayaki matches are retained;
   affected books need the SRT selected again. The search portion of `b7f09ca`
-  remains open in slice 4.
+  remains open in slice 3.
 - `7b9dda8`: both Anki backends resolve tag handlebars through the field resolver,
   replacing substitution whitespace with underscores. New/rebuilt formats use
   `hoshi`; saved tags retain their values.
@@ -484,7 +453,7 @@ Validation:
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
   pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 6.
+  remaining bridge gap described in slice 5.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct
@@ -543,7 +512,7 @@ Validation:
   downloads use cancellable repository coroutines and verified temporary files.
 - `17ceb79`: iOS modal presenter rejection is platform-specific. Android Reader
   is a typed Navigation3 route with an explicit close path, not a separately
-  presented reader window; its open-error UI gap remains slice 2.
+  presented reader window; its open-error UI gap remains slice 1.
 - `f6b15bc`: iOS AppIntents are platform shortcuts, not a portable API.
   Android already routes Page Up/Down and enabled volume keys through
   `ReaderHardwareKeyNavigation`; no distinct Android external shortcut contract
@@ -551,17 +520,17 @@ Validation:
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
   transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 6 rather than queueing revision bumps.
+  in slice 5 rather than queueing revision bumps.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
   bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 6.
+  automatic low-RAM difference remains slice 5.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 9.
+  Attribution for the downloadable stroke-order font remains slice 8.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

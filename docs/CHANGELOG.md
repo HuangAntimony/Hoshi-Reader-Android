@@ -121,6 +121,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Recover the reader after Android terminates its WebView renderer, preserving
+  the latest reading position, highlights, and Sasayaki cue display.
+
 - Use 10-second Google Drive connection/read timeouts and suppress transient
   network errors during automatic bookshelf refresh. Manual operations still
   report failures, and cached books remain visible.
