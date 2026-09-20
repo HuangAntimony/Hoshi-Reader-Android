@@ -696,6 +696,13 @@ Validate relevant sync/update/Sasayaki changes with:
   sequence should be recovered while repeated prefix text remains unmatched,
   and a large local text gap should recover only from a coherent later cue
   sequence.
+- Sasayaki highlight rendering changes: on a real WebView, compare unhighlighted
+  text and active cues in horizontal/vertical writing with ruby and publisher
+  `text-emphasis`. Verify complete glyph edges, ruby, and emphasis marks as well
+  as stable text positions. CSS Highlight API availability and unchanged Range
+  geometry alone do not establish correct painting. In VN, repeat the first cue
+  pass, revisit cues on the same screen, then leave and return to rebuild the
+  screen; check both normal and E-ink modes.
 - Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
   Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
   current-chapter centering without first flashing the default list position
