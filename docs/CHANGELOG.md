@@ -132,6 +132,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Show each failed dictionary import with its filename and reason, while
+  continuing other files in the batch.
+
 - Show a localized Reader fallback with a Close action when a book is missing
   or cannot be parsed, instead of exposing internal loading errors.
 

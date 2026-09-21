@@ -846,4 +846,11 @@
     <string name="dictionary_frequency_ascending">Ascending</string>
     <string name="dictionary_frequency_descending">Descending</string>
     <string name="dictionary_frequency_disabled">Disabled</string>
+    <string name="dictionary_import_file_error_format">%1$s: %2$s</string>
+    <string name="dictionary_import_native_error_format">Dictionary importer: %1$s</string>
+    <string name="dictionary_import_file_access_error">Cannot access the dictionary file.</string>
+    <string name="dictionary_import_archive_error">The dictionary archive is invalid or damaged.</string>
+    <string name="dictionary_import_index_error">The dictionary index is missing or invalid.</string>
+    <string name="dictionary_import_contents_error">No supported dictionary entries were found.</string>
+    <string name="dictionary_import_io_error">Could not read or save the dictionary files.</string>
 </resources>

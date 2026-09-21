@@ -17,6 +17,7 @@ internal data class NativeDictionaryImportResult(
     val pitchCount: Long,
     val kanjiCount: Long = 0,
     val mediaCount: Long,
+    val error: String = "",
 )
 
 internal interface DictionaryNativeBridge {
@@ -56,6 +57,7 @@ internal class HoshiDictionaryNativeBridge @Inject constructor() : DictionaryNat
                 pitchCount = result.pitchCount,
                 kanjiCount = result.kanjiCount,
                 mediaCount = result.mediaCount,
+                error = result.error,
             )
         }
 

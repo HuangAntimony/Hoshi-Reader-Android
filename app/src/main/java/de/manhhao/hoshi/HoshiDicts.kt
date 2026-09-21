@@ -9,6 +9,7 @@ class ImportResult(
     val pitchCount: Long,
     val kanjiCount: Long,
     val mediaCount: Long,
+    val error: String,
 )
 
 class DictionaryStyle(

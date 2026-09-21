@@ -537,8 +537,13 @@ Validate relevant dictionary/audio changes with:
   instrument -w -e class moe.antimony.hoshi.dictionary.DictionaryFrequencyNativeTest
   moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner`;
   do not use connected Gradle tasks that reinstall or clear app data.
-- manual multi-dictionary import with one invalid archive, confirming later
-  archives still import and failures are reported.
+- manual multi-dictionary import with invalid/unreadable archives, confirming
+  later archives still import and the error dialog lists each filename and
+  reason in English/Chinese. Check all-failed and mixed batches, Unicode names,
+  empty native diagnostics, cancellation and preservation of installed data.
+  `DictionaryImportNativeTest` uses generated cache fixtures to verify native
+  errors, including Unicode paths; run it with the same data-preserving
+  instrumentation procedure as `DictionaryFrequencyNativeTest`.
 - Low Memory Usage Mode with a large Yomitan archive.
 - dictionary row long-press deletion, keeping the left reorder handle dedicated
   to dragging.

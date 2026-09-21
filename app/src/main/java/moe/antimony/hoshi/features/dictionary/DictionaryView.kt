@@ -8,6 +8,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -727,7 +729,7 @@ fun DictionaryView(
             AlertDialog(
                 onDismissRequest = dictionaryViewModel::consumeErrorMessage,
                 title = { Text(stringResource(R.string.dialog_error_title)) },
-                text = { Text(message.asString()) },
+                text = { Text(message.asString(), modifier = Modifier.verticalScroll(rememberScrollState())) },
                 confirmButton = {
                     TextButton(onClick = dictionaryViewModel::consumeErrorMessage) {
                         Text(stringResource(R.string.action_ok))

@@ -27,6 +27,7 @@ class HoshiDictsAbiTest {
             Long::class.javaPrimitiveType!!,
             Long::class.javaPrimitiveType!!,
             Long::class.javaPrimitiveType!!,
+            String::class.java,
         )
         assertConstructor(
             className = "de.manhhao.hoshi.Pitch",

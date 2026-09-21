@@ -65,34 +65,30 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Dictionary import/update feedback
+### 2. Automatic dictionary update low-RAM policy
 
-Status: pending Android error details and automatic low-RAM policy.
+Status: pending Android sync.
 
-Commits: `222a72b`, `7dd3f49` (automatic low-RAM policy only).
+Commits: `7dd3f49` (automatic low-RAM policy only).
 
 iOS behavior to mirror:
 
-- Report filename plus reason for each failed batch import while continuing
-  later files. Automatic dictionary updates always use low-RAM import.
+- Automatic dictionary updates always use low-RAM import.
 
 Android current gap:
 
-- `ImportResult` omits native error text; `DictionaryImportDataSource` replaces
-  failure with a generic message. `DictionaryViewModel` retains failed items'
-  names but drops individual reasons. Per-import staging/continuation exists.
-- `DictionaryUpdateService` uses the user's low-RAM setting for automatic updates.
+- `DictionaryUpdateService` still uses the user's low-RAM setting for automatic
+  updates; it defaults off.
 
 Suggested slice:
 
-- Preserve native import errors through typed results and localized per-file
-  failure context, then force low-RAM only for automatic updates. Preserve
-  Android's serialized atomic query-session replacement.
+- Force low-RAM for `DictionaryMutationOperation.AutoUpdate`, preserving manual
+  settings and Android's serialized atomic query-session replacement.
 
 Validation:
 
-- Mixed valid/invalid batch imports and recovery; automatic low-RAM with the
-  manual setting off and unchanged manual behavior.
+- Automatic updates with the manual setting on/off, unchanged manual imports
+  and updates, update failures and busy-state handling.
 
 ### 3. Reader WebView line-box CSS parity
 
@@ -133,15 +129,20 @@ Validation:
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
-| `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
+| `7dd3f49` | 2026-09-02 | Automatic low-RAM dictionary updates | Pending automatic import policy |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1).
-2. Import diagnostics and automatic low-RAM update policy (2).
+2. Automatic low-RAM dictionary update policy (2).
 3. Reader line-box CSS parity (3).
 
 ## Covered Or No Android Action
+
+- `222a72b`: JNI import results retain native error details. Batch failures
+  preserve filename and localized reason for the existing error dialog while
+  continuing later files; cancellation propagates and staging/rollback remain
+  repository-owned. Successful imports publish changes even if later cancelled.
 
 - `165992a`, `e849e36`: profile-scoped Auto/Ascending/Descending/Disabled lookup
   sorting and an enabled frequency-dictionary selector feed native options
@@ -343,8 +344,8 @@ Validation:
   is introduced by this upstream commit.
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
-  transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 2 rather than queueing revision bumps.
+  transcriptions and importer error results, now exposed through Kotlin/JNI;
+  no revision-only sync work remains.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
@@ -354,7 +355,7 @@ Validation:
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 5.
+  Downloadable stroke-order font attribution is excluded at the project owner's request.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

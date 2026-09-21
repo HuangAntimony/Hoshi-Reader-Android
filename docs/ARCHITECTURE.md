@@ -154,6 +154,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   currently published session and return empty results when no session is
   ready. Enabled term dictionaries categorized as `exclude` remain stored and
   manageable but are omitted from the replacement session.
+- Dictionary imports preserve typed native failures through the repository;
+  batch results pair each failed file with a `UiText` reason. Error-dialog text
+  resolves joined resource fragments in the UI locale, retaining native details
+  without exposing arbitrary exception messages. Cancellation propagates while
+  completed imports still publish the mutation change version.
 - Lookup frequency order and selected dictionary are profile-scoped settings.
   Every lookup entry point passes typed options to the native query; sorting
   remains native-owned and does not require rebuilding the query session.

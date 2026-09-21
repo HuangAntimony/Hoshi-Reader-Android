@@ -844,4 +844,11 @@
     <string name="dictionary_frequency_ascending">升序</string>
     <string name="dictionary_frequency_descending">降序</string>
     <string name="dictionary_frequency_disabled">禁用</string>
+    <string name="dictionary_import_file_error_format">%1$s：%2$s</string>
+    <string name="dictionary_import_native_error_format">辞典导入器：%1$s</string>
+    <string name="dictionary_import_file_access_error">无法访问辞典文件。</string>
+    <string name="dictionary_import_archive_error">辞典压缩包无效或已损坏。</string>
+    <string name="dictionary_import_index_error">辞典索引缺失或无效。</string>
+    <string name="dictionary_import_contents_error">未找到支持的辞典条目。</string>
+    <string name="dictionary_import_io_error">无法读取或保存辞典文件。</string>
 </resources>
