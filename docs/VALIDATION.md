@@ -234,6 +234,15 @@ Dictionary tab. Cover cold start, an existing foreground task, two consecutive
 identical links, URL-encoded Japanese text, and missing or blank `text`; empty
 text must open a cleared, focused Dictionary search instead of an empty popup.
 
+Validate Dictionary pull-to-clear after a normal search and after an app-mode
+lookup deep link. At the top of the results, pull past the trigger threshold:
+only the search field should clear, focus, and show the keyboard. Results,
+recursive popups, and back/forward history must remain usable. Repeat with an
+empty field and after hiding the keyboard; type a new query and confirm the
+old results remain until search is submitted. A pull below the threshold must
+not clear the field or results. Explicit blank external lookups must still
+reset the search as described above.
+
 Manual reader validation should cover:
 
 - Renderer termination in paginated, continuous and VN modes: after moving

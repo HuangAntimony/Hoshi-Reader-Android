@@ -81,6 +81,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Pulling down in Dictionary now clears only the search field and opens the
+  keyboard, preserving the current lookup results and navigation history.
+
 - Use JapanesePod101, LanguagePod101, and Jisho as the default word-audio
   sources, matching Yomitan's Japanese defaults. Each source can be enabled
   and reordered independently; existing default sources migrate in place and

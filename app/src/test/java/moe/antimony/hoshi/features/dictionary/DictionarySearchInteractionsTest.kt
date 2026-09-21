@@ -27,7 +27,7 @@ class DictionarySearchInteractionsTest {
             ),
         )
         assertEquals(
-            DictionaryPullResetAction.ResetAndFocus,
+            DictionaryPullResetAction.ClearQueryAndFocus,
             dictionaryPullResetAction(
                 distancePx = 160f,
                 thresholdPx = DictionaryPullResetTriggerDistanceDp.toFloat(),

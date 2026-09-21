@@ -181,6 +181,30 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
+    fun clearingAndEditingQueryPreservesRenderedSearchWithoutRunningLookup() {
+        val repository = FakeDictionarySearchRepository(
+            lookupResults = listOf(lookupResult("猫")),
+            dictionaryStyles = mapOf("JMdict" to ".entry {}"),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.applyExternalLookup("猫")
+        viewModel.recordLookupRedirected(1)
+        viewModel.recordLookupRedirected(2)
+        viewModel.navigateBack()
+        viewModel.setPopups(listOf(popup("child")))
+        val previous = viewModel.uiState.value
+        val rebuildCount = repository.rebuildCount
+
+        for (query in listOf("", "", "犬")) {
+            viewModel.updateQuery(query)
+
+            assertEquals(previous.copy(query = query), viewModel.uiState.value)
+            assertEquals(listOf("猫:16:16"), repository.lookupCalls)
+            assertEquals(rebuildCount, repository.rebuildCount)
+        }
+    }
+
+    @Test
     fun resetSearchClearsQueryResultsPopupsAndHistoryWithoutRunningLookup() {
         val repository = FakeDictionarySearchRepository(
             lookupResults = listOf(lookupResult("猫")),

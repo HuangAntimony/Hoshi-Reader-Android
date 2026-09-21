@@ -6,7 +6,7 @@ internal const val DictionaryPullResetTriggerDistanceDp = 160
 
 internal enum class DictionaryPullResetAction {
     None,
-    ResetAndFocus,
+    ClearQueryAndFocus,
     FocusOnly,
 }
 
@@ -18,7 +18,7 @@ internal fun dictionaryPullResetAction(
     if (distancePx < thresholdPx) {
         DictionaryPullResetAction.None
     } else if (hasQuery) {
-        DictionaryPullResetAction.ResetAndFocus
+        DictionaryPullResetAction.ClearQueryAndFocus
     } else {
         DictionaryPullResetAction.FocusOnly
     }

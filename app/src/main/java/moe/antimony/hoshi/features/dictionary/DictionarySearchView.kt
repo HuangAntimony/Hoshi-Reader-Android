@@ -628,13 +628,15 @@ fun DictionarySearchView(
                                 hasQuery = uiState.query.isNotEmpty(),
                             )
                         ) {
-                            DictionaryPullResetAction.ResetAndFocus -> {
-                                childHistories = emptyMap()
-                                rootIframeAtTop = true
-                                searchViewModel.resetSearch()
+                            DictionaryPullResetAction.ClearQueryAndFocus -> {
+                                searchViewModel.updateQuery("")
+                                suppressAutomaticFocus = false
                                 requestSearchFocus()
                             }
-                            DictionaryPullResetAction.FocusOnly -> requestSearchFocus()
+                            DictionaryPullResetAction.FocusOnly -> {
+                                suppressAutomaticFocus = false
+                                requestSearchFocus()
+                            }
                             DictionaryPullResetAction.None -> Unit
                         }
                         pullDistancePx = 0f
