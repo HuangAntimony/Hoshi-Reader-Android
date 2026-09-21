@@ -134,7 +134,7 @@ class LocalizationResourceTest {
             defaultResources.strings.getValue("anki_selected_glossary_fallback").value,
         )
         assertEquals(
-            "{selected-glossary} Fallback",
+            "{selected-glossary} 默认值",
             zhResources.strings.getValue("anki_selected_glossary_fallback").value,
         )
         assertEquals(

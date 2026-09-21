@@ -81,6 +81,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Translate the Anki selected-glossary fallback label in Simplified Chinese.
+
 - Pulling down in Dictionary or tapping the search field's clear button now
   clears only the search field, focuses it, and opens the keyboard, preserving
   the current lookup results and navigation history.

@@ -129,53 +129,17 @@ Validation:
   complete-transcript realignment. Recheck SRT multi-volume matching, coverage,
   Reader cue rendering, playback and Anki audio export without clearing app data.
 
-### 3. Chinese Anki fallback label
-
-Status: pending Android sync.
-
-Commits:
-
-- `8ccade5` - Simplified Chinese localization updates.
-
-Dependency/value reasoning:
-
-- Small independent localization correction; no dependency on transcription.
-
-iOS behavior to mirror:
-
-- The fallback label translates its descriptive suffix while retaining the
-  literal `{selected-glossary}` handlebar.
-
-Android current gap:
-
-- `values-zh-rCN/strings.xml` still defines `anki_selected_glossary_fallback`
-  as `{selected-glossary} Fallback`, identical to the English resource.
-  Other inspected Anki, dictionary, Reader and statistics labels already have
-  Chinese resources; different established terminology is not a missing feature.
-
-Suggested slice:
-
-- Translate the suffix, preserve the literal handlebar and resource parity,
-  and align the existing Anki label validation guidance with the localized text.
-
-Validation:
-
-- Localization resource tests and lint; check Anki Advanced in both languages
-  and verify that braces remain literal rather than interpreted markup.
-
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `d24b2fa` | 2026-09-20 | On-device transcription and matching updates | Pending transcript/backend/alignment/UI, source exclusions and character coverage (2); cue ordering covered |
-| `8ccade5` | 2026-09-17 | Simplified Chinese localization | Pending Anki fallback-label suffix only (3); two-column copy belongs to (1) |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1): shared lookup presentation and settings.
-2. Chinese Anki fallback label (3): small independent correction.
-3. Sasayaki transcription (2): backend/token contract first, then persistence,
+2. Sasayaki transcription (2): backend/token contract first, then persistence,
    alignment and UI; no dependency on the other slices.
 
 ## Covered Or No Android Action
@@ -190,11 +154,12 @@ Validation:
   physical width is intentional.
 - `d24b2fa` (cue ordering): `ReaderSasayakiCues.chapterCuesJson()` already
   sorts chapter ranges by `start` before serializing them to the Reader.
-- `8ccade5` (remaining localization): Android Chinese resources already cover
+- `8ccade5`: Android Chinese resources cover
   the inspected statistics/archive, furigana, search, frequency sorting, Anki
   format and stroke-font controls. The iOS string-table routing fix has no
-  Android analogue. New two-column help text belongs with slice 1; the remaining
-  untranslated fallback-label suffix is tracked in slice 3.
+  Android analogue. The Anki selected-glossary fallback label now retains its
+  literal handlebar while translating the suffix. New two-column help text
+  remains with slice 1.
 
 - `bdf71a6`: shared Reader CSS no longer overrides WebKit line-box containment,
   matching upstream default line-box sizing. The obsolete JVM assertion that
