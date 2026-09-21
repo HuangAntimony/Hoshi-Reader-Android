@@ -232,7 +232,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   coordinator. Dictionary UI, manual updates, imports, and WorkManager automatic
   updates observe the same in-process busy/progress state and completed-change
   version; operational dictionary settings such as update interval, last update,
-  and low-memory import remain in DataStore.
+  and low-memory import remain in DataStore. Automatic updates force low-memory
+  import at the update service boundary without modifying that preference;
+  manual imports and updates continue to honor it.
 
 ## Reader
 

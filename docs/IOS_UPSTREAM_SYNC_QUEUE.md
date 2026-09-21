@@ -65,32 +65,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Automatic dictionary update low-RAM policy
-
-Status: pending Android sync.
-
-Commits: `7dd3f49` (automatic low-RAM policy only).
-
-iOS behavior to mirror:
-
-- Automatic dictionary updates always use low-RAM import.
-
-Android current gap:
-
-- `DictionaryUpdateService` still uses the user's low-RAM setting for automatic
-  updates; it defaults off.
-
-Suggested slice:
-
-- Force low-RAM for `DictionaryMutationOperation.AutoUpdate`, preserving manual
-  settings and Android's serialized atomic query-session replacement.
-
-Validation:
-
-- Automatic updates with the manual setting on/off, unchanged manual imports
-  and updates, update failures and busy-state handling.
-
-### 3. Reader WebView line-box CSS parity
+### 2. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -129,15 +104,17 @@ Validation:
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
-| `7dd3f49` | 2026-09-02 | Automatic low-RAM dictionary updates | Pending automatic import policy |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1).
-2. Automatic low-RAM dictionary update policy (2).
-3. Reader line-box CSS parity (3).
+2. Reader line-box CSS parity (2).
 
 ## Covered Or No Android Action
+
+- `7dd3f49` (automatic updates): `DictionaryUpdateService` always enables
+  low-RAM import for `AutoUpdate`; manual imports and updates retain the user's
+  setting without changing it. Existing mutation coordination remains shared.
 
 - `222a72b`: JNI import results retain native error details. Batch failures
   preserve filename and localized reason for the existing error dialog while
@@ -349,8 +326,8 @@ Validation:
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
-  bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 2.
+  bundle-release sequence is not an extra Android behavior requirement.
+  Automatic low-RAM updates are also covered above.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.

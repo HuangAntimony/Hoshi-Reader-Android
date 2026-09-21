@@ -80,6 +80,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Automatic dictionary updates always use low-memory import; manual imports
+  and updates continue to follow the Low Memory Usage Mode setting.
+
 - Book search now matches spaces and punctuation literally, shows complete
   sentence context, and returns up to 100 results. Jumping to a result temporarily
   marks the match in blue until page navigation, in all three reading modes.

@@ -57,7 +57,7 @@ internal class DictionaryUpdateService(
             withContext(ioDispatcher) {
                 val settings = dictionarySettingsRepository.settings.first()
                 val summary = dictionaryRepository.updateDictionaries(
-                    lowRamImport = settings.lowRamDictionaryImport,
+                    lowRamImport = operation == DictionaryMutationOperation.AutoUpdate || settings.lowRamDictionaryImport,
                     onProgress = { progress ->
                         session.report(progress)
                         onProgress(progress)

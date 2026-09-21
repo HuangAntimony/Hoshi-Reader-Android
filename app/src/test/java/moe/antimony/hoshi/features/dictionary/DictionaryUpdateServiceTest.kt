@@ -43,6 +43,52 @@ class DictionaryUpdateServiceTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
+    fun automaticUpdateForcesLowRamWhenSettingIsOff() = verifyLowRamPolicy(true, false)
+
+    @Test
+    fun automaticUpdateUsesLowRamWhenSettingIsOn() = verifyLowRamPolicy(true, true)
+
+    @Test
+    fun manualUpdatePreservesDisabledLowRamSetting() = verifyLowRamPolicy(false, false)
+
+    @Test
+    fun manualUpdatePreservesEnabledLowRamSetting() = verifyLowRamPolicy(false, true)
+
+    private fun verifyLowRamPolicy(automatic: Boolean, lowRamSetting: Boolean) = runBlocking {
+        settingsRepository().use { settingsHandle ->
+            settingsHandle.repository.update { it.copy(lowRamDictionaryImport = lowRamSetting) }
+            val filesDir = temporaryFolder.newFolder("low-ram-files")
+            val storage = DictionaryStorageDataSource(filesDir)
+            val installed = updatableIndex("Dictionary", "old")
+            val replacement = installed.copy(revision = "new")
+            writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+            storage.saveConfigFromStorage()
+            val bridge = ImportingDictionaryNativeBridge()
+            val coordinator = DictionaryMutationCoordinator()
+            val service = DictionaryUpdateService(
+                dictionaryRepository = DictionaryRepository(
+                    filesDir, storage, DictionaryImportDataSource(bridge),
+                    DictionaryLookupQueryService(NoOpDictionaryNativeBridge),
+                    FakeDictionaryRemoteDataSource(
+                        indexes = mapOf(installed.indexUrl to replacement),
+                        archives = mapOf(replacement.downloadUrl to dictionaryArchive(replacement)),
+                    ),
+                ),
+                dictionarySettingsRepository = settingsHandle.repository,
+                ankiSettingsRepository = InMemoryAnkiSettingsRepository(),
+                ioDispatcher = Dispatchers.Unconfined,
+                clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = coordinator,
+            )
+            val summary = service.updateDictionaries(operation = if (automatic) DictionaryMutationOperation.AutoUpdate else DictionaryMutationOperation.ManualUpdate)
+            assertEquals(1, summary.updatedCount)
+            assertEquals(listOf(automatic || lowRamSetting), bridge.lowRamCalls)
+            assertEquals(lowRamSetting, settingsHandle.repository.settings.first().lowRamDictionaryImport)
+            assertEquals(DictionaryMutationState(completedChangeVersion = 1L), coordinator.state.value)
+        }
+    }
+
+    @Test
     fun successfulUpdateRecordsLastUpdateAndMigratesDictionaryTitleReferences() = runBlocking {
         settingsRepository().use { settingsHandle ->
             val filesDir = temporaryFolder.newFolder("service-files")
@@ -543,7 +589,9 @@ class DictionaryUpdateServiceTest {
     }
 
     private class ImportingDictionaryNativeBridge : DictionaryNativeBridge {
+        val lowRamCalls = mutableListOf<Boolean>()
         override fun importDictionary(zipPath: String, outputDir: String, lowRam: Boolean): NativeDictionaryImportResult {
+            lowRamCalls += lowRam
             val index = ZipFile(File(zipPath)).use { zip ->
                 zip.getInputStream(zip.getEntry("index.json")).use { input ->
                     kotlinx.serialization.json.Json.decodeFromString<DictionaryIndex>(input.readBytes().decodeToString())

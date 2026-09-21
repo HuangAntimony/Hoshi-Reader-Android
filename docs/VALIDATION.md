@@ -544,7 +544,9 @@ Validate relevant dictionary/audio changes with:
   `DictionaryImportNativeTest` uses generated cache fixtures to verify native
   errors, including Unicode paths; run it with the same data-preserving
   instrumentation procedure as `DictionaryFrequencyNativeTest`.
-- Low Memory Usage Mode with a large Yomitan archive.
+- Low Memory Usage Mode with a large Yomitan archive. Automatic dictionary
+  updates must use low-memory import even with this setting off; manual imports
+  and updates must follow the setting, and automatic updates must not change it.
 - dictionary row long-press deletion, keeping the left reorder handle dedicated
   to dragging.
 - term/frequency/pitch/Kanji import, enable, reorder, delete, and update behavior
