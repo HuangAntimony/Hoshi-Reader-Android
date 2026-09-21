@@ -81,6 +81,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Remove the Anki Advanced “Embed media” switch; dictionary images now always
+  export to Anki as media files, including when the old setting was disabled.
+
 - Let Reader use the WebView default line-box sizing, matching current iOS
   reading styles.
 

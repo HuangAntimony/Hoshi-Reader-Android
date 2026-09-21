@@ -571,7 +571,6 @@
     <string name="anki_check_duplicates_all_models">Check for duplicates across all models</string>
     <string name="anki_duplicate_check_scope">Duplicate Check Scope</string>
     <string name="anki_compact_glossaries" comment="Anki setting label, intentionally matching dictionary compact glossaries.">Compact Glossaries</string>
-    <string name="anki_embed_media">Embed media</string>
     <string name="anki_droid_force_sync">Sync AnkiDroid after adding card</string>
     <string name="anki_droid_force_sync_description">Starts AnkiDroid sync after a card is added. AnkiDroid may ignore syncs run more often than every 5 minutes.</string>
     <string name="anki_fields">Fields</string>

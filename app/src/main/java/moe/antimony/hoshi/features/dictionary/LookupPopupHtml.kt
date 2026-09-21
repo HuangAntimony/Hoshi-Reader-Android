@@ -216,7 +216,6 @@ internal object LookupPopupHtml {
                     window.needsAudio = ${ankiSettings.needsAudio};
                     window.allowDupes = ${ankiSettings.allowDupes};
                     window.useAnkiConnect = ${ankiSettings.useAnkiConnect};
-                    window.embedMedia = ${ankiSettings.embedMedia};
                     window.compactGlossariesAnki = ${ankiSettings.compactGlossaries};
                     window.ankiFormats = ${ankiFormatsJson(ankiSettings)};
                     window.ankiBackendAvailable = ${ankiSettings.isBackendAvailable};

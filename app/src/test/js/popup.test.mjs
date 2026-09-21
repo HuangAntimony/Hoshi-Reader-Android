@@ -32,6 +32,9 @@ class FakeElement {
         this.className = '';
         this.classList = {
             contains: (name) => this.className.split(' ').includes(name),
+            add: (...names) => {
+                this.className = [...new Set([...this.className.split(' ').filter(Boolean), ...names])].join(' ');
+            },
             toggle: (name, enabled) => {
                 const names = new Set(this.className.split(' ').filter(Boolean));
                 if (enabled) names.add(name); else names.delete(name);
@@ -1512,3 +1515,20 @@ test('only the latest Kanji response may replace popup state or commit native hi
     assert.equal(setup.entriesContainer.children.length, 0);
     assert.equal(setup.kanjiRedirectCommittedMessages.length, 1);
 });
+
+for (const path of ['images/glyph.svg', 'images/illustration.png']) {
+    test(`AnkiDroid exports dictionary media without an embed setting: ${path}`, () => {
+        const { context } = popupContext();
+        vm.runInNewContext('currentDictionaryMedia = new Map()', context);
+        const node = context.createDefinitionImage({path, width: 24, height: 16, data: {alt: 'Illustration'}}, 'Dictionary', true);
+        const image = node.children[0].children.at(-1);
+        assert.equal(image.tagName, 'IMG');
+        assert.equal(image.src, `hoshi_dict_0.${path.split('.').pop()}`);
+        assert.equal(image.alt, 'Illustration');
+        const media = vm.runInNewContext('Array.from(currentDictionaryMedia.values())', context);
+        assert.equal(media.length, 1);
+        assert.equal(media[0].dictionary, 'Dictionary');
+        assert.equal(media[0].path, path);
+        assert.equal(media[0].filename, image.src);
+    });
+}

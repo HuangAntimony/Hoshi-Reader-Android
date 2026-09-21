@@ -9,6 +9,19 @@ import kotlinx.serialization.json.Json
 
 class AnkiSettingsMigrationTest {
     @Test
+    fun obsoleteEmbedMediaSettingDoesNotResetSavedConfiguration() {
+        val settings = decodeAnkiSettings(
+            """{"schemaVersion":2,"embedMedia":false,"cardFormats":[{"id":"saved","name":"Mining","selectedDeckId":3,"fieldMappings":{"Front":"{glossary}"}}]}""",
+        ) { error("Unexpected migration") }.settings
+
+        val format = settings.cardFormats.single()
+        assertEquals("saved", format.id)
+        assertEquals("Mining", format.name)
+        assertEquals(3L, format.selectedDeckId)
+        assertEquals(mapOf("Front" to "{glossary}"), format.fieldMappings)
+    }
+
+    @Test
     fun newAndRebuiltFormatsStartWithHoshiTags() {
         assertEquals("hoshi", defaultAnkiCardFormat("new").tags)
         for (raw in listOf("not-json", """{"schemaVersion":2,"cardFormats":[]}""")) {

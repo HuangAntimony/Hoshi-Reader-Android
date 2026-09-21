@@ -569,7 +569,6 @@
     <string name="anki_check_duplicates_all_models">跨所有模板检查重复</string>
     <string name="anki_duplicate_check_scope">重复检查范围</string>
     <string name="anki_compact_glossaries">紧凑释义</string>
-    <string name="anki_embed_media">嵌入媒体</string>
     <string name="anki_droid_force_sync">添加卡片后同步 AnkiDroid</string>
     <string name="anki_droid_force_sync_description">添加卡片成功后启动 AnkiDroid 同步。AnkiDroid 可能会忽略 5 分钟内重复触发的同步。</string>
     <string name="anki_fields">字段</string>

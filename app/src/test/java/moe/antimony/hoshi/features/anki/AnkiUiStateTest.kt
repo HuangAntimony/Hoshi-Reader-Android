@@ -171,29 +171,6 @@ class AnkiUiStateTest {
     }
 
     @Test
-    fun popupEmbedMediaHonorsTheGlobalSetting() {
-        val noteType = AnkiNoteType(5, "Basic", listOf("Front"))
-        val format = AnkiCardFormat(
-            id = "format",
-            name = "Default",
-            selectedDeckId = 3,
-            selectedNoteTypeId = 5,
-            fieldMappings = mapOf("Front" to "{expression}"),
-        )
-        fun state(embedMedia: Boolean) = AnkiUiState(
-            settings = AnkiSettings(
-                cardFormats = listOf(format),
-                availableDecks = listOf(AnkiDeck(3, "Mining")),
-                availableNoteTypes = listOf(noteType),
-                embedMedia = embedMedia,
-            ),
-        )
-
-        assertFalse(state(embedMedia = false).popupSettings.embedMedia)
-        assertTrue(state(embedMedia = true).popupSettings.embedMedia)
-    }
-
-    @Test
     fun disconnectedAnkiConnectDisablesOtherwiseValidFormats() {
         val basic = AnkiNoteType(5L, "Basic", listOf("Front"))
         val state = AnkiUiState(

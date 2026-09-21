@@ -1046,24 +1046,20 @@ function createDefinitionImage(data, dictionary, exporting = false) {
         }
     } else {
         const alt = nodeData?.alt || title || '';
-        const filename = (window.useAnkiConnect || window.embedMedia) ? getMediaFilename(dictionary, path) : null;
-        const image = document.createElement(filename ? 'img' : 'span');
+        const filename = getMediaFilename(dictionary, path);
+        const image = document.createElement('img');
         image.classList.add('gloss-image');
-        if (filename) {
-            image.alt = alt;
-            image.src = filename;
-            if (sizeUnits === 'em') {
-                const emSize = 14;
-                const scaleFactor = 2 * window.devicePixelRatio;
-                image.width = usedWidth * emSize * scaleFactor;
-            } else {
-                image.width = usedWidth;
-            }
-            image.height = image.width * invAspectRatio;
-            applyImageStyles(node, imageContainer, aspectRatioSizer, imageBackground, image, filename, appearance, sizeUnits === 'em');
+        image.alt = alt;
+        image.src = filename;
+        if (sizeUnits === 'em') {
+            const emSize = 14;
+            const scaleFactor = 2 * window.devicePixelRatio;
+            image.width = usedWidth * emSize * scaleFactor;
         } else {
-            image.textContent = alt;
+            image.width = usedWidth;
         }
+        image.height = image.width * invAspectRatio;
+        applyImageStyles(node, imageContainer, aspectRatioSizer, imageBackground, image, filename, appearance, sizeUnits === 'em');
         imageContainer.appendChild(image);
     }
     return node;
