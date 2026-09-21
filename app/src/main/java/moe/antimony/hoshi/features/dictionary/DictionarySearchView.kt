@@ -331,6 +331,11 @@ internal fun DictionarySearchView(
     fun requestSearchFocus() {
         localFocusRequestKey += 1
     }
+    fun clearQueryAndFocus() {
+        searchViewModel.updateQuery("")
+        suppressAutomaticFocus = false
+        requestSearchFocus()
+    }
     LifecycleResumeEffect(iframeHostWebView) {
         iframeHostWebView?.onResume()
         onPauseOrDispose { iframeHostWebView?.onPause() }
@@ -647,11 +652,7 @@ internal fun DictionarySearchView(
                                 hasQuery = uiState.query.isNotEmpty(),
                             )
                         ) {
-                            DictionaryPullResetAction.ClearQueryAndFocus -> {
-                                searchViewModel.updateQuery("")
-                                suppressAutomaticFocus = false
-                                requestSearchFocus()
-                            }
+                            DictionaryPullResetAction.ClearQueryAndFocus -> clearQueryAndFocus()
                             DictionaryPullResetAction.FocusOnly -> {
                                 suppressAutomaticFocus = false
                                 requestSearchFocus()
@@ -708,6 +709,7 @@ internal fun DictionarySearchView(
             query = uiState.query,
             isSearching = uiState.isSearching,
             onQueryChange = searchViewModel::updateQuery,
+            onClear = ::clearQueryAndFocus,
             onSubmit = runLookup,
             focusRequestKey = if (!isActive || suppressAutomaticFocus) {
                 null
@@ -925,6 +927,7 @@ private fun DictionarySearchTopBar(
     query: String,
     isSearching: Boolean,
     onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
     onSubmit: () -> Unit,
     focusRequestKey: Any?,
     contentLanguageProfile: ContentLanguageProfile,
@@ -947,6 +950,7 @@ private fun DictionarySearchTopBar(
                 query = query,
                 isSearching = isSearching,
                 onQueryChange = onQueryChange,
+                onClear = onClear,
                 onSubmit = onSubmit,
                 focusRequestKey = focusRequestKey,
                 contentLanguageProfile = contentLanguageProfile,
@@ -961,6 +965,7 @@ private fun DictionarySearchBar(
     query: String,
     isSearching: Boolean,
     onQueryChange: (String) -> Unit,
+    onClear: () -> Unit,
     onSubmit: () -> Unit,
     focusRequestKey: Any?,
     contentLanguageProfile: ContentLanguageProfile,
@@ -1035,7 +1040,7 @@ private fun DictionarySearchBar(
             }
             if (query.isNotEmpty()) {
                 IconButton(
-                    onClick = { onQueryChange("") },
+                    onClick = onClear,
                     modifier = Modifier.size(34.dp),
                 ) {
                     ClearGlyph(modifier = Modifier.size(24.dp))

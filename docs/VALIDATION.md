@@ -254,6 +254,9 @@ empty field and after hiding the keyboard; type a new query and confirm the
 old results remain until search is submitted. A pull below the threshold must
 not clear the field or results. Explicit blank external lookups must still
 reset the search as described above.
+Also tap the search field's clear button after a normal search and an app-mode
+lookup deep link, with the keyboard hidden: the field must clear, gain focus,
+and show the keyboard while preserving results and navigation history.
 
 Manual reader validation should cover:
 
