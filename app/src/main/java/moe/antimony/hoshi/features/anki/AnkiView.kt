@@ -389,7 +389,7 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         dictionaryViewModel.reload()
     }
-    val sections = ankiAdvancedSections(uiState.settings.backendKind)
+    val sections = ankiAdvancedSections()
     val termDictionaries = dictionaryUiState.dictionaries[DictionaryType.Term].orEmpty()
     SettingsDetailScaffold(title = stringResource(R.string.settings_advanced), onClose = onClose, modifier = modifier) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
@@ -397,14 +397,6 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
                 when (section) {
                     is AnkiAdvancedSection.General -> item {
                         AnkiCard {
-                            if (section.showEmbedMedia) {
-                                AnkiSwitchRow(
-                                    stringResource(R.string.anki_embed_media),
-                                    checked = uiState.settings.embedMedia,
-                                    onCheckedChange = viewModel::updateEmbedMedia,
-                                )
-                                AnkiDivider()
-                            }
                             AnkiSwitchRow(
                                 stringResource(R.string.anki_show_all_handlebars),
                                 checked = uiState.settings.showAllHandlebars,
@@ -474,7 +466,7 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 internal sealed interface AnkiAdvancedSection {
-    data class General(val showEmbedMedia: Boolean) : AnkiAdvancedSection
+    data object General : AnkiAdvancedSection
 
     data class SelectedGlossaryFallback(
         val options: List<String>,
@@ -483,9 +475,9 @@ internal sealed interface AnkiAdvancedSection {
     data object DictionaryCategories : AnkiAdvancedSection
 }
 
-internal fun ankiAdvancedSections(backendKind: AnkiBackendKind): List<AnkiAdvancedSection> =
+internal fun ankiAdvancedSections(): List<AnkiAdvancedSection> =
     listOf(
-        AnkiAdvancedSection.General(showEmbedMedia = backendKind != AnkiBackendKind.AnkiConnect),
+        AnkiAdvancedSection.General,
         AnkiAdvancedSection.SelectedGlossaryFallback(
             options = AnkiHandlebarOptions.selectedGlossaryFallbackOptions,
         ),

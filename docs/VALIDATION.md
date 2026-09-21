@@ -234,6 +234,15 @@ Dictionary tab. Cover cold start, an existing foreground task, two consecutive
 identical links, URL-encoded Japanese text, and missing or blank `text`; empty
 text must open a cleared, focused Dictionary search instead of an empty popup.
 
+Validate Dictionary pull-to-clear after a normal search and after an app-mode
+lookup deep link. At the top of the results, pull past the trigger threshold:
+only the search field should clear, focus, and show the keyboard. Results,
+recursive popups, and back/forward history must remain usable. Repeat with an
+empty field and after hiding the keyboard; type a new query and confirm the
+old results remain until search is submitted. A pull below the threshold must
+not clear the field or results. Explicit blank external lookups must still
+reset the search as described above.
+
 Manual reader validation should cover:
 
 - Renderer termination in paginated, continuous and VN modes: after moving
@@ -247,7 +256,15 @@ Manual reader validation should cover:
   on the intended test WebView; do not force-stop the app or clear its data.
 
 - cover image pages and multi-image illustration pages.
+- `ReaderViewportWebViewTest` uses generated content without changing books or
+  preferences to check vertical page height/padding, forward traversal to the
+  last text and end-position restore at zero/nonzero padding and normal/large
+  fonts. Run it via the explicit instrumentation runner with data-preserving
+  APK installation; never use connected Gradle tasks on an existing device.
 - paginated, continuous, and VN modes in vertical and horizontal writing.
+  Check default and enlarged line heights with ruby and inline images: glyphs,
+  readings, and images must remain visible without overlapping adjacent lines;
+  page/scroll progress and restoring the same passage must remain stable.
 - VN block and sentence screens, reveal speed 0/45/120, blank-area click
   advance, text lookup taps, links, images, restore, and chapter boundaries.
 - VN cross-screen lookup with a word split at the current-screen boundary:
@@ -527,9 +544,28 @@ Preserve existing app data when validating statistics:
 Validate relevant dictionary/audio changes with:
 
 - recommended dictionary downloads for JMdict, JMnedict, Jiten, and Jitendex.
-- manual multi-dictionary import with one invalid archive, confirming later
-  archives still import and failures are reported.
-- Low Memory Usage Mode with a large Yomitan archive.
+- lookup frequency sorting in Auto/Ascending/Descending/Disabled modes across
+  Reader, Dictionary, recursive popups and Process Text; explicit dictionary
+  selection, equal/missing frequencies, disable/delete/reorder, update renames,
+  profile switching and restart. Scan controls, frequency sort order and the
+  conditional dictionary selector must share one Lookup card: dividers inside,
+  rounded corners only on the outer group. `DictionaryFrequencyNativeTest` exercises the
+  JNI bridge using generated dictionaries in a unique cache directory. Build
+  with `./gradlew assembleDebug :app:assembleDebugAndroidTest`, install both
+  APKs using `adb install -r`, and run only this class with `adb shell am
+  instrument -w -e class moe.antimony.hoshi.dictionary.DictionaryFrequencyNativeTest
+  moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner`;
+  do not use connected Gradle tasks that reinstall or clear app data.
+- manual multi-dictionary import with invalid/unreadable archives, confirming
+  later archives still import and the error dialog lists each filename and
+  reason in English/Chinese. Check all-failed and mixed batches, Unicode names,
+  empty native diagnostics, cancellation and preservation of installed data.
+  `DictionaryImportNativeTest` uses generated cache fixtures to verify native
+  errors, including Unicode paths; run it with the same data-preserving
+  instrumentation procedure as `DictionaryFrequencyNativeTest`.
+- Low Memory Usage Mode with a large Yomitan archive. Automatic dictionary
+  updates must use low-memory import even with this setting off; manual imports
+  and updates must follow the setting, and automatic updates must not change it.
 - dictionary row long-press deletion, keeping the left reorder handle dedicated
   to dragging.
 - term/frequency/pitch/Kanji import, enable, reorder, delete, and update behavior
@@ -542,6 +578,50 @@ Validate relevant dictionary/audio changes with:
   but disabled afterward. Confirm a failed or interrupted download leaves no
   partial font and restores the enabled action, then verify numbered strokes in
   Reader, Dictionary, and Process Text Kanji popups.
+- local-first audio latency: with an enabled local source before slow or
+  unreachable remote sources, default playback/autoplay and mining must use
+  the local recording without requesting later sources. Opening the full
+  recording menu may load remote candidates, but must not block concurrent
+  default playback. Verify empty earlier sources still fall through in order.
+  Long-press with delayed sources: the menu must appear with localized loading
+  rows immediately, start all enabled sources concurrently, and make each
+  completed source selectable in configured order. Select a later source while
+  an earlier source is pending and verify playback/mining share its URL, even
+  if autoplay or mining began before that selection. Concurrent default mining
+  must not cancel a requested playback. Close
+  or reset the popup during loading; late results must not reopen its menu.
+  With definitions already scrolled, swipe inside the recording menu at its
+  top/bottom and with too few rows to overflow: definitions must stay still,
+  and the menu must not stretch or glow from overscroll.
+  With overflowing rows, internal menu scrolling must still work; after
+  dismissal, definitions must scroll normally again. In a short bottom popup,
+  open a long recording list: it must fit above or below the audio button
+  without covering it, including as delayed candidates arrive. Repeat with
+  the trigger near the bottom and popup scales 0.8, 1, and 2.
+- default remote word audio: new settings list JapanesePod101, LanguagePod101,
+  then Jisho. Upgrade from an enabled and a disabled old built-in proxy source;
+  verify in-place expansion, retained custom/local sources and ordering, and
+  persistence after restart. Existing custom entries using the old proxy URL
+  must remain custom entries. Disable/reorder the new sources and verify
+  playback and the candidate menu in Reader (all modes), Dictionary, Process
+  Text, and recursive popups. Check kanji with reading and kana-only queries,
+  a missing JapanesePod101 recording falling through to later sources, and all
+  sources unavailable. Select a Jisho/LanguagePod101 candidate and verify Anki
+  exports that recording; JapanesePod101's `audiomp3.php` URL must export as MP3,
+  never as PHP or the known placeholder recording. Use deterministic HTTP/HTML
+  fixtures in JVM tests; live service availability is a separate manual check.
+  `AnkiRemoteAudioDeviceTest` is an opt-in live test for all three sources and
+  actual AnkiDroid MP3 export. It requires initialized AnkiDroid with Hoshi's
+  existing database-access grant, uses in-memory settings, and deletes only
+  its three uniquely named notes in `finally`. Exported content-addressed media
+  can remain in Anki's media collection. AnkiDroid may append filename suffixes;
+  validate saved sound references and extensions rather than exact filenames.
+  Build/install the test APK with the
+  same data-preserving commands as `AnkiTagsDeviceTest` below, then run:
+
+  ```bash
+  adb shell am instrument -w -e class moe.antimony.hoshi.features.anki.AnkiRemoteAudioDeviceTest -e ankiRemoteAudioSmoke true moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner
+  ```
 - local audio database source ordering and per-source enable controls with
   imported MP3 and Opus `android.db` files. Disable the highest-priority source
   and confirm lookup playback and Anki audio export use the next enabled source;
@@ -622,9 +702,17 @@ Validate relevant dictionary/audio changes with:
   and the last format cannot be deleted. Confirming a deck/model fetch resets
   every format mapping while retaining IDs, names, icons, and tags.
 - Duplicate-note search through AnkiConnect `guiBrowse` and the AnkiDroid card
-  browser deep link for collection, deck, and deck-root scopes, including the
+  browser Intent for collection, deck, and deck-root scopes, including the
   all-models option and the global hide-search-button setting. Confirm the
   search button is absent when duplicate checking reports no matching note.
+  First select an unrelated deck in AnkiDroid, then open a matching note from
+  Hoshi: results must honor Hoshi’s scope without prompting to search all decks.
+  Do not combine a URI `search` parameter with the Intent extras: AnkiDroid
+  prioritizes the URI and retains its previous deck filter.
+  With an existing `あり難い` note, verify the `あり難い` dictionary result also
+  shows the duplicate icon and disables mining when duplicates are disallowed.
+  AnkiDroid first-field checksums must follow Anki’s NFC normalization before
+  HTML stripping; do not use NFKC, which would also fold full-width/half-width forms.
 - Exact cloze output for repeated matches, incorrect stored offsets, and
   supplementary-plane characters; selected-glossary fallback `None`,
   `{glossary-first}`, monolingual, bilingual, and both category fallback

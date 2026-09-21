@@ -14,6 +14,16 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 class DictionaryImportDataSourceTest {
+    @Test
+    fun nativeFailureRetainsDetailsAndCleansStaging() {
+        val destination = temporaryFolder.newFolder("native-error")
+        val source = DictionaryImportDataSource(FailingDictionaryBridge())
+        val error = runCatching { source.importDictionary(ByteArrayInputStream(dictionaryArchive("Partial")), destination) }.exceptionOrNull()
+        assertTrue(error is DictionaryImportException)
+        assertEquals("壊れた index𠮟", (error as DictionaryImportException).detail)
+        assertEquals(emptyList<String>(), destination.listFiles().orEmpty().map { it.name })
+    }
+
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
@@ -40,11 +50,11 @@ class DictionaryImportDataSourceTest {
         }
         val dataSource = DictionaryImportDataSource(FailingDictionaryBridge())
 
-        try {
+        val error = runCatching {
             dataSource.importDictionary(ByteArrayInputStream(dictionaryArchive("Partial")), typeDirectory)
-        } catch (expected: IllegalArgumentException) {
-            assertTrue(expected.message.orEmpty().contains("Failed to import dictionary"))
-        }
+        }.exceptionOrNull()
+        assertTrue(error is DictionaryImportException)
+        assertEquals("壊れた index𠮟", (error as DictionaryImportException).detail)
 
         assertEquals("keep", typeDirectory.resolve("Existing/index.json").readText())
         assertFalse(typeDirectory.listFiles().orEmpty().any { it.name.startsWith(".dictionary-import-") })
@@ -237,6 +247,7 @@ class DictionaryImportDataSourceTest {
             }
             return NativeDictionaryImportResult(
                 success = false,
+                error = "壊れた index𠮟",
                 title = "Partial",
                 termCount = 0,
                 metaCount = 0,

@@ -79,8 +79,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
-import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
@@ -203,7 +203,6 @@ fun DictionarySearchView(
     var suppressAutomaticFocus by remember {
         mutableStateOf(pendingLookupRequest?.query?.isNotBlank() == true)
     }
-    val localAudioRepository = appContainer.localAudioRepository
     val dictionaryRepository = appContainer.dictionaryRepository
     val fontManager = appContainer.readerFontManager
     val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
@@ -240,6 +239,8 @@ fun DictionarySearchView(
         )
     }
     val noAudioFoundText = stringResource(R.string.audio_no_audio_found)
+    val audioLoadingText = stringResource(R.string.loading)
+    val popupAudioSettings = uiState.audioSettings.withLocalizedSourceNames()
     val readerPopupIframeDocument = remember(
         uiState.dictionaryStyles,
         uiState.dictionarySettings,
@@ -250,12 +251,13 @@ fun DictionarySearchView(
         readerSettings.popupReducedMotionSwipeThreshold,
         popupDarkMode,
         readerSettings.eInkMode,
-        uiState.audioSettings,
+        popupAudioSettings,
         ankiUiState.popupSettings,
         fontFaceCss,
         readerSettings.popupScale,
         rootContentLanguageProfile,
         noAudioFoundText,
+        audioLoadingText,
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
@@ -268,8 +270,9 @@ fun DictionarySearchView(
             reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
             darkMode = popupDarkMode,
             eInkMode = readerSettings.eInkMode,
-            audioSettings = uiState.audioSettings,
+            audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
+            audioLoadingText = audioLoadingText,
             ankiSettings = ankiUiState.popupSettings,
             fontFaceCss = fontFaceCss,
             popupScale = readerSettings.popupScale,
@@ -280,12 +283,12 @@ fun DictionarySearchView(
     val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
         readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
     }
-    val readerPopupResourceHandler = remember(context, assets, fontManager, localAudioRepository, dictionaryRepository) {
+    val readerPopupResourceHandler = remember(context, assets, fontManager, appContainer.audioRequestHandler, dictionaryRepository) {
         ReaderLookupPopupResourceHandler(
             context = context.applicationContext,
             assets = assets,
             fontManager = fontManager,
-            audioRequestHandler = AudioRequestHandler(localAudioRepository),
+            audioRequestHandler = appContainer.audioRequestHandler,
             imageRequestHandler = DictionaryImageRequestHandler(dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
@@ -625,13 +628,15 @@ fun DictionarySearchView(
                                 hasQuery = uiState.query.isNotEmpty(),
                             )
                         ) {
-                            DictionaryPullResetAction.ResetAndFocus -> {
-                                childHistories = emptyMap()
-                                rootIframeAtTop = true
-                                searchViewModel.resetSearch()
+                            DictionaryPullResetAction.ClearQueryAndFocus -> {
+                                searchViewModel.updateQuery("")
+                                suppressAutomaticFocus = false
                                 requestSearchFocus()
                             }
-                            DictionaryPullResetAction.FocusOnly -> requestSearchFocus()
+                            DictionaryPullResetAction.FocusOnly -> {
+                                suppressAutomaticFocus = false
+                                requestSearchFocus()
+                            }
                             DictionaryPullResetAction.None -> Unit
                         }
                         pullDistancePx = 0f

@@ -1502,6 +1502,7 @@ class BookshelfViewModelTest {
 private fun UiText?.testString(): String? =
     when (this) {
         null -> null
+        is UiText.Joined -> parts.joinToString(separator) { it.testString().orEmpty() }
         is UiText.Literal -> value
         is UiText.Resource -> when (id) {
             R.string.bookshelf_importing_named_format -> "Importing ${args[0]}..."

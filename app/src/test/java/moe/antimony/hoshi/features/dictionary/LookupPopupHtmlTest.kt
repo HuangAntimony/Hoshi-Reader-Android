@@ -21,11 +21,28 @@ import moe.antimony.hoshi.features.anki.AnkiPopupFormat
 import moe.antimony.hoshi.features.anki.AnkiFormatIcon
 import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.AudioSource
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LookupPopupHtmlTest {
+    @Test
+    fun popupAudioPayloadKeepsEnabledBuiltInsInConfiguredOrder() {
+        val sources = AudioSettings.DefaultAudioSources.reversed().mapIndexed { index, source ->
+            source.copy(isEnabled = index != 1)
+        }
+        val html = LookupPopupHtml.renderIframeDocument(audioSettings = AudioSettings(audioSources = sources))
+        val payload = Json.parseToJsonElement(
+            html.substringAfter("window.audioSources = ").substringBefore(';'),
+        )
+        val expected = Json.parseToJsonElement("""[
+            {"name":"Jisho","url":"hoshi-builtin-audio-source://jisho/?term={term}&reading={reading}"},
+            {"name":"JapanesePod101","url":"hoshi-builtin-audio-source://jpod101/?term={term}&reading={reading}"}
+        ]""")
+        assertEquals(expected, payload)
+    }
+
     @Test
     fun sourceContainerPrecedesEntriesAndUsesNormalizedConfiguredSize() {
         listOf(9 to 12, 31 to 31, 60 to 48).forEach { (configured, expected) ->

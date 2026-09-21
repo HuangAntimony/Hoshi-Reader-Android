@@ -154,6 +154,15 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   currently published session and return empty results when no session is
   ready. Enabled term dictionaries categorized as `exclude` remain stored and
   manageable but are omitted from the replacement session.
+- Dictionary imports preserve typed native failures through the repository;
+  batch results pair each failed file with a `UiText` reason. Error-dialog text
+  resolves joined resource fragments in the UI locale, retaining native details
+  without exposing arbitrary exception messages. Cancellation propagates while
+  completed imports still publish the mutation change version.
+- Lookup frequency order and selected dictionary are profile-scoped settings.
+  Every lookup entry point passes typed options to the native query; sorting
+  remains native-owned and does not require rebuilding the query session.
+  Frequency-dictionary update renames migrate selected titles across profiles.
 - Dictionary data directories remain global under `Dictionaries/`, while each
   profile owns `dictionary_config.json` and `dictionary_settings.json` under
   `Profiles/<profileId>/`. The config preserves per-type order and enable state,
@@ -223,7 +232,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   coordinator. Dictionary UI, manual updates, imports, and WorkManager automatic
   updates observe the same in-process busy/progress state and completed-change
   version; operational dictionary settings such as update interval, last update,
-  and low-memory import remain in DataStore.
+  and low-memory import remain in DataStore. Automatic updates force low-memory
+  import at the update service boundary without modifying that preference;
+  manual imports and updates continue to honor it.
 
 ## Reader
 
@@ -263,6 +274,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and
   VN reading. Kotlin selects the asset, injects typed settings, and keeps
   persisted progress as chapter progress mapped to whole-book character count.
+  Paginated page height and page steps use the visible WebView viewport height;
+  vertical padding and column gaps contain only configured user spacing, with
+  no extra font-size overlap strip.
 - Reader `bookinfo.json` sidecars persist whole-book/spine character counts plus
   optional iOS-compatible TOC fragment offsets and a first-appearance raster
   image inventory. A reader-facts schema version invalidates stale derived
@@ -348,12 +362,26 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- Built-in remote word audio uses Yomitan's Japanese source order:
+  JapanesePod101, LanguagePod101, and Jisho. `BuiltInAudioSource` owns stable
+  internal source URLs and resource-backed names. `AudioSettingsRepository`
+  migrates the old built-in proxy source in place, preserving its enabled state
+  and all custom sources. `RemoteWordAudioRepository` owns HTTP requests on the
+  IO dispatcher, HTML parsing, and JapanesePod101 placeholder-audio validation.
+  The Hilt-provided `AudioRequestHandler` adapts these sources to the existing
+  audio-list JSON protocol at the WebView interception boundary; all popup
+  hosts share it. Candidate URLs are actual remote media URLs, so playback and
+  Anki continue through their existing bridges and backends.
 - Popup audio sources cross the iframe boundary as ordered name/URL pairs.
   `LocalAudioRepository` returns every enabled, ranked local candidate and
   `AudioRequestHandler` exposes their descriptive labels and deduplicated URLs.
   Popup JS owns the entry-scoped candidate cache and selected URL, so playback
   and Anki mining use the same choice; replacing or restoring popup results
-  clears that state.
+  clears that state. Source requests are cached separately: default playback
+  and mining stop at the first matching source in configured order, while the
+  recording menu opens immediately and resolves all sources concurrently.
+  Source groups update in configured order, and available rows select by URL
+  without waiting for other sources; closed/reset menus ignore late results.
 - Shared iframe frame payloads accept optional root `sourceText` for Dictionary
   search and Process Text; Reader and recursive child frames omit it. Shared
   popup assets render character spans, look up exact suffixes on tap, mark the
@@ -412,7 +440,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   as one default format. Popup mining, per-format duplicate checks, and opening
   existing notes all carry the stable format ID through the reader bridge and
   still go through the Anki repository/backend boundary. AnkiConnect opens
-  notes with `guiBrowse`; AnkiDroid uses its browser deep link. At mining time,
+  notes with `guiBrowse`; AnkiDroid opens its browser with `search_query` and `all_decks=true` Intent
+  extras so the previous browser deck selection cannot narrow the requested
+  duplicate scope. At mining time,
   glossary-first and monolingual/bilingual definition handlebars resolve from
   the current profile's persisted term-dictionary order and categories without
   extending the popup mining payload.

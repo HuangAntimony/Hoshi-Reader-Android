@@ -14,6 +14,24 @@ class AnkiDuplicateQueryTest {
     }
 
     @Test
+    fun checksumMatchesAnkiNfcForCompatibilityKanji() {
+        // U+FA68 is canonically equivalent to U+96E3, which Anki stores by default.
+        assertEquals(2620585645L, ankiFirstFieldChecksum("あり\uFA68い"))
+        assertEquals(2620585645L, ankiFirstFieldChecksum("<b>あり\uFA68い</b>"))
+    }
+
+    @Test
+    fun checksumMatchesAnkiNfcForDecomposedDakuten() {
+        assertEquals(ankiFirstFieldChecksum("が"), ankiFirstFieldChecksum("か\u3099"))
+    }
+
+    @Test
+    fun checksumDoesNotFoldCompatibilityOnlyDifferences() {
+        assertFalse(ankiFirstFieldChecksum("Ａ") == ankiFirstFieldChecksum("A"))
+        assertFalse(ankiFirstFieldChecksum("ｶﾞ") == ankiFirstFieldChecksum("ガ"))
+    }
+
+    @Test
     fun duplicateSelectionIncludesModelUnlessCheckingAllModels() {
         val scoped = ankiDuplicateNoteSelection(modelId = 7L, checksum = 1234L, checkAllModels = false)
         val allModels = ankiDuplicateNoteSelection(modelId = 7L, checksum = 1234L, checkAllModels = true)
@@ -110,15 +128,22 @@ class AnkiDuplicateQueryTest {
     }
 
     @Test
-    fun ankiDroidBrowserIntentTargetsOfficialDeepLink() {
-        val spec = ankiDroidBrowserIntentSpec("\"Expression:食べる\"")
+    fun ankiDroidBrowserSearchIgnoresLastDeckAndPreservesRequestedScope() {
+        val query = "\"Expression:食べる + &\" \"note:Lapis\" \"deck:Mining::日本語\""
+        val spec = ankiDroidBrowserIntentSpec(query)
 
-        assertEquals("android.intent.action.VIEW", spec.action)
+        assertEquals("com.ichi2.anki.CardBrowser", spec.activityClassName)
         assertEquals("com.ichi2.anki", spec.packageName)
-        assertEquals(
-            "anki://x-callback-url/browser?search=%22Expression%3A%E9%A3%9F%E3%81%B9%E3%82%8B%22",
-            spec.uri,
-        )
+        assertEquals(mapOf("search_query" to query), spec.stringExtras)
+        assertEquals(mapOf("all_decks" to true), spec.booleanExtras)
         assertTrue(spec.newTask)
+    }
+
+    @Test
+    fun ankiDroidBrowserSearchUsesDetectedPackageWithOriginalActivityClass() {
+        val spec = ankiDroidBrowserIntentSpec("食べる", packageName = "com.ichi2.anki.debug")
+
+        assertEquals("com.ichi2.anki.debug", spec.packageName)
+        assertEquals("com.ichi2.anki.CardBrowser", spec.activityClassName)
     }
 }

@@ -631,7 +631,7 @@ window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
   window.hoshiReader.didInitialize = true;
   window.hoshiReaderViewport.ensureDeviceViewport();
-  var pageHeight = window.innerHeight + __HOSHI_BOTTOM_OVERLAP_PX__;
+  var pageHeight = window.innerHeight;
   var pageWidth = window.innerWidth;
   document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
   document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');

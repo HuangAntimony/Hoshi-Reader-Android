@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.dictionary
 
 import de.manhhao.hoshi.DictionaryStyle
+import de.manhhao.hoshi.LookupOptions
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
 import java.io.File
@@ -52,10 +53,10 @@ internal class DictionaryLookupQueryService @Inject constructor(
         }
     }
 
-    fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16): List<LookupResult> =
+    fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16, options: LookupOptions = LookupOptions()): List<LookupResult> =
         queryLock.read {
             currentSession?.let { session ->
-                nativeBridge.lookup(session, text, maxResults, scanLength)
+                nativeBridge.lookup(session, text, maxResults, scanLength, options)
             } ?: emptyList()
         }
 

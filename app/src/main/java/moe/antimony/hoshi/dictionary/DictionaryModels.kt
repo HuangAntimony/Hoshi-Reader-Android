@@ -59,6 +59,7 @@ data class DictionaryUpdateProgress(
 data class DictionaryRename(
     val oldTitle: String,
     val newTitle: String,
+    val type: DictionaryType? = null,
 )
 
 data class DictionaryUpdateFailure(

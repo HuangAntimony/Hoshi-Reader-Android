@@ -8,6 +8,20 @@ import org.junit.Test
 
 class AnkiRepositoryTest {
     @Test
+    fun japanesePodPhpAudioIsExportedAsMp3() {
+        val url = "https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji=食べる&kana=たべる"
+        val bytes = byteArrayOf(0x49, 0x44, 0x33)
+        val loaded = readAnkiAudioBytes(url, readLocalAudio = { error("Unexpected local audio") }, readRemoteAudio = {
+            assertEquals(url, it)
+            bytes
+        })!!
+        assertTrue(bytes.contentEquals(loaded))
+        val media = ankiAudioMediaFile(url, loaded)
+        assertTrue(media.preferredName.endsWith(".mp3"))
+        assertEquals("audio/mpeg", media.mimeType)
+    }
+
+    @Test
     fun dictionaryMediaUsesFilenameInsideExistingGlossaryHtml() {
         assertEquals(
             "hoshi_dict_123.svg",

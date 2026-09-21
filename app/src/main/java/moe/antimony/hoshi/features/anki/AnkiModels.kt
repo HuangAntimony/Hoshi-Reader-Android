@@ -107,7 +107,6 @@ data class AnkiSettings(
     val checkDuplicatesAcrossAllModels: Boolean = false,
     val duplicateScope: AnkiDuplicateScope = AnkiDuplicateScope.Collection,
     val compactGlossaries: Boolean = false,
-    val embedMedia: Boolean = true,
     val disableShowNotes: Boolean = false,
     val selectedGlossaryFallback: String = "",
     val showAllHandlebars: Boolean = false,
@@ -232,7 +231,6 @@ data class AnkiPopupSettings(
     val allowDupes: Boolean = false,
     val compactGlossaries: Boolean = false,
     val disableShowNotes: Boolean = false,
-    val embedMedia: Boolean = false,
 )
 
 internal fun Map<String, String>.referencesAnkiHandlebar(handlebar: String): Boolean =

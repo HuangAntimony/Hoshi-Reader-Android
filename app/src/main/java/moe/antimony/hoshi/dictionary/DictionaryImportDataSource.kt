@@ -37,7 +37,7 @@ internal class DictionaryImportDataSource(
     ): Boolean {
         contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
         return contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Unable to open dictionary file." }
+            if (input == null) throw DictionaryImportException(DictionaryImportFailureKind.FileAccess)
             importDictionary(input, typeDirectory, lowRamImport, shouldSkip)
         }
     }
@@ -64,7 +64,7 @@ internal class DictionaryImportDataSource(
     ): Map<DictionaryType, List<ImportedDictionary>> {
         contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
         return contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Unable to open dictionary file." }
+            if (input == null) throw DictionaryImportException(DictionaryImportFailureKind.FileAccess)
             importDictionaryByDetectedTypes(input, importRootDirectory, typeDirectories, lowRamImport, shouldSkip)
         }
     }
@@ -86,9 +86,9 @@ internal class DictionaryImportDataSource(
             }
             stagingRoot.mkdirs()
             val result = nativeBridge.importDictionary(tempZip.absolutePath, stagingRoot.absolutePath, lowRamImport)
-            require(result.success) { "Failed to import dictionary." }
+            if (!result.success) throw DictionaryImportException.fromNative(result.error)
             val targetTypes = result.detectedTypes()
-            require(targetTypes.isNotEmpty()) { "Failed to detect dictionary type." }
+            if (targetTypes.isEmpty()) throw DictionaryImportException(DictionaryImportFailureKind.UnsupportedContents)
             return commitStagedDictionariesByType(stagingRoot, typeDirectories, targetTypes, shouldSkip)
         } finally {
             tempZip.delete()
@@ -114,7 +114,7 @@ internal class DictionaryImportDataSource(
             if (shouldSkip(index)) return emptyList()
             stagingRoot.mkdirs()
             val result = nativeBridge.importDictionary(tempZip.absolutePath, stagingRoot.absolutePath, lowRamImport)
-            require(result.success) { "Failed to import dictionary." }
+            if (!result.success) throw DictionaryImportException.fromNative(result.error)
             return commitStagedDictionaries(stagingRoot, typeDirectory)
         } finally {
             tempZip.delete()
@@ -125,7 +125,7 @@ internal class DictionaryImportDataSource(
     private fun readDictionaryIndexFromZip(zipFile: File): DictionaryIndex {
         ZipFile(zipFile).use { zip ->
             val entry = zip.getEntry("index.json")
-                ?: error("Unable to read dictionary index.")
+                ?: throw DictionaryImportException(DictionaryImportFailureKind.InvalidIndex)
             zip.getInputStream(entry).use { input ->
                 return json.decodeFromString<DictionaryIndex>(input.readBytes().decodeToString())
             }
@@ -134,7 +134,7 @@ internal class DictionaryImportDataSource(
 
     private fun commitStagedDictionaries(stagingRoot: File, typeDirectory: File): List<ImportedDictionary> {
         val importedDictionaries = stagingRoot.listFiles()?.filter(File::isDirectory).orEmpty()
-        require(importedDictionaries.isNotEmpty()) { "Failed to import dictionary." }
+        if (importedDictionaries.isEmpty()) throw DictionaryImportException(DictionaryImportFailureKind.UnsupportedContents)
         return importedDictionaries.map { stagedDictionary ->
             val imported = ImportedDictionary(
                 fileName = stagedDictionary.name,
@@ -152,7 +152,7 @@ internal class DictionaryImportDataSource(
         shouldSkip: (DictionaryType, DictionaryIndex) -> Boolean,
     ): Map<DictionaryType, List<ImportedDictionary>> {
         val stagedDictionaries = stagingRoot.listFiles()?.filter(File::isDirectory).orEmpty()
-        require(stagedDictionaries.isNotEmpty()) { "Failed to import dictionary." }
+        if (stagedDictionaries.isEmpty()) throw DictionaryImportException(DictionaryImportFailureKind.UnsupportedContents)
         return targetTypes.associateWith { type ->
             val typeDirectory = requireNotNull(typeDirectories[type]) { "Missing ${type.directoryName} dictionary directory." }
             typeDirectory.mkdirs()

@@ -14,6 +14,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Hoshi reports a low SubRead match rate, asks you to add the audiobook first
   when the book has none, and downloads and installs SubRead for you when SubRead
   is not installed.
+- Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
+  or Disabled, with an enabled frequency dictionary for explicit ordering.
+  Both controls share the Lookup settings card with the scan controls.
 
 - Preserve furigana readings in Reader highlights and show them in Contents.
   Select an existing highlight's exact text range to change its color, or choose
@@ -58,7 +61,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   character to look up from that position while keeping the full sentence for
   Anki cards. Back/Forward restores the selected occurrence for mining, and
   source text size is adjustable from 12 to 48.
-- Add Off, Dimmed, Toggle, and Hidden furigana modes in Reading Settings;
+- Add Off, Dimmed, Toggle, and Hidden furigana modes in Appearance;
   Toggle reveals whitespace-adjacent ruby annotations together on the first tap.
 
 - Add Show, Blur, and Hide privacy modes for bookshelf covers, plus deterministic
@@ -71,7 +74,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   import/management and popup lookup, a verified one-tap
   stroke-order font download for Kanji users, plus complete pitch data with H/L
   patterns and nasal/devoice markers.
-- Add downloadable recommended Japanese font families to Reading Settings,
+- Add downloadable recommended Japanese font families to Appearance,
   including separate family and named variant selectors, real static and
   variable weight selection, verified app-private downloads, and family/variant
   grouping for imported TTF and OTF fonts, with compact one-level type grouping
@@ -84,6 +87,32 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Pulling down in Dictionary now clears only the search field and opens the
+  keyboard, preserving the current lookup results and navigation history.
+
+- Use JapanesePod101, LanguagePod101, and Jisho as the default word-audio
+  sources, matching Yomitan's Japanese defaults. Each source can be enabled
+  and reordered independently; existing default sources migrate in place and
+  retain their enabled state, while custom sources stay unchanged. Default
+  playback and mining use the first matching source immediately, without
+  waiting for later remote sources when local audio is available. The recording
+  menu opens immediately, loads sources concurrently, and lets you select
+  available recordings while other sources are still loading. Scrolling inside
+  the menu has no overscroll stretch and never scrolls the definitions
+  underneath, including at either end
+  and when the menu has too few recordings to scroll. Long menus fit above
+  or below the playback button without covering it, scrolling internally
+  when the popup is short.
+
+- Remove the Anki Advanced “Embed media” switch; dictionary images now always
+  export to Anki as media files, including when the old setting was disabled.
+
+- Let Reader use the WebView default line-box sizing, matching current iOS
+  reading styles.
+
+- Automatic dictionary updates always use low-memory import; manual imports
+  and updates continue to follow the Low Memory Usage Mode setting.
+
 - Book search now matches spaces and punctuation literally, shows complete
   sentence context, and returns up to 100 results. Jumping to a result temporarily
   marks the match in blue until page navigation, in all three reading modes.
@@ -95,7 +124,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Apply the selected Recent/Title sort to Google Drive books. Recent uses the
   latest reading or audiobook progress time, falling back to bookdata last access.
 
-- Separate global display settings from profile Reading Settings, which now show
+- Separate global display settings from profile Appearance settings, which now show
   the edited profile name. Opening books or switching profiles keeps the same
   colors and E-ink setting.
 - Unify page, grouped card, nested control and popup colors across tabs, settings
@@ -106,7 +135,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Native backgrounds use a softer, more neutral tint and lighter separators,
   while buttons and active states retain the selected accent color.
   Theme uses the same inset row dividers as other settings pages.
-  Reading Settings uses inset rounded selections inside continuous neutral
+  Appearance uses inset rounded selections inside continuous neutral
   segment tracks, keeping the current choice clear without vertical separators.
 - Keep Statistics always available and move its settings to the Stats tab's
   upper-right corner. Statistics sync defaults on only when unset; saved daily goals,
@@ -135,6 +164,16 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   rebuilding the heatmap and charts during fast vertical swipes.
 
 ### Fixed
+
+- Recognize existing AnkiDroid cards for canonically equivalent Unicode spellings,
+  including compatibility kanji such as `難` and decomposed kana, so mined words
+  correctly show the existing-card icon and cannot bypass duplicate checking.
+
+- Open matching AnkiDroid cards even when its browser previously selected a
+  different deck, while preserving the configured duplicate-search scope.
+
+- Show each failed dictionary import with its filename and reason, while
+  continuing other files in the batch.
 
 - Show a localized Reader fallback with a Close action when a book is missing
   or cannot be parsed, instead of exposing internal loading errors.

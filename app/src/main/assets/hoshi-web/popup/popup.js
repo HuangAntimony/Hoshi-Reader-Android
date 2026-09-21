@@ -19,6 +19,7 @@ const NUMERIC_TAG = /^\d+$/;
 const POS_TAGS = new Set(['n', 'adj-i', 'adj-na', 'adj-no', 'v1', 'vk', 'vs', 'vs-i', 'vs-s', 'vz', 'vi', 'vt']);
 let audioUrls = {};
 let audioLists = {};
+let audioSelectionVersions = {};
 let audioStateGeneration = 0;
 let activeAudioCandidateMenu = null;
 let lastSelection = '';
@@ -1046,24 +1047,20 @@ function createDefinitionImage(data, dictionary, exporting = false) {
         }
     } else {
         const alt = nodeData?.alt || title || '';
-        const filename = (window.useAnkiConnect || window.embedMedia) ? getMediaFilename(dictionary, path) : null;
-        const image = document.createElement(filename ? 'img' : 'span');
+        const filename = getMediaFilename(dictionary, path);
+        const image = document.createElement('img');
         image.classList.add('gloss-image');
-        if (filename) {
-            image.alt = alt;
-            image.src = filename;
-            if (sizeUnits === 'em') {
-                const emSize = 14;
-                const scaleFactor = 2 * window.devicePixelRatio;
-                image.width = usedWidth * emSize * scaleFactor;
-            } else {
-                image.width = usedWidth;
-            }
-            image.height = image.width * invAspectRatio;
-            applyImageStyles(node, imageContainer, aspectRatioSizer, imageBackground, image, filename, appearance, sizeUnits === 'em');
+        image.alt = alt;
+        image.src = filename;
+        if (sizeUnits === 'em') {
+            const emSize = 14;
+            const scaleFactor = 2 * window.devicePixelRatio;
+            image.width = usedWidth * emSize * scaleFactor;
         } else {
-            image.textContent = alt;
+            image.width = usedWidth;
         }
+        image.height = image.width * invAspectRatio;
+        applyImageStyles(node, imageContainer, aspectRatioSizer, imageBackground, image, filename, appearance, sizeUnits === 'em');
         imageContainer.appendChild(image);
     }
     return node;
@@ -1189,7 +1186,11 @@ async function mineEntry(expression, reading, frequencies, pitches, rules, match
     const pitchAccentGraphs = constructPitchAccentGraphsHtml(pitches, reading || expression);
 
     if (!audioUrls[idx] && window.audioSources?.length && window.needsAudio) {
-        audioUrls[idx] = (await fetchAudioList(idx))[0]?.url || null;
+        const selection = audioUrls;
+        const defaultUrl = (await fetchAudioList(idx, true))[0]?.url || null;
+        if (selection !== audioUrls) return;
+        // A menu choice made during resolution takes priority over the default.
+        selection[idx] ||= defaultUrl;
     }
 
     const audio = audioUrls[idx] || '';
@@ -1689,30 +1690,31 @@ async function fetchAudioSources(source, expression, reading) {
     }
 }
 
-async function fetchAudioList(entryIndex) {
-    if (audioLists[entryIndex]) {
-        return await audioLists[entryIndex];
-    }
+async function fetchAudioList(entryIndex, firstMatchOnly = false) {
     const entry = window.lookupEntries?.[entryIndex];
     const sources = window.audioSources;
     if (!entry || !sources?.length) {
         return [];
     }
 
-    const cache = audioLists;
-    cache[entryIndex] = (async () => {
-        const list = [];
-        for (const source of sources) {
-            const candidates = await fetchAudioSources(source, entry.expression, entry.reading);
-            const sourceName = typeof source === 'string' ? 'Audio' : (source.name || 'Audio');
-            candidates.forEach(candidate => list.push({
-                name: candidate.name ? `${sourceName}: ${candidate.name}` : sourceName,
-                url: candidate.url,
-            }));
+    // Share each source request, not a promise for the complete menu: default
+    // playback/mining must not wait for lower-priority sources after a hit.
+    const requests = audioLists[entryIndex] ||= [];
+    const list = [];
+    for (let index = 0; index < sources.length; index++) {
+        const source = sources[index];
+        requests[index] ||= fetchAudioSources(source, entry.expression, entry.reading);
+        const candidates = await requests[index];
+        const sourceName = typeof source === 'string' ? 'Audio' : (source.name || 'Audio');
+        candidates.forEach(candidate => list.push({
+            name: candidate.name ? `${sourceName}: ${candidate.name}` : sourceName,
+            url: candidate.url,
+        }));
+        if (firstMatchOnly && list.length) {
+            break;
         }
-        return list;
-    })();
-    return await cache[entryIndex];
+    }
+    return list;
 }
 
 async function getAudioMenu(entryIndex) {
@@ -1736,32 +1738,24 @@ function closeAudioCandidateMenu() {
 }
 
 async function showAudioCandidateMenu(entryIndex, anchor) {
-    const generation = audioStateGeneration;
-    const menuData = await getAudioMenu(entryIndex);
-    if (generation !== audioStateGeneration || !anchor?.isConnected) {
-        return;
-    }
+    if (!anchor?.isConnected) return;
     closeAudioCandidateMenu();
-
+    const generation = audioStateGeneration;
+    const entry = window.lookupEntries?.[entryIndex];
+    const sources = entry ? (window.audioSources || []) : [];
+    const requests = audioLists[entryIndex] ||= [];
     const scrim = el('div', { className: 'audio-candidate-menu-scrim' });
     const menu = el('div', { className: 'audio-candidate-menu' });
-    const names = menuData.names.length ? menuData.names : [window.noAudioFoundText || 'No audio found'];
-    names.forEach((name, index) => {
-        const item = el('button', {
+    const groups = sources.map(source => {
+        const name = typeof source === 'string' ? 'Audio' : (source.name || 'Audio');
+        const container = el('div');
+        container.appendChild(el('button', {
             className: 'audio-candidate-menu-item',
-            textContent: name,
-            disabled: menuData.names.length === 0,
-            'data-selected': String(index === menuData.selected),
-        });
-        if (menuData.names.length) {
-            item.addEventListener('click', async event => {
-                event.preventDefault();
-                event.stopPropagation();
-                closeAudioCandidateMenu();
-                await playEntryAudio(entryIndex, index);
-            });
-        }
-        menu.appendChild(item);
+            textContent: `${name}: ${window.audioLoadingText || 'Loading...'}`,
+            disabled: true,
+        }));
+        menu.appendChild(container);
+        return { name, container, candidates: null, buttons: [] };
     });
     const stopMenuEvent = event => event.stopPropagation();
     menu.addEventListener('pointerdown', stopMenuEvent);
@@ -1775,23 +1769,74 @@ async function showAudioCandidateMenu(entryIndex, anchor) {
     document.body.appendChild(menu);
     activeAudioCandidateMenu = { menu, scrim };
 
-    const anchorRect = anchor.getBoundingClientRect();
-    requestAnimationFrame(() => {
-        if (activeAudioCandidateMenu?.menu !== menu) return;
-        const visualViewportWidth = window.innerWidth || document.documentElement.clientWidth || 320;
-        const visualViewportHeight = window.innerHeight || document.documentElement.clientHeight || 480;
-        const anchorPoint = popupGeometry.visualViewportPointToLayout(anchorRect.right, anchorRect.bottom);
-        const viewport = popupGeometry.visualViewportPointToLayout(visualViewportWidth, visualViewportHeight);
-        const menuWidth = menu.offsetWidth || 220;
-        const menuHeight = menu.offsetHeight || Math.min(names.length * 40, viewport.y - 16);
-        menu.style.left = `${Math.max(8, Math.min(anchorPoint.x - menuWidth, viewport.x - menuWidth - 8))}px`;
-        menu.style.top = `${Math.max(8, Math.min(anchorPoint.y + 4, viewport.y - menuHeight - 8))}px`;
-    });
+    const isCurrent = () => generation === audioStateGeneration &&
+        activeAudioCandidateMenu?.menu === menu && anchor.isConnected;
+    const updateMenu = () => {
+        if (!isCurrent()) return;
+        const counts = {};
+        groups.forEach(group => group.candidates?.forEach((candidate, index) => {
+            const name = candidate.name ? `${group.name}: ${candidate.name}` : group.name;
+            counts[name] = (counts[name] || 0) + 1;
+            group.buttons[index].textContent = counts[name] > 1 ? `${name} ${counts[name]}` : name;
+            group.buttons[index].setAttribute('data-selected', String(candidate.url === audioUrls[entryIndex]));
+        }));
+        if (groups.every(group => group.candidates?.length === 0)) {
+            menu.replaceChildren(el('button', {
+                className: 'audio-candidate-menu-item',
+                textContent: window.noAudioFoundText || 'No audio found',
+                disabled: true,
+            }));
+        }
+        requestAnimationFrame(() => {
+            if (!isCurrent()) return;
+            const anchorRect = anchor.getBoundingClientRect();
+            const visualViewportWidth = window.innerWidth || document.documentElement.clientWidth || 320;
+            const visualViewportHeight = window.innerHeight || document.documentElement.clientHeight || 480;
+            const anchorPoint = popupGeometry.visualViewportPointToLayout(anchorRect.right, anchorRect.bottom);
+            const anchorTop = popupGeometry.visualViewportPointToLayout(anchorRect.left, anchorRect.top).y;
+            const viewport = popupGeometry.visualViewportPointToLayout(visualViewportWidth, visualViewportHeight);
+            const spaceAbove = Math.max(0, anchorTop - 4 - 8);
+            const spaceBelow = Math.max(0, viewport.y - 8 - anchorPoint.y - 4);
+            const openBelow = spaceBelow >= spaceAbove;
+            const availableHeight = openBelow ? spaceBelow : spaceAbove;
+            // Keep the trigger uncovered as asynchronous candidates grow the menu.
+            menu.style.maxHeight = `${availableHeight}px`;
+            const menuWidth = menu.offsetWidth || 220;
+            const menuHeight = menu.offsetHeight || Math.min(Math.max(1, sources.length) * 40, availableHeight);
+            menu.style.left = `${Math.max(8, Math.min(anchorPoint.x - menuWidth, viewport.x - menuWidth - 8))}px`;
+            menu.style.top = `${openBelow ? anchorPoint.y + 4 : anchorTop - 4 - menuHeight}px`;
+        });
+    };
+    updateMenu();
+    await Promise.all(sources.map(async (source, index) => {
+        requests[index] ||= fetchAudioSources(source, entry.expression, entry.reading);
+        const candidates = await requests[index];
+        if (!isCurrent()) return;
+        const group = groups[index];
+        group.candidates = candidates;
+        group.buttons = candidates.map(candidate => {
+            const item = el('button', { className: 'audio-candidate-menu-item' });
+            item.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!isCurrent()) return;
+                // Bind the URL, not a list index that can shift as sources finish.
+                audioSelectionVersions[entryIndex] = (audioSelectionVersions[entryIndex] || 0) + 1;
+                audioUrls[entryIndex] = candidate.url;
+                closeAudioCandidateMenu();
+                playEntryAudio(entryIndex);
+            });
+            return item;
+        });
+        group.container.replaceChildren(...group.buttons);
+        updateMenu();
+    }));
 }
 
 function resetAudioCandidateState() {
     audioUrls = {};
     audioLists = {};
+    audioSelectionVersions = {};
     audioStateGeneration++;
     closeAudioCandidateMenu();
 }
@@ -1926,9 +1971,14 @@ async function playEntryAudio(entryIndex, sourceIndex = null) {
     const audioSlot = getButtonSlot('audio', entryIndex);
 
     if (sourceIndex !== null) {
-        audioUrls[entryIndex] = (await fetchAudioList(entryIndex))[sourceIndex]?.url || null;
-    } else if (!audioUrls[entryIndex]) {
-        audioUrls[entryIndex] = (await fetchAudioList(entryIndex))[0]?.url || null;
+        audioSelectionVersions[entryIndex] = (audioSelectionVersions[entryIndex] || 0) + 1;
+    }
+    if (sourceIndex !== null || !audioUrls[entryIndex]) {
+        const selection = audioUrls;
+        const selectionVersion = audioSelectionVersions[entryIndex] || 0;
+        const list = await fetchAudioList(entryIndex, sourceIndex === null);
+        if (selection !== audioUrls || selectionVersion !== (audioSelectionVersions[entryIndex] || 0)) return;
+        selection[entryIndex] = list[sourceIndex ?? 0]?.url || null;
     }
     if (!audioUrls[entryIndex] || !playWordAudio(audioUrls[entryIndex])) {
         updateButtonSlot(audioSlot, { state: 'error' });

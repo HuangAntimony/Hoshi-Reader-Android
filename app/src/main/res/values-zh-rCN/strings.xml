@@ -108,7 +108,7 @@
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profile</string>
     <string name="settings_display">主题</string>
-    <string name="settings_appearance">阅读设置</string>
+    <string name="settings_appearance">外观</string>
     <string name="settings_behavior">行为</string>
     <string name="settings_advanced">高级</string>
     <string name="settings_report_issue">反馈问题</string>
@@ -296,7 +296,7 @@
     <string name="profiles_delete_title_format" comment="Profile delete confirmation, intentionally matching book and imported-font delete confirmation formats.">删除“%1$s”？</string>
     <string name="profiles_default_cannot_delete">默认 Profile 不能删除。</string>
     <string name="bookshelf_profile">Profile</string>
-    <string name="bookshelf_profile_automatic">自动</string>
+    <string name="bookshelf_profile_automatic" comment="Automatically choose the content language profile for a book.">自动</string>
     <string name="bookshelf_profile_automatic_uses_format">将使用 %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">音量键翻页</string>
     <string name="reader_behavior_volume_keys_navigate_popup_terms">音量键跳转弹窗词条</string>
@@ -474,7 +474,7 @@
     <string name="sync_clear_cache_confirmation">Hoshi 将清除已缓存的 Google Drive 文件夹 ID 和远程封面缩略图。本地书籍不会被删除。</string>
     <string name="sync_sign_out_title">退出 Google Drive？</string>
     <string name="sync_sign_out_confirmation">Hoshi 将断开 Google Drive 并清除已缓存的 Drive 文件夹。本地书籍不会被删除。</string>
-    <string name="sync_mode_auto">自动</string>
+    <string name="sync_mode_auto" comment="Automatic synchronization mode.">自动</string>
     <string name="sync_mode_manual">手动</string>
     <string name="sync_google_drive" comment="Sync provider label, intentionally matching the bookshelf remote Google Drive section.">Google Drive</string>
     <string name="sync_device_client_id">设备客户端 ID</string>
@@ -569,7 +569,6 @@
     <string name="anki_check_duplicates_all_models">跨所有模板检查重复</string>
     <string name="anki_duplicate_check_scope">重复检查范围</string>
     <string name="anki_compact_glossaries">紧凑释义</string>
-    <string name="anki_embed_media">嵌入媒体</string>
     <string name="anki_droid_force_sync">添加卡片后同步 AnkiDroid</string>
     <string name="anki_droid_force_sync_description">添加卡片成功后启动 AnkiDroid 同步。AnkiDroid 可能会忽略 5 分钟内重复触发的同步。</string>
     <string name="anki_fields">字段</string>
@@ -848,5 +847,21 @@
     <string name="display_settings_eink_mode">墨水屏优化</string>
     <string name="display_settings_eink_appearance">墨水屏明暗</string>
     <string name="display_settings_eink_explanation">墨水屏优化期间使用黑白配色。关闭后恢复已保存的配色和强调色。</string>
-    <string name="reader_settings_profile_title">阅读设置 · %1$s</string>
+    <string name="reader_settings_profile_title">外观 · %1$s</string>
+    <string name="dictionary_frequency_sort_order">排序方式</string>
+    <string name="dictionary_frequency_dictionary">词频辞典</string>
+    <string name="dictionary_frequency_auto" comment="Automatic dictionary lookup frequency ordering.">自动</string>
+    <string name="dictionary_frequency_ascending">升序</string>
+    <string name="dictionary_frequency_descending">降序</string>
+    <string name="dictionary_frequency_disabled">禁用</string>
+    <string name="dictionary_import_file_error_format">%1$s：%2$s</string>
+    <string name="dictionary_import_native_error_format">辞典导入器：%1$s</string>
+    <string name="dictionary_import_file_access_error">无法访问辞典文件。</string>
+    <string name="dictionary_import_archive_error">辞典压缩包无效或已损坏。</string>
+    <string name="dictionary_import_index_error">辞典索引缺失或无效。</string>
+    <string name="dictionary_import_contents_error">未找到支持的辞典条目。</string>
+    <string name="dictionary_import_io_error">无法读取或保存辞典文件。</string>
+    <string name="audio_source_jpod101" translatable="false">JapanesePod101</string>
+    <string name="audio_source_language_pod101" translatable="false">LanguagePod101</string>
+    <string name="audio_source_jisho" translatable="false">Jisho</string>
 </resources>

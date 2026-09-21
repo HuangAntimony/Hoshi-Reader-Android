@@ -956,14 +956,13 @@ internal fun readerViewportCssLayout(
 ): ReaderViewportCssLayout {
     val width = viewportCssWidth.coerceAtLeast(1)
     val height = viewportCssHeight.coerceAtLeast(1)
-    val pageHeight = height + settings.bottomOverlapPx
     val generatedLayout = ReaderGeneratedLayout.from(settings)
     val imageMaxWidth = max(
         1,
         floor(width * generatedLayout.imageWidthViewportRatio).toInt() - generatedLayout.imageWidthReductionPx,
     )
     return ReaderViewportCssLayout(
-        pageHeightPx = pageHeight,
+        pageHeightPx = height,
         visibleHeightPx = height,
         pageWidthPx = width,
         verticalPaddingBlockPx = height * (settings.verticalPadding / 200.0),

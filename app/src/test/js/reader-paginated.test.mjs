@@ -37,7 +37,6 @@ function readerSource(url, options = {}) {
             options.layoutSemanticsScript ?? 'window.hoshiReaderLayoutSemantics = { sanitizeInlineBlocks: function() {} };',
         )
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
-        .replaceAll('__HOSHI_BOTTOM_OVERLAP_PX__', String(options.bottomOverlapPx ?? 0))
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_GAP_RATIO__', '0')
         .replaceAll('__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__', '1')
@@ -702,16 +701,16 @@ test('paged and continuous readers use shared media setup', () => {
     });
 });
 
-test('paged and continuous readers expose visible viewport height separately from page height', () => {
+test('paged and continuous readers use actual viewport height', () => {
     const paginatedBody = new TestElement('body');
-    const paginated = loadReader(paginatedBody, readerPaginatedUrl, { bottomOverlapPx: 37 });
+    const paginated = loadReader(paginatedBody, readerPaginatedUrl);
     paginated.reader.initialize();
 
-    assert.equal(paginated.document.documentElement.style.getPropertyValue('--page-height'), '837px');
+    assert.equal(paginated.document.documentElement.style.getPropertyValue('--page-height'), '800px');
     assert.equal(paginated.document.documentElement.style.getPropertyValue('--hoshi-reader-visible-height'), '800px');
 
     const continuousBody = new TestElement('body');
-    const continuous = loadReader(continuousBody, readerContinuousUrl, { bottomOverlapPx: 37 });
+    const continuous = loadReader(continuousBody, readerContinuousUrl);
     continuous.reader.initialize();
 
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--hoshi-continuous-height'), '800px');

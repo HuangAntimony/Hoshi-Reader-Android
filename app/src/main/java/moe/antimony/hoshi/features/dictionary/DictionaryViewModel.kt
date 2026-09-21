@@ -63,7 +63,7 @@ internal data class DictionaryImportItem(
 
 internal data class DictionaryImportBatchResult(
     val imported: List<DictionaryImportItem>,
-    val failed: List<DictionaryImportItem>,
+    val failed: List<DictionaryImportFailure>,
 )
 
 @Singleton
@@ -89,28 +89,21 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     ): DictionaryImportBatchResult =
         mutationCoordinator.runExclusive(DictionaryMutationOperation.Import) {
             val lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport
-            val imported = mutableListOf<DictionaryImportItem>()
-            val failed = mutableListOf<DictionaryImportItem>()
             var importedCount = 0
-            items.forEach { item ->
-                report(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, item.displayName))
-                onProgress(item)
-                try {
+            try {
+                runDictionaryImportBatch(items, onProgress = { item ->
+                    report(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, item.displayName))
+                    onProgress(item)
+                }) { item ->
                     importedCount += dictionaryRepository.importDictionary(
                         contentResolver = contentResolver,
                         uri = requireNotNull(item.uri),
                         lowRamImport = lowRamImport,
                     )
-                    imported += item
-                } catch (error: Throwable) {
-                    if (error is CancellationException) throw error
-                    failed += item
                 }
+            } finally {
+                if (importedCount > 0) markDictionariesChanged()
             }
-            if (importedCount > 0) {
-                markDictionariesChanged()
-            }
-            DictionaryImportBatchResult(imported = imported, failed = failed)
         } ?: DictionaryImportBatchResult(imported = emptyList(), failed = emptyList())
 
     override suspend fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
@@ -403,36 +396,29 @@ internal class DictionaryViewModel : ViewModel {
         if (importItems.isEmpty()) return
         scope.launch {
             _uiState.update { it.copy(isImporting = true, currentImportMessage = null, errorMessage = null) }
-            runCatching {
-                withContext(ioDispatcher) {
+            try {
+                val result = withContext(ioDispatcher) {
                     importOperation { item ->
-                        _uiState.update { state ->
-                            state.copy(
-                                currentImportMessage = item.importProgressMessage(),
-                            )
-                        }
+                        _uiState.update { it.copy(currentImportMessage = item.importProgressMessage()) }
                     }
                 }
-            }.onSuccess { result ->
                 if (result.failed.isNotEmpty()) {
                     _uiState.update {
-                        it.copy(
-                            errorMessage = UiText.Resource(
-                                R.string.dictionary_import_failed_list_format,
-                                result.failed.joinToString(separator = "\n") { item -> item.displayName },
-                            ),
-                        )
+                        it.copy(errorMessage = UiText.Resource(
+                            R.string.dictionary_import_failed_list_format,
+                            UiText.Joined(result.failed.map { failure ->
+                                UiText.Resource(R.string.dictionary_import_file_error_format, failure.item.displayName, failure.reason)
+                            }),
+                        ))
                     }
                 }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.dictionary_import_failed),
-                    )
-                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _uiState.update { it.copy(errorMessage = dictionaryImportErrorText(error)) }
+            } finally {
+                _uiState.update { it.copy(isImporting = false, currentImportMessage = null) }
             }
-            _uiState.update { it.copy(isImporting = false, currentImportMessage = null) }
         }
     }
 

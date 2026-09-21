@@ -108,7 +108,7 @@
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profiles</string>
     <string name="settings_display">Theme</string>
-    <string name="settings_appearance">Reading Settings</string>
+    <string name="settings_appearance">Appearance</string>
     <string name="settings_behavior">Behavior</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_report_issue">Report an Issue</string>
@@ -298,7 +298,7 @@
     <string name="profiles_delete_title_format" comment="Profile delete confirmation, intentionally matching book and imported-font delete confirmation formats.">Delete \"%1$s\"?</string>
     <string name="profiles_default_cannot_delete">The default profile cannot be deleted.</string>
     <string name="bookshelf_profile">Profile</string>
-    <string name="bookshelf_profile_automatic">Automatic</string>
+    <string name="bookshelf_profile_automatic" comment="Automatically choose the content language profile for a book.">Automatic</string>
     <string name="bookshelf_profile_automatic_uses_format">Uses %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">Volume Keys Turn Pages</string>
     <string name="reader_behavior_volume_keys_navigate_popup_terms">Volume Keys Navigate Popup Terms</string>
@@ -476,7 +476,7 @@
     <string name="sync_clear_cache_confirmation">Hoshi will clear cached Google Drive folder IDs and remote cover thumbnails. Local books are not deleted.</string>
     <string name="sync_sign_out_title">Sign out of Google Drive?</string>
     <string name="sync_sign_out_confirmation">Hoshi will disconnect Google Drive and clear cached Drive folders. Local books are not deleted.</string>
-    <string name="sync_mode_auto">Auto</string>
+    <string name="sync_mode_auto" comment="Automatic synchronization mode.">Auto</string>
     <string name="sync_mode_manual">Manual</string>
     <string name="sync_google_drive" comment="Sync provider label, intentionally matching the bookshelf remote Google Drive section.">Google Drive</string>
     <string name="sync_device_client_id">Device client ID</string>
@@ -571,7 +571,6 @@
     <string name="anki_check_duplicates_all_models">Check for duplicates across all models</string>
     <string name="anki_duplicate_check_scope">Duplicate Check Scope</string>
     <string name="anki_compact_glossaries" comment="Anki setting label, intentionally matching dictionary compact glossaries.">Compact Glossaries</string>
-    <string name="anki_embed_media">Embed media</string>
     <string name="anki_droid_force_sync">Sync AnkiDroid after adding card</string>
     <string name="anki_droid_force_sync_description">Starts AnkiDroid sync after a card is added. AnkiDroid may ignore syncs run more often than every 5 minutes.</string>
     <string name="anki_fields">Fields</string>
@@ -851,5 +850,21 @@
     <string name="display_settings_eink_mode">E-ink Optimization</string>
     <string name="display_settings_eink_appearance">E-ink Appearance</string>
     <string name="display_settings_eink_explanation">E-ink optimization uses a black-and-white palette. Turning it off restores your saved palette and accent color.</string>
-    <string name="reader_settings_profile_title">Reading Settings · %1$s</string>
+    <string name="reader_settings_profile_title">Appearance · %1$s</string>
+    <string name="dictionary_frequency_sort_order">Sort order</string>
+    <string name="dictionary_frequency_dictionary">Frequency dictionary</string>
+    <string name="dictionary_frequency_auto" comment="Automatic dictionary lookup frequency ordering.">Auto</string>
+    <string name="dictionary_frequency_ascending">Ascending</string>
+    <string name="dictionary_frequency_descending">Descending</string>
+    <string name="dictionary_frequency_disabled">Disabled</string>
+    <string name="dictionary_import_file_error_format">%1$s: %2$s</string>
+    <string name="dictionary_import_native_error_format">Dictionary importer: %1$s</string>
+    <string name="dictionary_import_file_access_error">Cannot access the dictionary file.</string>
+    <string name="dictionary_import_archive_error">The dictionary archive is invalid or damaged.</string>
+    <string name="dictionary_import_index_error">The dictionary index is missing or invalid.</string>
+    <string name="dictionary_import_contents_error">No supported dictionary entries were found.</string>
+    <string name="dictionary_import_io_error">Could not read or save the dictionary files.</string>
+    <string name="audio_source_jpod101" translatable="false">JapanesePod101</string>
+    <string name="audio_source_language_pod101" translatable="false">LanguagePod101</string>
+    <string name="audio_source_jisho" translatable="false">Jisho</string>
 </resources>

@@ -26,6 +26,17 @@ import java.io.File
 
 class DictionaryViewModelTest {
     @Test
+    fun cancelledImportClearsLoadingWithoutShowingAnError() {
+        val viewModel = DictionaryViewModel(repository = FakeDictionaryRepository(), coroutineScope = testScope, ioDispatcher = Dispatchers.Unconfined)
+        viewModel.importDictionaries(listOf(DictionaryImportItem("cancel.zip"))) {
+            throw kotlinx.coroutines.CancellationException("cancel")
+        }
+        assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun reloadPublishesDictionariesSettingsAndRebuildsLookupQuery() {
         val term = dictionary("term", "JMdict")
         val repository = FakeDictionaryRepository(
@@ -310,7 +321,7 @@ class DictionaryViewModelTest {
             listOf("Importing Bad.zip", "Importing Good.zip"),
             repository.progressMessages,
         )
-        assertEquals("Failed to import:\nBad.zip", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Failed to import:\nBad.zip: Import failed", viewModel.uiState.value.errorMessage.testString())
         assertEquals(listOf(imported), viewModel.uiState.value.currentDictionaries)
         assertFalse(viewModel.uiState.value.isImporting)
         assertNull(viewModel.uiState.value.currentImportMessage.testString())
@@ -332,7 +343,7 @@ class DictionaryViewModelTest {
         viewModel.importDictionaries(listOf(first, second))
 
         assertEquals(listOf(first, second), repository.importedItems)
-        assertEquals("Failed to import:\nBad.zip\nWorse.zip", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Failed to import:\nBad.zip: Import failed\nWorse.zip: Import failed", viewModel.uiState.value.errorMessage.testString())
         assertFalse(viewModel.uiState.value.isImporting)
         assertNull(viewModel.uiState.value.currentImportMessage.testString())
     }
@@ -440,7 +451,7 @@ class DictionaryViewModelTest {
 
         assertEquals(listOf(updated), viewModel.uiState.value.currentDictionaries)
         assertEquals(emptyList<DictionaryUpdateCandidate>(), viewModel.uiState.value.updatableDictionaries)
-        assertEquals("bad archive", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
     }
 
     @Test
@@ -607,7 +618,7 @@ class DictionaryViewModelTest {
 
         assertFalse(viewModel.uiState.value.isImporting)
         assertNull(viewModel.uiState.value.currentImportMessage.testString())
-        assertEquals("bad archive", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
         assertEquals(listOf(existing), viewModel.uiState.value.currentDictionaries)
 
         viewModel.importDictionaries(
@@ -642,7 +653,7 @@ class DictionaryViewModelTest {
             },
         )
 
-        assertEquals("bad archive", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
 
         viewModel.consumeErrorMessage()
 
@@ -746,13 +757,16 @@ class DictionaryViewModelTest {
 private fun UiText?.testString(): String? =
     when (this) {
         null -> null
+        is UiText.Joined -> parts.joinToString(separator) { it.testString().orEmpty() }
         is UiText.Literal -> value
         is UiText.Resource -> when (id) {
             R.string.dictionary_fetching_named_format -> "Fetching ${args[0]}"
             R.string.dictionary_checking_named_format -> "Checking ${args[0]}"
             R.string.dictionary_importing_named_format -> "Importing ${args[0]}"
             R.string.dictionary_downloading_named_format -> "Downloading ${args[0]}"
-            R.string.dictionary_import_failed_list_format -> "Failed to import:\n${args[0]}"
+            R.string.dictionary_import_failed_list_format -> "Failed to import:\n${(args[0] as UiText).testString()}"
+            R.string.dictionary_import_file_error_format -> "${args[0]}: ${(args[1] as UiText).testString()}"
+            R.string.dictionary_import_failed -> "Import failed"
             R.string.dictionary_update_failed_list_format -> "Failed to update:\n${args[0]}"
             else -> "resource:$id:${args.joinToString()}"
         }
@@ -797,13 +811,13 @@ private class FakeDictionaryRepository(
         onProgress: (DictionaryImportItem) -> Unit,
     ): DictionaryImportBatchResult {
         val imported = mutableListOf<DictionaryImportItem>()
-        val failed = mutableListOf<DictionaryImportItem>()
+        val failed = mutableListOf<DictionaryImportFailure>()
         items.forEach { item ->
             importedItems += item
             onProgress(item)
             progressMessages += "Importing ${item.displayName}"
             if (item in failedImportItems) {
-                failed += item
+                failed += DictionaryImportFailure(item, UiText.Resource(R.string.dictionary_import_failed))
             } else {
                 imported += item
                 onImport?.invoke()

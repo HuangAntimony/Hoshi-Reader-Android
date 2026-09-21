@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +36,7 @@ enum class AudioPlaybackMode(val rawValue: String, val displayName: String) {
 }
 
 data class AudioSettings(
-    val audioSources: List<AudioSource> = listOf(DefaultAudioSource),
+    val audioSources: List<AudioSource> = DefaultAudioSources,
     val enableLocalAudio: Boolean = false,
     val enableAutoplay: Boolean = false,
     val playbackMode: AudioPlaybackMode = AudioPlaybackMode.Interrupt,
@@ -78,12 +79,9 @@ data class AudioSettings(
             isEnabled = true,
         )
 
-        val DefaultAudioSource = AudioSource(
-            name = "Default",
-            url = "https://hoshi-reader.manhhaoo-do.workers.dev/?term={term}&reading={reading}",
-            isEnabled = true,
-            isDefault = true,
-        )
+        val DefaultAudioSources: List<AudioSource> = BuiltInAudioSource.entries.map { it.settingsSource() }
+        internal const val LegacyDefaultAudioUrl =
+            "https://hoshi-reader.manhhaoo-do.workers.dev/?term={term}&reading={reading}"
     }
 }
 
@@ -96,7 +94,7 @@ private fun AudioSettings.normalizedAudioSettings(): AudioSettings {
         audioSources = if (enableLocalAudio) {
             listOf(AudioSettings.LocalAudioSource) + withoutLocal
         } else {
-            withoutLocal.ifEmpty { listOf(AudioSettings.DefaultAudioSource) }
+            withoutLocal.ifEmpty { AudioSettings.DefaultAudioSources }
         },
     )
 }
@@ -116,7 +114,7 @@ class AudioSettingsStore(context: Context) : AudioSettingsLegacySource {
             ?.let { encoded ->
                 runCatching { json.decodeFromString(ListSerializer(AudioSource.serializer()), encoded) }.getOrNull()
             }
-            ?: listOf(AudioSettings.DefaultAudioSource)
+            ?: AudioSettings.DefaultAudioSources
         return AudioSettings(
             audioSources = sources,
             enableLocalAudio = preferences.getBoolean(KEY_ENABLE_LOCAL_AUDIO, false),
@@ -188,10 +186,16 @@ class AudioSettingsRepository(
     private suspend fun migrateLegacySettingsIfNeeded() {
         var didMigrate = false
         dataStore.edit { preferences ->
-            if (preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] == true) return@edit
-            preferences.writeAudioSettings(legacySource?.load()?.normalizedAudioSettings() ?: AudioSettings())
-            preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
-            didMigrate = true
+            if (preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] != true) {
+                preferences.writeAudioSettings(legacySource?.load()?.normalizedAudioSettings() ?: AudioSettings())
+                preferences[KEY_MIGRATED_FROM_SHARED_PREFERENCES] = true
+                didMigrate = true
+            }
+            if ((preferences[KEY_DEFAULT_SOURCES_VERSION] ?: 0) < 1) {
+                val settings = preferences.toAudioSettings()
+                preferences.writeAudioSettings(settings.copy(audioSources = migrateDefaultAudioSources(settings.audioSources)))
+                preferences[KEY_DEFAULT_SOURCES_VERSION] = 1
+            }
         }
         if (didMigrate) {
             legacySource?.clearObsoleteLocalAudioDatabaseUri()
@@ -203,7 +207,7 @@ class AudioSettingsRepository(
             ?.let { encoded ->
                 runCatching { json.decodeFromString(ListSerializer(AudioSource.serializer()), encoded) }.getOrNull()
             }
-            ?: listOf(AudioSettings.DefaultAudioSource)
+            ?: AudioSettings.DefaultAudioSources
         return AudioSettings(
             audioSources = sources,
             enableLocalAudio = this[KEY_ENABLE_LOCAL_AUDIO] ?: false,
@@ -227,6 +231,8 @@ class AudioSettingsRepository(
     companion object {
         const val DataStoreName = "audio-settings"
 
+        private val KEY_DEFAULT_SOURCES_VERSION = intPreferencesKey("defaultAudioSourcesVersion")
+
         private val KEY_MIGRATED_FROM_SHARED_PREFERENCES =
             booleanPreferencesKey("audioSettingsMigratedFromSharedPreferences")
         private val KEY_AUDIO_SOURCES = stringPreferencesKey("audioSources")
@@ -234,5 +240,17 @@ class AudioSettingsRepository(
         private val KEY_LOCAL_AUDIO_DATABASE_URI = stringPreferencesKey("localAudioDatabaseUri")
         private val KEY_AUDIO_ENABLE_AUTOPLAY = booleanPreferencesKey("audioEnableAutoplay")
         private val KEY_AUDIO_PLAYBACK_MODE = stringPreferencesKey("audioPlaybackMode")
+    }
+}
+
+private fun migrateDefaultAudioSources(sources: List<AudioSource>): List<AudioSource> {
+    val existingUrls = sources.mapTo(mutableSetOf()) { it.url }
+    return sources.flatMap { source ->
+        if (source.isDefault && source.url == AudioSettings.LegacyDefaultAudioUrl) {
+            AudioSettings.DefaultAudioSources.filter { existingUrls.add(it.url) }
+                .map { it.copy(isEnabled = source.isEnabled) }
+        } else {
+            listOf(source)
+        }
     }
 }

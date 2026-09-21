@@ -3,13 +3,12 @@
 This document tracks open Android work after checking iOS upstream `develop`.
 
 - Source: `reference/Hoshi-Reader-iOS`
-- Baseline for this refresh: `c31c9d0ce376ff83bf6a91d908bf9f8e0fb4947b`
-- Latest checked: `origin/develop` at `42e7b81d441c164c3a446152f4bf2356135d1e82`
-- Checked on: 2026-09-16
-- This refresh advances the reference by 43 reachable commits. The baseline is
-  an ancestor of the new tip; new behavior and earlier open work were checked
-  against current Android code. The older force-update is historical context
-  only (`24e356f` remains classified below).
+- Baseline for this refresh: `42e7b81d441c164c3a446152f4bf2356135d1e82`
+- Latest checked: `origin/develop` at `d24b2fa6e5fc559c7d4032b4db355eecdd669b29`
+- Checked on: 2026-09-21
+- This refresh advances the reference by 4 reachable commits. The baseline is
+  an ancestor of the new tip; new behavior and the remaining popup slice were
+  checked against current Android code.
 
 ## Current Queue
 
@@ -65,177 +64,168 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Frequency sorting controls and import/update feedback
-
-Status: partial native support; pending Android UI/bridge integration.
-
-Commits: `165992a`, `e849e36` (Auto naming), `222a72b`,
-`7dd3f49` (automatic low-RAM policy only).
-
-Dependency/value reasoning:
-
-- Native frequency options already exist in vendored hoshidicts; extend the
-  parent/JNI ABI consistently before settings/query callers. Import diagnostics
-  similarly need a typed result before UI can report useful per-file reasons.
-
-iOS behavior to mirror:
-
-- Auto/Ascending/Descending/Disabled frequency sorting, optional enabled
-  frequency dictionary for explicit order, initial valid dictionary selection
-  and preservation across dictionary title updates.
-- Batch import continues after individual failures and reports filename plus
-  reason. Automatic dictionary updates always use low-RAM import.
-
-Android current gap:
-
-- `DictionarySettings` has no sort order/dictionary fields;
-  `HoshiDicts.lookup`, `DictionaryNativeBridge` and
-  `DictionaryLookupQueryService.lookup()` accept no frequency options, although
-  the vendored C++ `LookupOptions`/C API support them.
-- `ImportResult` omits native error text; `DictionaryImportDataSource` replaces
-  failure with a generic message. `DictionaryViewModel` retains failed items'
-  names but drops individual reasons. Per-import staging/continuation exists.
-- `DictionaryAutoUpdateRunner` uses `DictionaryUpdateService`, whose
-  `lowRamImport = settings.lowRamDictionaryImport` defaults false even for
-  `DictionaryMutationOperation.AutoUpdate`.
-
-Suggested slice:
-
-- Expose typed native options/results, persist sort settings and update renamed
-  references, retain per-file localized failure context, force low-RAM only for
-  automatic updates. Keep Android's serialized atomic query-session replacement;
-  iOS `releaseQuery()` is an implementation choice, not an extra product gap.
-
-Validation:
-
-- All sorting modes, missing/disabled/reordered/renamed dictionaries, profiles,
-  equal/missing frequencies; mixed valid/invalid batch imports and recovery;
-  automatic low-RAM with the manual setting off and unchanged manual behavior.
-
-### 3. Reader navigation and options toolbar
-
-Status: partial Android implementation; remaining visual/interaction parity.
-
-Commits: `42e7b81`.
-
-Dependency/value reasoning:
-
-- Builds on existing Compose chrome/settings and always-available statistics;
-  UIKit itself is not an Android implementation target.
-
-iOS behavior to mirror:
-
-- A top navigation title/subtitle and bottom Close, centered information and
-  Options menu replace individual sheet buttons. Options contains Appearance,
-  Contents, Statistics and eligible Sasayaki. Focus hides both bars while
-  configured tracking/playback/history controls remain in the top safe strip.
-  Continuous content reserves navigation/toolbar insets without covering text.
-
-Android current gap:
-
-- `ReaderWebViewChrome.kt.ReaderBottomChrome` still exposes separate Appearance,
-  Contents, Statistics and Sasayaki buttons rather than the Options menu and
-  centered toolbar information. The current title/progress bubble layout also
-  differs from the navigation title/subtitle in `ReaderViewController.swift`.
-- `ReaderChrome.kt` already owns focus visibility and content insets; keep those
-  boundaries and adapt their final dimensions/state for the new arrangement.
-
-Suggested slice:
-
-- Mirror the final actions and information placement with Compose/Material 3,
-  reuse close/focus/menu state and verify continuous-mode inset handling.
-
-Validation:
-
-- Title/progress/statistics combinations, Close and Android Back, menu sheet
-  routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
-  continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
-
-### 4. Reader WebView line-box CSS parity
+### 2. Sasayaki on-device transcription and match coverage
 
 Status: pending Android sync.
 
 Commits:
 
-- `bdf71a6` - remove the WebKit line-box property.
+- `d24b2fa` - local audio transcription, resumable transcript storage, alignment
+  and character coverage; also changes the source filter used by SRT matching.
 
 Dependency/value reasoning:
 
-- Small independent layout parity change, but it needs device validation across
-  writing modes and replaced elements.
+- Independent feature. Establish an Android-capable local transcription backend
+  and timed-token contract before persistence, alignment and UI integration.
+  Confirm platform capabilities against official Android/Google documentation
+  during implementation; Apple Speech APIs are not portable.
 
 iOS behavior to mirror:
 
-- Reader CSS no longer sets
-  `-webkit-line-box-contain: block glyphs replaced;`.
+- On supported iOS 26 devices, choose Subtitles or Transcription and an audio
+  file (MP3/M4B/M4A). Japanese speech-model download, transcription progress,
+  estimated remaining time and alignment state are shown. Pause or leaving the
+  sheet cancels transcription and aligns retained tokens; deleting the active
+  book requests cancellation. Only one transcription task runs at a time.
+- `sasayaki_transcript.json` stores `through`, `duration` and tokens containing
+  `text`, `start`, `end`. Progress checkpoints approximately every 15 seconds;
+  a saved matching duration resumes from `through`. Complete transcripts can be
+  realigned. Clearing transcription requires confirmation and keeps the match.
+- Timed tokens align to normalized book text using anchors and bounded diff
+  blocks, then sentence/segment boundaries produce chapter-relative matches.
+  Timing budgets reject implausible spans and allow short-gap interpolation.
+- Both SRT and transcription source building additionally skip paths containing
+  `toc`, `caution` or `colophon` (case-insensitive). Coverage is summed match
+  lengths divided by the book character count, rather than matched cue count.
 
 Android current gap:
 
-- `app/src/main/assets/hoshi-web/reader/reader.css` still sets the property and
-  `ReaderSettingsTest` explicitly preserves it.
+- `SasayakiSubtitleMatchSection.kt` only parses selected SRT files and invokes
+  `SasayakiMatcher.match()`; there is no transcription selector, backend,
+  model-download state, pause/resume flow or transcript-clear action.
+- `SasayakiSidecarModels.kt` and `BookStorage.kt` expose match/playback data but
+  no timed-token transcript model or transcript persistence API.
+- `SasayakiMatcher.match()` filters linear/nav/guide-TOC chapters but lacks the
+  new path exclusions and timed-token alignment/sentence segmentation.
+- `SasayakiModels.matchRateText()` uses `matches.size / (matches.size + unmatched)`;
+  it does not report character coverage. `ReaderSasayakiCues.chapterCuesJson()`
+  already sorts by text offset, so that upstream portion is covered.
 
 Suggested slice:
 
-- Compare Android WebView layout, remove the retained declaration, and replace
-  the source-string preservation assertion with meaningful layout coverage.
+- Implement a repository-owned local transcription backend and compatible
+  checkpoint storage, then alignment and state-driven localized UI through the
+  existing Sasayaki boundaries. Keep the tested SRT coherent-start/recovery
+  behavior while adding source filtering and character coverage. Android audio
+  access must use the existing SAF/repository path rather than iOS bookmarks.
 
 Validation:
 
-- Paginated/continuous horizontal and vertical writing, ruby, cover and
-  multi-image pages, line height, progress, and restore.
+- Generated timed-token fixtures: kana/width/case normalization, ruby, repeated
+  text, punctuation/block boundaries, supplementary characters, chapter/image
+  offsets, excluded paths, partial transcripts and short/implausible gaps.
+- Check unavailable models/devices, download failure, cancellation, leave/reopen,
+  restart/resume, duration mismatch, deletion, clear-with-match-retained and
+  complete-transcript realignment. Recheck SRT multi-volume matching, coverage,
+  Reader cue rendering, playback and Anki audio export without clearing app data.
 
-### 5. App accent and stroke-order font attribution
+### 3. Chinese Anki fallback label
 
 Status: pending Android sync.
 
-Commits: `bd21e24`, `8024df1` (font attribution only).
+Commits:
+
+- `8ccade5` - Simplified Chinese localization updates.
 
 Dependency/value reasoning:
 
-- Independent small UI slices; accent must preserve Android dark/e-ink contrast.
-  Attribute the font Android already offers, without adding unused SwiftLAME.
+- Small independent localization correction; no dependency on transcription.
 
 iOS behavior to mirror:
 
-- Use the new blue accent (Display-P3 components 0.523/0.668/0.904) and expose
-  Kanji Stroke Order Font source/BSD-3 attribution in About.
+- The fallback label translates its descriptive suffix while retaining the
+  literal `{selected-glossary}` handlebar.
 
 Android current gap:
 
-- `Theme.kt`/`Color.kt` still use default purple Material accent colors.
-  `AboutView.kt` has no stroke-order font source/license entry, although
-  `KanjiStrokeOrderFontInstaller` offers that font for download.
+- `values-zh-rCN/strings.xml` still defines `anki_selected_glossary_fallback`
+  as `{selected-glossary} Fallback`, identical to the English resource.
+  Other inspected Anki, dictionary, Reader and statistics labels already have
+  Chinese resources; different established terminology is not a missing feature.
 
 Suggested slice:
 
-- Choose a color-managed equivalent in the Android palette and add localized
-  source/license UI using the existing About surface.
+- Translate the suffix, preserve the literal handlebar and resource parity,
+  and align the existing Anki label validation guidance with the localized text.
 
 Validation:
 
-- Ordinary app controls in light/dark/custom and pure e-ink themes; About links
-  and font license text in English/Chinese.
+- Localization resource tests and lint; check Anki Advanced in both languages
+  and verify that braces remain literal rather than interpreted markup.
 
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
-| `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
-| `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
-| `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
-| `42e7b81` | 2026-09-14 | Reader navigation/options toolbar | Pending final Compose action/information layout |
-| `bd21e24`, `8024df1` | 2026-08-09 / 08-22 | Blue accent and font attribution | Pending palette/About UI |
+| `d24b2fa` | 2026-09-20 | On-device transcription and matching updates | Pending transcript/backend/alignment/UI, source exclusions and character coverage (2); cue ordering covered |
+| `8ccade5` | 2026-09-17 | Simplified Chinese localization | Pending Anki fallback-label suffix only (3); two-column copy belongs to (1) |
 
 ## Suggested Implementation Order
 
-1. Popup layout/CSS isolation (1).
-2. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (2).
-3. Reader navigation/options toolbar (3), building on available statistics.
-4. Reader line-box CSS parity (4), app accent and font attribution (5).
+1. Popup layout/CSS isolation (1): shared lookup presentation and settings.
+2. Chinese Anki fallback label (3): small independent correction.
+3. Sasayaki transcription (2): backend/token contract first, then persistence,
+   alignment and UI; no dependency on the other slices.
 
 ## Covered Or No Android Action
+
+- `02ed801`: Android now uses actual viewport height for paginated CSS and
+  page steps, with ordinary user padding and no font-size overlap compensation.
+  Continuous and VN retain their visible-viewport layout; the unconditional,
+  zero-width Android trailing spacer remains.
+
+- `15aadf0`: `reader-paginated.js` already appends its trailing spacer
+  unconditionally, including zero vertical padding. Its Android-specific zero
+  physical width is intentional.
+- `d24b2fa` (cue ordering): `ReaderSasayakiCues.chapterCuesJson()` already
+  sorts chapter ranges by `start` before serializing them to the Reader.
+- `8ccade5` (remaining localization): Android Chinese resources already cover
+  the inspected statistics/archive, furigana, search, frequency sorting, Anki
+  format and stroke-font controls. The iOS string-table routing fix has no
+  Android analogue. New two-column help text belongs with slice 1; the remaining
+  untranslated fallback-label suffix is tracked in slice 3.
+
+- `bdf71a6`: shared Reader CSS no longer overrides WebKit line-box containment,
+  matching upstream default line-box sizing. The obsolete JVM assertion that
+  required the declaration is removed; Reader layout is checked in WebView.
+
+- `7dd3f49` (automatic updates): `DictionaryUpdateService` always enables
+  low-RAM import for `AutoUpdate`; manual imports and updates retain the user's
+  setting without changing it. Existing mutation coordination remains shared.
+
+- `222a72b`: JNI import results retain native error details. Batch failures
+  preserve filename and localized reason for the existing error dialog while
+  continuing later files; cancellation propagates and staging/rollback remain
+  repository-owned. Successful imports publish changes even if later cancelled.
+
+- `165992a`, `e849e36`: profile-scoped Auto/Ascending/Descending/Disabled lookup
+  sorting and an enabled frequency-dictionary selector feed native options
+  through the shared lookup paths. Dictionary updates preserve selected title
+  references across profiles; unavailable selections retain native fallback
+  semantics without replacing query sessions on settings changes.
+
+- `bd21e24`, `8024df1` (stroke-order font attribution): excluded from Android
+  sync at the project owner's request. Android retains its dynamic/custom/E-ink
+  color choices; changing the fallback accent and adding the font attribution
+  to About are not planned.
+
+- `42e7b81`: iOS replaces custom SwiftUI Reader overlays with UIKit navigation
+  and toolbar controls; the options menu and centered reading information
+  already existed before this commit. Android `ReaderBottomChrome` and
+  `ReaderMenuCard` already provide those controls, while `ReaderChrome.kt` owns
+  focus visibility and content insets. No concrete Android behavior gap is
+  established by this platform implementation change.
 
 - `b7f09ca` (search portion): `ReaderSearchEngine` matches literal paragraph text
   case-insensitively with sentence/bracket-aware snippets and a 100-hit cap.
@@ -353,8 +343,7 @@ Validation:
   classified individually above.
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
-  pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 2.
+  pitch and transcription data. Explicit frequency options are also integrated through the Kotlin/JNI bridge.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct
@@ -420,18 +409,18 @@ Validation:
   is introduced by this upstream commit.
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
-  transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 2 rather than queueing revision bumps.
+  transcriptions and importer error results, now exposed through Kotlin/JNI;
+  no revision-only sync work remains.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
-  bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 2.
+  bundle-release sequence is not an extra Android behavior requirement.
+  Automatic low-RAM updates are also covered above.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 5.
+  Downloadable stroke-order font attribution is excluded at the project owner's request.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

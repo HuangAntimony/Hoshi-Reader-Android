@@ -6,6 +6,25 @@ import org.junit.Test
 
 class UiTextTest {
     @Test
+    fun joinedFailuresResolveNestedReasonsInTheCurrentLocale() {
+        val text = UiText.Resource(1, UiText.Joined(listOf(
+            UiText.Resource(2, "壊れた𠮟.zip", UiText.Resource(3)),
+            UiText.Resource(2, "Other.zip", UiText.Literal("native detail")),
+        )))
+        for (reason in listOf("Invalid archive", "压缩包无效")) {
+            assertEquals("Failures: 壊れた𠮟.zip: $reason\nOther.zip: native detail", text.resolve(
+                getString = { id, args -> when (id) {
+                    1 -> "Failures: ${args[0]}"
+                    2 -> "${args[0]}: ${args[1]}"
+                    3 -> reason
+                    else -> error("Unexpected resource")
+                } },
+                getQuantityString = { _, _, _ -> error("No plurals") },
+            ))
+        }
+    }
+
+    @Test
     fun literalResolvesWithoutResourceLookup() {
         assertEquals(
             "External error",

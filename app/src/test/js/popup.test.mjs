@@ -32,6 +32,9 @@ class FakeElement {
         this.className = '';
         this.classList = {
             contains: (name) => this.className.split(' ').includes(name),
+            add: (...names) => {
+                this.className = [...new Set([...this.className.split(' ').filter(Boolean), ...names])].join(' ');
+            },
             toggle: (name, enabled) => {
                 const names = new Set(this.className.split(' ').filter(Boolean));
                 if (enabled) names.add(name); else names.delete(name);
@@ -1512,3 +1515,250 @@ test('only the latest Kanji response may replace popup state or commit native hi
     assert.equal(setup.entriesContainer.children.length, 0);
     assert.equal(setup.kanjiRedirectCommittedMessages.length, 1);
 });
+
+for (const path of ['images/glyph.svg', 'images/illustration.png']) {
+    test(`AnkiDroid exports dictionary media without an embed setting: ${path}`, () => {
+        const { context } = popupContext();
+        vm.runInNewContext('currentDictionaryMedia = new Map()', context);
+        const node = context.createDefinitionImage({path, width: 24, height: 16, data: {alt: 'Illustration'}}, 'Dictionary', true);
+        const image = node.children[0].children.at(-1);
+        assert.equal(image.tagName, 'IMG');
+        assert.equal(image.src, `hoshi_dict_0.${path.split('.').pop()}`);
+        assert.equal(image.alt, 'Illustration');
+        const media = vm.runInNewContext('Array.from(currentDictionaryMedia.values())', context);
+        assert.equal(media.length, 1);
+        assert.equal(media[0].dictionary, 'Dictionary');
+        assert.equal(media[0].path, path);
+        assert.equal(media[0].filename, image.src);
+    });
+}
+
+test('Yomitan sources skip an empty primary and share the chosen fallback with mining', async () => {
+    const requestedTargets = [];
+    const { context, playWordAudioMessages, mineEntryMessages } = popupContext({
+        fetchImpl: async (requestUrl) => {
+            const target = new URL(decodeURIComponent(requestUrl.split('url=')[1]));
+            requestedTargets.push(target.hostname);
+            const audioSources = target.hostname === 'jpod101' ? [] : [
+                { name: '', url: `https://example.com/${target.hostname}.mp3` },
+            ];
+            return { json: async () => ({ type: 'audioSourceList', audioSources }) };
+        },
+    });
+    context.window.audioSources = [
+        { name: 'JapanesePod101', url: 'hoshi-builtin-audio-source://jpod101/?term={term}&reading={reading}' },
+        { name: 'LanguagePod101', url: 'hoshi-builtin-audio-source://language-pod-101/?term={term}&reading={reading}' },
+        { name: 'Jisho', url: 'hoshi-builtin-audio-source://jisho/?term={term}&reading={reading}' },
+    ];
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', glossaries: [] }];
+    await context.playEntryAudio(0);
+    assert.equal(playWordAudioMessages.at(-1).url, 'https://example.com/language-pod-101.mp3');
+    assert.deepEqual(requestedTargets, ['jpod101', 'language-pod-101']);
+    assert.deepEqual([...(await context.getAudioMenu(0)).names], ['LanguagePod101', 'Jisho']);
+    await context.playEntryAudio(0, 1);
+    await context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+    assert.equal(mineEntryMessages.at(-1).payload.audio, 'https://example.com/jisho.mp3');
+    assert.deepEqual(requestedTargets, ['jpod101', 'language-pod-101', 'jisho']);
+});
+
+for (const primary of ['local://audio', 'hoshi-builtin-audio-source://jpod101/']) {
+    for (const action of ['play', 'mine']) {
+        test(`default ${action} stops after ${primary} without requesting later slow sources`, async () => {
+            const requested = [];
+            const { context, playWordAudioMessages, mineEntryMessages } = popupContext({
+                fetchImpl: async (url) => {
+                    const target = decodeURIComponent(url.split('url=')[1]);
+                    requested.push(target);
+                    if (target !== primary) return new Promise(() => {});
+                    return { json: async () => ({ type: 'audioSourceList', audioSources: [{ url: 'first.mp3' }] }) };
+                },
+            });
+            context.window.audioSources = [
+                { name: 'Primary', url: primary },
+                { name: 'LanguagePod101', url: 'hoshi-builtin-audio-source://language-pod-101/' },
+                { name: 'Jisho', url: 'hoshi-builtin-audio-source://jisho/' },
+            ];
+            context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', glossaries: [] }];
+            context.window.needsAudio = true;
+            const pending = action === 'play' ? context.playEntryAudio(0)
+                : context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+            await flushAsyncWork();
+            assert.equal(action === 'play' ? playWordAudioMessages.at(-1)?.url : mineEntryMessages.at(-1)?.payload.audio, 'first.mp3');
+            assert.deepEqual(requested, [primary]);
+            await pending;
+        });
+    }
+}
+
+test('default playback reuses local candidates while the full menu waits for a remote source', async () => {
+    const requested = [];
+    let finishRemote;
+    const { context, playWordAudioMessages } = popupContext({
+        fetchImpl: async (url) => {
+            const target = decodeURIComponent(url.split('url=')[1]);
+            requested.push(target);
+            const response = (audioUrl) => ({ json: async () => ({ type: 'audioSourceList', audioSources: [{ url: audioUrl }] }) });
+            if (target.startsWith('local://')) return response('local.opus');
+            return new Promise(resolve => { finishRemote = () => resolve(response('remote.mp3')); });
+        },
+    });
+    context.window.audioSources = [{ name: 'Local', url: 'local://audio' }, { name: 'Remote', url: 'https://remote.example/audio' }];
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ' }];
+    const menu = context.getAudioMenu(0);
+    await flushAsyncWork();
+    const playback = context.playEntryAudio(0);
+    await flushAsyncWork();
+    assert.equal(playWordAudioMessages.at(-1)?.url, 'local.opus');
+    finishRemote();
+    await playback;
+    assert.deepEqual([...(await menu).names], ['Local', 'Remote']);
+    assert.deepEqual(requested, ['local://audio', 'https://remote.example/audio']);
+});
+
+test('audio menu appears immediately and lets a faster later source play before earlier sources finish', async () => {
+    const responses = new Map();
+    const { context, body, playWordAudioMessages, mineEntryMessages } = popupContext({
+        fetchImpl: (url) => new Promise(resolve => {
+            const target = decodeURIComponent(url.split('url=')[1]);
+            responses.set(target, audioSources => resolve({ json: async () => ({ type: 'audioSourceList', audioSources }) }));
+        }),
+    });
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', glossaries: [] }];
+    context.window.audioSources = [{ name: 'Slow', url: 'slow://' }, { name: 'Fast', url: 'fast://' }];
+    context.window.audioLoadingText = '加载中…';
+    const pending = context.showAudioCandidateMenu(0, new FakeElement());
+    const menu = body.children.find(child => child.className === 'audio-candidate-menu');
+    assert.ok(menu, 'menu must exist before any request finishes');
+    assert.match(menu.children[0].children[0].textContent, /加载中/);
+    assert.equal(responses.size, 2, 'menu sources load concurrently');
+    responses.get('fast://')([{ url: 'fast.mp3' }]);
+    await flushAsyncWork();
+    const fastButton = menu.children[1].children[0];
+    assert.equal(fastButton.textContent, 'Fast');
+    assert.equal(fastButton.disabled, false);
+    fastButton.dispatch('click', { preventDefault() {}, stopPropagation() {} });
+    await flushAsyncWork();
+    assert.equal(playWordAudioMessages.at(-1)?.url, 'fast.mp3');
+    await context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+    assert.equal(mineEntryMessages.at(-1)?.payload.audio, 'fast.mp3');
+    responses.get('slow://')([{ url: 'slow.mp3' }]);
+    await pending;
+    assert.equal(body.children.some(child => child.className === 'audio-candidate-menu'), false, 'late results must not reopen a dismissed menu');
+});
+
+test('incremental audio menu preserves source order and existing buttons as other results arrive', async () => {
+    const responses = new Map();
+    const { context, body } = popupContext({
+        fetchImpl: (url) => new Promise(resolve => responses.set(decodeURIComponent(url.split('url=')[1]),
+            audioSources => resolve({ json: async () => ({ type: 'audioSourceList', audioSources }) }))),
+    });
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ' }];
+    context.window.audioSources = [{ name: 'First', url: 'first://' }, { name: 'Second', url: 'second://' }];
+    const pending = context.showAudioCandidateMenu(0, new FakeElement());
+    assert.equal(responses.size, 2);
+    responses.get('second://')([{ url: 'second.mp3' }]);
+    await flushAsyncWork();
+    const menu = body.children.find(child => child.className === 'audio-candidate-menu');
+    const second = menu.children[1].children[0];
+    responses.get('first://')([{ url: 'first.mp3' }]);
+    await pending;
+    assert.deepEqual(menu.children.map(group => group.children[0].textContent), ['First', 'Second']);
+    assert.equal(menu.children[1].children[0], second, 'do not replace a button the user may be pressing');
+});
+
+test('closing or resetting a loading audio menu prevents late results from changing a new menu', async () => {
+    let finishOld;
+    let count = 0;
+    const { context, body } = popupContext({
+        fetchImpl: async () => {
+            count++;
+            if (count === 1) return new Promise(resolve => { finishOld = () => resolve({ json: async () => ({ type: 'audioSourceList', audioSources: [{ url: 'old.mp3' }] }) }); });
+            return { json: async () => ({ type: 'audioSourceList', audioSources: [] }) };
+        },
+    });
+    context.window.audioSources = [{ name: 'Remote', url: 'remote://' }];
+    context.window.lookupEntries = [{ expression: '旧', reading: 'きゅう' }];
+    const old = context.showAudioCandidateMenu(0, new FakeElement());
+    context.window.resetPopupResults();
+    context.window.lookupEntries = [{ expression: '新', reading: 'しん' }];
+    await context.showAudioCandidateMenu(0, new FakeElement());
+    const current = body.children.find(child => child.className === 'audio-candidate-menu');
+    finishOld();
+    await old;
+    assert.deepEqual(body.children.filter(child => child.className === 'audio-candidate-menu'), [current]);
+    assert.equal(current.children[0].textContent, 'No audio found');
+    assert.equal(current.children[0].disabled, true);
+});
+
+for (const action of ['play', 'mine']) {
+    test(`pending default ${action} preserves a newer explicit menu selection`, async () => {
+        let finishSlow;
+        const { context, body, playWordAudioMessages, mineEntryMessages } = popupContext({
+            fetchImpl: async (url) => {
+                const response = audioUrl => ({ json: async () => ({ type: 'audioSourceList', audioSources: [{ url: audioUrl }] }) });
+                if (decodeURIComponent(url.split('url=')[1]) === 'slow://') return new Promise(resolve => { finishSlow = () => resolve(response('slow.mp3')); });
+                return response('fast.mp3');
+            },
+        });
+        context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', glossaries: [] }];
+        context.window.audioSources = [{ name: 'Slow', url: 'slow://' }, { name: 'Fast', url: 'fast://' }];
+        context.window.needsAudio = true;
+        const pending = action === 'play' ? context.playEntryAudio(0)
+            : context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+        const menuTask = context.showAudioCandidateMenu(0, new FakeElement());
+        await flushAsyncWork();
+        const menu = body.children.find(child => child.className === 'audio-candidate-menu');
+        menu.children[1].children[0].dispatch('click', { preventDefault() {}, stopPropagation() {} });
+        finishSlow();
+        await Promise.all([pending, menuTask]);
+        assert.deepEqual(playWordAudioMessages.map(message => message.url), ['fast.mp3']);
+        if (action === 'play') await context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+        assert.equal(mineEntryMessages.at(-1).payload.audio, 'fast.mp3');
+    });
+}
+
+test('default mining completion does not cancel concurrent requested playback', async () => {
+    let finish;
+    const { context, playWordAudioMessages, mineEntryMessages } = popupContext({
+        fetchImpl: () => new Promise(resolve => { finish = () => resolve({ json: async () => ({ type: 'audioSourceList', audioSources: [{ url: 'audio.mp3' }] }) }); }),
+    });
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ', glossaries: [] }];
+    context.window.audioSources = [{ name: 'Remote', url: 'remote://' }];
+    context.window.needsAudio = true;
+    const mining = context.mineEntry('猫', 'ねこ', [], [], [], '猫', 0, '', 'format-a');
+    const playback = context.playEntryAudio(0);
+    finish();
+    await Promise.all([mining, playback]);
+    assert.equal(mineEntryMessages.at(-1).payload.audio, 'audio.mp3');
+    assert.deepEqual(playWordAudioMessages.map(message => message.url), ['audio.mp3']);
+});
+
+for (const zoom of [0.8, 1, 2]) {
+    for (const side of ['below', 'above']) {
+        test(`long audio menu stays ${side} its anchor in a short viewport at zoom ${zoom}`, async () => {
+            const { context, body, document } = popupContext({ htmlZoom: String(zoom) });
+            context.window.innerWidth = 320 * zoom;
+            context.window.innerHeight = 200 * zoom;
+            const createElement = document.createElement.bind(document);
+            document.createElement = tag => {
+                const element = createElement(tag);
+                Object.defineProperty(element, 'offsetHeight', { get: () => Math.min(600, parseFloat(element.style.maxHeight) || 600) });
+                element.offsetWidth = 220;
+                return element;
+            };
+            const top = side === 'below' ? 20 : 150;
+            const bottom = top + 30;
+            const anchor = new FakeElement();
+            anchor.getBoundingClientRect = () => ({ top: top * zoom, bottom: bottom * zoom, right: 300 * zoom });
+            context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ' }];
+            context.window.audioSources = [{ name: 'Slow', url: 'slow://' }];
+            await context.showAudioCandidateMenu(0, anchor);
+            const menu = body.children.find(child => child.className === 'audio-candidate-menu');
+            const menuTop = parseFloat(menu.style.top);
+            const menuBottom = menuTop + menu.offsetHeight;
+            assert.ok(menuTop >= 8 && menuBottom <= 192, 'menu fits the popup viewport');
+            assert.ok(side === 'below' ? menuTop >= bottom + 4 : menuBottom <= top - 4, 'menu must not cover the trigger');
+            assert.equal(parseFloat(menu.style.maxHeight), 138);
+        });
+    }
+}

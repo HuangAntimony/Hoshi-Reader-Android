@@ -65,12 +65,12 @@ import moe.antimony.hoshi.epub.ReaderHighlight
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
-import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
-import moe.antimony.hoshi.features.audio.LocalAudioRepository
+import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
+import moe.antimony.hoshi.features.dictionary.lookupOptions
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
 import moe.antimony.hoshi.features.dictionary.LookupPopupHtml
@@ -239,6 +239,8 @@ fun ReaderWebView(
     val popupContentLanguageProfile = contentLanguageProfile
     val progressDisplay = readerProgressDisplay(contentLanguageProfile)
     val noAudioFoundText = stringResource(R.string.audio_no_audio_found)
+    val audioLoadingText = stringResource(R.string.loading)
+    val popupAudioSettings = audioSettings.withLocalizedSourceNames()
     val readerPopupIframeDocument = remember(
         dictionaryStyles,
         dictionarySettings,
@@ -249,13 +251,14 @@ fun ReaderWebView(
         effectiveSettings.popupReducedMotionSwipeThreshold,
         popupDarkMode,
         effectiveSettings.eInkMode,
-        audioSettings,
+        popupAudioSettings,
         ankiUiState.popupSettings,
         fontManager,
         fontLibraryState.revision,
         effectiveSettings.popupScale,
         popupContentLanguageProfile,
         noAudioFoundText,
+        audioLoadingText,
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
@@ -268,8 +271,9 @@ fun ReaderWebView(
             reducedMotionSwipeThreshold = effectiveSettings.popupReducedMotionSwipeThreshold,
             darkMode = popupDarkMode,
             eInkMode = effectiveSettings.eInkMode,
-            audioSettings = audioSettings,
+            audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
+            audioLoadingText = audioLoadingText,
             ankiSettings = ankiUiState.popupSettings,
             fontFaceCss = fontManager.popupFontFaceCss(),
             popupScale = effectiveSettings.popupScale,
@@ -299,7 +303,7 @@ fun ReaderWebView(
             context = context.applicationContext,
             assets = popupAssets,
             fontManager = fontManager,
-            audioRequestHandler = AudioRequestHandler(LocalAudioRepository.fromContext(context.applicationContext)),
+            audioRequestHandler = appContainer.audioRequestHandler,
             imageRequestHandler = DictionaryImageRequestHandler(dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
@@ -526,7 +530,7 @@ fun ReaderWebView(
         createLookupPopupItem(
             selection = selection,
             dictionaryStyles = dictionaryStyles,
-            lookup = dictionaryRepository::lookup,
+            lookup = { text, maxResults, scanLength -> dictionaryRepository.lookup(text, maxResults, scanLength, dictionarySettings.lookupOptions()) },
             options = LookupPopupOptions(
                 isVertical = effectiveSettings.verticalWriting,
                 isFullWidth = effectiveSettings.popupFullWidth,
@@ -554,7 +558,7 @@ fun ReaderWebView(
         createLookupPopupItem(
             selection = selection,
             dictionaryStyles = dictionaryStyles,
-            lookup = dictionaryRepository::lookup,
+            lookup = { text, maxResults, scanLength -> dictionaryRepository.lookup(text, maxResults, scanLength, dictionarySettings.lookupOptions()) },
             options = LookupPopupOptions(
                 isVertical = false,
                 isFullWidth = false,
@@ -814,6 +818,7 @@ fun ReaderWebView(
                     message.query,
                     popup.state.dictionarySettings.maxResults,
                     popup.state.dictionarySettings.scanLength,
+                    popup.state.dictionarySettings.lookupOptions(),
                 )
                 if (results.isNotEmpty()) {
                     setLookupPopups(

@@ -46,8 +46,8 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.dictionary.DictionaryRepository
 import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
+import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
-import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
@@ -76,11 +76,11 @@ import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import kotlin.math.min
 
 internal class ProcessTextLookupDependencies @Inject constructor(
+    val audioRequestHandler: AudioRequestHandler,
     val readerSettingsRepository: ReaderSettingsRepository,
     val dictionaryRepository: DictionaryRepository,
     val dictionarySettingsRepository: DictionarySettingsRepository,
     val audioSettingsRepository: AudioSettingsRepository,
-    val localAudioRepository: LocalAudioRepository,
     val readerFontManager: ReaderFontManager,
     val profileRepository: ProfileRepository,
 )
@@ -171,10 +171,12 @@ private fun ProcessTextLookupOverlay(
     }
     val popupSettings = popups.firstOrNull()?.state
     val noAudioFoundText = stringResource(R.string.audio_no_audio_found)
+    val audioLoadingText = stringResource(R.string.loading)
+    val popupAudioSettings = (popupSettings?.audioSettings ?: AudioSettings()).withLocalizedSourceNames()
     val readerPopupIframeDocument = remember(
+        popupAudioSettings,
         popupSettings?.dictionaryStyles,
         popupSettings?.dictionarySettings,
-        popupSettings?.audioSettings,
         contentLanguageProfile,
         readerSettings.popupSwipeThreshold,
         readerSettings.popupReducedMotionScrolling,
@@ -186,6 +188,7 @@ private fun ProcessTextLookupOverlay(
         ankiUiState.popupSettings,
         fontFaceCss,
         noAudioFoundText,
+        audioLoadingText,
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
@@ -198,8 +201,9 @@ private fun ProcessTextLookupOverlay(
             reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
             darkMode = darkMode,
             eInkMode = readerSettings.eInkMode,
-            audioSettings = popupSettings?.audioSettings ?: AudioSettings(),
+            audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
+            audioLoadingText = audioLoadingText,
             ankiSettings = ankiUiState.popupSettings,
             fontFaceCss = fontFaceCss,
             popupScale = readerSettings.popupScale,
@@ -214,13 +218,13 @@ private fun ProcessTextLookupOverlay(
         context,
         assets,
         dependencies.readerFontManager,
-        dependencies.localAudioRepository,
+        dependencies.audioRequestHandler,
     ) {
         ReaderLookupPopupResourceHandler(
             context = context.applicationContext,
             assets = assets,
             fontManager = dependencies.readerFontManager,
-            audioRequestHandler = AudioRequestHandler(dependencies.localAudioRepository),
+            audioRequestHandler = dependencies.audioRequestHandler,
             imageRequestHandler = DictionaryImageRequestHandler(dependencies.dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )
@@ -238,6 +242,7 @@ private fun ProcessTextLookupOverlay(
                     query,
                     dictionarySettings.maxResults,
                     dictionarySettings.scanLength,
+                    dictionarySettings.lookupOptions(),
                 )
                 processTextLookupRoot(
                     query = query,
@@ -322,7 +327,9 @@ private fun ProcessTextLookupOverlay(
             createLookupPopupItem(
                 selection = selection,
                 dictionaryStyles = popupSettings?.dictionaryStyles ?: dependencies.dictionaryRepository.dictionaryStyles(),
-                lookup = dependencies.dictionaryRepository::lookup,
+                lookup = { text, maxResults, scanLength ->
+                    dependencies.dictionaryRepository.lookup(text, maxResults, scanLength, (popupSettings?.dictionarySettings ?: DictionarySettings()).lookupOptions())
+                },
                 options = LookupPopupOptions(
                     isVertical = false,
                     isFullWidth = false,
@@ -400,6 +407,7 @@ private fun ProcessTextLookupOverlay(
                         message.query,
                         settings.maxResults,
                         settings.scanLength,
+                        settings.lookupOptions(),
                     )
                     if (results.isNotEmpty()) {
                         setIframePopups(
