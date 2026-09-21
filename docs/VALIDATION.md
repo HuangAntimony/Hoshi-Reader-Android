@@ -86,6 +86,13 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
+- Dictionary tab history: search A, follow a definition link to B, swipe back to
+  A, switch to Settings and return. A and its scroll/expanded definitions must
+  remain visible; forward must still reach B and back must return to A. Also
+  switch tabs while on B, repeat after a child lookup, and start a fresh search
+  to verify old history is cleared. `DictionarySearchSessionTest` checks WebView
+  session retention with in-memory pages without changing installed app data.
+
 - Book search: verify literal spaces/punctuation, case-insensitive matches,
   paragraph/`br` boundaries, ruby exclusion, complete bracketed sentence
   snippets, 100-result limit, and supplementary-plane characters before/inside

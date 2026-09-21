@@ -362,6 +362,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- Dictionary's `DictionarySearchSession` is owned by the AppShell composition.
+  It retains the WebView's current DOM, scroll position and JS history across tab
+  removal, with root scroll state, child history counts and the bridge callback
+  holder. Reattachment rebinds touch callbacks; detached views are paused and the
+  shell disposes the WebView. Do not put Activity-backed WebViews in ViewModels.
 - Built-in remote word audio uses Yomitan's Japanese source order:
   JapanesePod101, LanguagePod101, and Jisho. `BuiltInAudioSource` owns stable
   internal source URLs and resource-backed names. `AudioSettingsRepository`

@@ -41,6 +41,8 @@ import moe.antimony.hoshi.features.bookshelf.MainTab
 import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
+import moe.antimony.hoshi.features.dictionary.DictionarySearchSession
+import moe.antimony.hoshi.features.dictionary.rememberDictionarySearchSession
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
 import moe.antimony.hoshi.features.dictionary.DictionaryView
 import moe.antimony.hoshi.features.dictionary.PendingDictionaryLookupRequest
@@ -91,6 +93,7 @@ fun AppShell(
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.Books) }
     val booksBackStack = rememberNavBackStack(AppRoute.BooksRoute)
     val dictionaryBackStack = rememberNavBackStack(AppRoute.DictionaryRoute)
+    val dictionarySession = rememberDictionarySearchSession()
     val statisticsBackStack = rememberNavBackStack(AppRoute.StatisticsRoute)
     val settingsBackStack = rememberNavBackStack(AppRoute.SettingsRoute)
     val bookRepository = appContainer.bookRepository
@@ -275,6 +278,7 @@ fun AppShell(
                 )
                 AppRoute.DictionaryRoute -> TopLevelRouteContent(
                     selectedTab = MainTab.Dictionary,
+                    dictionarySession = dictionarySession,
                     pendingImportUri = currentPendingImportUri,
                     onPendingImportConsumed = currentOnPendingImportConsumed,
                     readerSettings = currentReaderSettings,
@@ -445,6 +449,7 @@ private fun TopLevelRouteContent(
     dictionaryFocusRequestKey: Int,
     pendingDictionaryLookupRequest: PendingDictionaryLookupRequest? = null,
     onPendingDictionaryLookupConsumed: () -> Unit = {},
+    dictionarySession: DictionarySearchSession? = null,
     onSettingsDestination: (SettingsDestination) -> Unit = {},
     onOpenStatisticsSettings: () -> Unit = {},
     onOpenBookStatistics: (String) -> Unit = {},
@@ -460,6 +465,7 @@ private fun TopLevelRouteContent(
             modifier = Modifier.fillMaxSize(),
         )
         MainTab.Dictionary -> DictionarySearchView(
+            session = requireNotNull(dictionarySession),
             readerSettings = readerSettings,
             focusRequestKey = dictionaryFocusRequestKey,
             pendingLookupRequest = pendingDictionaryLookupRequest,
