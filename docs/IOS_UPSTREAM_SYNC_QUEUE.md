@@ -65,52 +65,34 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Frequency sorting controls and import/update feedback
+### 2. Dictionary import/update feedback
 
-Status: partial native support; pending Android UI/bridge integration.
+Status: pending Android error details and automatic low-RAM policy.
 
-Commits: `165992a`, `e849e36` (Auto naming), `222a72b`,
-`7dd3f49` (automatic low-RAM policy only).
-
-Dependency/value reasoning:
-
-- Native frequency options already exist in vendored hoshidicts; extend the
-  parent/JNI ABI consistently before settings/query callers. Import diagnostics
-  similarly need a typed result before UI can report useful per-file reasons.
+Commits: `222a72b`, `7dd3f49` (automatic low-RAM policy only).
 
 iOS behavior to mirror:
 
-- Auto/Ascending/Descending/Disabled frequency sorting, optional enabled
-  frequency dictionary for explicit order, initial valid dictionary selection
-  and preservation across dictionary title updates.
-- Batch import continues after individual failures and reports filename plus
-  reason. Automatic dictionary updates always use low-RAM import.
+- Report filename plus reason for each failed batch import while continuing
+  later files. Automatic dictionary updates always use low-RAM import.
 
 Android current gap:
 
-- `DictionarySettings` has no sort order/dictionary fields;
-  `HoshiDicts.lookup`, `DictionaryNativeBridge` and
-  `DictionaryLookupQueryService.lookup()` accept no frequency options, although
-  the vendored C++ `LookupOptions`/C API support them.
 - `ImportResult` omits native error text; `DictionaryImportDataSource` replaces
   failure with a generic message. `DictionaryViewModel` retains failed items'
   names but drops individual reasons. Per-import staging/continuation exists.
-- `DictionaryAutoUpdateRunner` uses `DictionaryUpdateService`, whose
-  `lowRamImport = settings.lowRamDictionaryImport` defaults false even for
-  `DictionaryMutationOperation.AutoUpdate`.
+- `DictionaryUpdateService` uses the user's low-RAM setting for automatic updates.
 
 Suggested slice:
 
-- Expose typed native options/results, persist sort settings and update renamed
-  references, retain per-file localized failure context, force low-RAM only for
-  automatic updates. Keep Android's serialized atomic query-session replacement;
-  iOS `releaseQuery()` is an implementation choice, not an extra product gap.
+- Preserve native import errors through typed results and localized per-file
+  failure context, then force low-RAM only for automatic updates. Preserve
+  Android's serialized atomic query-session replacement.
 
 Validation:
 
-- All sorting modes, missing/disabled/reordered/renamed dictionaries, profiles,
-  equal/missing frequencies; mixed valid/invalid batch imports and recovery;
-  automatic low-RAM with the manual setting off and unchanged manual behavior.
+- Mixed valid/invalid batch imports and recovery; automatic low-RAM with the
+  manual setting off and unchanged manual behavior.
 
 ### 3. Reader WebView line-box CSS parity
 
@@ -151,17 +133,21 @@ Validation:
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
-| `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1).
-2. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (2).
+2. Import diagnostics and automatic low-RAM update policy (2).
 3. Reader line-box CSS parity (3).
 
 ## Covered Or No Android Action
+
+- `165992a`, `e849e36`: profile-scoped Auto/Ascending/Descending/Disabled lookup
+  sorting and an enabled frequency-dictionary selector feed native options
+  through the shared lookup paths. Dictionary updates preserve selected title
+  references across profiles; unavailable selections retain native fallback
+  semantics without replacing query sessions on settings changes.
 
 - `bd21e24`, `8024df1` (stroke-order font attribution): excluded from Android
   sync at the project owner's request. Android retains its dynamic/custom/E-ink
@@ -291,8 +277,7 @@ Validation:
   classified individually above.
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
-  pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 2.
+  pitch and transcription data. Explicit frequency options are also integrated through the Kotlin/JNI bridge.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct

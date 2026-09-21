@@ -2,6 +2,7 @@ package moe.antimony.hoshi.dictionary
 
 import android.content.ContentResolver
 import android.net.Uri
+import de.manhhao.hoshi.LookupOptions
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
 import java.io.File
@@ -166,6 +167,7 @@ internal class DictionaryRepository @Inject constructor(
                     renames += DictionaryRename(
                         oldTitle = installedIndex.title,
                         newTitle = replacement.index.title,
+                        type = candidate.type,
                     )
                 }
                 successfulCount += 1
@@ -248,9 +250,9 @@ internal class DictionaryRepository @Inject constructor(
         }
     }
 
-    fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16): List<LookupResult> {
+    fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16, options: LookupOptions = LookupOptions()): List<LookupResult> {
         ensureLookupQueryReady()
-        return lookupQueryService.lookup(text, maxResults, scanLength)
+        return lookupQueryService.lookup(text, maxResults, scanLength, options)
     }
 
     fun lookupKanji(kanji: String): KanjiResult {

@@ -21,6 +21,20 @@ import moe.antimony.hoshi.ui.UiText
 
 class DictionarySearchViewModelTest {
     @Test
+    fun searchAndRedirectUseCurrentProfileFrequencySettings() {
+        val settings = DictionarySettings(frequencySortOrder = FrequencySortOrder.Descending, frequencySortDictionary = "Count")
+        val repository = FakeDictionarySearchRepository(dictionarySettings = settings, lookupResults = listOf(lookupResult("猫")))
+        val viewModel = viewModel(repository)
+        viewModel.applyExternalLookup("猫")
+        assertEquals(settings.lookupOptions(), repository.lookupOptions.last())
+        viewModel.lookupRootRedirect("猫")
+        assertEquals(settings.lookupOptions(), repository.lookupOptions.last())
+        repository.dictionarySettingsFlow.value = settings.copy(frequencySortOrder = FrequencySortOrder.Disabled)
+        viewModel.lookupRedirect("猫")
+        assertEquals(settings.copy(frequencySortOrder = FrequencySortOrder.Disabled).lookupOptions(), repository.lookupOptions.last())
+    }
+
+    @Test
     fun restoredSourceHistoryUpdatesRootMiningContextInBothDirections() {
         listOf("猫と猫" to listOf(0, 2), "𠮟猫と猫" to listOf(2, 4)).forEach { (sentence, offsets) ->
             val repository = FakeDictionarySearchRepository(lookupResults = listOf(lookupResult("猫")))
@@ -446,6 +460,7 @@ private class FakeDictionarySearchRepository(
     val dictionarySettingsFlow = MutableStateFlow(dictionarySettings)
     val audioSettingsFlow = MutableStateFlow(audioSettings)
     val lookupCalls = mutableListOf<String>()
+    val lookupOptions = mutableListOf<de.manhhao.hoshi.LookupOptions>()
     var rebuildCount = 0
     var lookupResults = lookupResults
 
@@ -456,8 +471,9 @@ private class FakeDictionarySearchRepository(
         rebuildCount += 1
     }
 
-    override fun lookup(query: String, maxResults: Int, scanLength: Int): List<LookupResult> {
+    override fun lookup(query: String, maxResults: Int, scanLength: Int, options: de.manhhao.hoshi.LookupOptions): List<LookupResult> {
         lookupCalls += "$query:$maxResults:$scanLength"
+        lookupOptions += options
         error?.let { throw it }
         return lookupResults
     }

@@ -194,6 +194,78 @@ class DictionaryUpdateServiceTest {
     }
 
     @Test
+    fun frequencyUpdateMigratesSelectedDictionaryForEveryProfile() = runBlocking {
+        profileSettingsRepositories().use { settingsHandle ->
+            val filesDir = settingsHandle.filesDir
+            val profileRepository = settingsHandle.profileRepository
+            val storage = DictionaryStorageDataSource(filesDir, profileRepository = profileRepository)
+            val installed = updatableIndex("JMdict [2026-01-01]", "rev-2026")
+            val remoteIndex = installed.copy(
+                title = "JMdict [2099-01-01]",
+                revision = "rev-2099",
+                downloadUrl = "https://example.invalid/jmdict-2099.zip",
+            )
+            writeDictionary(storage.typeDirectory(DictionaryType.Frequency), installed.title, installed)
+            storage.saveConfigFromStorage()
+            settingsHandle.dictionaryRepository.update {
+                it.copy(collapsedDictionaries = setOf(installed.title, "Japanese only"), frequencySortDictionary = installed.title)
+            }
+            settingsHandle.ankiRepository.update {
+                it.copy(fieldMappings = mapOf("MainDefinition" to "{single-glossary-${installed.title}}"))
+            }
+            val englishProfile = profileRepository.createProfile("English", "en")
+            profileRepository.activateGlobal(englishProfile.id)
+            settingsHandle.dictionaryRepository.update {
+                it.copy(collapsedDictionaries = setOf(installed.title, "English only"), frequencySortDictionary = installed.title)
+            }
+            settingsHandle.ankiRepository.update {
+                it.copy(fieldMappings = mapOf("BriefDefinition" to "{single-glossary-${installed.title}-brief}"))
+            }
+            profileRepository.activateGlobal(ProfileRepository.DefaultProfileId)
+            val service = DictionaryUpdateService(
+                dictionaryRepository = DictionaryRepository(
+                    filesDir,
+                    storage,
+                    DictionaryImportDataSource(ImportingDictionaryNativeBridge()),
+                    DictionaryLookupQueryService(NoOpDictionaryNativeBridge),
+                    FakeDictionaryRemoteDataSource(
+                        indexes = mapOf(installed.indexUrl to remoteIndex),
+                        archives = mapOf(remoteIndex.downloadUrl to dictionaryArchive(remoteIndex)),
+                    ),
+                    profileRepository,
+                ),
+                dictionarySettingsRepository = settingsHandle.dictionaryRepository,
+                ankiSettingsRepository = settingsHandle.ankiRepository,
+                ioDispatcher = Dispatchers.Unconfined,
+                clock = FakeDictionaryUpdateClock(1_900_000_000_000L),
+                mutationCoordinator = DictionaryMutationCoordinator(),
+            )
+
+            service.updateDictionaries()
+
+            assertEquals(remoteIndex.title, settingsHandle.dictionaryRepository.settings.first().frequencySortDictionary)
+            assertEquals(
+                setOf(remoteIndex.title, "Japanese only"),
+                settingsHandle.dictionaryRepository.settings.first().collapsedDictionaries,
+            )
+            assertEquals(
+                "{single-glossary-${remoteIndex.title}}",
+                settingsHandle.ankiRepository.settings.first().fieldMappings["MainDefinition"],
+            )
+            profileRepository.activateGlobal(englishProfile.id)
+            assertEquals(remoteIndex.title, settingsHandle.dictionaryRepository.settings.first().frequencySortDictionary)
+            assertEquals(
+                setOf(remoteIndex.title, "English only"),
+                settingsHandle.dictionaryRepository.settings.first().collapsedDictionaries,
+            )
+            assertEquals(
+                "{single-glossary-${remoteIndex.title}-brief}",
+                settingsHandle.ankiRepository.settings.first().fieldMappings["BriefDefinition"],
+            )
+        }
+    }
+
+    @Test
     fun failedUpdateDoesNotRecordLastUpdate() = runBlocking {
         settingsRepository().use { settingsHandle ->
             val filesDir = temporaryFolder.newFolder("service-failure-files")

@@ -154,6 +154,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   currently published session and return empty results when no session is
   ready. Enabled term dictionaries categorized as `exclude` remain stored and
   manageable but are omitted from the replacement session.
+- Lookup frequency order and selected dictionary are profile-scoped settings.
+  Every lookup entry point passes typed options to the native query; sorting
+  remains native-owned and does not require rebuilding the query session.
+  Frequency-dictionary update renames migrate selected titles across profiles.
 - Dictionary data directories remain global under `Dictionaries/`, while each
   profile owns `dictionary_config.json` and `dictionary_settings.json` under
   `Profiles/<profileId>/`. The config preserves per-type order and enable state,

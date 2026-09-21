@@ -329,6 +329,7 @@ fun DictionaryView(
             DictionarySettingsView(
                 settings = uiState.settings,
                 termDictionaries = uiState.dictionaries[DictionaryType.Term].orEmpty(),
+                frequencyDictionaries = uiState.dictionaries[DictionaryType.Frequency].orEmpty(),
                 showScanNonJapaneseText = scanNonJapaneseTextSettingVisible(
                     profileState.effectiveContentLanguageProfile,
                 ),
@@ -1076,6 +1077,7 @@ private fun GroupDivider() {
 private fun DictionarySettingsView(
     settings: DictionarySettings,
     termDictionaries: List<DictionaryInfo>,
+    frequencyDictionaries: List<DictionaryInfo>,
     showScanNonJapaneseText: Boolean,
     onSettingsChange: ((DictionarySettings) -> DictionarySettings) -> Unit,
     onClose: () -> Unit,
@@ -1162,6 +1164,52 @@ private fun DictionarySettingsView(
                         canDecrease = settings.scanLength > DictionarySettings.MIN_SCAN_LENGTH,
                         canIncrease = settings.scanLength < DictionarySettings.MAX_SCAN_LENGTH,
                     )
+                }
+                SettingsGroup {
+                    var orderMenuExpanded by remember { mutableStateOf(false) }
+                    val enabledTitles = frequencyDictionaries.filter { it.isEnabled }.map { it.index.title }
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(stringResource(R.string.dictionary_frequency_sort_order)) },
+                        trailingContent = {
+                            Box {
+                                TextButton(onClick = { orderMenuExpanded = true }) {
+                                    Text(stringResource(settings.frequencySortOrder.labelRes))
+                                }
+                                DropdownMenu(expanded = orderMenuExpanded, onDismissRequest = { orderMenuExpanded = false }) {
+                                    FrequencySortOrder.entries.forEach { order ->
+                                        DropdownMenuItem(text = { Text(stringResource(order.labelRes)) }, onClick = {
+                                            orderMenuExpanded = false
+                                            onSettingsChange { it.withFrequencySortOrder(order, enabledTitles) }
+                                        })
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    if (settings.frequencySortOrder.usesDictionary && enabledTitles.isNotEmpty()) {
+                        GroupDivider()
+                        var dictionaryMenuExpanded by remember { mutableStateOf(false) }
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.dictionary_frequency_dictionary)) },
+                            trailingContent = {
+                                Box {
+                                    TextButton(onClick = { dictionaryMenuExpanded = true }) {
+                                        Text(settings.frequencySortDictionary)
+                                    }
+                                    DropdownMenu(expanded = dictionaryMenuExpanded, onDismissRequest = { dictionaryMenuExpanded = false }) {
+                                        enabledTitles.forEach { title ->
+                                            DropdownMenuItem(text = { Text(title) }, onClick = {
+                                                dictionaryMenuExpanded = false
+                                                onSettingsChange { it.copy(frequencySortDictionary = title) }
+                                            })
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
                 SectionLabel(stringResource(R.string.dictionary_settings_search_text))
                 SettingsGroup {

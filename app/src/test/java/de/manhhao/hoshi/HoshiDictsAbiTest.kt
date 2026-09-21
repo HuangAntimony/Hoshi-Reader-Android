@@ -6,6 +6,16 @@ import org.junit.Test
 
 class HoshiDictsAbiTest {
     @Test
+    fun frequencyLookupMethodMatchesJniArguments() {
+        val method = loadClass("de.manhhao.hoshi.HoshiDicts").getDeclaredMethod(
+            "lookupWithOptions", Long::class.javaPrimitiveType, String::class.java,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, String::class.java,
+        )
+        assertEquals(arrayClass("de.manhhao.hoshi.LookupResult"), method.returnType)
+    }
+
+    @Test
     fun typedModelsExposeCompletePitchAndKanjiAbi() {
         assertConstructor(
             className = "de.manhhao.hoshi.ImportResult",

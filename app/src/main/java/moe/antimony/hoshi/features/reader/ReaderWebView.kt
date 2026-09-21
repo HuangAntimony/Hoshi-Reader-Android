@@ -71,6 +71,7 @@ import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
+import moe.antimony.hoshi.features.dictionary.lookupOptions
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
 import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
 import moe.antimony.hoshi.features.dictionary.LookupPopupHtml
@@ -522,7 +523,7 @@ fun ReaderWebView(
         createLookupPopupItem(
             selection = selection,
             dictionaryStyles = dictionaryStyles,
-            lookup = dictionaryRepository::lookup,
+            lookup = { text, maxResults, scanLength -> dictionaryRepository.lookup(text, maxResults, scanLength, dictionarySettings.lookupOptions()) },
             options = LookupPopupOptions(
                 isVertical = effectiveSettings.verticalWriting,
                 isFullWidth = effectiveSettings.popupFullWidth,
@@ -550,7 +551,7 @@ fun ReaderWebView(
         createLookupPopupItem(
             selection = selection,
             dictionaryStyles = dictionaryStyles,
-            lookup = dictionaryRepository::lookup,
+            lookup = { text, maxResults, scanLength -> dictionaryRepository.lookup(text, maxResults, scanLength, dictionarySettings.lookupOptions()) },
             options = LookupPopupOptions(
                 isVertical = false,
                 isFullWidth = false,
@@ -810,6 +811,7 @@ fun ReaderWebView(
                     message.query,
                     popup.state.dictionarySettings.maxResults,
                     popup.state.dictionarySettings.scanLength,
+                    popup.state.dictionarySettings.lookupOptions(),
                 )
                 if (results.isNotEmpty()) {
                     setLookupPopups(

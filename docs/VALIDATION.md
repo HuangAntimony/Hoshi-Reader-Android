@@ -527,6 +527,16 @@ Preserve existing app data when validating statistics:
 Validate relevant dictionary/audio changes with:
 
 - recommended dictionary downloads for JMdict, JMnedict, Jiten, and Jitendex.
+- lookup frequency sorting in Auto/Ascending/Descending/Disabled modes across
+  Reader, Dictionary, recursive popups and Process Text; explicit dictionary
+  selection, equal/missing frequencies, disable/delete/reorder, update renames,
+  profile switching and restart. `DictionaryFrequencyNativeTest` exercises the
+  JNI bridge using generated dictionaries in a unique cache directory. Build
+  with `./gradlew assembleDebug :app:assembleDebugAndroidTest`, install both
+  APKs using `adb install -r`, and run only this class with `adb shell am
+  instrument -w -e class moe.antimony.hoshi.dictionary.DictionaryFrequencyNativeTest
+  moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner`;
+  do not use connected Gradle tasks that reinstall or clear app data.
 - manual multi-dictionary import with one invalid archive, confirming later
   archives still import and failures are reported.
 - Low Memory Usage Mode with a large Yomitan archive.

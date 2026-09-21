@@ -18,6 +18,19 @@ import org.junit.Test
 
 class DictionaryLookupQueryServiceTest {
     @Test
+    fun lookupForwardsEveryFrequencyModeWithoutRebuildingTheSession() {
+        val bridge = RecordingDictionaryNativeBridge()
+        val service = DictionaryLookupQueryService(bridge)
+        service.rebuild(emptyList(), emptyList(), emptyList())
+        de.manhhao.hoshi.LookupFrequencyOrder.entries.forEach { order ->
+            val options = de.manhhao.hoshi.LookupOptions(order, "頻度𠮟")
+            service.lookup("はし", options = options)
+            assertEquals(options, bridge.lastOptions)
+        }
+        assertEquals(1, bridge.createdLanguageIds.size)
+    }
+
+    @Test
     fun rebuildForwardsEnabledPathsByDictionaryTypeToNativeBridge() {
         val bridge = RecordingDictionaryNativeBridge()
         val service = DictionaryLookupQueryService(bridge)
@@ -229,7 +242,10 @@ class DictionaryLookupQueryServiceTest {
                 ),
             )
 
-        override fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): List<LookupResult> {
+        var lastOptions: de.manhhao.hoshi.LookupOptions? = null
+
+        override fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int, options: de.manhhao.hoshi.LookupOptions): List<LookupResult> {
+            lastOptions = options
             onLookup(session)
             val termPath = sessionTermPaths.getValue(session).singleOrNull().orEmpty()
             return listOf(

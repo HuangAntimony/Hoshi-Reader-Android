@@ -238,6 +238,7 @@ private fun ProcessTextLookupOverlay(
                     query,
                     dictionarySettings.maxResults,
                     dictionarySettings.scanLength,
+                    dictionarySettings.lookupOptions(),
                 )
                 processTextLookupRoot(
                     query = query,
@@ -322,7 +323,9 @@ private fun ProcessTextLookupOverlay(
             createLookupPopupItem(
                 selection = selection,
                 dictionaryStyles = popupSettings?.dictionaryStyles ?: dependencies.dictionaryRepository.dictionaryStyles(),
-                lookup = dependencies.dictionaryRepository::lookup,
+                lookup = { text, maxResults, scanLength ->
+                    dependencies.dictionaryRepository.lookup(text, maxResults, scanLength, (popupSettings?.dictionarySettings ?: DictionarySettings()).lookupOptions())
+                },
                 options = LookupPopupOptions(
                     isVertical = false,
                     isFullWidth = false,
@@ -400,6 +403,7 @@ private fun ProcessTextLookupOverlay(
                         message.query,
                         settings.maxResults,
                         settings.scanLength,
+                        settings.lookupOptions(),
                     )
                     if (results.isNotEmpty()) {
                         setIframePopups(

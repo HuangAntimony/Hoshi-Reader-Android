@@ -92,6 +92,9 @@ internal class DictionaryUpdateService(
             }
             current.copy(
                 collapsedDictionaries = renamed,
+                frequencySortDictionary = summary.renamedDictionaries.firstOrNull {
+                    it.type == moe.antimony.hoshi.dictionary.DictionaryType.Frequency && it.oldTitle == current.frequencySortDictionary
+                }?.newTitle ?: current.frequencySortDictionary,
                 lastDictionaryUpdateEpochMillis = if (summary.successfulCount > 0) {
                     clock.currentTimeMillis()
                 } else {

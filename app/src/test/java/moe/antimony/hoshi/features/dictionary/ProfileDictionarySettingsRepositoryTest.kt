@@ -21,6 +21,20 @@ class ProfileDictionarySettingsRepositoryTest {
     val tempFolder = TemporaryFolder()
 
     @Test
+    fun frequencySettingsRoundTripAndStayProfileScoped() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("frequency-files"))
+        val repository = repository(profiles)
+        val english = profiles.createProfile("English", "en")
+        assertEquals(FrequencySortOrder.Auto, repository.settings.first().frequencySortOrder)
+        repository.update { it.copy(frequencySortOrder = FrequencySortOrder.Descending, frequencySortDictionary = "頻度𠮟") }
+        profiles.activateGlobal(english.id)
+        assertEquals(FrequencySortOrder.Auto, repository.settings.first().frequencySortOrder)
+        profiles.activateGlobal(profiles.state.value.defaultProfileId)
+        assertEquals(FrequencySortOrder.Descending, repository.settings.first().frequencySortOrder)
+        assertEquals("頻度𠮟", repository.settings.first().frequencySortDictionary)
+    }
+
+    @Test
     fun profileJsonReadsAndWritesUseInjectedIoDispatcher() = runBlocking {
         CountingCoroutineDispatcher().use { ioDispatcher ->
             val profileRepository = ProfileRepository(

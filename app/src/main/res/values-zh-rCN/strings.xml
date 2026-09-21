@@ -296,7 +296,7 @@
     <string name="profiles_delete_title_format" comment="Profile delete confirmation, intentionally matching book and imported-font delete confirmation formats.">删除“%1$s”？</string>
     <string name="profiles_default_cannot_delete">默认 Profile 不能删除。</string>
     <string name="bookshelf_profile">Profile</string>
-    <string name="bookshelf_profile_automatic">自动</string>
+    <string name="bookshelf_profile_automatic" comment="Automatically choose the content language profile for a book.">自动</string>
     <string name="bookshelf_profile_automatic_uses_format">将使用 %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">音量键翻页</string>
     <string name="reader_behavior_volume_keys_navigate_popup_terms">音量键跳转弹窗词条</string>
@@ -474,7 +474,7 @@
     <string name="sync_clear_cache_confirmation">Hoshi 将清除已缓存的 Google Drive 文件夹 ID 和远程封面缩略图。本地书籍不会被删除。</string>
     <string name="sync_sign_out_title">退出 Google Drive？</string>
     <string name="sync_sign_out_confirmation">Hoshi 将断开 Google Drive 并清除已缓存的 Drive 文件夹。本地书籍不会被删除。</string>
-    <string name="sync_mode_auto">自动</string>
+    <string name="sync_mode_auto" comment="Automatic synchronization mode.">自动</string>
     <string name="sync_mode_manual">手动</string>
     <string name="sync_google_drive" comment="Sync provider label, intentionally matching the bookshelf remote Google Drive section.">Google Drive</string>
     <string name="sync_device_client_id">设备客户端 ID</string>
@@ -838,4 +838,10 @@
     <string name="display_settings_eink_appearance">墨水屏明暗</string>
     <string name="display_settings_eink_explanation">墨水屏优化期间使用黑白配色。关闭后恢复已保存的配色和强调色。</string>
     <string name="reader_settings_profile_title">外观 · %1$s</string>
+    <string name="dictionary_frequency_sort_order">排序方式</string>
+    <string name="dictionary_frequency_dictionary">词频辞典</string>
+    <string name="dictionary_frequency_auto" comment="Automatic dictionary lookup frequency ordering.">自动</string>
+    <string name="dictionary_frequency_ascending">升序</string>
+    <string name="dictionary_frequency_descending">降序</string>
+    <string name="dictionary_frequency_disabled">禁用</string>
 </resources>

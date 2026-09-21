@@ -2,6 +2,7 @@ package moe.antimony.hoshi.dictionary
 
 import de.manhhao.hoshi.DictionaryStyle
 import de.manhhao.hoshi.HoshiDicts
+import de.manhhao.hoshi.LookupOptions
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
 import javax.inject.Inject
@@ -33,7 +34,7 @@ internal interface DictionaryNativeBridge {
         kanjiPaths: Array<String>,
     ) = Unit
 
-    fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): List<LookupResult> = emptyList()
+    fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> = emptyList()
 
     fun queryKanji(session: Long, kanji: String): KanjiResult = KanjiResult(kanji, emptyArray())
 
@@ -75,8 +76,8 @@ internal class HoshiDictionaryNativeBridge @Inject constructor() : DictionaryNat
         HoshiDicts.rebuildQuery(session, termPaths, freqPaths, pitchPaths, kanjiPaths)
     }
 
-    override fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): List<LookupResult> =
-        HoshiDicts.lookup(session, text, maxResults, scanLength).toList()
+    override fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> =
+        HoshiDicts.lookup(session, text, maxResults, scanLength, options).toList()
 
     override fun queryKanji(session: Long, kanji: String): KanjiResult =
         HoshiDicts.queryKanji(session, kanji)

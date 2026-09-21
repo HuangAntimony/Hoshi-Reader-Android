@@ -98,6 +98,13 @@ class LookupResult(
     val traceCandidates: Array<TraceCandidate>,
 )
 
+enum class LookupFrequencyOrder(val nativeValue: Int) { Auto(0), Ascending(1), Descending(2), Disabled(3) }
+
+data class LookupOptions(
+    val frequencyOrder: LookupFrequencyOrder = LookupFrequencyOrder.Auto,
+    val frequencyDictionary: String? = null,
+)
+
 object HoshiDicts {
     init {
         System.loadLibrary("hoshidicts_jni")
@@ -114,7 +121,11 @@ object HoshiDicts {
         kanjiPaths: Array<String>,
     )
 
-    external fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int): Array<LookupResult>
+    fun lookup(session: Long, text: String, maxResults: Int, scanLength: Int, options: LookupOptions = LookupOptions()): Array<LookupResult> =
+        lookupWithOptions(session, text, maxResults, scanLength, options.frequencyOrder.nativeValue, options.frequencyDictionary)
+
+    private external fun lookupWithOptions(session: Long, text: String, maxResults: Int, scanLength: Int,
+                                          frequencyOrder: Int, frequencyDictionary: String?): Array<LookupResult>
     external fun queryKanji(session: Long, kanji: String): KanjiResult
     external fun getStyles(session: Long): Array<DictionaryStyle>
     external fun getMediaFile(session: Long, dictName: String, mediaPath: String): ByteArray?

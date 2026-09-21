@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.dictionary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.manhhao.hoshi.LookupOptions
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
 import javax.inject.Inject
@@ -29,7 +30,7 @@ internal interface DictionarySearchRepository {
     val dictionarySettings: Flow<DictionarySettings>
     val audioSettings: Flow<AudioSettings>
     suspend fun rebuildLookupQuery()
-    fun lookup(query: String, maxResults: Int, scanLength: Int): List<LookupResult>
+    fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult>
     fun dictionaryStyles(): Map<String, String>
     fun lookupKanji(kanji: String): KanjiResult = KanjiResult(kanji, emptyArray())
 }
@@ -47,8 +48,8 @@ internal class AndroidDictionarySearchRepository @Inject constructor(
         dictionaryRepository.rebuildLookupQuery()
     }
 
-    override fun lookup(query: String, maxResults: Int, scanLength: Int): List<LookupResult> =
-        dictionaryRepository.lookup(query, maxResults, scanLength)
+    override fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> =
+        dictionaryRepository.lookup(query, maxResults, scanLength, options)
 
     override fun dictionaryStyles(): Map<String, String> =
         dictionaryRepository.dictionaryStyles()
@@ -196,7 +197,7 @@ internal class DictionarySearchViewModel : ViewModel {
                         val styles = repository.dictionaryStyles()
                         DictionarySearchContent.runLookup(
                             query = query,
-                            lookup = { repository.lookup(it, dictionarySettings.maxResults, dictionarySettings.scanLength) },
+                            lookup = { repository.lookup(it, dictionarySettings.maxResults, dictionarySettings.scanLength, dictionarySettings.lookupOptions()) },
                             dictionaryStyles = styles,
                         )
                     }
@@ -248,7 +249,7 @@ internal class DictionarySearchViewModel : ViewModel {
 
     fun lookupRedirect(query: String): List<LookupResult> {
         val settings = _uiState.value.dictionarySettings.normalized()
-        return repository.lookup(query, settings.maxResults, settings.scanLength)
+        return repository.lookup(query, settings.maxResults, settings.scanLength, settings.lookupOptions())
     }
 
     fun lookupKanji(kanji: String): KanjiResult = repository.lookupKanji(kanji)
@@ -280,7 +281,7 @@ internal class DictionarySearchViewModel : ViewModel {
     fun lookupRootRedirect(query: String): List<LookupResult> {
         if (query.isBlank()) return emptyList()
         val settings = _uiState.value.dictionarySettings.normalized()
-        val results = runCatching { repository.lookup(query, settings.maxResults, settings.scanLength) }
+        val results = runCatching { repository.lookup(query, settings.maxResults, settings.scanLength, settings.lookupOptions()) }
             .getOrElse { return emptyList() }
         if (results.isNotEmpty()) {
             _uiState.update {
@@ -358,7 +359,7 @@ internal class DictionarySearchViewModel : ViewModel {
             selection = selection,
             options = options,
             dictionaryStyles = _uiState.value.dictionaryStyles,
-            lookup = repository::lookup,
+            lookup = { text, maxResults, scanLength -> repository.lookup(text, maxResults, scanLength, options.dictionarySettings.lookupOptions()) },
         )
 
     fun setPopups(popups: List<LookupPopupItem>) {
