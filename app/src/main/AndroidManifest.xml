@@ -13,6 +13,7 @@
 
     <queries>
         <package android:name="com.ichi2.anki" />
+        <package android:name="space.subread.app" />
         <provider android:authorities="com.ichi2.anki.flashcards" />
     </queries>
 

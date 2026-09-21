@@ -109,6 +109,38 @@ class SasayakiSheetTest {
     }
 
     @Test
+    fun subReadSelectionKeepsItsMatchRateUntilTheNextSelection() {
+        val selected = SasayakiSubtitleMatchUiState().acceptFile("subread.srt", subReadMatchRate = 0.62).state
+        val matched = selected.finishMatching(errorMessage = null)
+
+        assertEquals(0.62, requireNotNull(selected.subReadMatchRate), 0.0)
+        assertEquals(0.62, requireNotNull(matched.subReadMatchRate), 0.0)
+        assertNull(matched.acceptFile("picked.srt").state.subReadMatchRate)
+    }
+
+    @Test
+    fun aFailedMatchDropsTheSubReadMatchRate() {
+        val failed = SasayakiSubtitleMatchUiState(subReadMatchRate = 0.62, isMatching = true)
+            .finishMatching(errorMessage = "failed")
+
+        assertNull(failed.subReadMatchRate)
+        assertEquals("failed", failed.errorMessage)
+    }
+
+    @Test
+    fun clearedMessagesDropTheErrorAndTheSubReadMatchRate() {
+        val cleared = SasayakiSubtitleMatchUiState(
+            selectedFileName = "book.srt",
+            errorMessage = "failed",
+            subReadMatchRate = 0.62,
+        ).clearedMessages()
+
+        assertEquals("book.srt", cleared.selectedFileName)
+        assertNull(cleared.errorMessage)
+        assertNull(cleared.subReadMatchRate)
+    }
+
+    @Test
     fun audiobookCoverUsesSquareArtworkFrame() {
         assertEquals(SasayakiAudiobookCoverWidthDp, SasayakiAudiobookCoverHeightDp)
     }

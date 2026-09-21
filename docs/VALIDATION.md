@@ -728,6 +728,12 @@ Validate relevant sync/update/Sasayaki changes with:
   sequence should be recovered while repeated prefix text remains unmatched,
   and a large local text gap should recover only from a coherent later cue
   sequence.
+- Sasayaki SubRead subtitles: with SubRead 0.9.0 or later installed, use Make in
+  the Resources tab for a book with a copied audiobook and for a book with a
+  linked audiobook. SubRead must open both files, and the returned subtitles must
+  match and play like a selected `.srt`. Check a book without an audiobook, a
+  cancel in SubRead, a SubRead failure, and a match rate below 0.8. Uninstall
+  SubRead and confirm the dialog opens the releases page.
 - Sasayaki highlight rendering changes: on a real WebView, compare unhighlighted
   text and active cues in horizontal/vertical writing with ruby and publisher
   `text-emphasis`. Verify complete glyph edges, ruby, and emphasis marks as well

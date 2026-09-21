@@ -436,6 +436,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   may leave static duration or container-only metadata unknown until playback
   preparation. Displayed artist normalization remains `ARTIST`, then
   `ALBUMARTIST`, then `AUTHOR`.
+- Sasayaki subtitles can also come from SubRead (`space.subread.app`). The
+  Resources tab sends the audiobook source and the packed EPUB as `content://`
+  URIs from Hoshi's own `FileProvider`, with a read grant, and receives the
+  `.srt` URI in the activity result. The returned file goes through the same
+  parser, matcher, and sidecar save as a subtitle file that the user selects.
+  The request and result rules live in `SasayakiSubRead.kt`; the manifest
+  `<queries>` entry makes SubRead visible to the package manager.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
   ExoPlayer and MediaSession, but Reader load paths do not connect to the

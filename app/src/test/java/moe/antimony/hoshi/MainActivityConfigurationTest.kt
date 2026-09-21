@@ -210,6 +210,24 @@ class MainActivityConfigurationTest {
         )
     }
 
+    @Test
+    fun subReadIsVisibleToThePackageManagerForSasayakiSubtitles() {
+        assertTrue(
+            "Android 11 and later hide SubRead unless the manifest declares that Hoshi looks for it.",
+            queriedPackageNames().contains("space.subread.app"),
+        )
+    }
+
+    private fun queriedPackageNames(document: Document = sourceManifestDocument()): List<String> {
+        val queries = document.documentElement.getElementsByTagName("queries")
+        return (0 until queries.length).flatMap { queryIndex ->
+            val packages = (queries.item(queryIndex) as Element).getElementsByTagName("package")
+            (0 until packages.length).map { index ->
+                (packages.item(index) as Element).getAttribute("android:name")
+            }
+        }
+    }
+
     private fun mainActivityManifestElement(): Element {
         return activityManifestElement(".MainActivity")
     }

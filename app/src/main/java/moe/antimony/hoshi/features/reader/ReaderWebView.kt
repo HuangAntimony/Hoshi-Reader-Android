@@ -165,6 +165,10 @@ fun ReaderWebView(
         isSasayakiPlaybackLoaded = true
     }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
+    var sasayakiPackedEpubFile by remember(bookEntry) { mutableStateOf<File?>(null) }
+    LaunchedEffect(bookEntry, bookRepository) {
+        sasayakiPackedEpubFile = bookEntry?.let { bookRepository.epubFile(it) }
+    }
     var sasayakiAudiobookInfo by remember(bookRoot) {
         mutableStateOf(SasayakiAudiobookInfo.Empty)
     }
@@ -2025,6 +2029,8 @@ fun ReaderWebView(
                         bookEntry = entry,
                         bookRepository = bookRepository,
                         epubBookParser = appContainer.epubBookParser,
+                        audioRepository = sasayakiAudioRepository,
+                        packedEpubFile = sasayakiPackedEpubFile,
                     )
                 },
                 selectedTab = stateHolder.selectedSasayakiTab,

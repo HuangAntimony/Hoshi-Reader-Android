@@ -8,6 +8,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Make Sasayaki subtitles with SubRead from the Sasayaki Resources tab. The new
+  Make action sends the book's audiobook and its EPUB to SubRead, then matches
+  the returned .srt in the same way as a subtitle file that you select yourself.
+  Hoshi reports a low SubRead match rate, asks you to add the audiobook first
+  when the book has none, and offers the SubRead download when SubRead is not
+  installed.
+
 - Preserve furigana readings in Reader highlights and show them in Contents.
   Select an existing highlight's exact text range to change its color, or choose
   its current color to remove it, in paginated, continuous, and VN modes.

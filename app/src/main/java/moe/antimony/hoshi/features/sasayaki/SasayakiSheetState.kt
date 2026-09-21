@@ -6,6 +6,7 @@ import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiSidecarRepository
+import java.io.File
 
 internal enum class SasayakiSheetTab(@param:StringRes val labelRes: Int) {
     Resources(R.string.sasayaki_tab_resources),
@@ -30,6 +31,8 @@ internal data class SasayakiMatchDependencies(
     val bookEntry: BookEntry,
     val bookRepository: SasayakiSidecarRepository,
     val epubBookParser: EpubBookParser,
+    val audioRepository: SasayakiAudioRepository,
+    val packedEpubFile: File?,
 )
 
 internal fun sasayakiSubtitleMatchSummary(matchData: SasayakiMatchData?): String? =
@@ -39,8 +42,12 @@ internal data class SasayakiSubtitleMatchUiState(
     val selectedFileName: String? = null,
     val isMatching: Boolean = false,
     val errorMessage: String? = null,
+    val subReadMatchRate: Double? = null,
 ) {
-    fun acceptFile(fileName: String): SasayakiSubtitleSelectionTransition =
+    fun acceptFile(
+        fileName: String,
+        subReadMatchRate: Double? = null,
+    ): SasayakiSubtitleSelectionTransition =
         if (isMatching) {
             SasayakiSubtitleSelectionTransition(state = this, shouldStartMatching = false)
         } else {
@@ -49,13 +56,21 @@ internal data class SasayakiSubtitleMatchUiState(
                     selectedFileName = fileName,
                     isMatching = true,
                     errorMessage = null,
+                    subReadMatchRate = subReadMatchRate,
                 ),
                 shouldStartMatching = true,
             )
         }
 
     fun finishMatching(errorMessage: String?): SasayakiSubtitleMatchUiState =
-        copy(isMatching = false, errorMessage = errorMessage)
+        copy(
+            isMatching = false,
+            errorMessage = errorMessage,
+            subReadMatchRate = if (errorMessage == null) subReadMatchRate else null,
+        )
+
+    fun clearedMessages(): SasayakiSubtitleMatchUiState =
+        copy(errorMessage = null, subReadMatchRate = null)
 }
 
 internal data class SasayakiSubtitleSelectionTransition(

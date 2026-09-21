@@ -729,6 +729,15 @@
     <string name="sasayaki_file">File</string>
     <string name="sasayaki_no_file_selected">No file selected</string>
     <string name="sasayaki_matching">Matching...</string>
+    <string name="sasayaki_subread" translatable="false">SubRead</string>
+    <string name="sasayaki_subread_summary">Make the .srt from this audiobook and book</string>
+    <string name="sasayaki_subread_action">Make</string>
+    <string name="sasayaki_subread_needs_audio">Add the audiobook first, then make the subtitles.</string>
+    <string name="sasayaki_subread_needs_book">This book has no EPUB file to send to SubRead.</string>
+    <string name="sasayaki_subread_failed">SubRead did not make the subtitles.</string>
+    <string name="sasayaki_subread_low_match_rate_format">SubRead matched only %1$d%% of the lines. The audiobook and the book can be different editions, or the language can be wrong.</string>
+    <string name="sasayaki_subread_not_installed">SubRead makes the .srt for Sasayaki. It listens to the audiobook and aligns it with the book on this device. Install SubRead, then make the subtitles again.</string>
+    <string name="sasayaki_subread_get">Get SubRead</string>
     <string name="settings_book_cover_wallpaper">Book Cover Lock Screen</string>
     <string name="settings_book_cover_wallpaper_subtitle">Show the current book cover when the device is locked or sleeping</string>
     <string name="book_cover_wallpaper_lock_screen">Update lock screen wallpaper</string>

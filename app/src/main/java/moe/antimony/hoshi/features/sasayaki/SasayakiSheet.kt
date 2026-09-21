@@ -534,6 +534,7 @@ private fun SasayakiResourcesTab(
         }
         SasayakiSubtitleMatchSection(
             dependencies = matchDependencies,
+            playback = player.playback,
             currentMatchData = subtitleMatchData,
             onMatchUpdated = onSubtitleMatchUpdated,
         )
