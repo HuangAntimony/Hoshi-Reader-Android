@@ -3,13 +3,12 @@
 This document tracks open Android work after checking iOS upstream `develop`.
 
 - Source: `reference/Hoshi-Reader-iOS`
-- Baseline for this refresh: `c31c9d0ce376ff83bf6a91d908bf9f8e0fb4947b`
-- Latest checked: `origin/develop` at `42e7b81d441c164c3a446152f4bf2356135d1e82`
-- Checked on: 2026-09-16
-- This refresh advances the reference by 43 reachable commits. The baseline is
-  an ancestor of the new tip; new behavior and earlier open work were checked
-  against current Android code. The older force-update is historical context
-  only (`24e356f` remains classified below).
+- Baseline for this refresh: `42e7b81d441c164c3a446152f4bf2356135d1e82`
+- Latest checked: `origin/develop` at `d24b2fa6e5fc559c7d4032b4db355eecdd669b29`
+- Checked on: 2026-09-21
+- This refresh advances the reference by 4 reachable commits. The baseline is
+  an ancestor of the new tip; new behavior and the remaining popup slice were
+  checked against current Android code.
 
 ## Current Queue
 
@@ -65,17 +64,143 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
+### 2. Sasayaki on-device transcription and match coverage
+
+Status: pending Android sync.
+
+Commits:
+
+- `d24b2fa` - local audio transcription, resumable transcript storage, alignment
+  and character coverage; also changes the source filter used by SRT matching.
+
+Dependency/value reasoning:
+
+- Independent feature. Establish an Android-capable local transcription backend
+  and timed-token contract before persistence, alignment and UI integration.
+  Confirm platform capabilities against official Android/Google documentation
+  during implementation; Apple Speech APIs are not portable.
+
+iOS behavior to mirror:
+
+- On supported iOS 26 devices, choose Subtitles or Transcription and an audio
+  file (MP3/M4B/M4A). Japanese speech-model download, transcription progress,
+  estimated remaining time and alignment state are shown. Pause or leaving the
+  sheet cancels transcription and aligns retained tokens; deleting the active
+  book requests cancellation. Only one transcription task runs at a time.
+- `sasayaki_transcript.json` stores `through`, `duration` and tokens containing
+  `text`, `start`, `end`. Progress checkpoints approximately every 15 seconds;
+  a saved matching duration resumes from `through`. Complete transcripts can be
+  realigned. Clearing transcription requires confirmation and keeps the match.
+- Timed tokens align to normalized book text using anchors and bounded diff
+  blocks, then sentence/segment boundaries produce chapter-relative matches.
+  Timing budgets reject implausible spans and allow short-gap interpolation.
+- Both SRT and transcription source building additionally skip paths containing
+  `toc`, `caution` or `colophon` (case-insensitive). Coverage is summed match
+  lengths divided by the book character count, rather than matched cue count.
+
+Android current gap:
+
+- `SasayakiSubtitleMatchSection.kt` only parses selected SRT files and invokes
+  `SasayakiMatcher.match()`; there is no transcription selector, backend,
+  model-download state, pause/resume flow or transcript-clear action.
+- `SasayakiSidecarModels.kt` and `BookStorage.kt` expose match/playback data but
+  no timed-token transcript model or transcript persistence API.
+- `SasayakiMatcher.match()` filters linear/nav/guide-TOC chapters but lacks the
+  new path exclusions and timed-token alignment/sentence segmentation.
+- `SasayakiModels.matchRateText()` uses `matches.size / (matches.size + unmatched)`;
+  it does not report character coverage. `ReaderSasayakiCues.chapterCuesJson()`
+  already sorts by text offset, so that upstream portion is covered.
+
+Suggested slice:
+
+- Implement a repository-owned local transcription backend and compatible
+  checkpoint storage, then alignment and state-driven localized UI through the
+  existing Sasayaki boundaries. Keep the tested SRT coherent-start/recovery
+  behavior while adding source filtering and character coverage. Android audio
+  access must use the existing SAF/repository path rather than iOS bookmarks.
+
+Validation:
+
+- Generated timed-token fixtures: kana/width/case normalization, ruby, repeated
+  text, punctuation/block boundaries, supplementary characters, chapter/image
+  offsets, excluded paths, partial transcripts and short/implausible gaps.
+- Check unavailable models/devices, download failure, cancellation, leave/reopen,
+  restart/resume, duration mismatch, deletion, clear-with-match-retained and
+  complete-transcript realignment. Recheck SRT multi-volume matching, coverage,
+  Reader cue rendering, playback and Anki audio export without clearing app data.
+
+### 3. Chinese Anki fallback label
+
+Status: pending Android sync.
+
+Commits:
+
+- `8ccade5` - Simplified Chinese localization updates.
+
+Dependency/value reasoning:
+
+- Small independent localization correction; no dependency on transcription.
+
+iOS behavior to mirror:
+
+- The fallback label translates its descriptive suffix while retaining the
+  literal `{selected-glossary}` handlebar.
+
+Android current gap:
+
+- `values-zh-rCN/strings.xml` still defines `anki_selected_glossary_fallback`
+  as `{selected-glossary} Fallback`, identical to the English resource.
+  Other inspected Anki, dictionary, Reader and statistics labels already have
+  Chinese resources; different established terminology is not a missing feature.
+
+Suggested slice:
+
+- Translate the suffix, preserve the literal handlebar and resource parity,
+  and align the existing Anki label validation guidance with the localized text.
+
+Validation:
+
+- Localization resource tests and lint; check Anki Advanced in both languages
+  and verify that braces remain literal rather than interpreted markup.
+
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
+| `d24b2fa` | 2026-09-20 | On-device transcription and matching updates | Pending transcript/backend/alignment/UI, source exclusions and character coverage (2); cue ordering covered |
+| `8ccade5` | 2026-09-17 | Simplified Chinese localization | Pending Anki fallback-label suffix only (3); two-column copy belongs to (1) |
 
 ## Suggested Implementation Order
 
-1. Popup layout/CSS isolation (1).
+1. Popup layout/CSS isolation (1): shared lookup presentation and settings.
+2. Chinese Anki fallback label (3): small independent correction.
+3. Sasayaki transcription (2): backend/token contract first, then persistence,
+   alignment and UI; no dependency on the other slices.
 
 ## Covered Or No Android Action
+
+- `02ed801`: no demonstrated Android-visible gap. In paginated mode,
+  `ReaderContentStyles.kt` uses border-box sizing: the font-size addition to
+  page height is balanced by the same addition to bottom padding, so it does
+  not itself establish an extra visible blank strip. `reader-paginated.js`
+  uses the corresponding internal page height for page steps. Continuous mode
+  uses actual viewport height and ordinary padding; VN uses the separate
+  visible-height stage. The retained `hanging-punctuation` CSS declaration is
+  not evidence of working Chromium punctuation hanging. Do not remove this
+  coupled geometry solely to mirror the WKWebView change without demonstrating
+  an Android behavior difference.
+
+- `15aadf0`: `reader-paginated.js` already appends its trailing spacer
+  unconditionally, including zero vertical padding. Its Android-specific zero
+  physical width is intentional.
+- `d24b2fa` (cue ordering): `ReaderSasayakiCues.chapterCuesJson()` already
+  sorts chapter ranges by `start` before serializing them to the Reader.
+- `8ccade5` (remaining localization): Android Chinese resources already cover
+  the inspected statistics/archive, furigana, search, frequency sorting, Anki
+  format and stroke-font controls. The iOS string-table routing fix has no
+  Android analogue. New two-column help text belongs with slice 1; the remaining
+  untranslated fallback-label suffix is tracked in slice 3.
 
 - `bdf71a6`: shared Reader CSS no longer overrides WebKit line-box containment,
   matching upstream default line-box sizing. The obsolete JVM assertion that
