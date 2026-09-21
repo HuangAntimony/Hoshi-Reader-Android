@@ -693,9 +693,13 @@ Validate relevant dictionary/audio changes with:
   and the last format cannot be deleted. Confirming a deck/model fetch resets
   every format mapping while retaining IDs, names, icons, and tags.
 - Duplicate-note search through AnkiConnect `guiBrowse` and the AnkiDroid card
-  browser deep link for collection, deck, and deck-root scopes, including the
+  browser Intent for collection, deck, and deck-root scopes, including the
   all-models option and the global hide-search-button setting. Confirm the
   search button is absent when duplicate checking reports no matching note.
+  First select an unrelated deck in AnkiDroid, then open a matching note from
+  Hoshi: results must honor Hoshi’s scope without prompting to search all decks.
+  Do not combine a URI `search` parameter with the Intent extras: AnkiDroid
+  prioritizes the URI and retains its previous deck filter.
 - Exact cloze output for repeated matches, incorrect stored offsets, and
   supplementary-plane characters; selected-glossary fallback `None`,
   `{glossary-first}`, monolingual, bilingual, and both category fallback

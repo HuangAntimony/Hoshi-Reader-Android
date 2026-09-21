@@ -156,6 +156,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Open matching AnkiDroid cards even when its browser previously selected a
+  different deck, while preserving the configured duplicate-search scope.
+
 - Show each failed dictionary import with its filename and reason, while
   continuing other files in the batch.
 
