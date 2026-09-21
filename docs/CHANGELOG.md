@@ -81,6 +81,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Let Reader use the WebView default line-box sizing, matching current iOS
+  reading styles.
+
 - Automatic dictionary updates always use low-memory import; manual imports
   and updates continue to follow the Low Memory Usage Mode setting.
 

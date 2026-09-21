@@ -12,9 +12,6 @@ __HOSHI_PARAGRAPH_SPACING_CSS__
     --hoshi-sasayaki-text-color: __HOSHI_SASAYAKI_TEXT_COLOR__;
     --hoshi-sasayaki-background-color: __HOSHI_SASAYAKI_BACKGROUND_COLOR__;
 }
-html {
-    -webkit-line-box-contain: block glyphs replaced;
-}
 __HOSHI_LAYOUT_CSS__
 img.block-img {
     max-width: var(--hoshi-image-max-width, __HOSHI_IMAGE_MAX_WIDTH_FALLBACK__) !important;

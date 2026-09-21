@@ -727,7 +727,6 @@ class ReaderSettingsTest {
     fun readerCssIncludesIosWebKitSelectionAndSizingRules() {
         val css = ReaderContentStyles.styleTag()
 
-        assertTrue(css.contains("-webkit-line-box-contain: block glyphs replaced;"))
         assertTrue(css.contains("-webkit-text-size-adjust: none !important;"))
         assertTrue(css.contains("ruby > rt, ruby > rp"))
         assertTrue(css.contains("-webkit-user-select: none;"))

@@ -248,6 +248,9 @@ Manual reader validation should cover:
 
 - cover image pages and multi-image illustration pages.
 - paginated, continuous, and VN modes in vertical and horizontal writing.
+  Check default and enlarged line heights with ruby and inline images: glyphs,
+  readings, and images must remain visible without overlapping adjacent lines;
+  page/scroll progress and restoring the same passage must remain stable.
 - VN block and sentence screens, reveal speed 0/45/120, blank-area click
   advance, text lookup taps, links, images, restore, and chapter boundaries.
 - VN cross-screen lookup with a word split at the current-screen boundary:

@@ -65,52 +65,21 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Reader WebView line-box CSS parity
-
-Status: pending Android sync.
-
-Commits:
-
-- `bdf71a6` - remove the WebKit line-box property.
-
-Dependency/value reasoning:
-
-- Small independent layout parity change, but it needs device validation across
-  writing modes and replaced elements.
-
-iOS behavior to mirror:
-
-- Reader CSS no longer sets
-  `-webkit-line-box-contain: block glyphs replaced;`.
-
-Android current gap:
-
-- `app/src/main/assets/hoshi-web/reader/reader.css` still sets the property and
-  `ReaderSettingsTest` explicitly preserves it.
-
-Suggested slice:
-
-- Compare Android WebView layout, remove the retained declaration, and replace
-  the source-string preservation assertion with meaningful layout coverage.
-
-Validation:
-
-- Paginated/continuous horizontal and vertical writing, ruby, cover and
-  multi-image pages, line height, progress, and restore.
-
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
-| `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1).
-2. Reader line-box CSS parity (2).
 
 ## Covered Or No Android Action
+
+- `bdf71a6`: shared Reader CSS no longer overrides WebKit line-box containment,
+  matching upstream default line-box sizing. The obsolete JVM assertion that
+  required the declaration is removed; Reader layout is checked in WebView.
 
 - `7dd3f49` (automatic updates): `DictionaryUpdateService` always enables
   low-RAM import for `AutoUpdate`; manual imports and updates retain the user's
