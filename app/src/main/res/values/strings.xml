@@ -108,7 +108,7 @@
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profiles</string>
     <string name="settings_display">Theme</string>
-    <string name="settings_appearance">Reading Settings</string>
+    <string name="settings_appearance">Appearance</string>
     <string name="settings_behavior">Behavior</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_report_issue">Report an Issue</string>
@@ -839,5 +839,5 @@
     <string name="display_settings_eink_mode">E-ink Optimization</string>
     <string name="display_settings_eink_appearance">E-ink Appearance</string>
     <string name="display_settings_eink_explanation">E-ink optimization uses a black-and-white palette. Turning it off restores your saved palette and accent color.</string>
-    <string name="reader_settings_profile_title">Reading Settings · %1$s</string>
+    <string name="reader_settings_profile_title">Appearance · %1$s</string>
 </resources>

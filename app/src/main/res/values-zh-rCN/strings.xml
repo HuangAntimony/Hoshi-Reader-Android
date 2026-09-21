@@ -108,7 +108,7 @@
     <string name="settings_anki">Anki</string>
     <string name="settings_profiles" comment="Settings row label, intentionally matching the Profiles screen title.">Profile</string>
     <string name="settings_display">主题</string>
-    <string name="settings_appearance">阅读设置</string>
+    <string name="settings_appearance">外观</string>
     <string name="settings_behavior">行为</string>
     <string name="settings_advanced">高级</string>
     <string name="settings_report_issue">反馈问题</string>
@@ -837,5 +837,5 @@
     <string name="display_settings_eink_mode">墨水屏优化</string>
     <string name="display_settings_eink_appearance">墨水屏明暗</string>
     <string name="display_settings_eink_explanation">墨水屏优化期间使用黑白配色。关闭后恢复已保存的配色和强调色。</string>
-    <string name="reader_settings_profile_title">阅读设置 · %1$s</string>
+    <string name="reader_settings_profile_title">外观 · %1$s</string>
 </resources>
