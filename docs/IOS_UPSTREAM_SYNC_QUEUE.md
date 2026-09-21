@@ -112,46 +112,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 3. Reader navigation and options toolbar
-
-Status: partial Android implementation; remaining visual/interaction parity.
-
-Commits: `42e7b81`.
-
-Dependency/value reasoning:
-
-- Builds on existing Compose chrome/settings and always-available statistics;
-  UIKit itself is not an Android implementation target.
-
-iOS behavior to mirror:
-
-- A top navigation title/subtitle and bottom Close, centered information and
-  Options menu replace individual sheet buttons. Options contains Appearance,
-  Contents, Statistics and eligible Sasayaki. Focus hides both bars while
-  configured tracking/playback/history controls remain in the top safe strip.
-  Continuous content reserves navigation/toolbar insets without covering text.
-
-Android current gap:
-
-- `ReaderWebViewChrome.kt.ReaderBottomChrome` still exposes separate Appearance,
-  Contents, Statistics and Sasayaki buttons rather than the Options menu and
-  centered toolbar information. The current title/progress bubble layout also
-  differs from the navigation title/subtitle in `ReaderViewController.swift`.
-- `ReaderChrome.kt` already owns focus visibility and content insets; keep those
-  boundaries and adapt their final dimensions/state for the new arrangement.
-
-Suggested slice:
-
-- Mirror the final actions and information placement with Compose/Material 3,
-  reuse close/focus/menu state and verify continuous-mode inset handling.
-
-Validation:
-
-- Title/progress/statistics combinations, Close and Android Back, menu sheet
-  routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
-  continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
-
-### 4. Reader WebView line-box CSS parity
+### 3. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -184,38 +145,6 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 5. App accent and stroke-order font attribution
-
-Status: pending Android sync.
-
-Commits: `bd21e24`, `8024df1` (font attribution only).
-
-Dependency/value reasoning:
-
-- Independent small UI slices; accent must preserve Android dark/e-ink contrast.
-  Attribute the font Android already offers, without adding unused SwiftLAME.
-
-iOS behavior to mirror:
-
-- Use the new blue accent (Display-P3 components 0.523/0.668/0.904) and expose
-  Kanji Stroke Order Font source/BSD-3 attribution in About.
-
-Android current gap:
-
-- `Theme.kt`/`Color.kt` still use default purple Material accent colors.
-  `AboutView.kt` has no stroke-order font source/license entry, although
-  `KanjiStrokeOrderFontInstaller` offers that font for download.
-
-Suggested slice:
-
-- Choose a color-managed equivalent in the Android palette and add localized
-  source/license UI using the existing About surface.
-
-Validation:
-
-- Ordinary app controls in light/dark/custom and pure e-ink themes; About links
-  and font license text in English/Chinese.
-
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
@@ -224,18 +153,27 @@ Validation:
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
 | `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
-| `42e7b81` | 2026-09-14 | Reader navigation/options toolbar | Pending final Compose action/information layout |
-| `bd21e24`, `8024df1` | 2026-08-09 / 08-22 | Blue accent and font attribution | Pending palette/About UI |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1).
 2. Native frequency options/import diagnostics, then settings and automatic
    low-RAM update policy (2).
-3. Reader navigation/options toolbar (3), building on available statistics.
-4. Reader line-box CSS parity (4), app accent and font attribution (5).
+3. Reader line-box CSS parity (3).
 
 ## Covered Or No Android Action
+
+- `bd21e24`, `8024df1` (stroke-order font attribution): excluded from Android
+  sync at the project owner's request. Android retains its dynamic/custom/E-ink
+  color choices; changing the fallback accent and adding the font attribution
+  to About are not planned.
+
+- `42e7b81`: iOS replaces custom SwiftUI Reader overlays with UIKit navigation
+  and toolbar controls; the options menu and centered reading information
+  already existed before this commit. Android `ReaderBottomChrome` and
+  `ReaderMenuCard` already provide those controls, while `ReaderChrome.kt` owns
+  focus visibility and content insets. No concrete Android behavior gap is
+  established by this platform implementation change.
 
 - `b7f09ca` (search portion): `ReaderSearchEngine` matches literal paragraph text
   case-insensitively with sentence/bracket-aware snippets and a 100-hit cap.
