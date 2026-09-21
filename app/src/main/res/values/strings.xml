@@ -852,4 +852,7 @@
     <string name="dictionary_import_index_error">The dictionary index is missing or invalid.</string>
     <string name="dictionary_import_contents_error">No supported dictionary entries were found.</string>
     <string name="dictionary_import_io_error">Could not read or save the dictionary files.</string>
+    <string name="audio_source_jpod101" translatable="false">JapanesePod101</string>
+    <string name="audio_source_language_pod101" translatable="false">LanguagePod101</string>
+    <string name="audio_source_jisho" translatable="false">Jisho</string>
 </resources>

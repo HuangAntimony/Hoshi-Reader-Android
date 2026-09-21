@@ -7,14 +7,14 @@ import org.junit.Test
 
 class AudioSettingsTest {
     @Test
-    fun defaultSettingsMatchIosAudioDefaults() {
+    fun defaultSettingsUseYomitanSourcesAndIosPlaybackDefaults() {
         val settings = AudioSettings()
 
-        assertEquals(listOf(AudioSettings.DefaultAudioSource), settings.audioSources)
+        assertEquals(AudioSettings.DefaultAudioSources, settings.audioSources)
         assertFalse(settings.enableLocalAudio)
         assertFalse(settings.enableAutoplay)
         assertEquals(AudioPlaybackMode.Interrupt, settings.playbackMode)
-        assertEquals(listOf(AudioSettings.DefaultAudioSource.url), settings.enabledAudioSourceUrls)
+        assertEquals(AudioSettings.DefaultAudioSources.map { it.url }, settings.enabledAudioSourceUrls)
     }
 
     @Test
@@ -41,10 +41,7 @@ class AudioSettingsTest {
         val settings = AudioSettings()
             .withLocalAudioEnabled(true)
             .copy(
-                audioSources = listOf(
-                    AudioSettings.LocalAudioSource.copy(isEnabled = false),
-                    AudioSettings.DefaultAudioSource,
-                ),
+                audioSources = listOf(AudioSettings.LocalAudioSource.copy(isEnabled = false)) + AudioSettings.DefaultAudioSources,
             )
             .withLocalAudioEnabled(false)
 
@@ -68,11 +65,11 @@ class AudioSettingsTest {
         val settings = AudioSettings().addSource(
             AudioSource(
                 name = "Default Copy",
-                url = AudioSettings.DefaultAudioSource.url,
+                url = AudioSettings.DefaultAudioSources.first().url,
             ),
         )
 
-        assertEquals(listOf(AudioSettings.DefaultAudioSource), settings.audioSources)
+        assertEquals(AudioSettings.DefaultAudioSources, settings.audioSources)
     }
 
     @Test
@@ -100,11 +97,11 @@ class AudioSettingsTest {
             name = "Ankiconnect Android",
             url = AudioSettings.LocalAudioUrl,
         )
-        val settings = AudioSettings(audioSources = listOf(AudioSettings.LocalAudioSource, AudioSettings.DefaultAudioSource, external))
+        val settings = AudioSettings(audioSources = listOf(AudioSettings.LocalAudioSource) + AudioSettings.DefaultAudioSources + external)
             .copy(enableLocalAudio = true)
             .withLocalAudioEnabled(false)
 
         assertFalse(settings.enableLocalAudio)
-        assertEquals(listOf(AudioSettings.DefaultAudioSource, external), settings.audioSources)
+        assertEquals(AudioSettings.DefaultAudioSources + external, settings.audioSources)
     }
 }

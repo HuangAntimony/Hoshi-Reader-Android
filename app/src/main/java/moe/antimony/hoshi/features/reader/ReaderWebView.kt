@@ -65,9 +65,8 @@ import moe.antimony.hoshi.epub.ReaderHighlight
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
-import moe.antimony.hoshi.features.audio.AudioRequestHandler
 import moe.antimony.hoshi.features.audio.AudioSettings
-import moe.antimony.hoshi.features.audio.LocalAudioRepository
+import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
@@ -236,6 +235,8 @@ fun ReaderWebView(
     val popupContentLanguageProfile = contentLanguageProfile
     val progressDisplay = readerProgressDisplay(contentLanguageProfile)
     val noAudioFoundText = stringResource(R.string.audio_no_audio_found)
+    val audioLoadingText = stringResource(R.string.loading)
+    val popupAudioSettings = audioSettings.withLocalizedSourceNames()
     val readerPopupIframeDocument = remember(
         dictionaryStyles,
         dictionarySettings,
@@ -246,13 +247,14 @@ fun ReaderWebView(
         effectiveSettings.popupReducedMotionSwipeThreshold,
         popupDarkMode,
         effectiveSettings.eInkMode,
-        audioSettings,
+        popupAudioSettings,
         ankiUiState.popupSettings,
         fontManager,
         fontLibraryState.revision,
         effectiveSettings.popupScale,
         popupContentLanguageProfile,
         noAudioFoundText,
+        audioLoadingText,
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
@@ -265,8 +267,9 @@ fun ReaderWebView(
             reducedMotionSwipeThreshold = effectiveSettings.popupReducedMotionSwipeThreshold,
             darkMode = popupDarkMode,
             eInkMode = effectiveSettings.eInkMode,
-            audioSettings = audioSettings,
+            audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
+            audioLoadingText = audioLoadingText,
             ankiSettings = ankiUiState.popupSettings,
             fontFaceCss = fontManager.popupFontFaceCss(),
             popupScale = effectiveSettings.popupScale,
@@ -296,7 +299,7 @@ fun ReaderWebView(
             context = context.applicationContext,
             assets = popupAssets,
             fontManager = fontManager,
-            audioRequestHandler = AudioRequestHandler(LocalAudioRepository.fromContext(context.applicationContext)),
+            audioRequestHandler = appContainer.audioRequestHandler,
             imageRequestHandler = DictionaryImageRequestHandler(dictionaryRepository::dictionaryMedia),
             iframeDocument = { currentReaderPopupIframeDocument.value },
         )

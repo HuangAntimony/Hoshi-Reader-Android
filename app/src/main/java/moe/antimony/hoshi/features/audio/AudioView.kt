@@ -451,7 +451,7 @@ private fun AudioSourceRow(
 ) {
     ListItem(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(source.name, maxLines = 1) },
+        headlineContent = { Text(audioSourceName(source), maxLines = 1) },
         supportingContent = {
             if (!source.isDefault && !source.isBuiltInLocalAudioSource) {
                 Text(source.url, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -850,4 +850,7 @@
     <string name="dictionary_import_index_error">辞典索引缺失或无效。</string>
     <string name="dictionary_import_contents_error">未找到支持的辞典条目。</string>
     <string name="dictionary_import_io_error">无法读取或保存辞典文件。</string>
+    <string name="audio_source_jpod101" translatable="false">JapanesePod101</string>
+    <string name="audio_source_language_pod101" translatable="false">LanguagePod101</string>
+    <string name="audio_source_jisho" translatable="false">Jisho</string>
 </resources>

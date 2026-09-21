@@ -81,6 +81,20 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Use JapanesePod101, LanguagePod101, and Jisho as the default word-audio
+  sources, matching Yomitan's Japanese defaults. Each source can be enabled
+  and reordered independently; existing default sources migrate in place and
+  retain their enabled state, while custom sources stay unchanged. Default
+  playback and mining use the first matching source immediately, without
+  waiting for later remote sources when local audio is available. The recording
+  menu opens immediately, loads sources concurrently, and lets you select
+  available recordings while other sources are still loading. Scrolling inside
+  the menu has no overscroll stretch and never scrolls the definitions
+  underneath, including at either end
+  and when the menu has too few recordings to scroll. Long menus fit above
+  or below the playback button without covering it, scrolling internally
+  when the popup is short.
+
 - Remove the Anki Advanced “Embed media” switch; dictionary images now always
   export to Anki as media files, including when the old setting was disabled.
 

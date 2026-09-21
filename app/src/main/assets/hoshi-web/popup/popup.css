@@ -211,6 +211,7 @@ button.button-slot:disabled {
     max-width: min(280px, calc(100vw - 16px));
     max-height: calc(100vh - 16px);
     overflow-y: auto;
+    overscroll-behavior: none;
     padding: 4px;
     border: 1px solid rgba(60, 60, 67, 0.24);
     border-radius: 8px;

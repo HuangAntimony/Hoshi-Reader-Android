@@ -30,7 +30,7 @@ class AudioSettingsRepositoryTest {
     fun migratesLegacySharedPreferencesSettingsOnceAndNormalizesLocalSource() = runBlocking {
         val legacy = FakeLegacyAudioSettingsSource(
             AudioSettings(
-                audioSources = listOf(AudioSettings.DefaultAudioSource),
+                audioSources = AudioSettings.DefaultAudioSources,
                 enableLocalAudio = true,
                 enableAutoplay = true,
                 playbackMode = AudioPlaybackMode.Duck,
@@ -64,7 +64,7 @@ class AudioSettingsRepositoryTest {
         repository().use { repository ->
             repository.update {
                 AudioSettings(
-                    audioSources = listOf(AudioSettings.LocalAudioSource, AudioSettings.DefaultAudioSource, custom),
+                    audioSources = listOf(AudioSettings.LocalAudioSource) + AudioSettings.DefaultAudioSources + custom,
                     enableLocalAudio = false,
                     enableAutoplay = true,
                     playbackMode = AudioPlaybackMode.Mix,
@@ -75,7 +75,7 @@ class AudioSettingsRepositoryTest {
 
             assertFalse(saved.enableLocalAudio)
             assertFalse(saved.audioSources.any { it.url == AudioSettings.LocalAudioSource.url })
-            assertEquals(listOf(AudioSettings.DefaultAudioSource, custom), saved.audioSources)
+            assertEquals(AudioSettings.DefaultAudioSources + custom, saved.audioSources)
             assertTrue(saved.enableAutoplay)
             assertEquals(AudioPlaybackMode.Mix, saved.playbackMode)
         }

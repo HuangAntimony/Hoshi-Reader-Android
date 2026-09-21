@@ -569,6 +569,50 @@ Validate relevant dictionary/audio changes with:
   but disabled afterward. Confirm a failed or interrupted download leaves no
   partial font and restores the enabled action, then verify numbered strokes in
   Reader, Dictionary, and Process Text Kanji popups.
+- local-first audio latency: with an enabled local source before slow or
+  unreachable remote sources, default playback/autoplay and mining must use
+  the local recording without requesting later sources. Opening the full
+  recording menu may load remote candidates, but must not block concurrent
+  default playback. Verify empty earlier sources still fall through in order.
+  Long-press with delayed sources: the menu must appear with localized loading
+  rows immediately, start all enabled sources concurrently, and make each
+  completed source selectable in configured order. Select a later source while
+  an earlier source is pending and verify playback/mining share its URL, even
+  if autoplay or mining began before that selection. Concurrent default mining
+  must not cancel a requested playback. Close
+  or reset the popup during loading; late results must not reopen its menu.
+  With definitions already scrolled, swipe inside the recording menu at its
+  top/bottom and with too few rows to overflow: definitions must stay still,
+  and the menu must not stretch or glow from overscroll.
+  With overflowing rows, internal menu scrolling must still work; after
+  dismissal, definitions must scroll normally again. In a short bottom popup,
+  open a long recording list: it must fit above or below the audio button
+  without covering it, including as delayed candidates arrive. Repeat with
+  the trigger near the bottom and popup scales 0.8, 1, and 2.
+- default remote word audio: new settings list JapanesePod101, LanguagePod101,
+  then Jisho. Upgrade from an enabled and a disabled old built-in proxy source;
+  verify in-place expansion, retained custom/local sources and ordering, and
+  persistence after restart. Existing custom entries using the old proxy URL
+  must remain custom entries. Disable/reorder the new sources and verify
+  playback and the candidate menu in Reader (all modes), Dictionary, Process
+  Text, and recursive popups. Check kanji with reading and kana-only queries,
+  a missing JapanesePod101 recording falling through to later sources, and all
+  sources unavailable. Select a Jisho/LanguagePod101 candidate and verify Anki
+  exports that recording; JapanesePod101's `audiomp3.php` URL must export as MP3,
+  never as PHP or the known placeholder recording. Use deterministic HTTP/HTML
+  fixtures in JVM tests; live service availability is a separate manual check.
+  `AnkiRemoteAudioDeviceTest` is an opt-in live test for all three sources and
+  actual AnkiDroid MP3 export. It requires initialized AnkiDroid with Hoshi's
+  existing database-access grant, uses in-memory settings, and deletes only
+  its three uniquely named notes in `finally`. Exported content-addressed media
+  can remain in Anki's media collection. AnkiDroid may append filename suffixes;
+  validate saved sound references and extensions rather than exact filenames.
+  Build/install the test APK with the
+  same data-preserving commands as `AnkiTagsDeviceTest` below, then run:
+
+  ```bash
+  adb shell am instrument -w -e class moe.antimony.hoshi.features.anki.AnkiRemoteAudioDeviceTest -e ankiRemoteAudioSmoke true moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner
+  ```
 - local audio database source ordering and per-source enable controls with
   imported MP3 and Opus `android.db` files. Disable the highest-priority source
   and confirm lookup playback and Anki audio export use the next enabled source;
