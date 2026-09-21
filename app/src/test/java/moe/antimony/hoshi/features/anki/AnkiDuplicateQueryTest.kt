@@ -14,6 +14,24 @@ class AnkiDuplicateQueryTest {
     }
 
     @Test
+    fun checksumMatchesAnkiNfcForCompatibilityKanji() {
+        // U+FA68 is canonically equivalent to U+96E3, which Anki stores by default.
+        assertEquals(2620585645L, ankiFirstFieldChecksum("あり\uFA68い"))
+        assertEquals(2620585645L, ankiFirstFieldChecksum("<b>あり\uFA68い</b>"))
+    }
+
+    @Test
+    fun checksumMatchesAnkiNfcForDecomposedDakuten() {
+        assertEquals(ankiFirstFieldChecksum("が"), ankiFirstFieldChecksum("か\u3099"))
+    }
+
+    @Test
+    fun checksumDoesNotFoldCompatibilityOnlyDifferences() {
+        assertFalse(ankiFirstFieldChecksum("Ａ") == ankiFirstFieldChecksum("A"))
+        assertFalse(ankiFirstFieldChecksum("ｶﾞ") == ankiFirstFieldChecksum("ガ"))
+    }
+
+    @Test
     fun duplicateSelectionIncludesModelUnlessCheckingAllModels() {
         val scoped = ankiDuplicateNoteSelection(modelId = 7L, checksum = 1234L, checkAllModels = false)
         val allModels = ankiDuplicateNoteSelection(modelId = 7L, checksum = 1234L, checkAllModels = true)

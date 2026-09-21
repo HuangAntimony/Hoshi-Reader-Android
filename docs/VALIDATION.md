@@ -700,6 +700,10 @@ Validate relevant dictionary/audio changes with:
   Hoshi: results must honor Hoshi’s scope without prompting to search all decks.
   Do not combine a URI `search` parameter with the Intent extras: AnkiDroid
   prioritizes the URI and retains its previous deck filter.
+  With an existing `あり難い` note, verify the `あり難い` dictionary result also
+  shows the duplicate icon and disables mining when duplicates are disallowed.
+  AnkiDroid first-field checksums must follow Anki’s NFC normalization before
+  HTML stripping; do not use NFKC, which would also fold full-width/half-width forms.
 - Exact cloze output for repeated matches, incorrect stored offsets, and
   supplementary-plane characters; selected-glossary fallback `None`,
   `{glossary-first}`, monolingual, bilingual, and both category fallback

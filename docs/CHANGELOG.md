@@ -156,6 +156,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Recognize existing AnkiDroid cards for canonically equivalent Unicode spellings,
+  including compatibility kanji such as `難` and decomposed kana, so mined words
+  correctly show the existing-card icon and cannot bypass duplicate checking.
+
 - Open matching AnkiDroid cards even when its browser previously selected a
   different deck, while preserving the configured duplicate-search scope.
 
