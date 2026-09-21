@@ -92,6 +92,11 @@ node --test app/src/test/js/*.test.mjs
   switch tabs while on B, repeat after a child lookup, and start a fresh search
   to verify old history is cleared. `DictionarySearchSessionTest` checks WebView
   session retention with in-memory pages without changing installed app data.
+  Record the Settings-to-Dictionary transition and inspect the first visible
+  frames for blank results. Check external lookup followed by Settings does not
+  show a keyboard on Settings; repeated Dictionary selection still focuses search.
+  `RetainedTabContentTest` checks that inactive content remains attached, has a
+  CREATED lifecycle, and cannot consume another tab's Back action.
 
 - Book search: verify literal spaces/punctuation, case-insensitive matches,
   paragraph/`br` boundaries, ruby exclusion, complete bracketed sentence

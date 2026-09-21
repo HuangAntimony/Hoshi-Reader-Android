@@ -74,6 +74,7 @@ import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
@@ -175,6 +176,7 @@ internal fun dictionarySearchPopupOptions(
 @Composable
 internal fun DictionarySearchView(
     session: DictionarySearchSession,
+    isActive: Boolean,
     readerSettings: ReaderSettings,
     focusRequestKey: Int = 0,
     pendingLookupRequest: PendingDictionaryLookupRequest? = null,
@@ -328,6 +330,19 @@ internal fun DictionarySearchView(
     }
     fun requestSearchFocus() {
         localFocusRequestKey += 1
+    }
+    LifecycleResumeEffect(iframeHostWebView) {
+        iframeHostWebView?.onResume()
+        onPauseOrDispose { iframeHostWebView?.onPause() }
+    }
+    LaunchedEffect(isActive) {
+        if (isActive) {
+            requestSearchFocus()
+        } else {
+            suppressAutomaticFocus = false
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
     }
     val runLookup = {
         childHistories = emptyMap()
@@ -671,12 +686,15 @@ internal fun DictionarySearchView(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        // Explicit empty/profile resets must also clear a detached, retained iframe stack.
-        ReaderLookupPopupIframeSync(
-            webView = iframeHostWebView,
-            payloads = iframePayloads,
-            rootHighlight = null,
-        )
+        // Reentry starts before layout: never collapse the retained iframe to a zero-size
+        // placeholder. Empty/profile resets still need to clear its stack immediately.
+        if (iframePayloads.isEmpty() || (viewport.width > 0 && viewport.height > 0 && searchBarBottomDp > 0)) {
+            ReaderLookupPopupIframeSync(
+                webView = iframeHostWebView,
+                payloads = iframePayloads,
+                rootHighlight = null,
+            )
+        }
         if (uiState.hasResults && pullDistancePx > 1f) {
             DictionaryPullResetIndicator(
                 distancePx = pullDistancePx,
@@ -691,7 +709,7 @@ internal fun DictionarySearchView(
             isSearching = uiState.isSearching,
             onQueryChange = searchViewModel::updateQuery,
             onSubmit = runLookup,
-            focusRequestKey = if (suppressAutomaticFocus) {
+            focusRequestKey = if (!isActive || suppressAutomaticFocus) {
                 null
             } else {
                 focusRequestKey to localFocusRequestKey

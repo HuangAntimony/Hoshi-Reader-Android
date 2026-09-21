@@ -160,7 +160,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Fixed
 
 - Keep the current Dictionary result and back/forward history when switching tabs,
-  including after following a definition link and swiping back.
+  including after following a definition link and swiping back. Return to the
+  retained page without briefly blanking the results.
 
 - Recognize existing AnkiDroid cards for canonically equivalent Unicode spellings,
   including compatibility kanji such as `難` and decomposed kana, so mined words

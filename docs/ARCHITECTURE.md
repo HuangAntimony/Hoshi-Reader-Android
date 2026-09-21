@@ -36,7 +36,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   independent Nav3 back stack with its own saveable entry state and per-entry
   ViewModel stores. The shared main navigation chrome is owned by a Nav3 scene
   decorator around top-level root scenes, while Reader and Settings detail
-  routes remain full-screen outside that shell.
+  routes remain full-screen outside that shell. Once visited, the Dictionary
+  NavDisplay stays composed and attached across tab switches to retain its WebView
+  compositor. `RetainedTabContent` leaves it unplaced while inactive and caps its
+  lifecycle at CREATED, disabling hidden back handlers and lifecycle collection.
 - Production dependency injection is Hilt-backed. `HoshiApplication` owns the
   app component through `@HiltAndroidApp`, and Android entry points receive
   dependencies from the Hilt graph.
@@ -365,8 +368,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Dictionary's `DictionarySearchSession` is owned by the AppShell composition.
   It retains the WebView's current DOM, scroll position and JS history across tab
   removal, with root scroll state, child history counts and the bridge callback
-  holder. Reattachment rebinds touch callbacks; detached views are paused and the
-  shell disposes the WebView. Do not put Activity-backed WebViews in ViewModels.
+  holder. Reattachment rebinds touch callbacks; the WebView pauses outside its
+  resumed lifecycle, and the shell disposes it. Nonempty iframe sync waits for
+  measured viewport/header dimensions; empty search/profile resets clear the
+  stack immediately. Inactive search fields cannot request focus or show the
+  keyboard. Do not put Activity-backed WebViews in ViewModels.
 - Built-in remote word audio uses Yomitan's Japanese source order:
   JapanesePod101, LanguagePod101, and Jisho. `BuiltInAudioSource` owns stable
   internal source URLs and resource-backed names. `AudioSettingsRepository`
