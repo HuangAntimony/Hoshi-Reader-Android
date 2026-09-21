@@ -209,9 +209,9 @@ class ReaderSettingsTest {
         assertTrue(css.contains("margin-left: 1.4em !important;"))
         assertFalse(css.contains("margin-top: 1.4em !important;"))
         assertFalse(css.contains("margin-bottom: 1.4em !important;"))
-        assertTrue(css.contains("column-gap: calc(var(--hoshi-vertical-padding-gap, 8vh) + 28px);"))
+        assertTrue(css.contains("column-gap: var(--hoshi-vertical-padding-gap, 8vh);"))
         assertTrue(css.contains("padding: var(--hoshi-vertical-padding-block, 4.0vh) 6.0vw !important;"))
-        assertTrue(css.contains("padding-bottom: calc(var(--hoshi-vertical-padding-block, 4.0vh) + 28px) !important;"))
+        assertTrue(css.contains("padding-bottom: var(--hoshi-vertical-padding-block, 4.0vh) !important;"))
     }
 
     @Test
@@ -227,7 +227,7 @@ class ReaderSettingsTest {
             viewportCssHeight = 720,
         )
 
-        assertEquals(742, layout.pageHeightPx)
+        assertEquals(720, layout.pageHeightPx)
         assertEquals(720, layout.visibleHeightPx)
         assertEquals(360, layout.pageWidthPx)
         assertEquals(36.0, layout.verticalPaddingBlockPx, 0.0)
@@ -236,7 +236,7 @@ class ReaderSettingsTest {
         assertEquals(648, layout.imageMaxHeightPx)
 
         val css = layout.cssVariables()
-        assertTrue(css.contains("--page-height: 742px;"))
+        assertTrue(css.contains("--page-height: 720px;"))
         assertTrue(css.contains("--hoshi-reader-visible-height: 720px;"))
         assertTrue(css.contains("--page-width: 360px;"))
         assertTrue(css.contains("--hoshi-vertical-padding-block: 36.0px;"))
@@ -775,7 +775,7 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun visualNovelReaderCssCentersWithinVisibleViewportInsteadOfPageOverlap() {
+    fun visualNovelReaderCssCentersWithinVisibleViewport() {
         val css = ReaderContentStyles.styleTag(
             ReaderSettings(
                 viewMode = ReaderViewMode.VisualNovel,
@@ -803,7 +803,7 @@ class ReaderSettingsTest {
         assertEquals("visible !important", content["overflow"])
         assertEquals("allow-end !important", content["hanging-punctuation"])
         assertEquals("var(--hoshi-image-max-width, 88vw) !important", contentSvg["width"])
-        assertEquals("var(--hoshi-image-max-height, calc(var(--page-height, 100vh) - 28px)) !important", contentSvg["height"])
+        assertEquals("var(--hoshi-image-max-height, var(--page-height, 100vh)) !important", contentSvg["height"])
         assertFalse(content.containsValue("calc(100% - 28px) !important"))
     }
 

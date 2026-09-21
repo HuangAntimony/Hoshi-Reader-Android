@@ -180,16 +180,10 @@ Validation:
 
 ## Covered Or No Android Action
 
-- `02ed801`: no demonstrated Android-visible gap. In paginated mode,
-  `ReaderContentStyles.kt` uses border-box sizing: the font-size addition to
-  page height is balanced by the same addition to bottom padding, so it does
-  not itself establish an extra visible blank strip. `reader-paginated.js`
-  uses the corresponding internal page height for page steps. Continuous mode
-  uses actual viewport height and ordinary padding; VN uses the separate
-  visible-height stage. The retained `hanging-punctuation` CSS declaration is
-  not evidence of working Chromium punctuation hanging. Do not remove this
-  coupled geometry solely to mirror the WKWebView change without demonstrating
-  an Android behavior difference.
+- `02ed801`: Android now uses actual viewport height for paginated CSS and
+  page steps, with ordinary user padding and no font-size overlap compensation.
+  Continuous and VN retain their visible-viewport layout; the unconditional,
+  zero-width Android trailing spacer remains.
 
 - `15aadf0`: `reader-paginated.js` already appends its trailing spacer
   unconditionally, including zero vertical padding. Its Android-specific zero

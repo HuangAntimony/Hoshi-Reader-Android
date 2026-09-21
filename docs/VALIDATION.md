@@ -247,6 +247,11 @@ Manual reader validation should cover:
   on the intended test WebView; do not force-stop the app or clear its data.
 
 - cover image pages and multi-image illustration pages.
+- `ReaderViewportWebViewTest` uses generated content without changing books or
+  preferences to check vertical page height/padding, forward traversal to the
+  last text and end-position restore at zero/nonzero padding and normal/large
+  fonts. Run it via the explicit instrumentation runner with data-preserving
+  APK installation; never use connected Gradle tasks on an existing device.
 - paginated, continuous, and VN modes in vertical and horizontal writing.
   Check default and enlarged line heights with ruby and inline images: glyphs,
   readings, and images must remain visible without overlapping adjacent lines;

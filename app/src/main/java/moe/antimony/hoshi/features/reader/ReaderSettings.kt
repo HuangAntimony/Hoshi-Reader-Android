@@ -152,9 +152,6 @@ data class ReaderSettings(
     val continuousMode: Boolean
         get() = viewMode == ReaderViewMode.Continuous
 
-    val bottomOverlapPx: Int
-        get() = if (verticalWriting) fontSize else 0
-
     val writingModeCss: String
         get() = if (verticalWriting) "vertical-rl" else "horizontal-tb"
 
@@ -181,7 +178,7 @@ data class ReaderSettings(
     val columnGapCss: String
         get() {
             if (verticalWriting) {
-                return "calc(var(--hoshi-vertical-padding-gap, ${verticalPadding}vh) + ${bottomOverlapPx}px)"
+                return "var(--hoshi-vertical-padding-gap, ${verticalPadding}vh)"
             }
             return "${horizontalPadding}vw"
         }
@@ -193,17 +190,13 @@ data class ReaderSettings(
         get() = "$verticalPaddingBlockCss ${(horizontalPadding / 2.0).cssNumber()}vw"
 
     val bottomPaddingCss: String
-        get() = if (verticalWriting && bottomOverlapPx > 0) {
-            "calc($verticalPaddingBlockCss + ${bottomOverlapPx}px)"
-        } else {
-            verticalPaddingBlockCss
-        }
+        get() = verticalPaddingBlockCss
 
     val imageMaxWidthFallbackCss: String
         get() = "${100 - horizontalPadding}vw"
 
     val imageMaxHeightFallbackCss: String
-        get() = "calc(var(--page-height, 100vh) - ${bottomOverlapPx}px)"
+        get() = "var(--page-height, 100vh)"
 
     val trailingSpacerHeightCss: String
         get() = if (verticalWriting) bottomPaddingCss else "0"

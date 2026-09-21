@@ -274,6 +274,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader layout modes are WebView-backed assets for paginated, continuous, and
   VN reading. Kotlin selects the asset, injects typed settings, and keeps
   persisted progress as chapter progress mapped to whole-book character count.
+  Paginated page height and page steps use the visible WebView viewport height;
+  vertical padding and column gaps contain only configured user spacing, with
+  no extra font-size overlap strip.
 - Reader `bookinfo.json` sidecars persist whole-book/spine character counts plus
   optional iOS-compatible TOC fragment offsets and a first-appearance raster
   image inventory. A reader-facts schema version invalidates stale derived

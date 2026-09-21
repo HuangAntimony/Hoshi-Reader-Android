@@ -8,15 +8,14 @@ internal object ReaderLayoutDefaults {
     // Mirrors the first-run iOS ReaderWebView defaults:
     // verticalWriting=true, fontSize=22, horizontalPadding=5, verticalPadding=0.
     const val fontSizePx: Int = 22
-    const val bottomOverlapPx: Int = fontSizePx
     const val imageWidthViewportRatio: Double = 0.95
 
-    const val columnGapCss: String = "calc(0vh + 22px)"
+    const val columnGapCss: String = "0vh"
     const val pagePaddingCss: String = "0vh 2.5vw"
-    const val bottomPaddingCss: String = "calc(0vh + 22px)"
+    const val bottomPaddingCss: String = "0vh"
     const val imageMaxWidthFallbackCss: String = "95vw"
-    const val imageMaxHeightFallbackCss: String = "calc(var(--page-height, 100vh) - 22px)"
-    const val trailingSpacerHeightCss: String = "calc(0vh + 22px)"
+    const val imageMaxHeightFallbackCss: String = "var(--page-height, 100vh)"
+    const val trailingSpacerHeightCss: String = "0vh"
     // The spacer only needs inline height; physical width would allocate a new column in Android WebView.
     const val trailingSpacerWidthCss: String = "0"
 }
