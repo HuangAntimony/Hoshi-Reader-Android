@@ -733,7 +733,8 @@ Validate relevant sync/update/Sasayaki changes with:
   linked audiobook. SubRead must open both files, and the returned subtitles must
   match and play like a selected `.srt`. Check a book without an audiobook, a
   cancel in SubRead, a SubRead failure, and a match rate below 0.8. Uninstall
-  SubRead and confirm the dialog opens the releases page.
+  SubRead and confirm that Install SubRead downloads the APK and opens the
+  installer, and that the other button opens the releases page.
 - Sasayaki highlight rendering changes: on a real WebView, compare unhighlighted
   text and active cues in horizontal/vertical writing with ruby and publisher
   `text-emphasis`. Verify complete glyph edges, ruby, and emphasis marks as well

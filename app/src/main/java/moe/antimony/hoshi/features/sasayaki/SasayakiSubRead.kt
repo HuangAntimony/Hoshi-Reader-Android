@@ -1,10 +1,14 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import android.app.DownloadManager
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
+import kotlinx.coroutines.delay
 import java.io.File
 import java.util.Locale
 
@@ -21,6 +25,10 @@ internal object SubRead {
     const val EXTRA_MATCH_RATE = "space.subread.extra.MATCH_RATE"
     const val EXTRA_ERROR = "space.subread.extra.ERROR"
     const val RELEASES_URL = "https://github.com/equwal/subread-android/releases/latest"
+
+    /** Each SubRead release has the APK under this name also, so the link needs no version. */
+    const val APK_URL = "https://github.com/equwal/subread-android/releases/latest/download/SubRead.apk"
+    const val APK_FILE_NAME = "SubRead.apk"
 
     /** A match rate below this value usually means a different edition or language. */
     const val LOW_MATCH_RATE = 0.8
@@ -121,3 +129,49 @@ private fun sasayakiSubReadAudioUri(context: Context, audio: SasayakiPlaybackSou
 
 private fun sasayakiSubReadFileUri(context: Context, file: File): Uri =
     FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+/** Where the download of the SubRead APK is. */
+internal enum class SasayakiSubReadDownload { Running, Done, Failed }
+
+internal fun sasayakiSubReadDownloadState(downloadManagerStatus: Int?): SasayakiSubReadDownload =
+    when (downloadManagerStatus) {
+        DownloadManager.STATUS_SUCCESSFUL -> SasayakiSubReadDownload.Done
+        DownloadManager.STATUS_PENDING,
+        DownloadManager.STATUS_RUNNING,
+        DownloadManager.STATUS_PAUSED,
+        -> SasayakiSubReadDownload.Running
+        // A download that the user removed from the notification has no row any more.
+        else -> SasayakiSubReadDownload.Failed
+    }
+
+/**
+ * Downloads the SubRead APK with the download manager of the system.
+ * Returns the file, or null when the download failed.
+ */
+internal suspend fun downloadSasayakiSubReadApk(context: Context): File? {
+    val downloads = context.getSystemService(DownloadManager::class.java) ?: return null
+    val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
+    val target = File(directory, SubRead.APK_FILE_NAME)
+    target.delete()
+    val request = DownloadManager.Request(SubRead.APK_URL.toUri())
+        .setTitle("SubRead")
+        .setMimeType("application/vnd.android.package-archive")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+        .setDestinationUri(Uri.fromFile(target))
+    val id = runCatching { downloads.enqueue(request) }.getOrNull() ?: return null
+    while (true) {
+        val status = downloads.query(DownloadManager.Query().setFilterById(id))?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) else null
+        }
+        when (sasayakiSubReadDownloadState(status)) {
+            SasayakiSubReadDownload.Done -> return target.takeIf { it.isFile && it.length() > 0 }
+            SasayakiSubReadDownload.Failed -> {
+                downloads.remove(id)
+                return null
+            }
+            SasayakiSubReadDownload.Running -> delay(DownloadPollMillis)
+        }
+    }
+}
+
+private const val DownloadPollMillis = 500L

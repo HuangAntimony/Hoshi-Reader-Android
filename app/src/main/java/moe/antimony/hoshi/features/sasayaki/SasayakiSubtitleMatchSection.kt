@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.features.update.openDownloadedUpdate
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.importDisplayName
@@ -54,6 +55,8 @@ internal fun SasayakiSubtitleMatchSection(
     var matchUiState by remember { mutableStateOf(SasayakiSubtitleMatchUiState()) }
     var displayedMatch by remember { mutableStateOf(currentMatchData) }
     var showSubReadInstall by remember { mutableStateOf(false) }
+    var subReadDownloading by remember { mutableStateOf(false) }
+    val subReadDownloadFailedMessage = stringResource(R.string.sasayaki_subread_download_failed)
     val selectSrtMessage = stringResource(R.string.sasayaki_select_srt_file)
     val selectedSrtFallback = stringResource(R.string.sasayaki_selected_srt)
     val matchFailedMessage = stringResource(R.string.sasayaki_match_failed)
@@ -241,35 +244,63 @@ internal fun SasayakiSubtitleMatchSection(
     }
 
     if (showSubReadInstall) {
+        fun openSubReadPage() {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, SubRead.RELEASES_URL.toUri())) }
+        }
         SasayakiSubReadInstallDialog(
+            downloading = subReadDownloading,
             onInstall = {
-                showSubReadInstall = false
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, SubRead.RELEASES_URL.toUri()))
+                subReadDownloading = true
+                scope.launch {
+                    val apk = downloadSasayakiSubReadApk(context.applicationContext)
+                    subReadDownloading = false
+                    showSubReadInstall = false
+                    if (apk == null) {
+                        matchUiState = matchUiState.finishMatching(subReadDownloadFailedMessage)
+                        openSubReadPage()
+                    } else {
+                        // The installer of the app update. It asks for the permission to install
+                        // when the user did not give it yet.
+                        openDownloadedUpdate(context, apk)?.let { message ->
+                            matchUiState = matchUiState.finishMatching(message)
+                        }
+                    }
                 }
             },
-            onDismiss = { showSubReadInstall = false },
+            onOpenPage = {
+                showSubReadInstall = false
+                openSubReadPage()
+            },
+            onDismiss = { if (!subReadDownloading) showSubReadInstall = false },
         )
     }
 }
 
 @Composable
 private fun SasayakiSubReadInstallDialog(
+    downloading: Boolean,
     onInstall: () -> Unit,
+    onOpenPage: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.sasayaki_subread)) },
-        text = { Text(stringResource(R.string.sasayaki_subread_not_installed)) },
+        text = {
+            Text(
+                stringResource(
+                    if (downloading) R.string.sasayaki_subread_downloading else R.string.sasayaki_subread_not_installed,
+                ),
+            )
+        },
         confirmButton = {
-            TextButton(onClick = onInstall) {
+            TextButton(enabled = !downloading, onClick = onInstall) {
                 Text(stringResource(R.string.sasayaki_subread_get))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            TextButton(enabled = !downloading, onClick = onOpenPage) {
+                Text(stringResource(R.string.sasayaki_subread_open_page))
             }
         },
     )

@@ -724,8 +724,8 @@
     <string name="sasayaki_selected_srt">已选择 SRT</string>
     <string name="sasayaki_open_srt_failed">无法打开所选 SRT。</string>
     <string name="sasayaki_match_failed">无法匹配有声书字幕。</string>
-    <string name="sasayaki_file">文件</string>
-    <string name="sasayaki_no_file_selected">未选择文件</string>
+    <string name="sasayaki_file">字幕文件</string>
+    <string name="sasayaki_no_file_selected">未选择文件（目前仅支持 .srt）</string>
     <string name="sasayaki_matching">正在匹配...</string>
     <string name="sasayaki_subread_summary">用本有声书和本书生成 .srt</string>
     <string name="sasayaki_subread_action">生成</string>
@@ -734,7 +734,10 @@
     <string name="sasayaki_subread_failed">SubRead 未能生成字幕。</string>
     <string name="sasayaki_subread_low_match_rate_format">SubRead 只匹配了 %1$d%% 的字幕行。有声书和本书可能是不同版本，或者语言不对。</string>
     <string name="sasayaki_subread_not_installed">SubRead 为有声书生成 .srt。它在本机上把有声书和本书对齐。请先安装 SubRead，然后再生成字幕。</string>
-    <string name="sasayaki_subread_get">获取 SubRead</string>
+    <string name="sasayaki_subread_downloading">正在下载 SubRead（约 55 MB）。下载完成后，Android 会请你确认安装。</string>
+    <string name="sasayaki_subread_download_failed">SubRead 下载失败，改为打开下载页面。</string>
+    <string name="sasayaki_subread_open_page">打开下载页面</string>
+    <string name="sasayaki_subread_get">安装 SubRead</string>
     <string name="settings_book_cover_wallpaper">书籍封面锁屏</string>
     <string name="settings_book_cover_wallpaper_subtitle">锁屏或休眠时显示当前书籍封面</string>
     <string name="book_cover_wallpaper_lock_screen">更新锁屏壁纸</string>

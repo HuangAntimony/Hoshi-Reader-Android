@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import android.app.DownloadManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -104,5 +105,16 @@ class SasayakiSubReadTest {
         assertFalse(sasayakiSubReadMatchRateIsLow(Double.NaN))
     }
 
-    private val privateAudio = SasayakiPlaybackSource.PrivateFile(File("Sasayaki/sasayaki_audio.m4b"))
+    @Test
+    fun aDownloadWithNoRowAnyMoreHasFailed() {
+        assertEquals(SasayakiSubReadDownload.Done, sasayakiSubReadDownloadState(DownloadManager.STATUS_SUCCESSFUL))
+        assertEquals(SasayakiSubReadDownload.Running, sasayakiSubReadDownloadState(DownloadManager.STATUS_PENDING))
+        assertEquals(SasayakiSubReadDownload.Running, sasayakiSubReadDownloadState(DownloadManager.STATUS_RUNNING))
+        assertEquals(SasayakiSubReadDownload.Running, sasayakiSubReadDownloadState(DownloadManager.STATUS_PAUSED))
+        assertEquals(SasayakiSubReadDownload.Failed, sasayakiSubReadDownloadState(DownloadManager.STATUS_FAILED))
+        // The user removed the download from the notification: the wait must end.
+        assertEquals(SasayakiSubReadDownload.Failed, sasayakiSubReadDownloadState(null))
+    }
+
+    private val privateAudio =SasayakiPlaybackSource.PrivateFile(File("Sasayaki/sasayaki_audio.m4b"))
 }
