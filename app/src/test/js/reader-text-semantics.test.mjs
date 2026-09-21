@@ -90,3 +90,14 @@ test('Sasayaki punctuation whitelist handles every specified character', () => {
         assert.equal(index.range(1, 1).start, 2, char);
     }
 });
+
+test('search ranges include interior punctuation only and count supplementary characters once', () => {
+    const semantics = loadTextSemantics();
+    const entries = [{ text: '前「𠮟 ' }, { text: '、猫。」後' }];
+    const range = semantics.searchRawRange(entries, 1, 2);
+    assert.equal(range.start, 2);
+    assert.equal(range.end, 6);
+    for (const [start, length] of [[-1, 1], [1, 0], [1, -1], [0, 5], [1.5, 1]]) {
+        assert.equal(semantics.searchRawRange(entries, start, length), null);
+    }
+});

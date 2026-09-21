@@ -278,6 +278,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   content stream and uses the range map only for screen projection. Batch
   wrapping refreshes node offsets after each highlight so overlapping ranges
   remain projectable after a screen rebuild.
+- Book search keeps literal paragraph display text with a UTF-16 boundary map
+  to normalized code-point positions. Result jumps queue a chapter-local range
+  through the existing restore epoch; temporary search marks use shared raw
+  range projection (VN source stream to current clone), without sidecar writes.
+  Node-offset rebuilds refresh active search ranges after persistent-highlight
+  or Sasayaki wrapping moves text nodes; live DOM Ranges do not follow those moves.
 - Reader furigana mode is profile-scoped, with legacy hide-furigana booleans
   migrated to Hidden or Off. Shared selection consumes Toggle reveal taps and
   reveals whitespace-adjacent ruby groups; VN uses its existing source/clone

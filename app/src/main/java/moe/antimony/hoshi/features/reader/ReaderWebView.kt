@@ -400,7 +400,11 @@ fun ReaderWebView(
             resumeAfterAutoPageHold = { sasayakiPlayer?.resumeAfterAutoPageHold() },
         )
     }
+    fun clearSearchHighlight() {
+        webView?.evaluateJavascript(ReaderPaginationScripts.clearSearchHighlightInvocation(), null)
+    }
     fun jumpToPositionWithHistory(position: ReaderChapterPosition, fragment: String? = null) {
+        clearSearchHighlight()
         cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.jumpToWithHistory(position, fragment)
@@ -408,6 +412,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpBack() {
+        clearSearchHighlight()
         cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.navigateBackInJumpHistory() ?: return
@@ -415,6 +420,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpForward() {
+        clearSearchHighlight()
         cancelSasayakiAutoPage()
         val statistics = statisticsForSave()
         val savedPosition = stateHolder.navigateForwardInJumpHistory() ?: return
@@ -1733,6 +1739,8 @@ fun ReaderWebView(
                         systemDark = systemDarkTheme,
                     )
                     val generation = stateHolder.webViewGeneration
+                    val restoreEpoch = stateHolder.webViewRestoreEpoch
+                    val restoreChapterIndex = readerPosition.loadPosition.index
                     key(generation) {
                         ChapterWebView(
                             book = book,
@@ -1769,7 +1777,14 @@ fun ReaderWebView(
                             isWebViewRestoring = stateHolder.isWebViewRestoring,
                             webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
                             onRestoreStarted = stateHolder::markWebViewRestoring,
-                            onRestoreCompleted = stateHolder::markWebViewRestored,
+                            onRestoreCompleted = {
+                                if (generation == stateHolder.webViewGeneration && restoreEpoch == stateHolder.webViewRestoreEpoch) {
+                                    stateHolder.markWebViewRestored()
+                                    stateHolder.takeSearchHighlight(restoreChapterIndex, restoreEpoch)?.let { highlight ->
+                                        webView?.evaluateJavascript(ReaderPaginationScripts.showSearchHighlightInvocation(highlight), null)
+                                    }
+                                }
+                            },
                             onNextChapter = {
                                 goToNextChapter()
                             },
@@ -1966,8 +1981,20 @@ fun ReaderWebView(
                 },
                 onSearchResultJump = { result ->
                     closeLookupPopupsAndSelection()
-                    val target = ReaderHighlights.positionForCharacter(book.bookInfo, result.character)
-                    jumpToPositionWithHistory(target)
+                    clearSearchHighlight()
+                    cancelSasayakiAutoPage()
+                    val chapter = book.chapters[result.chapterIndex]
+                    val chapterInfo = book.bookInfo.chapterInfo[chapter.href]
+                    val offset = (result.character - (chapterInfo?.currentTotal ?: 0)).coerceAtLeast(0)
+                    val count = chapterInfo?.chapterCount ?: 0
+                    val target = ReaderChapterPosition(
+                        index = result.chapterIndex,
+                        progress = if (count > 0) (offset.toDouble() / count).coerceIn(0.0, 1.0) else 0.0,
+                    )
+                    val statistics = statisticsForSave()
+                    val savedPosition = stateHolder.jumpToSearchResult(target, offset, result.matchLength)
+                    resetStatisticsBaseline()
+                    saveReaderPosition(savedPosition, statistics)
                     stateHolder.dismissGoTo()
                 },
                 onHighlightJump = { highlight ->

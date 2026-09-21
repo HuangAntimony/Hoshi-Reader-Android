@@ -22,6 +22,12 @@ internal enum class ReaderNavigationResult {
 }
 
 internal object ReaderPaginationScripts {
+    fun showSearchHighlightInvocation(highlight: ReaderSearchHighlight): String =
+        "window.hoshiHighlights.showSearchHighlight(${highlight.offset}, ${highlight.length})"
+
+    fun clearSearchHighlightInvocation(): String =
+        "if (window.hoshiHighlights) window.hoshiHighlights.clearSearchHighlight()"
+
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
         "window.hoshiReader.paginate('${direction.jsValue}')"
 

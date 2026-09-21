@@ -1,10 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
-import kotlin.math.max
-import kotlin.math.min
 import kotlinx.coroutines.CancellationException
 import moe.antimony.hoshi.epub.EpubBook
-import moe.antimony.hoshi.epub.filteredReaderText
 import moe.antimony.hoshi.epub.isReaderMatchableCodePoint
 import moe.antimony.hoshi.epub.visibleReaderText
 
@@ -15,203 +12,133 @@ internal data class ReaderSearchResult(
     val snippet: String,
     val snippetMatchStart: Int,
     val snippetMatchEnd: Int,
+    val matchLength: Int,
 )
 
-internal class ReaderSearchEngine(
-    private val book: EpubBook,
-) {
-    private val document: ReaderSearchDocument by lazy { ReaderSearchDocument.from(book) }
+internal class ReaderSearchEngine(private val book: EpubBook) {
+    private val paragraphs by lazy { buildParagraphs() }
 
-    fun search(query: String, maxResults: Int = DefaultMaxResults): List<ReaderSearchResult> {
-        val normalizedQuery = query.filteredReaderText()
-        if (normalizedQuery.isBlank()) return emptyList()
-
+    fun search(query: String, maxResults: Int = 100): List<ReaderSearchResult> {
+        val literalQuery = query.trim()
+        if (literalQuery.isEmpty() || maxResults <= 0) return emptyList()
         val results = mutableListOf<ReaderSearchResult>()
-        val queryCodePoints = normalizedQuery.codePointCount(0, normalizedQuery.length)
-        var fromIndex = 0
-        while (fromIndex <= document.searchText.length && results.size < maxResults) {
-            val matchIndex = document.searchText.indexOf(normalizedQuery, startIndex = fromIndex, ignoreCase = true)
-            if (matchIndex < 0) break
-
-            val character = document.searchText.codePointCount(0, matchIndex)
-            val chapter = document.chapterForCharacter(character)
-            val matchEndCharacter = character + queryCodePoints
-            if (chapter != null && matchEndCharacter <= chapter.endSearchCharacter) {
-                results += document.resultFor(
-                    chapter = chapter,
-                    character = character,
-                    queryCodePoints = queryCodePoints,
+        for (paragraph in paragraphs) {
+            val text = paragraph.text
+            var cursor = 0
+            while (cursor < text.length) {
+                val start = text.indexOf(literalQuery, cursor, ignoreCase = true)
+                if (start < 0) break
+                val end = start + literalQuery.length
+                val bounds = sentenceBounds(text, start, end)
+                results += ReaderSearchResult(
+                    chapterIndex = paragraph.chapterIndex,
+                    chapterLabel = paragraph.chapterLabel,
+                    character = paragraph.character + paragraph.normalizedOffsets[start],
+                    snippet = text.substring(bounds.first, bounds.second),
+                    snippetMatchStart = text.codePointCount(bounds.first, start),
+                    snippetMatchEnd = text.codePointCount(bounds.first, end),
+                    matchLength = paragraph.normalizedOffsets[end] - paragraph.normalizedOffsets[start],
                 )
-            }
-
-            val matchEndIndex = document.searchText.offsetByCodePointsSafe(matchIndex, queryCodePoints)
-            fromIndex = if (chapter != null && matchEndCharacter <= chapter.endSearchCharacter && matchEndIndex > matchIndex) {
-                matchEndIndex
-            } else {
-                document.searchText.offsetByCodePointsSafe(matchIndex, 1).takeIf { it > matchIndex } ?: (matchIndex + 1)
+                if (results.size >= maxResults.coerceAtMost(100)) return results
+                cursor = end
             }
         }
         return results
     }
 
-    private companion object {
-        const val DefaultMaxResults = 1_000
-    }
-}
-
-private data class ReaderSearchDocument(
-    val searchText: String,
-    val displayText: String,
-    val searchToDisplayCodePointOffsets: IntArray,
-    val chapters: List<ReaderSearchChapterRange>,
-) {
-    fun chapterForCharacter(character: Int): ReaderSearchChapterRange? =
-        chapters.firstOrNull { character >= it.startSearchCharacter && character < it.endSearchCharacter }
-            ?: chapters.lastOrNull {
-                character == it.endSearchCharacter && it.endSearchCharacter == searchToDisplayCodePointOffsets.size
-            }
-
-    fun resultFor(
-        chapter: ReaderSearchChapterRange,
-        character: Int,
-        queryCodePoints: Int,
-    ): ReaderSearchResult {
-        val displayMatchStart = searchToDisplayCodePointOffsets[character]
-        val displayMatchEnd = searchToDisplayCodePointOffsets[character + queryCodePoints - 1] + 1
-        val snippetStart = max(chapter.startDisplayCharacter, displayMatchStart - SnippetLeadingCodePoints)
-        val snippetEnd = min(chapter.endDisplayCharacter, displayMatchEnd + SnippetTrailingCodePoints)
-        val hasPrefix = snippetStart > chapter.startDisplayCharacter
-        val hasSuffix = snippetEnd < chapter.endDisplayCharacter
-        val startIndex = displayText.codePointIndex(snippetStart)
-        val endIndex = displayText.codePointIndex(snippetEnd)
-        val prefix = if (hasPrefix) "..." else ""
-        val suffix = if (hasSuffix) "..." else ""
-        val body = displayText.substring(startIndex, endIndex)
-        val snippet = prefix + body + suffix
-        val matchStart = (if (hasPrefix) prefix.codePointCount(0, prefix.length) else 0) + displayMatchStart - snippetStart
-        return ReaderSearchResult(
-            chapterIndex = chapter.index,
-            chapterLabel = chapter.label,
-            character = character,
-            snippet = snippet,
-            snippetMatchStart = matchStart,
-            snippetMatchEnd = matchStart + displayMatchEnd - displayMatchStart,
-        )
-    }
-
-    companion object {
-        fun from(book: EpubBook): ReaderSearchDocument {
-            val builder = ReaderSearchDocumentBuilder()
-            val chapters = mutableListOf<ReaderSearchChapterRange>()
-            val labels = ReaderChapterLabels.labels(book)
-            book.chapters.forEachIndexed { fallbackIndex, chapter ->
-                val index = chapter.spineIndex ?: fallbackIndex
-                val html = book.readResource(chapter.href)?.toString(Charsets.UTF_8) ?: chapter.html
-                val bounds = builder.appendChapter(html)
-                chapters += ReaderSearchChapterRange(
-                    index = index,
-                    startSearchCharacter = bounds.startSearchCharacter,
-                    endSearchCharacter = bounds.endSearchCharacter,
-                    startDisplayCharacter = bounds.startDisplayCharacter,
-                    endDisplayCharacter = bounds.endDisplayCharacter,
-                    label = ReaderChapterLabels.sectionLabelForIndex(labels, index),
-                )
-            }
-            return ReaderSearchDocument(
-                searchText = builder.searchText.toString(),
-                displayText = builder.displayText.toString(),
-                searchToDisplayCodePointOffsets = builder.searchToDisplayCodePointOffsets.toIntArray(),
-                chapters = chapters,
-            )
-        }
-
-        private const val SnippetLeadingCodePoints = 24
-        private const val SnippetTrailingCodePoints = 48
-    }
-}
-
-private data class ReaderSearchChapterRange(
-    val index: Int,
-    val startSearchCharacter: Int,
-    val endSearchCharacter: Int,
-    val startDisplayCharacter: Int,
-    val endDisplayCharacter: Int,
-    val label: String,
-)
-
-private data class ReaderSearchChapterBounds(
-    val startSearchCharacter: Int,
-    val endSearchCharacter: Int,
-    val startDisplayCharacter: Int,
-    val endDisplayCharacter: Int,
-)
-
-private class ReaderSearchDocumentBuilder {
-    val searchText = StringBuilder()
-    val displayText = StringBuilder()
-    val searchToDisplayCodePointOffsets = IntArrayBuilder()
-    private var searchCodePointCount = 0
-    private var displayCodePointCount = 0
-
-    fun appendChapter(html: String): ReaderSearchChapterBounds {
-        val startSearchCharacter = searchCodePointCount
-        val startDisplayCharacter = displayCodePointCount
-        var hasDisplayContent = false
-        var pendingWhitespace = false
-        html.visibleReaderText().codePoints().forEach { codePoint ->
-            if (Character.isWhitespace(codePoint)) {
-                if (hasDisplayContent) {
-                    pendingWhitespace = true
+    private fun buildParagraphs(): List<SearchParagraph> = buildList {
+        val labels = ReaderChapterLabels.labels(book)
+        var nextChapterStart = 0
+        book.chapters.forEachIndexed { fallbackIndex, chapter ->
+            val index = chapter.spineIndex ?: fallbackIndex
+            var character = book.bookInfo.chapterInfo[chapter.href]?.currentTotal ?: nextChapterStart
+            val html = book.readResource(chapter.href)?.toString(Charsets.UTF_8) ?: chapter.html
+            for (line in html.visibleReaderText(preserveParagraphs = true).split('\n', '\r')) {
+                val text = line.trim()
+                val offsets = IntArray(text.length + 1)
+                var normalized = 0
+                var utf16 = 0
+                while (utf16 < text.length) {
+                    val codePoint = text.codePointAt(utf16)
+                    val width = Character.charCount(codePoint)
+                    repeat(width) { offsets[utf16 + it] = normalized }
+                    if (codePoint.isReaderMatchableCodePoint()) normalized++
+                    utf16 += width
                 }
-                return@forEach
+                offsets[text.length] = normalized
+                if (text.isNotEmpty()) {
+                    add(SearchParagraph(
+                        chapterIndex = index,
+                        chapterLabel = ReaderChapterLabels.sectionLabelForIndex(labels, index),
+                        character = character,
+                        text = text,
+                        normalizedOffsets = offsets,
+                    ))
+                }
+                character += normalized
             }
-
-            if (pendingWhitespace) {
-                appendDisplayCodePoint(' '.code)
-                pendingWhitespace = false
-            }
-
-            hasDisplayContent = true
-            val displayOffset = displayCodePointCount
-            appendDisplayCodePoint(codePoint)
-            if (codePoint.isReaderMatchableCodePoint()) {
-                searchText.appendCodePoint(codePoint)
-                searchToDisplayCodePointOffsets.add(displayOffset)
-                searchCodePointCount += 1
-            }
+            nextChapterStart = character
         }
-        return ReaderSearchChapterBounds(
-            startSearchCharacter = startSearchCharacter,
-            endSearchCharacter = searchCodePointCount,
-            startDisplayCharacter = startDisplayCharacter,
-            endDisplayCharacter = displayCodePointCount,
-        )
-    }
-
-    private fun appendDisplayCodePoint(codePoint: Int) {
-        displayText.appendCodePoint(codePoint)
-        displayCodePointCount += 1
     }
 }
 
-private class IntArrayBuilder(initialCapacity: Int = 256) {
-    private var values = IntArray(initialCapacity)
-    var size = 0
-        private set
+private data class SearchParagraph(
+    val chapterIndex: Int,
+    val chapterLabel: String,
+    val character: Int,
+    val text: String,
+    val normalizedOffsets: IntArray,
+)
 
-    fun add(value: Int) {
-        if (size == values.size) {
-            values = values.copyOf(max(values.size * 2, 1))
-        }
-        values[size] = value
-        size += 1
+private val sentenceDelimiters = "。！？.!?\n\r".toSet()
+private val trailingSentenceChars = "。、！？」』）)】〉》〕｝}］]".toSet()
+private val sentenceBrackets = mapOf(
+    '「' to '」', '『' to '』', '（' to '）', '(' to ')',
+    '【' to '】', '〈' to '〉', '《' to '》', '〔' to '〕', '｛' to '｝', '{' to '}', '［' to '］', '[' to ']',
+)
+
+private fun sentenceBounds(text: String, matchStart: Int, matchEnd: Int): Pair<Int, Int> {
+    var start = matchStart
+    while (start > 0 && text[start - 1] !in sentenceDelimiters) start--
+    var end = matchEnd
+    while (end < text.length && text[end] !in sentenceDelimiters) end++
+    if (end < text.length) {
+        end++
+        while (end < text.length && text[end] in trailingSentenceChars) end++
     }
-
-    fun toIntArray(): IntArray = values.copyOf(size)
+    fun trimBounds() {
+        while (start < matchStart && text[start].isWhitespace()) start++
+        while (end > matchEnd && text[end - 1].isWhitespace()) end--
+    }
+    trimBounds()
+    val stack = mutableListOf<Char>()
+    val unmatched = mutableListOf<Char>()
+    for (index in start until end) {
+        val char = text[index]
+        if (char in sentenceBrackets) stack.add(char)
+        else if (char in sentenceBrackets.values) {
+            if (stack.lastOrNull()?.let { sentenceBrackets[it] } == char) stack.removeAt(stack.lastIndex)
+            else unmatched.add(char)
+        }
+    }
+    while (stack.isNotEmpty() && start < matchStart && text[start] == stack.first()) {
+        stack.removeAt(0)
+        start++
+    }
+    var cursor = end
+    while (unmatched.isNotEmpty() && cursor > matchEnd) {
+        val previous = cursor - 1
+        if (text[previous] == unmatched.last()) {
+            unmatched.removeAt(unmatched.lastIndex)
+            end = previous
+        } else if (text[previous] !in sentenceDelimiters) break
+        cursor = previous
+    }
+    trimBounds()
+    return start to end
 }
 
-internal fun readerSearchQueryHasMatchableText(query: String): Boolean =
-    query.filteredReaderText().isNotBlank()
+internal fun readerSearchQueryHasMatchableText(query: String): Boolean = query.isNotBlank()
 
 internal sealed interface ReaderSearchLoadResult<out T> {
     data class Success<T>(val value: T) : ReaderSearchLoadResult<T>
@@ -228,12 +155,3 @@ internal suspend fun <T> loadReaderSearchResults(
     } catch (_: Throwable) {
         ReaderSearchLoadResult.Failure
     }
-
-private fun String.codePointIndex(codePointOffset: Int): Int =
-    offsetByCodePointsSafe(0, codePointOffset)
-
-private fun String.offsetByCodePointsSafe(startIndex: Int, codePointCount: Int): Int {
-    val safeStart = startIndex.coerceIn(0, length)
-    val available = codePointCount(safeStart, length)
-    return offsetByCodePoints(safeStart, codePointCount.coerceIn(0, available))
-}

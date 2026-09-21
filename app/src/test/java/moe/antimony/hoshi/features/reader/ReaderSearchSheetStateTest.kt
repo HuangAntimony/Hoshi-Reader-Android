@@ -54,6 +54,7 @@ class ReaderSearchSheetStateTest {
                 snippet = "先生",
                 snippetMatchStart = 0,
                 snippetMatchEnd = 2,
+                matchLength = 2,
             ),
         )
         state.searching = true

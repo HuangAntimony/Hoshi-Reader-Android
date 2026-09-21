@@ -504,6 +504,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
     vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
+        Highlight: Set,
         document,
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
@@ -1540,5 +1541,44 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         restored.window.hoshiHighlights.applyHighlights([{ id: 'saved', color: 'blue', offset: 3, text: '𠮟東京' }]);
         assert.equal(restored.window.hoshiHighlights.findHighlight(3, 3), 'saved');
         assert.equal(restored.window.hoshiHighlights.findHighlight(3, 2), null);
+    });
+}
+
+for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${sourceUrl.pathname.split('/').pop()} search highlight uses normalized offsets and stays transient`, () => {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('前「𠮟 、'));
+        const ruby = new TestElement('ruby');
+        ruby.appendChild(new TestText('猫'));
+        const rt = new TestElement('rt'); rt.appendChild(new TestText('ねこ')); ruby.appendChild(rt);
+        body.appendChild(ruby);
+        body.appendChild(new TestText('。」後'));
+        const registry = new Map();
+        const { reader, window } = loadReader(body, sourceUrl, {
+            css: { highlights: registry },
+            highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+        });
+        reader.buildNodeOffsets();
+        const highlights = window.hoshiHighlights;
+        highlights.showSearchHighlight(1, 2);
+        const text = () => Array.from(registry.get('hoshi-search') ?? [], range =>
+            range.startContainer.textContent.slice(range.startOffset, range.endOffset)).join('');
+        assert.equal(text(), '𠮟 、猫');
+        assert.equal(highlights.highlights.size, 0);
+        highlights.showSearchHighlight(3, 1);
+        assert.equal(text(), '後');
+        highlights.showSearchHighlight(2, 0);
+        assert.equal(text(), '');
+        highlights.showSearchHighlight(1, 2);
+        highlights.clearSearchHighlight();
+        assert.equal(text(), '');
+        highlights.showSearchHighlight(1, 2);
+        reader.paginate('forward');
+        assert.equal(text(), '');
+        highlights.showSearchHighlight(1, 2);
+        reader.highlightSasayakiCue({ id: 'cue', start: 3, length: 1 }, false);
+        assert.equal(text(), '𠮟 、猫');
+        reader.highlightSasayakiCue({ id: 'cue', start: 3, length: 1 }, true);
+        assert.equal(text(), '');
     });
 }

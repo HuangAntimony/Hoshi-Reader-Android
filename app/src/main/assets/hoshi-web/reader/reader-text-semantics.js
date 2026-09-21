@@ -29,6 +29,26 @@
     return Array.from(text || '').length;
   }
 
+  // Search includes interior punctuation, but not punctuation outside the first
+  // and last matchable characters (unlike Sasayaki sentence presentation).
+  function searchRawRange(entries, offset, length) {
+    if (!Number.isInteger(offset) || !Number.isInteger(length) || offset < 0 || length <= 0) return null;
+    var raw = 0;
+    var normalized = 0;
+    var start = null;
+    for (var entry of entries) {
+      for (var char of String(entry.text || '')) {
+        if (isMatchableChar(char)) {
+          if (normalized === offset) start = raw;
+          normalized += 1;
+          if (normalized === offset + length) return { start: start, end: raw + 1 };
+        }
+        raw += 1;
+      }
+    }
+    return null;
+  }
+
   var sasayakiOpening = new Set(Array.from('「『（〔［｛〈《【〖〘〚“‘｢([{'));
   var sasayakiTrailing = new Set(Array.from('」』）〕］｝〉》】〗〙〛”’｣)]}。、，．！？!?‼⁇⁈⁉､｡・･：；:;'));
   var sasayakiNeutral = new Set(Array.from('…‥—―–─〜～'));
@@ -97,6 +117,7 @@
   }
 
   global.hoshiReaderTextSemantics = {
+    searchRawRange: searchRawRange,
     createSasayakiTextIndex: createSasayakiTextIndex,
     normalizeText: normalizeText,
     isMatchableChar: isMatchableChar,

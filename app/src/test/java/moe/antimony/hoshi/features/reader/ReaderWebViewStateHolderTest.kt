@@ -1051,6 +1051,53 @@ class ReaderWebViewStateHolderTest {
         assertFalse(holder.showReaderMenu)
     }
 
+    @Test
+    fun searchLandingWaitsForMatchingRestoreAndIsConsumedOnce() {
+        val holder = stateHolder()
+        holder.markWebViewRestored()
+        val target = ReaderChapterPosition(1, 0.5)
+        holder.jumpToSearchResult(target, offset = 20, length = 3)
+        val epoch = holder.webViewRestoreEpoch
+        assertNull(holder.takeSearchHighlight(1, epoch))
+        holder.markWebViewRestored()
+        assertNull(holder.takeSearchHighlight(0, epoch))
+        assertNull(holder.takeSearchHighlight(1, epoch - 1))
+        assertEquals(ReaderSearchHighlight(1, 20, 3), holder.takeSearchHighlight(1, epoch))
+        assertNull(holder.takeSearchHighlight(1, epoch))
+    }
+
+    @Test
+    fun newerSearchAndOrdinaryNavigationInvalidatePendingLanding() {
+        val holder = stateHolder()
+        holder.markWebViewRestored()
+        holder.jumpToSearchResult(ReaderChapterPosition(0, 0.3), 3, 1)
+        val oldEpoch = holder.webViewRestoreEpoch
+        holder.jumpToSearchResult(ReaderChapterPosition(0, 0.6), 6, 2)
+        holder.markWebViewRestored()
+        assertNull(holder.takeSearchHighlight(0, oldEpoch))
+        assertEquals(ReaderSearchHighlight(0, 6, 2), holder.takeSearchHighlight(0, holder.webViewRestoreEpoch))
+        holder.jumpToSearchResult(ReaderChapterPosition(0, 0.8), 8, 1)
+        holder.navigateBackInJumpHistory()
+        holder.markWebViewRestored()
+        assertNull(holder.takeSearchHighlight(0, holder.webViewRestoreEpoch))
+        holder.navigateForwardInJumpHistory()
+        holder.markWebViewRestored()
+        assertNull(holder.takeSearchHighlight(0, holder.webViewRestoreEpoch))
+    }
+
+    @Test
+    fun samePositionSearchStillRestoresWithoutDuplicatingHistory() {
+        val holder = stateHolder(initialProgress = 0.4)
+        holder.markWebViewRestored()
+        val epoch = holder.webViewRestoreEpoch
+        holder.jumpToSearchResult(ReaderChapterPosition(0, 0.4), 4, 0)
+        assertTrue(holder.isWebViewRestoring)
+        assertTrue(holder.webViewRestoreEpoch > epoch)
+        assertNull(holder.backTargetPosition)
+        holder.markWebViewRestored()
+        assertEquals(ReaderSearchHighlight(0, 4, 0), holder.takeSearchHighlight(0, holder.webViewRestoreEpoch))
+    }
+
     private fun stateHolder(
         initialIndex: Int = 0,
         initialProgress: Double = 0.0,

@@ -11,10 +11,13 @@ internal fun String.filteredReaderText(): String {
     }
 }
 
-internal fun String.visibleReaderText(): String {
+internal fun String.visibleReaderText(preserveParagraphs: Boolean = false): String {
     var text = Regex("(?s)<body.*?</body>").find(this)?.value ?: this
     text = text.replace(Regex("(?s)<(rt|rp)[^>]*>.*?</\\1>"), "")
     text = text.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
+    if (preserveParagraphs) {
+        text = text.replace(Regex("(?i)<br[^>]*>|</(p|div|h[1-6]|li|blockquote|section|td|tr)\\s*>"), "\n")
+    }
     text = text.replace(Regex("<[^>]+>"), "")
     text = text.replace(Regex("&#[xX]?[0-9A-Fa-f]+;"), "")
     return text

@@ -852,7 +852,8 @@ function loadReader(body, options = {}) {
     };
     const source = `${options.selectionScript ?? ''}\n${configuredReaderSource(options)}`;
     vm.runInNewContext(source, {
-        CSS: {},
+        CSS: options.css ?? {},
+        Highlight: Set,
         document,
         window,
         HoshiReaderImage: imageBridge,
@@ -2882,4 +2883,40 @@ test('VN restores overlapping highlight geometry before recoloring and removing 
     reader.paginate('backward');
     assert.equal(wrappedText('b'), 'いうえ');
     assert.equal(highlights.highlights.has('a'), false);
+});
+
+test('VN search projects chapter offsets onto the current clone and survives highlight reapplication', async () => {
+    const registry = new Map();
+    const { reader, window } = await initializeReader(bodyWith(p('前。'), p('「𠮟 、猫。」'), p('後。')), {
+        mode: 'block', sentencesPerScreen: 1, revealSpeed: 0,
+        css: { highlights: registry }, highlightsScript: readerHighlightsSource(),
+    });
+    reader.renderScreen(1, true);
+    const highlights = window.hoshiHighlights;
+    highlights.showSearchHighlight(1, 2);
+    const text = () => Array.from(registry.get('hoshi-search') ?? [], range =>
+        range.startContainer.textContent.slice(range.startOffset, range.endOffset)).join('');
+    assert.equal(text(), '𠮟 、猫');
+    reader.applyCurrentScreenHighlights();
+    assert.equal(text(), '𠮟 、猫');
+    assert.equal(highlights.highlights.size, 0);
+    highlights.clearSearchHighlight();
+    reader.applyCurrentScreenHighlights();
+    assert.equal(text(), '');
+});
+
+test('VN cue jumps and page navigation clear search marks while passive cues preserve them', async () => {
+    const registry = new Map();
+    const { reader, window } = await initializeReader(bodyWith(p('前。'), p('猫。')), {
+        mode: 'block', revealSpeed: 0, css: { highlights: registry }, highlightsScript: readerHighlightsSource(),
+    });
+    const highlights = window.hoshiHighlights;
+    highlights.showSearchHighlight(0, 1);
+    reader.highlightSasayakiCue({ id: 'cue', start: 0, length: 1 }, false);
+    assert.notEqual(highlights.searchRange, null);
+    reader.highlightSasayakiCue({ id: 'cue', start: 1, length: 1 }, true);
+    assert.equal(highlights.searchRange, null);
+    highlights.showSearchHighlight(1, 1);
+    reader.paginate('backward');
+    assert.equal(highlights.searchRange, null);
 });

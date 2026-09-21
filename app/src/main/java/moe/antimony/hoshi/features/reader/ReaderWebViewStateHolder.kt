@@ -7,6 +7,8 @@ import androidx.compose.ui.unit.IntSize
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheetTab
 
+internal data class ReaderSearchHighlight(val chapterIndex: Int, val offset: Int, val length: Int)
+
 internal class ReaderWebViewStateHolder(
     initialSettings: ReaderSettings,
     initialPosition: ReaderChapterPosition,
@@ -245,7 +247,27 @@ internal class ReaderWebViewStateHolder(
         markWebViewRestoring()
     }
 
+    private var pendingSearchHighlight: ReaderSearchHighlight? = null
+
+    fun jumpToSearchResult(position: ReaderChapterPosition, offset: Int, length: Int): ReaderChapterPosition {
+        if (!isCurrentDisplayedTarget(position, null)) recordJumpOrigin()
+        readerPosition = readerPosition.jumpTo(position)
+        pendingSearchHighlight = ReaderSearchHighlight(position.index, offset, length)
+        // Even a result at the current position needs a fresh, token-guarded restore.
+        markWebViewRestoring()
+        return readerPosition.displayedPosition
+    }
+
+    fun takeSearchHighlight(chapterIndex: Int, restoreEpoch: Int): ReaderSearchHighlight? {
+        if (isWebViewRestoring || restoreEpoch != webViewRestoreEpoch) return null
+        val pending = pendingSearchHighlight ?: return null
+        if (pending.chapterIndex != chapterIndex) return null
+        pendingSearchHighlight = null
+        return pending
+    }
+
     fun jumpTo(position: ReaderChapterPosition, fragment: String? = null): ReaderChapterPosition {
+        pendingSearchHighlight = null
         if (isCurrentDisplayedTarget(position, fragment)) {
             return readerPosition.displayedPosition
         }

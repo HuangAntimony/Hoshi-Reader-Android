@@ -111,6 +111,37 @@ window.hoshiHighlights = {
     flushReading();
     return { text: text, textFurigana: annotated !== text ? annotated : null };
   },
+  searchRange: null,
+  searchRawRange: function(offset, length) {
+    var entries = [];
+    var walker = window.hoshiReader.createWalker();
+    var node;
+    while ((node = walker.nextNode())) entries.push({ text: node.textContent });
+    return window.hoshiReaderTextSemantics.searchRawRange(entries, offset, length);
+  },
+  showSearchHighlight: function(offset, length) {
+    this.clearSearchHighlight();
+    this.searchRange = this.searchRawRange(offset, length);
+    this.refreshSearchHighlight();
+  },
+  refreshSearchHighlight: function() {
+    if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
+    CSS.highlights.delete('hoshi-search');
+    if (!this.searchRange) return;
+    var highlight = new Highlight();
+    var segments = this.collectSegments(this.searchRange.start, this.searchRange.end - this.searchRange.start);
+    for (var segment of segments) {
+      var range = document.createRange();
+      range.setStart(segment.node, segment.start);
+      range.setEnd(segment.node, segment.end);
+      highlight.add(range);
+    }
+    CSS.highlights.set('hoshi-search', highlight);
+  },
+  clearSearchHighlight: function() {
+    this.searchRange = null;
+    if (typeof CSS !== 'undefined' && CSS.highlights) CSS.highlights.delete('hoshi-search');
+  },
   collectSegments: function(offset, length) {
     var end = offset + length;
     var segments = [];
@@ -168,6 +199,7 @@ window.hoshiHighlights = {
       // VN projects each subsequent range through offsets of the newly split nodes.
       window.hoshiReader.buildNodeOffsets();
     }
+    this.refreshSearchHighlight();
   },
   removeHighlight: function(id) {
     var entry = this.highlights.get(id);

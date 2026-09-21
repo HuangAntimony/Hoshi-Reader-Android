@@ -86,6 +86,25 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
+- Book search: verify literal spaces/punctuation, case-insensitive matches,
+  paragraph/`br` boundaries, ruby exclusion, complete bracketed sentence
+  snippets, 100-result limit, and supplementary-plane characters before/inside
+  matches. In paginated, continuous and VN modes with horizontal/vertical
+  writing, jump within/across chapters and to the current position, then
+  search again rapidly; only the latest restored target should receive a blue
+  mark. Check actual painting, not just Range geometry. Page navigation and
+  other jumps clear the mark; jump history must not recreate it. Search marks
+  never appear in saved Highlights or sidecars. Punctuation-only queries remain
+  searchable but a zero-normalized-length result paints no mark.
+  `ReaderSearchHighlightWebViewTest` uses in-memory content to verify blue
+  pixels and clearing in all six mode/writing-direction combinations, without
+  opening books or changing preferences. Standalone reader WebView fixtures must
+  inject `readerViewportCssLayout(...).cssVariables()` using the measured view
+  dimensions and wait for `HoshiReaderRestore`; loading only the shell script
+  can leave VN with a zero-height clipped viewport. Build instrumentation
+  separately and use `adb install -r` plus the explicit class runner; do not use connected
+  Gradle tasks on a device with user data.
+
 - In paginated, continuous, and VN modes, use the native selection color menu
   on plain text and ruby split across styled nodes. Contents should show base
   text with parenthesized readings, while old highlights without readings still

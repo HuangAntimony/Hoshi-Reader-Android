@@ -77,6 +77,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Changed
 
+- Book search now matches spaces and punctuation literally, shows complete
+  sentence context, and returns up to 100 results. Jumping to a result temporarily
+  marks the match in blue until page navigation, in all three reading modes.
+
 - Include surrounding Japanese quotation marks and punctuation in Sasayaki
   sentence highlights across all Reader modes, with consistent ownership
   between adjacent cues and across VN screens.

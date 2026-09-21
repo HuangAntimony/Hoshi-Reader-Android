@@ -52,7 +52,7 @@ class ReaderSearchTest {
             ),
         )
 
-        val results = ReaderSearchEngine(book).search("漢字A")
+        val results = ReaderSearchEngine(book).search("漢字 A")
 
         assertEquals(1, results.size)
         assertEquals(0, results.single().chapterIndex)
@@ -98,7 +98,7 @@ class ReaderSearchTest {
             ),
         )
 
-        val result = ReaderSearchEngine(book).search("猫です").single()
+        val result = ReaderSearchEngine(book).search("猫、です").single()
 
         assertEquals(3, result.character)
         assertTrue(result.snippet.contains("「猫、です。」"))
@@ -106,7 +106,7 @@ class ReaderSearchTest {
     }
 
     @Test
-    fun searchQueryPunctuationRemainsIgnoredWhenSnippetKeepsDisplayPunctuation() {
+    fun searchQueryMustMatchLiteralPunctuation() {
         val book = searchBook(
             chapters = listOf(chapter("c0.xhtml", "")),
             resources = mapOf("c0.xhtml" to xhtml("<html><body>吾輩は「猫、です。」犬</body></html>")),
@@ -116,10 +116,8 @@ class ReaderSearchTest {
             ),
         )
 
-        val result = ReaderSearchEngine(book).search("猫!です").single()
-
-        assertEquals(3, result.character)
-        assertEquals("猫、です", result.highlightedText())
+        assertTrue(ReaderSearchEngine(book).search("猫!です").isEmpty())
+        assertTrue(ReaderSearchEngine(book).search("猫です").isEmpty())
     }
 
     @Test
@@ -137,7 +135,7 @@ class ReaderSearchTest {
             ),
         )
 
-        val result = ReaderSearchEngine(book).search("漢字").single()
+        val result = ReaderSearchEngine(book).search("漢、字").single()
 
         assertEquals(0, result.character)
         assertTrue(result.snippet.contains("漢、字"))
@@ -157,11 +155,12 @@ class ReaderSearchTest {
             ),
         )
 
-        val result = ReaderSearchEngine(book).search("AB").single()
+        val result = ReaderSearchEngine(book).search("A🙂B").single()
 
         assertEquals(0, result.character)
         assertEquals("A🙂B", result.snippet)
         assertEquals("A🙂B", result.highlightedText())
+        assertEquals(2, result.matchLength)
     }
 
     @Test
@@ -196,8 +195,9 @@ class ReaderSearchTest {
     }
 
     @Test
-    fun punctuationOnlyQueryHasNoMatchableText() {
-        assertEquals(false, readerSearchQueryHasMatchableText(" ! "))
+    fun punctuationOnlyQueryIsSearchable() {
+        assertEquals(true, readerSearchQueryHasMatchableText(" ! "))
+        assertEquals(false, readerSearchQueryHasMatchableText("  "))
         assertEquals(true, readerSearchQueryHasMatchableText("猫!"))
     }
 
@@ -242,6 +242,48 @@ class ReaderSearchTest {
         }
 
         assertEquals(ReaderSearchLoadResult.Failure, result)
+    }
+
+    @Test
+    fun literalSearchPreservesWhitespaceAndParagraphBoundaries() {
+        val engine = ReaderSearchEngine(EpubBook(title = "Test", chapters = listOf(
+            chapter("c.xhtml", "<body><p>A  B</p><div>C<br>D</div><p>EF</p></body>"),
+        )))
+        assertEquals("A  B", engine.search(" A  B ").single().highlightedText())
+        for (query in listOf("A B", "AB", "BC", "CD", "DE", "B C", "B\nC")) {
+            assertTrue(query, engine.search(query).isEmpty())
+        }
+        assertEquals(4, engine.search("EF").single().character)
+    }
+
+    @Test
+    fun snippetsFollowSentencesAndTrimUnbalancedBrackets() {
+        val engine = ReaderSearchEngine(EpubBook(title = "Test", chapters = listOf(
+            chapter("c.xhtml", "<body><p>前。 「最初。次の猫です。」 後。</p><p>「犬です。」</p></body>"),
+        )))
+        assertEquals("次の猫です。", engine.search("猫").single().snippet)
+        assertEquals("「犬です。」", engine.search("犬").single().snippet)
+    }
+
+    @Test
+    fun searchReturnsAtMostOneHundredNonOverlappingResults() {
+        val engine = ReaderSearchEngine(EpubBook(title = "Test", chapters = listOf(
+            chapter("c.xhtml", "<body>" + "aaa ".repeat(110) + "</body>"),
+        )))
+        val results = engine.search("aa")
+        assertEquals(100, results.size)
+        assertEquals(297, results.last().character)
+    }
+
+    @Test
+    fun punctuationOnlyMatchKeepsItsPosition() {
+        val engine = ReaderSearchEngine(EpubBook(title = "Test", chapters = listOf(
+            chapter("c.xhtml", "<body>𠮟A！B</body>"),
+        )))
+        val result = engine.search(" ！ ").single()
+        assertEquals(2, result.character)
+        assertEquals("！", result.highlightedText())
+        assertEquals(0, result.matchLength)
     }
 
     private fun searchBook(

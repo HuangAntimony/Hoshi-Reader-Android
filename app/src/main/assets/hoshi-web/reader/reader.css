@@ -147,3 +147,8 @@ ruby.furigana-hidden {
     text-decoration-color: rgba(160, 160, 160, 0.8) !important;
     text-underline-offset: 0.05em !important;
 }
+
+::highlight(hoshi-search) {
+  background-color: rgba(100, 160, 255, 0.4);
+  color: inherit;
+}
