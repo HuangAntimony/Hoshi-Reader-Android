@@ -1166,8 +1166,7 @@ private fun DictionarySettingsView(
                         canDecrease = settings.scanLength > DictionarySettings.MIN_SCAN_LENGTH,
                         canIncrease = settings.scanLength < DictionarySettings.MAX_SCAN_LENGTH,
                     )
-                }
-                SettingsGroup {
+                    GroupDivider()
                     var orderMenuExpanded by remember { mutableStateOf(false) }
                     val enabledTitles = frequencyDictionaries.filter { it.isEnabled }.map { it.index.title }
                     ListItem(

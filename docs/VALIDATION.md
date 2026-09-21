@@ -530,7 +530,9 @@ Validate relevant dictionary/audio changes with:
 - lookup frequency sorting in Auto/Ascending/Descending/Disabled modes across
   Reader, Dictionary, recursive popups and Process Text; explicit dictionary
   selection, equal/missing frequencies, disable/delete/reorder, update renames,
-  profile switching and restart. `DictionaryFrequencyNativeTest` exercises the
+  profile switching and restart. Scan controls, frequency sort order and the
+  conditional dictionary selector must share one Lookup card: dividers inside,
+  rounded corners only on the outer group. `DictionaryFrequencyNativeTest` exercises the
   JNI bridge using generated dictionaries in a unique cache directory. Build
   with `./gradlew assembleDebug :app:assembleDebugAndroidTest`, install both
   APKs using `adb install -r`, and run only this class with `adb shell am
