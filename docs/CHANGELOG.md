@@ -121,6 +121,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Show a localized Reader fallback with a Close action when a book is missing
+  or cannot be parsed, instead of exposing internal loading errors.
+
 - Recover the reader after Android terminates its WebView renderer, preserving
   the latest reading position, highlights, and Sasayaki cue display.
 

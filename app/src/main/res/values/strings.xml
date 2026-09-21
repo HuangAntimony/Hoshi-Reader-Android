@@ -9,6 +9,7 @@
     <string name="action_back">Back</string>
     <string name="action_forward">Forward</string>
     <string name="action_close">Close</string>
+    <string name="reader_open_failed">Couldn\'t open book</string>
     <string name="action_share">Share</string>
     <string name="action_import" comment="Generic import action label.">Import</string>
     <string name="action_export">Export</string>

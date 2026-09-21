@@ -9,6 +9,7 @@
     <string name="action_back">返回</string>
     <string name="action_forward">前进</string>
     <string name="action_close">关闭</string>
+    <string name="reader_open_failed">无法打开书籍</string>
     <string name="action_share">分享</string>
     <string name="action_import" comment="Generic import action label.">导入</string>
     <string name="action_export">导出</string>

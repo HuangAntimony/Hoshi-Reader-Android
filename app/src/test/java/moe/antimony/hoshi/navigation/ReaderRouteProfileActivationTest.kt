@@ -32,7 +32,7 @@ class ReaderRouteProfileActivationTest {
         var activatedMetadata: BookMetadata? = null
         var clearCount = 0
 
-        ReaderRouteLoadState.Error("Book not found.").publishProfileActivation(
+        ReaderRouteLoadState.Error.publishProfileActivation(
             activateForBook = { metadata -> activatedMetadata = metadata },
             clearLoadedProfile = { clearCount += 1 },
         )

@@ -60,15 +60,31 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
-    fun loadErrorReportsMissingBook() = runBlocking {
-        val stateHolder = ReaderRouteStateHolder(
+    fun loadErrorUsesSameGenericStateForMissingAndUnparsableBooks() = runBlocking {
+        val missingBookStateHolder = ReaderRouteStateHolder(
             repository = FakeReaderRouteBookRepository(entry = null),
             parser = FakeReaderRouteEpubParser(readerBook()),
         )
+        val root = File("broken-book")
+        val unparsableBookStateHolder = ReaderRouteStateHolder(
+            repository = FakeReaderRouteBookRepository(
+                entry = BookEntry(
+                    root = root,
+                    metadata = BookMetadata("broken", "Broken", null, root.name, 0.0),
+                ),
+            ),
+            parser = object : ReaderRouteEpubParser {
+                override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook {
+                    error("Parser implementation detail")
+                }
+            },
+        )
 
-        val state = stateHolder.load("missing")
+        val missingBookState = missingBookStateHolder.load("missing")
+        val unparsableBookState = unparsableBookStateHolder.load("broken")
 
-        assertEquals(ReaderRouteLoadState.Error("Book not found."), state)
+        assertTrue(missingBookState is ReaderRouteLoadState.Error)
+        assertEquals(missingBookState, unparsableBookState)
     }
 
     @Test
