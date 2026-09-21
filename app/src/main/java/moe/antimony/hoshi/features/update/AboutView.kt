@@ -224,6 +224,7 @@ fun AboutScreen(
                             )
                             Text("GitHub")
                         }
+                        FfmpegLicenseNotice()
                     }
                 }
             }

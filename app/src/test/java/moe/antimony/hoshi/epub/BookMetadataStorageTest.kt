@@ -187,6 +187,7 @@ class BookMetadataStorageTest {
         root.resolve("Sasayaki").mkdirs()
         root.resolve("Sasayaki/sasayaki_audio.m4b").writeBytes(byteArrayOf(1, 2, 3))
         root.resolve("sasayaki_playback.json").writeText("""{"lastPosition":12.0,"audioFileName":"sasayaki_audio.m4b"}""")
+        root.resolve("sasayaki_transcript.json").writeText("""{"through":12.0,"duration":60,"tokens":[]}""")
         storage.saveMetadata(
             root,
             BookMetadata(
@@ -203,9 +204,11 @@ class BookMetadataStorageTest {
         assertTrue(root.resolve("legacy-book.epub").isFile)
         assertTrue(root.resolve("Sasayaki/sasayaki_audio.m4b").isFile)
         assertTrue(root.resolve("sasayaki_playback.json").isFile)
+        assertTrue(root.resolve("sasayaki_transcript.json").isFile)
         ZipFile(root.resolve("legacy-book.epub")).use { zip ->
             assertFalse(zip.entries().asSequence().any { it.name.startsWith("Sasayaki/") })
             assertFalse(zip.entries().asSequence().any { it.name == "sasayaki_playback.json" })
+            assertFalse(zip.entries().asSequence().any { it.name == "sasayaki_transcript.json" })
         }
     }
 

@@ -64,83 +64,15 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 2. Sasayaki on-device transcription and match coverage
-
-Status: pending Android sync.
-
-Commits:
-
-- `d24b2fa` - local audio transcription, resumable transcript storage, alignment
-  and character coverage; also changes the source filter used by SRT matching.
-
-Dependency/value reasoning:
-
-- Independent feature. Establish an Android-capable local transcription backend
-  and timed-token contract before persistence, alignment and UI integration.
-  Confirm platform capabilities against official Android/Google documentation
-  during implementation; Apple Speech APIs are not portable.
-
-iOS behavior to mirror:
-
-- On supported iOS 26 devices, choose Subtitles or Transcription and an audio
-  file (MP3/M4B/M4A). Japanese speech-model download, transcription progress,
-  estimated remaining time and alignment state are shown. Pause or leaving the
-  sheet cancels transcription and aligns retained tokens; deleting the active
-  book requests cancellation. Only one transcription task runs at a time.
-- `sasayaki_transcript.json` stores `through`, `duration` and tokens containing
-  `text`, `start`, `end`. Progress checkpoints approximately every 15 seconds;
-  a saved matching duration resumes from `through`. Complete transcripts can be
-  realigned. Clearing transcription requires confirmation and keeps the match.
-- Timed tokens align to normalized book text using anchors and bounded diff
-  blocks, then sentence/segment boundaries produce chapter-relative matches.
-  Timing budgets reject implausible spans and allow short-gap interpolation.
-- Both SRT and transcription source building additionally skip paths containing
-  `toc`, `caution` or `colophon` (case-insensitive). Coverage is summed match
-  lengths divided by the book character count, rather than matched cue count.
-
-Android current gap:
-
-- `SasayakiSubtitleMatchSection.kt` only parses selected SRT files and invokes
-  `SasayakiMatcher.match()`; there is no transcription selector, backend,
-  model-download state, pause/resume flow or transcript-clear action.
-- `SasayakiSidecarModels.kt` and `BookStorage.kt` expose match/playback data but
-  no timed-token transcript model or transcript persistence API.
-- `SasayakiMatcher.match()` filters linear/nav/guide-TOC chapters but lacks the
-  new path exclusions and timed-token alignment/sentence segmentation.
-- `SasayakiModels.matchRateText()` uses `matches.size / (matches.size + unmatched)`;
-  it does not report character coverage. `ReaderSasayakiCues.chapterCuesJson()`
-  already sorts by text offset, so that upstream portion is covered.
-
-Suggested slice:
-
-- Implement a repository-owned local transcription backend and compatible
-  checkpoint storage, then alignment and state-driven localized UI through the
-  existing Sasayaki boundaries. Keep the tested SRT coherent-start/recovery
-  behavior while adding source filtering and character coverage. Android audio
-  access must use the existing SAF/repository path rather than iOS bookmarks.
-
-Validation:
-
-- Generated timed-token fixtures: kana/width/case normalization, ruby, repeated
-  text, punctuation/block boundaries, supplementary characters, chapter/image
-  offsets, excluded paths, partial transcripts and short/implausible gaps.
-- Check unavailable models/devices, download failure, cancellation, leave/reopen,
-  restart/resume, duration mismatch, deletion, clear-with-match-retained and
-  complete-transcript realignment. Recheck SRT multi-volume matching, coverage,
-  Reader cue rendering, playback and Anki audio export without clearing app data.
-
 ## Open Commit Inventory
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
-| `d24b2fa` | 2026-09-20 | On-device transcription and matching updates | Pending transcript/backend/alignment/UI, source exclusions and character coverage (2); cue ordering covered |
 
 ## Suggested Implementation Order
 
 1. Popup layout/CSS isolation (1): shared lookup presentation and settings.
-2. Sasayaki transcription (2): backend/token contract first, then persistence,
-   alignment and UI; no dependency on the other slices.
 
 ## Covered Or No Android Action
 
@@ -152,8 +84,17 @@ Validation:
 - `15aadf0`: `reader-paginated.js` already appends its trailing spacer
   unconditionally, including zero vertical padding. Its Android-specific zero
   physical width is intentional.
-- `d24b2fa` (cue ordering): `ReaderSasayakiCues.chapterCuesJson()` already
-  sorts chapter ranges by `start` before serializing them to the Reader.
+- `d24b2fa`: Sasayaki now offers Japanese on-device transcription using
+  ReazonSpeech k2-v2 INT8/sherpa-onnx, model download, progress, pause/resume,
+  transcript clear and complete-transcript realignment. Atomic iOS-compatible
+  checkpoints and book-deletion coordination preserve completed work. Android
+  keeps transcription running with the sheet closed while reading, and pauses
+  when leaving Reader or backgrounding the app; it resumes from fully
+  processed audio and requires EOF for new transcripts. Matching uses real
+  normalized/ruby-aware anchors and bounded gap repair without inventing edge
+  matches. SRT and transcription share toc/caution/colophon exclusions and
+  character coverage. `ReaderSasayakiCues.chapterCuesJson()` retains chapter
+  ranges sorted by `start`.
 - `8ccade5`: Android Chinese resources cover
   the inspected statistics/archive, furigana, search, frequency sorting, Anki
   format and stroke-font controls. The iOS string-table routing fix has no

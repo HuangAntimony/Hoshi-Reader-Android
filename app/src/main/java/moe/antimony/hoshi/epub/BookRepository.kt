@@ -34,12 +34,14 @@ class BookRepository private constructor(
     private val sidecarDataSource: BookSidecarDataSource,
     private val clock: BookClock,
     internal val statisticsStore: BookStatisticsStore,
+    private val workRegistry: BookWorkRegistry,
 ) : ReaderRouteBookRepository, SasayakiSidecarRepository {
     @Inject
     constructor(
         @FilesDir filesDir: File,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         statisticsStore: BookStatisticsStore,
+        workRegistry: BookWorkRegistry,
     ) : this(
         filesDir = filesDir,
         ioDispatcher = ioDispatcher,
@@ -47,10 +49,14 @@ class BookRepository private constructor(
         sidecarDataSource = BookSidecarDataSource(ioDispatcher),
         clock = SystemBookClock,
         statisticsStore = statisticsStore,
+        workRegistry = workRegistry,
     )
 
-    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher = Dispatchers.IO) :
-        this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher))
+    constructor(
+        filesDir: File,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        workRegistry: BookWorkRegistry = BookWorkRegistry(),
+    ) : this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher), workRegistry)
 
     private val archiveExtractor = EpubArchiveExtractor()
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
@@ -148,7 +154,7 @@ class BookRepository private constructor(
     suspend fun deleteBook(
         bookRoot: File,
         releasePersistedSasayakiAudioUri: (String) -> Unit = {},
-    ) {
+    ) = workRegistry.delete(bookRoot) {
         val removedId = loadMetadata(bookRoot)?.id ?: bookRoot.name
         statisticsStore.archiveAndDelete(bookRoot) {
             loadSasayakiPlayback(bookRoot)?.audioUri?.let { uri ->
@@ -724,6 +730,7 @@ private val bookSidecarFileNames = setOf(
     BOOKINFO_FILE_NAME,
     SASAYAKI_MATCH_FILE_NAME,
     SASAYAKI_PLAYBACK_FILE_NAME,
+    "sasayaki_transcript.json",
 )
 
 private fun String.sanitizeRootFileName(): String =

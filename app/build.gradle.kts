@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -11,6 +13,11 @@ val uniffiOutDir = layout.buildDirectory.dir("generated/source/uniffi/main/kotli
 val rustDebugJniLibsDir = layout.buildDirectory.dir("jniLibs/debug").get().asFile
 val rustReleaseJniLibsDir = layout.buildDirectory.dir("jniLibs/release").get().asFile
 val cargo = System.getenv("HOME") + "/.cargo/bin/cargo"
+val sherpaOnnxArtifact = "com.k2fsa.sherpa:sherpa-onnx:${libs.versions.sherpaOnnx.get()}@aar"
+val sherpaOnnxArchive by configurations.creating {
+    isCanBeConsumed = false
+    isTransitive = false
+}
 val androidNdkHome = System.getenv("ANDROID_NDK_HOME") ?: "/opt/homebrew/share/android-ndk"
 val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
@@ -65,7 +72,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                targets += "hoshidicts_jni"
+                targets += listOf("hoshidicts_jni", "hoshiaudio_jni")
             }
         }
     }
@@ -132,6 +139,8 @@ android {
 }
 
 dependencies {
+    implementation(sherpaOnnxArtifact)
+    sherpaOnnxArchive(sherpaOnnxArtifact)
     implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(platform(libs.androidx.compose.bom))
@@ -177,6 +186,34 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// The upstream release is distributed as an AAR, without Maven metadata.
+// Verify the exact official archive before any build consumes its JNI code.
+abstract class VerifySherpaOnnxTask : DefaultTask() {
+    @get:InputFile
+    abstract val archive: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val digest = MessageDigest.getInstance("SHA-256")
+        archive.get().asFile.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        check(actual == "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96") {
+            "The sherpa-onnx AAR does not match the pinned official release SHA-256."
+        }
+    }
+}
+
+val verifySherpaOnnx by tasks.registering(VerifySherpaOnnxTask::class) {
+    archive.set(layout.file(sherpaOnnxArchive.elements.map { it.single().asFile }))
 }
 
 val buildRustHost by tasks.registering(Exec::class) {
@@ -281,6 +318,7 @@ val buildRustAndroidRelease by tasks.registering(Exec::class) {
 
 tasks.named("preBuild") {
     dependsOn(generateUniffiKotlin)
+    dependsOn(verifySherpaOnnx)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

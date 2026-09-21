@@ -29,3 +29,5 @@ target_include_directories(hoshidicts_jni PRIVATE
 target_link_libraries(hoshidicts_jni PRIVATE
     hoshidicts
 )
+
+add_subdirectory(audio)

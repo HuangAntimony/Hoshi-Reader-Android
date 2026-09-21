@@ -8,6 +8,18 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Transcribe Japanese audiobooks on-device in Sasayaki, with a downloadable
+  speech model, progress, pause/resume, and matching to book text. Ask before
+  downloading missing models and show transcription progress in one place. Continue
+  transcribing with the audiobook panel closed, and keep running when switching
+  apps instead of actively pausing; exiting the Reader still saves and pauses.
+  Reuse completed transcripts or clear them while keeping the current match.
+  Support M4A audio and show matched character coverage for both subtitles and transcription.
+  Preserve word beginnings at audio segment boundaries and recover short missing
+  word fragments when matching existing transcripts.
+  Speed up transcription with native audio decoding/resampling running alongside
+  speech recognition, while keeping audio buffers bounded.
+
 - Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
   or Disabled, with an enabled frequency dictionary for explicit ordering.
   Both controls share the Lookup settings card with the scan controls.

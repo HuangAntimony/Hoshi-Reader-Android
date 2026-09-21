@@ -22,6 +22,7 @@ ankidroidApi = "api-v1.1.0"
 hilt = "2.59.2"
 androidxHilt = "1.3.0"
 ksp = "2.3.9"
+sherpaOnnx = "1.13.8"
 
 [libraries]
 jsoup = { module = "org.jsoup:jsoup", version = "1.23.2" }

@@ -5,6 +5,8 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -45,6 +47,34 @@ class SasayakiAudioRepositoryTest {
     }
 
     @Test
+    fun repeatedCopiesKeepDifferentSourceIdentitiesAndContents() {
+        val root = temporaryFolder.newFolder("copies")
+        val repository = SasayakiAudioRepository(root)
+        val first = repository.importAudio("audio.mp3", "first recording".byteInputStream())
+        val second = repository.importAudio("audio.mp3", "second recording".byteInputStream())
+        assertNotEquals(first, second)
+        assertEquals("first recording", repository.audioFile(playback(audioFileName = first))!!.readText())
+        assertEquals("second recording", repository.audioFile(playback(audioFileName = second))!!.readText())
+    }
+
+    @Test
+    fun failedCopyRemovesPartialFileAndKeepsPreviousRecording() {
+        val root = temporaryFolder.newFolder("failed-copy")
+        val repository = SasayakiAudioRepository(root)
+        val previous = repository.importAudio("previous.mp3", "original".byteInputStream())
+        val failing = object : java.io.InputStream() {
+            var reads = 0
+            override fun read(): Int {
+                if (reads++ == 0) return 1
+                throw java.io.IOException("Provider disconnected")
+            }
+        }
+        assertThrows(java.io.IOException::class.java) { repository.importAudio("next.mp3", failing) }
+        assertEquals(listOf(previous), root.resolve("Sasayaki").listFiles()!!.map { it.name })
+        assertEquals("original", repository.audioFile(playback(audioFileName = previous))!!.readText())
+    }
+
+    @Test
     fun storageSummaryDescribesPrivateCopyExternalLinkAndMissingAudio() {
         val repository = SasayakiAudioRepository(temporaryFolder.newFolder("summary-book"))
 
@@ -57,7 +87,7 @@ class SasayakiAudioRepositoryTest {
             repository.storageSummary(playback(audioUri = "content://audio/book.m4b")),
         )
         assertEquals(
-            "Select a .mp3, .m4b, or .opus audiobook",
+            "Select a .mp3, .m4b, .m4a, or .opus audiobook",
             repository.storageSummary(playback()),
         )
     }

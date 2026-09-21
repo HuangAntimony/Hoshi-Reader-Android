@@ -92,6 +92,8 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
+import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionViewModel
+import moe.antimony.hoshi.features.sasayaki.rememberSasayakiTranscriptionState
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchDependencies
 import moe.antimony.hoshi.features.sasayaki.sasayakiDefaultSheetTab
 import moe.antimony.hoshi.features.sasayaki.sasayakiImageHoldMillis
@@ -172,6 +174,19 @@ fun ReaderWebView(
         bookCoverFile?.takeIf { it.isFile }
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
+    val onSasayakiMatchUpdated: (SasayakiMatchData) -> Unit = { data ->
+        sasayakiMatchData = data
+        sasayakiSheetMatchData = data
+        sasayakiPlayer?.updateMatchData(data)
+    }
+    val sasayakiTranscriptionState = rememberSasayakiTranscriptionState(
+        root = bookRoot,
+        audioRepository = sasayakiAudioRepository,
+        playback = sasayakiPlayer?.playback,
+        viewModel = sasayakiTranscriptionViewModel,
+        onMatchUpdated = onSasayakiMatchUpdated,
+    )
     var lastSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     var pendingSasayakiRestoreCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
@@ -1487,7 +1502,7 @@ fun ReaderWebView(
         keepScreenOnWhileReading = effectiveSettings.keepScreenOnWhileReading,
         sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
         sasayakiAutoScroll = sasayakiSettings.autoScroll,
-    )
+    ) || sasayakiTranscriptionState.running
     DisposableEffect(context, keepScreenOn) {
         val window = context.findActivity()?.window
         if (keepScreenOn) {
@@ -2030,16 +2045,15 @@ fun ReaderWebView(
                         bookEntry = entry,
                         bookRepository = bookRepository,
                         epubBookParser = appContainer.epubBookParser,
+                        characterCount = book.bookInfo.characterCount,
                     )
                 },
                 selectedTab = stateHolder.selectedSasayakiTab,
                 onSelectedTabChange = stateHolder::selectSasayakiTab,
-                onSubtitleMatchUpdated = { matchData ->
-                    sasayakiMatchData = matchData
-                    sasayakiSheetMatchData = matchData
-                    sasayakiPlayer?.updateMatchData(matchData)
-                },
+                onSubtitleMatchUpdated = onSasayakiMatchUpdated,
                 onSettingsChange = ::updateSasayakiSettings,
+                transcriptionState = sasayakiTranscriptionState,
+                transcriptionViewModel = sasayakiTranscriptionViewModel,
                 onDismiss = stateHolder::dismissSasayaki,
             )
         }

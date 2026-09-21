@@ -467,7 +467,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   offline, timeout and socket connection failures; manual operations still
   report errors, as do HTTP, TLS and non-network failures.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
-- Sasayaki accepts MP3, M4B, and Ogg Opus audiobook sources. One repository
+- Sasayaki accepts MP3, M4B/M4A, and Ogg Opus audiobook sources. One repository
   inspection returns format, metadata, chapters, and static duration for
   seekable sources before playback starts. M4B inspection reads MP4 metadata, `moov/udta/chpl`, and
   `mvhd`; Opus inspection reads OpusTags and derives duration from the final
@@ -477,6 +477,54 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   may leave static duration or container-only metadata unknown until playback
   preparation. Displayed artist normalization remains `ARTIST`, then
   `ALBUMARTIST`, then `AUTHOR`.
+- Sasayaki Japanese transcription uses the repository-owned sherpa-onnx backend
+  with ReazonSpeech k2-v2 INT8 and Silero VAD on CPU. SHA-256 verified models
+  download on demand to `noBackupFilesDir/SasayakiModels`; they are not bundled
+  into the APK or included in Android backup. A minimal FFmpeg 9.0.2 JNI decoder
+  reads existing SAF/private-file descriptors, respecting offset/length and
+  source timestamps, and downmixes/resamples to 16 kHz float PCM. CMake verifies
+  the upstream source archive SHA-256 and builds only local audio components;
+  no CLI, network protocols, encoders, or video decoders are bundled. Its license
+  and source link are available in Settings > About.
+  Decoding/resampling on the IO dispatcher overlaps the single ordered VAD/ASR
+  consumer through a bounded channel (at most 4 MiB of PCM queued). Native reads
+  return at most 4096 samples; seek preroll preserves codec history, and the
+  resampler phase stays on the absolute sample clock. Structured cancellation
+  closes the native decoder and SAF descriptors before recognition resources
+  are released. Speech segments have a 20-second hard limit;
+  checkpoints commit only fully processed audio. ASR supplies token start
+  timestamps; token ends are bounded estimates from the next token/segment.
+  Separate utterances trim already committed silence from leading ASR context
+  so early prefix timestamps cannot discard new words; hard cuts and resume
+  within speech retain leading context with timestamp deduplication.
+- A process-wide `SasayakiTranscriptionCoordinator` serializes transcription,
+  checkpoints `sasayaki_transcript.json` approximately every 15 seconds, and
+  finishes saving/alignment after cancellation. The sidecar keeps iOS's
+  `through`, `duration`, and timed-token schema with an optional audio-source
+  identity to avoid resuming a different file of the same duration. Atomic
+  replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
+  joins active work before book deletion. Clearing transcription preserves
+  existing matches; completed transcripts can be realigned without ASR.
+- The Reader-route Hilt ViewModel exposes transcription state and delivers
+  completed matches even after the sheet closes. Reader owns audio-source
+  binding and the combined keep-screen-on flag. Closing the sheet or backgrounding
+  the app does not actively pause inference. Removing the Reader route clears
+  its ViewModel, which pauses and saves the task; configuration recreation keeps
+  that ViewModel. This remains process-bound work without a foreground service or
+  WorkManager guarantee: Android may freeze or reclaim the background process,
+  and a later start resumes its saved checkpoint. Transcription reuses the
+  audiobook card's imported source;
+  verified cached models do not emit download progress. The model store requests
+  confirmation only after verifying the cache and before opening a download;
+  the coordinator suspends until the Reader confirms or cancels. Cancelling
+  before any new transcription leaves existing sidecars unchanged.
+  `SasayakiSource` shares chapter exclusions with SRT matching. The transcript
+  aligner uses normalized/ruby-aware exact anchors, monotonic ordering, bounded
+  gap repair, and sentence boundaries in Reader code-point coordinates; it does
+  not invent anchors at unspoken book/audio edges. Short omitted word fragments
+  can use the time between real neighboring anchors, but entire unspoken cues
+  and gaps across long silence remain unmatched. Match coverage is summed
+  matched character lengths divided by the parsed book character count.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
   ExoPlayer and MediaSession, but Reader load paths do not connect to the
@@ -519,11 +567,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 ## Native And Rust Build
 
-The Android app currently has two native stacks:
+The Android app currently has three native stacks:
 
 - `app/src/main/cpp/CMakeLists.txt` builds the hoshidicts JNI bridge from the
   `third_party/hoshidicts-kotlin-bridge` submodule.
 - `app/src/main/rust/hoshiepub` builds the Rust EPUB parser through UniFFI.
+- The pinned, checksum-verified sherpa-onnx AAR supplies local speech inference
+  and its ONNX Runtime libraries. Native JNI entry points are retained under R8.
 
 Current build wiring lives in `app/build.gradle.kts`:
 

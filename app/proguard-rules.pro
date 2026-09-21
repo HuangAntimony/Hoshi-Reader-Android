@@ -37,3 +37,9 @@
 
 # JNA also ships desktop AWT integration classes that are unused on Android.
 -dontwarn java.awt.**
+
+# sherpa-onnx JNI resolves config fields, result constructors, and methods by name.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+
+# FFmpeg transcription JNI entry points use the bridge class name.
+-keep class moe.antimony.hoshi.features.sasayaki.transcription.NativeSasayakiAudio { *; }

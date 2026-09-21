@@ -60,6 +60,9 @@ node --test app/src/test/js/*.test.mjs
 ## Device And Emulator Safety
 
 - Preserve app data by default.
+- `am instrument` can exit with shell status 0 despite failing tests. Require its
+  final `OK (N tests)` summary; inspect `FAILURES`, `INSTRUMENTATION_FAILED`, and
+  test stack traces before reporting a device run as passed.
 - Do not run `connectedDebugAndroidTest`, `connectedAndroidTest`,
   `installDebugAndroidTest`, or any connected instrumentation task that clears,
   reinstalls, or uninstalls app data unless the user explicitly permits a
@@ -838,6 +841,61 @@ Validate relevant sync/update/Sasayaki changes with:
   geometry alone do not establish correct painting. In VN, repeat the first cue
   pass, revisit cues on the same screen, then leave and return to rebuild the
   screen; check both normal and E-ink modes.
+- Sasayaki transcription: import MP3/M4B/M4A or Opus through the audiobook card
+  and select Transcription; there must be no second audio picker or permanent
+  model-download notice. Starting with missing or invalid models asks to download
+  the missing size before any network request; cancelling or leaving Reader
+  dismisses the request without writing an empty transcript or changing existing
+  progress. Cached models and realignment must not prompt. Display processed/total
+  audio time only once, both while running and paused; resuming must retain it
+  during preparation so the controls do not jump as the source is loaded. Check model
+  download/progress, pause, close/reopen the sheet, and background/foreground the
+  app. Closing the sheet must keep transcription progressing while reading;
+  reopening must show that same task with Pause enabled. After pausing, Resume
+  must work without changing tabs to refresh the audio source. Backgrounding
+  the app must not actively pause the task; while its process can execute,
+  completed batches continue advancing and returning shows the latest progress.
+  A pending download confirmation must remain unconfirmed through a background/
+  foreground cycle. Removing the Reader route saves and pauses, including when
+  waiting for download approval; reopening offers Resume. Configuration recreation
+  must not be treated as leaving the route. Background execution is best-effort,
+  with no foreground service or WorkManager guarantee; after process reclamation,
+  starting again resumes the saved checkpoint;
+  incomplete speech segments must neither vanish nor duplicate. Changing the
+  source or duration starts a new transcript. Complete transcripts offer
+  realignment; confirming Clear Transcription keeps the existing match. Verify
+  another book cannot start concurrent transcription, and deleting the active
+  book cannot recreate its files. Check download/decoder failures use localized
+  errors and leave usable checkpoints; retry with cached models while offline
+  and confirm no downloading label appears. Keep the screen awake while the
+  Reader transcription task is active, including with its sheet closed.
+  Compare highlighted passages and timing with the book/audio, especially
+  introductions, repeated text, ruby, silence, omitted sentences and audio ends.
+  Around silence-separated ASR segments, verify the next word's first character
+  survives even if its model timestamp falls inside leading context. Compare
+  continuous and checkpoint-resumed output for missing or duplicated prefixes;
+  keep hard-cut speech context. Existing transcripts may recover short word
+  fragments between real anchors, but must not highlight an entirely omitted
+  reply or bridge long silence.
+  Character coverage and subtitle cue match rate are different metrics; neither
+  alone verifies transcript accuracy. Exclude toc/caution/colophon source paths
+  for both SRT and transcription, retaining existing SRT multi-volume behavior.
+  `SasayakiTranscriptionReaderTest` checks asynchronous audio-source readiness,
+  download confirmation/cancellation, a single progress display, closing/reopening
+  controls, completion during reading and background/foreground continuation
+  using isolated cache fixtures. `SasayakiAudioDecoderDeviceTest` checks native
+  stereo downmixing, anti-alias filtering, absolute seek phase, MP3/Opus gapless beginnings,
+  AAC decoding, consistent first-audio-track selection, bounded descriptor slices,
+  and failure cleanup using generated
+  WAV and tracked synthetic compressed tones. Run it after native audio changes;
+  all fixtures live in cache and do not change books or preferences.
+  `SasayakiTranscriptionDeviceTest` also checks the Kotlin decoder boundary; its optional
+  native ASR test needs verified models in the app's no-backup model directory
+  and an explicit `-e realClip` scratch audio path; otherwise it is skipped and
+  never downloads models. Build the test APK separately, install with `adb
+  install -r`, and run the explicit class with `am instrument`. Remove only
+  the scratch audio afterwards. Also pause within the final 1.5 seconds: an
+  Android checkpoint must still offer Resume until all audio is processed.
 - Sasayaki linked and copied Ogg Opus playback with `testdata/opus_test.opus`.
   Confirm its title and artist metadata, all 22 `CHAPTERnnn` chapter entries,
   current-chapter centering without first flashing the default list position

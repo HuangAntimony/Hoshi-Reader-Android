@@ -622,6 +622,18 @@ class SasayakiMatcherTest {
     }
 
     @Test
+    fun excludesNonNarrativePathsCaseInsensitively() {
+        val paths = listOf("Text/TOC.xhtml", "Text/Caution.xhtml", "Text/COLOPHON.xhtml", "Text/story.xhtml")
+        val book = EpubBook(title = "Source filter", chapters = paths.mapIndexed { index, path ->
+            EpubChapter("$index", path, "application/xhtml+xml", "<body>これは同じ長い本文です。</body>")
+        })
+        val result = SasayakiMatcher.match(book, listOf(SasayakiCue("speech", 1.0, 3.0, "これは同じ長い本文です")))
+
+        assertEquals(3, result.matches.single().chapterIndex)
+        assertEquals(11, result.matches.single().length)
+    }
+
+    @Test
     fun skipsNonLinearAndNavSpineItemsLikeIosDuringMatch() {
         val root = tempFolder.newFolder("non-reader-spine-book")
         writeNonReaderSpineExtractedEpub(root)

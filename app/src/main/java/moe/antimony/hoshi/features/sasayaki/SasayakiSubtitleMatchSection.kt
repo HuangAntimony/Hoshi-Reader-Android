@@ -11,6 +11,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +25,10 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
@@ -39,6 +45,8 @@ internal fun SasayakiSubtitleMatchSection(
     currentMatchData: SasayakiMatchData?,
     onMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onMatchingChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -48,6 +56,12 @@ internal fun SasayakiSubtitleMatchSection(
     val selectSrtMessage = stringResource(R.string.sasayaki_select_srt_file)
     val selectedSrtFallback = stringResource(R.string.sasayaki_selected_srt)
     val matchFailedMessage = stringResource(R.string.sasayaki_match_failed)
+
+    SideEffect { onMatchingChange(matchUiState.isMatching) }
+    val currentMatchingChange by rememberUpdatedState(onMatchingChange)
+    DisposableEffect(Unit) {
+        onDispose { currentMatchingChange(false) }
+    }
 
     LaunchedEffect(currentMatchData) {
         displayedMatch = currentMatchData
@@ -70,6 +84,7 @@ internal fun SasayakiSubtitleMatchSection(
                         book = book,
                         cues = SasayakiParser.parseCues(srtBytes),
                     )
+                    currentCoroutineContext().ensureActive()
                     activeDependencies.bookRepository.saveSasayakiMatch(activeDependencies.bookEntry.root, nextMatch)
                     nextMatch
                 }
@@ -78,15 +93,16 @@ internal fun SasayakiSubtitleMatchSection(
                 onMatchUpdated(nextMatch)
                 matchUiState = matchUiState.finishMatching(errorMessage = null)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 matchUiState = matchUiState.finishMatching(
-                    errorMessage = error.localizedMessage ?: matchFailedMessage,
+                    errorMessage = matchFailedMessage,
                 )
             }
         }
     }
 
     val importer = rememberLauncherForActivityResult(FileImportContent()) { uri ->
-        if (uri == null || matchUiState.isMatching) return@rememberLauncherForActivityResult
+        if (uri == null || !enabled || matchUiState.isMatching) return@rememberLauncherForActivityResult
         runCatching {
             context.contentResolver.validateImportFile(uri, ImportFileType.SasayakiSubtitle)
         }.onFailure { error ->
@@ -114,8 +130,9 @@ internal fun SasayakiSubtitleMatchSection(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = sasayakiSubtitleMatchSummary(displayedMatch)
-                        ?: stringResource(R.string.sasayaki_no_subtitle_match),
+                    text = sasayakiSubtitleMatchSummary(displayedMatch, dependencies?.characterCount)?.let {
+                        stringResource(R.string.sasayaki_character_coverage, it)
+                    } ?: stringResource(R.string.sasayaki_no_subtitle_match),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -129,7 +146,7 @@ internal fun SasayakiSubtitleMatchSection(
                 } else {
                     stringResource(R.string.action_open)
                 },
-                actionEnabled = dependencies != null && !matchUiState.isMatching,
+                actionEnabled = enabled && dependencies != null && !matchUiState.isMatching,
                 onAction = { importer.launch(ImportFileType.SasayakiSubtitle.mimeTypes) },
             )
         }
