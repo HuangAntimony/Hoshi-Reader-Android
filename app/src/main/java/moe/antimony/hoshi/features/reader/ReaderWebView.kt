@@ -430,7 +430,14 @@ fun ReaderWebView(
             bookRepository.saveHighlights(root, nextHighlights)
         }
     }
-    fun addHighlight(color: HighlightColor, id: String, creation: ReaderHighlightCreationResult) {
+    fun changeHighlight(color: HighlightColor, id: String, result: ReaderHighlightResult) {
+        if (result !is ReaderHighlightCreationResult) {
+            val current = highlights.orEmpty()
+            val next = ReaderHighlights.applyEdit(current, result, color)
+            if (next != current) persistHighlights(next)
+            return
+        }
+        val creation = result
         val chapter = currentLoadChapter()
         val info = book.bookInfo.chapterInfo[chapter.href] ?: return
         val highlight = ReaderHighlight(
@@ -438,6 +445,7 @@ fun ReaderWebView(
             character = info.currentTotal + creation.start,
             offset = creation.offset,
             text = creation.text,
+            textFurigana = creation.textFurigana,
             color = color,
             createdAt = bookRepository.currentAppleReferenceDateSeconds(),
         )
@@ -1804,7 +1812,7 @@ fun ReaderWebView(
                             onReaderTapOutside = ::handleReaderTapOutside,
                             onReaderInteraction = ::handleReaderInteraction,
                             onImageTapped = ::openFullscreenImage,
-                            onHighlightCreated = ::addHighlight,
+                            onHighlightChanged = ::changeHighlight,
                             readerPopupBridgeHolder = readerPopupBridgeHolder,
                             readerPopupResourceHandler = readerPopupResourceHandler,
                             readerPopupFrames = readerLookupPopupPayloads,

@@ -570,6 +570,7 @@ class BookMetadataStorageTest {
                 character = 42,
                 offset = 7,
                 text = "食べる",
+                textFurigana = "食(た)べる",
                 color = HighlightColor.Green,
                 createdAt = 801187200.5,
             ),
@@ -582,6 +583,7 @@ class BookMetadataStorageTest {
         assertEquals(42, saved.getValue("character").jsonPrimitive.content.toInt())
         assertEquals(7, saved.getValue("offset").jsonPrimitive.content.toInt())
         assertEquals("食べる", saved.getValue("text").jsonPrimitive.content)
+        assertEquals("食(た)べる", saved.getValue("textFurigana").jsonPrimitive.content)
         assertEquals("green", saved.getValue("color").jsonPrimitive.content)
         assertEquals(801187200.5, saved.getValue("createdAt").jsonPrimitive.double, 0.0)
         assertEquals(highlights, storage.loadHighlights(root))

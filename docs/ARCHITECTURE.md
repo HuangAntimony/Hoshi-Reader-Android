@@ -270,6 +270,14 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   and chapter time remaining derive from one Kotlin-owned TOC range model;
   Gallery thumbnails and the fullscreen viewer reuse the existing safe EPUB
   resource path.
+- Reader highlights keep plain text/raw offsets for positioning and optional
+  iOS-compatible `textFurigana` for Contents display. The shared highlight asset
+  owns exact-range identity and returns explicit create/recolor/remove results;
+  Kotlin preserves record identity and creation time on edits through the
+  existing sidecar repository. VN extracts highlight text/readings from its
+  content stream and uses the range map only for screen projection. Batch
+  wrapping refreshes node offsets after each highlight so overlapping ranges
+  remain projectable after a screen rebuild.
 - Reader furigana mode is profile-scoped, with legacy hide-furigana booleans
   migrated to Hidden or Off. Shared selection consumes Toggle reveal taps and
   reveals whitespace-adjacent ruby groups; VN uses its existing source/clone

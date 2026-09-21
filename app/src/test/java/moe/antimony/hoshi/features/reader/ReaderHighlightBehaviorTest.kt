@@ -26,8 +26,8 @@ class ReaderHighlightBehaviorTest {
         )
 
         assertEquals(
-            """[{"id":"first","character":3,"offset":0,"text":"abc","color":"yellow","createdAt":1.0},{"id":"second","character":7,"offset":3,"text":"def","color":"blue","createdAt":1.0}]""",
-            json,
+            listOf(highlights[2], highlights[0]),
+            Json.decodeFromString<List<ReaderHighlight>>(requireNotNull(json)),
         )
     }
 
@@ -113,15 +113,15 @@ class ReaderHighlightBehaviorTest {
 
     @Test
     fun creationResultParsesValidWebViewJsonAndRejectsMissingData() {
-        val result = ReaderHighlightCreationResult.fromWebViewResult(
-            """{"start":4,"offset":9,"text":"食べる"}""",
+        val result = ReaderHighlightResult.fromWebViewResult(
+            """{"action":"created","start":4,"offset":9,"text":"食べる"}""",
         )
 
         assertEquals(ReaderHighlightCreationResult(start = 4, offset = 9, text = "食べる"), result)
-        assertNull(ReaderHighlightCreationResult.fromWebViewResult(null))
-        assertNull(ReaderHighlightCreationResult.fromWebViewResult("null"))
-        assertNull(ReaderHighlightCreationResult.fromWebViewResult("{}"))
-        assertNull(ReaderHighlightCreationResult.fromWebViewResult("not json"))
+        assertNull(ReaderHighlightResult.fromWebViewResult(null))
+        assertNull(ReaderHighlightResult.fromWebViewResult("null"))
+        assertNull(ReaderHighlightResult.fromWebViewResult("{}"))
+        assertNull(ReaderHighlightResult.fromWebViewResult("not json"))
     }
 
     @Test
@@ -151,6 +151,38 @@ class ReaderHighlightBehaviorTest {
         )
 
         assertEquals(highlight(id = "id-1", character = 5, offset = 2, text = "猫", color = HighlightColor.Purple, createdAt = 801187200.0), highlight)
+    }
+
+    @Test
+    fun furiganaSidecarRoundTripAndLegacyFallback() {
+        val legacy = highlight(id = "old", character = 5, offset = 2, text = "猫")
+        val oldJson = """{"id":"old","character":5,"offset":2,"text":"猫","color":"yellow","createdAt":1.0}"""
+        assertEquals(legacy, Json.decodeFromString<ReaderHighlight>(oldJson))
+        assertNull(legacy.textFurigana)
+        val annotated = Json.decodeFromString<ReaderHighlight>(oldJson.dropLast(1) + ",\"textFurigana\":\"猫(ねこ)\"}")
+        assertEquals("猫(ねこ)", annotated.textFurigana)
+        assertEquals(annotated, Json.decodeFromString<ReaderHighlight>(Json.encodeToString(annotated)))
+    }
+
+    @Test
+    fun explicitEditsPreserveMetadataAndDoNotToggleOnReplay() {
+        val original = highlight(id = "first", character = 5, offset = 2, text = "猫")
+            .copy(textFurigana = "猫(ねこ)")
+        val other = highlight(id = "second", character = 15, offset = 2, text = "猫")
+        val recolored = ReaderHighlights.applyEdit(listOf(original, other), ReaderHighlightResult.Recolored("first"), HighlightColor.Blue)
+        assertEquals(listOf(original.copy(color = HighlightColor.Blue), other), recolored)
+        assertEquals(recolored, ReaderHighlights.applyEdit(recolored, ReaderHighlightResult.Recolored("first"), HighlightColor.Blue))
+        assertEquals(listOf(other), ReaderHighlights.applyEdit(recolored, ReaderHighlightResult.Removed("first"), HighlightColor.Blue))
+        assertEquals(recolored, ReaderHighlights.applyEdit(recolored, ReaderHighlightResult.Removed("missing"), HighlightColor.Blue))
+    }
+
+    @Test
+    fun mutationResultsRejectInvalidPayloads() {
+        assertEquals(ReaderHighlightResult.Recolored("first"), ReaderHighlightResult.fromWebViewResult("""{"action":"recolored","id":"first"}"""))
+        assertEquals(ReaderHighlightResult.Removed("first"), ReaderHighlightResult.fromWebViewResult("""{"action":"removed","id":"first"}"""))
+        for (payload in listOf("null", "{}", "not json", """{"action":"removed","id":""}""", """{"action":"created","start":-1,"offset":0,"text":"猫"}""")) {
+            assertNull(ReaderHighlightResult.fromWebViewResult(payload))
+        }
     }
 
     private fun readerBook(): EpubBook =

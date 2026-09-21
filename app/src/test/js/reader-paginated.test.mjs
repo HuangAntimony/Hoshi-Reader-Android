@@ -211,6 +211,10 @@ class TestElement extends TestNode {
         this.childNodes = normalized;
     }
 
+    matches(selector) {
+        return selector.split(',').some((item) => item.trim().toUpperCase() === this.tagName);
+    }
+
     closest(selector) {
         const selectors = selector.split(',').map((item) => item.trim().toUpperCase());
         let node = this;
@@ -272,6 +276,17 @@ class TestRange {
         this.endOffset = 0;
         this.insertionParent = null;
         this.insertionIndex = null;
+    }
+
+    get startContainer() { return this.startNode; }
+    get endContainer() { return this.endNode; }
+    get collapsed() { return this.startNode === this.endNode && this.startOffset === this.endOffset; }
+
+    cloneRange() {
+        const range = new TestRange();
+        range.setStart(this.startNode, this.startOffset);
+        range.setEnd(this.endNode, this.endOffset);
+        return range;
     }
 
     selectNodeContents(node) {
@@ -1465,3 +1480,65 @@ test('Sasayaki includes ruby base punctuation without reading annotation text or
         assert.equal(ranges.map(({ node, start, end }) => node.textContent.slice(start, end)).join(''), '「𠮟。」');
     }
 });
+
+
+for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${sourceUrl.pathname.split('/').pop()} persists ruby and edits exact raw ranges through pending selection`, () => {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('あ 、𠮟'));
+        const ruby = new TestElement('ruby');
+        const base = new TestElement('span');
+        const bold = new TestElement('b'); bold.appendChild(new TestText('東'));
+        base.appendChild(bold); base.appendChild(new TestText('京'));
+        ruby.appendChild(base);
+        const rp = new TestElement('rp'); rp.appendChild(new TestText('(')); ruby.appendChild(rp);
+        const rt = new TestElement('rt'); rt.appendChild(new TestText('とうきょう')); ruby.appendChild(rt);
+        body.appendChild(ruby);
+        body.appendChild(new TestText('、東京'));
+        const { reader, window, document } = loadReader(body, sourceUrl, {
+            highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+        });
+        reader.buildNodeOffsets();
+        const highlights = window.hoshiHighlights;
+        const select = (offset, length) => {
+            const segments = highlights.collectSegments(offset, length);
+            const range = document.createRange();
+            range.setStart(segments[0].node, segments[0].start);
+            range.setEnd(segments.at(-1).node, segments.at(-1).end);
+            window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => range, removeAllRanges() {} });
+        };
+        select(4, 2);
+        assert.equal(highlights.prepareHighlightSelection(), true);
+        window.getSelection = () => null;
+        const created = highlights.createHighlight('yellow', 'ruby');
+        assert.equal(created.start, 2);
+        assert.equal(created.offset, 4);
+        assert.equal(created.text, '東京');
+        assert.equal(created.textFurigana, '東京(とうきょう)');
+        select(3, 3);
+        const overlap = highlights.createHighlight('blue', 'overlap');
+        assert.equal(overlap.action, 'created');
+        assert.equal(overlap.text, '𠮟東京');
+        assert.equal(overlap.textFurigana, '𠮟東京(とうきょう)');
+        select(7, 2);
+        assert.equal(highlights.createHighlight('pink', 'repeated').textFurigana, null);
+        assert.equal(highlights.highlights.size, 3);
+        select(4, 2);
+        assert.equal(highlights.createHighlight('green', 'unused').action, 'recolored');
+        assert.equal(highlights.highlights.get('ruby').color, 'green');
+        assert.equal(highlights.highlights.size, 3);
+        select(4, 2);
+        assert.equal(highlights.createHighlight('green', 'unused').action, 'removed');
+        assert.equal(highlights.highlights.size, 2);
+        assert.equal(highlights.textForRange(0, 9).text, 'あ 、𠮟東京、東京');
+        assert.equal(highlights.textForRange(4, 2).textFurigana, '東京(とうきょう)');
+        // Reloading persisted data must also rebuild exact-range identity.
+        const restored = loadReader(new TestElement('body'), sourceUrl, {
+            highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+        });
+        restored.document.body.appendChild(new TestText('あ 、𠮟東京、東京'));
+        restored.window.hoshiHighlights.applyHighlights([{ id: 'saved', color: 'blue', offset: 3, text: '𠮟東京' }]);
+        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 3), 'saved');
+        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 2), null);
+    });
+}

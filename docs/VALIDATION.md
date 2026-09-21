@@ -86,6 +86,19 @@ node --test app/src/test/js/*.test.mjs
 
 ## Reader And Lookup
 
+- In paginated, continuous, and VN modes, use the native selection color menu
+  on plain text and ruby split across styled nodes. Contents should show base
+  text with parenthesized readings, while old highlights without readings still
+  show plain text. Select exactly the same raw range to recolor without adding
+  a record, then choose its current color to remove it. Partial overlaps and
+  repeated text at different positions remain independent. Include whitespace,
+  punctuation and supplementary characters before/inside the range; verify
+  Contents jumps, chapter changes, restart and sync preserve location/readings.
+  In VN, also complete progressive reveal, leave/return to rebuild the screen,
+  and check both overlapping highlights still paint their full visible ranges.
+  Selecting only a visible part of a cross-screen highlight creates a separate
+  range rather than editing the complete stored range. Preserve device data.
+
 ### Theme
 
 Preserve app data and cover all four tabs, every settings category, native Reader

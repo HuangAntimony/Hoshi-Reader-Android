@@ -323,6 +323,10 @@ class TestElement extends TestNode {
         return clone;
     }
 
+    matches(selector) {
+        return selector.split(',').some((item) => matchesSelector(this, item.trim()));
+    }
+
     closest(selector) {
         const selectors = selector.split(',').map((item) => item.trim());
         let node = this;
@@ -2186,10 +2190,10 @@ test('visual novel first created highlight wraps the current screen immediately'
         currentScreen(reader).querySelectorAll('.hoshi-highlight').map((node) => node.textContent),
         ['うえ'],
     );
-    assert.equal(window.hoshiHighlights.wrappers.get('first').length, 1);
+    assert.equal(window.hoshiHighlights.highlights.get('first').wrappers.length, 1);
     assert.equal(
         JSON.stringify(reader.initialHighlights),
-        JSON.stringify([{ id: 'first', color: 'pink', offset: 3, text: 'うえ' }]),
+        JSON.stringify([{ id: 'first', color: 'pink', offset: 3, text: 'うえ', textFurigana: null }]),
     );
 });
 
@@ -2211,7 +2215,7 @@ test('visual novel persisted highlights wrap only the visible raw range on each 
         currentScreen(reader).querySelectorAll('.hoshi-highlight').map((node) => node.textContent),
         ['う'],
     );
-    assert.equal(window.hoshiHighlights.wrappers.get('h1').length, 1);
+    assert.equal(window.hoshiHighlights.highlights.get('h1').wrappers.length, 1);
 });
 
 test('visible node offsets remain chapter-level after rendering later screens', async () => {
@@ -2757,4 +2761,125 @@ test('VN preserves CSS paragraph punctuation boundaries before detaching source 
     await reader.initialize();
     const results = reader.collectSasayakiCueRanges([{ id: 'a', start: 0, length: 1 }, { id: 'b', start: 1, length: 1 }]);
     assert.deepEqual(Array.from(results, ({ ranges }) => ranges.map(({ node, start, end }) => node.textContent.slice(start, end)).join('')), ['前', '……次。']);
+});
+
+
+function selectHighlightRawRange(loaded, offset, length) {
+    const segments = loaded.reader.highlightSegmentsForChapterRawRange(offset, length);
+    assert.ok(segments.length);
+    const range = loaded.document.createRange();
+    range.setStart(segments[0].node, segments[0].start);
+    const last = segments.at(-1);
+    range.setEnd(last.node, last.end);
+    loaded.window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => range, removeAllRanges() {} });
+}
+
+test('exact highlight range recolors then removes and survives VN screen rebuilds', async () => {
+    const loaded = await initializeReader(bodyWith(p('あ、𠮟猫'), p('続き')), {
+        revealSpeed: 0, highlightsScript: readerHighlightsSource(),
+    });
+    const highlights = loaded.window.hoshiHighlights;
+    selectHighlightRawRange(loaded, 2, 2);
+    const created = highlights.createHighlight('yellow', 'original');
+    assert.equal(created.action, 'created');
+    assert.equal(created.start, 1);
+    assert.equal(created.offset, 2);
+    assert.equal(created.text, '𠮟猫');
+    selectHighlightRawRange(loaded, 2, 2);
+    assert.equal(JSON.stringify(highlights.createHighlight('pink', 'unused')), JSON.stringify({ action: 'recolored', id: 'original' }));
+    assert.equal(loaded.reader.initialHighlights.length, 1);
+    assert.equal(loaded.reader.initialHighlights[0].color, 'pink');
+    loaded.reader.paginate('forward');
+    loaded.reader.paginate('backward');
+    assert.equal(currentScreen(loaded.reader).querySelectorAll('.hoshi-highlight-pink').length, 1);
+    selectHighlightRawRange(loaded, 2, 2);
+    assert.equal(JSON.stringify(highlights.createHighlight('pink', 'unused2')), JSON.stringify({ action: 'removed', id: 'original' }));
+    loaded.reader.paginate('forward');
+    loaded.reader.paginate('backward');
+    assert.equal(loaded.reader.initialHighlights.length, 0);
+    assert.equal(currentScreen(loaded.reader).querySelectorAll('.hoshi-highlight').length, 0);
+});
+
+test('highlight text collects styled ruby once from source even after wrapping', async () => {
+    const ruby = new TestElement('ruby');
+    const base = new TestElement('span');
+    const bold = new TestElement('b');
+    bold.appendChild(new TestText('東'));
+    base.appendChild(bold);
+    base.appendChild(new TestText('京'));
+    ruby.appendChild(base);
+    const rp = new TestElement('rp'); rp.appendChild(new TestText('(')); ruby.appendChild(rp);
+    const rt = new TestElement('rt'); rt.appendChild(new TestText('とうきょう')); ruby.appendChild(rt);
+    const paragraph = p('前、'); paragraph.appendChild(ruby); paragraph.appendChild(new TestText('。'));
+    const loaded = await initializeReader(bodyWith(paragraph), { revealSpeed: 0, highlightsScript: readerHighlightsSource() });
+    selectHighlightRawRange(loaded, 2, 2);
+    const result = loaded.window.hoshiHighlights.createHighlight('yellow', 'ruby');
+    assert.equal(result.text, '東京');
+    assert.equal(result.textFurigana, '東京(とうきょう)');
+    selectHighlightRawRange(loaded, 1, 4);
+    const overlapping = loaded.window.hoshiHighlights.createHighlight('blue', 'overlap');
+    assert.equal(overlapping.text, '、東京。');
+    assert.equal(overlapping.textFurigana, '、東京(とうきょう)。');
+    assert.equal(loaded.reader.initialHighlights.length, 2);
+});
+
+test('VN source ruby and full highlight identity survive clipped screens and reveal completion', async () => {
+    const loaded = await initializeReader(bodyWith(paragraphWith('一', rubyText('二三', 'にさん'), '四五')), {
+        mode: 'block', charactersPerScreen: 2, revealSpeed: 10,
+        highlightsScript: readerHighlightsSource(),
+        initialHighlights: [{ id: 'cross', color: 'yellow', offset: 0, text: '一二三四', textFurigana: '一二三(にさん)四' }],
+    });
+    const { reader, window } = loaded;
+    reader.completeCurrentReveal();
+    assert.equal(window.hoshiHighlights.findHighlight(0, 4), 'cross');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    reader.completeCurrentReveal();
+    assert.equal(window.hoshiHighlights.findHighlight(0, 4), 'cross');
+    assert.equal(window.hoshiHighlights.findHighlight(1, 2), null);
+    const fullText = window.hoshiHighlights.textForRange(0, 4);
+    assert.equal(fullText.text, '一二三四');
+    assert.equal(fullText.textFurigana, '一二三(にさん)四');
+    selectHighlightRawRange(loaded, 1, 2);
+    assert.equal(window.hoshiHighlights.createHighlight('pink', 'ruby-only').action, 'created');
+    assert.equal(reader.initialHighlights.length, 2);
+    reader.completeCurrentReveal();
+    selectHighlightRawRange(loaded, 1, 2);
+    assert.equal(window.hoshiHighlights.createHighlight('blue', 'unused').action, 'recolored');
+    reader.paginate('forward');
+    reader.completeCurrentReveal();
+    reader.paginate('backward');
+    assert.equal(reader.initialHighlights.find((item) => item.id === 'ruby-only').color, 'blue');
+    assert.equal(window.hoshiHighlights.highlights.get('ruby-only').color, 'blue');
+    assert.equal(window.hoshiHighlights.highlights.get('cross').length, 4);
+    window.hoshiHighlights.removeHighlight('cross');
+    reader.completeCurrentReveal();
+    assert.equal(reader.initialHighlights.length, 1);
+    assert.equal(window.hoshiHighlights.findHighlight(0, 4), null);
+});
+
+test('VN restores overlapping highlight geometry before recoloring and removing either range', async () => {
+    const loaded = await initializeReader(bodyWith(p('あいうえお'), p('次')), {
+        revealSpeed: 0, highlightsScript: readerHighlightsSource(),
+    });
+    const { reader, window } = loaded;
+    const highlights = window.hoshiHighlights;
+    selectHighlightRawRange(loaded, 0, 3);
+    highlights.createHighlight('yellow', 'a');
+    selectHighlightRawRange(loaded, 1, 3);
+    highlights.createHighlight('blue', 'b');
+    reader.paginate('forward');
+    reader.paginate('backward');
+    const wrappedText = (id) => highlights.highlights.get(id).wrappers.map((node) => node.textContent).join('');
+    assert.equal(wrappedText('a'), 'あいう');
+    assert.equal(wrappedText('b'), 'いうえ');
+    selectHighlightRawRange(loaded, 1, 3);
+    assert.equal(highlights.createHighlight('pink', 'unused').action, 'recolored');
+    assert.equal(wrappedText('b'), 'いうえ');
+    selectHighlightRawRange(loaded, 0, 3);
+    assert.equal(highlights.createHighlight('yellow', 'unused').action, 'removed');
+    assert.equal(wrappedText('b'), 'いうえ');
+    reader.paginate('forward');
+    reader.paginate('backward');
+    assert.equal(wrappedText('b'), 'いうえ');
+    assert.equal(highlights.highlights.has('a'), false);
 });

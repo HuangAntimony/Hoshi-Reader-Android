@@ -91,7 +91,7 @@ internal fun ChapterWebView(
     onReaderTapOutside: () -> Unit,
     onReaderInteraction: () -> Unit,
     onImageTapped: (String) -> Unit,
-    onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit,
+    onHighlightChanged: (HighlightColor, String, ReaderHighlightResult) -> Unit,
     readerPopupBridgeHolder: ReaderLookupPopupBridgeCallbackHolder,
     readerPopupResourceHandler: ReaderLookupPopupResourceHandler,
     readerPopupFrames: List<ReaderLookupPopupFramePayload>,
@@ -110,7 +110,7 @@ internal fun ChapterWebView(
     val currentOnReaderTapOutside = rememberUpdatedState(onReaderTapOutside)
     val currentOnReaderInteraction = rememberUpdatedState(onReaderInteraction)
     val currentOnImageTapped = rememberUpdatedState(onImageTapped)
-    val currentOnHighlightCreated = rememberUpdatedState(onHighlightCreated)
+    val currentOnHighlightChanged = rememberUpdatedState(onHighlightChanged)
     val currentReaderPopupResourceHandler = rememberUpdatedState(readerPopupResourceHandler)
     val currentReaderPopupFrames = rememberUpdatedState(readerPopupFrames)
     val currentOnNextChapter = rememberUpdatedState(onNextChapter)
@@ -263,8 +263,8 @@ internal fun ChapterWebView(
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
-                this.onHighlightCreated = { color, id, creation ->
-                    currentOnHighlightCreated.value(color, id, creation)
+                this.onHighlightChanged = { color, id, result ->
+                    currentOnHighlightChanged.value(color, id, result)
                 }
                 hideForReaderRestore()
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -602,7 +602,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         })
     }
 
-    var onHighlightCreated: (HighlightColor, String, ReaderHighlightCreationResult) -> Unit = { _, _, _ -> }
+    var onHighlightChanged: (HighlightColor, String, ReaderHighlightResult) -> Unit = { _, _, _ -> }
     private var nativeSelectionActionModeActive = false
     private var nativeSelectionActionMode: ActionMode? = null
     private var nativeSelectionContentRect: Rect? = null
@@ -724,8 +724,8 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         val id = UUID.randomUUID().toString()
         dismissHighlightColorPopup()
         evaluateJavascript(ReaderHighlightCommand.Create(color, id).source) { result ->
-            ReaderHighlightCreationResult.fromWebViewResult(result)?.let { creation ->
-                onHighlightCreated(color, id, creation)
+            ReaderHighlightResult.fromWebViewResult(result)?.let { change ->
+                onHighlightChanged(color, id, change)
             }
             mode?.finish()
         }
@@ -747,7 +747,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         nativeSelectionActionMode?.finish()
         dismissHighlightColorPopup()
         setNativeSelectionActionMode(null)
-        onHighlightCreated = { _, _, _ -> }
+        onHighlightChanged = { _, _, _ -> }
     }
 }
 

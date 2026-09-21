@@ -564,6 +564,22 @@
       return { hasText: false, startChar: char, endChar: char, startRaw: raw, endRaw: raw };
     },
 
+    collectRawSegments: function(offset, length) {
+      var end = offset + length;
+      var segments = [];
+      for (var i = 0; i < this.textEntries.length; i++) {
+        var entry = this.textEntries[i];
+        if (entry.startRaw >= end) break;
+        if (entry.endRaw <= offset) continue;
+        segments.push({
+          node: entry.node,
+          start: utf16OffsetForRawCount(entry.text, Math.max(0, offset - entry.startRaw)),
+          end: utf16OffsetForRawCount(entry.text, Math.min(entry.endRaw, end) - entry.startRaw)
+        });
+      }
+      return segments;
+    },
+
     sourcePositionForRawOffset: function(rawOffset) {
       var target = Number(rawOffset);
       if (!Number.isFinite(target) || target < 0 || target >= this.totalRawChars) return null;

@@ -1,16 +1,30 @@
 package moe.antimony.hoshi.features.reader
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
 import moe.antimony.hoshi.epub.ReaderHighlight
+import moe.antimony.hoshi.epub.HighlightColor
 
 internal object ReaderHighlights {
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
+    }
+
+    fun applyEdit(
+        highlights: List<ReaderHighlight>,
+        result: ReaderHighlightResult,
+        color: HighlightColor,
+    ): List<ReaderHighlight> = when (result) {
+        is ReaderHighlightResult.Recolored -> highlights.map {
+            if (it.id == result.id) it.copy(color = color) else it
+        }
+        is ReaderHighlightResult.Removed -> highlights.filterNot { it.id == result.id }
+        is ReaderHighlightCreationResult -> highlights
     }
 
     fun chapterHighlightsJson(
@@ -102,18 +116,38 @@ internal data class ReaderHighlightSection(
 )
 
 @Serializable
+@SerialName("created")
 internal data class ReaderHighlightCreationResult(
     val start: Int,
     val offset: Int,
     val text: String,
-) {
-    companion object {
-        private val json = Json { ignoreUnknownKeys = true }
+    val textFurigana: String? = null,
+) : ReaderHighlightResult
 
-        fun fromWebViewResult(result: String?): ReaderHighlightCreationResult? {
-            val trimmed = result?.trim().orEmpty()
-            if (trimmed.isBlank() || trimmed == "null" || trimmed == "undefined") return null
-            return runCatching { json.decodeFromString<ReaderHighlightCreationResult>(trimmed) }.getOrNull()
+@Serializable
+internal sealed interface ReaderHighlightResult {
+    @Serializable
+    @SerialName("recolored")
+    data class Recolored(val id: String) : ReaderHighlightResult
+
+    @Serializable
+    @SerialName("removed")
+    data class Removed(val id: String) : ReaderHighlightResult
+
+    companion object {
+        private val json = Json {
+            ignoreUnknownKeys = true
+            classDiscriminator = "action"
         }
+
+        fun fromWebViewResult(result: String?): ReaderHighlightResult? = runCatching {
+            json.decodeFromString<ReaderHighlightResult>(result ?: return null).takeIf {
+                when (it) {
+                    is ReaderHighlightCreationResult -> it.start >= 0 && it.offset >= 0 && it.text.isNotEmpty()
+                    is Recolored -> it.id.isNotBlank()
+                    is Removed -> it.id.isNotBlank()
+                }
+            }
+        }.getOrNull()
     }
 }

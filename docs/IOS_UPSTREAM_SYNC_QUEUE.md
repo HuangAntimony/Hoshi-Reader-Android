@@ -16,42 +16,7 @@ This document tracks open Android work after checking iOS upstream `develop`.
 Only open work is listed below. After removing completed slices, renumber the
 remaining slices consecutively from 1 and update all slice references.
 
-### 1. Reader highlight ruby text and exact-range editing
-
-Status: pending Android sync.
-
-Commits: `00f95c4`, `21971bb`.
-
-Dependency/value reasoning:
-
-- Uses the completed shared text/offset normalization; adds useful highlight
-  editing without replacing Android's existing native selection menu.
-
-iOS behavior to mirror:
-
-- Persist optional `textFurigana` as base text plus parenthesized readings and
-  show it in Contents. Selecting an identical raw range recolors its existing
-  highlight; choosing its current color removes it.
-
-Android current gap:
-
-- `ReaderHighlight.kt`, `ReaderHighlightCreationResult`, `highlights.js`, and
-  `ReaderHighlightSheet.kt` carry/display only plain `text`.
-  `hoshiHighlights.createHighlight()` always wraps a new ID; it has no range
-  identity metadata or recolor/remove result. VN's highlight creation adapter
-  in `reader-visual-novel.js` also needs the same source-range behavior.
-
-Suggested slice:
-
-- Extend compatible sidecars and creation/update results, share exact-range
-  matching, and update the Kotlin persistence/Contents flow.
-
-Validation:
-
-- Legacy sidecars, ruby across styled nodes, repeated selection with same/new
-  color, restart/sync, all reader modes, and raw versus normalized offsets.
-
-### 2. Book search literal matching and landing highlight
+### 1. Book search literal matching and landing highlight
 
 Status: partial Android implementation; remaining parity work.
 
@@ -60,7 +25,7 @@ Commits: `b7f09ca` (search behavior only).
 Dependency/value reasoning:
 
 - Build on the completed shared normalization and existing Contents search;
-  reuse highlight range projection after slice 1 without storing transient
+  reuse the completed highlight range projection without storing transient
   search marks.
 
 iOS behavior to mirror:
@@ -91,7 +56,7 @@ Validation:
   bracketed complete sentences, 100-hit limit, jump/back/forward, page-turn
   clearing and supplementary-character offsets in all reader modes.
 
-### 3. Lookup popup two-column layout and dictionary CSS isolation
+### 2. Lookup popup two-column layout and dictionary CSS isolation
 
 Status: pending Android sync.
 
@@ -140,7 +105,7 @@ Validation:
 - Run `node --test app/src/test/js/*.test.mjs`, focused settings tests,
   localization tests, and lint.
 
-### 4. Frequency sorting controls and import/update feedback
+### 3. Frequency sorting controls and import/update feedback
 
 Status: partial native support; pending Android UI/bridge integration.
 
@@ -187,7 +152,7 @@ Validation:
   equal/missing frequencies; mixed valid/invalid batch imports and recovery;
   automatic low-RAM with the manual setting off and unchanged manual behavior.
 
-### 5. Reader navigation and options toolbar
+### 4. Reader navigation and options toolbar
 
 Status: partial Android implementation; remaining visual/interaction parity.
 
@@ -226,7 +191,7 @@ Validation:
   routing, Sasayaki eligibility, focus toggles/history, horizontal/vertical
   continuous and paginated/VN content, custom/dark/e-ink themes and rotation.
 
-### 6. Reader WebView line-box CSS parity
+### 5. Reader WebView line-box CSS parity
 
 Status: pending Android sync.
 
@@ -259,7 +224,7 @@ Validation:
 - Paginated/continuous horizontal and vertical writing, ruby, cover and
   multi-image pages, line height, progress, and restore.
 
-### 7. App accent and stroke-order font attribution
+### 6. App accent and stroke-order font attribution
 
 Status: pending Android sync.
 
@@ -297,7 +262,6 @@ Validation:
 | --- | --- | --- | --- |
 | `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
 | `bdf71a6` | 2026-06-07 | Remove Reader WebKit line-box property | Pending removal of retained Android declaration |
-| `00f95c4`, `21971bb` | 2026-08-12 / 08-13 | Highlight ruby text and exact-range editing | Pending sidecar/bridge/range editing |
 | `b7f09ca` (search portion) | 2026-08-13 | Book search | Pending literal search, snippets and landing marks |
 | `165992a`, `e849e36` | 2026-08-16 / 08-17 | Frequency sorting and final labels | Pending Kotlin/JNI/settings; remaining overview wording |
 | `222a72b`, `7dd3f49` | 2026-08-31 / 09-02 | Import diagnostics and automatic low-RAM updates | Pending per-file reasons and automatic import policy |
@@ -306,14 +270,20 @@ Validation:
 
 ## Suggested Implementation Order
 
-1. Highlight sidecar/range editing (1), then book search remaining parity (2).
-2. Popup layout/CSS isolation (3).
+1. Book search remaining parity (1), building on completed highlight range editing.
+2. Popup layout/CSS isolation (2).
 3. Native frequency options/import diagnostics, then settings and automatic
-   low-RAM update policy (4).
-4. Reader navigation/options toolbar (5), building on available statistics.
-5. Reader line-box CSS parity (6), app accent and font attribution (7).
+   low-RAM update policy (3).
+4. Reader navigation/options toolbar (4), building on available statistics.
+5. Reader line-box CSS parity (5), app accent and font attribution (6).
 
 ## Covered Or No Android Action
+
+- `00f95c4`, `21971bb`: Reader highlights persist optional iOS-compatible
+  `textFurigana`, shown in Contents with plain-text fallback. Exact chapter raw
+  ranges recolor the existing ID or remove it when the same color is selected.
+  All three modes share this behavior; VN reads text/readings from its source
+  stream and rebuilds screen projections, including overlapping highlights.
 
 - `53fdb72`: Reader route loading failures now resolve to one generic state.
   `ReaderOpenFailurePage` shows localized neutral error UI and closes through
@@ -350,7 +320,7 @@ Validation:
   native visible text excludes `rt`/`rp` contents. Reader-facts version 3
   refreshes cached counts and TOC offsets. Existing Sasayaki matches are retained;
   affected books need the SRT selected again. The search portion of `b7f09ca`
-  remains open in slice 2.
+  remains open in slice 1.
 - `7b9dda8`: both Anki backends resolve tag handlebars through the field resolver,
   replacing substitution whitespace with underscores. New/rebuilt formats use
   `hoshi`; saved tags retain their values.
@@ -421,7 +391,7 @@ Validation:
 - `e833279`, `e7b08b8`, `1992872`, `c1e4e57`: intermediate hoshidicts bumps are
   superseded by the final dictionary behavior; Android already exposes Kanji,
   pitch and transcription data. Explicit frequency option integration is the
-  remaining bridge gap described in slice 4.
+  remaining bridge gap described in slice 3.
 - `77a7eaa`, `19bd095`: iOS cleanup and unwrap removal do not define additional
   Android-visible behavior.
 - `188284b`: iOS local-audio launch/actor initialization fix has no direct
@@ -488,17 +458,17 @@ Validation:
 - `7c50443`, `434ed70`, `aa1994f`: dependency revision metadata only. Android's
   vendored native library already supports frequency `LookupOptions`, IPA/
   transcriptions and importer error results; expose missing Kotlin/JNI behavior
-  in slice 4 rather than queueing revision bumps.
+  in slice 3 rather than queueing revision bumps.
 - `7dd3f49` (query-release mechanics): Android's
   `DictionaryLookupQueryService.rebuild()` serializes complete replacement
   sessions and destroys the prior session after its atomic swap; the Swift
   bundle-release sequence is not an extra Android behavior requirement. The
-  automatic low-RAM difference remains slice 4.
+  automatic low-RAM difference remains slice 3.
 - `93ba3be` (popup defaults): Android already defaults popup width/height to
   500/500 and permits height 1000, exceeding the iOS increase to 350/310.
   Statistics sync defaults on only when unset.
 - `8024df1` (SwiftLAME attribution): Android does not ship SwiftLAME; no action.
-  Attribution for the downloadable stroke-order font remains slice 7.
+  Attribution for the downloadable stroke-order font remains slice 6.
 - `efd89fc`, `e1b0854`: README/issue-template changes only.
 - `0425880`, `c71a2a9`, `d76127d`, `f86eb95`, `d8e150d`, `8137e1e`:
   iOS version metadata only.

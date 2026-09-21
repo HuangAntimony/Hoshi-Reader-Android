@@ -8,6 +8,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Preserve furigana readings in Reader highlights and show them in Contents.
+  Select an existing highlight's exact text range to change its color, or choose
+  its current color to remove it, in paginated, continuous, and VN modes.
+
 - Add an optional “Hide thumbnails when collapsed” switch in Manage Shelves.
   It defaults off; when enabled, collapsed shelves show only their title row.
 

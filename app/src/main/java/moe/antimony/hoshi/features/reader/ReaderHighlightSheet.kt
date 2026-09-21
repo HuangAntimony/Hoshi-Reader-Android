@@ -55,7 +55,7 @@ internal fun ReaderHighlightRow(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                text = highlight.text.trim(),
+                text = (highlight.textFurigana ?: highlight.text).trim(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 5,

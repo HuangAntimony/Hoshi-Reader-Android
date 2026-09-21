@@ -1872,13 +1872,21 @@ window.hoshiReader = {
     var originalRemoveHighlight = typeof highlights.removeHighlight === 'function'
       ? highlights.removeHighlight.bind(highlights)
       : null;
+    highlights.collectTextSegments = function(offset, length) {
+      return reader.contentStream.collectRawSegments(offset, length);
+    };
     highlights.collectSegments = function(offset, length) {
       return reader.highlightSegmentsForChapterRawRange(offset, length);
     };
     if (originalCreateHighlight) {
       highlights.createHighlight = function(color, id) {
         var result = originalCreateHighlight(color, id);
-        if (result) reader.rememberCreatedHighlight(id, color, result);
+        if (result && result.action === 'created') reader.rememberCreatedHighlight(id, color, result);
+        if (result && result.action === 'recolored') {
+          reader.initialHighlights = reader.initialHighlights.map(function(highlight) {
+            return highlight.id === result.id ? Object.assign({}, highlight, { color: color }) : highlight;
+          });
+        }
         return result;
       };
     }
@@ -1900,7 +1908,8 @@ window.hoshiReader = {
       id: id,
       color: color,
       offset: result.offset,
-      text: result.text
+      text: result.text,
+      textFurigana: result.textFurigana
     });
     this.initialHighlights = highlights;
   },
@@ -1912,12 +1921,12 @@ window.hoshiReader = {
   },
   clearCurrentHighlightWrappers: function() {
     var highlights = window.hoshiHighlights;
-    if (!highlights || !highlights.wrappers || typeof highlights.wrappers.forEach !== 'function') return;
+    if (!highlights || !highlights.highlights || typeof highlights.highlights.forEach !== 'function') return;
     var wrapperGroups = [];
-    highlights.wrappers.forEach(function(wrappers) {
-      wrapperGroups.push(wrappers);
+    highlights.highlights.forEach(function(entry) {
+      wrapperGroups.push(entry.wrappers);
     });
-    highlights.wrappers.clear();
+    highlights.highlights.clear();
     for (var i = 0; i < wrapperGroups.length; i++) {
       this.unwrap(wrapperGroups[i]);
     }
@@ -1925,7 +1934,7 @@ window.hoshiReader = {
   applyCurrentScreenHighlights: function() {
     var highlights = Array.isArray(this.initialHighlights) ? this.initialHighlights : [];
     this.patchHighlightsForVisualNovel();
-    if (!highlights.length || !window.hoshiHighlights || typeof window.hoshiHighlights.applyHighlights !== 'function') return;
+    if (!window.hoshiHighlights || typeof window.hoshiHighlights.applyHighlights !== 'function') return;
     this.clearCurrentHighlightWrappers();
     window.hoshiHighlights.applyHighlights(highlights);
   },
