@@ -920,6 +920,13 @@ Validate relevant sync/update/Sasayaki changes with:
   Reader transcription task is active, including with its sheet closed.
   Compare highlighted passages and timing with the book/audio, especially
   introductions, repeated text, ruby, silence, omitted sentences and audio ends.
+  Reproduce ASR omissions with PCM from the production decoder, preserving its
+  equal-weight channel mixing and absolute sample clock; generic FFmpeg mono
+  conversion can change the input gain. Confirm the original token text and
+  timestamps on the target device before comparing segment boundaries or padding;
+  desktop quantized inference can differ even with identical PCM and model files.
+  Inspect VAD probabilities and actual recognition input ranges to distinguish
+  skipped speech from words omitted by recognition.
   Around silence-separated ASR segments, verify the next word's first character
   survives even if its model timestamp falls inside leading context. Compare
   continuous and checkpoint-resumed output for missing or duplicated prefixes;
