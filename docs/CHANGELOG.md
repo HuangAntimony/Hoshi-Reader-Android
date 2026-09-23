@@ -29,6 +29,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   or adjacent cue edges around a comma. Retain recognized text at EPUB chapter edges,
   short kana/kanji replies, contracted names, and comma-separated numeric expressions;
   preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
+  Keep recognized words beside omitted cues and inside long missing passages;
+  retain reliably timed text when another token has an abnormal duration, and account
+  for kana reading length when matching a shorter kanji spelling.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside

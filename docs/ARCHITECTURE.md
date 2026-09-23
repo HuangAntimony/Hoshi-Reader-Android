@@ -580,22 +580,34 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Commas still split display cues but retain shared sentence context for scoring.
   Short kana/kanji rewrites spanning one comma can use that sentence's confidence when both
   cues have recognized text and no whole omitted cue lies between them; proportional
-  token allocation gives the two cues disjoint time ranges at the comma.
+  token allocation gives the two cues disjoint time ranges at the comma. Cross-cue
+  error blocks compare each cue separately, retaining unique reading candidates while
+  letting competing name spellings veto ambiguous assignments. Entire recovered cues
+  require complete original token ranges and more than a single ambiguous character;
+  two supported sentence edges split only at a unique compatible original token boundary.
   Plain/ruby track selection weighs the affected text, not the length of surrounding
   anchors. Gap edit alignment prefers exact letters when edit costs tie and distinguishes
-  token insertions from text deletions. Short gaps with a substantial exact run allow
+  token insertions from text deletions. Both axes remain bounded to 384 characters;
+  a length imbalance does not discard distinctive recognized islands. Unique one-kanji
+  cues or two-character cue endings immediately beside a real anchor can pin the local
+  alignment, preventing a long omission from moving them into a later repeated word.
+  Short gaps with a substantial exact run allow
   more spelling differences; each uncertain block uses only its own tokens and requires
   minimum evidence from its sentence before inferring changed or omitted fragments. Compatible
   kana/kanji recovery requires existing kana to occur in order in the candidate reading
   and uses bounded lengths, not an automatic pronunciation dictionary. An entirely rewritten
-  short cue inside a larger gap additionally needs speech separated from both neighbors;
+  short cue lacking sentence evidence additionally needs speech separated from both neighbors;
   an extra spoken suffix cannot supply an omitted reply. Strong sentence evidence allows
   short contracted spellings such as a multi-character name recognized as one token.
   Bounded edit alignment treats individual Arabic/kanji digits as equivalent without
   merging comma-separated cues or synthesizing numeric tokens. A partial sentence
   edge can be recovered beside an omitted cue only when that cue cannot plausibly
   claim the same tokens. Explicit-token repair checks token duration, excluding
-  surrounding pauses. Ruby syllables sharing a source character merge their timings.
+  surrounding pauses. Kana/kanji rewrites retain their spoken character count for duration
+  validation, so a compact kanji spelling is not rejected solely for its shorter length.
+  Ruby syllables sharing a source character merge their timings. An abnormally long
+  token does not discard reliably timed neighboring fragments; each resulting fragment
+  is checked again for coverage, without clipping or inventing token endpoints.
   Short omitted word fragments can use the time between real neighboring anchors
   or an adjacent token within their cue when no silence exists; entire unspoken cues
   and token-free gaps across long silence remain unmatched. Sparse sentences keep

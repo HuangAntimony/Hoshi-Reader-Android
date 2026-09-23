@@ -18,7 +18,7 @@ object SasayakiTranscriptAligner {
     private const val minimumSimilarity = 0.55
     private const val maxUncertainRun = 6
 
-    private data class Timing(val start: Double, val end: Double)
+    private data class Timing(val start: Double, val end: Double, val tokenEnd: Boolean = true, val speechCharacters: Double = 1.0)
     private data class Speech(val text: IntArray, val times: List<Timing>, val lastStart: Double = 0.0)
     private data class Chapter(
         val source: SasayakiSource.Chapter,
@@ -176,7 +176,7 @@ object SasayakiTranscriptAligner {
             points.forEachIndexed { index, point ->
                 characters += point
                 val length = token.end - token.start
-                times += Timing(token.start + length * index / points.size, token.start + length * (index + 1) / points.size)
+                times += Timing(token.start + length * index / points.size, token.start + length * (index + 1) / points.size, index == points.lastIndex)
             }
         }
         return Speech(characters.toIntArray(), times, previousStart)
@@ -323,9 +323,8 @@ object SasayakiTranscriptAligner {
             val start = projection.starts.indexOfFirst { it >= context.lower }
             val end = projection.ends.indexOfLast { it <= context.upper } + 1
             if (start < 0 || end <= start || end - start > maxGap) return@mapNotNull null
-            val count = end - start
-            val contextSpokenCount = context.to - context.from
-            if (count.toDouble() / contextSpokenCount !in 0.45..2.2) return@mapNotNull null
+            // Work is bounded by maxGap on both axes. A long omission must not
+            // prevent comparing the few recognized words that remain inside it.
             // Pin the known text/audio edges while including their context in the
             // sentence score. A free realignment could move a repeated character
             // out of its anchor and then use its time again inside the gap.
@@ -336,8 +335,8 @@ object SasayakiTranscriptAligner {
             if (writtenEdges[1] > writtenEdges[2]) return@mapNotNull null
             val spokenEdges = intArrayOf(context.from, speechStart, speechEnd, context.to)
             val pairs = (0..2).flatMap { part ->
-                editAlignment(projection.text, writtenEdges[part], writtenEdges[part + 1],
-                    speech.text, spokenEdges[part], spokenEdges[part + 1]).first.map { pair ->
+                boundedAlignment(chapter, projection, writtenEdges[part], writtenEdges[part + 1],
+                    speech.text, spokenEdges[part], spokenEdges[part + 1]).map { pair ->
                     Pairing(if (pair.written < 0) -1 else pair.written + writtenEdges[part] - start,
                         if (pair.spoken < 0) -1 else pair.spoken + spokenEdges[part] - context.from, pair.exact)
                 }
@@ -375,7 +374,8 @@ object SasayakiTranscriptAligner {
                     // recognized here; isolated particles in unrelated speech
                     // still need evidence from their own sentence.
                     if (token in speechStart until speechEnd &&
-                        (scores[point - context.lower].similarity >= 0.25 || block.size >= 4)) {
+                        (scores[point - context.lower].similarity >= 0.25 || block.size >= 4 ||
+                            block.size >= 3 && block.count { isKanji(speech.text[context.from + it.spoken]) } >= 2)) {
                         assign(times, repair.projection, repair.offset + pair.written, speech.times[token])
                     }
                 }
@@ -403,7 +403,8 @@ object SasayakiTranscriptAligner {
                         speech.times[tokenTo].start - speech.times[tokenTo - 1].end >= 0.01
                     if (hasSentenceEvidence || wholeGap || wholeCue && isolatedSpeech) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
                         if (sameSentence) score.similarity else 0.0, times,
-                        supported = sameSentence && score.accepted)
+                        supported = sameSentence && score.accepted,
+                        evidence = { point -> scores[point - context.lower] })
                 }
             }
             spoken = speechTo
@@ -477,6 +478,7 @@ object SasayakiTranscriptAligner {
         chapter: Chapter, lower: Int, upper: Int,
         speech: Speech, speechStart: Int, speechEnd: Int,
         similarity: Double, times: Array<Timing?>, supported: Boolean = false,
+        evidence: (Int) -> SentenceScore = { SentenceScore(similarity, supported) },
     ) {
         val boundaries = (lower until upper - 1).filter { chapter.boundaries[it] }
         val prefix = lower > 0 && !chapter.boundaries[lower - 1]
@@ -486,46 +488,70 @@ object SasayakiTranscriptAligner {
         // unspoken cue between them and enough tokens to give each edge its own time.
         // Script compatibility prevents incidental exact particles from making an
         // otherwise unrelated phrase eligible for recovery across a comma.
-        val bridgesComma = supported && boundaries.size == 1 && !chapter.sentences[boundaries.single()] &&
+        val bridgesComma = similarity >= 0.25 && boundaries.size == 1 && !chapter.sentences[boundaries.single()] &&
             prefix && suffix && upper - lower <= maxUncertainRun && speechEnd - speechStart >= upper - lower &&
             isReadingRewrite(chapter.source.text.sliceArray(lower until upper),
                 speech.text.sliceArray(speechStart until speechEnd))
-        // Otherwise preserve the missing-whole-cue ambiguity checks. Only one
-        // partial edge may claim the available speech in that case.
         if (boundaries.isNotEmpty() && !bridgesComma) {
-            val prefixEnd = boundaries.first() + 1
-            val suffixStart = boundaries.last() + 1
-            if (prefix == suffix) return
-            // Without a pronunciation dictionary, two script-compatible candidates
-            // are ambiguous. Do not move the preceding cue's speech into the edge.
+            val edges = listOf(lower) + boundaries.map { it + 1 } + upper
             val spoken = speech.text.sliceArray(speechStart until speechEnd)
-            val omittedStart = if (prefix) prefixEnd else lower
-            val omittedEnd = if (prefix) upper else suffixStart
-            var start = omittedStart
-            for (end in omittedStart until omittedEnd) {
-                if (!chapter.boundaries[end]) continue
-                val written = SasayakiSource.normalizedText(String(chapter.source.text, start, end + 1 - start))
+            // Compare each cue independently. An omitted cue must not poison a
+            // neighboring reading, but competing plausible readings remain ambiguous.
+            val candidates = edges.zipWithNext().filter { (from, to) ->
+                val written = chapter.source.text.sliceArray(from until to)
                 val edits = editAlignment(written, 0, written.size, spoken, 0, spoken.size).second
-                val similarity = 1.0 - edits.toDouble() / max(written.size, spoken.size)
-                if (isReadingRewrite(written, spoken) || similarity >= 0.25) return
-                start = end + 1
+                isReadingRewrite(written, spoken) || 1.0 - edits.toDouble() / max(written.size, spoken.size) >= 0.25 ||
+                    // A differently transcribed name can also own these kanji.
+                    // Do not give its token to an adjacent kana interjection.
+                    evidence(from).similarity >= 0.25 && written.all(::isKanji) && spoken.all(::isKanji)
             }
-            val from = if (prefix) lower else suffixStart
-            val to = if (prefix) prefixEnd else upper
-            val written = SasayakiSource.normalizedText(String(chapter.source.text, from, to - from))
-            val edits = editAlignment(written, 0, written.size, spoken, 0, spoken.size).second
-            recoverShortRewrite(chapter, from, to, speech, speechStart, speechEnd,
-                1.0 - edits.toDouble() / max(written.size, spoken.size), times)
+            val candidate = candidates.singleOrNull()
+            if (candidate != null) {
+                val (from, to) = candidate
+                val score = evidence(from)
+                val wholeCue = (from == 0 || chapter.boundaries[from - 1]) && chapter.boundaries[to - 1]
+                if (wholeCue && (max(to - from, spoken.size) < 2 ||
+                        speechStart > 0 && !speech.times[speechStart - 1].tokenEnd || !speech.times[speechEnd - 1].tokenEnd)) return
+                val partialReading = !wholeCue && prefix != suffix &&
+                    isReadingRewrite(chapter.source.text.sliceArray(from until to), spoken)
+                if (score.similarity >= 0.25 || partialReading) recoverShortRewrite(chapter, from, to, speech, speechStart, speechEnd,
+                    score.similarity, times, score.accepted)
+                return
+            }
+            // Two already supported sentence edges may have separate spelling
+            // changes. Split only at an original token boundary and only when
+            // exactly one partition is compatible; never divide a shared token.
+            if (edges.size != 3 || !prefix || !suffix) return
+            val middle = edges[1]
+            val left = chapter.source.text.sliceArray(lower until middle)
+            val right = chapter.source.text.sliceArray(middle until upper)
+            fun compatible(written: IntArray, from: Int, to: Int, score: SentenceScore): Boolean {
+                if (score.similarity < 0.25) return false
+                val spoken = speech.text.sliceArray(from until to)
+                if (max(written.size, spoken.size) < 2) return false
+                return isReadingRewrite(written, spoken) || score.accepted &&
+                    written.all(::isKanji) && spoken.all(::isKanji) && written.size == spoken.size
+            }
+            val split = (speechStart + 1 until speechEnd).filter { point ->
+                speech.times[point - 1].tokenEnd &&
+                    compatible(left, speechStart, point, evidence(lower)) &&
+                    compatible(right, point, speechEnd, evidence(middle))
+            }.singleOrNull() ?: return
+            recoverShortRewrite(chapter, lower, middle, speech, speechStart, split,
+                evidence(lower).similarity, times, evidence(lower).accepted)
+            recoverShortRewrite(chapter, middle, upper, speech, split, speechEnd,
+                evidence(middle).similarity, times, evidence(middle).accepted)
             return
         }
         val writtenCount = upper - lower
         val spokenCount = speechEnd - speechStart
         if (writtenCount !in 1..24 || spokenCount !in 1..48) return
         val duration = speech.times[speechEnd - 1].end - speech.times[speechStart].start
-        if (duration <= 0 || duration > 1.0 + writtenCount * 0.7) return
         val written = chapter.source.text.sliceArray(lower until upper)
         val spoken = speech.text.sliceArray(speechStart until speechEnd)
         val readingRewrite = isReadingRewrite(written, spoken)
+        val durationCharacters = if (readingRewrite) max(writtenCount, spokenCount) else writtenCount
+        if (duration <= 0 || duration > 1.0 + durationCharacters * 0.7) return
         val ratio = writtenCount.toDouble() / spokenCount
         val shortSupportedRewrite = supported && writtenCount <= maxUncertainRun
         if (ratio !in 0.5..2.0 && !((readingRewrite || shortSupportedRewrite) && ratio in 0.25..4.0)) return
@@ -537,7 +563,8 @@ object SasayakiTranscriptAligner {
             // fractional token here would make the two cue timestamps overlap.
             val rounding = if (bridgesComma && chapter.boundaries[lower + index]) 0 else writtenCount - 1
             val end = speechStart + ((index + 1) * spokenCount + rounding) / writtenCount
-            assign(times, lower + index, Timing(speech.times[first].start, speech.times[end - 1].end))
+            assign(times, lower + index, Timing(speech.times[first].start, speech.times[end - 1].end,
+                speechCharacters = durationCharacters.toDouble() / writtenCount))
         }
     }
 
@@ -546,6 +573,8 @@ object SasayakiTranscriptAligner {
         fun kanji(point: Int) = Character.UnicodeScript.of(point) == Character.UnicodeScript.HAN
         fun compatible(reading: IntArray, mixed: IntArray): Boolean {
             if (!reading.all(::kana) || !mixed.any(::kanji) || !mixed.all { kana(it) || kanji(it) }) return false
+            // A truncated stutter or a single kana cannot stand for several kanji.
+            if (reading.size < mixed.count(::kanji) || reading.lastOrNull() == 'っ'.code || reading.all { it == 'ー'.code }) return false
             // Kana already present in the written phrase must survive the reading.
             // Otherwise any omitted mixed-script sentence could veto a real prefix.
             var cursor = 0
@@ -557,6 +586,55 @@ object SasayakiTranscriptAligner {
             return true
         }
         return compatible(written, spoken) || compatible(spoken, written)
+    }
+
+    private fun isKanji(point: Int): Boolean = Character.UnicodeScript.of(point) == Character.UnicodeScript.HAN
+
+    private fun isSingleKanjiCue(chapter: Chapter, projection: SasayakiSource.Projection, point: Int): Boolean {
+        val start = projection.starts[point]
+        return projection.ends[point] == start + 1 && isKanji(projection.text[point]) &&
+            (start == 0 || chapter.boundaries[start - 1]) && chapter.boundaries[start]
+    }
+
+    /** Preserve a unique, exact short reply at a pinned edge before aligning a long omission. */
+    private fun boundedAlignment(
+        chapter: Chapter, projection: SasayakiSource.Projection, from: Int, to: Int,
+        spoken: IntArray, speechFrom: Int, speechTo: Int,
+    ): List<Pairing> {
+        val pins = mutableListOf<Pair<Int, Int>>()
+        for (written in from until to) {
+            // Only short cue endings immediately beside a real anchor may become
+            // local pins. A repeated particle deeper in a missing passage cannot.
+            val length = when {
+                isSingleKanjiCue(chapter, projection, written) -> 1
+                written + 1 < to && chapter.boundaries[projection.ends[written + 1] - 1] -> 2
+                else -> continue
+            }
+            if (written - from > 1 && to - written - length > 1) continue
+            fun equal(text: IntArray, position: Int): Boolean =
+                (0 until length).all { text[position + it] == projection.text[written + it] }
+            if ((from..to - length).count { equal(projection.text, it) } != 1) continue
+            val token = (speechFrom..speechTo - length).filter { equal(spoken, it) }.singleOrNull() ?: continue
+            if (!(written - from <= 1 && token - speechFrom <= 1 ||
+                    to - written - length <= 1 && speechTo - token - length <= 1)) continue
+            repeat(length) { pins += written + it to token + it }
+        }
+        val distinct = pins.distinct().sortedBy { it.first }
+        if (distinct.zipWithNext().any { (a, b) -> a.first >= b.first || a.second >= b.second })
+            return editAlignment(projection.text, from, to, spoken, speechFrom, speechTo).first
+        val result = mutableListOf<Pairing>()
+        var lower = from
+        var first = speechFrom
+        for ((upper, last) in distinct + (to to speechTo)) {
+            result += editAlignment(projection.text, lower, upper, spoken, first, last).first.map {
+                Pairing(if (it.written < 0) -1 else it.written + lower - from,
+                    if (it.spoken < 0) -1 else it.spoken + first - speechFrom, it.exact)
+            }
+            if (upper < to) result += Pairing(upper - from, last - speechFrom, true)
+            lower = upper + 1
+            first = last + 1
+        }
+        return result
     }
 
     private fun editAlignment(
@@ -621,7 +699,8 @@ object SasayakiTranscriptAligner {
 
     private fun assign(times: Array<Timing?>, point: Int, time: Timing) {
         val existing = times[point]
-        times[point] = if (existing == null) time else Timing(min(existing.start, time.start), max(existing.end, time.end))
+        times[point] = if (existing == null) time else Timing(min(existing.start, time.start), max(existing.end, time.end),
+            speechCharacters = max(existing.speechCharacters, time.speechCharacters))
     }
 
     private fun cut(chapters: List<Chapter>, times: List<Array<Timing?>>): SasayakiMatchData {
@@ -636,37 +715,46 @@ object SasayakiTranscriptAligner {
                 fun emit(first: Int, last: Int) {
                     val lower = timed[first]
                     val upper = timed[last]
+                    // Recheck every fragment, including those split around a bad
+                    // timestamp: their density can be lower than the original cue.
+                    if ((last - first + 1).toDouble() / (upper - lower + 1) < 0.7) {
+                        var fragment = first
+                        while (fragment <= last) {
+                            val begin = fragment
+                            while (fragment < last && timed[fragment + 1] == timed[fragment] + 1) fragment++
+                            emit(begin, fragment)
+                            fragment++
+                        }
+                        return
+                    }
                     val from = times[index][lower]!!.start
                     val to = times[index][upper]!!.end
-                    if (to > from && to - from <= 1.0 + (upper - lower + 1) * 0.7) {
+                    val characters = max((upper - lower + 1).toDouble(),
+                        (first..last).sumOf { times[index][timed[it]]!!.speechCharacters })
+                    if (to > from && to - from <= 1.0 + characters * 0.7) {
                         matches += SasayakiMatch(
                             id = "${chapter.source.index}-$lower", startTime = from, endTime = to,
                             text = String(chapter.source.text, lower, upper - lower + 1),
                             chapterIndex = chapter.source.index, start = lower, length = upper - lower + 1,
                         )
+                    } else {
+                        // An abnormal token cannot erase the reliably timed rest
+                        // of the cue. Keep complete short runs; never invent a new
+                        // endpoint by clipping a long token to the duration limit.
+                        var fragment = first
+                        for (position in first..last + 1) {
+                            val time = if (position <= last) times[index][timed[position]] else null
+                            if (time != null && time.end - time.start <= 1.0 + max(1.0, time.speechCharacters) * 0.7) continue
+                            if (fragment < position && (fragment > first || position <= last)) emit(fragment, position - 1)
+                            fragment = position + 1
+                        }
                     }
                 }
                 var run = 0
                 while (run < timed.size) {
                     val first = run
                     while (run + 1 < timed.size && timed[run + 1] - timed[run] <= maxUncertainRun + 1) run++
-                    val lower = timed[first]
-                    val upper = timed[run]
-                    // Trim unsupported edges and split long internal holes. A missing passage
-                    // must neither acquire invented timing nor discard its neighboring anchors.
-                    if ((run - first + 1).toDouble() / (upper - lower + 1) >= 0.7) {
-                        emit(first, run)
-                    } else {
-                        // Low coverage invalidates joining the islands, not the supported
-                        // text itself. Keep its contiguous spans without filling any holes.
-                        var fragment = first
-                        while (fragment <= run) {
-                            val begin = fragment
-                            while (fragment < run && timed[fragment + 1] == timed[fragment] + 1) fragment++
-                            emit(begin, fragment)
-                            fragment++
-                        }
-                    }
+                    emit(first, run)
                     run++
                 }
                 if (matches.size == priorCount) unmatched++

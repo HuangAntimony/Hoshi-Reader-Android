@@ -675,6 +675,145 @@ class SasayakiTranscriptAlignerTest {
         assertEquals(8.0, result.matches.last().endTime, .0001)
     }
 
+    @Test fun imbalancedGapKeepsDistinctiveRecognizedWordWithoutFillingMissingAnnouncement() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。４限世界史開始が１０分遅れます。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("予言", 5.0, 5.4),
+                token("世界史", 5.4, 6.2), token("私は駅へ向かって歩いた", 7.0, 11.0)))
+        assertEquals(listOf("雨の降る静かな朝だった", "世界史", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+        assertEquals(5.4, result.matches[1].startTime, .0001)
+        assertEquals(6.2, result.matches[1].endTime, .0001)
+    }
+
+    @Test fun cueEdgesKeepReadingRewritesBesideOmittedInterjections() {
+        val cases = listOf(
+            Triple("おお、助かるぞ。", "おたすかるぞ", listOf("お", "助かるぞ")),
+            Triple("お前、親切だな。", "おまえしんせつだな", listOf("お前", "親切だな")),
+            Triple("あの、ごめんね。私、そんなことになると思わなかった。", "あのわたしそんなことになると思わなかった", listOf("あの", "私", "そんなことになると思わなかった")),
+            Triple("わ、わっ、わたし、ぶん、文芸部１年のっ、です。", "わ私ぶ文芸部一年のです", listOf("わ", "わたし", "ぶん", "文芸部１年のっ", "です")),
+            Triple("これなんの場面だろう。良く分からんが。", "これなんの場面だろよく分からんが", listOf("これなんの場面だろ", "良く分からんが")),
+            Triple("お、さっそく仲良くやってるねー。", "早速仲良くやってるねー", listOf("さっそく仲良くやってるねー")),
+            Triple("えー、なんなんだ。", "へえ何なんだ", listOf("え", "なんなんだ")),
+        )
+        for ((written, spoken, expected) in cases) {
+            val result = SasayakiTranscriptAligner.align(
+                book("<p>雨の降る静かな朝だった。$written 私は駅へ向かって歩いた。</p>"),
+                listOf(token("雨の降る静かな朝だった", 1.0, 4.0)) +
+                    spoken.mapIndexed { i, c -> token(c.toString(), 5.0 + i * .12, 5.12 + i * .12) } +
+                    token("私は駅へ向かって歩いた", 12.0, 16.0))
+            assertEquals(written, listOf("雨の降る静かな朝だった") + expected + "私は駅へ向かって歩いた", result.matches.map { it.text })
+            assertTrue(written, result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime + .000001 })
+        }
+    }
+
+    @Test fun separateTokensKeepRewrittenNameAndNextSentencePronoun() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>そこにいたのは小鞠<ruby>知花<rt>ちか</rt></ruby>。俺をグイと押しのけて鍵を開ける。</p>"),
+            listOf(token("そこにいたのは小鞠", 1.0, 4.0), token("千佳", 4.0, 4.5), token("おれ", 4.5, 5.0),
+                token("をグイと押しのけて鍵を開ける", 5.0, 9.0)))
+        assertEquals(listOf("そこにいたのは小鞠知花", "俺をグイと押しのけて鍵を開ける"), result.matches.map { it.text })
+        assertEquals(4.5, result.matches[0].endTime, .0001)
+        assertEquals(4.5, result.matches[1].startTime, .0001)
+    }
+
+    @Test fun uniqueKanjiCueKeepsOwnSpeechBeforeALongOmission() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。え。誰。どこの。あっ、あの、小鞠です。文芸部、小鞠知花。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("えっ", 5.0, 5.5), token("誰", 5.5, 6.5),
+                token("文芸部小鞠智加", 7.0, 9.0), token("私は駅へ向かって歩いた", 10.0, 14.0)))
+        val cue = result.matches.single { it.text == "誰" }
+        assertEquals(5.5, cue.startTime, .0001)
+        assertEquals(6.5, cue.endTime, .0001)
+        assertFalse(result.matches.any { it.text.contains("あの") || it.text.contains("どこの") })
+    }
+
+    @Test fun readingDurationUsesRecognizedSyllablesRatherThanOnlyWrittenKanjiCount() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。あの、ごめんね、私、そんなことになると思わなかった。</p>"),
+            listOf(token("雨の降る静かな朝だったあの", 1.0, 4.0), token("わたし", 5.0, 6.88),
+                token("そんなことになると思わなかった", 6.88, 10.0)))
+        val cue = result.matches.single { it.text == "私" }
+        assertEquals(5.0, cue.startTime, .0001)
+        assertEquals(6.88, cue.endTime, .0001)
+        assertFalse(result.matches.any { it.text.contains("ごめんね") })
+    }
+
+    @Test fun abnormalEdgeTokenDoesNotDiscardReliablyTimedRestOfCue() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。先生。文芸部。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("先", 5.0, 5.16), token("生", 5.16, 8.2),
+                token("文", 9.0, 12.48), token("芸", 12.48, 12.76), token("部", 12.76, 13.44),
+                token("私は駅へ向かって歩いた", 14.0, 18.0)))
+        assertEquals(listOf("雨の降る静かな朝だった", "先", "芸部", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+        assertEquals(5.16, result.matches[1].endTime, .0001)
+        assertEquals(12.48, result.matches[2].startTime, .0001)
+    }
+
+    @Test fun rewrittenNameCannotBeTakenByFollowingKanaInterjection() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>恥ずかしそうに頬を押さえる八奈見。</p>", "<p>え、つまりそれって付き合ってなかったのか。</p>"),
+            listOf(token("恥ずかしそうに頬を押さえる八", 1.0, 5.0), token("波", 5.0, 5.5),
+                token("つまりそれってつきあってなかったのか", 6.0, 10.0)))
+        assertFalse(result.matches.any { it.chapterIndex == 1 && it.start == 0 })
+    }
+
+    @Test fun wholeCueCannotClaimOnlyPartOfANeighboringRecognitionToken() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。えー、私、えー、そんなことになると思わなかった。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("へえ", 5.0, 5.5), token("へえ", 5.5, 6.0),
+                token("そんなことになると思わなかった", 6.0, 9.0), token("私は駅へ向かって歩いた", 10.0, 14.0)))
+        assertFalse(result.matches.any { it.text == "私" })
+    }
+
+    @Test fun aReadingCannotSplitOneKanjiStemBetweenAdjacentCueEdges() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。七宮だけは、埃をかぶった肉なんて食いたくない。</p>"),
+            listOf(token("雨の降る静かな朝だった七宮だけ", 1.0, 5.0), token("誇", 5.0, 5.3), token("り", 5.3, 5.5),
+                token("をかぶった肉なんて食いたくない", 5.5, 9.0)))
+        assertFalse(result.matches.any { it.text == "七宮だけは" })
+    }
+
+    @Test fun weaklyRecognizedNameStillCompetesWithPreviousKanaTail() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。ああ、葉村君、比留子さんが言った。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だったあ", 1.0, 5.0), token("羽", 5.0, 5.3), token("村くん紘子さんが言った", 5.3, 8.5),
+                token("私は駅へ向かって歩いた", 9.0, 13.0)))
+        assertFalse(result.matches.any { it.text == "ああ" })
+    }
+
+    @Test fun durationFragmentsRecheckCoverageBeforeJoiningUntimedWords() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。先に話した彼の生まれた村へ向かって歩いた。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("先", 5.0, 5.1), token("生", 8.1, 8.2),
+                token("ま", 8.2, 28.2), token("れた村へ向かって歩いた", 28.2, 32.2), token("私は駅へ向かって歩いた", 33.0, 37.0)))
+        assertEquals(listOf("雨の降る静かな朝だった", "先", "生", "れた村へ向かって歩いた", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+    }
+
+    @Test fun partialReadingBeforeALongUnspokenCueRemainsMatched() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>下松が明るい声をかけてきた。でもぶちょー、探偵さんたちも一緒に行くんなら一台じゃ無理だよ。撮影道具もあるし彼女は言った。</p>"),
+            listOf(token("下松が明るい声をかけてきたでも", 1.0, 5.0), token("部長", 5.0, 5.75),
+                token("撮影道具もあるし彼女は言った", 6.0, 10.0)))
+        assertEquals(listOf("下松が明るい声をかけてきた", "でもぶちょー", "撮影道具もあるし彼女は言った"), result.matches.map { it.text })
+    }
+
+    @Test fun sentenceEndingBesideAnchorCannotMoveIntoALaterOmittedSentence() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>どうしてそう言いきれる。答える代わりに明智さんは俺を見た。葉村君、時計はハンカチで包んでいたのだね。はい。今はハンカチだけが残されている。</p>"),
+            listOf(token("どうしてそう言い", 1.0, 4.0), token("切", 4.0, 4.16), token("れ", 4.16, 4.32), token("る", 4.32, 4.65),
+                token("今はハンカチだけが残されている", 5.0, 9.0)))
+        assertEquals(listOf("どうしてそう言いきれる", "今はハンカチだけが残されている"), result.matches.map { it.text })
+        assertEquals(4.65, result.matches.first().endTime, .0001)
+    }
+
+    @Test fun longerParaphraseDoesNotGainTheRelaxedReadingDurationLimit() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>これでは一時も心が休まらず、相当ストレスを溜め込んでいるのではなかろうか。</p>"),
+            listOf(token("これでは一時も心が休ま", 1.0, 4.0), token("りはしない彼女は", 4.0, 6.57),
+                token("相当ストレスを溜め込んでいるのではなかろうか", 7.0, 12.0)))
+        assertFalse(result.matches.any { it.text.endsWith("らず") })
+    }
+
     private fun book(vararg html: String) = EpubBook(
         title = "Generated alignment fixture",
         chapters = html.mapIndexed { index, content ->
