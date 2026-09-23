@@ -227,6 +227,77 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
+    fun adjacentReadingRewritesAcrossCommaKeepBothCueEdges() {
+        val source = book(
+            "<p>早く迎えに行かないと、<ruby>華恋<rt>かれん</rt></ruby>ちゃんイギリスに行っちゃうんだよ。それでいいの？</p>" +
+                "<p>だけど華恋の奴、俺にサヨナラって──</p><p>そんなの迎えに来てって意味に決まってるじゃない！</p>",
+        )
+        val tokens = listOf(token("早く迎えに行かないとカレンちゃんイギリスに行っちゃうんだよ", 302.968, 308.73),
+            token("だけどかれんの", 308.73, 310.77), token("やつ", 310.77, 311.226),
+            token("おれ", 311.226, 312.186), token("にさよならって", 312.186, 314.202),
+            token("そんなの迎えに来てって意味に決まってるじゃない", 314.202, 318.234))
+        val result = SasayakiTranscriptAligner.align(source, tokens)
+        val previous = result.matches.single { it.text == "だけど華恋の奴" }
+        val next = result.matches.single { it.text == "俺にサヨナラって" }
+        assertEquals(308.73, previous.startTime, 0.0001)
+        assertEquals(311.226, previous.endTime, 0.0001)
+        assertEquals(311.226, next.startTime, 0.0001)
+        assertEquals(314.202, next.endTime, 0.0001)
+        assertFalse(result.matches.any { "それでいいの" in it.text })
+        val session = SasayakiTranscriptAligner.Session(source)
+        tokens.indices.forEach { end ->
+            val prefix = tokens.take(end + 1)
+            assertEquals(SasayakiTranscriptAligner.align(source, prefix), session.align(prefix))
+        }
+    }
+
+    @Test
+    fun proportionalReadingRewritesCannotShareATokenAcrossComma() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。だけど彼女の奴、俺にサヨナラって言ったんだ。</p>"),
+            listOf(token("雨の降る静かな朝だっただけど彼女の", 1.0, 5.0),
+                token("つ", 5.0, 5.5), token("おれ", 5.5, 6.5), token("にさよならって言ったんだ", 6.5, 10.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "だけど彼女の奴", "俺にサヨナラって言ったんだ"),
+            result.matches.map { it.text })
+        assertEquals(5.5, result.matches[1].endTime, 0.0001)
+        assertEquals(5.5, result.matches[2].startTime, 0.0001)
+        assertTrue(result.matches.zipWithNext().all { (left, right) -> left.endTime <= right.startTime })
+    }
+
+    @Test
+    fun crossCueReadingRecoveryCannotFillAnUnspokenMiddleReply() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。だけど彼女の奴、はい、俺にサヨナラって言ったんだ。</p>"),
+            listOf(token("雨の降る静かな朝だっただけど彼女の", 1.0, 5.0),
+                token("やつおれ", 5.0, 6.5), token("にさよならって言ったんだ", 6.5, 10.0)),
+        )
+        assertFalse(result.matches.any { "はい" in it.text })
+    }
+
+    @Test
+    fun adjacentReadingRewritesCannotBorrowAcrossASentenceBoundary() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。だけど彼女の奴。俺にサヨナラって言ったんだ。</p>"),
+            listOf(token("雨の降る静かな朝だっただけど彼女の", 1.0, 5.0),
+                token("やつおれ", 5.0, 6.5), token("にさよならって言ったんだ", 6.5, 10.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "だけど彼女の", "にサヨナラって言ったんだ"),
+            result.matches.map { it.text })
+    }
+
+    @Test
+    fun coincidentalParticleCannotMakeAnOmittedCommaCueRecoverable() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。だけど彼女の奴、はい、俺にサヨナラって言ったんだ。</p>"),
+            listOf(token("雨の降る静かな朝だっただけど彼女の", 1.0, 5.0),
+                token("これは違う", 5.0, 6.5), token("にさよならって言ったんだ", 6.5, 10.0)),
+        )
+        assertFalse(result.matches.any { "はい" in it.text })
+        assertFalse(result.matches.any { "俺" in it.text })
+    }
+
+    @Test
     fun sentenceContextRecoversMixedSpellingTailBesideAnOmittedReply() {
         val source = book(
             "<p>この柔らかそうな<ruby>太<rt>ふと</rt></ruby><ruby>腿<rt>もも</rt></ruby>で" +

@@ -569,6 +569,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   existing text/token boundaries. Similarity is scored per sentence with that context;
   omitted neighboring sentences cannot lower the score of a recognized sentence.
   Commas still split display cues but retain shared sentence context for scoring.
+  Short kana/kanji rewrites spanning one comma can use that sentence's confidence when both
+  cues have recognized text and no whole omitted cue lies between them; proportional
+  token allocation gives the two cues disjoint time ranges at the comma.
   Plain/ruby track selection weighs the affected text, not the length of surrounding
   anchors. Gap edit alignment prefers exact letters when edit costs tie and distinguishes
   token insertions from text deletions. Short gaps with a substantial exact run allow

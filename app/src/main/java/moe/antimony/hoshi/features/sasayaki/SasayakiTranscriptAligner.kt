@@ -349,7 +349,7 @@ object SasayakiTranscriptAligner {
                     // off a kana/kanji fragment. Keep the original whole-gap reading
                     // fallback, but require sentence evidence for inferred fragments.
                     val wholeGap = from == lower && to == upper && tokenFrom == speechStart && tokenTo == speechEnd
-                    val sameSentence = (from until to - 1).none { chapter.boundaries[it] }
+                    val sameSentence = (from until to - 1).none { chapter.sentences[it] }
                     if (hasSentenceEvidence || wholeGap) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
                         if (sameSentence) score.similarity else 0.0, times,
                         supported = sameSentence && score.accepted)
@@ -427,14 +427,23 @@ object SasayakiTranscriptAligner {
         speech: Speech, speechStart: Int, speechEnd: Int,
         similarity: Double, times: Array<Timing?>, supported: Boolean = false,
     ) {
-        // A missing whole cue beside a recognized word fragment does not veto the
-        // fragment. Only one edge may be partial; two would have ambiguous timing.
         val boundaries = (lower until upper - 1).filter { chapter.boundaries[it] }
-        if (boundaries.isNotEmpty()) {
+        val prefix = lower > 0 && !chapter.boundaries[lower - 1]
+        val suffix = !chapter.boundaries[upper - 1]
+        // A comma can divide two short spelling changes inside one supported
+        // sentence. Both cues must already have recognized text, with no whole
+        // unspoken cue between them and enough tokens to give each edge its own time.
+        // Script compatibility prevents incidental exact particles from making an
+        // otherwise unrelated phrase eligible for recovery across a comma.
+        val bridgesComma = supported && boundaries.size == 1 && !chapter.sentences[boundaries.single()] &&
+            prefix && suffix && upper - lower <= maxUncertainRun && speechEnd - speechStart >= upper - lower &&
+            isReadingRewrite(chapter.source.text.sliceArray(lower until upper),
+                speech.text.sliceArray(speechStart until speechEnd))
+        // Otherwise preserve the missing-whole-cue ambiguity checks. Only one
+        // partial edge may claim the available speech in that case.
+        if (boundaries.isNotEmpty() && !bridgesComma) {
             val prefixEnd = boundaries.first() + 1
             val suffixStart = boundaries.last() + 1
-            val prefix = lower > 0 && !chapter.boundaries[lower - 1]
-            val suffix = !chapter.boundaries[upper - 1]
             if (prefix == suffix) return
             // Without a pronunciation dictionary, two script-compatible candidates
             // are ambiguous. Do not move the preceding cue's speech into the edge.
@@ -472,7 +481,10 @@ object SasayakiTranscriptAligner {
         if (!supported && similarity < 0.25 && !readingRewrite) return
         for (index in 0 until writtenCount) {
             val first = speechStart + index * spokenCount / writtenCount
-            val end = speechStart + ((index + 1) * spokenCount + writtenCount - 1) / writtenCount
+            // At a cue edge, round toward the next cue's first token; sharing the
+            // fractional token here would make the two cue timestamps overlap.
+            val rounding = if (bridgesComma && chapter.boundaries[lower + index]) 0 else writtenCount - 1
+            val end = speechStart + ((index + 1) * spokenCount + rounding) / writtenCount
             assign(times, lower + index, Timing(speech.times[first].start, speech.times[end - 1].end))
         }
     }

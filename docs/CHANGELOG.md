@@ -23,7 +23,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Preserve more sentence-opening audio at segment boundaries to reduce missing
   words and sentences, and recover short missing word fragments when matching
   existing transcripts. Use sentence context to match kana/kanji spelling differences
-  and recognition errors without losing recognized sentence endings or short replies;
+  and recognition errors without losing recognized sentence endings, short replies,
+  or adjacent cue edges around a comma;
   preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
