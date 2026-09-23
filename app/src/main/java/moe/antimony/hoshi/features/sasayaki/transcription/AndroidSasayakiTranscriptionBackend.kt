@@ -5,9 +5,6 @@ import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
-import com.k2fsa.sherpa.onnx.SileroVadModelConfig
-import com.k2fsa.sherpa.onnx.Vad
-import com.k2fsa.sherpa.onnx.VadModelConfig
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -89,37 +86,23 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         ))
         try {
             currentCoroutineContext().ensureActive()
-            val vad = Vad(config = VadModelConfig(
-                sileroVadModelConfig = SileroVadModelConfig(
-                    model = File(directory, "silero_vad.onnx").absolutePath,
-                    threshold = .5f,
-                    minSpeechDuration = .25f,
-                    minSilenceDuration = .5f,
-                    maxSpeechDuration = 20f,
-                    windowSize = 512,
-                ),
-                sampleRate = TRANSCRIPTION_SAMPLE_RATE,
-                numThreads = 1,
-                provider = "cpu",
-            ))
-            try {
-                // Intentional ASR context is distinct from decoder sync
-                // preroll; already committed tokens are filtered below.
-                val decodeFrom = maxOf(0.0, from - .5)
-                transcribeSpeechAudio(from, duration, decodeFrom, parallelism,
-                    decode = { send -> decoder.decode(source, decodeFrom, send) },
-                    probability = vad::compute, recognize = { samples ->
+            val energy = SasayakiEnergyVad()
+            // Intentional ASR context is distinct from decoder sync
+            // preroll; already committed tokens are filtered below.
+            val decodeFrom = maxOf(0.0, from - .5)
+            transcribeSpeechAudio(from, duration, decodeFrom, parallelism,
+                decode = { send -> decoder.decode(source, decodeFrom, send) },
+                probability = energy::probability, recognize = { samples ->
+                    currentCoroutineContext().ensureActive()
+                    val stream = recognizer.createStream()
+                    try {
+                        stream.acceptWaveform(samples, TRANSCRIPTION_SAMPLE_RATE)
+                        recognizer.decode(stream)
                         currentCoroutineContext().ensureActive()
-                        val stream = recognizer.createStream()
-                        try {
-                            stream.acceptWaveform(samples, TRANSCRIPTION_SAMPLE_RATE)
-                            recognizer.decode(stream)
-                            currentCoroutineContext().ensureActive()
-                            val result = recognizer.getResult(stream)
-                            RecognitionTokens(result.tokens, result.timestamps)
-                        } finally { stream.release() }
-                }, onBatch = onBatch)
-            } finally { vad.release() }
+                        val result = recognizer.getResult(stream)
+                        RecognitionTokens(result.tokens, result.timestamps)
+                    } finally { stream.release() }
+            }, onBatch = onBatch)
         } finally { recognizer.release() }
     }
 }

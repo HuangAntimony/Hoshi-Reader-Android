@@ -9,14 +9,15 @@ internal data class SpeechBounds(val start: Long, val end: Long, val hardCut: Bo
     val paddedEnd: Long get() = end + SPEECH_TAIL_SAMPLES
 }
 
-/** Silero probabilities with explicit bounded segments; the native VAD's
- * maxSpeechDuration changes its threshold but does not impose a hard limit. */
+/** Keep short pauses within speech; reject brief sounds only after a segment
+ * ends, rather than requiring every opening frame to stay above threshold. */
 internal class SpeechSegmenter {
     var position: Long = 0
         private set
     private var candidateStart: Long? = null
     private var speech = false
     private var silenceStart: Long? = null
+    private var continuation = false
 
     val safeThroughSample: Long
         get() = ((candidateStart ?: position) - SPEECH_LEAD_SAMPLES).coerceAtLeast(0)
@@ -28,7 +29,7 @@ internal class SpeechSegmenter {
         if (!speech) {
             if (probability >= .5f) {
                 if (candidateStart == null) candidateStart = frameStart
-                if (position - candidateStart!! >= 4_000) speech = true
+                speech = true
             } else {
                 candidateStart = null
             }
@@ -37,10 +38,11 @@ internal class SpeechSegmenter {
         if (probability < .35f) {
             if (silenceStart == null) silenceStart = frameStart
             if (position - silenceStart!! >= 8_000) {
-                val result = SpeechBounds(candidateStart!!, silenceStart!!)
+                val result = speechBounds(silenceStart!!)
                 candidateStart = null
                 silenceStart = null
                 speech = false
+                continuation = false
                 return result
             }
         } else {
@@ -50,6 +52,7 @@ internal class SpeechSegmenter {
             val end = silenceStart ?: position
             val result = SpeechBounds(candidateStart!!, end, hardCut = silenceStart == null)
             speech = silenceStart == null
+            continuation = speech
             candidateStart = if (speech) position else null
             silenceStart = null
             return result
@@ -58,12 +61,18 @@ internal class SpeechSegmenter {
     }
 
     fun finish(): SpeechBounds? {
-        val result = if (speech && position > candidateStart!!) SpeechBounds(candidateStart!!, silenceStart ?: position) else null
+        val result = if (speech) speechBounds(silenceStart ?: position) else null
         candidateStart = null
         silenceStart = null
         speech = false
+        continuation = false
         return result
     }
+
+    private fun speechBounds(end: Long): SpeechBounds? = SpeechBounds(candidateStart!!, end)
+        // Even an immediate silence after a hard cut owns its trailing context:
+        // the recognizer may timestamp the last syllable just beyond the cut.
+        .takeIf { it.end >= it.start && (continuation || it.end - it.start >= 4_000) }
 }
 
 /** Fixed-size PCM history supporting ASR's leading and trailing context. */

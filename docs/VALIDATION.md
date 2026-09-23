@@ -925,8 +925,11 @@ Validate relevant sync/update/Sasayaki changes with:
   conversion can change the input gain. Confirm the original token text and
   timestamps on the target device before comparing segment boundaries or padding;
   desktop quantized inference can differ even with identical PCM and model files.
-  Inspect VAD probabilities and actual recognition input ranges to distinguish
+  Inspect energy scores and actual recognition input ranges to distinguish
   skipped speech from words omitted by recognition.
+  Check quiet openings, changes in background level, expressive loud dialogue,
+  short replies with syllable gaps, and final words just after a 20-second hard
+  cut. Segment rejection must not discard a short continuation of accepted speech.
   Around silence-separated ASR segments, verify the next word's first character
   survives even if its model timestamp falls inside leading context. Compare
   continuous and checkpoint-resumed output for missing or duplicated prefixes;

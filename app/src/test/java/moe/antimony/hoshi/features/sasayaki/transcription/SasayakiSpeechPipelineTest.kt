@@ -5,6 +5,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SasayakiSpeechPipelineTest {
+    @Test fun speechEndingExactlyAtHardCutStillOwnsDelayedFinalToken() = runBlocking {
+        var frames = 0
+        var calls = 0
+        val batches = mutableListOf<SasayakiTranscriptionBatch>()
+        val pipeline = SasayakiSpeechPipeline(0.0, 20.512,
+            probability = { if (frames++ < 625) 1f else 0f },
+            recognize = {
+                RecognitionTokens(arrayOf("終"), floatArrayOf(if (calls++ == 0) 20.1f else .6f))
+            }, schedule = { work -> batches += work() })
+        pipeline.accept(AudioSamples(0, FloatArray(328_192)))
+        pipeline.finish()
+        val token = batches.flatMap { it.tokens }.single()
+        assertEquals("終", token.text)
+        assertEquals(20.1, token.start, .00001)
+        assertEquals(20.25, token.end, .00001)
+    }
+
     @Test fun lateVadOnsetRetainsQuietSpeechPrefix() = runBlocking {
         val inputs = mutableListOf<FloatArray>()
         var windows = 0

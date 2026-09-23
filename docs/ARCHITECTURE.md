@@ -478,7 +478,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   preparation. Displayed artist normalization remains `ARTIST`, then
   `ALBUMARTIST`, then `AUTHOR`.
 - Sasayaki Japanese transcription uses the repository-owned sherpa-onnx backend
-  with ReazonSpeech k2-v2 INT8 and Silero VAD on CPU. SHA-256 verified models
+  with ReazonSpeech k2-v2 INT8 on CPU and adaptive energy segmentation for clean
+  audiobook recordings. A bounded 30-second RMS histogram estimates the noise
+  floor; its 10th percentile plus 12 dB is clamped to -55..-30 dBFS. Quiet
+  prehistory protects low-volume openings. Short pauses stay inside a candidate
+  utterance; the 250 ms minimum applies after the segment ends, except for
+  continuations after a hard cut. Silero is not loaded or downloaded.
+  SHA-256 verified models
   download on demand to `noBackupFilesDir/SasayakiModels`; they are not bundled
   into the APK or included in Android backup. ONNX Runtime, sherpa JNI and the FFmpeg decoder also
   download on demand to `noBackupFilesDir/SasayakiRuntime/<abi>`, using filenames
@@ -497,11 +503,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   DataStore-backed Sasayaki settings persist Lightweight/Balanced/Fast transcription
   presets, mapping to 1/2/3 concurrent ASR segments, with Balanced as the default.
   Each start/resume snapshots its preset; the selector is locked while running.
-  ASR and VAD use one internal model thread each. One shared recognizer owns
-  independent streams; VAD and segmentation remain sequential. A bounded queue
+  ASR uses one internal model thread per inference. One shared recognizer owns
+  independent streams; energy scoring and segmentation remain sequential. A bounded queue
   publishes completed segments in audio order, including silence, so checkpoints
   never skip unfinished speech. Cancellation joins all streams before model release.
-  Decoding/resampling on the IO dispatcher overlaps VAD/ASR through a bounded
+  Decoding/resampling on the IO dispatcher overlaps segmentation/ASR through a bounded
   channel (at most 4 MiB of decoded PCM queued, plus bounded speech segment copies).
   Native reads
   return at most 4096 samples; seek preroll preserves codec history, and the

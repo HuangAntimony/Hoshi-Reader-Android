@@ -34,8 +34,6 @@ internal object ReazonSpeechModelCatalog {
             "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de"),
         SasayakiModelFile("tokens.txt", BASE + "tokens.txt", 45754,
             "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def"),
-        SasayakiModelFile("silero_vad.onnx", "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx", 643854,
-            "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"),
     )
 }
 

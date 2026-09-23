@@ -3,9 +3,10 @@ package moe.antimony.hoshi.features.sasayaki.transcription
 import android.os.Build
 import android.os.Process
 import androidx.test.platform.app.InstrumentationRegistry
-import com.k2fsa.sherpa.onnx.SileroVadModelConfig
-import com.k2fsa.sherpa.onnx.Vad
-import com.k2fsa.sherpa.onnx.VadModelConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -57,10 +58,26 @@ class SasayakiRuntimeDeviceTest {
                 Dispatchers.IO, specs, readOnly = true)
             offline.ensure({ fail("Cached runtime asks to download") }) { fail("Cached runtime shows downloading") }
             SasayakiRuntimeRepository(context, Dispatchers.IO).load(directory)
-            val model = File(context.noBackupFilesDir, "SasayakiModels/reazonspeech-k2-v2-int8-v1/silero_vad.onnx")
-            assertTrue("Seed verified VAD model for native execution", model.isFile)
-            val vad = Vad(config = VadModelConfig(sileroVadModelConfig = SileroVadModelConfig(model = model.absolutePath)))
-            try { vad.acceptWaveform(FloatArray(512)); assertTrue(vad.empty()) } finally { vad.release() }
+            val models = File(context.noBackupFilesDir, "SasayakiModels/reazonspeech-k2-v2-int8-v1")
+            assertTrue("Seed verified speech models for native execution",
+                ReazonSpeechModelCatalog.files.all { File(models, it.name).length() == it.bytes })
+            val recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = OfflineModelConfig(
+                transducer = OfflineTransducerModelConfig(
+                    encoder = File(models, "encoder.int8.onnx").absolutePath,
+                    decoder = File(models, "decoder.int8.onnx").absolutePath,
+                    joiner = File(models, "joiner.int8.onnx").absolutePath,
+                ), tokens = File(models, "tokens.txt").absolutePath, numThreads = 1, modelType = "transducer",
+            )))
+            try {
+                val stream = recognizer.createStream()
+                try {
+                    stream.acceptWaveform(FloatArray(16_000), 16_000)
+                    recognizer.decode(stream)
+                    val result = recognizer.getResult(stream)
+                    assertEquals(result.tokens.size, result.timestamps.size)
+                    assertTrue(result.timestamps.all { it.isFinite() && it >= 0f })
+                } finally { stream.release() }
+            } finally { recognizer.release() }
         } finally { root.deleteRecursively() }
     }
 }
