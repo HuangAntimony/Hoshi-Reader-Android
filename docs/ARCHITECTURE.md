@@ -538,6 +538,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
   joins active work before book deletion. Clearing transcription preserves
   existing matches; completed transcripts can be realigned without ASR.
+  Typed failures distinguish audio access, model/runtime resource preparation,
+  speech recognition, book matching, and transcript storage; the UI maps each
+  category to a localized message and uses a generic message for unknown failures.
 - Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android
   transcription matches are recognized by their chapter-offset cue IDs; this
   provenance selects the default matching tab without overriding a manual tab

@@ -277,7 +277,7 @@ class SasayakiTranscriptionViewModelTest {
         model.bind(temporary.newFolder(), "audio") {}
         runCurrent()
         assertFalse(model.uiState.value.isLoading)
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_failed), model.uiState.value.error)
+        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_storage), model.uiState.value.error)
     }
 
     @Test fun downloadConfirmationGatesWorkAndCancellationKeepsSavedTranscriptUntouched() = runTest {

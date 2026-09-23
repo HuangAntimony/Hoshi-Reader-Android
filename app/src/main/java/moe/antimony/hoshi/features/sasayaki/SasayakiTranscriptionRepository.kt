@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.IoDispatcher
@@ -45,7 +46,13 @@ internal class AndroidSasayakiTranscriptionRepository @Inject constructor(
             if (result != previous) {
                 withContext(ioDispatcher) {
                     check(root.isDirectory)
-                    books.saveSasayakiMatch(root, result)
+                    try {
+                        books.saveSasayakiMatch(root, result)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        throw error.asSasayakiFailure(SasayakiFailureKind.Storage)
+                    }
                 }
                 previous = result
             }

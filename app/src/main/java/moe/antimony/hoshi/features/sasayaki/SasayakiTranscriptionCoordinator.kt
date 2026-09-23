@@ -24,7 +24,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.BookWorkRegistry
@@ -84,7 +83,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             }
         } catch (error: Exception) {
             job.cancel()
-            mutableState.value = SasayakiTranscriptionState(root = root, error = failure(), revision = state.value.revision, completionRevision = state.value.completionRevision)
+            mutableState.value = SasayakiTranscriptionState(root = root, error = error.toSasayakiFailureText(SasayakiFailureKind.Unknown), revision = state.value.revision, completionRevision = state.value.completionRevision)
             return false
         }
         task = job
@@ -139,13 +138,19 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         var alignedCount = -1
         val requests = Channel<List<SasayakiToken>>(Channel.CONFLATED)
         suspend fun align(snapshot: List<SasayakiToken>, complete: Boolean) {
-            val active = alignment ?: repository.openAlignment(root).also { alignment = it }
-            val matched = active.align(snapshot, complete)
-            if (deleted.get()) return
-            alignedCount = snapshot.size
-            result = matched
-            mutableState.update {
-                it.copy(match = matched, error = null, revision = it.revision + if (it.match == matched) 0 else 1)
+            try {
+                val active = alignment ?: repository.openAlignment(root).also { alignment = it }
+                val matched = active.align(snapshot, complete)
+                if (deleted.get()) return
+                alignedCount = snapshot.size
+                result = matched
+                mutableState.update {
+                    it.copy(match = matched, error = null, revision = it.revision + if (it.match == matched) 0 else 1)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.BookMatch)
             }
         }
         val matching = launch {
@@ -161,18 +166,29 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                     align(snapshot, complete = false)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     // A match failure must not discard successful recognition or stop inference.
                     alignment = null
-                    mutableState.update { it.copy(error = failure()) }
+                    mutableState.update { it.copy(error = error.toSasayakiFailureText(SasayakiFailureKind.BookMatch)) }
                 }
             }
         }
         fun checkpoint() = SasayakiTranscript(through, duration, tokens.toList(), source)
         try {
-            duration = backend.duration(source)
-            require(duration.isFinite() && duration > 0)
-            val saved = repository.load(root)?.takeIf {
+            duration = try {
+                backend.duration(source).also { require(it.isFinite() && it > 0) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.AudioSource)
+            }
+            val saved = try {
+                repository.load(root)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.Storage)
+            }?.takeIf {
                 kotlin.math.abs(it.duration - duration) < 0.01 && (it.source == null || it.source == source)
             }
             if (saved != null) {
@@ -228,7 +244,13 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                     ) }
                     if (batch.tokens.isNotEmpty()) requests.trySend(tokens.toList())
                     if (now - lastPersist >= 15_000_000_000L) {
-                        repository.save(root, checkpoint())
+                        try {
+                            repository.save(root, checkpoint())
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            throw error.asSasayakiFailure(SasayakiFailureKind.Storage)
+                        }
                         lastPersist = now
                     }
                 })
@@ -242,8 +264,10 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             completed = true
         } catch (_: CancellationException) {
             // Pause keeps only complete backend batches. Resume re-decodes the unfinished segment.
-        } catch (_: Exception) {
-            error = failure()
+        } catch (failure: SasayakiOperationFailure) {
+            error = sasayakiFailureText(failure.kind)
+        } catch (failure: Exception) {
+            error = failure.toSasayakiFailureText(SasayakiFailureKind.Unknown)
         } finally {
             requests.close()
             withContext(NonCancellable + ioDispatcher) {
@@ -255,7 +279,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                             mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
                             align(tokens, complete = completed)
                         }
-                    } catch (_: Exception) { error = failure() }
+                    } catch (failure: Exception) { error = failure.toSasayakiFailureText(SasayakiFailureKind.Storage) }
                 }
                 mutableState.update { it.copy(
                     stage = SasayakiTranscriptionStage.Idle,
@@ -266,6 +290,4 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             }
         }
     }
-
-    private fun failure() = UiText.Resource(R.string.sasayaki_transcription_failed)
 }

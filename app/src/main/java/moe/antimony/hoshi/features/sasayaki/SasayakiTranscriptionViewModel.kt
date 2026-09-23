@@ -145,7 +145,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                showError()
+                showError(SasayakiFailureKind.Unknown)
             } finally {
                 if (root == activeRoot) {
                     _uiState.value = _uiState.value.copy(isUpdating = false)
@@ -188,7 +188,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                showError()
+                showError(SasayakiFailureKind.Storage)
             } finally {
                 if (root == activeRoot) {
                     _uiState.value = _uiState.value.copy(isUpdating = false)
@@ -211,7 +211,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (generation == loadGeneration) showError()
+                if (generation == loadGeneration) showError(SasayakiFailureKind.Storage)
             } finally {
                 if (generation == loadGeneration) {
                     _uiState.value = _uiState.value.copy(isLoading = false)
@@ -243,8 +243,8 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         )
     }
 
-    private fun showError() {
-        localError = UiText.Resource(R.string.sasayaki_transcription_failed)
+    private fun showError(kind: SasayakiFailureKind) {
+        localError = sasayakiFailureText(kind)
     }
 
     override fun onCleared() {

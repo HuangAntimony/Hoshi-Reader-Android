@@ -10,10 +10,10 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import java.io.File
-import java.io.IOException
 import moe.antimony.hoshi.features.sasayaki.SasayakiToken
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -21,6 +21,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.DefaultDispatcher
+import moe.antimony.hoshi.features.sasayaki.SasayakiFailureKind
+import moe.antimony.hoshi.features.sasayaki.SasayakiOperationFailure
+import moe.antimony.hoshi.features.sasayaki.asSasayakiFailure
 
 /** Native model lifetime is one active transcription, never a whole audiobook's
  * PCM. Calls are serialized so multiple readers cannot load concurrent 400MB sessions. */
@@ -33,7 +36,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
 ) : SasayakiTranscriptionBackend {
     private val mutex = Mutex()
 
-    override suspend fun duration(source: String): Double = decoder.duration(source)
+    override suspend fun duration(source: String): Double = readAudioDuration(source)
 
     override suspend fun transcribe(
         source: String,
@@ -47,20 +50,55 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         withContext(defaultDispatcher) {
             require(parallelism in 1..3)
             require(from.isFinite() && from >= 0)
-            val duration = decoder.duration(source)
+            val duration = readAudioDuration(source)
             if (from >= duration) {
                 onBatch(SasayakiTranscriptionBatch(emptyList(), duration))
                 return@withContext
             }
-            val directories = prepareSasayakiResources(listOf(runtime.store(), models.store), onDownloadRequired, onDownload)
+            val runtimeStore = try {
+                runtime.store()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.Recognition)
+            }
+            val directories = try {
+                prepareSasayakiResources(listOf(runtimeStore, models.store), onDownloadRequired, onDownload)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.ModelResources)
+            }
             currentCoroutineContext().ensureActive()
             try {
                 runtime.load(directories[0])
-                transcribeWithModels(source, from, duration, directories[1], parallelism, previousTokens, onBatch)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: LinkageError) {
-                throw IOException("Native transcription runtime is unavailable", error)
+                throw SasayakiOperationFailure(SasayakiFailureKind.Recognition, error)
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.Recognition)
+            }
+            try {
+                transcribeWithModels(source, from, duration, directories[1], parallelism, previousTokens, onBatch)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: SasayakiOperationFailure) {
+                throw error
+            } catch (error: LinkageError) {
+                throw SasayakiOperationFailure(SasayakiFailureKind.Recognition, error)
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.Recognition)
             }
         }
+    }
+
+    private suspend fun readAudioDuration(source: String): Double = try {
+        decoder.duration(source)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        throw error.asSasayakiFailure(SasayakiFailureKind.AudioSource)
     }
 
     private suspend fun transcribeWithModels(
@@ -94,7 +132,15 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
             // preroll; saved tail text deduplicates already emitted context.
             val decodeFrom = maxOf(0.0, from - .5)
             transcribeSpeechAudio(from, duration, decodeFrom, parallelism,
-                decode = { send -> decoder.decode(source, decodeFrom, send) },
+                decode = { send ->
+                    try {
+                        decoder.decode(source, decodeFrom, send)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        throw error.asSasayakiFailure(SasayakiFailureKind.AudioSource)
+                    }
+                },
                 probability = energy::probability, recognize = { samples ->
                     currentCoroutineContext().ensureActive()
                     val stream = recognizer.createStream()
