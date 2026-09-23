@@ -925,7 +925,14 @@ Validate relevant sync/update/Sasayaki changes with:
   continuous and checkpoint-resumed output for missing or duplicated prefixes;
   keep hard-cut speech context. Existing transcripts may recover short word
   fragments between real anchors, but must not highlight an entirely omitted
-  reply or bridge long silence.
+  reply or bridge token-free long silence. Explicitly recognized words after a
+  long pause must retain their token times. Check kana/kanji rewrites around a
+  local exact phrase and punctuation, a missing whole reply beside a recognized
+  prefix, ambiguous readings on either side of a sentence boundary, and a partial
+  ruby reading error sharing one base character. Repaired syllables must preserve
+  the exact syllables' timing; deleted letters inside a spoken word must not give
+  an omitted whole cue its neighbor's time. Sparse sentences must retain supported
+  fragments, and incremental matching must agree with full alignment.
   Character coverage and subtitle cue match rate are different metrics; neither
   alone verifies transcript accuracy. Exclude toc/caution/colophon source paths
   for both SRT and transcription, retaining existing SRT multi-volume behavior.

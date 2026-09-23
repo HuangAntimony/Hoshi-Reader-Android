@@ -563,9 +563,18 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   searched; bounded gaps are repaired again only when their neighboring anchors
   change. The global monotonic chain is still reconsidered so new evidence can
   correct an earlier position. CPU matching runs on the Default dispatcher;
-  parsing and persistence remain repository-owned I/O. Short omitted word fragments
-  can use the time between real neighboring anchors, but entire unspoken cues
-  and gaps across long silence remain unmatched. Match coverage is summed
+  parsing and persistence remain repository-owned I/O. Gap edit alignment prefers
+  exact letters when edit costs tie and distinguishes token insertions from text
+  deletions. Short gaps with a substantial exact run allow more spelling differences;
+  each uncertain block uses only its own tokens. Script-compatible kana/kanji recovery
+  uses bounded lengths, not an automatic pronunciation dictionary. A partial sentence
+  edge can be recovered beside an omitted cue only when that cue cannot plausibly
+  claim the same tokens. Explicit-token repair checks token duration, excluding
+  surrounding pauses. Ruby syllables sharing a source character merge their timings.
+  Short omitted word fragments can use the time between real neighboring anchors
+  or an adjacent token within their cue when no silence exists; entire unspoken cues
+  and token-free gaps across long silence remain unmatched. Sparse sentences keep
+  their contiguous supported spans instead of discarding all matches. Match coverage is summed
   matched character lengths divided by the parsed book character count.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active

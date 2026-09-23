@@ -200,7 +200,105 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
-    fun boundedRecoveryRejectsUnrelatedSpeechAndLongSilence() {
+    fun recognizedPrefixAfterOmittedReplyUsesItsOwnTokensAfterLongPause() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。ふう。訳がわからないと彼女は言った。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("わけ", 12.0, 12.6),
+                token("がわからないと彼女は言った", 12.6, 16.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "訳がわからないと彼女は言った"), result.matches.map { it.text })
+        assertEquals(13, result.matches.last().start)
+        assertEquals(12.0, result.matches.last().startTime, 0.0001)
+        assertEquals(16.0, result.matches.last().endTime, 0.0001)
+        assertEquals(1, result.unmatched)
+    }
+
+    @Test
+    fun shortRewritesAroundLocalExactTextPreserveWordTimesAcrossComma() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。なにを呑気にしてんだよ、山田！彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("何", 5.0, 5.5),
+                token("を", 5.5, 5.7), token("のんき", 5.7, 6.5), token("にしてんだよ", 6.5, 8.0),
+                token("矢間", 8.4, 9.0), token("彼女は窓の外を眺めていた", 10.0, 14.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "なにを呑気にしてんだよ", "山田", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(listOf(1.0, 5.0, 8.4, 10.0), result.matches.map { it.startTime })
+        assertEquals(listOf(4.0, 8.0, 9.0, 14.0), result.matches.map { it.endTime })
+    }
+
+    @Test
+    fun editDeletionDoesNotGiveAnOmittedSentenceThePreviousWordsTime() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。彼女は窓辺で手紙を読む。はい。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女は窓へで手紙を読む", 4.0, 8.0),
+                token("私は駅へ向かって歩いた", 9.0, 13.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓辺で手紙を読む", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+        assertEquals(1, result.unmatched)
+    }
+
+    @Test
+    fun editDeletionInsideSpokenWordCanUseAdjacentTokenWithoutSilence() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。ふうん。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("ふ", 5.0, 5.3),
+                token("ん", 5.3, 5.5), token("彼女は窓の外を眺めていた", 6.0, 10.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "ふうん", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, .0001)
+        assertEquals(5.5, result.matches[1].endTime, .0001)
+    }
+
+    @Test
+    fun singleKanjiReadingCanSpanThreeKanaTokens() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。私は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("わたし", 5.0, 5.8),
+                token("は窓の外を眺めていた", 5.8, 9.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "私は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches.last().startTime, .0001)
+    }
+
+    @Test
+    fun ambiguousReadingCannotMoveAcrossAnOmittedSentenceBoundary() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。音。訳がわからないと彼女は言った。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("おと", 5.0, 5.6),
+                token("がわからないと彼女は言った", 5.6, 9.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "がわからないと彼女は言った"), result.matches.map { it.text })
+        assertEquals(5.6, result.matches.last().startTime, .0001)
+    }
+
+    @Test
+    fun repairedRubySyllableRetainsTheExactSyllablesTimeOnSharedBaseCharacter() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。<ruby>花<rt>はな</rt></ruby>を見た男と話す。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("は", 5.0, 5.5), token("ま", 5.5, 6.0),
+                token("を見た", 6.0, 7.0), token("人", 7.0, 7.5), token("と話す", 7.5, 8.0),
+                token("彼女は窓の外を眺めていた", 9.0, 13.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "花を見た男と話す", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, .0001)
+        assertEquals(8.0, result.matches[1].endTime, .0001)
+        assertEquals(11, result.matches[1].start)
+        assertEquals(8, result.matches[1].length)
+    }
+
+    @Test
+    fun sparseSentenceStillKeepsItsSupportedEndingWhenMiddleWasNotSpoken() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。このペンションを提供してくれてる。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("ここ", 5.0, 5.5),
+                token("を提供してくれてる", 5.5, 7.5), token("彼女は窓の外を眺めていた", 8.0, 12.0)),
+        )
+        assertTrue(result.matches.any { it.text == "を提供してくれてる" && it.startTime == 5.5 && it.endTime == 7.5 })
+        assertFalse(result.matches.any { "ペンション" in it.text })
+    }
+
+    @Test
+    fun boundedRecoveryUsesExplicitTokenDurationAndRejectsUnrelatedSpeech() {
         val source = book("<p>雨の降る静かな朝だった。多分。彼女は窓の外を眺めていた。</p>")
         val unrelated = SasayakiTranscriptAligner.align(source,
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("音楽", 4.5, 5.0), token("彼女は窓の外を眺めていた", 5.5, 9.0)),
@@ -209,7 +307,13 @@ class SasayakiTranscriptAlignerTest {
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("たぶん", 12.0, 13.0), token("彼女は窓の外を眺めていた", 15.0, 19.0)),
         )
         assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓の外を眺めていた"), unrelated.matches.map { it.text })
-        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓の外を眺めていた"), delayed.matches.map { it.text })
+        assertEquals(listOf("雨の降る静かな朝だった", "多分", "彼女は窓の外を眺めていた"), delayed.matches.map { it.text })
+        assertEquals(12.0, delayed.matches[1].startTime, 0.0001)
+        assertEquals(13.0, delayed.matches[1].endTime, 0.0001)
+        val overlong = SasayakiTranscriptAligner.align(source,
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("たぶん", 4.5, 14.0), token("彼女は窓の外を眺めていた", 15.0, 19.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓の外を眺めていた"), overlong.matches.map { it.text })
     }
 
     @Test
@@ -271,6 +375,21 @@ class SasayakiTranscriptAlignerTest {
             for (end in (chunkSize..tokens.size step chunkSize).toList() + tokens.size) {
                 val prefix = tokens.take(end)
                 assertEquals("chunk=$chunkSize end=$end", SasayakiTranscriptAligner.align(book, prefix), session.align(prefix))
+            }
+        }
+    }
+
+    @Test fun incrementalRewritesAndOmittedRepliesAgreeWithFreshAlignment() {
+        val book = book("<p>雨の降る静かな朝だった。ふう。訳がわからないと彼女は言った。なにを呑気にしてんだよ、山田！はい。私は駅へ向かって歩いた。</p>")
+        val text = "雨の降る静かな朝だったわけがわからないと彼女は言った何をのんきにしてんだよ矢間私は駅へ向かって歩いた"
+        val tokens = text.mapIndexed { i, c -> token(c.toString(), i * .2, (i + 1) * .2) }
+        for (chunkSize in listOf(1, 5, 13)) {
+            val session = SasayakiTranscriptAligner.Session(book)
+            for (end in (chunkSize..tokens.size step chunkSize).toList() + tokens.size) {
+                val prefix = tokens.take(end)
+                val fresh = SasayakiTranscriptAligner.align(book, prefix)
+                assertEquals("chunk=$chunkSize end=$end", fresh, session.align(prefix))
+                assertFalse(fresh.matches.any { it.text == "ふう" || it.text == "はい" })
             }
         }
     }
