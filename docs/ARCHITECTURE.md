@@ -577,7 +577,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   existing anchor candidates. Only new speech and an overlapping exact tail are
   searched; bounded gaps are repaired again only when their neighboring anchors
   change. The global monotonic chain is still reconsidered so new evidence can
-  correct an earlier position. CPU matching runs on the Default dispatcher;
+  correct an earlier position. After chain selection, a one- or two-character
+  cross-sentence anchor prefix may return to an earlier recognized sentence's short
+  ending when that remainder aligns, the intervening sentence has no equally strong
+  competing tail (including ruby readings), and the following distinctive anchor stays intact.
+  Transfers preserve whole token and ruby-base boundaries; the intervening omitted
+  sentence receives no borrowed time. Resolved anchors also key the gap cache.
+  CPU matching runs on the Default dispatcher;
   parsing and persistence remain repository-owned I/O. Bounded gap alignment includes
   neighboring confirmed text through sentence edges when available, pinning the
   existing text/token boundaries. Similarity is scored per sentence with that context;
@@ -614,7 +620,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   and uses bounded lengths, not an automatic pronunciation dictionary. When two real
   anchors enclose exactly one short cue and complete speech tokens, its book text can
   use that interval despite entirely different ASR wording or numeric values, subject
-  to duration and length-ratio limits. Within a larger repair window, an isolated short
+  to length-ratio and token-boundary limits. Within a larger repair window, an isolated short
   reply can likewise use a complete token range separated from both neighbors by pauses;
   an extra spoken suffix cannot supply
   an omitted reply. Supported phrases allow length ratios of 1:4 through 4:1, retaining
@@ -628,15 +634,18 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   vowels as equivalent without changing exact anchor seeds, stored text, or cue offsets.
   Small tsu and contracted ya/yu/yo remain distinct. A partial sentence
   edge can be recovered beside an omitted cue only when that cue cannot plausibly
-  claim the same tokens. Explicit-token repair checks token duration, excluding
-  surrounding pauses. Kana/kanji rewrites retain their spoken character count for duration
-  validation, so a compact kanji spelling is not rejected solely for its shorter length.
-  Ruby syllables sharing a source character merge their timings. An abnormally long
-  token does not discard reliably timed neighboring fragments; each resulting fragment
-  is checked again for coverage, without clipping or inventing token endpoints.
+  claim the same tokens. Recognized text and evidence-supported explicit-token repairs
+  are not rejected solely for long estimated durations: a token end can include silence
+  or omitted speech before the next token starts. Invalid/nonpositive token intervals
+  remain excluded. Ruby syllables sharing a source character merge their timings;
+  final cues retain their token intervals without applying a duration cap or inventing
+  endpoints. Text density still determines whether to keep a cue or its supported spans.
   Short omitted word fragments can use the time between real neighboring anchors
   or an adjacent token within their cue when no silence exists; entire unspoken cues
-  and token-free gaps across long silence remain unmatched. Sparse sentences keep
+  and token-free gaps across long silence remain unmatched. Cue assembly applies the same
+  gap-duration limit before joining supported spans across intervals with no recognized
+  speech, even when text density is high; unassigned ASR wording is not treated as silence.
+  Sparse sentences keep
   their contiguous supported spans instead of discarding all matches. Match coverage is summed
   matched character lengths divided by the parsed book character count.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3

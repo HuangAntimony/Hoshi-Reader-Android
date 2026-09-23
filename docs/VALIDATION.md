@@ -945,8 +945,17 @@ Validate relevant sync/update/Sasayaki changes with:
   anchors and complete speech tokens should retain the book's wording even when ASR
   mishears it; check rewritten short replies, numeric values, contracted phrases,
   and `%`/`％` output. Contextual cross-cue allocation must not split a recognized
-  neighboring word to invent a missing interjection. Sparse sentences must retain supported
-  fragments, and incremental matching must agree with full alignment.
+  neighboring word to invent a missing interjection. Long estimated token intervals must
+  retain recognized words, sentence endings, and supported rewrites without a fixed
+  duration cap. A short suffix attached to the next sentence's exact anchor must stay
+  with the recognized earlier sentence when its local context supports that ownership;
+  keep the intervening unspoken sentence unmatched. Check one- and two-character
+  endings, a fully or partially recognized middle sentence, and competing endings
+  including ruby readings.
+  Sparse sentences must retain supported fragments; dense cues must also split around
+  token-free gaps across long silence. Distinguish unmatched ASR wording from silence,
+  including overlapping same-frame multi-character tokens. Incremental matching must
+  agree with full alignment.
   Character coverage and subtitle cue match rate are different metrics; neither
   alone verifies transcript accuracy. Exclude toc/caution/colophon source paths
   for both SRT and transcription, retaining existing SRT multi-volume behavior.

@@ -30,8 +30,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   short kana/kanji replies, contracted names, and comma-separated numeric expressions;
   preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
   Keep recognized words beside omitted cues and inside long missing passages;
-  retain reliably timed text when another token has an abnormal duration, and account
-  for kana reading length when matching a shorter kanji spelling. Preserve recognized
+  retain recognized words and supported spelling changes even when estimated token
+  durations are long, and keep a recognized sentence's ending from being assigned
+  to a later omitted sentence. Preserve recognized
   words on both sides of overlapping audio segments, including pause/resume, while
   removing repeated context. Match small-vowel spellings and adjacent reading changes
   without assigning the next word's opening to an omitted reply. Use surrounding
