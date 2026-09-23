@@ -39,6 +39,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.Icons
@@ -69,6 +71,7 @@ import androidx.compose.material.icons.rounded.Translate
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -117,10 +120,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
@@ -407,29 +414,32 @@ fun BookshelfView(
         AlertDialog(
             onDismissRequest = { deleteCandidate = null },
             title = { Text(stringResource(R.string.bookshelf_delete_book_title_format, candidate.displayTitle)) },
-            text = {
-                if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive && candidate.metadata.id in uiState.canDeleteLocalBookIds) {
-                    TextButton(onClick = {
-                        booksViewModel.deleteLocalBook(candidate)
-                        deleteCandidate = null
-                    }) {
-                        Text(stringResource(R.string.sync_delete_local))
-                    }
-                }
-            },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        booksViewModel.deleteBook(candidate)
-                        deleteCandidate = null
-                    },
-                ) {
-                    Text(stringResource(if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive) R.string.sync_delete_everywhere else R.string.action_delete))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteCandidate = null }) {
-                    Text(stringResource(R.string.action_cancel))
+                Column(Modifier.fillMaxWidth()) {
+                    if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive && candidate.metadata.id in uiState.canDeleteLocalBookIds) {
+                        TextButton(
+                            onClick = {
+                                booksViewModel.deleteLocalBook(candidate)
+                                deleteCandidate = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.sync_delete_local))
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            booksViewModel.deleteBook(candidate)
+                            deleteCandidate = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Text(stringResource(if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive) R.string.sync_delete_everywhere else R.string.action_delete))
+                    }
+                    TextButton(onClick = { deleteCandidate = null }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
                 }
             },
         )
@@ -1506,19 +1516,32 @@ private fun BookGridCell(
             progress = progress,
         )
         Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (entry.metadata.epub == null) {
-                Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp).padding(end = 3.dp))
-            }
-            Text(
-                text = entry.displayTitle,
-                style = layoutSpec.bookTitleTextStyle.toTextStyle(),
-                fontWeight = layoutSpec.bookTitleFontWeight.toFontWeight(),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = if (downloadProgress == null) 2 else 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(
+            text = buildAnnotatedString {
+                if (entry.metadata.epub == null) {
+                    appendInlineContent("cloud")
+                    append(" ")
+                }
+                append(entry.displayTitle)
+            },
+            inlineContent = mapOf(
+                "cloud" to InlineTextContent(
+                    Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter),
+                ) {
+                    Icon(
+                        Icons.Rounded.CloudDownload,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                },
+            ),
+            style = layoutSpec.bookTitleTextStyle.toTextStyle(),
+            fontWeight = layoutSpec.bookTitleFontWeight.toFontWeight(),
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = if (downloadProgress == null) 2 else 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         downloadProgress?.let { value ->
             LinearProgressIndicator(progress = { value.toFloat() }, modifier = Modifier.fillMaxWidth())
         }

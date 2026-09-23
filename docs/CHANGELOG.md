@@ -12,6 +12,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   highlights, shelves, reading sessions and Sasayaki playback with iOS. Cloud
   books download when opened; choose Delete Local to keep the cloud copy or
   Delete Everywhere to remove it across devices while retaining reading history.
+  Book deletion actions stack vertically, and cloud icons sit inline on the first
+  title line.
   Failed Google Drive sign-ins show an error dialog.
   Debug builds sync edits after 2 seconds and poll for cloud changes every 5 seconds.
 

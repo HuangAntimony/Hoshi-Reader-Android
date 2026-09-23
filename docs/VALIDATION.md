@@ -439,6 +439,11 @@ Validate relevant bookshelf/import changes with:
   missing timestamps. Recent places unknown times last; Title uses natural title
   order. Switch sort while refresh is delayed/offline, then refresh and import a
   remote book; remaining entries must retain the selected ordering.
+- Hoshi cloud-book titles: check long titles wrap to two lines with the cloud
+  icon inline on the first line and the second line using the full card width.
+  Open the delete dialog for an uploaded local book and check Delete Local,
+  Delete Everywhere, and Cancel stack vertically at narrow widths and large
+  font sizes; dismiss without deleting during layout checks.
 - dark and E-ink editable text fields, confirming visible cursors and horizontal
   scrolling for long values.
 - Android-created `Books` and `Dictionaries` `.hoshi` archives restored by iOS
