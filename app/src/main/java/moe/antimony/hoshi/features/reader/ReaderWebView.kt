@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sync.SyncProvider
+import moe.antimony.hoshi.features.sync.SyncBook
+import moe.antimony.hoshi.features.sync.syncKey
+import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -116,6 +121,9 @@ fun ReaderWebView(
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
     onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: ReadingSessions?) -> Unit = { _, _, _ -> },
+    onSaveStatistics: (ReadingSessions) -> Unit = {},
+    onFlushBookmarkSaves: suspend () -> Unit = {},
+    syncProvider: SyncProvider = SyncProvider.Gdrive,
     onFlushAutoSyncExport: () -> Unit = {},
     onForegroundAutoSyncImport: () -> Unit = {},
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
@@ -123,6 +131,8 @@ fun ReaderWebView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var bookDeleted by remember(bookRoot) { mutableStateOf(false) }
+    var applyingBookmark by remember(bookRoot) { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
     val appContainer = LocalHoshiUiDependencies.current
@@ -408,6 +418,7 @@ fun ReaderWebView(
         }
     }
     fun recordStatisticsAtDisplayedPosition() {
+        if (applyingBookmark || bookDeleted) return
         statisticsTracker?.update(currentDisplayedCharacter())
         syncStatisticsState()
     }
@@ -419,7 +430,12 @@ fun ReaderWebView(
         recordStatisticsAtDisplayedPosition()
         return statisticsTracker?.statisticsForPersistenceOrNull()
     }
+    fun flushStatistics() {
+        if (bookDeleted || statisticsTracker?.state?.isTracking != true) return
+        statisticsForSave()?.let(onSaveStatistics)
+    }
     fun saveReaderPosition(position: ReaderChapterPosition, statistics: ReadingSessions? = statisticsForSave()) {
+        if (applyingBookmark || bookDeleted) return
         onSaveBookmark(position.index, position.progress, statistics)
     }
     fun saveCurrentDisplayedPosition() {
@@ -503,9 +519,9 @@ fun ReaderWebView(
     fun toggleStatisticsTracking() {
         val tracker = statisticsTracker ?: return
         if (tracker.state.isTracking) {
+            flushStatistics()
             tracker.stop(currentDisplayedCharacter())
             syncStatisticsState()
-            saveCurrentDisplayedPosition()
         } else {
             tracker.start(currentDisplayedCharacter())
             syncStatisticsState()
@@ -513,6 +529,7 @@ fun ReaderWebView(
     }
     fun pauseStatisticsForLifecycleStop(): Boolean {
         val tracker = statisticsTracker ?: return false
+        flushStatistics()
         val paused = tracker.pause(currentDisplayedCharacter())
         if (paused) {
             syncStatisticsState()
@@ -544,7 +561,7 @@ fun ReaderWebView(
         if (tracker.state.isTracking) {
             while (tracker.state.isTracking) {
                 delay(1_000)
-                tracker.update(currentDisplayedCharacter())
+                if (!applyingBookmark && !bookDeleted) tracker.update(currentDisplayedCharacter())
                 syncStatisticsState()
             }
         }
@@ -613,6 +630,9 @@ fun ReaderWebView(
         }
 
     fun closeReader() {
+        flushStatistics()
+        statisticsTracker?.stop(currentDisplayedCharacter())
+        syncStatisticsState()
         val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
         if (plan.flushPendingProgressSave) {
             webView?.flushPendingProgressSave()
@@ -711,6 +731,7 @@ fun ReaderWebView(
         return false
     }
     fun saveDisplayedProgress(progress: Double) {
+        if (applyingBookmark || bookDeleted) return
         stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordDisplayedProgress(progress)
@@ -719,6 +740,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition)
     }
     fun displayPagedTurnProgress(progress: Double) {
+        if (applyingBookmark || bookDeleted) return
         stateHolder.enterFocusModeForReaderInteraction()
         startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordDisplayedProgress(progress)
@@ -726,12 +748,14 @@ fun ReaderWebView(
         recordStatisticsAtDisplayedPosition()
     }
     fun displayContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        if (applyingBookmark || bookDeleted) return
         startStatisticsForProgressChangeIfNeeded()
         stateHolder.recordContinuousScrollDisplayProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
         recordStatisticsAtDisplayedPosition()
     }
     fun saveContinuousScrollProgress(progress: Double, restoreEpoch: Int) {
+        if (applyingBookmark || bookDeleted) return
         startStatisticsForProgressChangeIfNeeded()
         val savedPosition = stateHolder.recordContinuousScrollProgress(progress, restoreEpoch) ?: return
         stateHolder.clearForwardHistoryAfterManualMovement()
@@ -1502,6 +1526,68 @@ fun ReaderWebView(
             SasayakiAudiobookInfo.Empty
         }
     }
+    val currentSyncFlush = rememberUpdatedState<suspend (String) -> Unit> { key ->
+        if (bookRoot?.name?.syncKey() == key) withContext(Dispatchers.Main.immediate) {
+            onFlushBookmarkSaves()
+            sasayakiPlayer?.flushSaves()
+        }
+    }
+    val currentSyncStop = rememberUpdatedState<suspend (String) -> Unit> { key ->
+        if (bookRoot?.name?.syncKey() == key) withContext(Dispatchers.Main.immediate) {
+            flushStatistics()
+            statisticsTracker?.stop(currentDisplayedCharacter())
+            syncStatisticsState()
+            bookDeleted = true
+            onFlushBookmarkSaves()
+            cancelSasayakiAutoPage()
+            val player = sasayakiPlayer
+            player?.stopPlayback()
+            player?.flushSaves()
+            player?.release()
+            sasayakiPlayer = null
+            onClose()
+        }
+    }
+    val currentSyncApply = rememberUpdatedState<suspend (String, SyncBook, Boolean) -> Unit> { key, syncedBook, bookmarkChanged ->
+        if (bookRoot?.name?.syncKey() == key && !bookDeleted) withContext(Dispatchers.Main.immediate) {
+            if (bookmarkChanged) {
+                book.bookInfo.resolveTtuCharacterPosition(syncedBook.bookmark!!.value.characterCount)?.let { position ->
+                    applyingBookmark = true
+                    stateHolder.applySyncedBookmark(ReaderChapterPosition(position.spineIndex, position.progress))
+                    resetStatisticsBaseline()
+                }
+            }
+            highlights = bookRepository.loadHighlights(bookRoot)
+            syncedBook.audiobook?.let { change ->
+                val playback = sasayakiPlayer?.playback
+                if (playback != null && (playback.lastPosition != change.value.lastPosition || playback.delay != change.value.delay || playback.rate.toDouble() != change.value.rate)) {
+                    sasayakiPlayer?.applySyncedPlayback(bookRepository.loadSasayakiPlayback(bookRoot)!!)
+                }
+            }
+            statisticsTracker?.applySessions(syncedBook.sessions)
+            syncStatisticsState()
+        }
+    }
+    val currentSyncMatch = rememberUpdatedState<suspend (String) -> Unit> { key ->
+        if (bookRoot?.name?.syncKey() == key) withContext(Dispatchers.Main.immediate) {
+            val match = bookRepository.loadSasayakiMatch(bookRoot)
+            sasayakiSheetMatchData = match
+            pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(match, preserveLayout = true)
+        }
+    }
+    DisposableEffect(bookRoot) {
+        val sync = appContainer.googleDriveSyncManager
+        sync.flushReader = { currentSyncFlush.value(it) }
+        sync.stopReader = { currentSyncStop.value(it) }
+        sync.store.applyReaderState = { key, book, changed -> currentSyncApply.value(key, book, changed) }
+        sync.reloadSyncedMatch = { currentSyncMatch.value(it) }
+        onDispose {
+            sync.flushReader = null
+            sync.stopReader = null
+            sync.store.applyReaderState = null
+            sync.reloadSyncedMatch = null
+        }
+    }
     DisposableEffect(Unit) {
         onDispose { sasayakiPlayer?.release() }
     }
@@ -1568,6 +1654,7 @@ fun ReaderWebView(
         val plan = readerLifecycleAutoSyncPlan(
             event = ReaderLifecycleAutoSyncEvent.Resume,
             inactiveElapsedMillis = inactiveAt?.let { SystemClock.elapsedRealtime() - it },
+            provider = syncProvider,
         )
         if (plan.importOnForeground) {
             onForegroundAutoSyncImport()
@@ -1589,6 +1676,9 @@ fun ReaderWebView(
         }
     }
     val currentLifecycleDispose = rememberUpdatedState {
+        flushStatistics()
+        statisticsTracker?.stop(currentDisplayedCharacter())
+        syncStatisticsState()
         val plan = readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Dispose)
         if (plan.flushPendingProgressSave) {
             webView?.flushPendingProgressSave()
@@ -1846,6 +1936,10 @@ fun ReaderWebView(
                             onRestoreCompleted = {
                                 if (generation == stateHolder.webViewGeneration && restoreEpoch == stateHolder.webViewRestoreEpoch) {
                                     stateHolder.markWebViewRestored()
+                                    if (applyingBookmark) {
+                                        applyingBookmark = false
+                                        resetStatisticsBaseline()
+                                    }
                                     stateHolder.takeSearchHighlight(restoreChapterIndex, restoreEpoch)?.let { highlight ->
                                         webView?.evaluateJavascript(ReaderPaginationScripts.showSearchHighlightInvocation(highlight), null)
                                     }
@@ -2210,7 +2304,7 @@ internal data class PendingSasayakiCue(
 )
 
 private data class PendingSasayakiMatchUpdate(
-    val data: SasayakiMatchData,
+    val data: SasayakiMatchData?,
     val preserveLayout: Boolean,
 )
 

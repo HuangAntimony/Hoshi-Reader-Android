@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -23,7 +25,10 @@ object SyncFormat {
 
     inline fun <reified T> decode(data: String): T {
         val document = json.parseToJsonElement(data).jsonObject
-        if (document["formatVersion"] != JsonPrimitive(1)) throw SyncFormatError()
+        val version = document["formatVersion"]
+        if (version == null || version == JsonNull) throw SyncFormatError()
+        if (version.jsonPrimitive.isString) throw SerializationException("Invalid formatVersion type.")
+        if (version.jsonPrimitive.content.toBigDecimal().longValueExact() != 1L) throw SyncFormatError()
         return json.decodeFromJsonElement(document)
     }
 
@@ -158,15 +163,15 @@ data class SyncShelves(
 data class SyncRecord(
     val generation: Int,
     val deleted: Boolean,
-    val files: SyncFiles = emptyMap(),
-    val sources: Map<SyncFileType, Long> = emptyMap(),
-    val attached: Boolean = false,
-    val pending: Boolean = true,
-    val cleanup: Set<Int> = emptySet(),
+    @Required val files: SyncFiles = emptyMap(),
+    @Required val sources: Map<SyncFileType, Long> = emptyMap(),
+    @Required val attached: Boolean = false,
+    @Required val pending: Boolean = true,
+    @Required val cleanup: Set<Int> = emptySet(),
 )
 
 @Serializable
-data class SyncState(val books: Map<String, SyncRecord> = emptyMap(), val shelvesPending: Boolean = false)
+data class SyncState(@Required val books: Map<String, SyncRecord> = emptyMap(), @Required val shelvesPending: Boolean = false)
 
 fun String.syncKey(): String = Normalizer.normalize(this, Normalizer.Form.NFC)
 

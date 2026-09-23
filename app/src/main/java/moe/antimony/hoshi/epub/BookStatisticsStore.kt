@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.UUID
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -133,10 +134,11 @@ class BookStatisticsStore private constructor(
         val destination = archiveRoot(bookRoot.name)
         val merged = SyncBook.mergeRecords(readSessions(bookRoot), readSessions(destination))
         val cover = if (merged.values.any { it.value != null }) runCatching { writeArchivedCover(bookRoot, metadata, destination) }.getOrNull() else null
-        val archivedMetadata = metadata.copy(
-            title = metadata.displayTitle.ifBlank { bookRoot.name }, renamedTitle = null,
-            folder = destination.name, cover = cover, epub = null, shelves = null,
-            characterCount = maxOf(metadata.characterCount ?: 0, runCatching { json.decodeFromString(BookInfo.serializer(), bookRoot.resolve("bookinfo.json").readText()).characterCount }.getOrDefault(0)),
+        val archivedMetadata = BookMetadata(
+            id = UUID.randomUUID().toString().uppercase(), title = metadata.displayTitle,
+            author = metadata.author, folder = destination.name, cover = cover,
+            lastAccess = metadata.lastAccess, modified = metadata.modified,
+            characterCount = metadata.characterCount ?: runCatching { json.decodeFromString(BookInfo.serializer(), bookRoot.resolve("bookinfo.json").readText()).characterCount }.getOrNull(),
         )
         writeBookJson(destination.resolve("metadata.json"), json.encodeToString(BookMetadata.serializer(), archivedMetadata))
         writeSessions(destination, merged)

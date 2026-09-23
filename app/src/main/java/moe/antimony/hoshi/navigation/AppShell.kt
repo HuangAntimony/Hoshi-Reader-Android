@@ -183,7 +183,7 @@ fun AppShell(
                     is AppRoute.ReaderRoute -> {
                         clearReaderRoutesOutsideBooks()
                         selectedTab = MainTab.Books
-                        booksBackStack.openReaderRoute(route.bookId)
+                        booksBackStack.openReaderRoute(route.bookId, route.skipSyncOnOpen)
                     }
                     else -> selectTopLevelRoute(route)
                 }
@@ -221,10 +221,10 @@ fun AppShell(
         settingsBackStack.returnFromAnkiFormatDuplicate()
     }
 
-    fun openReader(bookId: String) {
+    fun openReader(bookId: String, skipSyncOnOpen: Boolean) {
         clearReaderRoutesOutsideBooks()
         selectedTab = MainTab.Books
-        booksBackStack.openReaderRoute(bookId)
+        booksBackStack.openReaderRoute(bookId, skipSyncOnOpen)
     }
 
     fun returnToSasayakiReader(bookId: String) {
@@ -354,6 +354,7 @@ fun AppShell(
                 is AppRoute.ReaderRoute -> {
                     ReaderRouteDestination(
                         bookId = route.bookId,
+                        skipSyncOnOpen = route.skipSyncOnOpen,
                         stateHolder = readerRouteStateHolder,
                         readerSettings = currentReaderSettings,
                         onReaderSettingsChange = currentOnReaderSettingsChange,
@@ -461,7 +462,7 @@ private fun TopLevelRouteContent(
     onPendingImportConsumed: () -> Unit,
     readerSettings: ReaderSettings,
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
-    onOpenReader: (String) -> Unit,
+    onOpenReader: (String, Boolean) -> Unit,
     bookshelfRefreshKey: Int,
     dictionaryFocusRequestKey: Int,
     pendingDictionaryLookupRequest: PendingDictionaryLookupRequest? = null,

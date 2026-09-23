@@ -834,7 +834,17 @@ Validate relevant settings/theme changes with:
 
 Validate relevant sync/update/Sasayaki changes with:
 
-- Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
+- Hoshi sync: verify GIS consent for the installed package/signing certificate and
+  `drive.file` access to the same Hoshi Reader folder as iOS. Test first upload,
+  cloud-only download on tap, canceled downloads, Delete Local/Everywhere,
+  offline metadata/bookmark/highlight/shelf/session conflicts, session deletion,
+  reimport generations, live reader updates/deletion, Sasayaki position/matches,
+  sign-out, cache clearing and Books backup restore. Check foreground activation,
+  120-second polling, 30-second local-edit debounce, background final pass and
+  network restoration. Unsupported `formatVersion` must block file transfers and
+  cursor advancement until a successful full pass; restart must retain cursor
+  and version skips. Preserve both devices' app data.
+- TTU Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
   remote-only bookshelf list, pull-to-refresh, import, long-press delete,
   transient network behavior, manual import/export result dialogs,
   reader-open import-only behavior, auto-export timing, close/background flush,

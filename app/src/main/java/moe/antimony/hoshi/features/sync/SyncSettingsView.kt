@@ -11,6 +11,10 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import moe.antimony.hoshi.ui.asString
+import java.text.DateFormat
+import java.util.Date
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
@@ -97,6 +101,8 @@ fun SyncSettingsView(
     val sasayakiSettingsRepository = appContainer.sasayakiSettingsRepository
     val authorizer = appContainer.deviceCodeDriveAuthorizer
     val googleAuth = appContainer.googleDriveAuth
+    val hoshiSync = appContainer.googleDriveSyncManager
+    val hoshiState by hoshiSync.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val settings = repository.settings.collectAsLoadedSettings()
     val readerSettings = readerSettingsRepository.settings.collectAsLoadedSettings()
@@ -104,6 +110,7 @@ fun SyncSettingsView(
     var authStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
+    var statisticsModeMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var copyMessage by remember { mutableStateOf<String?>(null) }
     var isAuthorizing by remember { mutableStateOf(false) }
@@ -144,6 +151,7 @@ fun SyncSettingsView(
                 if (result.resultCode == Activity.RESULT_OK) {
                     googleAuth.authorizationResult(result.data)
                     googleAuth.accept()
+                    hoshiSync.start()
                     authStatus = DriveAuthStatus.Connected
                 }
             } catch (error: CancellationException) {
@@ -189,6 +197,7 @@ fun SyncSettingsView(
             when (result) {
                 is DriveAuthorizationResult.Authorized -> {
                     googleAuth.clearHoshiLogin()
+                    hoshiSync.start()
                     isAuthorizing = false
                     devicePrompt = null
                     authStatus = DriveAuthStatus.Connected
@@ -240,6 +249,7 @@ fun SyncSettingsView(
                         authorizationLauncher.launch(IntentSenderRequest.Builder(result.pendingIntent!!).build())
                     } else {
                         googleAuth.accept()
+                        hoshiSync.start()
                         authStatus = DriveAuthStatus.Connected
                         isAuthorizing = false
                     }
@@ -283,20 +293,22 @@ fun SyncSettingsView(
 
     fun signOut() {
         scope.launch {
-            googleAuth.revokeAccess()
-            repository.clearGoogleDriveCache()
-            authStatus = googleAuth.status()
-            message = null
-            copyMessage = null
-            devicePrompt = null
-            isAuthorizing = false
+            runCatching {
+                hoshiSync.signOut()
+                authStatus = googleAuth.status()
+                message = null
+                copyMessage = null
+                devicePrompt = null
+                isAuthorizing = false
+            }.onFailure { message = resources.getString(R.string.bookshelf_sync_failed) }
         }
     }
 
     fun clearCache() {
         scope.launch {
-            repository.clearGoogleDriveCache()
-            message = resources.getString(R.string.sync_cache_cleared)
+            runCatching { hoshiSync.clearCache() }
+                .onSuccess { message = resources.getString(R.string.sync_cache_cleared) }
+                .onFailure { message = resources.getString(R.string.bookshelf_sync_failed) }
         }
     }
 
@@ -410,8 +422,8 @@ fun SyncSettingsView(
                                                 onClick = {
                                                     providerMenuExpanded = false
                                                     scope.launch {
-                                                        repository.clearGoogleDriveCache()
-                                                        repository.update { it.copy(provider = provider) }
+                                                        runCatching { hoshiSync.changeProvider(provider) }
+                                                            .onFailure { message = resources.getString(R.string.bookshelf_sync_failed) }
                                                     }
                                                 },
                                             )
@@ -503,6 +515,32 @@ fun SyncSettingsView(
                                         )
                                     },
                                 )
+                                if (row.kind == SyncSettingsDataRowKind.SyncStats) {
+                                    SettingsDivider()
+                                    ListItem(
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        headlineContent = { Text(stringResource(R.string.reader_statistics_sync_behaviour)) },
+                                        supportingContent = { Text(stringResource(R.string.reader_statistics_sync_behaviour_hint)) },
+                                        trailingContent = {
+                                            Box {
+                                                TextButton(onClick = { statisticsModeMenuExpanded = true }) {
+                                                    Text(stringResource(currentReaderSettings.statisticsSyncMode.labelRes))
+                                                }
+                                                DropdownMenu(expanded = statisticsModeMenuExpanded, onDismissRequest = { statisticsModeMenuExpanded = false }) {
+                                                    StatisticsSyncMode.entries.forEach { mode ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(stringResource(mode.labelRes)) },
+                                                            onClick = {
+                                                                statisticsModeMenuExpanded = false
+                                                                saveReaderSettings(currentReaderSettings.copy(statisticsSyncMode = mode))
+                                                            },
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -607,6 +645,26 @@ fun SyncSettingsView(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                     )
+                }
+            }
+            item {
+                if (currentSettings?.enabled == true && currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus == DriveAuthStatus.Connected) {
+                    SettingsCard {
+                        hoshiState.lastSync?.let { lastSync ->
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text(stringResource(R.string.sync_last_sync)) },
+                                trailingContent = { Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(lastSync))) },
+                            )
+                            SettingsDivider()
+                        }
+                        TextButton(onClick = { scope.launch { hoshiSync.sync() } }, enabled = !hoshiState.isSyncing) {
+                            Text(stringResource(R.string.sync_now))
+                        }
+                    }
+                    hoshiState.errorMessage?.let {
+                        Text(it.asString(), color = colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
                 }
             }
             item {
@@ -845,15 +903,13 @@ internal fun syncSettingsDataRows(
             checked = readerSettings.statisticsSyncEnabled,
         ),
     )
-    if (sasayakiSettings.enabled) {
-        add(
-            SyncSettingsDataRow(
-                kind = SyncSettingsDataRowKind.SyncAudiobookProgress,
-                titleRes = R.string.sync_audiobook_progress,
-                checked = sasayakiSettings.syncEnabled,
-            ),
-        )
-    }
+    add(
+        SyncSettingsDataRow(
+            kind = SyncSettingsDataRowKind.SyncAudiobookProgress,
+            titleRes = R.string.sync_audiobook_progress,
+            checked = sasayakiSettings.syncEnabled,
+        ),
+    )
 }
 
 @Composable
@@ -881,3 +937,10 @@ private fun SettingsDivider() {
         color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
+
+@get:StringRes
+private val StatisticsSyncMode.labelRes: Int
+    get() = when (this) {
+        StatisticsSyncMode.Merge -> R.string.reader_statistics_sync_mode_merge
+        StatisticsSyncMode.Replace -> R.string.reader_statistics_sync_mode_replace
+    }

@@ -3,6 +3,7 @@ package moe.antimony.hoshi.navigation
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookMetadata
@@ -26,12 +27,13 @@ internal class ReaderRouteStateHolder(
                 ?: error("Book not found.")
             val cachedBookInfo = repository.loadReaderBookInfo(entry.root)
             val parsedBook = parser.parse(entry.root, cachedBookInfo)
-            val metadata = entry.metadata.copy(
-                title = parsedBook.title,
-                cover = repository.metadataCoverPath(entry.root, parsedBook.coverHref) ?: entry.metadata.cover,
+            val currentMetadata = repository.loadBookEntry(bookId)!!.metadata
+            val metadata = currentMetadata.copy(
+                title = currentMetadata.title ?: parsedBook.title,
+                cover = currentMetadata.cover ?: repository.metadataCoverPath(entry.root, parsedBook.coverHref),
                 folder = entry.root.name,
                 lastAccess = repository.currentAppleReferenceDateSeconds(),
-                bookLanguage = entry.metadata.bookLanguage ?: parsedBook.language,
+                bookLanguage = currentMetadata.bookLanguage ?: parsedBook.language,
             )
             repository.saveMetadata(
                 entry.root,
@@ -42,13 +44,20 @@ internal class ReaderRouteStateHolder(
             if (cachedBookInfo != displayBook.bookInfo) {
                 repository.saveBookInfo(entry.root, displayBook.bookInfo)
             }
-            val bookCoverFile = resolveMetadataCoverFile(entry.root, metadata.cover)
+            if (cachedBookInfo == null) {
+                repository.loadBookmark(entry.root)?.let { bookmark ->
+                    val position = displayBook.bookInfo.resolveTtuCharacterPosition(bookmark.characterCount)
+                    repository.saveBookmark(entry.root, bookmark.copy(chapterIndex = position?.spineIndex ?: 0, progress = position?.progress ?: 0.0))
+                }
+            }
             beforeBookmarkLoad(displayEntry)
+            val refreshed = repository.loadBookEntry(bookId)!!
+            val bookCoverFile = resolveMetadataCoverFile(entry.root, refreshed.metadata.cover)
             val bookmark = repository.loadBookmark(entry.root)
             ReaderRouteLoadState.Ready(
-                entry = displayEntry,
+                entry = refreshed,
                 bookRoot = entry.root,
-                book = displayBook,
+                book = displayBook.copy(title = refreshed.displayTitle),
                 bookCoverFile = bookCoverFile,
                 bookmark = bookmark,
             )
@@ -63,11 +72,13 @@ internal class ReaderRouteStateHolder(
         onBookmarkSaved: () -> Unit,
     ) {
         withContext(ioDispatcher) {
+            val old = repository.loadBookmark(state.bookRoot)
+            val count = state.book.characterCountAt(chapterIndex, progress)
             val bookmark = Bookmark(
                 chapterIndex = chapterIndex,
                 progress = progress,
-                characterCount = state.book.characterCountAt(chapterIndex, progress),
-                lastModified = repository.currentAppleReferenceDateSeconds(),
+                characterCount = count,
+                lastModified = if (old?.characterCount == count) old.lastModified else repository.currentAppleReferenceDateSeconds(),
             )
             repository.saveBookmark(state.bookRoot, bookmark)
             if (statistics != null) {

@@ -98,28 +98,39 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   to false. When enabled, local, Reading, and Google Drive collapsed sections
   omit their preview rows entirely while retaining their title/count/toggle row;
   expanded cards continue to follow the cover mode.
-- Book metadata, bookmarks, highlights, reading statistics, and Sasayaki data
-  are persisted through book sidecar repositories and models.
-- Statistics is always available from its top-level tab. Its settings and
-  folder-keyed daily editor use that tab's Navigation3 back stack and
-  entry-scoped Hilt ViewModels. Reader statistics display preferences remain in Reading Settings;
-  the Sync and Statistics settings screens share the global sync preference.
-- `BookStatisticsStore` is the shared Hilt singleton for reader statistics,
-  transactional sync imports, daily edits, archive/restore, and dashboard reads.
-  File operations run on the IO dispatcher behind one mutex and use atomic
-  replacement. Reader saves submit only changed days, merge by modification
-  timestamp, and respect in-process editor deletions so queued writes cannot
-  undo a later edit. No deletion markers are added to the sidecar/sync format.
-- Deleting a book first stores active dates and compatible metadata under
-  `Books/statistics_archive/<folder>/`, with an optional JPEG cover bounded to
-  240 px. Required archive failures preserve the source book. Import restores
-  after external sidecars are written; normalized folder identity joins active
-  and archived records by date without double counting. Equal timestamps keep
-  the first input: existing archive on deletion, current book on restore.
+- Book metadata, bookmarks, highlights, reading sessions, and Sasayaki data
+  are persisted through iOS-compatible sidecar repositories and models.
+  Highlights use timestamped UUID records with durable deletion markers;
+  `shelves.json` maps names to timestamped nullable positions, while metadata
+  holds timestamped memberships. Legacy arrays convert on first read as on iOS.
+  New EPUB imports retain the selected source filename and fill cloud placeholders;
+  importing an already-local book leaves it unchanged.
+  Metadata and playback have modification stamps; bookmark dates retain the
+  Apple reference epoch, while sync and session timestamps use Unix milliseconds.
+- Statistics is always available from its top-level tab. Settings and folder-keyed
+  session editors use that tab's Navigation3 back stack and entry-scoped Hilt
+  ViewModels. Reader statistics display preferences remain in Reading Settings;
+  TTU statistics and playback sync controls live in Sync settings.
+- `BookStatisticsStore` is the shared Hilt singleton for reader sessions,
+  transactional sync imports, session edits, archive/restore, and dashboard reads.
+  `BookStorageLock` serializes sidecar and statistics transactions across IO
+  suspensions; writes use atomic replacement. `statistics.json` maps UUIDs to
+  timestamped nullable sessions. Legacy daily records convert with deterministic
+  SHA-256-derived IDs shared with iOS. Daily totals are derived from sessions using
+  the current reset time. TTU daily import/export remains at the provider boundary.
+  A reading sitting keeps its ID across pauses and backgrounding; the next save
+  overwrites edits to an active session, while deletion starts a new session.
+- Deleting a book archives sessions, including deletion records, and compatible
+  metadata under `Books/statistics_archive/<folder>/`, with an optional JPEG cover
+  bounded to 240 px when live sessions remain. Required archive failures preserve
+  the source book. Import restores archived sessions before TTU statistics merge;
+  normalized folder identity and UUIDs prevent double counting. Equal stamps keep
+  the first input: current book on both deletion and restore. Clearing archives
+  records deletions and removes unused covers without removing sync history.
   The archive directory is excluded from book discovery and TTU exports but is
   included in Books `.hoshi` backups.
 - Statistics repositories combine local and archived sidecars for the dashboard
-  and all-date book editors. The daily goal card combines a semicircular gauge,
+  and session editors. The daily goal card combines a semicircular gauge,
   history metrics with shared text baselines, and a display-only reading-intensity
   heatmap. Sparse active dates back a lazy week grid with viewport-only drawing;
   heatmap scrolling and data are independent of chart selection. The fixed
@@ -141,8 +152,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   when none is selected. Calculations zero-fill buckets, use elapsed-period
   averages and recompute historical goals across the entire history.
   Heatmap and week periods follow the locale's first weekday. Reader tracking
-  and the dashboard share the reset-time local-date provider; historical date
-  keys are not rewritten.
+  and the dashboard share the reset-time local-date provider; historical daily
+  buckets are recalculated from session timestamps.
 - Book metadata sidecars may include a forced profile id and parsed EPUB
   language. Reader opening resolves the effective profile from forced profile,
   then EPUB language primary profile, then the global active profile.
@@ -457,15 +468,40 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   glossary-first and monolingual/bilingual definition handlebars resolve from
   the current profile's persisted term-dictionary order and categories without
   extending the popup mining payload.
-- Google Drive sync uses Android/Google OAuth and Drive APIs through the
-  repository/sync boundary. The Drive data source owns paginated folder listing,
-  grouped sync-file discovery, bookdata upload/download, trash, cache clearing,
-  and network preflight; Books keeps remote-only Google Drive books as
-  `RemoteBookEntry` models rather than local `BookEntry` placeholders. OAuth
-  and Drive HTTP connections use 10-second connect/read timeouts. Sync-layer
-  network failure classification lets automatic bookshelf refresh ignore
-  offline, timeout and socket connection failures; manual operations still
-  report errors, as do HTTP, TLS and non-network failures.
+- Google Drive sync has Hoshi (`gdrive`) and TTU (`ttu`) providers. Hoshi is the
+  default; existing TTU logins migrate to TTU. Hoshi uses Google Identity Services
+  `AuthorizationClient` with `drive.file` and Android package/signing registration;
+  TTU retains its device-code authorization. Preferences remain DataStore-backed.
+- `GoogleDriveClient` shares cancellable HTTP transport, token refresh and network
+  preflight. Hoshi connections use 60-second connect/read timeouts; TTU uses
+  10 seconds. `GoogleDriveSyncHandler` owns the native Drive layout and changes
+  feed, while `TtuDriveHandler` retains TTU folder/file discovery and cache behavior.
+  TTU remote books remain `RemoteBookEntry` values; automatic TTU refresh suppresses
+  offline, timeout and socket errors, while manual, HTTP and TLS errors remain visible.
+- Hoshi v1 uses `Hoshi Reader/state/<book>.json`, `state/.shelves.json`, and
+  immutable files under `books/<book>/<generation>/`. `SyncStorage` keeps
+  `Books/.sync.json` records and atomically applies merged sidecars. The manager's
+  `drive-sync.json` caches folder IDs, change cursor and per-document versions.
+  Generations separate reimports; deletion wins within a generation and session
+  deletions merge across generations. Unknown format versions prevent cursor
+  advancement and file work until a successful full state pass.
+- `GoogleDriveSyncManager` performs targeted synchronization on open, 120-second
+  foreground polling, 30-second local-edit debounce, network-restored passes,
+  immutable upload/download and stale-file cleanup. Process lifecycle callbacks
+  start/pause polling; a Hilt WorkManager job performs the final background pass.
+  Hoshi cloud books are local metadata placeholders: tapping downloads the EPUB,
+  Delete Local retains their cloud state, and Delete Everywhere archives sessions
+  and publishes deletion. Covers and Sasayaki match data download automatically.
+- Synced bookmarks, highlights, sessions, playback and matches apply to an open
+  reader through existing reader/controller boundaries. Pending saves flush before
+  reconciliation; bookmark restoration suppresses local writes, and remote deletion
+  or replacement closes the reader after saving statistics and stopping audio.
+  Every Hoshi foreground return syncs the open book; backgrounding and reader
+  exit flush session changes before synchronization. TTU retains its ten-minute
+  foreground threshold.
+  Books backup restore stops sync, resets connection bookkeeping, then restarts;
+  a failed restore disables sync. Android profile, language and audio URI fields
+  stay local when remote state is applied.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
 - Sasayaki accepts MP3, M4B/M4A, and Ogg Opus audiobook sources. One repository
   inspection returns format, metadata, chapters, and static duration for
@@ -538,8 +574,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `Aligning` stage during recognition. Match sidecars use atomic replacement. The sidecar keeps iOS's
   `through`, `duration`, and timed-token schema with an optional audio-source
   identity to avoid resuming a different file of the same duration. Atomic
-  replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
-  joins active work before book deletion. Clearing transcription preserves
+  replacement retains the previous checkpoint on interruption. `BookWorkRegistry`,
+  keyed by canonical book paths,
+  joins active work before local/cloud book deletion and sync generation replacement,
+  before acquiring the shared book storage lock. Clearing transcription preserves
   existing matches; completed transcripts can be realigned without ASR.
   Typed failures distinguish audio access, model/runtime resource preparation,
   speech recognition, book matching, and transcript storage; the UI maps each
@@ -558,7 +596,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   adjustments. Shared snapshots use separate cache paths and expire after seven days on next export.
 - The Reader-route Hilt ViewModel exposes transcription state and delivers
   match revisions during transcription even after the sheet closes. Reader coalesces
-  match snapshots until lookup, image holds, and restoration finish. Data refreshes
+  match snapshots, including synced matches, until lookup, image holds, and restoration finish. Data refreshes
   preserve playback/hold state and repaint changed cues without navigation; reader
   reattachment explicitly restores the current cue. Live VN cue updates defer
   pagination changes until the next navigation and preserve the current reveal.

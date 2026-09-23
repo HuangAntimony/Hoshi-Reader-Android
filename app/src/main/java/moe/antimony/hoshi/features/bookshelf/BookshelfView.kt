@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.ShowChart
@@ -135,6 +136,7 @@ import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sync.DriveAuthStatus
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncMode
+import moe.antimony.hoshi.features.sync.SyncProvider
 import moe.antimony.hoshi.features.sync.SyncSettings
 import moe.antimony.hoshi.importing.DirectoryImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -156,7 +158,7 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 fun BookshelfView(
     pendingImportUri: Uri? = null,
     onPendingImportConsumed: () -> Unit = {},
-    onOpenReader: (String) -> Unit,
+    onOpenReader: (String, Boolean) -> Unit,
     refreshKey: Int = 0,
     layoutSpec: MainShellLayoutSpec,
     modifier: Modifier = Modifier,
@@ -241,9 +243,9 @@ fun BookshelfView(
         booksViewModel.reloadBookEntries()
     }
 
-    LaunchedEffect(syncSettings.enabled, refreshKey) {
+    LaunchedEffect(syncSettings.enabled, syncSettings.provider, refreshKey) {
         driveAuthStatus = if (syncSettings.enabled) {
-            appContainer.deviceCodeDriveAuthorizer.status()
+            appContainer.googleDriveAuth.status()
         } else {
             null
         }
@@ -261,7 +263,7 @@ fun BookshelfView(
 
     LaunchedEffect(uiState.openReaderBookId) {
         val bookId = uiState.openReaderBookId ?: return@LaunchedEffect
-        onOpenReader(bookId)
+        onOpenReader(bookId, uiState.openReaderSkipSync)
         booksViewModel.consumeOpenReaderEvent()
     }
 
@@ -405,6 +407,16 @@ fun BookshelfView(
         AlertDialog(
             onDismissRequest = { deleteCandidate = null },
             title = { Text(stringResource(R.string.bookshelf_delete_book_title_format, candidate.displayTitle)) },
+            text = {
+                if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive && candidate.metadata.id in uiState.canDeleteLocalBookIds) {
+                    TextButton(onClick = {
+                        booksViewModel.deleteLocalBook(candidate)
+                        deleteCandidate = null
+                    }) {
+                        Text(stringResource(R.string.sync_delete_local))
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -412,7 +424,7 @@ fun BookshelfView(
                         deleteCandidate = null
                     },
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(if (syncSettings.enabled && syncSettings.provider == SyncProvider.Gdrive) R.string.sync_delete_everywhere else R.string.action_delete))
                 }
             },
             dismissButton = {
@@ -757,7 +769,7 @@ internal fun shouldEnableBookshelfPullRefresh(
     isSelecting: Boolean,
     fileTaskBlocked: Boolean,
 ): Boolean =
-    shouldLoadRemoteBooks(syncSettings, authStatus ?: DriveAuthStatus.NotConnected) &&
+    syncSettings.enabled && authStatus == DriveAuthStatus.Connected &&
         hasLoadedBooks &&
         !isSelecting &&
         !fileTaskBlocked
@@ -1062,6 +1074,7 @@ private fun BooksTab(
                                         BookGridCell(
                                             entry = entry,
                                             progress = bookProgressById[entry.metadata.id] ?: 0.0,
+                                            downloadProgress = remoteImportProgressById[entry.metadata.id],
                                             coverSource = coverSourcesById[entry.metadata.id],
                                             coverMode = coverMode,
                                             layoutSpec = layoutSpec,
@@ -1425,6 +1438,7 @@ private fun BookshelfSectionHeader(
 private fun BookGridCell(
     entry: BookEntry,
     progress: Double,
+    downloadProgress: Double?,
     coverSource: BookCoverSource?,
     coverMode: BookshelfCoverMode,
     layoutSpec: MainShellLayoutSpec,
@@ -1492,14 +1506,22 @@ private fun BookGridCell(
             progress = progress,
         )
         Spacer(Modifier.height(6.dp))
-        Text(
-            text = entry.displayTitle,
-            style = layoutSpec.bookTitleTextStyle.toTextStyle(),
-            fontWeight = layoutSpec.bookTitleFontWeight.toFontWeight(),
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (entry.metadata.epub == null) {
+                Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp).padding(end = 3.dp))
+            }
+            Text(
+                text = entry.displayTitle,
+                style = layoutSpec.bookTitleTextStyle.toTextStyle(),
+                fontWeight = layoutSpec.bookTitleFontWeight.toFontWeight(),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = if (downloadProgress == null) 2 else 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        downloadProgress?.let { value ->
+            LinearProgressIndicator(progress = { value.toFloat() }, modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -1635,7 +1657,7 @@ private fun BookContextMenu(
         onDismissRequest = onDismiss,
     ) {
         if (syncSettings.enabled) {
-            if (syncSettings.mode == SyncMode.Manual) {
+            if (syncSettings.provider == SyncProvider.Ttu && syncSettings.mode == SyncMode.Manual) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.bookshelf_sync)) },
                     trailingIcon = {
@@ -1690,6 +1712,7 @@ private fun BookContextMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.bookshelf_mark_read)) },
+            enabled = entry.metadata.epub != null,
             onClick = {
                 onMarkReadCandidate(entry)
                 onDismiss()
@@ -1697,6 +1720,7 @@ private fun BookContextMenu(
         )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.bookshelf_export_epub)) },
+            enabled = entry.metadata.epub != null,
             onClick = {
                 onExportCandidate(entry)
                 onDismiss()

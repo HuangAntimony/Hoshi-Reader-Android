@@ -44,13 +44,13 @@ class ReaderRouteStateHolderTest {
         assertTrue(state is ReaderRouteLoadState.Ready)
         state as ReaderRouteLoadState.Ready
         assertEquals(root, state.bookRoot)
-        assertEquals(parsedBook, state.book)
+        assertEquals(parsedBook.copy(title = "Old Title"), state.book)
         assertEquals(root.resolve("cover.jpg"), state.bookCoverFile)
-        assertEquals(bookmark, state.bookmark)
+        assertEquals(bookmark.copy(progress = 0.4), state.bookmark)
         assertEquals(
             BookMetadata(
                 id = "book-a",
-                title = "Parsed Title",
+                title = "Old Title",
                 cover = "Books/${root.name}/cover.jpg",
                 folder = root.name,
                 lastAccess = 42.0,
@@ -188,7 +188,7 @@ class ReaderRouteStateHolderTest {
         var savedStatistics: ReadingSessions? = null
             private set
 
-        override suspend fun loadBookEntry(bookId: String): BookEntry? = entry
+        override suspend fun loadBookEntry(bookId: String): BookEntry? = entry?.let { it.copy(metadata = savedMetadata ?: it.metadata) }
 
         override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
             coverHref?.let { "Books/${bookRoot.name}/${File(it).name}" }
@@ -197,7 +197,7 @@ class ReaderRouteStateHolderTest {
             savedMetadata = metadata
         }
 
-        override suspend fun loadBookmark(bookRoot: File): Bookmark? = bookmark
+        override suspend fun loadBookmark(bookRoot: File): Bookmark? = savedBookmark ?: bookmark
 
         override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
             savedBookmark = bookmark

@@ -14,7 +14,7 @@ class StatisticsSettingsViewModelTest {
     fun settingsEditsUseLatestPreferencesAndClearArchiveRefreshesCount() = runTest {
         val settings = MutableStateFlow(ReaderSettings(statisticsSyncEnabled = false))
         val repository = StatisticsRepositoryFake().apply { archiveCount = 3 }
-        val model = StatisticsSettingsViewModel(settings, MutableStateFlow(true), { settings.value = it(settings.value) }, repository, backgroundScope)
+        val model = StatisticsSettingsViewModel(settings, { settings.value = it(settings.value) }, repository, backgroundScope)
         model.reload()
         runCurrent()
         assertEquals(3, model.uiState.value.archivedBookCount)
@@ -34,7 +34,7 @@ class StatisticsSettingsViewModelTest {
     fun failedArchiveClearRetainsCountAndReportsError() = runTest {
         val settings = MutableStateFlow(ReaderSettings())
         val repository = StatisticsRepositoryFake().apply { archiveCount = 2; failWrites = true }
-        val model = StatisticsSettingsViewModel(settings, MutableStateFlow(false), {}, repository, backgroundScope)
+        val model = StatisticsSettingsViewModel(settings, {}, repository, backgroundScope)
         model.reload()
         runCurrent()
         model.clearArchive()

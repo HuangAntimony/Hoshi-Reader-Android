@@ -19,8 +19,10 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.ApplicationScope
@@ -37,10 +39,10 @@ import moe.antimony.hoshi.ui.UiText
 @Serializable
 data class GoogleDriveSyncCache(
     val cursor: String? = null,
-    val root: String = "",
-    val stateFolder: String = "",
-    val bookFolder: String = "",
-    val bookVersions: Map<String, Map<String, String>> = emptyMap(),
+    @Required val root: String = "",
+    @Required val stateFolder: String = "",
+    @Required val bookFolder: String = "",
+    @Required val bookVersions: Map<String, Map<String, String>> = emptyMap(),
 )
 
 data class GoogleDriveSyncState(
@@ -94,6 +96,7 @@ class GoogleDriveSyncManager internal constructor(
     private var downloadTask: Job? = null
     private var stopped = false
     private var unsupportedFormat = false
+    var flushReader: (suspend (String) -> Unit)? = null
     var stopReader: (suspend (String) -> Unit)? = null
     var reloadSyncedMatch: (suspend (String) -> Unit)? = null
 
@@ -101,7 +104,8 @@ class GoogleDriveSyncManager internal constructor(
         cache = withContext(ioDispatcher) {
             runCatching { SyncFormat.decode<GoogleDriveSyncCache>(filesDir.resolve("drive-sync.json").readText()) }.getOrDefault(GoogleDriveSyncCache())
         }
-        store.prepareLibrary()
+        runCatching { store.prepareLibrary() }
+        Unit
     }
 
     init {
@@ -254,12 +258,14 @@ class GoogleDriveSyncManager internal constructor(
         stateTask = task
         mutableState.value = state.value.copy(isSyncing = true)
         task.start()
-        task.join()
-        if (!task.isCancelled) {
-            stateTask = null
-            mutableState.value = state.value.copy(isSyncing = false)
-            if (book != null || (state.value.errorMessage == null && store.transaction { store.state.books.values.any { it.pending } || store.state.shelvesPending })) schedule()
-            if (book == null) startFileSync()
+        withContext(NonCancellable) {
+            task.join()
+            if (stateTask === task && !task.isCancelled) {
+                stateTask = null
+                mutableState.value = state.value.copy(isSyncing = false)
+                if (book != null || (state.value.errorMessage == null && store.transaction { store.state.books.values.any { it.pending } || store.state.shelvesPending })) schedule()
+                if (book == null) startFileSync()
+            }
         }
     }
 
@@ -305,7 +311,13 @@ class GoogleDriveSyncManager internal constructor(
         return false
     }
 
+    suspend fun cancelDownload(): Unit = withContext(mainDispatcher) {
+        downloadTask?.cancel()
+        downloadTask = null
+    }
+
     suspend fun downloadBook(book: BookMetadata, onProgress: (Double) -> Unit): BookMetadata = withContext(mainDispatcher) {
+        downloadTask?.cancel()
         val task = scope.async(start = CoroutineStart.LAZY) {
             val key = book.folder!!.syncKey()
             sync(book)
@@ -324,7 +336,8 @@ class GoogleDriveSyncManager internal constructor(
             task.await()
         } finally {
             task.cancel()
-            downloadTask = null
+            if (downloadTask === task) downloadTask = null
+            if (currentCoroutineContext().isActive) startFileSync()
         }
     }
 
@@ -403,6 +416,7 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     private suspend fun mergeBook(key: String, remote: SyncBook?) {
+        flushReader?.invoke(key)
         val record = store.transaction {
             val root = store.resolveBookDirectory(key)
             if (books.loadMetadata(root) != null) store.prepareBook(root)
@@ -413,8 +427,7 @@ class GoogleDriveSyncManager internal constructor(
             return
         }
         val replaced = remote.generation > record.generation && (record.attached || record.deleted)
-        if (replaced || (remote.deleted && remote.generation >= record.generation)) stopReader?.invoke(key)
-        store.transaction {
+        suspend fun applyBook() = store.transaction {
             var local = store.loadBook(key)!!
             if (replaced) {
                 store.removeBookFiles(key)
@@ -423,6 +436,14 @@ class GoogleDriveSyncManager internal constructor(
             if (!record.attached && record.generation == 0) local = local.copy(metadata = remote.metadata)
             if (!record.attached && !record.deleted && !remote.deleted) local = local.copy(generation = remote.generation)
             store.applyBook(key, SyncBook.merge(local, remote))
+        }
+        if (replaced || (remote.deleted && remote.generation >= record.generation)) {
+            books.workRegistry.delete(store.bookDirectory(key)) {
+                stopReader?.invoke(key)
+                applyBook()
+            }
+        } else {
+            applyBook()
         }
     }
 

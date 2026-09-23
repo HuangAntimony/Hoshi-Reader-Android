@@ -19,6 +19,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiPlaybackServiceRuntime
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.features.statistics.StatisticsDateProvider
 import moe.antimony.hoshi.features.storage.StorageCleanupRepository
+import moe.antimony.hoshi.features.sync.GoogleDriveSyncManager
 import moe.antimony.hoshi.features.sync.GoogleDriveAuth
 import moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer
 import moe.antimony.hoshi.features.sync.TtuSyncManager
@@ -51,6 +52,7 @@ internal class HoshiUiDependencies @Inject constructor(
     private val localAudioRepositoryProvider: Lazy<LocalAudioRepository>,
     private val backupRepositoryProvider: Lazy<HoshiBackupRepository>,
     private val storageCleanupRepositoryProvider: Lazy<StorageCleanupRepository>,
+    private val googleDriveSyncManagerProvider: Lazy<GoogleDriveSyncManager>,
     private val googleDriveAuthProvider: Lazy<GoogleDriveAuth>,
     private val deviceCodeDriveAuthorizerProvider: Lazy<DeviceCodeDriveAuthorizer>,
     private val syncManagerProvider: Lazy<TtuSyncManager>,
@@ -79,6 +81,7 @@ internal class HoshiUiDependencies @Inject constructor(
     val localAudioRepository: LocalAudioRepository get() = localAudioRepositoryProvider.get()
     val backupRepository: HoshiBackupRepository get() = backupRepositoryProvider.get()
     val storageCleanupRepository: StorageCleanupRepository get() = storageCleanupRepositoryProvider.get()
+    val googleDriveSyncManager: GoogleDriveSyncManager get() = googleDriveSyncManagerProvider.get()
     val googleDriveAuth: GoogleDriveAuth get() = googleDriveAuthProvider.get()
     val deviceCodeDriveAuthorizer: DeviceCodeDriveAuthorizer get() = deviceCodeDriveAuthorizerProvider.get()
     val syncManager: TtuSyncManager get() = syncManagerProvider.get()

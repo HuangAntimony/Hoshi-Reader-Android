@@ -8,6 +8,7 @@ import kotlin.math.roundToLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -53,8 +54,8 @@ internal class StatisticsBookViewModel internal constructor(
     private val repository: StatisticsRepository,
     private val coroutineScope: CoroutineScope?,
 ) : ViewModel() {
-    @Inject constructor(repository: StatisticsRepository, statisticsStore: moe.antimony.hoshi.epub.BookStatisticsStore) : this(repository, null) {
-        scope.launch { statisticsStore.changes.collect { folder?.let(::load) } }
+    @Inject constructor(repository: StatisticsRepository, statisticsStore: moe.antimony.hoshi.epub.BookStatisticsStore, syncStorage: moe.antimony.hoshi.features.sync.SyncStorage) : this(repository, null) {
+        scope.launch { combine(statisticsStore.changes, syncStorage.booksChanged) { _, _ -> Unit }.collect { folder?.let(::load) } }
     }
 
     private val scope get() = coroutineScope ?: viewModelScope

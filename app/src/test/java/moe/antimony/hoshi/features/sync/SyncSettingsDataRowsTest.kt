@@ -27,14 +27,14 @@ class SyncSettingsDataRowsTest {
     }
 
     @Test
-    fun dataRowsKeepStatisticsWhenAudiobookFeatureIsDisabled() {
+    fun dataRowsKeepStatisticsAndAudiobookSyncWhenPlaybackFeatureIsDisabled() {
         val rows = syncSettingsDataRows(
             syncSettings = SyncSettings(enabled = true, uploadBooks = false),
             readerSettings = ReaderSettings(statisticsSyncEnabled = true),
             sasayakiSettings = SasayakiSettings(enabled = false, syncEnabled = true),
         )
 
-        assertEquals(listOf(R.string.sync_upload_books, R.string.sync_stats), rows.map { it.titleRes })
-        assertEquals(listOf(false, true), rows.map { it.checked })
+        assertEquals(listOf(R.string.sync_upload_books, R.string.sync_stats, R.string.sync_audiobook_progress), rows.map { it.titleRes })
+        assertEquals(listOf(false, true, true), rows.map { it.checked })
     }
 }

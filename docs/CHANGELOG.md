@@ -6,6 +6,18 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add Hoshi Google Drive sync alongside TTU, sharing books, reading position,
+  highlights, shelves, reading sessions and Sasayaki playback with iOS. Cloud
+  books download when opened; choose Delete Local to keep the cloud copy or
+  Delete Everywhere to remove it across devices while retaining reading history.
+
+### Changed
+
+- Edit individual reading sessions in Statistics. Session deletions persist across
+  sync, and daily totals follow the selected reset time.
+
 ## [v1.4.0] - 2026-09-24
 
 ### Added

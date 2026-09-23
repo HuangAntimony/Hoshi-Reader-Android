@@ -56,7 +56,7 @@ class BookStatisticsStoreTest {
         store.delete(listOf("A"), "book")
         store.edit("A", "book", 42, 60.0)
         assertNull(store.loadSessions(root).getValue("A").value)
-        assertNull(BookRepository(root.parentFile.parentFile).loadSessions(root).getValue("A").value)
+        assertNull(BookRepository(root.parentFile!!.parentFile!!).loadSessions(root).getValue("A").value)
     }
 
     @Test fun emptyArchiveRetainsMetadataAndTombstonesAndLosesCover() = runBlocking {

@@ -25,8 +25,11 @@ class SyncStorage @Inject constructor(
     private val books: BookRepository,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    @Volatile var state = SyncState()
-        private set
+    private val mutableRecords = MutableStateFlow(SyncState())
+    val records = mutableRecords.asStateFlow()
+    var state: SyncState
+        get() = mutableRecords.value
+        private set(value) { mutableRecords.value = value }
     private var loaded = false
     private val sidecars get() = books.sidecarDataSource
     private val statistics get() = books.statisticsStore
@@ -48,7 +51,6 @@ class SyncStorage @Inject constructor(
             }
         }
         books.onShelvesChange = ::handleShelvesChange
-        books.onBookImport = ::handleBookImport
     }
 
     suspend fun <T> transaction(action: suspend () -> T): T = withContext(ioDispatcher) {
@@ -241,28 +243,32 @@ class SyncStorage @Inject constructor(
         saveChanges()
     }
 
-    suspend fun deleteLocalBook(key: String) = transaction {
-        val root = bookDirectory(key)
-        val metadata = books.loadMetadata(root)!!
-        root.resolve(metadata.epub!!).delete()
-        sidecars.saveMetadata(root, metadata.copy(epub = null))
-        updateRecord(key) { it.copy(sources = it.sources - SyncFileType.epub) }
-        save()
-        notifyBooksChanged()
+    suspend fun deleteLocalBook(key: String) = books.workRegistry.delete(bookDirectory(key)) {
+        transaction {
+            val root = bookDirectory(key)
+            val metadata = books.loadMetadata(root)!!
+            root.resolve(metadata.epub!!).delete()
+            sidecars.saveMetadata(root, metadata.copy(epub = null))
+            updateRecord(key) { it.copy(sources = it.sources - SyncFileType.epub) }
+            save()
+            notifyBooksChanged()
+        }
     }
 
-    suspend fun deleteBook(key: String) = transaction {
-        val root = bookDirectory(key)
-        statistics.archiveBook(root)
-        updateRecord(key) { record ->
-            record.copy(deleted = true, pending = true, cleanup = record.cleanup + record.generation,
-                files = record.files - SyncFileType.epub - SyncFileType.sasayaki,
-                sources = record.sources - SyncFileType.epub - SyncFileType.sasayaki)
+    suspend fun deleteBook(key: String) = books.workRegistry.delete(bookDirectory(key)) {
+        transaction {
+            val root = bookDirectory(key)
+            statistics.archiveBook(root)
+            updateRecord(key) { record ->
+                record.copy(deleted = true, pending = true, cleanup = record.cleanup + record.generation,
+                    files = record.files - SyncFileType.epub - SyncFileType.sasayaki,
+                    sources = record.sources - SyncFileType.epub - SyncFileType.sasayaki)
+            }
+            saveChanges()
+            root.deleteRecursively()
+            clearUnusedCover(key)
+            saveChanges()
         }
-        saveChanges()
-        root.deleteRecursively()
-        clearUnusedCover(key)
-        saveChanges()
     }
 
     suspend fun handleBookChange(folder: String) = transaction {

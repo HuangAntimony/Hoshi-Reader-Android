@@ -74,9 +74,19 @@ class HoshiSyncModelsTest {
     }
 
     @Test fun missingAndUnsupportedVersionsAreRejected() {
-        for (value in listOf("{}", "{\"formatVersion\":2}", "{\"formatVersion\":\"1\"}")) {
+        for (value in listOf("{}", "{\"formatVersion\":2}", "{\"formatVersion\":2147483648}")) {
             assertThrows(SyncFormatError::class.java) { SyncFormat.decode<SyncBook>(value) }
         }
+    }
+
+    @Test fun formatVersionMatchesSwiftIntegerDecoding() {
+        val encoded = SyncFormat.encode(book())
+        assertEquals(book(), SyncFormat.decode<SyncBook>(encoded.replace("\"formatVersion\":1", "\"formatVersion\":1.0")))
+        assertEquals(book(), SyncFormat.decode<SyncBook>(encoded.replace("\"formatVersion\":1", "\"formatVersion\":1e0")))
+        val error = assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            SyncFormat.decode<SyncBook>("{\"formatVersion\":\"1\"}")
+        }
+        assertFalse(error is SyncFormatError)
     }
 
     @Test fun highlightNativeDateUsesAppleEpochAndRemoteDateUsesMilliseconds() {

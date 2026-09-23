@@ -2,6 +2,10 @@ package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +19,29 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SasayakiPlaybackPersistenceStateTest {
+    @Test
+    fun flushWaitsForLocalSavesAndSyncedPlaybackDoesNotSaveAgain() = runTest {
+        val repository = BlockingPlaybackRepository()
+        val state = SasayakiPlaybackPersistenceState(
+            repository, SasayakiAudioRepository(File("book-root")), null,
+            backgroundScope, Dispatchers.Unconfined,
+        )
+        state.savePosition(1.0)
+        state.savePosition(2.0)
+        val flush = launch { state.flush() }
+        runCurrent()
+        assertTrue(flush.isActive)
+        repository.completeFirstSave()
+        runCurrent()
+        assertTrue(flush.isCompleted)
+        val synced = SasayakiPlaybackData(lastPosition = 42.0, delay = 0.5, rate = 1.2f, modified = 1234)
+        state.applySyncedPlayback(synced)
+        assertEquals(synced, state.playback)
+        assertEquals(listOf(1.0, 2.0), repository.saved.map { it.lastPosition })
+    }
+
     @Test
     fun loadsPlaybackAndSavesDelayRateAndPositionChanges() {
         val initial = SasayakiPlaybackData(

@@ -2,9 +2,16 @@ package moe.antimony.hoshi.features.sync
 
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookShelf
@@ -109,6 +116,34 @@ class SyncStorageTest {
         assertEquals(sessions, live.sessions)
         assertTrue(storage.state.books.getValue("book-a").attached)
         assertFalse(storage.bookDirectory("book-a", true).exists())
+    }
+
+    @Test fun deletionJoinsBookWorkBeforeLockingStorageOrRemovingFiles() = runBlocking {
+        withTimeout(5000) {
+            for (localOnly in listOf(true, false)) {
+                val root = local("book-$localOnly")
+                storage.prepareLibrary()
+                var stopped = false
+                val work = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        withContext(NonCancellable) {
+                            repository.storageLock.withLock {
+                                assertTrue(root.resolve("${root.name}.epub").exists())
+                                stopped = true
+                            }
+                        }
+                    }
+                }
+                repository.workRegistry.register(root.resolve(".")) { work.cancelAndJoin() }.use {
+                    if (localOnly) storage.deleteLocalBook(root.name) else storage.deleteBook(root.name)
+                }
+                assertTrue(stopped)
+                assertFalse(root.resolve("${root.name}.epub").exists())
+                assertEquals(localOnly, root.exists())
+            }
+        }
     }
 
     @Test fun generationReplacementRetainsDeviceAudioSelection() = runBlocking {

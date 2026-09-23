@@ -7,6 +7,9 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +54,26 @@ class GoogleDriveSyncManagerTest {
         val manager = GoogleDriveSyncManager(store, handler, client, settings, books, temporary.root,
             temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {})
         return Fixture(remote, books, store, manager)
+    }
+
+    @Test fun cancelingForegroundWaiterLetsBackgroundPassFinishAndReleaseSyncState() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        val gate = CompletableDeferred<Unit>()
+        f.manager.flushReader = { gate.await() }
+        val foreground = backgroundScope.launch { f.manager.sync() }
+        runCurrent()
+        assertTrue(f.manager.state.value.isSyncing)
+        foreground.cancel()
+        val background = backgroundScope.launch { f.manager.syncInBackground() }
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(f.manager.state.value.isSyncing)
+        assertTrue(background.isCompleted)
+        assertEquals("next", f.manager.cache.cursor)
+        f.manager.sync()
+        assertNull(f.manager.state.value.errorMessage)
     }
 
     @Test fun capturesCursorBeforeListingAndSkipsUnchangedStateAfterRestart() = runTest {
@@ -229,7 +252,18 @@ class GoogleDriveSyncManagerTest {
         f.manager.sync()
         runCurrent()
         var stopped = false
+        var workStopped = false
+        val root = f.store.bookDirectory("book-a")
+        val registration = f.books.workRegistry.register(root) {
+            backgroundScope.async {
+                f.books.storageLock.withLock {
+                    assertTrue(root.exists())
+                    workStopped = true
+                }
+            }.await()
+        }
         f.manager.stopReader = { key ->
+            assertTrue(workStopped)
             stopped = true
             f.books.statisticsStore.saveTrackedSession(f.store.bookDirectory(key), "ACTIVE", moe.antimony.hoshi.epub.ReadingSession(1, 2, 10, 1.0))
         }
@@ -238,9 +272,37 @@ class GoogleDriveSyncManagerTest {
         entry.data = SyncFormat.encode(remoteBook.copy(generation = 2))
         f.manager.sync()
         runCurrent()
+        registration.close()
         assertTrue(stopped)
         assertEquals(2, f.store.loadBook("book-a")!!.generation)
         assertEquals(10, f.store.loadBook("book-a")!!.sessions.getValue("ACTIVE").value!!.charactersRead)
+    }
+
+    @Test fun remoteDeletionJoinsBookWorkBeforeRemovingFiles() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val root = f.store.bookDirectory("book-a")
+        var stopped = false
+        val registration = f.books.workRegistry.register(root) {
+            backgroundScope.async {
+                f.books.storageLock.withLock {
+                    assertTrue(root.exists())
+                    stopped = true
+                }
+            }.await()
+        }
+        val entry = f.remote.entries.getValue("a")
+        entry.file = entry.file.copy(version = "2")
+        entry.data = SyncFormat.encode(remoteBook.delete())
+        f.manager.sync()
+        runCurrent()
+        registration.close()
+        assertNull(f.manager.state.value.errorMessage)
+        assertTrue(stopped)
+        assertFalse(root.exists())
+        assertTrue(f.store.loadBook("book-a")!!.deleted)
     }
 
     private data class Fixture(val remote: DriveService, val books: BookRepository, val store: SyncStorage, val manager: GoogleDriveSyncManager)

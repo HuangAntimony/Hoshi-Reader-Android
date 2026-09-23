@@ -3,8 +3,6 @@ package moe.antimony.hoshi.epub
 import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.io.InputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -47,7 +45,7 @@ class BookRepository private constructor(
     internal val sidecarDataSource: BookSidecarDataSource,
     private val clock: BookClock,
     internal val statisticsStore: BookStatisticsStore,
-    private val workRegistry: BookWorkRegistry,
+    internal val workRegistry: BookWorkRegistry,
 ) : ReaderRouteBookRepository, SasayakiSidecarRepository {
     @Inject
     constructor(
@@ -72,12 +70,11 @@ class BookRepository private constructor(
     ) : this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher), workRegistry)
 
     private val archiveExtractor = EpubArchiveExtractor()
-    private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
+    private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher, sidecarDataSource = sidecarDataSource)
 
     internal val storageLock get() = statisticsStore.storageLock
     var onBookChange: (suspend (String, moe.antimony.hoshi.features.sync.SyncFileType?) -> Unit)? = null
     var onShelvesChange: (suspend () -> Unit)? = null
-    var onBookImport: (suspend (BookMetadata, File) -> Unit)? = null
 
     private val legacyPackedMigrationMutex = Mutex()
 
@@ -245,8 +242,9 @@ class BookRepository private constructor(
         sidecarDataSource.loadBookmark(bookRoot)
 
     override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) = storageLock.withLock {
+        val old = loadBookmark(bookRoot)
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
-        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        if (old?.characterCount != bookmark.characterCount || old.lastModified != bookmark.lastModified) onBookChange?.invoke(bookRoot.name.syncKey(), null)
         Unit
     }
 
@@ -330,8 +328,8 @@ class BookRepository private constructor(
 
     override fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()
 
-    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File =
-        importDataSource.importBook(contentResolver, uri)
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri, onImported: suspend (File, File) -> Unit = { _, _ -> }): File =
+        importDataSource.importBook(contentResolver, uri, onImported)
 
     private suspend fun File.fallbackMetadata(): BookMetadata = withContext(ioDispatcher) {
         BookMetadata(
@@ -605,18 +603,20 @@ class BookImportDataSource(
     private val parser: EpubBookParser = EpubBookParser(),
     private val archiveExtractor: EpubArchiveExtractor = EpubArchiveExtractor(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val sidecarDataSource: BookSidecarDataSource = BookSidecarDataSource(ioDispatcher),
 ) {
-    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File = withContext(ioDispatcher) {
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri, onImported: suspend (File, File) -> Unit = { _, _ -> }): File = withContext(ioDispatcher) {
         val displayName = contentResolver.validateImportFile(uri, ImportFileType.Epub)
         contentResolver.openInputStream(uri).use { input ->
             importBook(
                 displayName = displayName,
                 input = requireNotNull(input) { "Unable to open selected EPUB" },
+                onImported = onImported,
             )
         }
     }
 
-    internal suspend fun importBook(displayName: String, input: InputStream): File = withContext(ioDispatcher) {
+    internal suspend fun importBook(displayName: String, input: InputStream, onImported: suspend (File, File) -> Unit = { _, _ -> }): File = withContext(ioDispatcher) {
         val fallbackTitle = displayName
             .substringBeforeLast('.', missingDelimiterValue = displayName)
             .takeIf { it.isNotBlank() }
@@ -629,12 +629,18 @@ class BookImportDataSource(
             archiveExtractor.extract(archiveFile, extractedRoot)
             val parsedBook = parser.parse(extractedRoot, fallbackTitle = fallbackTitle)
             val targetRoot = fileDataSource.createBookDirectoryForImportedTitle(parsedBook.title)
-            if (targetRoot.listFiles()?.isNotEmpty() == true) {
+            if (sidecarDataSource.loadMetadata(targetRoot)?.epub != null) {
                 targetRoot
             } else {
                 targetRoot.mkdirs()
-                val packedEpub = targetRoot.resolve("${targetRoot.name}.epub")
+                val packedEpub = targetRoot.resolve(File(displayName).name)
                 archiveFile.copyTo(packedEpub, overwrite = true)
+                try {
+                    onImported(targetRoot, packedEpub)
+                } catch (error: Exception) {
+                    packedEpub.delete()
+                    throw error
+                }
                 targetRoot
             }
         } finally {

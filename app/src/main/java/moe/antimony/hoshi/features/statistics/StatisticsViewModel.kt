@@ -42,6 +42,7 @@ internal class StatisticsViewModel internal constructor(
         dateProvider: StatisticsDateProvider,
         @DefaultDispatcher calculationDispatcher: CoroutineDispatcher,
         statisticsStore: moe.antimony.hoshi.epub.BookStatisticsStore,
+        syncStorage: moe.antimony.hoshi.features.sync.SyncStorage,
     ) : this(
         repository = repository,
         settings = settingsRepository.settings,
@@ -52,7 +53,7 @@ internal class StatisticsViewModel internal constructor(
         coroutineScope = null,
     ) {
         scope.launch {
-            combine(statisticsStore.changes, readerSettingsRepository.settings.map { it.statisticsResetMinutes }.distinctUntilChanged()) { revision, reset -> revision to reset }
+            combine(statisticsStore.changes, syncStorage.booksChanged, readerSettingsRepository.settings.map { it.statisticsResetMinutes }.distinctUntilChanged()) { _, _, _ -> Unit }
                 .collect { reload() }
         }
     }

@@ -3,6 +3,7 @@ package moe.antimony.hoshi.epub
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.features.sync.Timestamped
 
@@ -12,8 +13,8 @@ typealias ReadingSessions = Map<String, Timestamped<ReadingSession?>>
 data class ReadingSession(
     val startedAt: Long,
     val endedAt: Long,
-    val charactersRead: Int = 0,
-    val readingTime: Double = 0.0,
+    @Required val charactersRead: Int = 0,
+    @Required val readingTime: Double = 0.0,
 ) {
     val hasActivity: Boolean get() = charactersRead > 0 || readingTime > 0
     val readingSpeed: Int get() = ReadingTotal.speed(charactersRead, readingTime)

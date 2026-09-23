@@ -21,6 +21,21 @@ import org.junit.Test
 
 class ReaderWebViewStateHolderTest {
     @Test
+    fun syncedBookmarkRestoresSamePositionWithoutAddingJumpHistory() {
+        val holder = stateHolder(initialIndex = 2)
+        holder.jumpToWithHistory(ReaderChapterPosition(3, 0.1))
+        holder.markWebViewRestored()
+        val epoch = holder.webViewRestoreEpoch
+        holder.applySyncedBookmark(ReaderChapterPosition(3, 0.1))
+        assertEquals(epoch + 1, holder.webViewRestoreEpoch)
+        assertTrue(holder.isWebViewRestoring)
+        assertEquals(ReaderChapterPosition(2, 0.0), holder.backTargetPosition)
+        assertNull(holder.recordContinuousScrollProgress(0.9, epoch))
+        holder.markWebViewRestored()
+        assertEquals(ReaderChapterPosition(3, 0.1), holder.readerPosition.displayedPosition)
+    }
+
+    @Test
     fun rendererRecoveryPreservesUnfinishedCueLandingButDoesNotRevealCompletedCue() {
         val cue = PendingSasayakiCue(sasayakiProgressCue(80), true, SasayakiCueRevealSource.DirectJump)
         val queued = cue.copy(cue = sasayakiProgressCue(120))
