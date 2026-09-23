@@ -227,6 +227,125 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
+    fun sentenceContextRecoversMixedSpellingTailBesideAnOmittedReply() {
+        val source = book(
+            "<p>この柔らかそうな<ruby>太<rt>ふと</rt></ruby><ruby>腿<rt>もも</rt></ruby>で" +
+                "<ruby>膝<rt>ひざ</rt></ruby><ruby>枕<rt>まくら</rt></ruby>を──</p>" +
+                "<p>「駄目だよ草介！こんなところで油売ってる場合じゃないよ！」</p>" +
+                "<p>隣のテーブルから聞こえてきた。</p>",
+        )
+        val tokens = listOf(token("この柔らかそうな太", 223.77, 225.53),
+            token("ももで膝枕を", 225.53, 227.066), token("こんなところで油売って", 227.32, 230.49),
+            token("隣のテーブルから聞こえてきた", 232.728, 236.282))
+        val result = SasayakiTranscriptAligner.align(source, tokens)
+        assertEquals(listOf("この柔らかそうな太腿で膝枕を", "こんなところで油売って", "隣のテーブルから聞こえてきた"),
+            result.matches.map { it.text })
+        assertEquals(223.77, result.matches[0].startTime, 0.0001)
+        assertEquals(227.066, result.matches[0].endTime, 0.0001)
+        assertEquals(227.32, result.matches[1].startTime, 0.0001)
+        val session = SasayakiTranscriptAligner.Session(source)
+        tokens.indices.forEach { end ->
+            val prefix = tokens.take(end + 1)
+            assertEquals(SasayakiTranscriptAligner.align(source, prefix), session.align(prefix))
+        }
+        assertEquals(result, session.align(tokens))
+    }
+
+    @Test
+    fun sentenceContextRecoversMixedSpellingPrefixAfterAnOmittedReply() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>返事はなかった。</p>" +
+                "<p>膝枕にもたれていた彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("ひざ枕に", 8.0, 9.0),
+                token("もたれていた彼女は窓の外を眺めていた", 9.0, 14.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "膝枕にもたれていた彼女は窓の外を眺めていた"),
+            result.matches.map { it.text })
+        assertEquals(8.0, result.matches.last().startTime, 0.0001)
+        assertEquals(14.0, result.matches.last().endTime, 0.0001)
+        assertEquals(1, result.unmatched)
+    }
+
+    @Test
+    fun lowSentenceCoverageKeepsItsRecognizedShortReply() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>ううん、いいの。</p><p>彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("いいの", 5.0, 6.0),
+                token("彼女わ窓の外を眺めていた", 7.0, 11.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "いいの", "彼女は窓の外を眺めていた"),
+            result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, 0.0001)
+        assertEquals(6.0, result.matches[1].endTime, 0.0001)
+    }
+
+    @Test
+    fun contextAlignmentCannotMoveAnAnchoredRepeatedCharacterToItsNeighbor() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>ああ、先生、早く戻って来てくれないか。</p>" +
+                "<p>彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("あ", 5.0, 6.0), token("先生", 6.0, 7.0),
+                token("早く戻ってきてくれないか", 7.0, 11.0), token("彼女は窓の外を眺めていた", 12.0, 16.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "ああ", "先生", "早く戻って来てくれないか", "彼女は窓の外を眺めていた"),
+            result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, 0.0001)
+        assertEquals(6.0, result.matches[1].endTime, 0.0001)
+        assertTrue(result.matches.zipWithNext().all { (left, right) -> left.endTime <= right.startTime })
+    }
+
+    @Test
+    fun isolatedParticlesInUnrelatedSpeechDoNotBecomeMatchedText() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>彼らは駅で待っていた。</p><p>私は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("音楽は終了です", 5.0, 8.0),
+                token("私は窓の外を眺めていた", 9.0, 13.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "私は窓の外を眺めていた"), result.matches.map { it.text })
+    }
+
+    @Test
+    fun rejectedSentenceCannotRecoverAnUnrelatedFragmentAsAReadingRewrite() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>それは本当だった。</p><p>私は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("音楽は終了です", 5.0, 7.0),
+                token("私は窓の外を眺めていた", 8.0, 12.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "私は窓の外を眺めていた"), result.matches.map { it.text })
+    }
+
+    @Test
+    fun insufficientSentenceEvidenceCannotInferAnOmittedPrefix() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>ううんいいの。</p><p>私は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("いいです", 5.0, 7.0),
+                token("私は窓の外を眺めていた", 8.0, 12.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "私は窓の外を眺めていた"), result.matches.map { it.text })
+    }
+
+    @Test
+    fun boundedNameSpellingErrorsRetainTheWholeName() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。</p><p>八奈見杏菜。</p><p>私は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("八波杏奈", 5.0, 7.0),
+                token("私は窓の外を眺めていた", 8.0, 12.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "八奈見杏菜", "私は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, 0.0001)
+        assertEquals(7.0, result.matches[1].endTime, 0.0001)
+    }
+
+    @Test
+    fun abbreviatedRubyCannotReverseThePinnedTextBounds() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝に<ruby>博士号<rt>D</rt></ruby>を取得した彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝に博師号を取得した彼女は窓の外を眺めていた", 1.0, 10.0)),
+        )
+        assertEquals("雨の降る静かな朝に博士号を取得した彼女は窓の外を眺めていた", result.matches.single().text)
+    }
+
+    @Test
     fun editDeletionDoesNotGiveAnOmittedSentenceThePreviousWordsTime() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。彼女は窓辺で手紙を読む。はい。私は駅へ向かって歩いた。</p>"),

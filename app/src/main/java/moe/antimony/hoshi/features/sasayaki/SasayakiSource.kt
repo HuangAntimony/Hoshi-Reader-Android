@@ -30,13 +30,14 @@ object SasayakiSource {
             listOf("toc", "caution", "colophon").none(path::contains)
     }
 
-    internal fun boundaries(chapter: Chapter): BooleanArray {
+    internal fun boundaries(chapter: Chapter, splitAtCommas: Boolean = true): BooleanArray {
         val result = BooleanArray(chapter.text.size)
         var offset = 0
         chapter.html.visibleReaderText(preserveParagraphs = true).codePoints().forEach { point ->
             if (point.isReaderMatchableCodePoint()) {
                 offset++
-            } else if (offset > 0 && offset <= result.size && point in sentenceEnders) {
+            } else if (offset > 0 && offset <= result.size && point in sentenceEnders &&
+                (splitAtCommas || point !in commaEnders)) {
                 result[offset - 1] = true
             }
         }
@@ -118,4 +119,5 @@ object SasayakiSource {
     private val rt = Regex("(?s)<rt\\b[^>]*>(.*?)</rt>")
     private val voicingMarks = setOf(0x3099, 0x309A, 0xFF9E, 0xFF9F)
     private val sentenceEnders = "。！？!?…」』「『（\n、，,".codePointsArray().toSet()
+    private val commaEnders = "、，,".codePointsArray().toSet()
 }

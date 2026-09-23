@@ -24,6 +24,7 @@ object SasayakiTranscriptAligner {
         val source: SasayakiSource.Chapter,
         val projections: List<SasayakiSource.Projection>,
         val boundaries: BooleanArray,
+        val sentences: BooleanArray,
         val globalStart: Int,
     )
     private data class Seed(val chapter: Int, val projection: Int, val offset: Int, val sourceStart: Int)
@@ -46,8 +47,9 @@ object SasayakiTranscriptAligner {
         val projection: SasayakiSource.Projection,
         val offset: Int,
         val pairs: List<Pairing>,
-        val similarity: Double,
     )
+
+    private data class Window(val lower: Int, val upper: Int, val from: Int, val to: Int)
 
     fun align(book: EpubBook, tokens: List<SasayakiToken>): SasayakiMatchData =
         Session(book).align(tokens)
@@ -60,12 +62,13 @@ object SasayakiTranscriptAligner {
         private var speech = Speech(IntArray(0), emptyList())
         private var candidates = emptyList<Anchor>()
         private var gaps = emptyMap<Gap, List<Timing?>>()
-        private data class Gap(val chapter: Int, val lower: Int, val upper: Int, val from: Int, val to: Int)
+        private data class Gap(val chapter: Int, val window: Window, val context: Window)
 
         init {
             var offset = 0
             chapters = SasayakiSource.chapters(book).map { source ->
-                Chapter(source, SasayakiSource.projections(source), SasayakiSource.boundaries(source), offset)
+                Chapter(source, SasayakiSource.projections(source), SasayakiSource.boundaries(source),
+                    SasayakiSource.boundaries(source, splitAtCommas = false), offset)
                     .also { offset += source.text.size }
             }
             index = buildIndex(chapters)
@@ -99,15 +102,16 @@ object SasayakiTranscriptAligner {
             val nextGaps = HashMap<Gap, List<Timing?>>()
             anchors.zipWithNext().forEach { (left, right) ->
                 if (left.chapter != right.chapter) return@forEach
-                val gap = Gap(left.chapter, left.sourceEnd, right.sourceStart, left.speechEnd, right.spoken)
-                if (gap.upper - gap.lower !in 1..maxGap || gap.to - gap.from !in 0..maxGap) return@forEach
+                val window = Window(left.sourceEnd, right.sourceStart, left.speechEnd, right.spoken)
+                if (window.upper - window.lower !in 1..maxGap || window.to - window.from !in 0..maxGap) return@forEach
+                val gap = Gap(left.chapter, window, sentenceContext(chapters[left.chapter], left, right, window))
                 val cached = gaps[gap]
                 if (cached != null) {
-                    cached.forEachIndexed { position, time -> times[gap.chapter][gap.lower + position] = time }
+                    cached.forEachIndexed { position, time -> times[gap.chapter][window.lower + position] = time }
                     nextGaps[gap] = cached
                 } else {
-                    repairGap(chapters[gap.chapter], gap.lower, gap.upper, speech, gap.from, gap.to, times[gap.chapter])
-                    nextGaps[gap] = times[gap.chapter].slice(gap.lower until gap.upper)
+                    repairGap(chapters[gap.chapter], window, gap.context, speech, times[gap.chapter])
+                    nextGaps[gap] = times[gap.chapter].slice(window.lower until window.upper)
                 }
             }
             // A formerly unmatched gap is retried only when its neighboring anchors change.
@@ -241,10 +245,29 @@ object SasayakiTranscriptAligner {
         return chain.asReversed()
     }
 
-    private fun repairGap(
-        chapter: Chapter, lower: Int, upper: Int,
-        speech: Speech, speechStart: Int, speechEnd: Int, times: Array<Timing?>,
-    ) {
+    /** Include the neighboring anchors up to the sentence edges, preserving their token mapping. */
+    private fun sentenceContext(chapter: Chapter, left: Anchor, right: Anchor, gap: Window): Window {
+        var lower = gap.lower
+        var upper = gap.upper
+        var from = gap.from
+        var to = gap.to
+        val before = chapter.projections[left.projection]
+        while (from > left.spoken && lower > 0 && !chapter.sentences[lower - 1] &&
+            upper - lower < maxGap && to - from < maxGap) {
+            from--
+            lower = before.starts[left.written + from - left.spoken]
+        }
+        val after = chapter.projections[right.projection]
+        while (to < right.speechEnd && upper > 0 && !chapter.sentences[upper - 1] &&
+            upper - lower < maxGap && to - from < maxGap) {
+            upper = after.ends[right.written + to - right.spoken]
+            to++
+        }
+        return Window(lower, upper, from, to)
+    }
+
+    private fun repairGap(chapter: Chapter, gap: Window, context: Window, speech: Speech, times: Array<Timing?>) {
+        val (lower, upper, speechStart, speechEnd) = gap
         val writtenCount = upper - lower
         val spokenCount = speechEnd - speechStart
         if (spokenCount == 0) {
@@ -252,61 +275,125 @@ object SasayakiTranscriptAligner {
             return
         }
         if (writtenCount !in 1..maxGap || spokenCount !in 1..maxGap) return
-        val repair = chapter.projections.mapNotNull { projection ->
-            val start = projection.starts.indexOfFirst { it >= lower }
-            val end = projection.ends.indexOfLast { it <= upper } + 1
+        val best = chapter.projections.mapNotNull { projection ->
+            val start = projection.starts.indexOfFirst { it >= context.lower }
+            val end = projection.ends.indexOfLast { it <= context.upper } + 1
             if (start < 0 || end <= start || end - start > maxGap) return@mapNotNull null
             val count = end - start
-            if (count.toDouble() / spokenCount !in 0.45..2.2) return@mapNotNull null
-            val (pairs, edits) = editAlignment(projection.text, start, end, speech.text, speechStart, speechEnd)
-            Repair(projection, start, pairs, 1.0 - edits.toDouble() / max(count, spokenCount))
-        }.maxByOrNull { it.similarity }
-        if (repair == null) {
+            val contextSpokenCount = context.to - context.from
+            if (count.toDouble() / contextSpokenCount !in 0.45..2.2) return@mapNotNull null
+            // Pin the known text/audio edges while including their context in the
+            // sentence score. A free realignment could move a repeated character
+            // out of its anchor and then use its time again inside the gap.
+            val writtenEdges = intArrayOf(start,
+                projection.starts.indexOfFirst { it >= lower }.coerceIn(start, end),
+                (projection.ends.indexOfLast { it <= upper } + 1).coerceIn(start, end), end)
+            // A shortened ruby reading may span both pinned edges with one symbol.
+            if (writtenEdges[1] > writtenEdges[2]) return@mapNotNull null
+            val spokenEdges = intArrayOf(context.from, speechStart, speechEnd, context.to)
+            val pairs = (0..2).flatMap { part ->
+                editAlignment(projection.text, writtenEdges[part], writtenEdges[part + 1],
+                    speech.text, spokenEdges[part], spokenEdges[part + 1]).first.map { pair ->
+                    Pairing(if (pair.written < 0) -1 else pair.written + writtenEdges[part] - start,
+                        if (pair.spoken < 0) -1 else pair.spoken + spokenEdges[part] - context.from, pair.exact)
+                }
+            }
+            val repair = Repair(projection, start, pairs)
+            repair to sentenceScores(chapter, context, repair)
+        }.maxByOrNull { (_, scores) ->
+            // Choose the spelling track for the affected sentences, so a long
+            // neighboring sentence cannot force its ruby spelling onto a name.
+            (lower until upper).sumOf { scores[it - context.lower].similarity }
+        }
+        if (best == null) {
             recoverShortRewrite(chapter, lower, upper, speech, speechStart, speechEnd, 0.0, times)
             return
         }
-        var exactRun = 0
-        var longestExactRun = 0
-        repair.pairs.forEach {
-            exactRun = if (it.exact) exactRun + 1 else 0
-            longestExactRun = max(longestExactRun, exactRun)
-        }
-        // Short local phrases may contain several kana/kanji rewrites. A substantial
-        // exact run supports those edits without relaxing the whole-book anchor search.
-        val localSupport = writtenCount <= 48 && spokenCount <= 48 &&
-            repair.similarity >= 0.45 && longestExactRun >= 4
-        if (repair.similarity < minimumSimilarity && !localSupport) {
-            recoverShortRewrite(chapter, lower, upper, speech, speechStart, speechEnd, repair.similarity, times)
-            return
-        }
+        val (repair, scores) = best
         // Keep exact islands fixed and assign only the tokens inside each error block.
         // In particular a DP deletion must not give an omitted reply a neighbor's time.
         var cursor = 0
-        var spoken = speechStart
+        var spoken = context.from
         while (cursor < repair.pairs.size) {
             val first = cursor
             val exact = repair.pairs[cursor].exact
             while (cursor < repair.pairs.size && repair.pairs[cursor].exact == exact) cursor++
             val block = repair.pairs.subList(first, cursor)
-            val written = block.filter { it.written >= 0 }
-            val speechTo = block.lastOrNull { it.spoken >= 0 }?.let { speechStart + it.spoken + 1 } ?: spoken
+            val written = block.filter { it.written >= 0 &&
+                repair.projection.starts[repair.offset + it.written] >= lower &&
+                repair.projection.ends[repair.offset + it.written] <= upper }
+            val speechTo = block.lastOrNull { it.spoken >= 0 }?.let { context.from + it.spoken + 1 } ?: spoken
             if (exact) {
-                for (index in first until cursor) {
-                    val pair = repair.pairs[index]
-                    assign(times, repair.projection, repair.offset + pair.written, speech.times[speechStart + pair.spoken])
+                for (pair in written) {
+                    val point = repair.projection.starts[repair.offset + pair.written]
+                    val token = context.from + pair.spoken
+                    // Even a partly omitted sentence keeps the words actually
+                    // recognized here; isolated particles in unrelated speech
+                    // still need evidence from their own sentence.
+                    if (token in speechStart until speechEnd &&
+                        (scores[point - context.lower].similarity >= 0.25 || block.size >= 4)) {
+                        assign(times, repair.projection, repair.offset + pair.written, speech.times[token])
+                    }
                 }
-            } else if (written.isNotEmpty() && written.size <= maxUncertainRun) {
+            } else if (written.isNotEmpty()) {
                 val from = repair.projection.starts[repair.offset + written.first().written]
                 val to = repair.projection.ends[repair.offset + written.last().written]
-                if (speechTo == spoken) {
-                    recoverOmittedCharacters(chapter, from, to, speech, spoken, times)
-                } else {
-                    recoverShortRewrite(chapter, from, to, speech, spoken, speechTo, repair.similarity, times,
-                        supported = true)
+                val tokenFrom = spoken.coerceAtLeast(speechStart)
+                val tokenTo = speechTo.coerceAtMost(speechEnd)
+                val score = scores[from - context.lower]
+                val hasSentenceEvidence = score.similarity >= 0.25
+                if (tokenTo == tokenFrom) {
+                    if (hasSentenceEvidence) recoverOmittedCharacters(chapter, from, to, speech, tokenFrom, times)
+                } else if (tokenTo > tokenFrom) {
+                    // Weak sentence evidence cannot become plausible just by splitting
+                    // off a kana/kanji fragment. Keep the original whole-gap reading
+                    // fallback, but require sentence evidence for inferred fragments.
+                    val wholeGap = from == lower && to == upper && tokenFrom == speechStart && tokenTo == speechEnd
+                    val sameSentence = (from until to - 1).none { chapter.boundaries[it] }
+                    if (hasSentenceEvidence || wholeGap) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
+                        if (sameSentence) score.similarity else 0.0, times,
+                        supported = sameSentence && score.accepted)
                 }
             }
             spoken = speechTo
         }
+    }
+
+    private data class SentenceScore(val similarity: Double, val accepted: Boolean)
+
+    /** Score each sentence with its exact context; an omitted neighbor contributes no penalty. */
+    private fun sentenceScores(chapter: Chapter, window: Window, repair: Repair): List<SentenceScore> {
+        val sentenceAt = IntArray(window.upper - window.lower)
+        var count = 0
+        for (point in sentenceAt.indices) {
+            sentenceAt[point] = count
+            if (chapter.sentences[window.lower + point]) count++
+        }
+        val written = IntArray(count + 1)
+        val spoken = IntArray(count + 1)
+        val edits = IntArray(count + 1)
+        val longest = IntArray(count + 1)
+        var sentence = sentenceAt.last()
+        var run = 0
+        for (pair in repair.pairs.asReversed()) {
+            if (pair.written >= 0) {
+                val next = sentenceAt[repair.projection.starts[repair.offset + pair.written] - window.lower]
+                if (next != sentence) run = 0
+                sentence = next
+                written[sentence]++
+            }
+            if (pair.spoken >= 0) spoken[sentence]++
+            if (!pair.exact) edits[sentence]++
+            run = if (pair.exact) run + 1 else 0
+            longest[sentence] = max(longest[sentence], run)
+        }
+        val scores = written.indices.map { index ->
+            val similarity = 1.0 - edits[index].toDouble() / max(written[index], spoken[index]).coerceAtLeast(1)
+            val accepted = similarity >= minimumSimilarity ||
+                (written[index] <= 48 && spoken[index] <= 48 && similarity >= 0.45 && longest[index] >= 4)
+            SentenceScore(similarity, accepted)
+        }
+        return sentenceAt.map { scores[it] }
     }
 
     /** Repair a short missing word fragment, never an entirely unspoken cue. */
@@ -363,8 +450,12 @@ object SasayakiTranscriptAligner {
                 if (isReadingRewrite(written, spoken) || similarity >= 0.25) return
                 start = end + 1
             }
-            recoverShortRewrite(chapter, if (prefix) lower else suffixStart, if (prefix) prefixEnd else upper,
-                speech, speechStart, speechEnd, 0.0, times)
+            val from = if (prefix) lower else suffixStart
+            val to = if (prefix) prefixEnd else upper
+            val written = SasayakiSource.normalizedText(String(chapter.source.text, from, to - from))
+            val edits = editAlignment(written, 0, written.size, spoken, 0, spoken.size).second
+            recoverShortRewrite(chapter, from, to, speech, speechStart, speechEnd,
+                1.0 - edits.toDouble() / max(written.size, spoken.size), times)
             return
         }
         val writtenCount = upper - lower
@@ -389,8 +480,19 @@ object SasayakiTranscriptAligner {
     private fun isReadingRewrite(written: IntArray, spoken: IntArray): Boolean {
         fun kana(point: Int) = point in 0x3041..0x30FA || point == 0x30FC
         fun kanji(point: Int) = Character.UnicodeScript.of(point) == Character.UnicodeScript.HAN
-        return (written.all(::kana) && spoken.any(::kanji) && spoken.all { kana(it) || kanji(it) }) ||
-            (spoken.all(::kana) && written.any(::kanji) && written.all { kana(it) || kanji(it) })
+        fun compatible(reading: IntArray, mixed: IntArray): Boolean {
+            if (!reading.all(::kana) || !mixed.any(::kanji) || !mixed.all { kana(it) || kanji(it) }) return false
+            // Kana already present in the written phrase must survive the reading.
+            // Otherwise any omitted mixed-script sentence could veto a real prefix.
+            var cursor = 0
+            for (point in mixed.filter(::kana)) {
+                while (cursor < reading.size && reading[cursor] != point) cursor++
+                if (cursor == reading.size) return false
+                cursor++
+            }
+            return true
+        }
+        return compatible(written, spoken) || compatible(spoken, written)
     }
 
     private fun editAlignment(

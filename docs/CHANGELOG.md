@@ -22,9 +22,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Support M4A audio and show matched character coverage for both subtitles and transcription.
   Preserve more sentence-opening audio at segment boundaries to reduce missing
   words and sentences, and recover short missing word fragments when matching
-  existing transcripts. Improve matching of short
-  kana/kanji rewrites and recognition errors around confirmed text, preserve
-  recognized prefixes after pauses, and keep unspoken replies unmatched.
+  existing transcripts. Use sentence context to match kana/kanji spelling differences
+  and recognition errors without losing recognized sentence endings or short replies;
+  preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside

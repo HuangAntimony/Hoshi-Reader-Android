@@ -564,11 +564,18 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   searched; bounded gaps are repaired again only when their neighboring anchors
   change. The global monotonic chain is still reconsidered so new evidence can
   correct an earlier position. CPU matching runs on the Default dispatcher;
-  parsing and persistence remain repository-owned I/O. Gap edit alignment prefers
-  exact letters when edit costs tie and distinguishes token insertions from text
-  deletions. Short gaps with a substantial exact run allow more spelling differences;
-  each uncertain block uses only its own tokens. Script-compatible kana/kanji recovery
-  uses bounded lengths, not an automatic pronunciation dictionary. A partial sentence
+  parsing and persistence remain repository-owned I/O. Bounded gap alignment includes
+  neighboring confirmed text through sentence edges when available, pinning the
+  existing text/token boundaries. Similarity is scored per sentence with that context;
+  omitted neighboring sentences cannot lower the score of a recognized sentence.
+  Commas still split display cues but retain shared sentence context for scoring.
+  Plain/ruby track selection weighs the affected text, not the length of surrounding
+  anchors. Gap edit alignment prefers exact letters when edit costs tie and distinguishes
+  token insertions from text deletions. Short gaps with a substantial exact run allow
+  more spelling differences; each uncertain block uses only its own tokens and requires
+  minimum evidence from its sentence before inferring changed or omitted fragments. Compatible
+  kana/kanji recovery requires existing kana to occur in order in the candidate reading
+  and uses bounded lengths, not an automatic pronunciation dictionary. A partial sentence
   edge can be recovered beside an omitted cue only when that cue cannot plausibly
   claim the same tokens. Explicit-token repair checks token duration, excluding
   surrounding pauses. Ruby syllables sharing a source character merge their timings.
