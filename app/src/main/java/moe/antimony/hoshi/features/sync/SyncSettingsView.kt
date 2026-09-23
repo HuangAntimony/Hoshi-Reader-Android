@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -120,6 +119,7 @@ fun SyncSettingsView(
     var pollIntervalSeconds by remember { mutableStateOf(5L) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
+    var showAuthorizationError by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
     val currentSettings = settings
     val currentReaderSettings = readerSettings
@@ -148,16 +148,14 @@ fun SyncSettingsView(
     val authorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         scope.launch {
             try {
-                if (result.resultCode == Activity.RESULT_OK) {
-                    googleAuth.authorizationResult(result.data)
-                    googleAuth.accept()
-                    hoshiSync.start()
-                    authStatus = DriveAuthStatus.Connected
-                }
+                googleAuth.authorizationResult(result.data)
+                googleAuth.accept()
+                hoshiSync.start()
+                authStatus = DriveAuthStatus.Connected
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                message = resources.getString(R.string.sync_google_drive_authorization_failed)
+                showAuthorizationError = true
             } finally {
                 isAuthorizing = false
             }
@@ -257,7 +255,7 @@ fun SyncSettingsView(
                     throw error
                 } catch (_: Exception) {
                     isAuthorizing = false
-                    message = resources.getString(R.string.sync_google_drive_authorization_failed)
+                    showAuthorizationError = true
                 }
                 return@launch
             }
@@ -313,6 +311,18 @@ fun SyncSettingsView(
     }
 
     BackHandler(onBack = onClose)
+    if (showAuthorizationError) {
+        AlertDialog(
+            onDismissRequest = { showAuthorizationError = false },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { Text(stringResource(R.string.sync_google_drive_authorization_failed)) },
+            confirmButton = {
+                TextButton(onClick = { showAuthorizationError = false }) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            },
+        )
+    }
     if (showSignOutConfirmation) {
         AlertDialog(
             onDismissRequest = { showSignOutConfirmation = false },

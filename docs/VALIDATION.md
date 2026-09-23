@@ -835,7 +835,11 @@ Validate relevant settings/theme changes with:
 Validate relevant sync/update/Sasayaki changes with:
 
 - Hoshi sync: verify GIS consent for the installed package/signing certificate and
-  `drive.file` access to the same Hoshi Reader folder as iOS. Test first upload,
+  `drive.file` access to the same Hoshi Reader folder as iOS. Cancel the account
+  picker and test a rejected authorization: both must show a localized error
+  dialog and re-enable Connect. Pass every GIS activity result to
+  `getAuthorizationResultFromIntent`, including non-`RESULT_OK` results, so SDK
+  failures are surfaced. Test first upload,
   cloud-only download on tap, canceled downloads, Delete Local/Everywhere,
   offline metadata/bookmark/highlight/shelf/session conflicts, session deletion,
   reimport generations, live reader updates/deletion, Sasayaki position/matches,
