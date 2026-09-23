@@ -16,7 +16,7 @@ class SasayakiSpeechPipelineTest {
             inputStarts += samples.first()
             if (inputStarts.size == 1) RecognitionTokens(arrayOf("から"), floatArrayOf(.8f))
             else RecognitionTokens(arrayOf("冷", "房"), floatArrayOf(0f, .4f))
-        }, onBatch = batches::add)
+        }, schedule = { work -> batches.add(work()) })
         pipeline.accept(AudioSamples(0, FloatArray(49_152) { it / 49_152f }))
         pipeline.finish()
         assertEquals(listOf("から", "冷", "房"), batches.flatMap { it.tokens }.map { it.text })
@@ -32,7 +32,7 @@ class SasayakiSpeechPipelineTest {
             inputSizes += samples.size
             if (inputSizes.size == 1) RecognitionTokens(arrayOf("前"), floatArrayOf(19.6f))
             else RecognitionTokens(arrayOf("前", "後"), floatArrayOf(.1f, .6f))
-        }, onBatch = batches::add)
+        }, schedule = { work -> batches.add(work()) })
         pipeline.accept(AudioSamples(0, FloatArray(336_000)))
         pipeline.finish()
         assertEquals(listOf("前", "後"), batches.flatMap { it.tokens }.map { it.text })
@@ -74,7 +74,7 @@ class SasayakiSpeechPipelineTest {
             recognized++
             assertTrue(batches.all { it.through <= 30.0 })
             RecognitionTokens(arrayOf("声"), floatArrayOf(.5f))
-        }, onBatch = batches::add)
+        }, schedule = { work -> batches.add(work()) })
         repeat(625) { index -> pipeline.accept(AudioSamples(480_000L + index * 512, FloatArray(512))) }
         assertEquals(0, recognized)
         assertTrue(batches.isEmpty())
@@ -88,7 +88,7 @@ class SasayakiSpeechPipelineTest {
         val batches = mutableListOf<SasayakiTranscriptionBatch>()
         val pipeline = SasayakiSpeechPipeline(100.0, 112.0, probability = { 0f }, recognize = {
             error("Silence must not enter ASR")
-        }, onBatch = batches::add)
+        }, schedule = { work -> batches.add(work()) })
         repeat(375) { index -> pipeline.accept(AudioSamples(1_600_000L + index * 512, FloatArray(512))) }
         pipeline.finish()
         assertTrue(batches.size >= 3)
@@ -102,7 +102,7 @@ class SasayakiSpeechPipelineTest {
         var windows = 0
         val pipeline = SasayakiSpeechPipeline(0.0, 2.0, probability = { if (windows++ < 32) .9f else 0f }, recognize = {
             RecognitionTokens(arrayOf("終"), floatArrayOf(1.12f))
-        }, onBatch = batches::add)
+        }, schedule = { work -> batches.add(work()) })
         pipeline.accept(AudioSamples(0, FloatArray(32_000)))
         pipeline.finish()
         assertEquals("終", batches.flatMap { it.tokens }.single().text)
@@ -113,7 +113,7 @@ class SasayakiSpeechPipelineTest {
         val batches = mutableListOf<SasayakiTranscriptionBatch>()
         val pipeline = SasayakiSpeechPipeline(30.0, 31.0, probability = { .9f }, recognize = {
             RecognitionTokens(arrayOf("旧", "新"), floatArrayOf(.2f, 1f))
-        }, onBatch = batches::add, audioFrom = 29.5)
+        }, schedule = { work -> batches.add(work()) }, audioFrom = 29.5)
         pipeline.accept(AudioSamples(472_000, FloatArray(24_000)))
         pipeline.finish()
         assertEquals(listOf("新"), batches.flatMap { it.tokens }.map { it.text })

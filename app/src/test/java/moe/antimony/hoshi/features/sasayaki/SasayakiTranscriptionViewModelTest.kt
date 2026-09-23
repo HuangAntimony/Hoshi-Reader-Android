@@ -113,7 +113,7 @@ class SasayakiTranscriptionViewModelTest {
         val repository = MemoryRepository()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) = Unit
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) = Unit
         }
         val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, kotlinx.coroutines.Dispatchers.Unconfined)
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
@@ -383,7 +383,7 @@ class SasayakiTranscriptionViewModelTest {
             prepare?.await()
             return 100.0
         }
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
             if (needsDownload) {
                 onDownloadRequired(161_016_054)
                 downloads++

@@ -38,6 +38,16 @@ internal fun SasayakiMatchModeControl(
     enabled: Boolean,
     onSelected: (SasayakiMatchMode) -> Unit,
     modifier: Modifier = Modifier,
+) = SasayakiOptionControl(SasayakiMatchMode.entries, selected, enabled, { it.labelRes }, onSelected, modifier)
+
+@Composable
+private fun <T> SasayakiOptionControl(
+    options: List<T>,
+    selected: T,
+    enabled: Boolean,
+    label: (T) -> Int,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
@@ -49,7 +59,7 @@ internal fun SasayakiMatchModeControl(
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        SasayakiMatchMode.entries.forEach { mode ->
+        options.forEach { mode ->
             val isSelected = selected == mode
             Box(
                 modifier = Modifier
@@ -61,7 +71,7 @@ internal fun SasayakiMatchModeControl(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    stringResource(mode.labelRes),
+                    stringResource(label(mode)),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isSelected) hoshiSurfaces.onSelected else hoshiSurfaces.muted,
@@ -75,6 +85,8 @@ internal fun SasayakiMatchModeControl(
 internal fun SasayakiTranscriptionSection(
     state: SasayakiTranscriptionUiState,
     enabled: Boolean,
+    preset: SasayakiTranscriptionPreset,
+    onPresetChange: (SasayakiTranscriptionPreset) -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onConfirmDownload: () -> Unit,
@@ -88,6 +100,26 @@ internal fun SasayakiTranscriptionSection(
         state.stage != SasayakiTranscriptionStage.Downloading && state.stage != SasayakiTranscriptionStage.AwaitingDownload
     SasayakiResourceCard {
         Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (!currentTranscript || !state.transcriptComplete) {
+                Text(stringResource(R.string.sasayaki_transcription_speed), style = MaterialTheme.typography.labelLarge)
+                SasayakiOptionControl(
+                    SasayakiTranscriptionPreset.entries, preset, enabled && !state.controlsLocked,
+                    label = { when (it) {
+                        SasayakiTranscriptionPreset.Light -> R.string.sasayaki_transcription_light
+                        SasayakiTranscriptionPreset.Balanced -> R.string.sasayaki_transcription_balanced
+                        SasayakiTranscriptionPreset.Fast -> R.string.sasayaki_transcription_fast
+                    } }, onSelected = onPresetChange,
+                )
+                Text(
+                    stringResource(when (preset) {
+                        SasayakiTranscriptionPreset.Light -> R.string.sasayaki_transcription_light_description
+                        SasayakiTranscriptionPreset.Balanced -> R.string.sasayaki_transcription_balanced_description
+                        SasayakiTranscriptionPreset.Fast -> R.string.sasayaki_transcription_fast_description
+                    }),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     transcriptionStatusLabel(state),

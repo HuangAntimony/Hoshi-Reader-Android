@@ -28,7 +28,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val loadModels = CompletableDeferred<Unit>()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
                 download.await()
                 onDownload(1.0)
                 loadModels.await()
@@ -55,6 +55,7 @@ class SasayakiTranscriptionCoordinatorTest {
         assertTrue(coordinator.start(root, "audio"))
         runCurrent()
         assertEquals(10.0, coordinator.state.value.through, 0.0)
+        assertEquals(2, backend.parallelism)
         assertFalse(coordinator.start(root, "audio"))
         coordinator.pause(root)
         runCurrent()
@@ -82,6 +83,23 @@ class SasayakiTranscriptionCoordinatorTest {
         assertTrue(coordinator.state.value.revision > revision)
     }
 
+    @Test fun resumeCanChangePresetWithoutRestartingOrDiscardingCommittedText() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository()
+        val backend = Backend()
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio", SasayakiTranscriptionPreset.Fast); runCurrent()
+        assertEquals(3, backend.parallelism)
+        coordinator.pause(root); runCurrent()
+        val committed = repository.saved!!
+        coordinator.start(root, "audio", SasayakiTranscriptionPreset.Light); runCurrent()
+        assertEquals(1, backend.parallelism)
+        assertEquals(committed.through, backend.from, 0.0)
+        coordinator.pause(root); runCurrent()
+        assertEquals(committed.tokens, repository.saved!!.tokens.take(committed.tokens.size))
+        assertEquals(20.0, repository.saved!!.through, 0.0)
+    }
+
     @Test fun completeTranscriptRealignsWithoutLoadingModel() = runTest {
         val root = temporary.newFolder()
         val repository = MemoryRepository(SasayakiTranscript(99.0, 100.0, listOf(SasayakiToken("本文", 1.0, 2.0))))
@@ -100,7 +118,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val backend = object : SasayakiTranscriptionBackend {
             var from = -1.0
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
                 this.from = from
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("末尾", 99.1, 99.9)), 100.0))
             }
@@ -168,7 +186,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val repository = MemoryRepository()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("一", 1.0, 2.0)), 10.0))
                 delay(15_000)
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("二", 20.0, 21.0)), 40.0))
@@ -206,7 +224,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val repository = MemoryRepository(beforeAlign = { count -> if (count == 1) finish.await() })
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
                 for (batch in batches) onBatch(batch)
             }
         }
@@ -257,9 +275,10 @@ class SasayakiTranscriptionCoordinatorTest {
     private class Backend(private val fail: Boolean = false) : SasayakiTranscriptionBackend {
         var from = -1.0
         var transcriptions = 0
+        var parallelism = 0
         override suspend fun duration(source: String) = 100.0
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
-            this.from = from; transcriptions++
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+            this.from = from; this.parallelism = parallelism; transcriptions++
             onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("本文", from + 2, from + 3)), from + 10))
             if (fail) error("Decoder details must not be shown to users")
             awaitCancellation()

@@ -69,13 +69,13 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
     private val mutableState = MutableStateFlow(SasayakiTranscriptionState())
     val state = mutableState.asStateFlow()
 
-    suspend fun start(root: File, source: String): Boolean = gate.withLock {
+    suspend fun start(root: File, source: String, preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced): Boolean = gate.withLock {
         if (task?.isCompleted == false) return false
         val deleted = AtomicBoolean(false)
         val entered = AtomicBoolean(false)
         val job = scope.launch(ioDispatcher, start = CoroutineStart.LAZY) {
             entered.set(true)
-            run(root, source, deleted)
+            run(root, source, deleted, preset)
         }
         val registration = try {
             workRegistry.register(root) {
@@ -126,7 +126,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         true
     }
 
-    private suspend fun run(root: File, source: String, deleted: AtomicBoolean) = coroutineScope {
+    private suspend fun run(root: File, source: String, deleted: AtomicBoolean, preset: SasayakiTranscriptionPreset) = coroutineScope {
         var duration = 0.0
         var through = 0.0
         var checkpointNeeded = false
@@ -189,7 +189,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 hasTranscript = saved != null,
             ) }
             if (saved?.isComplete != true) {
-                backend.transcribe(source, through, onDownloadRequired = { bytes ->
+                backend.transcribe(source, through, parallelism = preset.parallelism, onDownloadRequired = { bytes ->
                     val approval = CompletableDeferred<Unit>()
                     downloadApproval = approval
                     try {

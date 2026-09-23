@@ -494,8 +494,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   the upstream source archive SHA-256 and builds only local audio components;
   no CLI, network protocols, encoders, or video decoders are bundled. Its license
   and source link are available in Settings > About.
-  Decoding/resampling on the IO dispatcher overlaps the single ordered VAD/ASR
-  consumer through a bounded channel (at most 4 MiB of PCM queued). Native reads
+  DataStore-backed Sasayaki settings persist Lightweight/Balanced/Fast transcription
+  presets, mapping to 1/2/3 concurrent ASR segments, with Balanced as the default.
+  Each start/resume snapshots its preset; the selector is locked while running.
+  ASR and VAD use one internal model thread each. One shared recognizer owns
+  independent streams; VAD and segmentation remain sequential. A bounded queue
+  publishes completed segments in audio order, including silence, so checkpoints
+  never skip unfinished speech. Cancellation joins all streams before model release.
+  Decoding/resampling on the IO dispatcher overlaps VAD/ASR through a bounded
+  channel (at most 4 MiB of decoded PCM queued, plus bounded speech segment copies).
+  Native reads
   return at most 4096 samples; seek preroll preserves codec history, and the
   resampler phase stays on the absolute sample clock. Structured cancellation
   closes the native decoder and SAF descriptors before recognition resources

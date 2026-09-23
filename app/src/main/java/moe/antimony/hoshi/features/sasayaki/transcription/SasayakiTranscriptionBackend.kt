@@ -17,5 +17,6 @@ interface SasayakiTranscriptionBackend {
         onDownloadRequired: suspend (Long) -> Unit,
         onDownload: suspend (Double) -> Unit,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
+        parallelism: Int = 2,
     )
 }

@@ -4,7 +4,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-/** Overlap decoding with one ordered recognition consumer. Decoder chunks contain
+/** Overlap decoding with sequential VAD/segmentation. Decoder chunks contain
  * at most 4096 samples, so queued PCM uses at most 4 MiB regardless of book length. */
 internal suspend fun feedTranscriptionAudio(
     decode: suspend (suspend (AudioSamples) -> Unit) -> Unit,

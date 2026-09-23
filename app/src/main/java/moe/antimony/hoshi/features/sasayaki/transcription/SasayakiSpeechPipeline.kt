@@ -39,14 +39,15 @@ internal class SasayakiSpeechPipeline(
     private val duration: Double,
     private val probability: (FloatArray) -> Float,
     private val recognize: suspend (FloatArray) -> RecognitionTokens,
-    private val onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
+    private val schedule: suspend (suspend () -> SasayakiTranscriptionBatch) -> Unit,
     audioFrom: Double = from,
 ) {
     private val originSample = ceil(audioFrom * 16000 - 1e-8).toLong()
     private val history = AudioSampleHistory(24 * 16000)
     private val segmenter = SpeechSegmenter()
     private val pending = ArrayDeque<SpeechBounds>()
-    private var committed = from
+    // Producer boundary only; the ordered consumer owns the persisted checkpoint.
+    private var scheduledThrough = from
     private val frame = FloatArray(512)
     private var frameSize = 0
     private var receivedSamples = 0L
@@ -84,7 +85,7 @@ internal class SasayakiSpeechPipeline(
         drain(finishing = false)
         val safeSample = minOf(segmenter.safeThroughSample, pending.firstOrNull()?.paddedStart ?: Long.MAX_VALUE)
         val through = minOf(duration, (originSample + safeSample) / 16000.0)
-        if (through - committed >= 5.0) emit(emptyList(), through)
+        if (through - scheduledThrough >= 5.0) emit(emptyList(), through)
     }
 
     private suspend fun drain(finishing: Boolean) {
@@ -93,33 +94,39 @@ internal class SasayakiSpeechPipeline(
             if (!finishing && bounds.paddedEnd > history.endSample) return
             currentCoroutineContext().ensureActive()
             val end = minOf(bounds.paddedEnd, history.endSample)
-            val committedSample = ceil(committed * 16000 - 1e-8).toLong() - originSample
+            val scheduledThroughSample = ceil(scheduledThrough * 16000 - 1e-8).toLong() - originSample
             // Between distinct utterances, leading context can overlap the prior
-            // segment's committed silence. ASR may timestamp the new word at the
+            // segment's scheduled silence. ASR may timestamp the new word at the
             // start of that context, causing it to be mistaken for an old token.
             // Trim only before new speech; hard cuts and in-speech resume retain
             // their leading speech context and timestamp-based deduplication.
-            val start = if (bounds.start > committedSample) maxOf(bounds.paddedStart, committedSample) else bounds.paddedStart
+            val start = if (bounds.start > scheduledThroughSample) maxOf(bounds.paddedStart, scheduledThroughSample) else bounds.paddedStart
             val samples = history.read(start, end)
-            val result = recognize(samples)
-            currentCoroutineContext().ensureActive()
             // A normal silence boundary owns its trailing context, which can
             // contain the model's slightly delayed final token. Hard cuts must
             // leave that context to the next segment.
             val ownedEnd = if (bounds.hardCut) bounds.end else end
             val through = minOf(duration, (originSample + ownedEnd) / 16000.0)
-            val tokens = projectRecognitionTokens(result,
-                segmentStart = (originSample + start) / 16000.0,
-                segmentEnd = (originSample + end) / 16000.0,
-                committed = committed, through = through)
-            emit(tokens, through)
+            val previous = scheduledThrough
+            if (through > previous) {
+                schedule {
+                    val result = recognize(samples)
+                    currentCoroutineContext().ensureActive()
+                    val tokens = projectRecognitionTokens(result,
+                        segmentStart = (originSample + start) / 16000.0,
+                        segmentEnd = (originSample + end) / 16000.0,
+                        committed = previous, through = through)
+                    SasayakiTranscriptionBatch(tokens, through)
+                }
+                scheduledThrough = through
+            }
             pending.removeFirst()
         }
     }
 
     private suspend fun emit(tokens: List<SasayakiToken>, through: Double) {
-        if (through <= committed) return
-        onBatch(SasayakiTranscriptionBatch(tokens, through))
-        committed = through
+        if (through <= scheduledThrough) return
+        schedule { SasayakiTranscriptionBatch(tokens, through) }
+        scheduledThrough = through
     }
 }

@@ -5,6 +5,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -84,6 +87,7 @@ class SasayakiSettingsRepositoryTest {
             autoScroll = false,
             autoPause = false,
             imageHoldSeconds = 4.5f,
+            transcriptionPreset = SasayakiTranscriptionPreset.Fast,
             lightTextColor = 0xFF010203,
             lightBackgroundColor = 0x44040506,
             darkTextColor = 0xFF070809,
@@ -122,6 +126,26 @@ class SasayakiSettingsRepositoryTest {
 
             assertEquals(3.5f, repository.settings.first().imageHoldSeconds, 0f)
         }
+    }
+
+    @Test
+    fun transcriptionPresetSurvivesReopeningAndUnknownValuesUseBalanced() = runBlocking {
+        val file = tempFolder.root.resolve("presets.preferences_pb")
+        val firstJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + firstJob), produceFile = { file })
+            val repository = SasayakiSettingsRepository(store)
+            assertEquals(SasayakiTranscriptionPreset.Balanced, repository.settings.first().transcriptionPreset)
+            repository.update { it.copy(transcriptionPreset = SasayakiTranscriptionPreset.Light) }
+        } finally { firstJob.cancelAndJoin() }
+        val secondJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + secondJob), produceFile = { file })
+            val repository = SasayakiSettingsRepository(store)
+            assertEquals(SasayakiTranscriptionPreset.Light, repository.settings.first().transcriptionPreset)
+            store.edit { it[stringPreferencesKey("sasayakiTranscriptionPreset")] = "unsupported" }
+            assertEquals(SasayakiTranscriptionPreset.Balanced, repository.settings.first().transcriptionPreset)
+        } finally { secondJob.cancelAndJoin() }
     }
 
     private fun repository(

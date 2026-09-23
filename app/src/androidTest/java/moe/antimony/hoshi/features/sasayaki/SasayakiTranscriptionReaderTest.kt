@@ -130,6 +130,29 @@ class SasayakiTranscriptionReaderTest {
         assertEquals(1, reader.backend.downloads)
     }
 
+    @Test fun presetSelectionIsLockedWhileRunningAndResumeUsesTheNewPreset() = withReader { reader ->
+        compose.runOnIdle { reader.playback.value = SasayakiPlaybackData(0.0, audioUri = "content://test/audiobook") }
+        compose.waitUntil { reader.model.uiState.value.canStart }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_fast)).performClick()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_fast_description)).assertExists()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_start)).performClick()
+        compose.waitUntil { reader.backend.runs == 1 }
+        assertEquals(3, reader.backend.parallelism)
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_light)).assertIsNotEnabled()
+        reader.batch(10.0)
+        compose.waitUntil { reader.model.uiState.value.through == 10.0 }
+        compose.runOnIdle { reader.visible.value = false }
+        compose.runOnIdle { reader.visible.value = true }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_fast_description)).assertExists()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_pause)).performClick()
+        compose.waitUntil { reader.model.uiState.value.canStart }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_light)).assertIsEnabled().performClick()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_resume)).performClick()
+        compose.waitUntil { reader.backend.runs == 2 }
+        assertEquals(1, reader.backend.parallelism)
+        assertEquals(10.0, reader.backend.resumedFrom, 0.0)
+    }
+
     private fun withReader(test: (Reader) -> Unit) {
         val reader = Reader()
         try {
@@ -143,7 +166,8 @@ class SasayakiTranscriptionReaderTest {
                         if (reader.visible.value) {
                             SasayakiTranscriptionSection(
                                 state = state, enabled = true,
-                                onStart = reader.model::start, onPause = reader.model::pause,
+                                preset = reader.preset.value, onPresetChange = { reader.preset.value = it },
+                                onStart = { reader.model.start(reader.preset.value) }, onPause = reader.model::pause,
                                 onConfirmDownload = reader.model::confirmDownload,
                                 onRequestClear = reader.model::requestClear, onDismissClear = reader.model::dismissClear,
                                 onConfirmClear = reader.model::confirmClear,
@@ -172,6 +196,7 @@ class SasayakiTranscriptionReaderTest {
         val audioRepository = SasayakiAudioRepository(root)
         val playback = mutableStateOf<SasayakiPlaybackData?>(null)
         val visible = mutableStateOf(true)
+        val preset = mutableStateOf(SasayakiTranscriptionPreset.Balanced)
         val matches = mutableListOf<SasayakiMatchData>()
         val lifecycle = ReaderLifecycle()
         fun text(id: Int) = context.getString(id)
@@ -188,12 +213,14 @@ class SasayakiTranscriptionReaderTest {
     private class Backend : SasayakiTranscriptionBackend {
         val batches = Channel<SasayakiTranscriptionBatch>(Channel.UNLIMITED)
         @Volatile var runs = 0
+        @Volatile var parallelism = 0
         @Volatile var resumedFrom = 0.0
         @Volatile var needsDownload = false
         @Volatile var downloads = 0
         override suspend fun duration(source: String) = 100.0
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) {
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
             resumedFrom = from
+            this.parallelism = parallelism
             runs++
             if (needsDownload) {
                 onDownloadRequired(161_016_054)

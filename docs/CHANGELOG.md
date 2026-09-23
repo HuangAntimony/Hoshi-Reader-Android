@@ -25,7 +25,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside
-  speech recognition, while keeping audio buffers bounded.
+  speech recognition, while keeping audio buffers bounded. Choose Lightweight, Balanced
+  (default), or Fast transcription, with the selection remembered for later sessions;
+  recognize audio segments in parallel while preserving ordered progress and resume.
 
 - Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
   or Disabled, with an enabled frequency dictionary for explicit ordering.

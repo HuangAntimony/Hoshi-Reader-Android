@@ -885,4 +885,11 @@
     <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
     <string name="about_ffmpeg_source">FFmpeg 源代码</string>
     <string name="about_transcription_license">转写组件许可证</string>
+    <string name="sasayaki_transcription_speed">转录速度</string>
+    <string name="sasayaki_transcription_light">轻量</string>
+    <string name="sasayaki_transcription_balanced">均衡</string>
+    <string name="sasayaki_transcription_fast">快速</string>
+    <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
+    <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
+    <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
 </resources>

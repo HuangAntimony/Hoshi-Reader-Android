@@ -133,7 +133,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         }
     }
 
-    fun start() {
+    fun start(preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced) {
         if (!_uiState.value.canStart) return
         val activeRoot = root ?: return
         val activeSource = source ?: return
@@ -141,7 +141,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         _uiState.value = _uiState.value.copy(isUpdating = true, error = null, showClearConfirmation = false)
         startJob = scope.launch {
             try {
-                coordinator.start(activeRoot, activeSource)
+                coordinator.start(activeRoot, activeSource, preset)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

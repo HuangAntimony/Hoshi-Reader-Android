@@ -12,6 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import moe.antimony.hoshi.features.sasayaki.SasayakiToken
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -74,19 +75,47 @@ class SasayakiTranscriptionDeviceTest {
                         checkpoint = batch
                         throw CancellationException("Exercise native resource cleanup and resume")
                     }
-                })
+                }, parallelism = 3)
                 fail("The Japanese clip must contain recognized speech")
             } catch (_: CancellationException) { }
             val saved = checkNotNull(checkpoint)
             assertTrue(saved.through > 0 && saved.through < duration)
             val resumed = mutableListOf<SasayakiTranscriptionBatch>()
-            backend.transcribe(source, saved.through, { error("Device tests must never download models") }, {}, resumed::add)
+            backend.transcribe(source, saved.through, { error("Device tests must never download models") }, {}, resumed::add, parallelism = 1)
             assertEquals(duration, resumed.last().through, .001)
             val tokens = resumed.flatMap { it.tokens }
             assertTrue(tokens.size > 10)
             assertTrue(tokens.all { it.start >= saved.through && it.end >= it.start && it.end <= duration })
             assertTrue(resumed.zipWithNext().all { (a, b) -> a.through < b.through })
             Log.i("HoshiAsrSmoke", "duration=$duration checkpoint=${saved.through} tokens=${tokens.size}")
+        }
+    }
+
+    @Test fun realClipPresetsProduceIdenticalTokensAndTimestamps() = runBlocking<Unit> {
+        val clip = InstrumentationRegistry.getArguments().getString("realClip")
+        assumeTrue("Supply a scratch Japanese realClip to exercise native ASR", clip != null)
+        val directory = File(context.noBackupFilesDir, "SasayakiModels/reazonspeech-k2-v2-int8-v1")
+        assumeTrue("Seed verified model files first", ReazonSpeechModelCatalog.files.all { File(directory, it.name).length() == it.bytes })
+        val source = File(clip!!).toURI().toString()
+        val backend = AndroidSasayakiTranscriptionBackend(
+            AndroidSasayakiAudioDecoder(context, Dispatchers.IO),
+            SasayakiModelRepository(context, Dispatchers.IO),
+            SasayakiRuntimeRepository(context, Dispatchers.IO), Dispatchers.Default,
+        )
+        withTimeout(120_000) {
+            var reference: List<SasayakiToken>? = null
+            val duration = backend.duration(source)
+            for (parallelism in 1..3) {
+                val batches = mutableListOf<SasayakiTranscriptionBatch>()
+                val start = System.nanoTime()
+                backend.transcribe(source, 0.0, { error("Device tests must never download models") }, {}, batches::add, parallelism)
+                val tokens = batches.flatMap { it.tokens }
+                assertTrue(tokens.size > 10)
+                assertEquals(duration, batches.last().through, .001)
+                assertTrue(batches.zipWithNext().all { (a, b) -> a.through < b.through })
+                if (reference == null) reference = tokens else assertEquals(reference, tokens)
+                Log.i("HoshiAsrSmoke", "parallelism=$parallelism seconds=${(System.nanoTime() - start) / 1e9} tokens=${tokens.size}")
+            }
         }
     }
 

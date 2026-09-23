@@ -887,4 +887,11 @@
     <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
     <string name="about_ffmpeg_source">FFmpeg source code</string>
     <string name="about_transcription_license">Transcription component licenses</string>
+    <string name="sasayaki_transcription_speed">Transcription speed</string>
+    <string name="sasayaki_transcription_light">Lightweight</string>
+    <string name="sasayaki_transcription_balanced">Balanced</string>
+    <string name="sasayaki_transcription_fast">Fast</string>
+    <string name="sasayaki_transcription_light_description">Uses fewer resources, with slower transcription.</string>
+    <string name="sasayaki_transcription_balanced_description">Balances transcription speed and everyday use.</string>
+    <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
 </resources>

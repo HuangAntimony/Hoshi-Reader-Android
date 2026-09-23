@@ -893,6 +893,13 @@ Validate relevant sync/update/Sasayaki changes with:
   The opt-in `SasayakiIncrementalMatchDeviceTest` accepts `-e matchBookRoot <root>`;
   it reads an existing book/transcript without writing sidecars and places timing
   and allocation results in `cache/incremental-match-benchmark/report.json`.
+  Verify Lightweight/Balanced/Fast defaults to Balanced and persists across restart.
+  Preset selection is locked while running; pausing, changing preset and resuming
+  must retain committed progress, and closing/reopening the sheet keeps the choice.
+  With cached models, `SasayakiTranscriptionDeviceTest` compares all three presets'
+  native token text/order/timestamps on an explicit scratch `realClip`, and checks
+  cancellation in Fast followed by resume in Lightweight. Pure pipeline tests cover
+  out-of-order completion, bounded work, silence ordering and failure/cancellation.
   After pausing, Resume
   must work without changing tabs to refresh the audio source. Backgrounding
   the app must not actively pause the task; while its process can execute,

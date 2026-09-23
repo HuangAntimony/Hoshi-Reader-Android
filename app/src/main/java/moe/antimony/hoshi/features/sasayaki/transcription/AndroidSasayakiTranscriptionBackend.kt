@@ -43,8 +43,10 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         onDownloadRequired: suspend (Long) -> Unit,
         onDownload: suspend (Double) -> Unit,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
+        parallelism: Int,
     ) = mutex.withLock {
         withContext(defaultDispatcher) {
+            require(parallelism in 1..3)
             require(from.isFinite() && from >= 0)
             val duration = decoder.duration(source)
             if (from >= duration) {
@@ -55,7 +57,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
             currentCoroutineContext().ensureActive()
             try {
                 runtime.load(directories[0])
-                transcribeWithModels(source, from, duration, directories[1], onBatch)
+                transcribeWithModels(source, from, duration, directories[1], parallelism, onBatch)
             } catch (error: LinkageError) {
                 throw IOException("Native transcription runtime is unavailable", error)
             }
@@ -67,6 +69,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         from: Double,
         duration: Double,
         directory: File,
+        parallelism: Int,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
     ) {
         val recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
@@ -78,7 +81,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
                     joiner = File(directory, "joiner.int8.onnx").absolutePath,
                 ),
                 tokens = File(directory, "tokens.txt").absolutePath,
-                numThreads = 2,
+                numThreads = 1,
                 provider = "cpu",
                 modelType = "transducer",
             ),
@@ -96,29 +99,26 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
                     windowSize = 512,
                 ),
                 sampleRate = TRANSCRIPTION_SAMPLE_RATE,
-                numThreads = 2,
+                numThreads = 1,
                 provider = "cpu",
             ))
             try {
                 // Intentional ASR context is distinct from decoder sync
                 // preroll; already committed tokens are filtered below.
                 val decodeFrom = maxOf(0.0, from - .5)
-                val pipeline = SasayakiSpeechPipeline(from, duration, vad::compute, recognize = { samples ->
-                    currentCoroutineContext().ensureActive()
-                    val stream = recognizer.createStream()
-                    try {
-                        stream.acceptWaveform(samples, TRANSCRIPTION_SAMPLE_RATE)
-                        recognizer.decode(stream)
-                        currentCoroutineContext().ensureActive()
-                        val result = recognizer.getResult(stream)
-                        RecognitionTokens(result.tokens, result.timestamps)
-                    } finally { stream.release() }
-                }, onBatch = onBatch, audioFrom = decodeFrom)
-                feedTranscriptionAudio(
+                transcribeSpeechAudio(from, duration, decodeFrom, parallelism,
                     decode = { send -> decoder.decode(source, decodeFrom, send) },
-                    consume = pipeline::accept,
-                )
-                pipeline.finish()
+                    probability = vad::compute, recognize = { samples ->
+                        currentCoroutineContext().ensureActive()
+                        val stream = recognizer.createStream()
+                        try {
+                            stream.acceptWaveform(samples, TRANSCRIPTION_SAMPLE_RATE)
+                            recognizer.decode(stream)
+                            currentCoroutineContext().ensureActive()
+                            val result = recognizer.getResult(stream)
+                            RecognitionTokens(result.tokens, result.timestamps)
+                        } finally { stream.release() }
+                }, onBatch = onBatch)
             } finally { vad.release() }
         } finally { recognizer.release() }
     }
