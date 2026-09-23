@@ -166,16 +166,20 @@ internal fun ReaderChapterListRow(
     val isCurrentEInkRow = eInkMode && row.isCurrent
     val currentRowColor = when {
         isCurrentEInkRow -> MaterialTheme.colorScheme.onSurface
-        row.isCurrent -> hoshiSurfaces.nested
+        row.isCurrent -> MaterialTheme.colorScheme.secondaryContainer
         else -> Color.Transparent
     }
     val rowContentColor = if (isCurrentEInkRow) {
         MaterialTheme.colorScheme.surface
+    } else if (row.isCurrent) {
+        MaterialTheme.colorScheme.onSecondaryContainer
     } else {
         MaterialTheme.colorScheme.onSurface
     }
     val rowMetaColor = if (isCurrentEInkRow) {
         MaterialTheme.colorScheme.surface
+    } else if (row.isCurrent) {
+        MaterialTheme.colorScheme.onSecondaryContainer
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
