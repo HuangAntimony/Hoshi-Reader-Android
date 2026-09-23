@@ -8,7 +8,7 @@ import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSessions
 import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import java.io.File
 
@@ -59,7 +59,7 @@ internal class ReaderRouteStateHolder(
         state: ReaderRouteLoadState.Ready,
         chapterIndex: Int,
         progress: Double,
-        statistics: List<ReadingStatistics>? = null,
+        statistics: ReadingSessions? = null,
         onBookmarkSaved: () -> Unit,
     ) {
         withContext(ioDispatcher) {
@@ -71,7 +71,7 @@ internal class ReaderRouteStateHolder(
             )
             repository.saveBookmark(state.bookRoot, bookmark)
             if (statistics != null) {
-                repository.saveTrackedStatistics(state.bookRoot, statistics)
+                repository.saveTrackedSessions(state.bookRoot, statistics)
             }
         }
         onBookmarkSaved()

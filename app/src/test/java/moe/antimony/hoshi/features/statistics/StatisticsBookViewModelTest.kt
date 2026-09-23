@@ -6,7 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSession
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -23,16 +23,16 @@ class StatisticsBookViewModelTest {
         assertEquals("2", model.uiState.value.draft?.minutes)
         model.changeDraft { it.copy(characters = "1500") }
         repository.failWrites = true
-        model.saveDay()
+        model.saveSession()
         runCurrent()
         assertEquals("1500", model.uiState.value.draft?.characters)
         assertNotNull(model.uiState.value.error)
         repository.failWrites = false
-        model.saveDay()
+        model.saveSession()
         runCurrent()
         assertNull(model.uiState.value.draft)
-        assertEquals(1500, model.uiState.value.book!!.statistics.single().charactersRead)
-        assertEquals(3720.0, model.uiState.value.book!!.statistics.single().readingTime, 0.0)
+        assertEquals(1500, model.uiState.value.book!!.sessions.values.single().value!!.charactersRead)
+        assertEquals(3690.0, model.uiState.value.book!!.sessions.values.single().value!!.readingTime, 0.0)
     }
 
     @Test
@@ -44,16 +44,16 @@ class StatisticsBookViewModelTest {
         model.edit("2026-09-17")
         model.changeDraft { it.copy(characters = "") }
         repository.failWrites = true
-        model.deleteDay("2026-09-17")
+        model.deleteSession("2026-09-17")
         runCurrent()
         assertEquals("", model.uiState.value.draft?.characters)
-        assertEquals(1, model.uiState.value.book!!.statistics.size)
+        assertEquals(1, model.uiState.value.book!!.sessions.size)
         assertNotNull(model.uiState.value.error)
         repository.failWrites = false
-        model.deleteDay("2026-09-17")
+        model.deleteSession("2026-09-17")
         runCurrent()
         assertNull(model.uiState.value.draft)
-        assertTrue(model.uiState.value.book!!.statistics.isEmpty())
+        assertTrue(model.uiState.value.book!!.sessions.values.all { it.value == null })
         assertFalse(model.uiState.value.closeRequested)
     }
 
@@ -64,10 +64,10 @@ class StatisticsBookViewModelTest {
         model.load("book")
         runCurrent()
         model.edit("2026-09-17")
-        model.deleteDay("2026-09-17")
+        model.deleteSession("2026-09-17")
         runCurrent()
         assertNull(model.uiState.value.draft)
-        assertTrue(model.uiState.value.closeRequested)
+        assertFalse(model.uiState.value.closeRequested)
     }
 
     @Test
@@ -86,28 +86,28 @@ class StatisticsBookViewModelTest {
         model.edit("2026-09-17")
         model.changeDraft { it.copy(characters = "777") }
         model.cancelEdit()
-        assertEquals(1000, repository.storedBook!!.statistics.single().charactersRead)
+        assertEquals(1000, repository.storedBook!!.sessions.values.single().value!!.charactersRead)
         assertNull(model.uiState.value.draft)
         model.load("book")
         runCurrent()
         model.edit("2026-09-17")
         model.changeDraft { it.copy(characters = "2000") }
-        model.saveDay()
+        model.saveSession()
         runCurrent()
         staleLoad.complete(book())
         runCurrent()
-        assertEquals(2000, model.uiState.value.book!!.statistics.single().charactersRead)
+        assertEquals(2000, model.uiState.value.book!!.sessions.values.single().value!!.charactersRead)
     }
 
     @Test
     fun invalidAndOverflowingDraftsCannotBeSaved() {
-        assertFalse(StatisticsDayDraft("2026-09-17", "-1", "1", "0").canSave)
-        assertFalse(StatisticsDayDraft("2026-09-17", "100", "1", "60").canSave)
-        assertFalse(StatisticsDayDraft("2026-09-17", "100", "2147483647", "0").canSave)
-        assertTrue(StatisticsDayDraft("2026-09-17", "0", "0", "0").canSave)
+        assertFalse(StatisticsSessionDraft("2026-09-17", 0, "-1", "1", "0").canSave)
+        assertFalse(StatisticsSessionDraft("2026-09-17", 0, "100", "1", "60").canSave)
+        assertFalse(StatisticsSessionDraft("2026-09-17", 0, "100", "2147483647", "0").canSave)
+        assertTrue(StatisticsSessionDraft("2026-09-17", 0, "0", "0", "0").canSave)
     }
 
-    private fun book() = StatisticsBookRecords("book", "Book", false, listOf(
-        ReadingStatistics("Book", "2026-09-17", charactersRead = 1000, readingTime = 3690.0),
+    private fun book() = StatisticsBookRecords("book", "Book", false, mapOf(
+        "2026-09-17" to moe.antimony.hoshi.features.sync.Timestamped<ReadingSession?>(1, ReadingSession(0, 3690000, charactersRead = 1000, readingTime = 3690.0)),
     ))
 }

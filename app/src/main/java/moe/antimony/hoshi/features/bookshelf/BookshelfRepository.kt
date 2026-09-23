@@ -398,7 +398,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
         if (syncStats) {
             remote.syncFiles.statistics?.let { file ->
                 val stats = remoteJson.decodeFromString(ListSerializer(moe.antimony.hoshi.epub.ReadingStatistics.serializer()), drive.downloadFile(file.id).decodeToString())
-                bookRepository.saveStatistics(entry.root, stats)
+                bookRepository.statisticsStore.importHistory(entry.root, stats)
             }
         }
         if (syncAudioBook) {

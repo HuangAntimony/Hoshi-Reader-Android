@@ -898,4 +898,5 @@
     <string name="sasayaki_transcription_light_description">Uses fewer resources, with slower transcription.</string>
     <string name="sasayaki_transcription_balanced_description">Balances transcription speed and everyday use.</string>
     <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
+    <string name="statistics_sessions_heading">Sessions</string>
 </resources>

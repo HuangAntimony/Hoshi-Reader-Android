@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,6 +41,7 @@ internal class StatisticsViewModel internal constructor(
         readerSettingsRepository: ReaderSettingsRepository,
         dateProvider: StatisticsDateProvider,
         @DefaultDispatcher calculationDispatcher: CoroutineDispatcher,
+        statisticsStore: moe.antimony.hoshi.epub.BookStatisticsStore,
     ) : this(
         repository = repository,
         settings = settingsRepository.settings,
@@ -48,7 +50,12 @@ internal class StatisticsViewModel internal constructor(
         dateProvider = dateProvider,
         calculationDispatcher = calculationDispatcher,
         coroutineScope = null,
-    )
+    ) {
+        scope.launch {
+            combine(statisticsStore.changes, readerSettingsRepository.settings.map { it.statisticsResetMinutes }.distinctUntilChanged()) { revision, reset -> revision to reset }
+                .collect { reload() }
+        }
+    }
 
     private val scope: CoroutineScope
         get() = coroutineScope ?: viewModelScope

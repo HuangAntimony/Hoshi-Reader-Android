@@ -60,7 +60,7 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.HighlightColor
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSessions
 import moe.antimony.hoshi.epub.ReaderHighlight
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
@@ -115,7 +115,7 @@ fun ReaderWebView(
     readerSettings: ReaderSettings = ReaderSettings(),
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit = {},
     onReaderKeyEventHandlerChange: (((KeyEvent) -> Boolean)?) -> Unit = {},
-    onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: List<ReadingStatistics>?) -> Unit = { _, _, _ -> },
+    onSaveBookmark: (chapterIndex: Int, progress: Double, statistics: ReadingSessions?) -> Unit = { _, _, _ -> },
     onFlushAutoSyncExport: () -> Unit = {},
     onForegroundAutoSyncImport: () -> Unit = {},
     onTextSelected: (ReaderSelectionData) -> Int? = { null },
@@ -351,12 +351,12 @@ fun ReaderWebView(
     val focusMode = stateHolder.focusMode
     val sasayakiWasPausedByLookup = stateHolder.sasayakiWasPausedByLookup
     var persistedStatistics by remember(bookRoot) {
-        mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
+        mutableStateOf<ReadingSessions?>(if (bookRoot == null) emptyMap() else null)
     }
     var statisticsLoadFailed by remember(bookRoot) { mutableStateOf(false) }
     LaunchedEffect(bookRoot, bookRepository) {
         try {
-            persistedStatistics = if (bookRoot != null) bookRepository.loadStatistics(bookRoot) else emptyList()
+            persistedStatistics = if (bookRoot != null) bookRepository.loadSessions(bookRoot) else emptyMap()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -367,19 +367,28 @@ fun ReaderWebView(
     val statisticsTracker = remember(
         bookRoot,
         book.title,
-        effectiveSettings.statisticsResetMinutes,
         persistedStatistics,
     ) {
         persistedStatistics?.let { statistics ->
             ReaderStatisticsTracker(
-                title = book.title,
                 initialStatistics = statistics,
                 resetMinutes = effectiveSettings.statisticsResetMinutes,
-                dateProvider = statisticsDateProvider,
             )
         }
     }
     var statisticsState by remember(statisticsTracker) { mutableStateOf(statisticsTracker?.state) }
+    LaunchedEffect(statisticsTracker, effectiveSettings.statisticsResetMinutes) {
+        statisticsTracker?.resetMinutes = effectiveSettings.statisticsResetMinutes
+        statisticsState = statisticsTracker?.state
+    }
+    LaunchedEffect(statisticsTracker, bookRoot) {
+        if (bookRoot != null && statisticsTracker != null) {
+            bookRepository.statisticsStore.changes.collect {
+                statisticsTracker.applySessions(bookRepository.loadSessions(bookRoot))
+                statisticsState = statisticsTracker.state
+            }
+        }
+    }
     var resumeStatisticsTrackingOnStart by remember(statisticsTracker) { mutableStateOf(false) }
     fun currentDisplayedCharacter(): Int =
         book.characterCountAt(
@@ -406,11 +415,11 @@ fun ReaderWebView(
         statisticsTracker?.resetBaseline(currentDisplayedCharacter())
         syncStatisticsState()
     }
-    fun statisticsForSave(): List<ReadingStatistics>? {
+    fun statisticsForSave(): ReadingSessions? {
         recordStatisticsAtDisplayedPosition()
         return statisticsTracker?.statisticsForPersistenceOrNull()
     }
-    fun saveReaderPosition(position: ReaderChapterPosition, statistics: List<ReadingStatistics>? = statisticsForSave()) {
+    fun saveReaderPosition(position: ReaderChapterPosition, statistics: ReadingSessions? = statisticsForSave()) {
         onSaveBookmark(position.index, position.progress, statistics)
     }
     fun saveCurrentDisplayedPosition() {
@@ -1018,7 +1027,7 @@ fun ReaderWebView(
             forwardTargetCharacter = stateHolder.forwardTargetPosition?.let { book.characterCountAt(it.index, it.progress) },
             statistics = statisticsState?.session?.let {
                 ReaderStatisticsChromeState(
-                    readingSpeed = it.lastReadingSpeed,
+                    readingSpeed = it.readingSpeed,
                     readingTimeSeconds = it.readingTime,
                 )
             },
@@ -2150,10 +2159,10 @@ private fun SasayakiMatch.toCueRange(): SasayakiCueRange =
     SasayakiCueRange(id = id, start = start, length = length)
 
 internal fun readerSasayakiChapterLoadPosition(
-    saveStatistics: () -> List<ReadingStatistics>?,
+    saveStatistics: () -> ReadingSessions?,
     jumpToTarget: () -> ReaderChapterPosition,
     resetStatisticsBaseline: () -> Unit,
-    saveReaderPosition: (ReaderChapterPosition, List<ReadingStatistics>?) -> Unit,
+    saveReaderPosition: (ReaderChapterPosition, ReadingSessions?) -> Unit,
 ): ReaderChapterPosition {
     val statistics = saveStatistics()
     val savedPosition = jumpToTarget()

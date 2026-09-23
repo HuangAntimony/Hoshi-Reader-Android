@@ -236,15 +236,17 @@ class BookRepository private constructor(
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
     }
 
-    override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
+    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
         statisticsStore.load(bookRoot).orEmpty()
 
     suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
         statisticsStore.save(bookRoot, statistics)
     }
 
-    override suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
-        statisticsStore.saveTrackedDays(bookRoot, statistics)
+    override suspend fun loadSessions(bookRoot: File): ReadingSessions = statisticsStore.loadSessions(bookRoot)
+
+    override suspend fun saveTrackedSessions(bookRoot: File, sessions: ReadingSessions) {
+        for ((id, change) in sessions) statisticsStore.saveTrackedSession(bookRoot, id, change.value!!)
     }
 
     suspend fun updateStatistics(bookRoot: File, transform: (List<ReadingStatistics>) -> List<ReadingStatistics>) {
@@ -449,8 +451,8 @@ interface ReaderRouteBookRepository {
     suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
     suspend fun loadBookmark(bookRoot: File): Bookmark?
     suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
-    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics>
-    suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>)
+    suspend fun loadSessions(bookRoot: File): ReadingSessions
+    suspend fun saveTrackedSessions(bookRoot: File, sessions: ReadingSessions)
     suspend fun loadReaderBookInfo(bookRoot: File): BookInfo?
     suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
     fun currentAppleReferenceDateSeconds(): Double

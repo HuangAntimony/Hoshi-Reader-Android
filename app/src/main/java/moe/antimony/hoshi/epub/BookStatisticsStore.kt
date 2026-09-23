@@ -3,19 +3,30 @@ package moe.antimony.hoshi.epub
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.File
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
+import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
+import moe.antimony.hoshi.features.sync.SyncBook
+import moe.antimony.hoshi.features.sync.StatisticsSyncMode
+import moe.antimony.hoshi.features.sync.Timestamped
+import moe.antimony.hoshi.features.sync.TtuStatistics
 
 internal const val STATISTICS_ARCHIVE_DIRECTORY = "statistics_archive"
 
@@ -24,7 +35,8 @@ internal data class StoredBookStatistics(
     val metadata: BookMetadata,
     val isArchived: Boolean,
     val coverPath: String?,
-    val statistics: List<ReadingStatistics>,
+    val sessions: ReadingSessions,
+    val days: List<StatisticsDay>,
 )
 
 internal data class StoredStatisticsSnapshot(
@@ -32,79 +44,109 @@ internal data class StoredStatisticsSnapshot(
     val corruptBookIds: Set<String>,
 )
 
-/** One serialization boundary for reader sidecars, editor mutations and deletion archives. */
 @Singleton
-class BookStatisticsStore @Inject constructor(
-    @param:FilesDir private val filesDir: File,
-    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+class BookStatisticsStore private constructor(
+    private val filesDir: File,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val resetMinutes: suspend () -> Int,
 ) {
+    @Inject constructor(
+        @FilesDir filesDir: File,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        settings: ReaderSettingsRepository,
+    ) : this(filesDir, ioDispatcher, { settings.settings.first().statisticsResetMinutes })
+
+    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(filesDir, ioDispatcher, { 0 })
+
     private val mutex = Mutex()
-    // Only protects queued in-process Reader writes; no persisted or sync tombstones.
-    private val locallyDeletedDays = mutableMapOf<Pair<String, String>, Long>()
-    private val locallyClearedBooks = mutableMapOf<String, Long>()
+    private var resetTime = 0
     private val booksDirectory get() = filesDir.resolve("Books")
     private val archiveDirectory get() = booksDirectory.resolve(STATISTICS_ARCHIVE_DIRECTORY)
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false; prettyPrint = true }
-    private val serializer = ListSerializer(ReadingStatistics.serializer())
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
+    private val serializer = MapSerializer(String.serializer(), Timestamped.serializer(ReadingSession.serializer().nullable))
+    private val revision = MutableStateFlow(0)
+    val changes = revision.asStateFlow()
+    var onSave: (suspend (String, ReadingSessions) -> Unit)? = null
 
-    suspend fun load(bookRoot: File): List<ReadingStatistics>? = locked { readStatistics(bookRoot) }
+    suspend fun loadSessions(bookRoot: File): ReadingSessions = locked { readSessions(bookRoot) }
 
-    suspend fun save(bookRoot: File, statistics: List<ReadingStatistics>) = locked {
-        // Never silently replace corrupt history with a reader's empty fallback.
-        readStatistics(bookRoot)
-        writeStatistics(bookRoot, statistics)
+    suspend fun applySessions(bookRoot: File, sessions: ReadingSessions) = locked {
+        if (readSessions(bookRoot) != sessions) writeSessions(bookRoot, sessions)
     }
 
-    suspend fun update(bookRoot: File, transform: (List<ReadingStatistics>) -> List<ReadingStatistics>) = locked {
-        check(bookRoot.isDirectory) { "The book no longer exists." }
-        writeStatistics(bookRoot, transform(readStatistics(bookRoot).orEmpty()))
+    suspend fun saveSessions(bookRoot: File, sessions: ReadingSessions) {
+        locked { writeSessions(bookRoot, sessions) }
+        onSave?.invoke(bookRoot.name, sessions)
     }
 
-    suspend fun saveTrackedDays(bookRoot: File, changedDays: List<ReadingStatistics>) = locked {
-        if (!bookRoot.isDirectory) return@locked
-        val folder = bookRoot.name.normalizedBookFolder()
-        val accepted = changedDays.filter {
-            it.lastStatisticModified > maxOf(
-                locallyDeletedDays[folder to it.dateKey] ?: Long.MIN_VALUE,
-                locallyClearedBooks[folder] ?: Long.MIN_VALUE,
-            )
+    suspend fun saveTrackedSession(bookRoot: File, id: String, session: ReadingSession): ReadingSessions {
+        var changed = false
+        val sessions = locked {
+            val root = activeRoot(bookRoot.name).takeIf { it.isDirectory } ?: archiveRoot(bookRoot.name)
+            val stored = readSessions(root)
+            if (stored[id]?.let { it.value == null } == true || !session.hasActivity || stored[id]?.value == session) {
+                stored
+            } else {
+                (stored + (id to Timestamped<ReadingSession?>(System.currentTimeMillis(), session))).also { writeSessions(root, it); changed = true }
+            }
         }
-        writeStatistics(bookRoot, (readStatistics(bookRoot).orEmpty() + accepted).deduplicateReadingStatistics())
+        if (changed) onSave?.invoke(bookRoot.name, sessions)
+        return sessions
+    }
+
+    suspend fun load(bookRoot: File): List<ReadingStatistics> = locked {
+        TtuStatistics.export(readSessions(bookRoot), readMetadata(bookRoot).displayTitle, resetTime)
+    }
+
+    suspend fun save(bookRoot: File, statistics: List<ReadingStatistics>) = importHistory(bookRoot, statistics, StatisticsSyncMode.Replace)
+
+    suspend fun importHistory(bookRoot: File, statistics: List<ReadingStatistics>, mode: StatisticsSyncMode = StatisticsSyncMode.Merge) {
+        var changed = false
+        val sessions = locked {
+            val stored = readSessions(bookRoot)
+            TtuStatistics.importHistory(statistics, stored, bookRoot.name, resetTime, mode).also {
+                if (it != stored) { writeSessions(bookRoot, it); changed = true }
+            }
+        }
+        if (changed) onSave?.invoke(bookRoot.name, sessions)
+    }
+
+    suspend fun update(bookRoot: File, transform: (List<ReadingStatistics>) -> List<ReadingStatistics>) {
+        val sessions = locked {
+            val stored = readSessions(bookRoot)
+            val daily = TtuStatistics.export(stored, readMetadata(bookRoot).displayTitle, resetTime)
+            TtuStatistics.importHistory(transform(daily), stored, bookRoot.name, resetTime).also {
+                if (it != stored) writeSessions(bookRoot, it)
+            }
+        }
+        onSave?.invoke(bookRoot.name, sessions)
     }
 
     internal suspend fun archiveAndDelete(bookRoot: File, delete: suspend () -> Unit) = locked {
-        require(bookRoot.canonicalFile.parentFile == booksDirectory.canonicalFile && bookRoot.name != STATISTICS_ARCHIVE_DIRECTORY) {
-            "Unsafe book directory."
-        }
         archive(bookRoot)
         delete()
     }
 
+    suspend fun archiveBook(bookRoot: File) = locked { archive(bookRoot) }
+
     private fun archive(bookRoot: File) {
-        val statistics = readStatistics(bookRoot).orEmpty().filter { it.hasActivity }
-        if (statistics.isEmpty()) return
         val metadata = readMetadata(bookRoot)
         val destination = archiveRoot(bookRoot.name)
-        val merged = (readStatistics(destination).orEmpty() + statistics).deduplicateReadingStatistics().filter { it.hasActivity }
-        val cover = runCatching { writeArchivedCover(bookRoot, metadata, destination) }.getOrNull()
+        val merged = SyncBook.mergeRecords(readSessions(bookRoot), readSessions(destination))
+        val cover = if (merged.values.any { it.value != null }) runCatching { writeArchivedCover(bookRoot, metadata, destination) }.getOrNull() else null
         val archivedMetadata = metadata.copy(
-            title = metadata.displayTitle.ifBlank { bookRoot.name },
-            renamedTitle = null,
-            folder = destination.name,
-            cover = cover,
-            epub = null,
+            title = metadata.displayTitle.ifBlank { bookRoot.name }, renamedTitle = null,
+            folder = destination.name, cover = cover, epub = null, shelves = null,
         )
         atomicWrite(destination.resolve("metadata.json"), json.encodeToString(BookMetadata.serializer(), archivedMetadata))
-        writeStatistics(destination, merged)
+        writeSessions(destination, merged)
     }
 
-    /** Called only after an import has finished writing its external sidecars. */
     suspend fun restore(folder: String) = locked {
         val active = activeRoot(folder)
         val archived = archiveRoot(folder)
         if (!active.isDirectory || !archived.isDirectory) return@locked
-        val merged = (readStatistics(active).orEmpty() + readStatistics(archived).orEmpty()).deduplicateReadingStatistics()
-        writeStatistics(active, merged)
+        writeSessions(active, SyncBook.mergeRecords(readSessions(active), readSessions(archived)))
         removeArchive(archived)
     }
 
@@ -121,8 +163,7 @@ class BookStatisticsStore @Inject constructor(
             try {
                 val metadata = readMetadata(root)
                 id = metadata.id
-                val days = readCoalesced(folder).filter { it.hasActivity }
-                StoredBookStatistics(folder, metadata, folder !in activeRoots, resolveCover(root, metadata.cover)?.absolutePath, days)
+                storedBook(folder, root, metadata, folder !in activeRoots)
             } catch (_: Exception) {
                 corrupt += id
                 null
@@ -135,62 +176,64 @@ class BookStatisticsStore @Inject constructor(
         val active = activeRoot(folder)
         val archived = archiveRoot(folder)
         val root = active.takeIf { it.isDirectory } ?: archived.takeIf { it.isDirectory } ?: return@locked null
-        val metadata = readMetadata(root)
-        StoredBookStatistics(folder, metadata, root == archived, resolveCover(root, metadata.cover)?.absolutePath, readCoalesced(folder).filter { it.hasActivity })
+        storedBook(folder, root, readMetadata(root), root == archived)
     }
 
-    suspend fun updateDay(folder: String, dateKey: String, characters: Int, totalMinutes: Int) = mutate(folder) { records ->
-        check(records.any { it.dateKey == dateKey }) { "The reading day no longer exists." }
-        records.map { if (it.dateKey == dateKey) it.updated(characters, totalMinutes.coerceAtLeast(0).toDouble() * 60.0) else it }
+    private fun storedBook(folder: String, root: File, metadata: BookMetadata, archived: Boolean): StoredBookStatistics {
+        val sessions = readCoalesced(folder)
+        return StoredBookStatistics(folder, metadata, archived, resolveCover(root, metadata.cover)?.absolutePath,
+            sessions, StatisticsDay.grouped(sessions, resetTime).filter { it.total.charactersRead > 0 || it.total.readingTime > 0 })
     }
 
-    suspend fun deleteDay(folder: String, dateKey: String) = mutate(folder) { records -> records.filterNot { it.dateKey == dateKey } }
+    suspend fun edit(id: String, folder: String, characters: Int?, readingTime: Double?) = mutate(folder) { sessions ->
+        val stored = sessions[id]?.value ?: return@mutate sessions
+        val changed = stored.copy(charactersRead = characters ?: stored.charactersRead, readingTime = readingTime ?: stored.readingTime)
+        if (changed == stored) sessions else sessions + (id to Timestamped(System.currentTimeMillis(), changed))
+    }
 
-    suspend fun deleteAll(folder: String) = mutate(folder, clearAll = true) { emptyList() }
+    suspend fun delete(ids: Collection<String>, folder: String) = mutate(folder) { sessions ->
+        sessions.toMutableMap().apply {
+            ids.filter { this[it]?.value != null }.forEach { this[it] = Timestamped(System.currentTimeMillis(), null) }
+        }
+    }
 
     suspend fun loadArchiveSummary(): Int = locked {
         archiveDirectory.listFiles().orEmpty().count { root ->
-            root.isDirectory && !root.name.startsWith('.') && runCatching {
-                readMetadata(root)
-                readStatistics(root).orEmpty().any { it.hasActivity }
-            }.getOrDefault(false)
+            root.isDirectory && !root.name.startsWith('.') && runCatching { readSessions(root).values.any { it.value != null } }.getOrDefault(false)
         }
     }
 
-    suspend fun clearArchive() = locked {
-        if (archiveDirectory.exists()) check(archiveDirectory.deleteRecursively()) { "Unable to clear the statistics archive." }
+    suspend fun clearArchive() {
+        val folders = locked { archiveDirectory.listFiles().orEmpty().filter { it.isDirectory }.map { it.name } }
+        for (folder in folders) {
+            val ids = locked { runCatching { readSessions(archiveRoot(folder)).keys }.getOrNull() } ?: continue
+            delete(ids, folder)
+        }
     }
 
-    private suspend fun mutate(folder: String, clearAll: Boolean = false, transform: (List<ReadingStatistics>) -> List<ReadingStatistics>) = locked {
-        val active = activeRoot(folder)
-        val archived = archiveRoot(folder)
-        val root = active.takeIf { it.isDirectory } ?: archived.takeIf { it.isDirectory }
-            ?: error("The statistics book no longer exists.")
-        val original = readCoalesced(folder)
-        val records = transform(original).deduplicateReadingStatistics().filter { it.hasActivity }
-        if (root == archived && records.isEmpty()) {
-            removeArchive(archived)
-        } else {
-            writeStatistics(root, records)
-            // A previous interrupted restore must not resurrect an edited or deleted day.
-            if (root == active && archived.exists()) removeArchive(archived)
+    private suspend fun mutate(folder: String, transform: (ReadingSessions) -> ReadingSessions) {
+        val records = locked {
+            val active = activeRoot(folder)
+            val root = active.takeIf { it.isDirectory } ?: archiveRoot(folder)
+            val stored = readCoalesced(folder)
+            transform(stored).also { records ->
+                if (records != stored) writeSessions(root, records)
+                if (root == active && archiveRoot(folder).exists()) removeArchive(archiveRoot(folder))
+            }
         }
-        val modified = System.currentTimeMillis()
-        val remainingDates = records.mapTo(hashSetOf()) { it.dateKey }
-        original.filterNot { it.dateKey in remainingDates }.forEach {
-            locallyDeletedDays[folder.normalizedBookFolder() to it.dateKey] = modified
-        }
-        if (clearAll) locallyClearedBooks[folder.normalizedBookFolder()] = modified
+        onSave?.invoke(folder, records)
     }
 
-    private fun readCoalesced(folder: String): List<ReadingStatistics> =
-        (readStatistics(activeRoot(folder)).orEmpty() + readStatistics(archiveRoot(folder)).orEmpty()).deduplicateReadingStatistics()
+    private fun readCoalesced(folder: String): ReadingSessions =
+        SyncBook.mergeRecords(readSessions(activeRoot(folder)), readSessions(archiveRoot(folder)))
 
-    private fun readStatistics(root: File): List<ReadingStatistics>? {
+    private fun readSessions(root: File): ReadingSessions {
         val file = root.resolve("statistics.json")
-        if (!file.exists()) return null
-        if (!file.isFile) throw IOException("Statistics sidecar is not a file.")
-        return json.decodeFromString(serializer, file.readText()).deduplicateReadingStatistics()
+        if (!file.exists()) return emptyMap()
+        val element = json.parseToJsonElement(file.readText())
+        if (element !is JsonArray) return json.decodeFromJsonElement(serializer, element)
+        val daily = json.decodeFromJsonElement(ListSerializer(ReadingStatistics.serializer()), element)
+        return TtuStatistics.legacySessions(daily, root.name, resetTime).also { writeSessions(root, it) }
     }
 
     private fun readMetadata(root: File): BookMetadata {
@@ -199,8 +242,11 @@ class BookStatisticsStore @Inject constructor(
             BookMetadata(root.name, root.name, null, root.name, 0.0)
     }
 
-    private fun writeStatistics(root: File, statistics: List<ReadingStatistics>) =
-        atomicWrite(root.resolve("statistics.json"), json.encodeToString(serializer, statistics.deduplicateReadingStatistics()))
+    private fun writeSessions(root: File, sessions: ReadingSessions) {
+        atomicWrite(root.resolve("statistics.json"), json.encodeToString(serializer, sessions))
+        if (root.parentFile == archiveDirectory && sessions.values.all { it.value == null }) root.resolve("cover.jpg").delete()
+        revision.value += 1
+    }
 
     private fun atomicWrite(file: File, contents: String) {
         val parent = requireNotNull(file.parentFile)
@@ -269,6 +315,7 @@ class BookStatisticsStore @Inject constructor(
     private suspend fun <T> locked(block: suspend () -> T): T = withContext(ioDispatcher) {
         mutex.withLock {
             migrateReservedStatisticsBook(booksDirectory)
+            resetTime = resetMinutes()
             block()
         }
     }

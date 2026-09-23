@@ -305,7 +305,7 @@ class ReaderWebViewStateHolderTest {
     @Test
     fun sasayakiChapterLoadResetsStatisticsBaselineAfterSavingHiddenJumpTarget() {
         val events = mutableListOf<String>()
-        val statistics = listOf(ReadingStatistics(title = "Book", dateKey = "2026-06-24", charactersRead = 12))
+        val statistics = mapOf("session" to moe.antimony.hoshi.features.sync.Timestamped<moe.antimony.hoshi.epub.ReadingSession?>(1, moe.antimony.hoshi.epub.ReadingSession(0, 1, 12)))
         val target = ReaderChapterPosition(index = 3, progress = 0.75)
 
         val saved = readerSasayakiChapterLoadPosition(
@@ -321,7 +321,7 @@ class ReaderWebViewStateHolderTest {
                 events += "reset"
             },
             saveReaderPosition = { position, savedStatistics ->
-                events += "save ${position.index}:${position.progress} ${savedStatistics?.single()?.charactersRead}"
+                events += "save ${position.index}:${position.progress} ${savedStatistics?.values?.single()?.value?.charactersRead}"
             },
         )
 

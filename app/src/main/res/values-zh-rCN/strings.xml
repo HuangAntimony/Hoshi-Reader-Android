@@ -896,4 +896,5 @@
     <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
+    <string name="statistics_sessions_heading">阅读记录</string>
 </resources>

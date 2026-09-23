@@ -27,7 +27,7 @@ class SyncManagerTest {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
         repository.saveBookmark(entry.root, Bookmark(0, 0.1, 10, TtuSyncRules.unixMillisToAppleReferenceSeconds(1_000)))
-        repository.saveStatistics(
+        repository.statisticsStore.importHistory(
             entry.root,
             listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100)),
         )
@@ -60,7 +60,7 @@ class SyncManagerTest {
         assertEquals(120, repository.loadStatistics(entry.root).single().charactersRead)
         assertEquals(
             SasayakiPlaybackData(lastPosition = 88.5, delay = 0.2, rate = 1.5f, audioUri = "content://audio"),
-            repository.loadSasayakiPlayback(entry.root),
+            repository.loadSasayakiPlayback(entry.root)?.copy(modified = null),
         )
     }
 
@@ -73,7 +73,7 @@ class SyncManagerTest {
             ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100),
         )
         repository.saveBookmark(entry.root, originalBookmark)
-        repository.saveStatistics(entry.root, originalStats)
+        repository.statisticsStore.importHistory(entry.root, originalStats)
         val drive = FakeDriveSyncDataSource(
             progress = TtuProgress(7, 150, 0.5, 2_000),
             statistics = listOf(
@@ -105,7 +105,7 @@ class SyncManagerTest {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
         repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
-        repository.saveStatistics(
+        repository.statisticsStore.importHistory(
             entry.root,
             listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 220, lastStatisticModified = 200)),
         )
@@ -139,7 +139,7 @@ class SyncManagerTest {
         val entry = repository.createEntry()
         val originalBookmark = Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321))
         repository.saveBookmark(entry.root, originalBookmark)
-        repository.saveStatistics(
+        repository.statisticsStore.importHistory(
             entry.root,
             listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 220, lastStatisticModified = 200)),
         )
@@ -335,7 +335,7 @@ class SyncManagerTest {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
         repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
-        repository.saveStatistics(
+        repository.statisticsStore.importHistory(
             entry.root,
             listOf(ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 220, lastStatisticModified = 200)),
         )

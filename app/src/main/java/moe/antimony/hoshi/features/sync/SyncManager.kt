@@ -188,9 +188,7 @@ class SyncManager private constructor(
 
         importProgress(entry, progress)
         if (syncStats) {
-            bookRepository.updateStatistics(entry.root) { localStats ->
-                TtuSyncRules.mergeStatistics(localStats, remoteStats, statsSyncMode).ifEmpty { localStats }
-            }
+            bookRepository.statisticsStore.importHistory(entry.root, remoteStats, statsSyncMode)
         }
         if (remoteAudioBook != null) {
             importAudioBook(entry, remoteAudioBook)
