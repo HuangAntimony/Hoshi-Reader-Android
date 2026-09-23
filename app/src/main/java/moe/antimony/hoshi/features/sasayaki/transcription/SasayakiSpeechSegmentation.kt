@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki.transcription
 
-internal const val SPEECH_LEAD_SAMPLES = 8_000L
+internal const val SPEECH_LEAD_SAMPLES = 16_000L
+internal const val SPEECH_CONTINUATION_LEAD_SAMPLES = 8_000L
 internal const val SPEECH_TAIL_SAMPLES = 4_000L
 
 internal data class SpeechBounds(val start: Long, val end: Long, val hardCut: Boolean = false) {

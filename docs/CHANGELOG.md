@@ -20,8 +20,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   including partial results; preserve multiline subtitles when importing.
   Show current match coverage and export together above both matching tabs.
   Support M4A audio and show matched character coverage for both subtitles and transcription.
-  Preserve word beginnings at audio segment boundaries and recover short missing
-  word fragments when matching existing transcripts. Improve matching of short
+  Preserve more sentence-opening audio at segment boundaries to reduce missing
+  words and sentences, and recover short missing word fragments when matching
+  existing transcripts. Improve matching of short
   kana/kanji rewrites and recognition errors around confirmed text, preserve
   recognized prefixes after pauses, and keep unspoken replies unmatched.
   Match new transcription automatically while reading, preserving playback,

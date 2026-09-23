@@ -5,6 +5,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SasayakiSpeechPipelineTest {
+    @Test fun lateVadOnsetRetainsQuietSpeechPrefix() = runBlocking {
+        val inputs = mutableListOf<FloatArray>()
+        var windows = 0
+        val pipeline = SasayakiSpeechPipeline(0.0, 3.584, probability = {
+            val frame = windows++
+            if (frame in 0..31 || frame in 60..91) .9f else 0f
+        }, recognize = { samples ->
+            inputs += samples
+            RecognitionTokens(emptyArray(), floatArrayOf())
+        }, schedule = { work -> work(); Unit })
+        // The first utterance ends at 1.024 s. The next quiet prefix at 1.3 s
+        // precedes the VAD's 1.92 s onset, outside the old half-second context.
+        val audio = FloatArray(57_344)
+        audio.fill(.25f, 20_800, 21_120)
+        pipeline.accept(AudioSamples(0, audio))
+        pipeline.finish()
+        assertEquals(2, inputs.size)
+        assertTrue("The quiet prefix must reach recognition", inputs[1].any { it == .25f })
+    }
+
     @Test fun adjacentSilenceSegmentsDoNotDiscardNextWordPrefixAsOldContext() = runBlocking {
         val batches = mutableListOf<SasayakiTranscriptionBatch>()
         val inputStarts = mutableListOf<Float>()

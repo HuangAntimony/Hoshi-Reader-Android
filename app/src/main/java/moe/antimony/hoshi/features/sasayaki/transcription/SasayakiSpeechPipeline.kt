@@ -99,8 +99,12 @@ internal class SasayakiSpeechPipeline(
             // segment's scheduled silence. ASR may timestamp the new word at the
             // start of that context, causing it to be mistaken for an old token.
             // Trim only before new speech; hard cuts and in-speech resume retain
-            // their leading speech context and timestamp-based deduplication.
-            val start = if (bounds.start > scheduledThroughSample) maxOf(bounds.paddedStart, scheduledThroughSample) else bounds.paddedStart
+            // their half-second context and timestamp-based deduplication.
+            val start = if (bounds.start > scheduledThroughSample) {
+                maxOf(bounds.paddedStart, scheduledThroughSample)
+            } else {
+                (bounds.start - SPEECH_CONTINUATION_LEAD_SAMPLES).coerceAtLeast(0)
+            }
             val samples = history.read(start, end)
             // A normal silence boundary owns its trailing context, which can
             // contain the model's slightly delayed final token. Hard cuts must
