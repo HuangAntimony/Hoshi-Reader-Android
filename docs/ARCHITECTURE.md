@@ -522,6 +522,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   transcription matches are recognized by their chapter-offset cue IDs; this
   provenance selects the default matching tab without overriding a manual tab
   choice in the current Reader session. Transcript presence alone is not used.
+  A Reader-scoped subtitle export ViewModel snapshots either source through an
+  injected repository, which owns UTF-8 SRT cache files and SAF output I/O.
+  A Reader-owned launcher stays registered when the sheet closes, saving via
+  CreateDocument or sharing a temporary read-only FileProvider URI; a pending save retains its snapshot path in SavedStateHandle.
+  Exports contain matched text and original audio timestamps, without playback delay/rate
+  adjustments. Shared snapshots use separate cache paths and expire after seven days on next export.
 - The Reader-route Hilt ViewModel exposes transcription state and delivers
   match revisions during transcription even after the sheet closes. Reader coalesces
   match snapshots until lookup, image holds, and restoration finish. Data refreshes

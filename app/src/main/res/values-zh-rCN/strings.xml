@@ -711,7 +711,10 @@
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
     <string name="sasayaki_storage_select_audio">选择 .mp3、.m4b、.m4a 或 .opus 有声书</string>
-    <string name="sasayaki_subtitle_match">字幕匹配</string>
+    <string name="sasayaki_export_srt">导出 SRT</string>
+    <string name="sasayaki_srt_saved">SRT 文件已保存。</string>
+    <string name="sasayaki_srt_export_failed">无法导出字幕，请重试。</string>
+    <string name="sasayaki_current_match">当前匹配</string>
     <string name="sasayaki_no_subtitle_match">未匹配</string>
     <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
     <string name="sasayaki_unknown_chapter">章节</string>
@@ -866,7 +869,6 @@
     <string name="sasayaki_transcription_progress">正在转写并匹配…</string>
     <string name="sasayaki_transcription_paused">转写已暂停</string>
     <string name="sasayaki_transcription_complete">转写完成</string>
-    <string name="sasayaki_transcription_coverage">当前匹配覆盖率：%1$s</string>
     <string name="sasayaki_transcription_awaiting_download">等待确认下载</string>
     <string name="sasayaki_transcription_download_title">下载转写文件？</string>
     <string name="sasayaki_transcription_download_message">转写还需下载约 %1$d MiB 的文件（语音模型及运行组件），下载后可离线重复使用。音频不会上传。</string>
@@ -880,7 +882,6 @@
     <string name="sasayaki_transcription_clear_message">仅清除转写数据，保留当前匹配结果。</string>
     <string name="sasayaki_transcription_failed">无法转写或匹配此音频。请检查文件和网络连接后重试。</string>
     <string name="sasayaki_transcription_busy">正在转写另一本书。</string>
-    <string name="sasayaki_character_coverage">覆盖率：%1$s</string>
     <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
     <string name="about_ffmpeg_source">FFmpeg 源代码</string>
     <string name="about_transcription_license">转写组件许可证</string>

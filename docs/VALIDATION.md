@@ -71,6 +71,18 @@ For reader web asset changes, run the focused JavaScript tests:
 node --test app/src/test/js/*.test.mjs
 ```
 
+## Sasayaki Subtitle Export
+
+- From Resources, export the current match using both Subtitles and Transcription.
+  Save through the system document picker, cancel and retry, and open the system
+  share sheet without selecting a recipient. Verify UTF-8 text, cue times and
+  multiline text survive export/import. Only matched cues are exported.
+- During transcription, export a partial match without pausing or changing Reader
+  or playback position; later matches must not alter the already prepared file.
+  `SasayakiSrtTest` covers both-source rematching and timestamp rounding;
+  `SasayakiSubtitleExportTest` covers readable shared URIs, snapshot persistence,
+  picker cancellation, and save failure recovery using test-owned cache files.
+
 ## Device And Emulator Safety
 
 - Preserve app data by default.

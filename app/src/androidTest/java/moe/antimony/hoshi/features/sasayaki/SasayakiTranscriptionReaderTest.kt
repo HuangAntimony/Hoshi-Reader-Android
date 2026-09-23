@@ -142,7 +142,7 @@ class SasayakiTranscriptionReaderTest {
                     HoshiReaderTheme {
                         if (reader.visible.value) {
                             SasayakiTranscriptionSection(
-                                state = state, coverage = null, enabled = true,
+                                state = state, enabled = true,
                                 onStart = reader.model::start, onPause = reader.model::pause,
                                 onConfirmDownload = reader.model::confirmDownload,
                                 onRequestClear = reader.model::requestClear, onDismissClear = reader.model::dismissClear,

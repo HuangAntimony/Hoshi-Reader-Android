@@ -93,6 +93,8 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
 import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionViewModel
+import moe.antimony.hoshi.features.sasayaki.SasayakiSubtitleExportHost
+import moe.antimony.hoshi.features.sasayaki.SasayakiSubtitleExportViewModel
 import moe.antimony.hoshi.features.sasayaki.rememberSasayakiTranscriptionState
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchDependencies
 import moe.antimony.hoshi.features.sasayaki.sasayakiDefaultSheetTab
@@ -177,6 +179,8 @@ fun ReaderWebView(
     var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
     var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
     val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
+    val sasayakiSubtitleExportViewModel: SasayakiSubtitleExportViewModel = hiltViewModel()
+    SasayakiSubtitleExportHost(sasayakiSubtitleExportViewModel)
     val onSasayakiMatchUpdated: (SasayakiMatchData) -> Unit = { data ->
         sasayakiSheetMatchData = data
         pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = false)
@@ -2088,6 +2092,7 @@ fun ReaderWebView(
                 onSettingsChange = ::updateSasayakiSettings,
                 transcriptionState = sasayakiTranscriptionState,
                 transcriptionViewModel = sasayakiTranscriptionViewModel,
+                subtitleExportViewModel = sasayakiSubtitleExportViewModel,
                 onDismiss = stateHolder::dismissSasayaki,
             )
         }

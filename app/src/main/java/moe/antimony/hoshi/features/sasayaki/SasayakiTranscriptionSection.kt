@@ -74,7 +74,6 @@ internal fun SasayakiMatchModeControl(
 @Composable
 internal fun SasayakiTranscriptionSection(
     state: SasayakiTranscriptionUiState,
-    coverage: String?,
     enabled: Boolean,
     onStart: () -> Unit,
     onPause: () -> Unit,
@@ -131,13 +130,6 @@ internal fun SasayakiTranscriptionSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            coverage?.let {
-                Text(
-                    stringResource(R.string.sasayaki_transcription_coverage, it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             state.error?.let { error ->
                 Text(error.asString(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

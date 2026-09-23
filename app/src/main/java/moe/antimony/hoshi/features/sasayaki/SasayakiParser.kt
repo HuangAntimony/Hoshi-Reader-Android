@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 object SasayakiParser {
     fun parseCues(data: ByteArray): List<SasayakiCue> =
         String(data, StandardCharsets.UTF_8)
+            .removePrefix("\uFEFF")
             .replace("\r\n", "\n")
             .split("\n\n")
             .mapIndexedNotNull { index, block ->
@@ -16,7 +17,7 @@ object SasayakiParser {
                     id = index.toString(),
                     startTime = parseTimestamp(times[0]),
                     endTime = parseTimestamp(times[1]),
-                    text = lines[2].trim(),
+                    text = lines.drop(2).joinToString("\n").trim(),
                 )
             }
 

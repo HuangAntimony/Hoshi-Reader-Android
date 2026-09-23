@@ -115,6 +115,7 @@ internal fun SasayakiSheet(
     modifier: Modifier = Modifier,
     transcriptionState: SasayakiTranscriptionUiState,
     transcriptionViewModel: SasayakiTranscriptionViewModel,
+    subtitleExportViewModel: SasayakiSubtitleExportViewModel,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -197,6 +198,8 @@ internal fun SasayakiSheet(
                 )
                 when (selectedTab) {
                     SasayakiSheetTab.Resources -> SasayakiResourcesTab(
+                        bookTitle = bookTitle,
+                        subtitleExportViewModel = subtitleExportViewModel,
                         player = player,
                         settings = settings,
                         subtitleMatchData = subtitleMatchData,
@@ -524,6 +527,8 @@ private fun SasayakiSheetTabs(
 
 @Composable
 private fun SasayakiResourcesTab(
+    bookTitle: String,
+    subtitleExportViewModel: SasayakiSubtitleExportViewModel,
     player: SasayakiPlayer,
     settings: SasayakiSettings,
     subtitleMatchData: SasayakiMatchData?,
@@ -565,6 +570,28 @@ private fun SasayakiResourcesTab(
         player.errorMessage?.let { message ->
             SasayakiErrorMessage(message = message.asString())
         }
+        SasayakiResourceCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(R.string.sasayaki_current_match),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        sasayakiSubtitleMatchSummary(subtitleMatchData, matchDependencies?.characterCount)
+                            ?: stringResource(R.string.sasayaki_no_subtitle_match),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                SasayakiSubtitleExportControl(bookTitle, subtitleMatchData, subtitleExportViewModel)
+            }
+        }
         SasayakiMatchModeControl(
             selected = transcriptionState.mode,
             enabled = !isImporting && !subtitleMatching && !transcriptionState.controlsLocked,
@@ -574,14 +601,12 @@ private fun SasayakiResourcesTab(
         when (transcriptionState.mode) {
             SasayakiMatchMode.Subtitles -> SasayakiSubtitleMatchSection(
                 dependencies = matchDependencies,
-                currentMatchData = subtitleMatchData,
                 onMatchUpdated = onSubtitleMatchUpdated,
                 enabled = !isImporting && !transcriptionState.controlsLocked,
                 onMatchingChange = onSubtitleMatchingChange,
             )
             SasayakiMatchMode.Transcription -> SasayakiTranscriptionSection(
                 state = transcriptionState,
-                coverage = sasayakiSubtitleMatchSummary(subtitleMatchData, matchDependencies?.characterCount),
                 enabled = !isImporting && !subtitleMatching,
                 onStart = onStartTranscription,
                 onPause = onPauseTranscription,

@@ -713,7 +713,10 @@
     <string name="sasayaki_storage_copied">Copied to app storage. The original audiobook file can be deleted.</string>
     <string name="sasayaki_storage_linked">Linked to the external audiobook file. Keep the original file available.</string>
     <string name="sasayaki_storage_select_audio">Select a .mp3, .m4b, .m4a, or .opus audiobook</string>
-    <string name="sasayaki_subtitle_match">Subtitle Match</string>
+    <string name="sasayaki_export_srt">Export SRT</string>
+    <string name="sasayaki_srt_saved">SRT file saved.</string>
+    <string name="sasayaki_srt_export_failed">Could not export subtitles. Please try again.</string>
+    <string name="sasayaki_current_match">Current Match</string>
     <string name="sasayaki_no_subtitle_match">No match</string>
     <string name="sasayaki_no_chapters">No chapters found in this audiobook.</string>
     <string name="sasayaki_unknown_chapter">Chapter</string>
@@ -868,7 +871,6 @@
     <string name="sasayaki_transcription_progress">Transcribing and matching…</string>
     <string name="sasayaki_transcription_paused">Transcription paused</string>
     <string name="sasayaki_transcription_complete">Transcription complete</string>
-    <string name="sasayaki_transcription_coverage">Current match coverage: %1$s</string>
     <string name="sasayaki_transcription_awaiting_download">Waiting for download confirmation</string>
     <string name="sasayaki_transcription_download_title">Download transcription files?</string>
     <string name="sasayaki_transcription_download_message">Transcription needs about %1$d MiB of additional files (speech model and processing components). Downloaded files can be reused offline. Your audio stays on this device.</string>
@@ -882,7 +884,6 @@
     <string name="sasayaki_transcription_clear_message">Only transcription data will be cleared. The current match will be kept.</string>
     <string name="sasayaki_transcription_failed">Couldn’t transcribe or match this audio. Check the file and connection, then try again.</string>
     <string name="sasayaki_transcription_busy">Another book is being transcribed.</string>
-    <string name="sasayaki_character_coverage">Coverage: %1$s</string>
     <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
     <string name="about_ffmpeg_source">FFmpeg source code</string>
     <string name="about_transcription_license">Transcription component licenses</string>

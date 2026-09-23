@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -23,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +39,6 @@ import moe.antimony.hoshi.importing.validateImportFile
 @Composable
 internal fun SasayakiSubtitleMatchSection(
     dependencies: SasayakiMatchDependencies?,
-    currentMatchData: SasayakiMatchData?,
     onMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -52,7 +48,6 @@ internal fun SasayakiSubtitleMatchSection(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var matchUiState by remember { mutableStateOf(SasayakiSubtitleMatchUiState()) }
-    var displayedMatch by remember { mutableStateOf(currentMatchData) }
     val selectSrtMessage = stringResource(R.string.sasayaki_select_srt_file)
     val selectedSrtFallback = stringResource(R.string.sasayaki_selected_srt)
     val matchFailedMessage = stringResource(R.string.sasayaki_match_failed)
@@ -61,10 +56,6 @@ internal fun SasayakiSubtitleMatchSection(
     val currentMatchingChange by rememberUpdatedState(onMatchingChange)
     DisposableEffect(Unit) {
         onDispose { currentMatchingChange(false) }
-    }
-
-    LaunchedEffect(currentMatchData) {
-        displayedMatch = currentMatchData
     }
 
     fun startMatching(uri: Uri) {
@@ -89,7 +80,6 @@ internal fun SasayakiSubtitleMatchSection(
                     nextMatch
                 }
             }.onSuccess { nextMatch ->
-                displayedMatch = nextMatch
                 onMatchUpdated(nextMatch)
                 matchUiState = matchUiState.finishMatching(errorMessage = null)
             }.onFailure { error ->
@@ -123,21 +113,6 @@ internal fun SasayakiSubtitleMatchSection(
             modifier = modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = stringResource(R.string.sasayaki_subtitle_match),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = sasayakiSubtitleMatchSummary(displayedMatch, dependencies?.characterCount)?.let {
-                        stringResource(R.string.sasayaki_character_coverage, it)
-                    } ?: stringResource(R.string.sasayaki_no_subtitle_match),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            HorizontalDivider()
             SasayakiInlineActionRow(
                 label = stringResource(R.string.sasayaki_file),
                 value = matchUiState.selectedFileName ?: stringResource(R.string.sasayaki_no_file_selected),
