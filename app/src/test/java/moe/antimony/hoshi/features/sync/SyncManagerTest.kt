@@ -42,7 +42,7 @@ class SyncManagerTest {
             ),
             audioBook = TtuAudioBook("Title", 88.5, 2_000),
         )
-        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+        val manager = TtuSyncManager(repository, drive, nowUnixMillis = { 9_999 })
 
         val result = manager.syncBook(
             entry = entry,
@@ -81,7 +81,7 @@ class SyncManagerTest {
             ),
             statisticsFetchError = RuntimeException("stats fetch failed"),
         )
-        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+        val manager = TtuSyncManager(repository, drive, nowUnixMillis = { 9_999 })
 
         try {
             manager.syncBook(
@@ -116,7 +116,7 @@ class SyncManagerTest {
                 ReadingStatistics(title = "Title", dateKey = "2026-05-12", charactersRead = 100, lastStatisticModified = 100),
             ),
         )
-        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+        val manager = TtuSyncManager(repository, drive, nowUnixMillis = { 9_999 })
 
         val result = manager.syncBook(
             entry = entry,
@@ -150,7 +150,7 @@ class SyncManagerTest {
             ),
             statisticsFetchError = RuntimeException("stats fetch failed"),
         )
-        val manager = SyncManager(repository, drive, nowUnixMillis = { 9_999 })
+        val manager = TtuSyncManager(repository, drive, nowUnixMillis = { 9_999 })
 
         try {
             manager.syncBook(
@@ -176,7 +176,7 @@ class SyncManagerTest {
         val repository = BookRepository(tempFolder.root)
         val entry = repository.createEntry()
         val drive = FakeDriveSyncDataSource(staleOnFirstList = true)
-        val manager = SyncManager(repository, drive)
+        val manager = TtuSyncManager(repository, drive)
 
         val result = manager.syncBook(
             entry = entry,
@@ -198,7 +198,7 @@ class SyncManagerTest {
         val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
         exported.writeText("bookdata")
         val drive = FakeDriveSyncDataSource()
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             nowUnixMillis = { 9_999 },
@@ -225,7 +225,7 @@ class SyncManagerTest {
         val entry = repository.createEntry()
         repository.saveBookmark(entry.root, Bookmark(0, 0.5, 100, TtuSyncRules.unixMillisToAppleReferenceSeconds(4_321)))
         val drive = FakeDriveSyncDataSource()
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             bookDataExporter = { null },
@@ -252,7 +252,7 @@ class SyncManagerTest {
         val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
         exported.writeText("bookdata")
         val drive = FakeDriveSyncDataSource()
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             bookDataExporter = { _: BookEntry -> exported },
@@ -277,7 +277,7 @@ class SyncManagerTest {
         val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
         exported.writeText("bookdata")
         val drive = FakeDriveSyncDataSource(bookDataUploadError = RuntimeException("bookdata upload failed"))
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             bookDataExporter = { _: BookEntry -> exported },
@@ -310,7 +310,7 @@ class SyncManagerTest {
         val drive = FakeDriveSyncDataSource(
             progress = TtuProgress(7, 150, 0.5, 2_000),
         )
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             bookDataExporter = { exported },
@@ -346,7 +346,7 @@ class SyncManagerTest {
             statistics = emptyList(),
             bookDataUploadError = RuntimeException("bookdata upload failed"),
         )
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             nowUnixMillis = { 9_999 },
@@ -381,7 +381,7 @@ class SyncManagerTest {
         val drive = FakeDriveSyncDataSource(
             bookDataUploadErrors = mutableListOf(GoogleDriveApiException("Not found", statusCode = 404)),
         )
-        val manager = SyncManager(
+        val manager = TtuSyncManager(
             bookRepository = repository,
             drive = drive,
             bookDataExporter = { exported },
@@ -408,7 +408,7 @@ class SyncManagerTest {
         val entry = repository.createEntry()
         val exported = tempFolder.newFile("bookdata_1_6_200_1000_1000.zip")
         val importOnlyDrive = FakeDriveSyncDataSource()
-        val importOnlyManager = SyncManager(
+        val importOnlyManager = TtuSyncManager(
             bookRepository = repository,
             drive = importOnlyDrive,
             bookDataExporter = { exported },
@@ -425,7 +425,7 @@ class SyncManagerTest {
         )
 
         val alreadyPresentDrive = FakeDriveSyncDataSource(bookData = DriveFile("bookdata", "bookdata_1_6_200_1000_1000.zip"))
-        val alreadyPresentManager = SyncManager(
+        val alreadyPresentManager = TtuSyncManager(
             bookRepository = repository,
             drive = alreadyPresentDrive,
             bookDataExporter = { exported },

@@ -153,6 +153,8 @@ androidComponents.onVariants { variant ->
 dependencies {
     implementation(files(prepareSherpa.map { it.outputDirectory.file("bindings.jar").get() }))
     sherpaOnnxArchive(sherpaOnnxArtifact)
+    implementation(libs.google.play.services.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(platform(libs.androidx.compose.bom))

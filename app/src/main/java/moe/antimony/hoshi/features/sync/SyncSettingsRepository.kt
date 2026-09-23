@@ -12,19 +12,26 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 
 private val Context.syncSettingsDataStore by preferencesDataStore(name = SyncSettingsRepository.DataStoreName)
 
-fun Context.syncSettingsRepository(drive: DriveSyncDataSource): SyncSettingsRepository =
-    SyncSettingsRepository(syncSettingsDataStore, drive)
+fun Context.syncSettingsRepository(drive: DriveSyncDataSource, hasTtuLogin: suspend () -> Boolean): SyncSettingsRepository =
+    SyncSettingsRepository(syncSettingsDataStore, drive, hasTtuLogin = hasTtuLogin)
 
 class SyncSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val drive: DriveSyncDataSource,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val hasTtuLogin: suspend () -> Boolean = { false },
 ) {
     val settings: Flow<SyncSettings> = dataStore.data
+        .onStart {
+            dataStore.edit { preferences ->
+                if (preferences[KEY_PROVIDER] == null) preferences[KEY_PROVIDER] = if (hasTtuLogin()) "ttu" else "gdrive"
+            }
+        }
         .map { preferences -> preferences.toSyncSettings() }
 
     suspend fun update(transform: (SyncSettings) -> SyncSettings) {
@@ -41,6 +48,7 @@ class SyncSettingsRepository(
     private fun Preferences.toSyncSettings(): SyncSettings =
         SyncSettings(
             enabled = this[KEY_ENABLED] ?: false,
+            provider = SyncProvider.entries.firstOrNull { it.rawValue == this[KEY_PROVIDER] } ?: SyncProvider.Gdrive,
             mode = SyncMode.fromRawValue(this[KEY_MODE]),
             autoSyncEnabled = this[KEY_AUTO_SYNC_ENABLED] ?: false,
             authProvider = SyncAuthProvider.DeviceCode,
@@ -49,6 +57,7 @@ class SyncSettingsRepository(
 
     private fun MutablePreferences.writeSyncSettings(settings: SyncSettings) {
         this[KEY_ENABLED] = settings.enabled
+        this[KEY_PROVIDER] = settings.provider.rawValue
         this[KEY_MODE] = settings.mode.rawValue
         this[KEY_AUTO_SYNC_ENABLED] = settings.autoSyncEnabled
         this[KEY_AUTH_PROVIDER] = settings.authProvider.name
@@ -58,6 +67,7 @@ class SyncSettingsRepository(
     companion object {
         const val DataStoreName = "sync-settings"
 
+        private val KEY_PROVIDER = stringPreferencesKey("syncProvider")
         private val KEY_ENABLED = booleanPreferencesKey("syncEnabled")
         private val KEY_MODE = stringPreferencesKey("syncMode")
         private val KEY_AUTO_SYNC_ENABLED = booleanPreferencesKey("autoSyncEnabled")

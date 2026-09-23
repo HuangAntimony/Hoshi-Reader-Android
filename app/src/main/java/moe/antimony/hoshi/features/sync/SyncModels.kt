@@ -34,6 +34,7 @@ enum class StatisticsSyncMode(val rawValue: String) {
 
 data class SyncSettings(
     val enabled: Boolean = false,
+    val provider: SyncProvider = SyncProvider.Gdrive,
     val mode: SyncMode = SyncMode.Auto,
     val autoSyncEnabled: Boolean = false,
     val authProvider: SyncAuthProvider = SyncAuthProvider.DeviceCode,

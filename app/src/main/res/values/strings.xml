@@ -899,4 +899,7 @@
     <string name="sasayaki_transcription_balanced_description">Balances transcription speed and everyday use.</string>
     <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
     <string name="statistics_sessions_heading">Sessions</string>
+    <string name="sync_provider">Provider</string>
+    <string name="sync_provider_ttu">ッツ/yatsu</string>
+    <string name="sync_hoshi_description">Sync your library between Hoshi Reader devices.</string>
 </resources>

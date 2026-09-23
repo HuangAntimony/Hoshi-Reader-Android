@@ -30,8 +30,9 @@ import moe.antimony.hoshi.features.sync.DriveAuthorizer
 import moe.antimony.hoshi.features.sync.DriveSyncDataSource
 import moe.antimony.hoshi.features.sync.GoogleDriveApiException
 import moe.antimony.hoshi.features.sync.SyncDirection
-import moe.antimony.hoshi.features.sync.SyncManager
+import moe.antimony.hoshi.features.sync.TtuSyncManager
 import moe.antimony.hoshi.features.sync.SyncResult
+import moe.antimony.hoshi.features.sync.SyncProvider
 import moe.antimony.hoshi.features.sync.SyncSettingsRepository
 import moe.antimony.hoshi.features.sync.TtuBookDataConverter
 import moe.antimony.hoshi.features.sync.TtuProgress
@@ -97,7 +98,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
     private val dictionaryRepository: DictionaryRepository,
     private val settingsRepository: BookshelfSettingsRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
-    private val syncManager: SyncManager,
+    private val syncManager: TtuSyncManager,
     private val drive: DriveSyncDataSource,
     private val driveAuthorizer: DriveAuthorizer,
     private val ttuBookDataConverter: TtuBookDataConverter,
@@ -466,7 +467,7 @@ private val remoteJson = Json {
 }
 
 internal fun shouldLoadRemoteBooks(syncSettings: moe.antimony.hoshi.features.sync.SyncSettings, authStatus: DriveAuthStatus): Boolean =
-    syncSettings.enabled && authStatus is DriveAuthStatus.Connected
+    syncSettings.enabled && syncSettings.provider == SyncProvider.Ttu && authStatus is DriveAuthStatus.Connected
 
 internal suspend fun loadRemoteBooksOnce(
     drive: DriveSyncDataSource,

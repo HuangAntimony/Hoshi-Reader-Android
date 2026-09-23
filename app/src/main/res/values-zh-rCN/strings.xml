@@ -897,4 +897,7 @@
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
     <string name="statistics_sessions_heading">阅读记录</string>
+    <string name="sync_provider">同步服务</string>
+    <string name="sync_provider_ttu">ッツ/yatsu</string>
+    <string name="sync_hoshi_description">在 Hoshi Reader 设备之间同步书库。</string>
 </resources>
