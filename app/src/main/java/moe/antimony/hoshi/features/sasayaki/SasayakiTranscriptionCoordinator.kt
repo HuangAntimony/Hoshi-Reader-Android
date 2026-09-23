@@ -83,7 +83,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             }
         } catch (error: Exception) {
             job.cancel()
-            mutableState.value = SasayakiTranscriptionState(root = root, error = error.toSasayakiFailureText(SasayakiFailureKind.Unknown), revision = state.value.revision, completionRevision = state.value.completionRevision)
+            mutableState.value = SasayakiTranscriptionState(root = root, error = reportSasayakiFailure("start_registration", error, SasayakiFailureKind.Unknown), revision = state.value.revision, completionRevision = state.value.completionRevision)
             return false
         }
         task = job
@@ -134,6 +134,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         var result: SasayakiMatchData? = null
         var error: UiText? = null
         var completed = false
+        var failureStage = "audio_duration"
         var alignment: SasayakiTranscriptionAlignment? = null
         var alignedCount = -1
         val requests = Channel<List<SasayakiToken>>(Channel.CONFLATED)
@@ -169,7 +170,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 } catch (error: Exception) {
                     // A match failure must not discard successful recognition or stop inference.
                     alignment = null
-                    mutableState.update { it.copy(error = error.toSasayakiFailureText(SasayakiFailureKind.BookMatch)) }
+                    mutableState.update { it.copy(error = reportSasayakiFailure("book_matching", error, SasayakiFailureKind.BookMatch)) }
                 }
             }
         }
@@ -182,6 +183,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             } catch (error: Exception) {
                 throw error.asSasayakiFailure(SasayakiFailureKind.AudioSource)
             }
+            failureStage = "load_checkpoint"
             val saved = try {
                 repository.load(root)
             } catch (cancelled: CancellationException) {
@@ -205,6 +207,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 hasTranscript = saved != null,
             ) }
             if (saved?.isComplete != true) {
+                failureStage = "transcription"
                 backend.transcribe(source, through, parallelism = preset.parallelism,
                     previousTokens = tokens.takeLastWhile { it.end >= through - 1.0 }, onDownloadRequired = { bytes ->
                     val approval = CompletableDeferred<Unit>()
@@ -245,7 +248,9 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                     if (batch.tokens.isNotEmpty()) requests.trySend(tokens.toList())
                     if (now - lastPersist >= 15_000_000_000L) {
                         try {
+                            failureStage = "checkpoint_save"
                             repository.save(root, checkpoint())
+                            failureStage = "transcription"
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
@@ -265,9 +270,9 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         } catch (_: CancellationException) {
             // Pause keeps only complete backend batches. Resume re-decodes the unfinished segment.
         } catch (failure: SasayakiOperationFailure) {
-            error = sasayakiFailureText(failure.kind)
+            error = reportSasayakiFailure(failureStage, failure, SasayakiFailureKind.Unknown)
         } catch (failure: Exception) {
-            error = failure.toSasayakiFailureText(SasayakiFailureKind.Unknown)
+            error = reportSasayakiFailure(failureStage, failure, SasayakiFailureKind.Unknown)
         } finally {
             requests.close()
             withContext(NonCancellable + ioDispatcher) {
@@ -279,7 +284,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                             mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
                             align(tokens, complete = completed)
                         }
-                    } catch (failure: Exception) { error = failure.toSasayakiFailureText(SasayakiFailureKind.Storage) }
+                    } catch (failure: Exception) { error = reportSasayakiFailure("transcription_finalize", failure, SasayakiFailureKind.Storage) }
                 }
                 mutableState.update { it.copy(
                     stage = SasayakiTranscriptionStage.Idle,

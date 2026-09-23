@@ -882,7 +882,6 @@
     <string name="sasayaki_transcription_clear">Clear Transcription</string>
     <string name="sasayaki_transcription_clear_confirmation">Clear transcription?</string>
     <string name="sasayaki_transcription_clear_message">Only transcription data will be cleared. The current match will be kept.</string>
-    <string name="sasayaki_transcription_failed">Couldn’t complete transcription. Try again.</string>
     <string name="sasayaki_transcription_error_audio">Couldn’t read this audio. Check that the file is complete, accessible, and in a supported format, then try again.</string>
     <string name="sasayaki_transcription_error_resources">Couldn’t download or verify transcription files. Check your connection and available storage, then try again.</string>
     <string name="sasayaki_transcription_error_recognition">Japanese speech recognition couldn’t start or complete. Restart the app and try again; if it repeats, switch to Lightweight mode.</string>

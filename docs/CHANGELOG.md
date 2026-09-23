@@ -50,6 +50,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   recognize audio segments in parallel while preserving ordered progress and resume.
   Show distinct localized errors for unreadable audio, transcription resource
   preparation, recognition, book matching, and progress saving failures.
+  Show the original exception and cause chain when an unexpected transcription
+  failure cannot be classified.
 
 - Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
   or Disabled, with an enabled frequency dictionary for explicit ordering.

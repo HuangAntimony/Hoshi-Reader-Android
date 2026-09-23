@@ -144,8 +144,8 @@ internal class SasayakiTranscriptionViewModel internal constructor(
                 coordinator.start(activeRoot, activeSource, preset)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError(SasayakiFailureKind.Unknown)
+            } catch (error: Exception) {
+                showError(error, SasayakiFailureKind.Unknown, "viewmodel_start")
             } finally {
                 if (root == activeRoot) {
                     _uiState.value = _uiState.value.copy(isUpdating = false)
@@ -187,8 +187,8 @@ internal class SasayakiTranscriptionViewModel internal constructor(
                 if (coordinator.clear(activeRoot) && root == activeRoot) transcript = null
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError(SasayakiFailureKind.Storage)
+            } catch (error: Exception) {
+                showError(error, SasayakiFailureKind.Storage, "clear_transcript")
             } finally {
                 if (root == activeRoot) {
                     _uiState.value = _uiState.value.copy(isUpdating = false)
@@ -210,8 +210,8 @@ internal class SasayakiTranscriptionViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                if (generation == loadGeneration) showError(SasayakiFailureKind.Storage)
+            } catch (error: Exception) {
+                if (generation == loadGeneration) showError(error, SasayakiFailureKind.Storage, "load_transcript")
             } finally {
                 if (generation == loadGeneration) {
                     _uiState.value = _uiState.value.copy(isLoading = false)
@@ -243,8 +243,8 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         )
     }
 
-    private fun showError(kind: SasayakiFailureKind) {
-        localError = sasayakiFailureText(kind)
+    private fun showError(error: Throwable, kind: SasayakiFailureKind, stage: String) {
+        localError = reportSasayakiFailure(stage, error, kind)
     }
 
     override fun onCleared() {

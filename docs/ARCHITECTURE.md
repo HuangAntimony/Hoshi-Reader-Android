@@ -540,7 +540,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   existing matches; completed transcripts can be realigned without ASR.
   Typed failures distinguish audio access, model/runtime resource preparation,
   speech recognition, book matching, and transcript storage; the UI maps each
-  category to a localized message and uses a generic message for unknown failures.
+  category to a localized message. Unknown failures show the original exception
+  and cause chain in the UI, and Logcat records the full stack with its operation
+  stage and category.
 - Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android
   transcription matches are recognized by their chapter-offset cue IDs; this
   provenance selects the default matching tab without overriding a manual tab

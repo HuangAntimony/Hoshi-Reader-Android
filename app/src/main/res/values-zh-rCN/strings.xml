@@ -880,7 +880,6 @@
     <string name="sasayaki_transcription_clear">清除转写</string>
     <string name="sasayaki_transcription_clear_confirmation">清除转写数据？</string>
     <string name="sasayaki_transcription_clear_message">仅清除转写数据，保留当前匹配结果。</string>
-    <string name="sasayaki_transcription_failed">无法完成转写，请重试。</string>
     <string name="sasayaki_transcription_error_audio">无法读取此音频。请确认文件完整、可访问且格式受支持，然后重试。</string>
     <string name="sasayaki_transcription_error_resources">无法下载或校验转写文件。请检查网络连接和可用存储空间后重试。</string>
     <string name="sasayaki_transcription_error_recognition">日语语音识别无法启动或完成。请重启应用后重试；若仍失败，可切换为“轻量”模式。</string>
