@@ -62,6 +62,7 @@ object SasayakiTranscriptAligner {
         private var speech = Speech(IntArray(0), emptyList())
         private var candidates = emptyList<Anchor>()
         private var gaps = emptyMap<Gap, List<Timing?>>()
+        private var chapterGaps = emptyMap<Pair<Anchor, Anchor>, List<Timing?>>()
         private data class Gap(val chapter: Int, val window: Window, val context: Window)
 
         init {
@@ -80,6 +81,7 @@ object SasayakiTranscriptAligner {
                 speech = Speech(IntArray(0), emptyList())
                 candidates = emptyList()
                 gaps = emptyMap()
+                chapterGaps = emptyMap()
             }
             require(tokens.size >= processedTokens) { "A matching session requires an append-only transcript" }
             // Revisit an exact run touching the old tail: new speech may extend it.
@@ -100,8 +102,22 @@ object SasayakiTranscriptAligner {
                 }
             }
             val nextGaps = HashMap<Gap, List<Timing?>>()
+            val nextChapterGaps = HashMap<Pair<Anchor, Anchor>, List<Timing?>>()
             anchors.zipWithNext().forEach { (left, right) ->
-                if (left.chapter != right.chapter) return@forEach
+                if (left.chapter != right.chapter) {
+                    val count = right.globalStart - left.globalEnd
+                    if (count !in 1..maxGap || right.spoken - left.speechEnd !in 1..maxGap) return@forEach
+                    val key = left to right
+                    val repaired = chapterGaps[key] ?: repairChapterGap(chapters, left, right, speech)
+                    nextChapterGaps[key] = repaired
+                    for (index in left.chapter..right.chapter) {
+                        val chapter = chapters[index]
+                        val start = max(left.globalEnd, chapter.globalStart)
+                        val end = min(right.globalStart, chapter.globalStart + chapter.source.text.size)
+                        for (point in start until end) times[index][point - chapter.globalStart] = repaired[point - left.globalEnd]
+                    }
+                    return@forEach
+                }
                 val window = Window(left.sourceEnd, right.sourceStart, left.speechEnd, right.spoken)
                 if (window.upper - window.lower !in 1..maxGap || window.to - window.from !in 0..maxGap) return@forEach
                 val gap = Gap(left.chapter, window, sentenceContext(chapters[left.chapter], left, right, window))
@@ -116,8 +132,36 @@ object SasayakiTranscriptAligner {
             }
             // A formerly unmatched gap is retried only when its neighboring anchors change.
             gaps = nextGaps
+            chapterGaps = nextChapterGaps
             return cut(chapters, times)
         }
+    }
+
+    /** EPUB file boundaries do not end the audio. Reuse the bounded repair, retaining cue boundaries. */
+    private fun repairChapterGap(chapters: List<Chapter>, left: Anchor, right: Anchor, speech: Speech): List<Timing?> {
+        val parts = chapters.subList(left.chapter, right.chapter + 1)
+        val base = parts.first().globalStart
+        val rightOffset = parts.last().globalStart - base
+        val projections = (0 until parts.maxOf { it.projections.size }).map { track ->
+            SasayakiSource.Projection(
+                parts.flatMap { it.projections[min(track, it.projections.lastIndex)].text.asList() }.toIntArray(),
+                parts.flatMap { c -> c.projections[min(track, c.projections.lastIndex)].starts.map { it + c.globalStart - base } }.toIntArray(),
+                parts.flatMap { c -> c.projections[min(track, c.projections.lastIndex)].ends.map { it + c.globalStart - base } }.toIntArray(),
+            )
+        }
+        val joined = Chapter(
+            SasayakiSource.Chapter(parts.first().source.index, "", parts.flatMap { it.source.text.asList() }.toIntArray()),
+            projections, parts.flatMap { it.boundaries.asList() }.toBooleanArray(),
+            parts.flatMap { it.sentences.asList() }.toBooleanArray(), base,
+        )
+        val after = right.copy(
+            written = right.written + parts.dropLast(1).sumOf { it.projections[min(right.projection, it.projections.lastIndex)].text.size },
+            sourceStart = right.sourceStart + rightOffset, sourceEnd = right.sourceEnd + rightOffset,
+        )
+        val gap = Window(left.sourceEnd, after.sourceStart, left.speechEnd, right.spoken)
+        val times = arrayOfNulls<Timing>(joined.source.text.size)
+        repairGap(joined, gap, sentenceContext(joined, left, after, gap), speech, times)
+        return times.slice(gap.lower until gap.upper)
     }
 
     private fun speech(tokens: List<SasayakiToken>, minimumStart: Double = 0.0): Speech {
@@ -350,7 +394,14 @@ object SasayakiTranscriptAligner {
                     // fallback, but require sentence evidence for inferred fragments.
                     val wholeGap = from == lower && to == upper && tokenFrom == speechStart && tokenTo == speechEnd
                     val sameSentence = (from until to - 1).none { chapter.sentences[it] }
-                    if (hasSentenceEvidence || wholeGap) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
+                    val wholeCue = (from == 0 || chapter.boundaries[from - 1]) && chapter.boundaries[to - 1] &&
+                        (from until to - 1).none { chapter.boundaries[it] }
+                    // A wholly rewritten reply needs its own separated speech, not
+                    // an extra suffix inside an adjacent sentence's token interval.
+                    val isolatedSpeech = tokenFrom > 0 && tokenTo < speech.times.size &&
+                        speech.times[tokenFrom].start - speech.times[tokenFrom - 1].end >= 0.01 &&
+                        speech.times[tokenTo].start - speech.times[tokenTo - 1].end >= 0.01
+                    if (hasSentenceEvidence || wholeGap || wholeCue && isolatedSpeech) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
                         if (sameSentence) score.similarity else 0.0, times,
                         supported = sameSentence && score.accepted)
                 }
@@ -476,7 +527,8 @@ object SasayakiTranscriptAligner {
         val spoken = speech.text.sliceArray(speechStart until speechEnd)
         val readingRewrite = isReadingRewrite(written, spoken)
         val ratio = writtenCount.toDouble() / spokenCount
-        if (ratio !in 0.5..2.0 && !(readingRewrite && ratio in 0.25..4.0)) return
+        val shortSupportedRewrite = supported && writtenCount <= maxUncertainRun
+        if (ratio !in 0.5..2.0 && !((readingRewrite || shortSupportedRewrite) && ratio in 0.25..4.0)) return
         // Entirely unrelated phrases cannot be recovered from duration/length alone.
         if (!supported && similarity < 0.25 && !readingRewrite) return
         for (index in 0 until writtenCount) {
@@ -522,7 +574,7 @@ object SasayakiTranscriptAligner {
         for (col in 0..cols) costs[col] = col * unit
         for (row in 1..rows) {
             for (col in 1..cols) {
-                val difference = if (written[from + row - 1] == spoken[speechFrom + col - 1]) -1 else unit
+                val difference = if (sameSymbol(written[from + row - 1], spoken[speechFrom + col - 1])) -1 else unit
                 costs[row * width + col] = min(costs[(row - 1) * width + col - 1] + difference,
                     min(costs[(row - 1) * width + col] + unit, costs[row * width + col - 1] + unit))
             }
@@ -531,7 +583,7 @@ object SasayakiTranscriptAligner {
         var col = cols
         val pairs = mutableListOf<Pairing>()
         while (row > 0 && col > 0) {
-            val exact = written[from + row - 1] == spoken[speechFrom + col - 1]
+            val exact = sameSymbol(written[from + row - 1], spoken[speechFrom + col - 1])
             if (costs[row * width + col] == costs[(row - 1) * width + col - 1] + if (exact) -1 else unit) {
                 pairs += Pairing(row - 1, col - 1, exact)
                 row--
@@ -547,6 +599,18 @@ object SasayakiTranscriptAligner {
         while (row > 0) pairs += Pairing(--row, -1, false)
         while (col > 0) pairs += Pairing(-1, --col, false)
         return pairs.asReversed() to ((costs[rows * width + cols] + max(rows, cols)) / unit)
+    }
+
+    // Only compare individual digits here. Keep the original text, comma boundaries,
+    // and each token's time; do not parse a spoken number into a new synthetic token.
+    private fun sameSymbol(written: Int, spoken: Int): Boolean {
+        if (written == spoken) return true
+        val (digit, kanji) = when {
+            written in '0'.code..'9'.code -> written - '0'.code to spoken
+            spoken in '0'.code..'9'.code -> spoken - '0'.code to written
+            else -> return false
+        }
+        return kanji == "〇一二三四五六七八九"[digit].code || digit == 0 && kanji == '零'.code
     }
 
     private fun assign(times: Array<Timing?>, projection: SasayakiSource.Projection, index: Int, time: Timing) {

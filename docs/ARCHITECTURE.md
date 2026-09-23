@@ -564,7 +564,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `SasayakiSource` shares chapter exclusions with SRT matching. The transcript
   aligner uses normalized/ruby-aware exact anchors, monotonic ordering, bounded
   gap repair, and sentence boundaries in Reader code-point coordinates; it does
-  not invent anchors at unspoken book/audio edges. A run-scoped alignment session
+  not invent anchors at unspoken book/audio edges. Bounded gaps between real anchors
+  can cross EPUB files, retaining chapter/cue boundaries and original chapter offsets;
+  these repairs use the same length/evidence limits and are cached until the anchors change.
+  A run-scoped alignment session
   caches book normalization, the distinctive-text index, normalized speech, and
   existing anchor candidates. Only new speech and an overlapping exact tail are
   searched; bounded gaps are repaired again only when their neighboring anchors
@@ -584,7 +587,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   more spelling differences; each uncertain block uses only its own tokens and requires
   minimum evidence from its sentence before inferring changed or omitted fragments. Compatible
   kana/kanji recovery requires existing kana to occur in order in the candidate reading
-  and uses bounded lengths, not an automatic pronunciation dictionary. A partial sentence
+  and uses bounded lengths, not an automatic pronunciation dictionary. An entirely rewritten
+  short cue inside a larger gap additionally needs speech separated from both neighbors;
+  an extra spoken suffix cannot supply an omitted reply. Strong sentence evidence allows
+  short contracted spellings such as a multi-character name recognized as one token.
+  Bounded edit alignment treats individual Arabic/kanji digits as equivalent without
+  merging comma-separated cues or synthesizing numeric tokens. A partial sentence
   edge can be recovered beside an omitted cue only when that cue cannot plausibly
   claim the same tokens. Explicit-token repair checks token duration, excluding
   surrounding pauses. Ruby syllables sharing a source character merge their timings.

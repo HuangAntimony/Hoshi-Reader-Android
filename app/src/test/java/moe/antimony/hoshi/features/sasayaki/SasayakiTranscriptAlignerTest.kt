@@ -584,6 +584,97 @@ class SasayakiTranscriptAlignerTest {
         }
     }
 
+    @Test fun chapterEdgesRepairBoundedSpeechWithoutMergingBookCoordinates() {
+        val source = book("<p>雨の降る静かな朝だった。彼女は窓辺にいた。</p>", "<p><img src='page.png'></p>",
+            "<p>つまり、それって付き合ってなかったのか。私は駅へ向かって歩いた。</p>")
+        val tokens = listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女は窓へにいた", 4.5, 7.0),
+            token("つまりそれってつきあってなかったのか", 8.0, 12.0), token("私は駅へ向かって歩いた", 13.0, 17.0))
+        val result = SasayakiTranscriptAligner.align(source, tokens)
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓辺にいた", "つまり", "それって付き合ってなかったのか", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+        assertEquals(listOf(0, 0, 2, 2, 2), result.matches.map { it.chapterIndex })
+        assertEquals(listOf(0, 11, 0, 3, 18), result.matches.map { it.start })
+        assertTrue(result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime })
+        val session = SasayakiTranscriptAligner.Session(source)
+        for (end in 1..tokens.size) {
+            assertEquals(SasayakiTranscriptAligner.align(source, tokens.take(end)), session.align(tokens.take(end)))
+        }
+    }
+
+    @Test fun crossChapterRepairCannotInventAnUnspokenChapterOrBookEdges() {
+        val source = book("<p>まだ読まれていない序文。雨の降る静かな朝だった。</p>", "<p>はい。</p>",
+            "<p>彼女は窓の外を眺めていた。まだ読まれていない続き。</p>")
+        val result = SasayakiTranscriptAligner.align(source,
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女は窓の外を眺めていた", 5.0, 9.0)))
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(listOf(0, 2), result.matches.map { it.chapterIndex })
+    }
+
+    @Test fun crossChapterRepairKeepsRubyOffsetsAndDoesNotFillAnOmittedReply() {
+        val source = book("<p><ruby>雨<rt>あめ</rt></ruby>の降る静かな朝だった。彼女は窓辺で手紙を読む。</p>",
+            "<p>はい。</p><p>手紙には<ruby>故郷<rt>ふるさと</rt></ruby>の風景が記されていた。</p>")
+        val tokens = listOf(token("あめの降る静かな朝だった", 1.0, 4.0), token("彼女は窓へで手紙を読む", 5.0, 9.0),
+            token("手紙にはふるさとの風景が記されていた", 10.0, 15.0))
+        val result = SasayakiTranscriptAligner.align(source, tokens)
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓辺で手紙を読む", "手紙には故郷の風景が記されていた"), result.matches.map { it.text })
+        assertEquals(listOf(0, 0, 1), result.matches.map { it.chapterIndex })
+        assertEquals(listOf(0, 11, 2), result.matches.map { it.start })
+        assertEquals(5.0, result.matches[1].startTime, .0001)
+        assertEquals(9.0, result.matches[1].endTime, .0001)
+        val session = SasayakiTranscriptAligner.Session(source)
+        tokens.indices.forEach { end ->
+            assertEquals(SasayakiTranscriptAligner.align(source, tokens.take(end + 1)), session.align(tokens.take(end + 1)))
+        }
+        assertEquals(result, session.align(tokens, complete = true))
+    }
+
+    @Test fun wholeKanaReplyIsRecoveredEvenWithAnotherRewriteInTheSameAnchorGap() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。彼女は呟いた。</p><p>謝るな。馬鹿。</p><p>私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女はつぶやいた", 5.0, 7.0),
+                token("謝るな", 8.0, 10.0), token("バカ", 11.0, 11.8), token("私は駅へ向かって歩いた", 13.0, 17.0)))
+        val reply = result.matches.single { it.text == "馬鹿" }
+        assertEquals(11.0, reply.startTime, .0001)
+        assertEquals(11.8, reply.endTime, .0001)
+    }
+
+    @Test fun wholeCueReadingCannotClaimAnExtraSuffixInsidePreviousSpeech() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。彼女は呟いた。馬鹿。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女はつぶやいたんだ", 5.0, 8.0),
+                token("私は駅へ向かって歩いた", 9.0, 13.0)))
+        assertFalse(result.matches.any { it.text == "馬鹿" })
+    }
+
+    @Test fun numericRewriteAcrossCommaKeepsSeparateCuesAndTokenTimes() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>小学校に上がる前だから、４、５歳くらいかな。それはノーカンだろ。</p>"),
+            listOf(token("小学校に上がる前だから", 1.0, 4.0), token("四", 4.0, 4.2), token("十", 4.2, 4.3),
+                token("五", 4.3, 4.5), token("歳くらいかなそれはノーカンだろ", 4.5, 8.0)))
+        assertEquals(listOf("小学校に上がる前だから", "４", "５歳くらいかな", "それはノーカンだろ"), result.matches.map { it.text })
+        assertEquals(4.0, result.matches[1].startTime, .0001)
+        assertEquals(4.2, result.matches[1].endTime, .0001)
+        assertEquals(4.3, result.matches[2].startTime, .0001)
+        assertTrue(result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime })
+    }
+
+    @Test fun unequalNumericValuesCannotSupplyAnEntireUnspokenCue() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。４。私は駅へ向かって歩いた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("五", 5.0, 5.5),
+                token("私は駅へ向かって歩いた", 6.0, 10.0)))
+        assertFalse(result.matches.any { it.text == "４" })
+    }
+
+    @Test fun stronglySupportedSentenceAllowsAContractedShortName() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>そんな俺の気遣いもむなしく、八奈見は向かいの席に腰を下ろしてきた。</p>"),
+            listOf(token("そんな俺の気遣いもむなしく", 1.0, 4.0), token("波", 4.0, 4.5),
+                token("は向かいの席に腰を下ろしてきた", 4.5, 8.0)))
+        assertEquals(listOf("そんな俺の気遣いもむなしく", "八奈見は向かいの席に腰を下ろしてきた"), result.matches.map { it.text })
+        assertEquals(4.0, result.matches.last().startTime, .0001)
+        assertEquals(8.0, result.matches.last().endTime, .0001)
+    }
+
     private fun book(vararg html: String) = EpubBook(
         title = "Generated alignment fixture",
         chapters = html.mapIndexed { index, content ->

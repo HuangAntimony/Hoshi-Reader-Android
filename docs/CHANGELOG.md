@@ -26,7 +26,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   words and sentences, and recover short missing word fragments when matching
   existing transcripts. Use sentence context to match kana/kanji spelling differences
   and recognition errors without losing recognized sentence endings, short replies,
-  or adjacent cue edges around a comma;
+  or adjacent cue edges around a comma. Retain recognized text at EPUB chapter edges,
+  short kana/kanji replies, contracted names, and comma-separated numeric expressions;
   preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
