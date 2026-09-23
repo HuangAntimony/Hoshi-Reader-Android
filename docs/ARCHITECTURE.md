@@ -586,6 +586,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   and cause chain in the UI, and Logcat records the full stack with its operation
   stage and category.
 - Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android
+  matches without `images` remain readable; new Android matches write an empty
+  `images` array for iOS decoding. Image entries received from iOS are retained
+  on save but are not used by Android's image-pause handling. Legacy Android
   transcription matches are recognized by their chapter-offset cue IDs; this
   provenance selects the default matching tab without overriding a manual tab
   choice in the current Reader session. Transcript presence alone is not used.

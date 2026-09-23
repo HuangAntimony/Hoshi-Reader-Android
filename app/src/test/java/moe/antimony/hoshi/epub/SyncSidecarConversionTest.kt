@@ -3,12 +3,48 @@ package moe.antimony.hoshi.epub
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import moe.antimony.hoshi.features.sync.Timestamped
 import org.junit.Assert.*
 import org.junit.Test
 
 class SyncSidecarConversionTest {
+    @Test fun savedSasayakiMatchesIncludeTheImagesArrayRequiredByIos() = runBlocking {
+        val root = Files.createTempDirectory("sasayaki-images").toFile()
+        val source = BookSidecarDataSource()
+        val cue = SasayakiMatch("1", 1.0, 2.0, "本文", 0, 0, 2)
+        SasayakiMatchSource.entries.forEach { matchSource ->
+            val match = SasayakiMatchData(listOf(cue), 0, matchSource)
+            source.saveSasayakiMatch(root, match)
+            val json = Json.parseToJsonElement(root.resolve("sasayaki_match.json").readText()).jsonObject
+            assertEquals(JsonArray(emptyList()), json["images"])
+            assertEquals(match, source.loadSasayakiMatch(root))
+        }
+        root.deleteRecursively()
+        Unit
+    }
+
+    @Test fun legacySasayakiMatchesGainImagesWhenSavedAndIosImagesSurviveRoundTrip() = runBlocking {
+        val root = Files.createTempDirectory("sasayaki-legacy-images").toFile()
+        val source = BookSidecarDataSource()
+        val file = root.resolve("sasayaki_match.json")
+        val images = Json.parseToJsonElement("""[{"chapterIndex":0,"imageIndex":1,"offset":42}]""") as JsonArray
+        val cases = listOf(
+            """{"matches":[],"unmatched":0}""" to JsonArray(emptyList()),
+            """{"matches":[],"unmatched":0,"images":$images}""" to images,
+        )
+        for ((stored, expected) in cases) {
+            file.writeText(stored)
+            val match = source.loadSasayakiMatch(root)!!
+            source.saveSasayakiMatch(root, match)
+            assertEquals(expected, Json.parseToJsonElement(file.readText()).jsonObject["images"])
+        }
+        root.deleteRecursively()
+        Unit
+    }
+
     @Test fun legacyHighlightsKeepCreationStampsAndDeletedIdsCannotReturn() = runBlocking {
         val root = Files.createTempDirectory("highlights").toFile()
         val id = "80CC1266-83A1-4A41-89E5-76EF980BDB66"
