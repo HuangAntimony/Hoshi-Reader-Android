@@ -30,6 +30,7 @@ import moe.antimony.hoshi.di.DefaultDispatcher
 internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
     private val decoder: AndroidSasayakiAudioDecoder,
     private val models: SasayakiModelRepository,
+    private val runtime: SasayakiRuntimeRepository,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : SasayakiTranscriptionBackend {
     private val mutex = Mutex()
@@ -50,10 +51,11 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
                 onBatch(SasayakiTranscriptionBatch(emptyList(), duration))
                 return@withContext
             }
-            val directory = models.ensure(onDownloadRequired, onDownload)
+            val directories = prepareSasayakiResources(listOf(runtime.store(), models.store), onDownloadRequired, onDownload)
             currentCoroutineContext().ensureActive()
             try {
-                transcribeWithModels(source, from, duration, directory, onBatch)
+                runtime.load(directories[0])
+                transcribeWithModels(source, from, duration, directories[1], onBatch)
             } catch (error: LinkageError) {
                 throw IOException("Native transcription runtime is unavailable", error)
             }

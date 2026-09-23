@@ -16,6 +16,13 @@ import org.junit.runner.RunWith
 class SasayakiAudioDecoderDeviceTest {
     private val cache = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
 
+    @org.junit.Before fun prepareCachedRuntime() = kotlinx.coroutines.runBlocking<Unit> {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val runtime = SasayakiRuntimeRepository(context, kotlinx.coroutines.Dispatchers.IO)
+        val directory = runtime.store().ensure({ error("Seed verified runtime files before native tests") }) {}
+        runtime.load(directory)
+    }
+
     @Test fun stereoDownmixFiltersOutUltrasoundAndKeepsSeekClock() {
         withWave { file ->
             val full = decode(file)

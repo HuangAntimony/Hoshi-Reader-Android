@@ -862,14 +862,14 @@
     <string name="sasayaki_transcription_realign">重新匹配</string>
     <string name="sasayaki_transcription_pause">暂停</string>
     <string name="sasayaki_transcription_preparing">正在准备转写…</string>
-    <string name="sasayaki_transcription_downloading">正在下载模型… %1$d%%</string>
+    <string name="sasayaki_transcription_downloading">正在下载转写文件… %1$d%%</string>
     <string name="sasayaki_transcription_progress">正在转写…</string>
     <string name="sasayaki_transcription_paused">转写已暂停</string>
     <string name="sasayaki_transcription_complete">转写完成</string>
     <string name="sasayaki_transcription_coverage">当前匹配覆盖率：%1$s</string>
     <string name="sasayaki_transcription_awaiting_download">等待确认下载</string>
-    <string name="sasayaki_transcription_download_title">下载语音模型？</string>
-    <string name="sasayaki_transcription_download_message">转写需要下载约 %1$d MiB 的语音模型，下载后可离线重复使用。音频不会上传。</string>
+    <string name="sasayaki_transcription_download_title">下载转写文件？</string>
+    <string name="sasayaki_transcription_download_message">转写还需下载约 %1$d MiB 的文件（语音模型及运行组件），下载后可离线重复使用。音频不会上传。</string>
     <string name="sasayaki_transcription_download_action">下载并转写</string>
     <string name="sasayaki_transcription_saved_progress">已转写 %1$s / %2$s</string>
     <string name="sasayaki_transcription_remaining">约剩 %1$d 分钟</string>
@@ -883,4 +883,5 @@
     <string name="sasayaki_character_coverage">覆盖率：%1$s</string>
     <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
     <string name="about_ffmpeg_source">FFmpeg 源代码</string>
+    <string name="about_transcription_license">转写组件许可证</string>
 </resources>

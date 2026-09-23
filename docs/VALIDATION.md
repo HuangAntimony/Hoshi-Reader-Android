@@ -19,6 +19,20 @@ build behavior:
 ./gradlew lint
 ```
 
+For transcription runtime packaging or binding transforms, also run
+`./gradlew -p buildSrc test` and `python3 tools/build-transcription-audio.py --check`.
+When changing the FFmpeg decoder or its CMake configuration, build all component
+ABIs with `python3 tools/build-transcription-audio.py --ndk <NDK-29.0.14206865>
+--cmake <CMake-3.31.6>`. Commit the generated
+`app/src/main/assets/transcription-audio-runtime.json` with those sources.
+Before shipping the APK, publish `build/transcription-audio/distribution` using
+`tools/publish-transcription-components.py --catalog <catalog> --directory <distribution>
+--notice app/src/main/res/raw/ffmpeg_license.txt --extra <generated-source-archive>
+--target <remote-commit>`. Include the generated source archive so the component
+can be rebuilt independently of the APK.
+This publishes an immutable component prerelease and never replaces existing
+files. Use `--remote-check --catalog <catalog>` to verify public download hashes.
+
 Run a release build when changing `minSdk`, `targetSdk`, `compileSdk`, ABI
 filters, signing, native packaging, or other release packaging behavior:
 
@@ -843,10 +857,15 @@ Validate relevant sync/update/Sasayaki changes with:
   screen; check both normal and E-ink modes.
 - Sasayaki transcription: import MP3/M4B/M4A or Opus through the audiobook card
   and select Transcription; there must be no second audio picker or permanent
-  model-download notice. Starting with missing or invalid models asks to download
+  model-download notice. Starting with missing or invalid models or runtime files asks to download
   the missing size before any network request; cancelling or leaving Reader
   dismisses the request without writing an empty transcript or changing existing
-  progress. Cached models and realignment must not prompt. Display processed/total
+  progress. Cached models plus runtime files and realignment must not prompt.
+  Verify a model-only cache requests just the runtime, and fully cached resources
+  work offline. Runtime files must be read-only and SHA-256 verified before native
+  loading; corrupt or cancelled downloads must not publish a library. Check release
+  APKs contain no FFmpeg/ONNX/sherpa native libraries, and component release assets
+  match the URLs, byte sizes and hashes embedded in `transcription-runtime.json`. Display processed/total
   audio time only once, both while running and paused; resuming must retain it
   during preparation so the controls do not jump as the source is loaded. Check model
   download/progress, pause, close/reopen the sheet, and background/foreground the
@@ -888,9 +907,16 @@ Validate relevant sync/update/Sasayaki changes with:
   AAC decoding, consistent first-audio-track selection, bounded descriptor slices,
   and failure cleanup using generated
   WAV and tracked synthetic compressed tones. Run it after native audio changes;
-  all fixtures live in cache and do not change books or preferences.
+  all fixtures live in cache and do not change books or preferences. Native
+  decoder tests require the verified runtime cache. To provision it explicitly,
+  run `SasayakiRuntimeDeviceTest#installRuntimeFromPublishedUrls` with
+  `-e downloadRuntime true`; this downloads only the pinned components and
+  verifies subsequent preparation emits no download prompt/progress. The separate
+  `verifiedPrivateLibrariesLoadAndCachedFilesWorkOffline` method uses isolated
+  cache storage and accepts `-e runtimePayloads <scratch-directory>` for local
+  payloads or `-e downloadRuntime true` for public download verification.
   `SasayakiTranscriptionDeviceTest` also checks the Kotlin decoder boundary; its optional
-  native ASR test needs verified models in the app's no-backup model directory
+  native ASR test needs verified models and runtime files in the app's no-backup directories
   and an explicit `-e realClip` scratch audio path; otherwise it is skipped and
   never downloads models. Build the test APK separately, install with `adb
   install -r`, and run the explicit class with `am instrument`. Remove only

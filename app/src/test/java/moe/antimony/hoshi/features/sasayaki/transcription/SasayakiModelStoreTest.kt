@@ -102,6 +102,38 @@ class SasayakiModelStoreTest {
         }
     }
 
+    @Test fun nativeFilesAreReadOnlyBeforeWritingAndReusedOffline() = runBlocking {
+        withDirectory { directory ->
+            val native = spec.copy(name = "runtime.so")
+            val store = SasayakiModelStore(directory, SasayakiModelTransport {
+                SasayakiDownloadResponse(ByteArrayInputStream("abc".toByteArray()), 3)
+            }, Dispatchers.Unconfined, listOf(native), readOnly = true)
+            assertEquals(3L, store.missingBytes())
+            store.ensure({ assertEquals(3L, it) }) { progress ->
+                if (progress > 0 && progress < 1) {
+                    assertFalse(directory.listFiles()!!.single().canWrite())
+                }
+            }
+            assertFalse(File(directory, native.name).canWrite())
+            assertEquals(0L, store.missingBytes())
+            store.ensure({ fail("Native cache should be reused") }) { fail("No download") }
+        }
+    }
+
+    @Test fun progressCountsOnlyTheBytesBeingDownloaded() = runBlocking {
+        withDirectory { directory ->
+            File(directory, spec.name).writeText("abc")
+            val store = SasayakiModelStore(directory, SasayakiModelTransport {
+                SasayakiDownloadResponse(ByteArrayInputStream("abc".toByteArray()), 3)
+            }, Dispatchers.Unconfined, listOf(spec, spec.copy(name = "missing.onnx")))
+            val progress = mutableListOf<Double>()
+            assertEquals(3L, store.missingBytes())
+            store.ensure({}) { progress += it }
+            assertEquals(0.0, progress.first(), 0.0)
+            assertEquals(1.0, progress.last(), 0.0)
+        }
+    }
+
     private suspend fun withDirectory(block: suspend (File) -> Unit) {
         val directory = Files.createTempDirectory("sasayaki-model-test").toFile()
         try { block(directory) } finally { directory.deleteRecursively() }

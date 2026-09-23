@@ -50,3 +50,27 @@ internal fun FfmpegLicenseNotice() {
         )
     }
 }
+
+@Composable
+internal fun TranscriptionLicenseNotice() {
+    val context = LocalContext.current
+    var showLicense by remember { mutableStateOf(false) }
+    TextButton(onClick = { showLicense = true }) {
+        Text(stringResource(R.string.about_transcription_license))
+    }
+    if (showLicense) {
+        val license by produceState("", context) {
+            value = withContext(Dispatchers.IO) {
+                context.assets.open("transcription-runtime-NOTICES.txt").bufferedReader().use { it.readText() }
+            }
+        }
+        HoshiAlertDialog(
+            onDismissRequest = { showLicense = false },
+            title = { Text(stringResource(R.string.about_transcription_license)) },
+            text = { Text(license, Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = {
+                TextButton(onClick = { showLicense = false }) { Text(stringResource(R.string.action_close)) }
+            },
+        )
+    }
+}

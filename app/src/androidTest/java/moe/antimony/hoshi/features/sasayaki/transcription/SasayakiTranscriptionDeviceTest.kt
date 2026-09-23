@@ -24,6 +24,13 @@ import org.junit.runner.RunWith
 class SasayakiTranscriptionDeviceTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
+    @org.junit.Before fun prepareCachedRuntime() = kotlinx.coroutines.runBlocking<Unit> {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val runtime = SasayakiRuntimeRepository(context, kotlinx.coroutines.Dispatchers.IO)
+        val directory = runtime.store().ensure({ error("Seed verified runtime files before native tests") }) {}
+        runtime.load(directory)
+    }
+
     @Test fun decoderResamplesStereoAndTrimsSeekPreroll() = runBlocking {
         val file = File.createTempFile("asr-decoder-", ".wav", context.cacheDir)
         try {
@@ -55,7 +62,8 @@ class SasayakiTranscriptionDeviceTest {
         val source = File(clip!!).toURI().toString()
         val backend = AndroidSasayakiTranscriptionBackend(
             AndroidSasayakiAudioDecoder(context, Dispatchers.IO),
-            SasayakiModelRepository(context, Dispatchers.IO), Dispatchers.Default,
+            SasayakiModelRepository(context, Dispatchers.IO),
+            SasayakiRuntimeRepository(context, Dispatchers.IO), Dispatchers.Default,
         )
         withTimeout(120_000) {
             val duration = backend.duration(source)

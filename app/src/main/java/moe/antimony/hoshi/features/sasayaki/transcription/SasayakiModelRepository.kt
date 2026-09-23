@@ -17,7 +17,7 @@ internal class SasayakiModelRepository @Inject constructor(
     @param:ApplicationContext context: Context,
     @param:IoDispatcher ioDispatcher: CoroutineDispatcher,
 ) {
-    private val store = SasayakiModelStore(
+    val store = SasayakiModelStore(
         File(context.noBackupFilesDir, "SasayakiModels/reazonspeech-k2-v2-int8-v1"),
         HttpSasayakiModelTransport(), ioDispatcher,
     )
@@ -26,7 +26,7 @@ internal class SasayakiModelRepository @Inject constructor(
         store.ensure(onDownloadRequired, onProgress)
 }
 
-private class HttpSasayakiModelTransport : SasayakiModelTransport {
+internal class HttpSasayakiModelTransport : SasayakiModelTransport {
     override suspend fun open(url: String): SasayakiDownloadResponse {
         require(url.startsWith("https://"))
         val connection = URL(url).openConnection() as HttpURLConnection

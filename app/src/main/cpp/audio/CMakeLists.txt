@@ -1,3 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(hoshi_audio LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 23)
+
 include(ExternalProject)
 find_program(HOSHI_MAKE NAMES gmake make REQUIRED)
 
@@ -9,6 +13,10 @@ get_filename_component(NDK_BIN "${CMAKE_C_COMPILER}" DIRECTORY)
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(FFMPEG_ARCH aarch64)
     set(FFMPEG_TARGET aarch64-linux-android)
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    set(FFMPEG_ARCH arm)
+    set(FFMPEG_TARGET armv7a-linux-androideabi)
+    set(FFMPEG_ARCH_OPTIONS --cpu=armv7-a)
 elseif(ANDROID_ABI STREQUAL "x86_64")
     set(FFMPEG_ARCH x86_64)
     set(FFMPEG_TARGET x86_64-linux-android)

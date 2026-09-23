@@ -80,4 +80,7 @@ jobs:
 
       - name: Test, lint, and assemble debug APK
         shell: bash
-        run: ./gradlew --no-daemon test lint assembleDebug
+        run: |
+          python3 tools/build-transcription-audio.py --check
+          ./gradlew --no-daemon -p buildSrc test
+          ./gradlew --no-daemon test lint assembleDebug

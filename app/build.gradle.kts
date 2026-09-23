@@ -1,4 +1,4 @@
-import java.security.MessageDigest
+import hoshi.build.PrepareSherpaTask
 
 plugins {
     alias(libs.plugins.android.application)
@@ -23,6 +23,8 @@ val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE")
 val releaseKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val releaseAbi = providers.gradleProperty("releaseAbi").getOrElse("arm64-v8a")
+require(releaseAbi in listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
 val releaseVersionName = providers.gradleProperty("releaseVersionName").orNull
 val releaseVersionCode = providers.gradleProperty("releaseVersionCode").orNull?.toIntOrNull()
 if (providers.gradleProperty("releaseVersionCode").isPresent && releaseVersionCode == null) {
@@ -72,7 +74,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                targets += listOf("hoshidicts_jni", "hoshiaudio_jni")
+                targets += listOf("hoshidicts_jni")
             }
         }
     }
@@ -101,7 +103,7 @@ android {
             isShrinkResources = true
             manifestPlaceholders["appLabel"] = "Hoshi Reader"
             ndk {
-                abiFilters += listOf("arm64-v8a")
+                abiFilters += listOf(releaseAbi)
             }
             if (isReleaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
@@ -138,8 +140,18 @@ android {
     sourceSets["release"].jniLibs.directories.add(rustReleaseJniLibsDir.absolutePath)
 }
 
+val prepareSherpa by tasks.registering(PrepareSherpaTask::class) {
+    archive.set(layout.file(sherpaOnnxArchive.elements.map { it.single().asFile }))
+    releaseBaseUrl.set("https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-sherpa-${libs.versions.sherpaOnnx.get()}-633c2432")
+    outputDirectory.set(layout.buildDirectory.dir("generated/sherpa"))
+    assetsDirectory.set(outputDirectory.dir("assets"))
+}
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareSherpa, PrepareSherpaTask::getAssetsDirectory)
+}
+
 dependencies {
-    implementation(sherpaOnnxArtifact)
+    implementation(files(prepareSherpa.map { it.outputDirectory.file("bindings.jar").get() }))
     sherpaOnnxArchive(sherpaOnnxArtifact)
     implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
@@ -186,34 +198,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-}
-
-// The upstream release is distributed as an AAR, without Maven metadata.
-// Verify the exact official archive before any build consumes its JNI code.
-abstract class VerifySherpaOnnxTask : DefaultTask() {
-    @get:InputFile
-    abstract val archive: RegularFileProperty
-
-    @TaskAction
-    fun verify() {
-        val digest = MessageDigest.getInstance("SHA-256")
-        archive.get().asFile.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        val actual = digest.digest().joinToString("") { "%02x".format(it) }
-        check(actual == "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96") {
-            "The sherpa-onnx AAR does not match the pinned official release SHA-256."
-        }
-    }
-}
-
-val verifySherpaOnnx by tasks.registering(VerifySherpaOnnxTask::class) {
-    archive.set(layout.file(sherpaOnnxArchive.elements.map { it.single().asFile }))
 }
 
 val buildRustHost by tasks.registering(Exec::class) {
@@ -301,13 +285,14 @@ val buildRustAndroidRelease by tasks.registering(Exec::class) {
     )
     inputs.dir(rustProjectDir.resolve("src"))
     inputs.property("androidNdkHome", androidNdkHome)
-    outputs.file(rustReleaseJniLibsDir.resolve("arm64-v8a/libhoshiepub.so"))
+    inputs.property("releaseAbi", releaseAbi)
+    outputs.file(rustReleaseJniLibsDir.resolve("$releaseAbi/libhoshiepub.so"))
 
     commandLine(
         cargo,
         "ndk",
         "-t",
-        "arm64-v8a",
+        releaseAbi,
         "-o",
         rustReleaseJniLibsDir.absolutePath,
         "build",
@@ -318,7 +303,7 @@ val buildRustAndroidRelease by tasks.registering(Exec::class) {
 
 tasks.named("preBuild") {
     dependsOn(generateUniffiKotlin)
-    dependsOn(verifySherpaOnnx)
+    dependsOn(prepareSherpa)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

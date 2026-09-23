@@ -9,8 +9,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Transcribe Japanese audiobooks on-device in Sasayaki, with a downloadable
-  speech model, progress, pause/resume, and matching to book text. Ask before
-  downloading missing models and show transcription progress in one place. Continue
+  speech model, progress, pause/resume, and matching to book text. Download
+  transcription components only when needed to keep the base app small;
+  ask once for all missing files and show transcription progress in one place. Continue
   transcribing with the audiobook panel closed, and keep running when switching
   apps instead of actively pausing; exiting the Reader still saves and pauses.
   Reuse completed transcripts or clear them while keeping the current match.

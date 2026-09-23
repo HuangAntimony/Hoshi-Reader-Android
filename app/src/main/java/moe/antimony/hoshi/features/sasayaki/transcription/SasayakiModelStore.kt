@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+@kotlinx.serialization.Serializable
 internal data class SasayakiModelFile(val name: String, val url: String, val bytes: Long, val sha256: String)
 
 internal object ReazonSpeechModelCatalog {
@@ -63,8 +64,18 @@ internal class SasayakiModelStore(
     private val transport: SasayakiModelTransport,
     private val ioDispatcher: CoroutineDispatcher,
     private val files: List<SasayakiModelFile> = ReazonSpeechModelCatalog.files,
+    private val readOnly: Boolean = false,
 ) {
     private val mutex = Mutex()
+
+    init {
+        require(files.all { it.name.isNotBlank() && it.name != "." && it.name != ".." && '/' !in it.name && '\\' !in it.name })
+        require(files.map { it.name }.distinct().size == files.size)
+    }
+
+    suspend fun missingBytes(): Long = mutex.withLock {
+        withContext(ioDispatcher) { files.filterNot { valid(File(directory, it.name), it) }.sumOf { it.bytes } }
+    }
 
     suspend fun ensure(onDownloadRequired: suspend (Long) -> Unit, onProgress: suspend (Double) -> Unit): File = mutex.withLock {
         withContext(ioDispatcher) {
@@ -79,8 +90,8 @@ internal class SasayakiModelStore(
                 if (ready.size == files.size) return@withContext directory
                 onDownloadRequired(files.filterNot { it in ready }.sumOf { it.bytes })
                 currentCoroutineContext().ensureActive()
-                val total = files.sumOf { it.bytes }.toDouble()
-                var completed = ready.sumOf { it.bytes }
+                val total = files.filterNot { it in ready }.sumOf { it.bytes }.toDouble()
+                var completed = 0L
                 onProgress(completed / total)
                 for (spec in files) {
                     currentCoroutineContext().ensureActive()
@@ -129,13 +140,17 @@ internal class SasayakiModelStore(
                 digest.update(buffer, 0, count)
             }
         }
-        return digest.hex() == spec.sha256
+        if (digest.hex() != spec.sha256) return false
+        if (readOnly && !file.setReadOnly()) throw IOException("Cannot protect runtime file")
+        return true
     }
 
     private suspend fun copyVerified(input: InputStream, target: File, spec: SasayakiModelFile, progress: suspend (Long) -> Unit) {
         val digest = MessageDigest.getInstance("SHA-256")
         var total = 0L
         FileOutputStream(target).use { output ->
+            // Android dynamic-code guidance: remove write permission before writing via the open descriptor.
+            if (readOnly && !target.setReadOnly()) throw IOException("Cannot protect runtime file")
             val buffer = ByteArray(64 * 1024)
             while (true) {
                 currentCoroutineContext().ensureActive()

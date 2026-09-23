@@ -480,7 +480,15 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Sasayaki Japanese transcription uses the repository-owned sherpa-onnx backend
   with ReazonSpeech k2-v2 INT8 and Silero VAD on CPU. SHA-256 verified models
   download on demand to `noBackupFilesDir/SasayakiModels`; they are not bundled
-  into the APK or included in Android backup. A minimal FFmpeg 9.0.2 JNI decoder
+  into the APK or included in Android backup. ONNX Runtime, sherpa JNI and the FFmpeg decoder also
+  download on demand to `noBackupFilesDir/SasayakiRuntime/<abi>`, using filenames
+  addressed by content hash so app upgrades reuse unchanged files. The installed
+  APK pins URLs, sizes and SHA-256 hashes; both resource groups share one consent
+  and byte-weighted progress flow. Native files become read-only before writing
+  and are atomically published after verification. The backend loads ONNX then
+  sherpa JNI by absolute path only after preparation. This is the GitHub APK
+  distribution path; a Play distribution would require Play Feature Delivery.
+  A minimal FFmpeg 9.0.2 JNI decoder
   reads existing SAF/private-file descriptors, respecting offset/length and
   source timestamps, and downmixes/resamples to 16 kHz float PCM. CMake verifies
   the upstream source archive SHA-256 and builds only local audio components;
@@ -573,7 +581,17 @@ The Android app currently has three native stacks:
   `third_party/hoshidicts-kotlin-bridge` submodule.
 - `app/src/main/rust/hoshiepub` builds the Rust EPUB parser through UniFFI.
 - The pinned, checksum-verified sherpa-onnx AAR supplies local speech inference
-  and its ONNX Runtime libraries. Native JNI entry points are retained under R8.
+  and its ONNX Runtime libraries. `buildSrc` extracts a bindings-only JAR and
+  redirects its native-load calls to the verified app-private loader. The unused
+  sherpa C/C++ API libraries are neither bundled nor downloaded. Release CI
+  publishes the exact hash-named inference files in a separate, pinned component
+  prerelease (excluded from app updates), with notices
+  also accessible under Settings > About. FFmpeg builds independently through
+  `tools/build-transcription-audio.py` and has a checked-in, content-addressed
+  catalog. Publish its binaries before shipping APKs that reference a new catalog;
+  app release CI verifies their deployed hashes. Neither inference nor FFmpeg
+  native code is bundled in the base APK.
+  Native JNI entry points are retained under R8.
 
 Current build wiring lives in `app/build.gradle.kts`:
 
