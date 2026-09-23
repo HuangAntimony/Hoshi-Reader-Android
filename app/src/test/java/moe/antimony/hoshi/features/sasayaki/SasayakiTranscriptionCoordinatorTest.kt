@@ -28,7 +28,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val loadModels = CompletableDeferred<Unit>()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
                 download.await()
                 onDownload(1.0)
                 loadModels.await()
@@ -118,7 +118,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val backend = object : SasayakiTranscriptionBackend {
             var from = -1.0
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
                 this.from = from
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("末尾", 99.1, 99.9)), 100.0))
             }
@@ -186,7 +186,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val repository = MemoryRepository()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("一", 1.0, 2.0)), 10.0))
                 delay(15_000)
                 onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("二", 20.0, 21.0)), 40.0))
@@ -224,7 +224,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val repository = MemoryRepository(beforeAlign = { count -> if (count == 1) finish.await() })
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
                 for (batch in batches) onBatch(batch)
             }
         }
@@ -277,7 +277,7 @@ class SasayakiTranscriptionCoordinatorTest {
         var transcriptions = 0
         var parallelism = 0
         override suspend fun duration(source: String) = 100.0
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
             this.from = from; this.parallelism = parallelism; transcriptions++
             onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("本文", from + 2, from + 3)), from + 10))
             if (fail) error("Decoder details must not be shown to users")

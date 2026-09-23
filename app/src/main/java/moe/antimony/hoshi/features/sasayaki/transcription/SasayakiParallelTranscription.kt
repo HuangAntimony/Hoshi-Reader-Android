@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki.transcription
 
+import moe.antimony.hoshi.features.sasayaki.SasayakiToken
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -21,9 +22,10 @@ internal suspend fun transcribeSpeechAudio(
     probability: (FloatArray) -> Float,
     recognize: suspend (FloatArray) -> RecognitionTokens,
     onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
+    previousTokens: List<SasayakiToken> = emptyList(),
 ) = coroutineScope {
     require(parallelism in 1..3)
-    val results = Channel<Deferred<SasayakiTranscriptionBatch>>(parallelism + 1)
+    val results = Channel<Deferred<SasayakiRecognitionBatch>>(parallelism + 1)
     val slots = Semaphore(parallelism)
     launch {
         val pipeline = SasayakiSpeechPipeline(from, duration, probability, recognize,
@@ -35,9 +37,14 @@ internal suspend fun transcribeSpeechAudio(
             pipeline.finish()
         } finally { results.close() }
     }
+    val stitcher = SasayakiRecognitionStitcher(from, previousTokens)
+    var publishedThrough = from
     for (result in results) {
         val batch = result.await()
         currentCoroutineContext().ensureActive()
-        onBatch(batch)
+        if (batch.through > publishedThrough) {
+            onBatch(stitcher.accept(batch))
+            publishedThrough = batch.through
+        }
     }
 }

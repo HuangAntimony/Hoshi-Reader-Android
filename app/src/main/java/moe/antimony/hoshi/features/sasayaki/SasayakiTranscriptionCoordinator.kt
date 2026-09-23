@@ -189,7 +189,8 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 hasTranscript = saved != null,
             ) }
             if (saved?.isComplete != true) {
-                backend.transcribe(source, through, parallelism = preset.parallelism, onDownloadRequired = { bytes ->
+                backend.transcribe(source, through, parallelism = preset.parallelism,
+                    previousTokens = tokens.takeLastWhile { it.end >= through - 1.0 }, onDownloadRequired = { bytes ->
                     val approval = CompletableDeferred<Unit>()
                     downloadApproval = approval
                     try {

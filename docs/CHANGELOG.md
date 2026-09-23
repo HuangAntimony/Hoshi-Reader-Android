@@ -31,7 +31,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
   Keep recognized words beside omitted cues and inside long missing passages;
   retain reliably timed text when another token has an abnormal duration, and account
-  for kana reading length when matching a shorter kanji spelling.
+  for kana reading length when matching a shorter kanji spelling. Preserve recognized
+  words on both sides of overlapping audio segments, including pause/resume, while
+  removing repeated context. Match small-vowel spellings and adjacent reading changes
+  without assigning the next word's opening to an omitted reply.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside

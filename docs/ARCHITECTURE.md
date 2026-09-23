@@ -518,8 +518,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   timestamps; token ends are bounded estimates from the next token/segment.
   Separate utterances retain up to one second of leading ASR context and trim
   already committed silence so early prefix timestamps cannot discard new words;
-  hard cuts and resume within speech retain half a second of leading context
-  with timestamp deduplication.
+  hard cuts and resume within speech retain half a second of leading context.
+  Ordered token stitching compares a recent suffix with the next recognized prefix,
+  retaining new words whose timestamps fall in overlapping context. Single-token
+  duplicates require close timestamps; multi-token phrases can tolerate drift within
+  the phrase. Only overlapping leading tokens are redistributed after already emitted
+  text. Core checkpoints remain independent of recognized trailing padding; resume
+  passes the saved one-second token tail by interval overlap to the same stitcher.
 - A process-wide `SasayakiTranscriptionCoordinator` serializes transcription,
   checkpoints `sasayaki_transcript.json` approximately every 15 seconds, and
   runs one conflated matching worker alongside recognition. The first text batch
@@ -584,7 +589,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   error blocks compare each cue separately, retaining unique reading candidates while
   letting competing name spellings veto ambiguous assignments. Entire recovered cues
   require complete original token ranges and more than a single ambiguous character;
-  two supported sentence edges split only at a unique compatible original token boundary.
+  two supported cue edges split only at a unique compatible original token boundary.
+  One edge may be a whole reading cue, but a kana reading cannot be split between
+  two kanji words solely by script lengths. A weak omitted cue cannot take one kana
+  from a continuous reading of the next anchored kanji word when no other cue has
+  a competing reading.
   Plain/ruby track selection weighs the affected text, not the length of surrounding
   anchors. Gap edit alignment prefers exact letters when edit costs tie and distinguishes
   token insertions from text deletions. Both axes remain bounded to 384 characters;
@@ -599,8 +608,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   short cue lacking sentence evidence additionally needs speech separated from both neighbors;
   an extra spoken suffix cannot supply an omitted reply. Strong sentence evidence allows
   short contracted spellings such as a multi-character name recognized as one token.
-  Bounded edit alignment treats individual Arabic/kanji digits as equivalent without
-  merging comma-separated cues or synthesizing numeric tokens. A partial sentence
+  Bounded edit alignment treats individual Arabic/kanji digits and small/full kana
+  vowels as equivalent without changing exact anchor seeds, stored text, or cue offsets.
+  Small tsu and contracted ya/yu/yo remain distinct. A partial sentence
   edge can be recovered beside an omitted cue only when that cue cannot plausibly
   claim the same tokens. Explicit-token repair checks token duration, excluding
   surrounding pauses. Kana/kanji rewrites retain their spoken character count for duration

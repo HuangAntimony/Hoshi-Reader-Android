@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SasayakiSpeechPipelineTest {
+    @Test fun continuationCanRecoverAWordMissingFromTheFirstHardCutResult() = runBlocking {
+        var frames = 0
+        var calls = 0
+        val batches = mutableListOf<SasayakiTranscriptionBatch>()
+        val pipeline = SasayakiSpeechPipeline(0.0, 20.512,
+            probability = { if (frames++ < 625) 1f else 0f }, recognize = {
+                if (calls++ == 0) RecognitionTokens(emptyArray(), floatArrayOf())
+                else RecognitionTokens(arrayOf("終"), floatArrayOf(.6f))
+            }, schedule = collect(batches))
+        pipeline.accept(AudioSamples(0, FloatArray(328_192)))
+        pipeline.finish()
+        assertEquals(2, calls)
+        assertEquals("終", batches.flatMap { it.tokens }.single().text)
+    }
+
     @Test fun speechEndingExactlyAtHardCutStillOwnsDelayedFinalToken() = runBlocking {
         var frames = 0
         var calls = 0
@@ -13,7 +28,7 @@ class SasayakiSpeechPipelineTest {
             probability = { if (frames++ < 625) 1f else 0f },
             recognize = {
                 RecognitionTokens(arrayOf("終"), floatArrayOf(if (calls++ == 0) 20.1f else .6f))
-            }, schedule = { work -> batches += work() })
+            }, schedule = collect(batches))
         pipeline.accept(AudioSamples(0, FloatArray(328_192)))
         pipeline.finish()
         val token = batches.flatMap { it.tokens }.single()
@@ -53,7 +68,7 @@ class SasayakiSpeechPipelineTest {
             inputStarts += samples.first()
             if (inputStarts.size == 1) RecognitionTokens(arrayOf("から"), floatArrayOf(.8f))
             else RecognitionTokens(arrayOf("冷", "房"), floatArrayOf(0f, .4f))
-        }, schedule = { work -> batches.add(work()) })
+        }, schedule = collect(batches))
         pipeline.accept(AudioSamples(0, FloatArray(49_152) { it / 49_152f }))
         pipeline.finish()
         assertEquals(listOf("から", "冷", "房"), batches.flatMap { it.tokens }.map { it.text })
@@ -69,34 +84,28 @@ class SasayakiSpeechPipelineTest {
             inputSizes += samples.size
             if (inputSizes.size == 1) RecognitionTokens(arrayOf("前"), floatArrayOf(19.6f))
             else RecognitionTokens(arrayOf("前", "後"), floatArrayOf(.1f, .6f))
-        }, schedule = { work -> batches.add(work()) })
+        }, schedule = collect(batches))
         pipeline.accept(AudioSamples(0, FloatArray(336_000)))
         pipeline.finish()
         assertEquals(listOf("前", "後"), batches.flatMap { it.tokens }.map { it.text })
         assertEquals(24_000, inputSizes[1])
-        assertEquals(20.1, batches.flatMap { it.tokens }.last().start, .00001)
+        assertEquals(batches.first().tokens.last().end, batches.flatMap { it.tokens }.last().start, .00001)
     }
 
-    @Test fun paddedResultsUseAbsoluteTimeAndDropAlreadyCommittedTokens() {
+    @Test fun paddedResultsRetainAllValidTokenTimesForOrderedStitching() {
         val tokens = projectRecognitionTokens(
             RecognitionTokens(arrayOf("前", "今", "後"), floatArrayOf(.1f, .8f, 1.2f)),
-            segmentStart = 10.0, segmentEnd = 11.5, committed = 10.5, through = 11.0,
+            segmentStart = 10.0, segmentEnd = 11.5,
         )
-        assertEquals(listOf("今"), tokens.map { it.text })
-        assertEquals(10.8, tokens.single().start, .00001)
-        assertEquals(11.0, tokens.single().end, 0.0)
-        val next = projectRecognitionTokens(
-            RecognitionTokens(arrayOf("今", "後"), floatArrayOf(.3f, .6f)),
-            segmentStart = 10.5, segmentEnd = 12.0, committed = 11.0, through = 12.0,
-        )
-        assertEquals(listOf("後"), next.map { it.text })
-        assertEquals(11.1, next.single().start, .00001)
+        assertEquals(listOf("前", "今", "後"), tokens.map { it.text })
+        assertEquals(10.1, tokens.first().start, .00001)
+        assertEquals(11.5, tokens.last().end, 0.0)
     }
 
     @Test fun tokensEmittedOnSameRnnTFrameHavePositiveBoundedDurations() {
         val tokens = projectRecognitionTokens(
             RecognitionTokens(arrayOf("同", "時", "刻"), floatArrayOf(.4f, .4f, .8f)),
-            segmentStart = 10.0, segmentEnd = 12.0, committed = 10.0, through = 11.0,
+            segmentStart = 10.0, segmentEnd = 11.0,
         )
         assertEquals(3, tokens.size)
         assertTrue(tokens.all { it.end > it.start && it.end <= 11.0 })
@@ -111,7 +120,7 @@ class SasayakiSpeechPipelineTest {
             recognized++
             assertTrue(batches.all { it.through <= 30.0 })
             RecognitionTokens(arrayOf("声"), floatArrayOf(.5f))
-        }, schedule = { work -> batches.add(work()) })
+        }, schedule = collect(batches, 30.0))
         repeat(625) { index -> pipeline.accept(AudioSamples(480_000L + index * 512, FloatArray(512))) }
         assertEquals(0, recognized)
         assertTrue(batches.isEmpty())
@@ -125,7 +134,7 @@ class SasayakiSpeechPipelineTest {
         val batches = mutableListOf<SasayakiTranscriptionBatch>()
         val pipeline = SasayakiSpeechPipeline(100.0, 112.0, probability = { 0f }, recognize = {
             error("Silence must not enter ASR")
-        }, schedule = { work -> batches.add(work()) })
+        }, schedule = collect(batches, 100.0))
         repeat(375) { index -> pipeline.accept(AudioSamples(1_600_000L + index * 512, FloatArray(512))) }
         pipeline.finish()
         assertTrue(batches.size >= 3)
@@ -139,7 +148,7 @@ class SasayakiSpeechPipelineTest {
         var windows = 0
         val pipeline = SasayakiSpeechPipeline(0.0, 2.0, probability = { if (windows++ < 32) .9f else 0f }, recognize = {
             RecognitionTokens(arrayOf("終"), floatArrayOf(1.12f))
-        }, schedule = { work -> batches.add(work()) })
+        }, schedule = collect(batches))
         pipeline.accept(AudioSamples(0, FloatArray(32_000)))
         pipeline.finish()
         assertEquals("終", batches.flatMap { it.tokens }.single().text)
@@ -150,11 +159,24 @@ class SasayakiSpeechPipelineTest {
         val batches = mutableListOf<SasayakiTranscriptionBatch>()
         val pipeline = SasayakiSpeechPipeline(30.0, 31.0, probability = { .9f }, recognize = {
             RecognitionTokens(arrayOf("旧", "新"), floatArrayOf(.2f, 1f))
-        }, schedule = { work -> batches.add(work()) }, audioFrom = 29.5)
+        }, schedule = collect(batches, 30.0), audioFrom = 29.5)
         pipeline.accept(AudioSamples(472_000, FloatArray(24_000)))
         pipeline.finish()
         assertEquals(listOf("新"), batches.flatMap { it.tokens }.map { it.text })
         assertEquals(30.5, batches.single().tokens.single().start, .00001)
         assertEquals(31.0, batches.last().through, 0.0)
     }
+    private fun collect(batches: MutableList<SasayakiTranscriptionBatch>, from: Double = 0.0):
+        suspend (suspend () -> SasayakiRecognitionBatch) -> Unit {
+        val stitcher = SasayakiRecognitionStitcher(from)
+        var through = from
+        return { work ->
+            val batch = work()
+            if (batch.through > through) {
+                batches += stitcher.accept(batch)
+                through = batch.through
+            }
+        }
+    }
+
 }

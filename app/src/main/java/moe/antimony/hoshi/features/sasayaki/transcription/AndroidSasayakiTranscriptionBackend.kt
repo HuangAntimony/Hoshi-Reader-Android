@@ -11,6 +11,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import java.io.File
 import java.io.IOException
+import moe.antimony.hoshi.features.sasayaki.SasayakiToken
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -41,6 +42,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         onDownload: suspend (Double) -> Unit,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
         parallelism: Int,
+        previousTokens: List<SasayakiToken>,
     ) = mutex.withLock {
         withContext(defaultDispatcher) {
             require(parallelism in 1..3)
@@ -54,7 +56,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
             currentCoroutineContext().ensureActive()
             try {
                 runtime.load(directories[0])
-                transcribeWithModels(source, from, duration, directories[1], parallelism, onBatch)
+                transcribeWithModels(source, from, duration, directories[1], parallelism, previousTokens, onBatch)
             } catch (error: LinkageError) {
                 throw IOException("Native transcription runtime is unavailable", error)
             }
@@ -67,6 +69,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
         duration: Double,
         directory: File,
         parallelism: Int,
+        previousTokens: List<SasayakiToken>,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
     ) {
         val recognizer = OfflineRecognizer(config = OfflineRecognizerConfig(
@@ -88,7 +91,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
             currentCoroutineContext().ensureActive()
             val energy = SasayakiEnergyVad()
             // Intentional ASR context is distinct from decoder sync
-            // preroll; already committed tokens are filtered below.
+            // preroll; saved tail text deduplicates already emitted context.
             val decodeFrom = maxOf(0.0, from - .5)
             transcribeSpeechAudio(from, duration, decodeFrom, parallelism,
                 decode = { send -> decoder.decode(source, decodeFrom, send) },
@@ -102,7 +105,7 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
                         val result = recognizer.getResult(stream)
                         RecognitionTokens(result.tokens, result.timestamps)
                     } finally { stream.release() }
-            }, onBatch = onBatch)
+            }, onBatch = onBatch, previousTokens = previousTokens)
         } finally { recognizer.release() }
     }
 }

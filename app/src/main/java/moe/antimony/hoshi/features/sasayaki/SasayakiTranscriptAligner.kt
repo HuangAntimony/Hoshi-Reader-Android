@@ -353,6 +353,30 @@ object SasayakiTranscriptAligner {
             return
         }
         val (repair, scores) = best
+        // A weak, wholly unanchored reply can accidentally share one kana with
+        // the reading of the next anchored word (いいわね。私 ← わたし). Keep
+        // that continuous reading together instead of splitting off its first kana.
+        val lastBoundary = (lower until upper - 1).lastOrNull { chapter.boundaries[it] }
+        if (lastBoundary != null && (lower == 0 || chapter.boundaries[lower - 1]) &&
+            !chapter.boundaries[upper - 1] && scores[lastBoundary + 1 - context.lower].accepted) {
+            val prefixPairs = repair.pairs.filter { it.written >= 0 &&
+                repair.projection.starts[repair.offset + it.written] in lower..lastBoundary }
+            val word = chapter.source.text.sliceArray(lastBoundary + 1 until upper)
+            val spoken = speech.text.sliceArray(speechStart until speechEnd)
+            val earlierEdges = listOf(lower) + (lower..lastBoundary).filter { chapter.boundaries[it] }.map { it + 1 }
+            if (word.all(::isKanji) && isReadingRewrite(word, spoken) &&
+                earlierEdges.zipWithNext().none { (from, to) ->
+                    isReadingRewrite(chapter.source.text.sliceArray(from until to), spoken)
+                } &&
+                prefixPairs.count { it.exact } <= 1 &&
+                (lower..lastBoundary).all { !scores[it - context.lower].accepted } &&
+                (speechStart until speechEnd - 1).all { speech.times[it + 1].start - speech.times[it].end < .1 }) {
+                val score = scores[lastBoundary + 1 - context.lower]
+                recoverShortRewrite(chapter, lastBoundary + 1, upper, speech, speechStart, speechEnd,
+                    score.similarity, times, score.accepted)
+                return
+            }
+        }
         // Keep exact islands fixed and assign only the tokens inside each error block.
         // In particular a DP deletion must not give an omitted reply a neighbor's time.
         var cursor = 0
@@ -499,6 +523,8 @@ object SasayakiTranscriptAligner {
             // neighboring reading, but competing plausible readings remain ambiguous.
             val candidates = edges.zipWithNext().filter { (from, to) ->
                 val written = chapter.source.text.sliceArray(from until to)
+                val wholeCue = (from == 0 || chapter.boundaries[from - 1]) && chapter.boundaries[to - 1]
+                if (wholeCue && max(written.size, spoken.size) < 2) return@filter false
                 val edits = editAlignment(written, 0, written.size, spoken, 0, spoken.size).second
                 isReadingRewrite(written, spoken) || 1.0 - edits.toDouble() / max(written.size, spoken.size) >= 0.25 ||
                     // A differently transcribed name can also own these kanji.
@@ -521,10 +547,14 @@ object SasayakiTranscriptAligner {
             // Two already supported sentence edges may have separate spelling
             // changes. Split only at an original token boundary and only when
             // exactly one partition is compatible; never divide a shared token.
-            if (edges.size != 3 || !prefix || !suffix) return
+            if (edges.size != 3 || !prefix && !suffix) return
             val middle = edges[1]
             val left = chapter.source.text.sliceArray(lower until middle)
             val right = chapter.source.text.sliceArray(middle until upper)
+            // With an entirely rewritten cue, script lengths alone cannot split
+            // one kana reading between two kanji words (最初、盛大 ← さいしょ).
+            if ((!prefix || !suffix) && left.all(::isKanji) && right.all(::isKanji) &&
+                spoken.none(::isKanji)) return
             fun compatible(written: IntArray, from: Int, to: Int, score: SentenceScore): Boolean {
                 if (score.similarity < 0.25) return false
                 val spoken = speech.text.sliceArray(from until to)
@@ -683,6 +713,13 @@ object SasayakiTranscriptAligner {
     // and each token's time; do not parse a spoken number into a new synthetic token.
     private fun sameSymbol(written: Int, spoken: Int): Boolean {
         if (written == spoken) return true
+        // Small vowel spellings express the same elongated interjection. Do not
+        // fold small tsu/ya/yu/yo, which would erase phonetic distinctions.
+        fun vowel(point: Int): Int = when (point) {
+            'ぁ'.code, 'ぃ'.code, 'ぅ'.code, 'ぇ'.code, 'ぉ'.code -> point + 1
+            else -> point
+        }
+        if (vowel(written) == vowel(spoken)) return true
         val (digit, kanji) = when {
             written in '0'.code..'9'.code -> written - '0'.code to spoken
             spoken in '0'.code..'9'.code -> spoken - '0'.code to written

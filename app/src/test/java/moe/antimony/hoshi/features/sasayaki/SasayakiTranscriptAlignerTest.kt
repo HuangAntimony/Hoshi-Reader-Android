@@ -9,6 +9,50 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SasayakiTranscriptAlignerTest {
+    @Test fun aWholeCueReadingCannotBeSplitToInventAnUnspokenNeighbor() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。最初、盛大に音漏れしてたのは。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("さ", 4.5, 4.7),
+                token("い", 4.7, 4.9), token("し", 4.9, 5.1), token("ょ", 5.1, 5.4),
+                token("に音漏れしてたのは", 5.4, 8.0), token("彼女は窓の外を眺めていた", 9.0, 12.0)),
+        )
+        assertFalse(result.matches.any { "盛大" in it.text })
+    }
+
+    @Test fun smallVowelSpellingKeepsBothSidesOfComma() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。へぇ、珍しい名前ね。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("へ", 4.5, 4.7),
+                token("え", 4.7, 4.9), token("めずら", 5.0, 5.5), token("しい名前ね", 5.5, 7.0),
+                token("彼女は窓の外を眺めていた", 8.0, 12.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "へぇ", "珍しい名前ね", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(4.9, result.matches[1].endTime, .0001)
+        assertEquals(5.0, result.matches[2].startTime, .0001)
+    }
+
+    @Test fun wholeReadingCueBeforeSupportedNameUsesSeparateTokens() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。皆、ひとみ先生が大好きなので。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("みんな", 4.5, 5.0),
+                token("人", 5.0, 5.2), token("見", 5.2, 5.4), token("先生が大好きなので", 5.4, 8.0),
+                token("彼女は窓の外を眺めていた", 9.0, 12.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "皆", "ひとみ先生が大好きなので", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].endTime, .0001)
+        assertEquals(5.0, result.matches[2].startTime, .0001)
+    }
+
+    @Test fun omittedReplyCannotTakeTheFirstKanaOfFollowingWord() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。いいわね。私のお母さんは夜まで家にいないから。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("わ", 5.0, 6.4),
+                token("た", 6.4, 6.5), token("し", 6.5, 6.7), token("のお母さんは夜まで家にいないから", 6.7, 10.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "私のお母さんは夜まで家にいないから"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches.last().startTime, .0001)
+    }
+
     @Test fun emptyAlignmentStillRecordsTranscriptionSource() {
         val result = SasayakiTranscriptAligner.align(book("<p>本文</p>"), emptyList())
         assertTrue(result.matches.isEmpty())
