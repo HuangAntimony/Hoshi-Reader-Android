@@ -16,6 +16,7 @@ object SasayakiSource {
         val text: IntArray,
         val starts: IntArray,
         val ends: IntArray,
+        val variantOf: Int? = null,
     )
 
     internal fun chapters(book: EpubBook): List<Chapter> =
@@ -46,7 +47,8 @@ object SasayakiSource {
     }
 
     internal fun projections(chapter: Chapter): List<Projection> {
-        val plain = projection(chapter.html.visibleReaderText())
+        val visible = chapter.html.visibleReaderText()
+        val plain = projection(visible)
         val body = Regex("(?s)<body.*?</body>").find(chapter.html)?.value ?: chapter.html
         val markup = body.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
         val text = mutableListOf<Int>()
@@ -78,8 +80,37 @@ object SasayakiSource {
         }
         append(markup.substring(cursor).visibleReaderText())
         // ReaderTextFilter owns stored offsets. Malformed markup must never change them.
-        if (!hasReading || sourceOffset != chapter.text.size) return listOf(plain)
-        return listOf(plain, Projection(text.toIntArray(), starts.toIntArray(), ends.toIntArray()))
+        val projections = if (!hasReading || sourceOffset != chapter.text.size) listOf(plain)
+            else listOf(plain, Projection(text.toIntArray(), starts.toIntArray(), ends.toIntArray()))
+        // Percent signs do not count toward Reader offsets. Offer their spoken
+        // form as an additional track, attached to the preceding source character,
+        // while retaining the plain track for transcripts that omit the symbol.
+        val percentEnds = mutableSetOf<Int>()
+        var offset = 0
+        visible.codePoints().forEach { point ->
+            if (point.isReaderMatchableCodePoint()) offset++
+            else if ((point == '%'.code || point == '％'.code) && offset > 0) percentEnds += offset
+        }
+        if (percentEnds.isEmpty()) return projections
+        return projections + projections.mapIndexed { track, projection ->
+            val expanded = mutableListOf<Int>()
+            val starts = mutableListOf<Int>()
+            val ends = mutableListOf<Int>()
+            projection.text.forEachIndexed { index, point ->
+                expanded += point
+                starts += projection.starts[index]
+                ends += projection.ends[index]
+                val end = projection.ends[index]
+                if (end in percentEnds && (index == projection.text.lastIndex || projection.starts[index + 1] >= end)) {
+                    normalize("パーセント").forEach { spoken ->
+                        expanded += spoken
+                        starts += end - 1
+                        ends += end
+                    }
+                }
+            }
+            Projection(expanded.toIntArray(), starts.toIntArray(), ends.toIntArray(), variantOf = track)
+        }
     }
 
     internal fun normalizedText(text: String): IntArray =

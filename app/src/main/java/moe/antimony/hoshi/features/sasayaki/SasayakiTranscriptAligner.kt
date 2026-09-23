@@ -57,7 +57,7 @@ object SasayakiTranscriptAligner {
     /** One append-only transcript. Book normalization and the distinctive-text index are shared by all updates. */
     class Session(book: EpubBook) {
         private val chapters: List<Chapter>
-        private val index: Map<Long, Seed?>
+        private val index: Map<Long, List<Seed>?>
         private var processedTokens = 0
         private var speech = Speech(IntArray(0), emptyList())
         private var candidates = emptyList<Anchor>()
@@ -90,8 +90,8 @@ object SasayakiTranscriptAligner {
             val added = speech(tokens.subList(processedTokens, tokens.size), speech.lastStart)
             speech = Speech(speech.text + added.text, speech.times + added.times, added.lastStart)
             processedTokens = tokens.size
-            candidates = (candidates.filter { it.spoken < from && it.speechEnd < tail } +
-                findAnchors(chapters, speech.text, index, from)).distinctBy { Triple(it.chapter, it.sourceStart, it.spoken) }
+            candidates = strongestAtEachStart(chapters, candidates.filter { it.spoken < from && it.speechEnd < tail } +
+                findAnchors(chapters, speech.text, index, from))
             // Choosing the monotonic chain is cheap and lets stronger new evidence correct an old location.
             val anchors = coherentAnchors(candidates)
             val times = chapters.map { arrayOfNulls<Timing>(it.source.text.size) }
@@ -172,7 +172,9 @@ object SasayakiTranscriptAligner {
             if (!token.start.isFinite() || !token.end.isFinite() || token.start < previousStart ||
                 token.end <= token.start) return@forEach
             previousStart = token.start
-            val points = SasayakiSource.normalizedText(token.text)
+            // The Japanese recognizer emits percentage signs as lexical tokens.
+            // Preserve their spoken meaning before reader punctuation filtering.
+            val points = SasayakiSource.normalizedText(token.text.replace("％", "パーセント").replace("%", "パーセント"))
             points.forEachIndexed { index, point ->
                 characters += point
                 val length = token.end - token.start
@@ -182,21 +184,24 @@ object SasayakiTranscriptAligner {
         return Speech(characters.toIntArray(), times, previousStart)
     }
 
-    private fun buildIndex(chapters: List<Chapter>): Map<Long, Seed?> {
+    private fun buildIndex(chapters: List<Chapter>): Map<Long, List<Seed>?> {
         // A null entry is ambiguous. Duplicate base/ruby projections at the same source
         // position count once; repeated phrases elsewhere cannot become independent anchors.
-        val index = HashMap<Long, Seed?>()
+        val index = HashMap<Long, List<Seed>?>()
         chapters.forEachIndexed { chapterIndex, chapter ->
             chapter.projections.forEachIndexed { projectionIndex, projection ->
                 for (position in 0..projection.text.size - seedLength) {
                     val key = hash(projection.text, position)
                     val candidate = Seed(chapterIndex, projectionIndex, position, projection.starts[position])
                     if (!index.containsKey(key)) {
-                        index[key] = candidate
+                        index[key] = listOf(candidate)
                     } else {
                         val previous = index[key]
-                        if (previous != null && (previous.chapter != chapterIndex || previous.sourceStart != candidate.sourceStart)) {
-                            index[key] = null
+                        if (previous != null) {
+                            val first = previous.first()
+                            if (first.chapter != chapterIndex || first.sourceStart != candidate.sourceStart) index[key] = null
+                            else if ((chapter.projections[first.projection].variantOf ?: first.projection) ==
+                                (projection.variantOf ?: projectionIndex)) index[key] = previous + candidate
                         }
                     }
                 }
@@ -205,36 +210,60 @@ object SasayakiTranscriptAligner {
         return index
     }
 
-    private fun findAnchors(chapters: List<Chapter>, speech: IntArray, index: Map<Long, Seed?>, from: Int): List<Anchor> {
+    private val anchorStrength = compareBy<Anchor> { it.sourceEnd - it.sourceStart }.thenBy { it.length }
+
+    private fun strongestAtEachStart(chapters: List<Chapter>, anchors: List<Anchor>): List<Anchor> {
+        val selected = LinkedHashMap<Triple<Int, Int, Int>, Anchor>()
+        fun baseTrack(anchor: Anchor) = chapters[anchor.chapter].projections[anchor.projection].variantOf ?: anchor.projection
+        anchors.forEach { anchor ->
+            val key = Triple(anchor.chapter, anchor.sourceStart, anchor.spoken)
+            val previous = selected[key]
+            // Preserve the existing plain/ruby anchor choice. Only compare symbol
+            // variants of that track; a broader ruby extension may pin an incidental
+            // letter across an omitted reply and change its neighbor's ownership.
+            if (previous == null || baseTrack(anchor) == baseTrack(previous) && anchorStrength.compare(anchor, previous) > 0)
+                selected[key] = anchor
+        }
+        return selected.values.toList()
+    }
+
+    private fun findAnchors(chapters: List<Chapter>, speech: IntArray, index: Map<Long, List<Seed>?>, from: Int): List<Anchor> {
         val result = mutableListOf<Anchor>()
         var position = from
         while (position <= speech.size - seedLength) {
-            val seed = index[hash(speech, position)]
-            if (seed == null) {
+            val seeds = index[hash(speech, position)]
+            if (seeds == null) {
                 position++
                 continue
             }
-            val chapter = chapters[seed.chapter]
-            val projection = chapter.projections[seed.projection]
-            if ((0 until seedLength).any { speech[position + it] != projection.text[seed.offset + it] } ||
-                (0 until seedLength).map { speech[position + it] }.distinct().size < 3) {
+            if ((0 until seedLength).map { speech[position + it] }.distinct().size < 3) {
                 position++
                 continue
             }
-            var before = 0
-            while (position > before && seed.offset > before &&
-                speech[position - before - 1] == projection.text[seed.offset - before - 1]) before++
-            var length = seedLength
-            while (position + length < speech.size && seed.offset + length < projection.text.size &&
-                speech[position + length] == projection.text[seed.offset + length]) length++
-            val written = seed.offset - before
-            val sourceStart = projection.starts[written]
-            val sourceEnd = projection.ends[seed.offset + length - 1]
-            result += Anchor(seed.chapter, seed.projection, written, position - before,
-                length + before, sourceStart, sourceEnd, chapter.globalStart + sourceStart)
-            position += length - seedLength + 1
+            // Equivalent symbol spellings at one source position are not ambiguity.
+            // Extend that track's variants before choosing: a plain prefix may
+            // stop at a percent spelling whose spoken form matches the whole cue.
+            val anchor = seeds.mapNotNull { seed ->
+                val chapter = chapters[seed.chapter]
+                val projection = chapter.projections[seed.projection]
+                if ((0 until seedLength).any { speech[position + it] != projection.text[seed.offset + it] }) return@mapNotNull null
+                var before = 0
+                while (position > before && seed.offset > before &&
+                    speech[position - before - 1] == projection.text[seed.offset - before - 1]) before++
+                var length = seedLength
+                while (position + length < speech.size && seed.offset + length < projection.text.size &&
+                    speech[position + length] == projection.text[seed.offset + length]) length++
+                val written = seed.offset - before
+                val sourceStart = projection.starts[written]
+                val sourceEnd = projection.ends[seed.offset + length - 1]
+                Anchor(seed.chapter, seed.projection, written, position - before,
+                    length + before, sourceStart, sourceEnd, chapter.globalStart + sourceStart)
+            }.maxWithOrNull(anchorStrength)
+            if (anchor == null) { position++; continue }
+            result += anchor
+            position = anchor.speechEnd - seedLength + 1
         }
-        return result.distinctBy { Triple(it.chapter, it.sourceStart, it.spoken) }
+        return strongestAtEachStart(chapters, result)
     }
 
     private fun hash(text: IntArray, offset: Int): Long {
@@ -319,6 +348,16 @@ object SasayakiTranscriptAligner {
             return
         }
         if (writtenCount !in 1..maxGap || spokenCount !in 1..maxGap) return
+        val wholeCue = (lower == 0 || chapter.boundaries[lower - 1]) && chapter.boundaries[upper - 1] &&
+            (lower until upper - 1).none { chapter.boundaries[it] }
+        // Two exact anchors already locate this single short utterance. ASR can
+        // mishear every letter; use its complete token interval, not spelling as
+        // a second prerequisite for displaying the book's text.
+        if (wholeCue && writtenCount <= maxUncertainRun && spokenCount <= 8 &&
+            (speechStart == 0 || speech.times[speechStart - 1].tokenEnd) && speech.times[speechEnd - 1].tokenEnd) {
+            recoverShortRewrite(chapter, lower, upper, speech, speechStart, speechEnd, 1.0, times, supported = true)
+            if ((lower until upper).all { times[it] != null }) return
+        }
         val best = chapter.projections.mapNotNull { projection ->
             val start = projection.starts.indexOfFirst { it >= context.lower }
             val end = projection.ends.indexOfLast { it <= context.upper } + 1
@@ -425,9 +464,11 @@ object SasayakiTranscriptAligner {
                     val isolatedSpeech = tokenFrom > 0 && tokenTo < speech.times.size &&
                         speech.times[tokenFrom].start - speech.times[tokenFrom - 1].end >= 0.01 &&
                         speech.times[tokenTo].start - speech.times[tokenTo - 1].end >= 0.01
+                    val isolatedReply = wholeCue && isolatedSpeech && to - from <= maxUncertainRun && tokenTo - tokenFrom <= 8 &&
+                        speech.times[tokenFrom - 1].tokenEnd && speech.times[tokenTo - 1].tokenEnd
                     if (hasSentenceEvidence || wholeGap || wholeCue && isolatedSpeech) recoverShortRewrite(chapter, from, to, speech, tokenFrom, tokenTo,
                         if (sameSentence) score.similarity else 0.0, times,
-                        supported = sameSentence && score.accepted,
+                        supported = sameSentence && score.accepted || isolatedReply,
                         evidence = { point -> scores[point - context.lower] })
                 }
             }
@@ -544,6 +585,35 @@ object SasayakiTranscriptAligner {
                     score.similarity, times, score.accepted)
                 return
             }
+            // Strong surrounding text can locate a contracted/rewritten phrase
+            // spanning two cue edges. Interpolate at an actual token boundary;
+            // a whole neighboring content word still needs its own evidence.
+            if (edges.size == 3 && (prefix || suffix) && upper - lower <= 12 &&
+                (speechStart == 0 || speech.times[speechStart - 1].tokenEnd) && speech.times[speechEnd - 1].tokenEnd) {
+                val middle = edges[1]
+                fun anchored(from: Int, to: Int, partial: Boolean): Boolean = to - from >= 2 &&
+                    if (partial) evidence(from).accepted else to - from == 2 &&
+                        chapter.source.text.sliceArray(from until to).all { it in 0x3041..0x30FA || it == 0x30FC }
+                fun fits(from: Int, to: Int, start: Int, end: Int): Boolean {
+                    val ratio = (to - from).toDouble() / (end - start)
+                    val duration = speech.times[end - 1].end - speech.times[start].start
+                    return ratio in .25..4.0 && duration > 0 && duration <= 1.0 + (to - from) * .7
+                }
+                val kanaOnly = chapter.source.text.sliceArray(lower until upper).all { it in 0x3041..0x30FA || it == 0x30FC } &&
+                    spoken.all { it in 0x3041..0x30FA || it == 0x30FC }
+                if ((prefix && suffix || kanaOnly) && anchored(lower, middle, prefix) && anchored(middle, upper, suffix)) {
+                    val target = speechStart + (middle - lower).toDouble() * spoken.size / (upper - lower)
+                    val split = (speechStart + 1 until speechEnd).filter { point ->
+                        speech.times[point - 1].tokenEnd && speech.times[point - 1].end <= speech.times[point].start &&
+                            fits(lower, middle, speechStart, point) && fits(middle, upper, point, speechEnd)
+                    }.minByOrNull { kotlin.math.abs(it - target) }
+                    if (split != null) {
+                        recoverShortRewrite(chapter, lower, middle, speech, speechStart, split, 1.0, times, supported = true)
+                        recoverShortRewrite(chapter, middle, upper, speech, split, speechEnd, 1.0, times, supported = true)
+                        return
+                    }
+                }
+            }
             // Two already supported sentence edges may have separate spelling
             // changes. Split only at an original token boundary and only when
             // exactly one partition is compatible; never divide a shared token.
@@ -583,8 +653,7 @@ object SasayakiTranscriptAligner {
         val durationCharacters = if (readingRewrite) max(writtenCount, spokenCount) else writtenCount
         if (duration <= 0 || duration > 1.0 + durationCharacters * 0.7) return
         val ratio = writtenCount.toDouble() / spokenCount
-        val shortSupportedRewrite = supported && writtenCount <= maxUncertainRun
-        if (ratio !in 0.5..2.0 && !((readingRewrite || shortSupportedRewrite) && ratio in 0.25..4.0)) return
+        if (ratio !in 0.5..2.0 && !((readingRewrite || supported) && ratio in 0.25..4.0)) return
         // Entirely unrelated phrases cannot be recovered from duration/length alone.
         if (!supported && similarity < 0.25 && !readingRewrite) return
         for (index in 0 until writtenCount) {

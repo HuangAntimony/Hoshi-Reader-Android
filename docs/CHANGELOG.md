@@ -34,7 +34,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   for kana reading length when matching a shorter kanji spelling. Preserve recognized
   words on both sides of overlapping audio segments, including pause/resume, while
   removing repeated context. Match small-vowel spellings and adjacent reading changes
-  without assigning the next word's opening to an omitted reply.
+  without assigning the next word's opening to an omitted reply. Use surrounding
+  matched text to recover short misrecognized replies and contracted phrases,
+  including rewritten cue edges and percentages emitted as symbols by recognition.
   Match new transcription automatically while reading, preserving playback,
   reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside

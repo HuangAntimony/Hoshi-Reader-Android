@@ -941,7 +941,11 @@ Validate relevant sync/update/Sasayaki changes with:
   prefix, ambiguous readings on either side of a sentence boundary, and a partial
   ruby reading error sharing one base character. Repaired syllables must preserve
   the exact syllables' timing; deleted letters inside a spoken word must not give
-  an omitted whole cue its neighbor's time. Sparse sentences must retain supported
+  an omitted whole cue its neighbor's time. A single short cue enclosed by reliable
+  anchors and complete speech tokens should retain the book's wording even when ASR
+  mishears it; check rewritten short replies, numeric values, contracted phrases,
+  and `%`/`％` output. Contextual cross-cue allocation must not split a recognized
+  neighboring word to invent a missing interjection. Sparse sentences must retain supported
   fragments, and incremental matching must agree with full alignment.
   Character coverage and subtitle cue match rate are different metrics; neither
   alone verifies transcript accuracy. Exclude toc/caution/colophon source paths

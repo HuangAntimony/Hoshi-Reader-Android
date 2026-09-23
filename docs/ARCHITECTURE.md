@@ -586,16 +586,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Short kana/kanji rewrites spanning one comma can use that sentence's confidence when both
   cues have recognized text and no whole omitted cue lies between them; proportional
   token allocation gives the two cues disjoint time ranges at the comma. Cross-cue
-  error blocks compare each cue separately, retaining unique reading candidates while
-  letting competing name spellings veto ambiguous assignments. Entire recovered cues
-  require complete original token ranges and more than a single ambiguous character;
-  two supported cue edges split only at a unique compatible original token boundary.
+  error blocks compare each cue separately, retaining unique reading candidates before
+  attempting proportional allocation. Two supported cue edges may proportionally split
+  a short rewrite at a non-overlapping original token boundary; a whole neighboring cue
+  additionally requires a two-kana cue with all-kana written and spoken gaps. Other cross-cue reading
+  repairs require a unique compatible split, with competing readings left unresolved.
+  Entire cues recovered from cross-cue gaps require complete original token ranges
+  and more than a single ambiguous character.
   One edge may be a whole reading cue, but a kana reading cannot be split between
   two kanji words solely by script lengths. A weak omitted cue cannot take one kana
   from a continuous reading of the next anchored kanji word when no other cue has
   a competing reading.
   Plain/ruby track selection weighs the affected text, not the length of surrounding
-  anchors. Gap edit alignment prefers exact letters when edit costs tie and distinguishes
+  anchors. Symbol variants of the chosen seed track remain available until exact
+  extension; selection and cache deduplication prefer wider source coverage, then longer
+  spoken coverage. Existing plain/ruby seed precedence remains unchanged; a spoken
+  percent variant cannot let a different ruby track consume an adjacent omitted reply.
+  Gap edit alignment prefers exact letters when edit costs tie and distinguishes
   token insertions from text deletions. Both axes remain bounded to 384 characters;
   a length imbalance does not discard distinctive recognized islands. Unique one-kanji
   cues or two-character cue endings immediately beside a real anchor can pin the local
@@ -604,10 +611,19 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   more spelling differences; each uncertain block uses only its own tokens and requires
   minimum evidence from its sentence before inferring changed or omitted fragments. Compatible
   kana/kanji recovery requires existing kana to occur in order in the candidate reading
-  and uses bounded lengths, not an automatic pronunciation dictionary. An entirely rewritten
-  short cue lacking sentence evidence additionally needs speech separated from both neighbors;
-  an extra spoken suffix cannot supply an omitted reply. Strong sentence evidence allows
-  short contracted spellings such as a multi-character name recognized as one token.
+  and uses bounded lengths, not an automatic pronunciation dictionary. When two real
+  anchors enclose exactly one short cue and complete speech tokens, its book text can
+  use that interval despite entirely different ASR wording or numeric values, subject
+  to duration and length-ratio limits. Within a larger repair window, an isolated short
+  reply can likewise use a complete token range separated from both neighbors by pauses;
+  an extra spoken suffix cannot supply
+  an omitted reply. Supported phrases allow length ratios of 1:4 through 4:1, retaining
+  contracted names and wording differences without requiring the ASR to repeat each letter.
+  The internal speech projection expands `%`/`％` to `パーセント` before punctuation
+  filtering, preserving the original token's interval and boundary without changing stored ASR text.
+  Source projections retain plain/ruby tracks and offer the spoken percent spelling as
+  another track; its timing attaches to the preceding counted character so Reader offsets
+  and symbol-only spellings continue to work.
   Bounded edit alignment treats individual Arabic/kanji digits and small/full kana
   vowels as equivalent without changing exact anchor seeds, stored text, or cue offsets.
   Small tsu and contracted ya/yu/yo remain distinct. A partial sentence

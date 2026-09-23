@@ -9,6 +9,179 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SasayakiTranscriptAlignerTest {
+    @Test fun symbolVariantsDoNotChangeExistingRubyAnchorAndReplyOwnership() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>とりあえずお茶でも<ruby>淹<rt>い</rt></ruby>れるから、見学者名簿に名前書いておいて。</p>" +
+                "<p>ありがと。あ、わたし緑茶で。</p>" +
+                "<p><ruby>八<rt>や</rt></ruby><ruby>奈<rt>な</rt></ruby><ruby>見<rt>み</rt></ruby>は名簿に名前を書くと、パラパラとページをめくる。</p>"),
+            listOf(token("とりあえずお茶でもいれるから見学者名簿に名前書いておいて", 1.0, 6.0),
+                token("あ", 6.0, 7.48), token("っ", 7.48, 7.76), token("私", 7.76, 8.24),
+                token("緑", 8.24, 8.52), token("茶", 8.52, 8.84), token("で", 8.84, 9.264),
+                token("八波は名簿に名前を書くとパラパラとページをめくる", 9.3, 13.6)),
+        )
+        assertTrue(result.matches.any { it.text == "わたし緑茶で" })
+    }
+
+    @Test fun contextualCueSplitCannotDivideAKanjiWordBetweenCompetingKanaReadings() {
+        for ((written, spoken) in listOf("じゅんび" to listOf("準", "備"), "しごと" to listOf("仕", "事"))) {
+            val result = SasayakiTranscriptAligner.align(
+                book("<p>雨の降る静かな朝だった。うん。${written}をしなければならない。</p>"),
+                listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token(spoken[0], 5.0, 5.3),
+                    token(spoken[1], 5.3, 5.6), token("をしなければならない", 5.6, 9.0)),
+            )
+            assertFalse(written, result.matches.any { it.text == "うん" })
+        }
+    }
+
+    @Test fun bookPercentSymbolsKeepTheirSourceOffsetsAndMatchBothSpokenSpellings() {
+        for (symbol in listOf("%", "％")) {
+            for (spoken in listOf("支持率は10${symbol}です", "支持率は10パーセントです", "支持率は10です")) {
+                val result = SasayakiTranscriptAligner.align(
+                    book("<p>支持率は10${symbol}です。</p>"), listOf(token(spoken, 1.0, 5.0)),
+                )
+                val cue = result.matches.single()
+                assertEquals("支持率は10です", cue.text)
+                assertEquals(0, cue.start)
+                assertEquals(8, cue.length)
+                assertEquals(1.0, cue.startTime, .0001)
+                assertEquals(5.0, cue.endTime, .0001)
+            }
+        }
+    }
+
+    @Test fun bookPercentProjectionRetainsRubyAndFollowingCueOffsets() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>この<ruby>資料<rt>しりょう</rt></ruby>の支持率は10％です。結果を確認しました。</p>"),
+            listOf(token("このしりょうの支持率は10パーセントです", 1.0, 7.0), token("結果を確認しました", 8.0, 11.0)),
+        )
+        assertEquals(listOf("この資料の支持率は10です", "結果を確認しました"), result.matches.map { it.text })
+        assertEquals(13, result.matches.last().start)
+        assertEquals(7.0, result.matches.first().endTime, .0001)
+        assertEquals(8.0, result.matches.last().startTime, .0001)
+    }
+
+    @Test fun longerEquivalentPercentTrackExtendsAnExistingPlainSeed() {
+        for (written in listOf("彼の支持率は10％です", "一番高い数字は99%になった")) {
+            val result = SasayakiTranscriptAligner.align(book("<p>$written。</p>"), listOf(token(written, 1.0, 5.0)))
+            assertEquals(written.replace("％", "").replace("%", ""), result.matches.single().text)
+            assertEquals(5.0, result.matches.single().endTime, .0001)
+        }
+    }
+
+    @Test fun shortIsolatedReplyKeepsItsOwnAudioInsideALargerSpellingGap() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>尻尾のちぎれた友達が待っていました。「ナー」と鳴く彼女に挨拶をして大きく手を振った。</p>"),
+            listOf(token("尻尾のちぎれた友達が待っていました", 1.0, 5.0),
+                token("ま", 5.3, 5.9), token("あ", 5.9, 6.5),
+                token("と", 6.9, 7.1), token("な", 7.1, 7.3), token("く", 7.3, 7.5),
+                token("彼女に挨拶をして大きく手を振った", 7.5, 12.0)),
+        )
+        val cue = result.matches.single { it.text == "ナー" }
+        assertEquals(5.3, cue.startTime, .0001)
+        assertEquals(6.5, cue.endTime, .0001)
+        assertTrue(result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime })
+    }
+
+    @Test fun contextualCueSplitCannotGiveHalfAContentWordToAnOmittedInterjection() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>見た目の割に爽やかな話題がない。っと、撮影の準備があるんだった。君たちも同行するの。</p>"),
+            listOf(token("見た目の割に爽やかな話題がない", 1.0, 5.0),
+                token("じ", 6.0, 6.2), token("ゅ", 6.2, 6.3), token("ん", 6.3, 6.4), token("び", 6.4, 6.5),
+                token("があるんだった", 6.5, 8.0), token("君たちも同行するの", 9.0, 12.0)),
+        )
+        assertFalse(result.matches.any { it.text == "っと" })
+        assertEquals("見た目の割に爽やかな話題がない", result.matches.first().text)
+        assertEquals("君たちも同行するの", result.matches.last().text)
+    }
+
+    @Test fun contextualCueSplitCannotTakeAnAlreadyPlausibleReadingFromItsNeighbor() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>今から俺たちがパンドラの匣を開けてやるぅっ。救世の士にでもなったつもりだろう。</p>"),
+            listOf(token("今から俺たちがパンドラの匣を開けてやる", 1.0, 6.0), token("旧", 6.0, 6.3),
+                token("姓", 6.3, 6.6), token("の士にでもなったつもりだろう", 6.6, 10.0)),
+        )
+        assertFalse(result.matches.any { it.text.endsWith("ぅっ") })
+        assertEquals("救世の士にでもなったつもりだろう", result.matches.last().text)
+        assertEquals(6.0, result.matches.last().startTime, .0001)
+    }
+
+    @Test fun rejectedWholeCueTimingStillKeepsItsReliablyTimedWords() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>雨の降る静かな朝だった。そうだね。彼女は窓の外を眺めていた。</p>"),
+            listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("そうだ", 5.0, 5.8),
+                token("ね", 5.8, 12.0), token("彼女は窓の外を眺めていた", 12.0, 16.0)),
+        )
+        assertEquals(listOf("雨の降る静かな朝だった", "そうだ", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+    }
+
+    @Test fun contractedPhraseUsesItsAudioBetweenReliableContext() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>小さな彼女を胸にかかえあげてくるくるまわっていると胸元からうめき声が聞こえてきたので放してあげました。</p>"),
+            listOf(token("小さな彼女を胸にかかえあげてくるくる", 1.0, 5.0),
+                token("回", 5.0, 5.2), token("り", 5.2, 5.6),
+                token("胸元からうめき声が聞こえてきたので放してあげました", 5.6, 12.0)),
+        )
+        assertEquals("小さな彼女を胸にかかえあげてくるくるまわっていると胸元からうめき声が聞こえてきたので放してあげました", result.matches.single().text)
+        assertEquals(1.0, result.matches.single().startTime, .0001)
+        assertEquals(12.0, result.matches.single().endTime, .0001)
+    }
+
+    @Test fun shortMistranscribedCueUsesBookTextAndOnlyItsOwnTokenInterval() {
+        for ((written, spoken) in listOf("ふぅ" to "はあ", "ナー" to "まあ", "多分" to "音楽", "４" to "五")) {
+            val result = SasayakiTranscriptAligner.align(
+                book("<p>雨の降る静かな朝だった。$written。彼女は窓の外を眺めていた。</p>"),
+                listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token(spoken, 4.0, 5.0),
+                    token("彼女は窓の外を眺めていた", 5.0, 9.0)),
+            )
+            assertEquals(written, listOf("雨の降る静かな朝だった", written, "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+            assertEquals(4.0, result.matches[1].startTime, .0001)
+            assertEquals(5.0, result.matches[1].endTime, .0001)
+        }
+    }
+
+    @Test fun shortPhraseRewrittenAcrossCommaKeepsBothCuesAndTheirNeighbors() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>南さんは自分の腕を切ることについてはあんまり話してくれなかったから、でもそれ以外のことについてはしっかり話してくれました。</p>"),
+            listOf(token("南さんは自分の腕を切ることについてはあんまり話してくれなかった", 1.0, 8.0),
+                token("け", 8.0, 8.2), token("れ", 8.2, 8.3), token("ど", 8.3, 8.5),
+                token("それ以外のことについてはしっかり話してくれました", 8.5, 14.0)),
+        )
+        assertTrue(result.matches.first().text.endsWith("から"))
+        assertTrue(result.matches.last().text.startsWith("でも"))
+        assertEquals(1.0, result.matches.first().startTime, .0001)
+        assertEquals(14.0, result.matches.last().endTime, .0001)
+        assertTrue(result.matches.first().endTime <= result.matches.last().startTime)
+    }
+
+    @Test fun shortConjunctionCanKeepItsOwnCueWithinAContextualRewrite() {
+        val result = SasayakiTranscriptAligner.align(
+            book("<p>南さんは自分の腕を切ることについてはあんまり話してくれなかったから。でも、それ以外のことについてはしっかり話してくれました。</p>"),
+            listOf(token("南さんは自分の腕を切ることについてはあんまり話してくれなかった", 1.0, 8.0),
+                token("け", 8.0, 8.2), token("れ", 8.2, 8.3), token("ど", 8.3, 8.5),
+                token("それ以外のことについてはしっかり話してくれました", 8.5, 14.0)),
+        )
+        assertEquals(3, result.matches.size)
+        assertTrue(result.matches.first().text.endsWith("から"))
+        assertEquals("でも", result.matches[1].text)
+        assertTrue(result.matches.last().text.startsWith("それ以外"))
+        assertEquals(8.5, result.matches[1].endTime, .0001)
+        assertTrue(result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime })
+    }
+
+    @Test fun spokenPercentSymbolKeepsItsMeaningAndTimeDuringMatching() {
+        for (symbol in listOf("%", "％")) {
+            val result = SasayakiTranscriptAligner.align(
+                book("<p>今日は雨は降らないって言ってたわ。10パーセントだって。つまり九人は雨が降らないって言った。</p>"),
+                listOf(token("今日は雨は降らないって言ってたわ", 1.0, 5.0), token("十", 5.0, 5.4),
+                    token(symbol, 5.4, 6.0), token("だって", 6.0, 6.5),
+                    token("つまり九人は雨が降らないって言った", 7.0, 11.0)),
+            )
+            assertEquals("10パーセントだって", result.matches[1].text)
+            assertEquals(5.0, result.matches[1].startTime, .0001)
+            assertEquals(6.5, result.matches[1].endTime, .0001)
+        }
+    }
+
     @Test fun aWholeCueReadingCannotBeSplitToInventAnUnspokenNeighbor() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。最初、盛大に音漏れしてたのは。彼女は窓の外を眺めていた。</p>"),
@@ -430,13 +603,15 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
-    fun insufficientSentenceEvidenceCannotInferAnOmittedPrefix() {
+    fun surroundingAnchorsRecoverAShortReplyDespiteALowInternalScore() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。</p><p>ううんいいの。</p><p>私は窓の外を眺めていた。</p>"),
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("いいです", 5.0, 7.0),
                 token("私は窓の外を眺めていた", 8.0, 12.0)),
         )
-        assertEquals(listOf("雨の降る静かな朝だった", "私は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].startTime, .0001)
+        assertEquals(7.0, result.matches[1].endTime, .0001)
+        assertEquals(listOf("雨の降る静かな朝だった", "ううんいいの", "私は窓の外を眺めていた"), result.matches.map { it.text })
     }
 
     @Test
@@ -532,15 +707,17 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
-    fun boundedRecoveryUsesExplicitTokenDurationAndRejectsUnrelatedSpeech() {
+    fun boundedRecoveryUsesExplicitTokenDurationDespiteRecognitionErrors() {
         val source = book("<p>雨の降る静かな朝だった。多分。彼女は窓の外を眺めていた。</p>")
-        val unrelated = SasayakiTranscriptAligner.align(source,
+        val misrecognized = SasayakiTranscriptAligner.align(source,
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("音楽", 4.5, 5.0), token("彼女は窓の外を眺めていた", 5.5, 9.0)),
         )
         val delayed = SasayakiTranscriptAligner.align(source,
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("たぶん", 12.0, 13.0), token("彼女は窓の外を眺めていた", 15.0, 19.0)),
         )
-        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓の外を眺めていた"), unrelated.matches.map { it.text })
+        assertEquals(listOf("雨の降る静かな朝だった", "多分", "彼女は窓の外を眺めていた"), misrecognized.matches.map { it.text })
+        assertEquals(4.5, misrecognized.matches[1].startTime, .0001)
+        assertEquals(5.0, misrecognized.matches[1].endTime, .0001)
         assertEquals(listOf("雨の降る静かな朝だった", "多分", "彼女は窓の外を眺めていた"), delayed.matches.map { it.text })
         assertEquals(12.0, delayed.matches[1].startTime, 0.0001)
         assertEquals(13.0, delayed.matches[1].endTime, 0.0001)
@@ -701,12 +878,14 @@ class SasayakiTranscriptAlignerTest {
         assertTrue(result.matches.zipWithNext().all { (a, b) -> a.endTime <= b.startTime })
     }
 
-    @Test fun unequalNumericValuesCannotSupplyAnEntireUnspokenCue() {
+    @Test fun misrecognizedNumericReplyUsesBookValueInsideItsAnchoredInterval() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。４。私は駅へ向かって歩いた。</p>"),
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("五", 5.0, 5.5),
                 token("私は駅へ向かって歩いた", 6.0, 10.0)))
-        assertFalse(result.matches.any { it.text == "４" })
+        assertEquals("４", result.matches[1].text)
+        assertEquals(5.0, result.matches[1].startTime, .0001)
+        assertEquals(5.5, result.matches[1].endTime, .0001)
     }
 
     @Test fun stronglySupportedSentenceAllowsAContractedShortName() {
