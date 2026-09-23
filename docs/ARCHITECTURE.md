@@ -516,6 +516,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are released. Speech segments have a 20-second hard limit;
   checkpoints commit only fully processed audio. ASR supplies token start
   timestamps; token ends are bounded estimates from the next token/segment.
+  Transcription duration prefers the platform's first audio-track duration,
+  falling back to the parsed M4B/Opus container duration when the platform
+  extractor exposes no audio track, then to media metadata.
   Separate utterances retain up to one second of leading ASR context and trim
   already committed silence so early prefix timestamps cannot discard new words;
   hard cuts and resume within speech retain half a second of leading context.

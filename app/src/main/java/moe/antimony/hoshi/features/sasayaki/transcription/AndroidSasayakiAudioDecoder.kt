@@ -6,36 +6,63 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.IoDispatcher
+import moe.antimony.hoshi.features.sasayaki.inspectSeekableAudiobook
+import moe.antimony.hoshi.features.sasayaki.openSeekableAudioChannel
 
 internal class AndroidSasayakiAudioDecoder @Inject constructor(
     @param:ApplicationContext private val context: Context,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     suspend fun duration(source: String): Double = withContext(ioDispatcher) {
+        resolveSasayakiAudioDuration(
+            extractorDuration = { extractorDuration(source) },
+            containerDuration = { containerDuration(source) },
+            metadataRetrieverDuration = { metadataRetrieverDuration(source) },
+        )
+    }
+
+    private fun extractorDuration(source: String): Double? {
         val extractor = open(source)
         try {
             val track = audioTrack(extractor)
             val format = extractor.getTrackFormat(track)
-            val duration = if (format.containsKey(MediaFormat.KEY_DURATION)) {
+            return if (format.containsKey(MediaFormat.KEY_DURATION)) {
                 format.getLong(MediaFormat.KEY_DURATION) / 1_000_000.0
             } else {
-                val retriever = MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(context, localUri(source))
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull()?.div(1000.0)
-                        ?: throw IOException("Audio duration is unavailable")
-                } finally { retriever.release() }
+                null
             }
-            if (!duration.isFinite() || duration <= 0) throw IOException("Invalid audio duration")
-            duration
         } finally { extractor.release() }
+    }
+
+    private fun containerDuration(source: String): Double? {
+        val uri = localUri(source)
+        val channel = when (uri.scheme) {
+            "content" -> context.contentResolver.openSeekableAudioChannel(uri)
+            "file" -> uri.path?.let { Files.newByteChannel(File(it).toPath()) }
+            else -> null
+        } ?: return null
+        return channel.use { inspectSeekableAudiobook(it).durationSeconds }
+    }
+
+    private fun metadataRetrieverDuration(source: String): Double? {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, localUri(source))
+            return retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toDoubleOrNull()
+                ?.div(1000.0)
+        } finally {
+            retriever.release()
+        }
     }
 
     /** Native decoding owns a duplicate of the SAF descriptor and emits bounded

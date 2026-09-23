@@ -212,7 +212,7 @@ private fun SasayakiAudiobookMetadata.normalizedFields(): SasayakiAudiobookMetad
         artworkData = artworkData,
     )
 
-private fun inspectSeekableAudiobook(channel: SeekableByteChannel): SasayakiAudiobookInfo {
+internal fun inspectSeekableAudiobook(channel: SeekableByteChannel): SasayakiAudiobookInfo {
     SasayakiAudiobookOpusMetadata.parse(channel)?.let { opus ->
         return SasayakiAudiobookInfo(
             format = SasayakiAudiobookFormat.Opus,
@@ -315,12 +315,12 @@ private fun ContentResolver.displayName(uri: Uri): String =
         }
     } ?: uri.lastPathSegment.orEmpty()
 
-private fun ContentResolver.openSeekableAudioChannel(uri: Uri): SeekableByteChannel? {
+internal fun ContentResolver.openSeekableAudioChannel(uri: Uri): SeekableByteChannel? {
     val descriptor = openFileDescriptor(uri, "r") ?: return null
     return ParcelFileDescriptorSeekableByteChannel(descriptor)
 }
 
-private class ParcelFileDescriptorSeekableByteChannel(
+internal class ParcelFileDescriptorSeekableByteChannel(
     private val descriptor: ParcelFileDescriptor,
 ) : SeekableByteChannel {
     private val channel = FileInputStream(descriptor.fileDescriptor).channel
