@@ -25,7 +25,7 @@ class SyncStorage @Inject constructor(
     private val books: BookRepository,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
-    var state = SyncState()
+    @Volatile var state = SyncState()
         private set
     private var loaded = false
     private val sidecars get() = books.sidecarDataSource
@@ -80,6 +80,10 @@ class SyncStorage @Inject constructor(
 
     suspend fun updateRecord(key: String, transform: (SyncRecord) -> SyncRecord) = transaction {
         state = state.copy(books = state.books + (key to transform(state.books.getValue(key))))
+    }
+
+    suspend fun removeRecord(key: String) = transaction {
+        state = state.copy(books = state.books - key)
     }
 
     suspend fun setShelvesPending(pending: Boolean) = transaction {

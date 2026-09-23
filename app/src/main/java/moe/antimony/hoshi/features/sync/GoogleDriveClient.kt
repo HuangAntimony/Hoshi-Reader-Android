@@ -31,12 +31,18 @@ import kotlinx.serialization.json.put
 import moe.antimony.hoshi.di.IoDispatcher
 
 @Singleton
-class GoogleDriveClient @Inject constructor(
-    @ApplicationContext context: Context,
-    private val auth: GoogleDriveAuth,
-    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+class GoogleDriveClient internal constructor(
+    private val auth: DriveAccessTokenProvider,
+    private val provider: suspend () -> SyncProvider,
+    private val checkInternet: () -> Unit,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val openConnection: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection },
 ) {
-    private val connectivityManager = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        auth: GoogleDriveAuth,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ) : this(auth, auth::provider, { checkValidatedInternet(context) }, ioDispatcher)
     private val connections = Collections.synchronizedSet(mutableSetOf<HttpURLConnection>())
     @Volatile private var isStopped = false
     @Volatile var connectionId = 0
@@ -161,11 +167,11 @@ class GoogleDriveClient @Inject constructor(
         read: (HttpURLConnection) -> ByteArray,
     ): ByteArray {
         if (isStopped) throw CancellationException()
-        checkValidatedInternet()
+        checkInternet()
         val connection = connectionId
         val token = auth.accessToken()
-        val timeout = if (auth.provider() == SyncProvider.Ttu) 10_000 else 60_000
-        val request = (URL(url).openConnection() as HttpURLConnection).apply {
+        val timeout = if (provider() == SyncProvider.Ttu) 10_000 else 60_000
+        val request = openConnection(url).apply {
             requestMethod = method
             connectTimeout = timeout
             readTimeout = timeout
@@ -213,20 +219,6 @@ class GoogleDriveClient @Inject constructor(
         return data
     }
 
-    private fun checkValidatedInternet() {
-        val network = connectivityManager?.activeNetwork
-            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
-        val capabilities = connectivityManager.getNetworkCapabilities(network)
-            ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
-        if (!shouldAttemptDriveRequest(
-                hasActiveNetwork = true,
-                hasInternetCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
-                hasValidatedCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
-            )
-        ) {
-            throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
-        }
-    }
 }
 
 internal fun driveUrl(endpoint: String, queryParameters: Map<String, String>): String {
@@ -239,6 +231,21 @@ internal fun driveUrl(endpoint: String, queryParameters: Map<String, String>): S
 internal fun String.urlQueryComponent(): String =
     URLEncoder.encode(this, StandardCharsets.UTF_8.name())
 
-
 internal fun String.urlPathSegment(): String =
     split("/").joinToString("/") { it.urlQueryComponent() }
+
+private fun checkValidatedInternet(context: Context) {
+    val connectivityManager = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+    val network = connectivityManager?.activeNetwork
+        ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+    val capabilities = connectivityManager.getNetworkCapabilities(network)
+        ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+    if (!shouldAttemptDriveRequest(
+            hasActiveNetwork = true,
+            hasInternetCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+            hasValidatedCapability = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
+        )
+    ) {
+        throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+    }
+}
