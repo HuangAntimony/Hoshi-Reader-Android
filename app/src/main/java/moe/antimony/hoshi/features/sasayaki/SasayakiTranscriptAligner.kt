@@ -10,7 +10,7 @@ import moe.antimony.hoshi.epub.SasayakiMatchSource
 /**
  * Exact, distinctive text establishes positions; edit alignment only repairs bounded gaps.
  * There are deliberately no synthetic anchors at the start/end of the audio or book.
- * This keeps unspoken passages and unrelated introductions out of the saved highlights.
+ * Unbounded introductions and book endings remain outside the saved highlights.
  */
 object SasayakiTranscriptAligner {
     private const val seedLength = 8
@@ -893,11 +893,11 @@ object SasayakiTranscriptAligner {
         val matches = mutableListOf<SasayakiMatch>()
         var unmatched = 0
         chapters.forEachIndexed { index, chapter ->
+            val chapterMatches = mutableListOf<SasayakiMatch>()
             var start = 0
             chapter.boundaries.forEachIndexed { end, boundary ->
                 if (!boundary) return@forEachIndexed
                 val timed = (start..end).filter { times[index][it] != null }
-                val priorCount = matches.size
                 fun emit(first: Int, last: Int) {
                     val lower = timed[first]
                     val upper = timed[last]
@@ -918,7 +918,7 @@ object SasayakiTranscriptAligner {
                     // Token ends are estimates from the next start, not measured
                     // phoneme durations. A long interval cannot invalidate its text.
                     if (to > from) {
-                        matches += SasayakiMatch(
+                        chapterMatches += SasayakiMatch(
                             id = "${chapter.source.index}-$lower", startTime = from, endTime = to,
                             text = String(chapter.source.text, lower, upper - lower + 1),
                             chapterIndex = chapter.source.index, start = lower, length = upper - lower + 1,
@@ -941,10 +941,75 @@ object SasayakiTranscriptAligner {
                     emit(first, run)
                     run++
                 }
-                if (matches.size == priorCount) unmatched++
+                start = end + 1
+            }
+            val merged = mergeOmittedCues(chapter, times[index], chapterMatches)
+            matches += merged
+            var match = 0
+            start = 0
+            chapter.boundaries.forEachIndexed { end, boundary ->
+                if (!boundary) return@forEachIndexed
+                while (match < merged.size && merged[match].start + merged[match].length <= start) match++
+                if (match == merged.size || merged[match].start > end) unmatched++
                 start = end + 1
             }
         }
         return SasayakiMatchData(matches.sortedBy { it.startTime }, unmatched, SasayakiMatchSource.Transcription)
+    }
+
+    /**
+     * A narrated interior cue may be absent from ASR entirely. Keep the precise
+     * matches as anchors and include the omission in one neighbor's highlight,
+     * without allocating somebody else's token to a new independent cue.
+     */
+    private fun mergeOmittedCues(chapter: Chapter, times: Array<Timing?>, original: List<SasayakiMatch>): List<SasayakiMatch> {
+        val result = original.toMutableList()
+        fun edgeExcess(cue: SasayakiMatch, atEnd: Boolean): Double {
+            val edge = if (atEnd) cue.start + cue.length - 1 else cue.start
+            val timing = times[edge] ?: return 0.0
+            val nearby = (max(cue.start, edge - 8)..min(cue.start + cue.length - 1, edge + 8))
+                .mapNotNull { times[it] }.filter { it != timing }.distinct()
+                .map { it.end - it.start }.sorted()
+            if (nearby.isEmpty()) return 0.0
+            return max(0.0, timing.end - timing.start - nearby[nearby.size / 2])
+        }
+        // Decisions always use the original anchors, never a previously enlarged
+        // cue. This prevents an inferred range from becoming evidence for another.
+        original.zipWithNext().forEachIndexed { index, (left, right) ->
+            val lower = left.start + left.length
+            val upper = right.start
+            val missing = upper - lower
+            val pause = right.startTime - left.endTime
+            // This is a short cue grouping, not a new word/phoneme alignment or a
+            // chapter-sized highlight. Partial words still use the existing repair.
+            if (missing !in 1..48 || left.length < 4 || right.length < 4 || left.length + right.length < seedLength * 2 ||
+                pause < -0.000001 || pause > 12.0 ||
+                !chapter.boundaries[lower - 1] || !chapter.boundaries[upper - 1] ||
+                (lower until upper).any { times[it] != null } ||
+                (lower until upper).count { chapter.sentences[it] } > 2) return@forEachIndexed
+
+            val leftExtra = edgeExcess(left, atEnd = true)
+            val rightExtra = edgeExcess(right, atEnd = false)
+            val continuesLeft = !chapter.sentences[lower - 1]
+            val continuesRight = !chapter.sentences[upper - 1]
+            val preferLeft = when {
+                kotlin.math.abs(leftExtra - rightExtra) > .15 -> leftExtra > rightExtra
+                continuesLeft != continuesRight -> continuesLeft
+                else -> (left.length + missing) / (right.startTime - left.startTime) <=
+                    (right.length + missing) / (right.endTime - left.endTime)
+            }
+            val target = if (preferLeft) index else index + 1
+            val current = result[target]
+            if (current.length + missing > 96) return@forEachIndexed
+            val start = if (preferLeft) current.start else lower
+            val end = if (preferLeft) upper else current.start + current.length
+            result[target] = current.copy(
+                id = "${chapter.source.index}-$start", start = start, length = end - start,
+                text = String(chapter.source.text, start, end - start),
+                startTime = if (preferLeft) current.startTime else min(current.startTime, left.endTime),
+                endTime = if (preferLeft) max(current.endTime, right.startTime) else current.endTime,
+            )
+        }
+        return result
     }
 }

@@ -934,14 +934,15 @@ Validate relevant sync/update/Sasayaki changes with:
   survives even if its model timestamp falls inside leading context. Compare
   continuous and checkpoint-resumed output for missing or duplicated prefixes;
   keep hard-cut speech context. Existing transcripts may recover short word
-  fragments between real anchors, but must not highlight an entirely omitted
-  reply or bridge token-free long silence. Explicitly recognized words after a
+  fragments between real anchors; short entirely omitted interior cues can share
+  a neighboring highlight but must not receive fabricated independent word times.
+  Partial-word repair must not bridge token-free long silence. Explicitly recognized words after a
   long pause must retain their token times. Check kana/kanji rewrites around a
   local exact phrase and punctuation, a missing whole reply beside a recognized
   prefix, ambiguous readings on either side of a sentence boundary, and a partial
   ruby reading error sharing one base character. Repaired syllables must preserve
-  the exact syllables' timing; deleted letters inside a spoken word must not give
-  an omitted whole cue its neighbor's time. A single short cue enclosed by reliable
+  the exact syllables' timing; deleted letters inside a spoken word must not allocate
+  a neighbor's token to an independent omitted cue. A single short cue enclosed by reliable
   anchors and complete speech tokens should retain the book's wording even when ASR
   mishears it; check rewritten short replies, numeric values, contracted phrases,
   and `%`/`％` output. Contextual cross-cue allocation must not split a recognized
@@ -949,9 +950,14 @@ Validate relevant sync/update/Sasayaki changes with:
   retain recognized words, sentence endings, and supported rewrites without a fixed
   duration cap. A short suffix attached to the next sentence's exact anchor must stay
   with the recognized earlier sentence when its local context supports that ownership;
-  keep the intervening unspoken sentence unmatched. Check one- and two-character
+  let a wholly omitted interior sentence share a neighbor rather than take that suffix
+  as its own cue. Check one- and two-character
   endings, a fully or partially recognized middle sentence, and competing endings
-  including ruby readings.
+  including ruby readings. Check omitted questions split by commas, missing sentences
+  beside long first/last tokens, and short cries/replies with ordinary token durations,
+  both with and without an inter-cue pause. Grouping must preserve the opposite cue,
+  keep text/time ranges non-overlapping, update IDs/offsets and unmatched counts, stop
+  at real intervening matches and never propagate across chapter boundaries or book ends.
   Sparse sentences must retain supported fragments; dense cues must also split around
   token-free gaps across long silence. Distinguish unmatched ASR wording from silence,
   including overlapping same-frame multi-character tokens. Incremental matching must

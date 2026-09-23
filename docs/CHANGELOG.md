@@ -28,7 +28,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and recognition errors without losing recognized sentence endings, short replies,
   or adjacent cue edges around a comma. Retain recognized text at EPUB chapter edges,
   short kana/kanji replies, contracted names, and comma-separated numeric expressions;
-  preserve recognized prefixes after pauses, and keep unspoken replies unmatched.
+  preserve recognized prefixes after pauses. Include short sentences and replies
+  omitted by recognition in the neighboring highlight that best fits their timing
+  and sentence context, including cries, without requiring a new transcription.
   Keep recognized words beside omitted cues and inside long missing passages;
   retain recognized words and supported spelling changes even when estimated token
   durations are long, and keep a recognized sentence's ending from being assigned

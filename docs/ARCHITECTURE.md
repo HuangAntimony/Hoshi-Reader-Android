@@ -582,7 +582,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   ending when that remainder aligns, the intervening sentence has no equally strong
   competing tail (including ruby readings), and the following distinctive anchor stays intact.
   Transfers preserve whole token and ruby-base boundaries; the intervening omitted
-  sentence receives no borrowed time. Resolved anchors also key the gap cache.
+  sentence receives no independently borrowed token time. Resolved anchors also key the gap cache.
   CPU matching runs on the Default dispatcher;
   parsing and persistence remain repository-owned I/O. Bounded gap alignment includes
   neighboring confirmed text through sentence edges when available, pinning the
@@ -638,15 +638,27 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   are not rejected solely for long estimated durations: a token end can include silence
   or omitted speech before the next token starts. Invalid/nonpositive token intervals
   remain excluded. Ruby syllables sharing a source character merge their timings;
-  final cues retain their token intervals without applying a duration cap or inventing
-  endpoints. Text density still determines whether to keep a cue or its supported spans.
+  supported cues retain their token intervals without applying a duration cap or inventing
+  word endpoints. Text density still determines whether to keep a cue or its supported spans.
   Short omitted word fragments can use the time between real neighboring anchors
-  or an adjacent token within their cue when no silence exists; entire unspoken cues
-  and token-free gaps across long silence remain unmatched. Cue assembly applies the same
+  or an adjacent token within their cue when no silence exists. Cue assembly applies the same
   gap-duration limit before joining supported spans across intervals with no recognized
   speech, even when text density is high; unassigned ASR wording is not treated as silence.
   Sparse sentences keep
-  their contiguous supported spans instead of discarding all matches. Match coverage is summed
+  their contiguous supported spans instead of discarding all matches.
+  After precise cue assembly, short entirely omitted interior cues can share a neighboring
+  highlight: audiobook body text bounded by real matches is assumed narrated. Grouping stays
+  within one chapter and whole display-cue boundaries, with at most 48 missing characters,
+  two sentence boundaries (commas excluded), a 12-second inter-cue gap and 96 characters
+  in the resulting cue. Both neighbors need at least four matched characters and sixteen
+  combined. The side with more excess boundary-token time relative to its nearby cadence
+  is preferred; otherwise sentence continuity across commas, then the lower combined
+  character rate decide. The selected cue includes the intervening audio gap; the opposite
+  cue and all original recognized text remain intact. Decisions use original matches only,
+  never inferred text as new evidence. No separate timing is invented for the omission,
+  no ASR inference is run, and book/chapter ends remain unextended. Grouped text participates
+  in coverage, unmatched counts and SRT export through the existing match model.
+  Match coverage is summed
   matched character lengths divided by the parsed book character count.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
