@@ -6,6 +6,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+## [v1.4.0] - 2026-09-24
+
 ### Added
 
 - Transcribe Japanese audiobooks on-device in Sasayaki, with a downloadable
@@ -52,8 +54,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   preparation, recognition, book matching, and progress saving failures.
   Show the original exception and cause chain when an unexpected transcription
   failure cannot be classified.
-  Allow transcription to continue to resource preparation when M4B or Ogg Opus
-  playback works but the platform extractor cannot expose its audio track.
+
+- Fix transcription setup for some playable M4B and Ogg Opus audiobooks.
 
 - Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
   or Disabled, with an enabled frequency dictionary for explicit ordering.
