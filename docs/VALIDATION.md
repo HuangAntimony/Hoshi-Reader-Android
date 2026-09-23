@@ -840,7 +840,8 @@ Validate relevant sync/update/Sasayaki changes with:
   offline metadata/bookmark/highlight/shelf/session conflicts, session deletion,
   reimport generations, live reader updates/deletion, Sasayaki position/matches,
   sign-out, cache clearing and Books backup restore. Check foreground activation,
-  120-second polling, 30-second local-edit debounce, background final pass and
+  release 120-second polling/30-second local-edit debounce, debug 5-second
+  polling/2-second debounce, background final pass and
   network restoration. Unsupported `formatVersion` must block file transfers and
   cursor advancement until a successful full pass; restart must retain cursor
   and version skips. Preserve both devices' app data.

@@ -28,6 +28,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.ReadingStatistics
@@ -171,7 +172,8 @@ class GoogleDriveSyncManagerTest {
         assertEquals(reference.modified, f.store.state.books.getValue("book-a").sources[SyncFileType.epub])
     }
 
-    @Test fun debouncesFromFirstEditForThirtySeconds() = runTest {
+    @Test fun debouncesFromFirstEditAtBuildInterval() = runTest {
+        val interval = if (BuildConfig.DEBUG) 2_000L else 30_000L
         val f = fixture()
         f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
         f.manager.sync()
@@ -179,10 +181,10 @@ class GoogleDriveSyncManagerTest {
         val root = f.store.bookDirectory("book-a")
         f.books.saveMetadata(root, f.books.loadMetadata(root)!!.copy(renamedTitle = "First", modified = 2000))
         runCurrent()
-        advanceTimeBy(20_000)
+        advanceTimeBy(interval / 2)
         f.books.saveMetadata(root, f.books.loadMetadata(root)!!.copy(renamedTitle = "Latest", modified = 3000))
         runCurrent()
-        advanceTimeBy(9_999)
+        advanceTimeBy(interval / 2 - 1)
         runCurrent()
         assertTrue(f.remote.writes.isEmpty())
         advanceTimeBy(1)
@@ -192,12 +194,13 @@ class GoogleDriveSyncManagerTest {
     }
 
     @Test fun pollsWhileActiveAndRunsOneFinalPassOnPause() = runTest {
+        val interval = if (BuildConfig.DEBUG) 5_000L else 120_000L
         val f = fixture()
         f.manager.start()
         runCurrent()
         val first = f.remote.requests.count { it == "changes" }
         assertEquals(1, first)
-        advanceTimeBy(119_999)
+        advanceTimeBy(interval - 1)
         runCurrent()
         assertEquals(first, f.remote.requests.count { it == "changes" })
         advanceTimeBy(1)
@@ -206,7 +209,7 @@ class GoogleDriveSyncManagerTest {
         f.manager.pause()
         runCurrent()
         assertEquals(first + 2, f.remote.requests.count { it == "changes" })
-        advanceTimeBy(120_000)
+        advanceTimeBy(interval)
         runCurrent()
         assertEquals(first + 2, f.remote.requests.count { it == "changes" })
     }

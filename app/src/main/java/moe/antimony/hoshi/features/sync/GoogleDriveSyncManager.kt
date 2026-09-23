@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
+import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.di.CacheDir
@@ -126,7 +127,7 @@ class GoogleDriveSyncManager internal constructor(
         pollTask = scope.launch {
             sync()
             while (true) {
-                delay(120_000)
+                delay(if (BuildConfig.DEBUG) 5_000 else 120_000)
                 sync()
             }
         }
@@ -204,7 +205,7 @@ class GoogleDriveSyncManager internal constructor(
     suspend fun schedule(): Unit = withContext(mainDispatcher) {
         if (!enabled() || stateTask != null || debounceTask != null) return@withContext
         debounceTask = scope.launch {
-            delay(30_000)
+            delay(if (BuildConfig.DEBUG) 2_000 else 30_000)
             debounceTask = null
             sync()
         }

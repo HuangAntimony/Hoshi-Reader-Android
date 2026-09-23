@@ -486,8 +486,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   deletions merge across generations. Unknown format versions prevent cursor
   advancement and file work until a successful full state pass.
 - `GoogleDriveSyncManager` performs targeted synchronization on open, 120-second
-  foreground polling, 30-second local-edit debounce, network-restored passes,
-  immutable upload/download and stale-file cleanup. Process lifecycle callbacks
+  foreground polling and 30-second local-edit debounce in release builds; debug
+  builds use 5-second polling and 2-second debounce for testing. It also performs
+  network-restored passes, immutable upload/download and stale-file cleanup. Process lifecycle callbacks
   start/pause polling; a Hilt WorkManager job performs the final background pass.
   Hoshi cloud books are local metadata placeholders: tapping downloads the EPUB,
   Delete Local retains their cloud state, and Delete Everywhere archives sessions
