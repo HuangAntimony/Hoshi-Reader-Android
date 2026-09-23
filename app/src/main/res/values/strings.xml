@@ -865,7 +865,7 @@
     <string name="sasayaki_transcription_pause">Pause</string>
     <string name="sasayaki_transcription_preparing">Preparing transcription…</string>
     <string name="sasayaki_transcription_downloading">Downloading transcription files… %1$d%%</string>
-    <string name="sasayaki_transcription_progress">Transcribing…</string>
+    <string name="sasayaki_transcription_progress">Transcribing and matching…</string>
     <string name="sasayaki_transcription_paused">Transcription paused</string>
     <string name="sasayaki_transcription_complete">Transcription complete</string>
     <string name="sasayaki_transcription_coverage">Current match coverage: %1$s</string>

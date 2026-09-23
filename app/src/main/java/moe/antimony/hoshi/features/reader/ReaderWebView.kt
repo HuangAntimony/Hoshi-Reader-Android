@@ -174,18 +174,22 @@ fun ReaderWebView(
         bookCoverFile?.takeIf { it.isFile }
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
+    var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
     val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
     val onSasayakiMatchUpdated: (SasayakiMatchData) -> Unit = { data ->
-        sasayakiMatchData = data
         sasayakiSheetMatchData = data
-        sasayakiPlayer?.updateMatchData(data)
+        pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = false)
     }
     val sasayakiTranscriptionState = rememberSasayakiTranscriptionState(
         root = bookRoot,
         audioRepository = sasayakiAudioRepository,
         playback = sasayakiPlayer?.playback,
         viewModel = sasayakiTranscriptionViewModel,
-        onMatchUpdated = onSasayakiMatchUpdated,
+        onMatchUpdated = { data ->
+            sasayakiSheetMatchData = data
+            pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = true)
+        },
     )
     var lastSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
@@ -1385,6 +1389,15 @@ fun ReaderWebView(
             return
         }
         pendingSasayakiCue = null
+        if (source == SasayakiCueRevealSource.MatchRefresh) {
+            targetWebView.evaluateJavascript(
+                ReaderPaginationScripts.highlightSasayakiCueInvocation(
+                    cue.toCueRange(), reveal = false, preserveReveal = true,
+                ),
+                null,
+            )
+            return
+        }
         cancelSasayakiAutoPage()
         sasayakiAutoPageJob = scope.launch {
             val progress = revealSasayakiCueWithMediaStops(
@@ -1396,6 +1409,25 @@ fun ReaderWebView(
                 recordSasayakiDisplayedProgress(it, countStatistics = progress.countStatistics)
             }
         }
+    }
+    LaunchedEffect(
+        pendingSasayakiMatchUpdate,
+        webView,
+        sasayakiAutoPageJob,
+        lookupPopups.isNotEmpty(),
+        fullscreenImage,
+        stateHolder.isWebViewRestoring,
+    ) {
+        val update = pendingSasayakiMatchUpdate ?: return@LaunchedEffect
+        if (lookupPopups.isNotEmpty() || fullscreenImage != null || stateHolder.isWebViewRestoring) return@LaunchedEffect
+        // Updating cue targets can replace DOM text nodes; wait for lookup and media holds to finish.
+        awaitReaderSasayakiPresentationIdle(webView?.readerNativeSelectionState()) { sasayakiAutoPageJob }
+        if (pendingSasayakiMatchUpdate !== update) return@LaunchedEffect
+        if (stateHolder.lookupPopups.isNotEmpty() || fullscreenImage != null || stateHolder.isWebViewRestoring) return@LaunchedEffect
+        sasayakiMatchData = update.data
+        preserveSasayakiCueLayout = update.preserveLayout
+        pendingSasayakiMatchUpdate = null
+        sasayakiPlayer?.updateMatchData(update.data)
     }
     LaunchedEffect(
         webView,
@@ -1840,6 +1872,7 @@ fun ReaderWebView(
                                 matchData = sasayakiMatchData,
                                 chapterIndex = readerPosition.loadPosition.index,
                             ),
+                            preserveSasayakiCueLayout = preserveSasayakiCueLayout,
                             sasayakiTextColor = currentSasayakiColors.textColor,
                             sasayakiBackgroundColor = currentSasayakiColors.backgroundColor,
                             onTextSelected = handleTextSelected,
@@ -2159,6 +2192,11 @@ internal data class PendingSasayakiCue(
     val cue: SasayakiMatch,
     val reveal: Boolean,
     val source: SasayakiCueRevealSource,
+)
+
+private data class PendingSasayakiMatchUpdate(
+    val data: SasayakiMatchData,
+    val preserveLayout: Boolean,
 )
 
 private data class PendingSasayakiTargetMediaRestore(

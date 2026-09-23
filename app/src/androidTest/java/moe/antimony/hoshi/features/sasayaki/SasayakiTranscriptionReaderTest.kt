@@ -49,7 +49,8 @@ class SasayakiTranscriptionReaderTest {
         compose.waitUntil { reader.backend.runs == 1 }
         compose.runOnIdle { reader.visible.value = false }
         reader.batch(10.0)
-        compose.waitUntil { reader.model.uiState.value.through == 10.0 }
+        compose.waitUntil { reader.model.uiState.value.through == 10.0 && reader.matches.size == 1 }
+        assertTrue("Matches arrive before pausing, with the controls sheet closed", reader.model.uiState.value.canPause)
         compose.runOnIdle { reader.visible.value = true }
         compose.onAllNodes(hasText("0:00:10 / 0:01:40", substring = true)).assertCountEquals(1)
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_pause)).assertIsEnabled().performClick()
@@ -210,6 +211,6 @@ class SasayakiTranscriptionReaderTest {
         override suspend fun load(root: File) = saved
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
         override suspend fun clear(root: File) { saved = null }
-        override suspend fun align(root: File, tokens: List<SasayakiToken>) = SasayakiMatchData(emptyList(), 0)
+        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _, _ -> SasayakiMatchData(emptyList(), 0) }
     }
 }

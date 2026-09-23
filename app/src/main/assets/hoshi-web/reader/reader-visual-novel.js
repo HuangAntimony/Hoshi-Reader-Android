@@ -24,6 +24,7 @@ window.hoshiReader = {
   sasayakiCues: [],
   sasayakiCueMap: new Map(),
   sasayakiCuesSignature: null,
+  sasayakiScreensNeedRebuild: false,
   cueWrappers: new Map(),
   cueSourceRanges: new Map(),
   cueGeometryRanges: new Map(),
@@ -269,6 +270,7 @@ window.hoshiReader = {
     this.totalChapterChars = this.contentStream.totalMatchableChars;
   },
   buildScreens: function() {
+    this.sasayakiScreensNeedRebuild = false;
     var mode = String(this.screenMode || '').toLowerCase();
     var baseScreens;
     if (mode === 'sentence' || mode === 'sentences') {
@@ -1953,12 +1955,21 @@ window.hoshiReader = {
         return "revealed";
       }
       if (this.currentScreenIndex >= this.screens.length - 1) return "limit";
-      this.renderScreen(this.currentScreenIndex + 1, false);
+      this.renderAdjacentScreen(this.currentScreenIndex + 1, false);
       return "scrolled";
     }
     if (this.currentScreenIndex <= 0) return "limit";
-    this.renderScreen(this.currentScreenIndex - 1, true);
+    this.renderAdjacentScreen(this.currentScreenIndex - 1, true);
     return "scrolled";
+  },
+  renderAdjacentScreen: function(index, fullyRevealed) {
+    if (this.sasayakiScreensNeedRebuild) {
+      // Follow the adjacent screen's source position, even if a new cue now merges it with this screen.
+      var progress = this.progressForScreen(this.screens[index]);
+      this.buildScreens();
+      index = this.screenIndexForProgress(progress);
+    }
+    this.renderScreen(index, fullyRevealed);
   },
   calculateProgress: function() {
     if (!this.screens.length) return 0;
@@ -1974,6 +1985,7 @@ window.hoshiReader = {
   },
   restoreProgress: async function(progress) {
     await this.ensureReady();
+    if (this.sasayakiScreensNeedRebuild) this.buildScreens();
     this.renderScreen(this.screenIndexForProgress(progress), true);
     this.notifyRestoreComplete();
   },
@@ -1991,6 +2003,10 @@ window.hoshiReader = {
     if (index < 0) {
       this.notifyRestoreComplete();
       return false;
+    }
+    if (this.sasayakiScreensNeedRebuild) {
+      this.buildScreens();
+      index = this.screenIndexForFragment(fragment);
     }
     this.renderScreen(index, true);
     this.notifyRestoreComplete();
@@ -2218,10 +2234,12 @@ window.hoshiReader = {
     this.cueGeometryRanges.clear();
     this.buildNodeOffsets();
   },
-  applySasayakiCues: function(cues) {
+  applySasayakiCues: function(cues, preserveLayout) {
     var activeCueId = this.activeCueId;
     var nextCues = Array.isArray(cues) ? cues : [];
-    var shouldRebuildScreens = this.mergeCrossScreenSasayakiCues && this.sasayakiCueDataChanged(nextCues);
+    var layoutChanged = this.mergeCrossScreenSasayakiCues && this.sasayakiCueDataChanged(nextCues);
+    this.sasayakiScreensNeedRebuild = this.sasayakiScreensNeedRebuild || layoutChanged;
+    var shouldRebuildScreens = !preserveLayout && this.sasayakiScreensNeedRebuild;
     var progress = shouldRebuildScreens ? this.calculateProgress() : null;
     this.clearSasayakiTargets();
     this.setSasayakiCueData(nextCues);
@@ -2233,6 +2251,12 @@ window.hoshiReader = {
     }
     this.buildNodeOffsets();
     if (this.activeCueId) this.refreshSasayakiCuePresentation();
+  },
+  rebuildSasayakiScreensForNavigation: function() {
+    if (!this.sasayakiScreensNeedRebuild) return;
+    var progress = this.calculateProgress();
+    this.buildScreens();
+    this.renderScreen(this.screenIndexForProgress(progress), true);
   },
   sasayakiMediaStopsBetweenScreens: function(startIndex, endIndex) {
     if (!this.screens || !this.screens.length) return [];
@@ -2247,12 +2271,14 @@ window.hoshiReader = {
     return stops;
   },
   sasayakiMediaStopsBeforeCue: function(cue) {
+    this.rebuildSasayakiScreensForNavigation();
     var cueObject = this.sasayakiCueForInput(cue);
     var targetIndex = this.screenIndexForSasayakiCue(cueObject);
     if (targetIndex < 0) return [];
     return this.sasayakiMediaStopsBetweenScreens(this.currentScreenIndex, targetIndex);
   },
   sasayakiMediaStopsToChapterEnd: function() {
+    this.rebuildSasayakiScreensForNavigation();
     if (!this.screens || !this.screens.length) return [];
     var stops = [];
     for (var i = this.currentScreenIndex; i < this.screens.length; i++) {
@@ -2271,7 +2297,8 @@ window.hoshiReader = {
     this.renderScreen(safeIndex, true);
     return this.calculateProgress();
   },
-  highlightSasayakiCue: function(cue, reveal) {
+  highlightSasayakiCue: function(cue, reveal, preserveReveal) {
+    if (reveal) this.rebuildSasayakiScreensForNavigation();
     if (reveal) window.hoshiHighlights?.clearSearchHighlight?.();
     var cueObject = this.sasayakiCueForInput(cue);
     var cueId = typeof cue === 'string' ? cue : cueObject && cueObject.id;
@@ -2296,7 +2323,7 @@ window.hoshiReader = {
       this.refreshSasayakiCuePresentation();
       return this.calculateProgress();
     }
-    if (!this.revealComplete) this.completeCurrentReveal();
+    if (!preserveReveal && !this.revealComplete) this.completeCurrentReveal();
     this.refreshSasayakiCuePresentation();
     return null;
   },

@@ -2632,6 +2632,77 @@ test('visual novel Sasayaki merge setting combines sentence screens intersecting
     assert.equal(currentScreen(reader).textContent, '四。');
 });
 
+test('live Sasayaki data updates preserve the visible VN screen while correcting cue ranges', async () => {
+    const cue = { id: 'cue', start: 0, length: 1 };
+    const { reader } = await initializeReader(bodyWith(p('一二。'), p('三四。'), p('五。')), {
+        revealSpeed: 0,
+        mergeCrossScreenSasayakiCues: true,
+        initialSasayakiCues: [cue],
+    });
+    reader.highlightSasayakiCue(cue, false);
+    const screen = currentScreen(reader);
+    const progress = reader.calculateProgress();
+
+    reader.applySasayakiCues([{ id: 'cue', start: 0, length: 4 }], true);
+
+    assert.equal(currentScreen(reader), screen);
+    assert.equal(currentScreen(reader).textContent, '一二。');
+    assert.equal(reader.calculateProgress(), progress);
+    assert.equal(reader.sasayakiCueMap.get('cue').length, 4);
+    assert.equal(sasayakiWrappers(reader).map((wrapper) => wrapper.textContent).join(''), '一二。');
+
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '一二。三四。');
+    assert.equal(reader.paginate('forward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '五。');
+});
+
+test('natural Sasayaki reveal applies deferred VN cue merging', async () => {
+    const cue = { id: 'cue', start: 2, length: 3 };
+    const { reader } = await initializeReader(bodyWith(p('一二。'), p('三四。'), p('五。')), {
+        revealSpeed: 0,
+        mergeCrossScreenSasayakiCues: true,
+    });
+    reader.applySasayakiCues([cue], true);
+    assert.equal(currentScreen(reader).textContent, '一二。');
+
+    reader.sasayakiMediaStopsBeforeCue(cue);
+    reader.highlightSasayakiCue(cue, true);
+
+    assert.equal(currentScreen(reader).textContent, '三四。五。');
+});
+
+test('missing VN fragment leaves deferred cue layout and reading position intact', async () => {
+    const { reader } = await initializeReader(bodyWith(p('一。'), p('二。'), p('三。')), {
+        revealSpeed: 0,
+        mergeCrossScreenSasayakiCues: true,
+    });
+    reader.paginate('forward');
+    reader.paginate('forward');
+    const progress = reader.calculateProgress();
+    const screenCount = reader.screens.length;
+    reader.applySasayakiCues([{ id: 'cue', start: 0, length: 3 }], true);
+
+    assert.equal(await reader.jumpToFragment('missing-id'), false);
+
+    assert.equal(reader.calculateProgress(), progress);
+    assert.equal(reader.screens.length, screenCount);
+    assert.equal(currentScreen(reader).textContent, '三。');
+    assert.equal(reader.paginate('backward'), 'scrolled');
+    assert.equal(currentScreen(reader).textContent, '一。二。三。');
+});
+
+test('quiet Sasayaki highlight correction preserves an unfinished VN reveal', async () => {
+    const cue = { id: 'cue', start: 0, length: 4 };
+    const { reader } = await initializeReader(bodyWith(p('蒸し暑い')), { revealSpeed: 10 });
+    reader.applySasayakiCues([cue], true);
+
+    reader.highlightSasayakiCue(cue, false, true);
+
+    assert.equal(reader.revealComplete, false);
+    assert.ok(currentScreen(reader).querySelectorAll('[data-hoshi-visual-novel-unrevealed]').length > 0);
+});
+
 test('visual novel Sasayaki merged screens still split when text exceeds the viewport', async () => {
     const cue = { id: 'cue', start: 0, length: 8 };
     const { reader } = await initializeReader(

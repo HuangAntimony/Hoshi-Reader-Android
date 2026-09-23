@@ -227,6 +227,8 @@ class SasayakiPlayerFacadeTest {
             commands += "updateMatchData:${matchData?.matches?.size ?: 0}"
         }
 
+        override fun restoreCueDisplay() = Unit
+
         override fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? {
             commands += "findCue:$chapterIndex:$offset"
             return cue

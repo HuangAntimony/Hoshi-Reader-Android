@@ -82,6 +82,122 @@ class SasayakiPlaybackControllerDeferredCommandTest {
     }
 
     @Test
+    fun appendingMatchesDoesNotRedisplayCurrentCue() {
+        val displayedCues = mutableListOf<Pair<SasayakiMatch, Boolean>>()
+        val cue = SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(listOf(cue), 0),
+            onCue = { match, reveal, _ -> displayedCues += match to reveal },
+        )
+        harness.controller.togglePlayback()
+        displayedCues.clear()
+        harness.engine.events.clear()
+
+        harness.controller.updateMatchData(
+            SasayakiMatchData(listOf(cue.copy(), SasayakiMatch("next", 6.0, 8.0, "next", 0, 7, 4)), 0),
+        )
+
+        assertTrue(displayedCues.isEmpty())
+        assertTrue(harness.engine.events.isEmpty())
+        assertEquals(3.5, harness.controller.currentTime, 0.0)
+    }
+
+    @Test
+    fun correctedCurrentCueRangeRefreshesHighlightWithoutRevealingIt() {
+        val displayedCues = mutableListOf<Pair<SasayakiMatch, Boolean>>()
+        val cue = SasayakiMatch("current", 3.0, 5.0, "cur", 0, 0, 3)
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(listOf(cue), 0),
+            onCue = { match, reveal, _ -> displayedCues += match to reveal },
+        )
+        harness.controller.togglePlayback()
+        displayedCues.clear()
+        val corrected = cue.copy(text = "current", length = 7, endTime = 6.0)
+
+        harness.controller.updateMatchData(SasayakiMatchData(listOf(corrected), 0))
+
+        assertEquals(listOf(corrected to false), displayedCues)
+        assertTrue(harness.controller.isPlaying)
+    }
+
+    @Test
+    fun newlyMatchedOtherChapterClearsOldHighlightWithoutNavigating() {
+        val displayedCues = mutableListOf<Pair<SasayakiMatch, Boolean>>()
+        var clearCount = 0
+        val cue = SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(listOf(cue), 0),
+            onCue = { match, reveal, _ -> displayedCues += match to reveal },
+            onClearCue = { clearCount++ },
+        )
+        harness.controller.togglePlayback()
+        displayedCues.clear()
+
+        harness.controller.updateMatchData(SasayakiMatchData(listOf(cue.copy(chapterIndex = 1)), 0))
+
+        assertEquals(1, clearCount)
+        assertTrue(displayedCues.isEmpty())
+        assertEquals(3.5, harness.controller.currentTime, 0.0)
+    }
+
+    @Test
+    fun clearingMatchesRemovesStaleHighlight() {
+        var clearCount = 0
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(listOf(SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)), 0),
+            onClearCue = { clearCount++ },
+        )
+        harness.controller.togglePlayback()
+
+        harness.controller.updateMatchData(null)
+        harness.controller.updateMatchData(null)
+
+        assertEquals(1, clearCount)
+        assertFalse(harness.controller.hasMatch)
+    }
+
+    @Test
+    fun matchRefreshDuringAutoPageHoldPreservesAutomaticResume() {
+        val cue = SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)
+        val harness = controllerHarness(matchData = SasayakiMatchData(listOf(cue), 0))
+        harness.controller.togglePlayback()
+        harness.engine.events.clear()
+        assertTrue(harness.controller.pauseForAutoPageHold())
+
+        harness.controller.updateMatchData(SasayakiMatchData(listOf(cue), 0))
+        harness.controller.resumeAfterAutoPageHold()
+
+        assertEquals(listOf("pause", "start:1.0"), harness.engine.events)
+        assertTrue(harness.controller.isPlaying)
+    }
+
+    @Test
+    fun sameBookReaderReattachmentExplicitlyRestoresUnchangedCueWithoutSeeking() {
+        val attachment = SasayakiReaderAttachment()
+        attachment.attach(getCurrentChapterIndex = { 0 }, onCue = { _, _, _ -> }, onClearCue = {})
+        val cue = SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)
+        val data = SasayakiMatchData(listOf(cue), 0)
+        val harness = controllerHarness(matchData = data, onCue = attachment::cue)
+        harness.controller.togglePlayback()
+        harness.engine.events.clear()
+        attachment.detach()
+        val displayedCues = mutableListOf<Pair<SasayakiMatch, Boolean>>()
+        attachment.attach(
+            getCurrentChapterIndex = { 0 },
+            onCue = { match, reveal, _ -> displayedCues += match to reveal },
+            onClearCue = {},
+        )
+
+        harness.controller.updateMatchData(data)
+        assertTrue(displayedCues.isEmpty())
+        harness.controller.restoreCueDisplay()
+
+        assertEquals(listOf(cue to true), displayedCues)
+        assertTrue(harness.engine.events.isEmpty())
+        assertEquals(3.5, harness.controller.currentTime, 0.0)
+    }
+
+    @Test
     fun previousCueFallsBackToFixedSkipWhenMatchDataIsMissing() {
         val harness = controllerHarness(
             initialPosition = 20.0,
@@ -186,6 +302,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         matchData: SasayakiMatchData? = null,
         initialPosition: Double = 3.5,
         onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit = { _, _, _ -> },
+        onClearCue: () -> Unit = {},
     ): ControllerHarness {
         val bookRoot = temporaryFolder.newFolder("book")
         val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.m4b").also { file ->
@@ -209,7 +326,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
             persistenceDispatcher = Dispatchers.Unconfined,
             getCurrentChapterIndex = { 0 },
             onCue = onCue,
-            onClearCue = {},
+            onClearCue = onClearCue,
             playbackPreparer = preparer,
             onPlaybackStartRequested = { onReady -> onReady() },
             restoreAudioOnCreate = false,

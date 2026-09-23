@@ -232,6 +232,42 @@ class SasayakiTranscriptAlignerTest {
         assertEquals("ガラスの窓からギンコウを眺めていた", reverse.matches.single().text)
     }
 
+    @Test fun incrementalUpdatesExtendPartialSentenceWithoutDuplicateCues() {
+        val book = book("<p>雨の降る静かな朝だったけれど彼女はまだ眠っていた。</p>")
+        val session = SasayakiTranscriptAligner.Session(book)
+        val first = token("雨の降る静かな朝だった", 10.0, 14.0)
+        val second = token("けれど彼女はまだ眠っていた", 14.0, 20.0)
+        assertEquals("雨の降る静かな朝だった", session.align(listOf(first)).matches.single().text)
+        val complete = session.align(listOf(first, second))
+        assertEquals("雨の降る静かな朝だったけれど彼女はまだ眠っていた", complete.matches.single().text)
+        assertEquals(20.0, complete.matches.single().endTime, 0.001)
+        assertEquals(complete, session.align(listOf(first, second), complete = true))
+    }
+
+    @Test fun incrementalNewRightAnchorRepairsEarlierUnmatchedSpeech() {
+        val book = book("<p>雨の降る静かな朝だった。彼女は窓辺で手紙を読む。私は駅へ向かって歩いた。</p>")
+        val tokens = listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("彼女は窓へで手紙を読む", 4.0, 8.0), token("私は駅へ向かって歩いた", 8.0, 12.0))
+        val session = SasayakiTranscriptAligner.Session(book)
+        session.align(tokens.take(2))
+        val result = session.align(tokens)
+        assertEquals(listOf("雨の降る静かな朝だった", "彼女は窓辺で手紙を読む", "私は駅へ向かって歩いた"), result.matches.map { it.text })
+        assertEquals(4.0, result.matches[1].startTime, 0.001)
+        assertEquals(8.0, result.matches[1].endTime, 0.001)
+    }
+
+    @Test fun incrementalTokenBoundariesAndRepeatedTextAgreeWithFreshAlignment() {
+        val book = book("<p>そうだ。うん。そうだ。うん。</p>", "<p>そうだ。私は駅へ向かって歩いた。うん。彼女は窓の外を眺めていた。日差しがよく当たるから、冷房も強めに設定してあるのだろう。</p>")
+        val text = "そうだ私は駅へ向かって歩いたうん彼女は窓の外を眺めていた日差しがよく当たるから房も強めに設定してあるのだろう"
+        val tokens = text.mapIndexed { index, c -> token(c.toString(), index.toDouble(), index + 0.9) }
+        for (chunkSize in listOf(1, 3, 8, 13)) {
+            val session = SasayakiTranscriptAligner.Session(book)
+            for (end in (chunkSize..tokens.size step chunkSize).toList() + tokens.size) {
+                val prefix = tokens.take(end)
+                assertEquals("chunk=$chunkSize end=$end", SasayakiTranscriptAligner.align(book, prefix), session.align(prefix))
+            }
+        }
+    }
+
     private fun book(vararg html: String) = EpubBook(
         title = "Generated alignment fixture",
         chapters = html.mapIndexed { index, content ->

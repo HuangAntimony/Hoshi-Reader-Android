@@ -870,7 +870,18 @@ Validate relevant sync/update/Sasayaki changes with:
   during preparation so the controls do not jump as the source is loaded. Check model
   download/progress, pause, close/reopen the sheet, and background/foreground the
   app. Closing the sheet must keep transcription progressing while reading;
-  reopening must show that same task with Pause enabled. After pausing, Resume
+  reopening must show that same task with Pause enabled. Match coverage and usable
+  cues must grow while transcription is still running, without requiring Pause.
+  Check first-batch publication and throttled updates after further batches,
+  including slow matching (no queue of obsolete snapshots), silence (no redundant
+  rematching), a partial sentence extended by later speech, and a previously
+  unmatched gap gaining a right-hand anchor. Live updates must preserve the
+  playback position, current page, VN typewriter reveal, lookup popup, and image
+  hold/automatic resume. Completion must agree with a fresh full alignment.
+  The opt-in `SasayakiIncrementalMatchDeviceTest` accepts `-e matchBookRoot <root>`;
+  it reads an existing book/transcript without writing sidecars and places timing
+  and allocation results in `cache/incremental-match-benchmark/report.json`.
+  After pausing, Resume
   must work without changing tabs to refresh the audio source. Backgrounding
   the app must not actively pause the task; while its process can execute,
   completed batches continue advancing and returning shows the latest progress.

@@ -37,11 +37,11 @@ internal object ReaderPaginationScripts {
     fun progressInvocation(): String =
         "window.hoshiReader.calculateProgress()"
 
-    fun applySasayakiCuesInvocation(cuesJson: String): String =
-        "if (window.hoshiReader && typeof window.hoshiReader.applySasayakiCues === 'function') { window.hoshiReader.applySasayakiCues($cuesJson); }"
+    fun applySasayakiCuesInvocation(cuesJson: String, preserveLayout: Boolean = false): String =
+        "if (window.hoshiReader && typeof window.hoshiReader.applySasayakiCues === 'function') { window.hoshiReader.applySasayakiCues($cuesJson, $preserveLayout); }"
 
-    fun highlightSasayakiCueInvocation(cue: SasayakiCueRange, reveal: Boolean): String =
-        "window.hoshiReader.highlightSasayakiCue(${cue.toJavaScriptObjectLiteral()}, $reveal)"
+    fun highlightSasayakiCueInvocation(cue: SasayakiCueRange, reveal: Boolean, preserveReveal: Boolean = false): String =
+        "window.hoshiReader.highlightSasayakiCue(${cue.toJavaScriptObjectLiteral()}, $reveal, $preserveReveal)"
 
     fun sasayakiMediaStopsBeforeCueInvocation(cue: SasayakiCueRange): String =
         "window.hoshiReader.sasayakiMediaStopsBeforeCue(${cue.toJavaScriptObjectLiteral()})"

@@ -24,6 +24,62 @@ import org.junit.rules.TemporaryFolder
 class SasayakiTranscriptionViewModelTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun publishesDuringTranscriptionWithoutLockingPauseOrReloadingControls() = runTest {
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        val matches = mutableListOf<SasayakiMatchData>()
+        model.bind(temporary.newFolder(), "audio", matches::add)
+        runCurrent(); model.start(); runCurrent()
+        assertEquals(listOf(repository.match), matches)
+        assertTrue(model.uiState.value.canPause)
+        assertFalse(model.uiState.value.isLoading)
+        model.pause(); runCurrent()
+        assertEquals(listOf(repository.match), matches)
+    }
+
+    @Test fun idleCoordinatorDoesNotOverwriteLaterSubtitleMatchOnReaderReopen() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio"); runCurrent()
+        coordinator.pause(root); runCurrent()
+        val imported = SasayakiMatchData(listOf(SasayakiMatch("srt", 20.0, 25.0, "新字幕", 0, 100, 3)), 0)
+        var readerMatch = imported
+        val reopened = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        reopened.bind(root, "audio") { readerMatch = it }; runCurrent()
+        assertEquals(imported, readerMatch)
+    }
+
+    @Test fun newReaderBindingReceivesAlreadyPublishedActiveMatch() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio"); runCurrent()
+        val matches = mutableListOf<SasayakiMatchData>()
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        model.bind(root, "audio", matches::add); runCurrent()
+        assertEquals(listOf(repository.match), matches)
+        coordinator.pause(root); runCurrent()
+    }
+
+    @Test fun fastSilentCompletionRefreshesControlsEvenWhenRunningStateWasConflated() = runTest {
+        val repository = MemoryRepository()
+        val backend = object : SasayakiTranscriptionBackend {
+            override suspend fun duration(source: String) = 100.0
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit) = Unit
+        }
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, kotlinx.coroutines.Dispatchers.Unconfined)
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        val root = temporary.newFolder()
+        model.bind(root, "audio") {}; runCurrent()
+        coordinator.start(root, "audio")
+        assertFalse(coordinator.state.value.running)
+        runCurrent()
+        assertTrue(model.uiState.value.transcriptComplete)
+        assertEquals(R.string.sasayaki_transcription_realign, model.uiState.value.actionLabelRes)
+    }
+
     @Test fun partialTranscriptResumesOnlyForItsSelectedSource() = runTest {
         val root = temporary.newFolder()
         val repository = MemoryRepository(SasayakiTranscript(20.0, 100.0, emptyList(), "audio"))
@@ -97,7 +153,7 @@ class SasayakiTranscriptionViewModelTest {
 
     @Test fun latestReaderCallbackReceivesCompletionOnlyOnce() = runTest {
         val root = temporary.newFolder()
-        val repository = MemoryRepository()
+        val repository = MemoryRepository().apply { finishAlignment = CompletableDeferred() }
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val oldMatches = mutableListOf<SasayakiMatchData>()
@@ -108,6 +164,8 @@ class SasayakiTranscriptionViewModelTest {
         runCurrent()
         model.bind(root, "audio", newMatches::add)
         model.pause()
+        runCurrent()
+        repository.finishAlignment!!.complete(Unit)
         runCurrent()
         model.bind(root, "audio", newMatches::add)
         runCurrent()
@@ -244,11 +302,12 @@ class SasayakiTranscriptionViewModelTest {
         runCurrent()
         model.start(); runCurrent()
         assertTrue(coordinator.state.value.running)
+        val deliveredBeforeClosing = matches.toList()
         store.clear(); runCurrent()
         assertFalse(coordinator.state.value.running)
         assertEquals(10.0, repository.saved!!.through, 0.0)
         assertNotNull(coordinator.state.value.match)
-        assertTrue("A closed Reader must not receive UI callbacks", matches.isEmpty())
+        assertEquals("A closed Reader must not receive UI callbacks", deliveredBeforeClosing, matches)
         val reopened = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         reopened.bind(root, "audio") {}
         runCurrent()
@@ -299,9 +358,9 @@ class SasayakiTranscriptionViewModelTest {
         }
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
         override suspend fun clear(root: File) { saved = null }
-        override suspend fun align(root: File, tokens: List<SasayakiToken>): SasayakiMatchData {
+        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { tokens, complete ->
             finishAlignment?.await()
-            return match
+            match
         }
     }
 }

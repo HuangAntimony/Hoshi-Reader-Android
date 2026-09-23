@@ -12,8 +12,11 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -43,6 +46,7 @@ internal data class SasayakiTranscriptionState(
     val error: UiText? = null,
     val match: SasayakiMatchData? = null,
     val revision: Long = 0,
+    val completionRevision: Long = 0,
 ) {
     val running get() = stage != SasayakiTranscriptionStage.Idle
 }
@@ -80,12 +84,13 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             }
         } catch (error: Exception) {
             job.cancel()
-            mutableState.value = SasayakiTranscriptionState(root = root, error = failure(), revision = state.value.revision)
+            mutableState.value = SasayakiTranscriptionState(root = root, error = failure(), revision = state.value.revision, completionRevision = state.value.completionRevision)
             return false
         }
         task = job
         mutableState.value = SasayakiTranscriptionState(
             root = root, stage = SasayakiTranscriptionStage.Preparing, revision = state.value.revision,
+            completionRevision = state.value.completionRevision,
         )
         job.invokeOnCompletion {
             registration.close()
@@ -121,7 +126,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         true
     }
 
-    private suspend fun run(root: File, source: String, deleted: AtomicBoolean) {
+    private suspend fun run(root: File, source: String, deleted: AtomicBoolean) = coroutineScope {
         var duration = 0.0
         var through = 0.0
         var checkpointNeeded = false
@@ -129,6 +134,40 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         val tokens = ArrayList<SasayakiToken>()
         var result: SasayakiMatchData? = null
         var error: UiText? = null
+        var completed = false
+        var alignment: SasayakiTranscriptionAlignment? = null
+        var alignedCount = -1
+        val requests = Channel<List<SasayakiToken>>(Channel.CONFLATED)
+        suspend fun align(snapshot: List<SasayakiToken>, complete: Boolean) {
+            val active = alignment ?: repository.openAlignment(root).also { alignment = it }
+            val matched = active.align(snapshot, complete)
+            if (deleted.get()) return
+            alignedCount = snapshot.size
+            result = matched
+            mutableState.update {
+                it.copy(match = matched, error = null, revision = it.revision + if (it.match == matched) 0 else 1)
+            }
+        }
+        val matching = launch {
+            var lastMatchAt: Long? = null
+            for (pending in requests) {
+                lastMatchAt?.let { previous ->
+                    val waitMillis = ((15_000_000_000L - (clock.nowNanos() - previous)) / 1_000_000L).coerceAtLeast(0)
+                    delay(waitMillis)
+                }
+                val snapshot = requests.tryReceive().getOrNull() ?: pending
+                lastMatchAt = clock.nowNanos()
+                try {
+                    align(snapshot, complete = false)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A match failure must not discard successful recognition or stop inference.
+                    alignment = null
+                    mutableState.update { it.copy(error = failure()) }
+                }
+            }
+        }
         fun checkpoint() = SasayakiTranscript(through, duration, tokens.toList(), source)
         try {
             duration = backend.duration(source)
@@ -144,6 +183,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             val startPosition = through
             var firstBatchAt: Long? = null
             var lastPersist = clock.nowNanos()
+
             mutableState.update { it.copy(
                 stage = SasayakiTranscriptionStage.Preparing, through = through, duration = duration,
                 hasTranscript = saved != null,
@@ -185,6 +225,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                         stage = SasayakiTranscriptionStage.Transcribing, through = through, duration = duration,
                         remainingSeconds = remaining, hasTranscript = true,
                     ) }
+                    if (batch.tokens.isNotEmpty()) requests.trySend(tokens.toList())
                     if (now - lastPersist >= 15_000_000_000L) {
                         repository.save(root, checkpoint())
                         lastPersist = now
@@ -197,26 +238,29 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 through = duration
             }
             checkpointNeeded = true
+            completed = true
         } catch (_: CancellationException) {
             // Pause keeps only complete backend batches. Resume re-decodes the unfinished segment.
         } catch (_: Exception) {
             error = failure()
         } finally {
+            requests.close()
             withContext(NonCancellable + ioDispatcher) {
+                matching.cancelAndJoin()
                 if (checkpointNeeded && !deleted.get()) {
                     try {
                         repository.save(root, checkpoint())
-                        if (tokens.isNotEmpty() && !deleted.get()) {
+                        if (tokens.isNotEmpty() && !deleted.get() && (completed || alignedCount != tokens.size)) {
                             mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
-                            result = repository.align(root, tokens)
+                            align(tokens, complete = completed)
                         }
                     } catch (_: Exception) { error = failure() }
                 }
                 mutableState.update { it.copy(
                     stage = SasayakiTranscriptionStage.Idle,
                     through = through, duration = duration, remainingSeconds = null,
-                    hasTranscript = (checkpointNeeded || hasSavedTranscript) && !deleted.get(), error = error,
-                    match = result, revision = it.revision + 1,
+                    hasTranscript = (checkpointNeeded || hasSavedTranscript) && !deleted.get(), error = error ?: it.error,
+                    match = result ?: it.match, completionRevision = it.completionRevision + 1,
                 ) }
             }
         }

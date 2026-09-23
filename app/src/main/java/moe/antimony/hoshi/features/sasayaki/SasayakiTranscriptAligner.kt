@@ -18,7 +18,7 @@ object SasayakiTranscriptAligner {
     private const val maxUncertainRun = 6
 
     private data class Timing(val start: Double, val end: Double)
-    private data class Speech(val text: IntArray, val times: List<Timing>)
+    private data class Speech(val text: IntArray, val times: List<Timing>, val lastStart: Double = 0.0)
     private data class Chapter(
         val source: SasayakiSource.Chapter,
         val projections: List<SasayakiSource.Projection>,
@@ -47,34 +47,77 @@ object SasayakiTranscriptAligner {
         val similarity: Double,
     )
 
-    fun align(book: EpubBook, tokens: List<SasayakiToken>): SasayakiMatchData {
-        var offset = 0
-        val chapters = SasayakiSource.chapters(book).map { source ->
-            Chapter(source, SasayakiSource.projections(source), SasayakiSource.boundaries(source), offset)
-                .also { offset += source.text.size }
-        }
-        val speech = speech(tokens)
-        val times = chapters.map { arrayOfNulls<Timing>(it.source.text.size) }
-        val anchors = coherentAnchors(findAnchors(chapters, speech.text))
-        anchors.forEach { anchor ->
-            val projection = chapters[anchor.chapter].projections[anchor.projection]
-            repeat(anchor.length) { index ->
-                assign(times[anchor.chapter], projection, anchor.written + index, speech.times[anchor.spoken + index])
+    fun align(book: EpubBook, tokens: List<SasayakiToken>): SasayakiMatchData =
+        Session(book).align(tokens)
+
+    /** One append-only transcript. Book normalization and the distinctive-text index are shared by all updates. */
+    class Session(book: EpubBook) {
+        private val chapters: List<Chapter>
+        private val index: Map<Long, Seed?>
+        private var processedTokens = 0
+        private var speech = Speech(IntArray(0), emptyList())
+        private var candidates = emptyList<Anchor>()
+        private var gaps = emptyMap<Gap, List<Timing?>>()
+        private data class Gap(val chapter: Int, val lower: Int, val upper: Int, val from: Int, val to: Int)
+
+        init {
+            var offset = 0
+            chapters = SasayakiSource.chapters(book).map { source ->
+                Chapter(source, SasayakiSource.projections(source), SasayakiSource.boundaries(source), offset)
+                    .also { offset += source.text.size }
             }
+            index = buildIndex(chapters)
         }
-        anchors.zipWithNext().forEach { (left, right) ->
-            if (left.chapter == right.chapter) {
-                repairGap(chapters[left.chapter], left.sourceEnd, right.sourceStart,
-                    speech, left.speechEnd, right.spoken, times[left.chapter])
+
+        fun align(tokens: List<SasayakiToken>, complete: Boolean = false): SasayakiMatchData {
+            if (complete) {
+                processedTokens = 0
+                speech = Speech(IntArray(0), emptyList())
+                candidates = emptyList()
+                gaps = emptyMap()
             }
+            require(tokens.size >= processedTokens) { "A matching session requires an append-only transcript" }
+            // Revisit an exact run touching the old tail: new speech may extend it.
+            val tail = (speech.text.size - seedLength + 1).coerceAtLeast(0)
+            val from = candidates.filter { it.speechEnd >= tail }.minOfOrNull { it.spoken }?.coerceAtMost(tail) ?: tail
+            val added = speech(tokens.subList(processedTokens, tokens.size), speech.lastStart)
+            speech = Speech(speech.text + added.text, speech.times + added.times, added.lastStart)
+            processedTokens = tokens.size
+            candidates = (candidates.filter { it.spoken < from && it.speechEnd < tail } +
+                findAnchors(chapters, speech.text, index, from)).distinctBy { Triple(it.chapter, it.sourceStart, it.spoken) }
+            // Choosing the monotonic chain is cheap and lets stronger new evidence correct an old location.
+            val anchors = coherentAnchors(candidates)
+            val times = chapters.map { arrayOfNulls<Timing>(it.source.text.size) }
+            anchors.forEach { anchor ->
+                val projection = chapters[anchor.chapter].projections[anchor.projection]
+                repeat(anchor.length) { position ->
+                    assign(times[anchor.chapter], projection, anchor.written + position, speech.times[anchor.spoken + position])
+                }
+            }
+            val nextGaps = HashMap<Gap, List<Timing?>>()
+            anchors.zipWithNext().forEach { (left, right) ->
+                if (left.chapter != right.chapter) return@forEach
+                val gap = Gap(left.chapter, left.sourceEnd, right.sourceStart, left.speechEnd, right.spoken)
+                if (gap.upper - gap.lower !in 1..maxGap || gap.to - gap.from !in 0..maxGap) return@forEach
+                val cached = gaps[gap]
+                if (cached != null) {
+                    cached.forEachIndexed { position, time -> times[gap.chapter][gap.lower + position] = time }
+                    nextGaps[gap] = cached
+                } else {
+                    repairGap(chapters[gap.chapter], gap.lower, gap.upper, speech, gap.from, gap.to, times[gap.chapter])
+                    nextGaps[gap] = times[gap.chapter].slice(gap.lower until gap.upper)
+                }
+            }
+            // A formerly unmatched gap is retried only when its neighboring anchors change.
+            gaps = nextGaps
+            return cut(chapters, times)
         }
-        return cut(chapters, times)
     }
 
-    private fun speech(tokens: List<SasayakiToken>): Speech {
+    private fun speech(tokens: List<SasayakiToken>, minimumStart: Double = 0.0): Speech {
         val characters = mutableListOf<Int>()
         val times = mutableListOf<Timing>()
-        var previousStart = 0.0
+        var previousStart = minimumStart
         tokens.forEach { token ->
             if (!token.start.isFinite() || !token.end.isFinite() || token.start < previousStart ||
                 token.end <= token.start) return@forEach
@@ -86,11 +129,10 @@ object SasayakiTranscriptAligner {
                 times += Timing(token.start + length * index / points.size, token.start + length * (index + 1) / points.size)
             }
         }
-        return Speech(characters.toIntArray(), times)
+        return Speech(characters.toIntArray(), times, previousStart)
     }
 
-    private fun findAnchors(chapters: List<Chapter>, speech: IntArray): List<Anchor> {
-        if (speech.size < seedLength) return emptyList()
+    private fun buildIndex(chapters: List<Chapter>): Map<Long, Seed?> {
         // A null entry is ambiguous. Duplicate base/ruby projections at the same source
         // position count once; repeated phrases elsewhere cannot become independent anchors.
         val index = HashMap<Long, Seed?>()
@@ -110,8 +152,12 @@ object SasayakiTranscriptAligner {
                 }
             }
         }
+        return index
+    }
+
+    private fun findAnchors(chapters: List<Chapter>, speech: IntArray, index: Map<Long, Seed?>, from: Int): List<Anchor> {
         val result = mutableListOf<Anchor>()
-        var position = 0
+        var position = from
         while (position <= speech.size - seedLength) {
             val seed = index[hash(speech, position)]
             if (seed == null) {

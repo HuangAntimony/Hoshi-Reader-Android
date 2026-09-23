@@ -863,7 +863,7 @@
     <string name="sasayaki_transcription_pause">暂停</string>
     <string name="sasayaki_transcription_preparing">正在准备转写…</string>
     <string name="sasayaki_transcription_downloading">正在下载转写文件… %1$d%%</string>
-    <string name="sasayaki_transcription_progress">正在转写…</string>
+    <string name="sasayaki_transcription_progress">正在转写并匹配…</string>
     <string name="sasayaki_transcription_paused">转写已暂停</string>
     <string name="sasayaki_transcription_complete">转写完成</string>
     <string name="sasayaki_transcription_coverage">当前匹配覆盖率：%1$s</string>

@@ -111,6 +111,62 @@ class SasayakiCueDisplayCoordinatorTest {
         assertEquals(20.0, coordinator.currentCueStartTime ?: -1.0, 0.0)
     }
 
+    @Test
+    fun quietCrossChapterRefreshDoesNotNavigateOnFollowingPlaybackTicks() {
+        val coordinator = SasayakiCueDisplayCoordinator()
+        coordinator.update(cueA, currentChapterIndex = 0, autoScroll = true, hasPlayedOnce = true)
+
+        assertSame(SasayakiCueDisplayAction.Clear, coordinator.refresh(otherChapterCue, currentChapterIndex = 0))
+        repeat(2) {
+            assertSame(
+                SasayakiCueDisplayAction.None,
+                coordinator.update(
+                    otherChapterCue,
+                    currentChapterIndex = 0,
+                    autoScroll = true,
+                    hasPlayedOnce = true,
+                    source = SasayakiCueRevealSource.NaturalPlayback,
+                ),
+            )
+        }
+
+        val nextCue = otherChapterCue.copy(id = "next", startTime = 33.0, endTime = 35.0, start = 4)
+        assertTrue(
+            coordinator.update(
+                nextCue,
+                currentChapterIndex = 0,
+                autoScroll = true,
+                hasPlayedOnce = true,
+                source = SasayakiCueRevealSource.NaturalPlayback,
+            ) is SasayakiCueDisplayAction.ClearAndDisplay,
+        )
+    }
+
+    @Test
+    fun quietCrossChapterRefreshDoesNotBlockExplicitCueNavigation() {
+        val coordinator = SasayakiCueDisplayCoordinator()
+        coordinator.refresh(otherChapterCue, currentChapterIndex = 0)
+
+        assertTrue(
+            coordinator.update(
+                otherChapterCue,
+                currentChapterIndex = 0,
+                autoScroll = true,
+                hasPlayedOnce = true,
+                source = SasayakiCueRevealSource.DirectJump,
+            ) is SasayakiCueDisplayAction.ClearAndDisplay,
+        )
+    }
+
+    @Test
+    fun quietRefreshClearsStaleCueAfterReaderChangesChapter() {
+        val coordinator = SasayakiCueDisplayCoordinator()
+        coordinator.update(cueA, currentChapterIndex = 0, autoScroll = true, hasPlayedOnce = true)
+
+        assertSame(SasayakiCueDisplayAction.Clear, coordinator.refresh(cueA, currentChapterIndex = 1))
+        assertNull(coordinator.currentCueStartTime)
+    }
+
     private fun assertDisplay(action: SasayakiCueDisplayAction, cue: SasayakiMatch, reveal: Boolean) {
         assertTrue(action is SasayakiCueDisplayAction.Display)
         val display = action as SasayakiCueDisplayAction.Display

@@ -72,6 +72,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
     private var transcript: TranscriptSummary? = null
     private var onMatchUpdated: ((SasayakiMatchData) -> Unit)? = null
     private var observedRevision = 0L
+    private var observedCompletionRevision = 0L
     private var wasRunning = false
     private var loadJob: Job? = null
     private var startJob: Job? = null
@@ -82,13 +83,14 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         scope.launch {
             coordinator.state.collect { task ->
                 val ownTask = task.root == root && root != null
-                val completed = ownTask && !task.running && (wasRunning || task.revision > observedRevision)
+                val completed = ownTask && !task.running && (wasRunning || task.completionRevision > observedCompletionRevision)
                 wasRunning = ownTask && task.running
+                if (ownTask && task.revision > observedRevision) {
+                    observedRevision = task.revision
+                    task.match?.let { onMatchUpdated?.invoke(it) }
+                }
                 if (completed) {
-                    if (task.revision > observedRevision) {
-                        observedRevision = task.revision
-                        task.match?.let { onMatchUpdated?.invoke(it) }
-                    }
+                    observedCompletionRevision = task.completionRevision
                     root?.let(::loadTranscript)
                 }
                 render(task)
@@ -106,9 +108,11 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             transcript = null
             localError = null
             observedRevision = coordinator.state.value.revision
+            observedCompletionRevision = coordinator.state.value.completionRevision
             wasRunning = false
             _uiState.value = SasayakiTranscriptionUiState()
             loadTranscript(root)
+            coordinator.state.value.takeIf { it.root == root && it.running }?.match?.let(onMatchUpdated)
         }
         render(coordinator.state.value)
     }

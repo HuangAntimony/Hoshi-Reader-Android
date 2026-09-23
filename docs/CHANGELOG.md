@@ -18,6 +18,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Support M4A audio and show matched character coverage for both subtitles and transcription.
   Preserve word beginnings at audio segment boundaries and recover short missing
   word fragments when matching existing transcripts.
+  Match new transcription automatically while reading, preserving playback,
+  reading position, dictionary lookups, and image holds as coverage grows.
   Speed up transcription with native audio decoding/resampling running alongside
   speech recognition, while keeping audio buffers bounded.
 

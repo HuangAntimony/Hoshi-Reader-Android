@@ -507,14 +507,24 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   within speech retain leading context with timestamp deduplication.
 - A process-wide `SasayakiTranscriptionCoordinator` serializes transcription,
   checkpoints `sasayaki_transcript.json` approximately every 15 seconds, and
-  finishes saving/alignment after cancellation. The sidecar keeps iOS's
+  runs one conflated matching worker alongside recognition. The first text batch
+  requests a match immediately; subsequent updates are throttled to 15 seconds
+  and consume the latest immutable token snapshot. Pausing flushes unmatched
+  batches; completion and explicit realignment perform a full calibration.
+  Match publication has its own revision and does not enter the blocking
+  `Aligning` stage during recognition. Match sidecars use atomic replacement. The sidecar keeps iOS's
   `through`, `duration`, and timed-token schema with an optional audio-source
   identity to avoid resuming a different file of the same duration. Atomic
   replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
   joins active work before book deletion. Clearing transcription preserves
   existing matches; completed transcripts can be realigned without ASR.
 - The Reader-route Hilt ViewModel exposes transcription state and delivers
-  completed matches even after the sheet closes. Reader owns audio-source
+  match revisions during transcription even after the sheet closes. Reader coalesces
+  match snapshots until lookup, image holds, and restoration finish. Data refreshes
+  preserve playback/hold state and repaint changed cues without navigation; reader
+  reattachment explicitly restores the current cue. Live VN cue updates defer
+  pagination changes until the next navigation and preserve the current reveal.
+  Reader owns audio-source
   binding and the combined keep-screen-on flag. Closing the sheet or backgrounding
   the app does not actively pause inference. Removing the Reader route clears
   its ViewModel, which pauses and saves the task; configuration recreation keeps
@@ -529,7 +539,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `SasayakiSource` shares chapter exclusions with SRT matching. The transcript
   aligner uses normalized/ruby-aware exact anchors, monotonic ordering, bounded
   gap repair, and sentence boundaries in Reader code-point coordinates; it does
-  not invent anchors at unspoken book/audio edges. Short omitted word fragments
+  not invent anchors at unspoken book/audio edges. A run-scoped alignment session
+  caches book normalization, the distinctive-text index, normalized speech, and
+  existing anchor candidates. Only new speech and an overlapping exact tail are
+  searched; bounded gaps are repaired again only when their neighboring anchors
+  change. The global monotonic chain is still reconsidered so new evidence can
+  correct an earlier position. CPU matching runs on the Default dispatcher;
+  parsing and persistence remain repository-owned I/O. Short omitted word fragments
   can use the time between real neighboring anchors, but entire unspoken cues
   and gaps across long silence remain unmatched. Match coverage is summed
   matched character lengths divided by the parsed book character count.
