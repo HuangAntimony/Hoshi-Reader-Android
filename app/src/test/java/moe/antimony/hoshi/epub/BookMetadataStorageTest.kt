@@ -340,7 +340,7 @@ class BookMetadataStorageTest {
     fun deleteBookRemovesBookDirectory() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-delete").toFile())
         val root = storage.createBookDirectory("delete-me")
-        root.resolve("metadata.json").writeText("{}")
+        storage.saveMetadata(root, BookMetadata(id = UUID.randomUUID().toString(), title = "Delete me", folder = root.name, lastAccess = 0.0))
 
         storage.deleteBook(root)
 

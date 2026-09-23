@@ -3,6 +3,8 @@ package moe.antimony.hoshi.epub
 import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.io.InputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -42,7 +44,7 @@ class BookRepository private constructor(
     private val filesDir: File,
     private val ioDispatcher: CoroutineDispatcher,
     private val fileDataSource: BookFileDataSource,
-    private val sidecarDataSource: BookSidecarDataSource,
+    internal val sidecarDataSource: BookSidecarDataSource,
     private val clock: BookClock,
     internal val statisticsStore: BookStatisticsStore,
     private val workRegistry: BookWorkRegistry,
@@ -57,7 +59,7 @@ class BookRepository private constructor(
         filesDir = filesDir,
         ioDispatcher = ioDispatcher,
         fileDataSource = BookFileDataSource(filesDir, ioDispatcher),
-        sidecarDataSource = BookSidecarDataSource(ioDispatcher),
+        sidecarDataSource = BookSidecarDataSource(ioDispatcher, statisticsStore.storageLock),
         clock = SystemBookClock,
         statisticsStore = statisticsStore,
         workRegistry = workRegistry,
@@ -71,6 +73,11 @@ class BookRepository private constructor(
 
     private val archiveExtractor = EpubArchiveExtractor()
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
+
+    internal val storageLock get() = statisticsStore.storageLock
+    var onBookChange: (suspend (String, moe.antimony.hoshi.features.sync.SyncFileType?) -> Unit)? = null
+    var onShelvesChange: (suspend () -> Unit)? = null
+    var onBookImport: (suspend (BookMetadata, File) -> Unit)? = null
 
     private val legacyPackedMigrationMutex = Mutex()
 
@@ -138,8 +145,11 @@ class BookRepository private constructor(
     suspend fun loadMetadata(bookRoot: File): BookMetadata? =
         sidecarDataSource.loadMetadata(bookRoot)
 
-    override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) = storageLock.withLock {
+        val old = loadMetadata(bookRoot)
+        val changed = old != null && (old.displayTitle != metadata.displayTitle || old.author != metadata.author)
         sidecarDataSource.saveMetadata(bookRoot, metadata)
+        if (changed || old?.shelves != metadata.shelves || old?.characterCount != metadata.characterCount) onBookChange?.invoke(bookRoot.name.syncKey(), null)
     }
 
     suspend fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
@@ -195,7 +205,7 @@ class BookRepository private constructor(
             .map { (name, _) -> BookShelf(name, books.filter { it.shelves?.get(name)?.value == true }.map { it.id }) }
     }
 
-    suspend fun saveShelves(shelves: List<BookShelf>) {
+    suspend fun saveShelves(shelves: List<BookShelf>) = storageLock.withLock {
         val old = loadShelfList()
         val list = old.toMutableMap()
         val now = System.currentTimeMillis()
@@ -219,6 +229,8 @@ class BookRepository private constructor(
             if (memberships != metadata.shelves.orEmpty()) saveMetadata(root, metadata.copy(shelves = memberships))
         }
         saveShelfList(list)
+        if (old != list) onShelvesChange?.invoke()
+        Unit
     }
 
     private suspend fun replaceShelfBookIds(idReplacements: Map<String, String>) {
@@ -232,8 +244,10 @@ class BookRepository private constructor(
     override suspend fun loadBookmark(bookRoot: File): Bookmark? =
         sidecarDataSource.loadBookmark(bookRoot)
 
-    override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) = storageLock.withLock {
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
+        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
@@ -266,8 +280,10 @@ class BookRepository private constructor(
     suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
         sidecarDataSource.loadHighlights(bookRoot).orEmpty()
 
-    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) = storageLock.withLock {
         sidecarDataSource.saveHighlights(bookRoot, highlights)
+        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
@@ -276,24 +292,30 @@ class BookRepository private constructor(
     override suspend fun loadReaderBookInfo(bookRoot: File): BookInfo? =
         loadBookInfo(bookRoot)
 
-    override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) = storageLock.withLock {
         sidecarDataSource.saveBookInfo(bookRoot, bookInfo)
+        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     override suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         sidecarDataSource.loadSasayakiMatch(bookRoot)
 
-    override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = storageLock.withLock {
         sidecarDataSource.saveSasayakiMatch(bookRoot, match)
+        onBookChange?.invoke(bookRoot.name.syncKey(), moe.antimony.hoshi.features.sync.SyncFileType.sasayaki)
+        Unit
     }
 
     override suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         sidecarDataSource.loadSasayakiPlayback(bookRoot)
 
-    override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
+    override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) = storageLock.withLock {
         val stored = loadSasayakiPlayback(bookRoot)
         val changed = stored?.lastPosition != playback.lastPosition || stored.delay != playback.delay || stored.rate != playback.rate
         sidecarDataSource.saveSasayakiPlayback(bookRoot, playback.copy(modified = if (changed) System.currentTimeMillis() else stored.modified))
+        if (changed) onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     suspend fun applySasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) =
@@ -689,6 +711,7 @@ class EpubArchiveExtractor {
 
 class BookSidecarDataSource(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val storageLock: BookStorageLock = BookStorageLock(),
 ) {
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
@@ -716,9 +739,9 @@ class BookSidecarDataSource(
     private val highlightSerializer = MapSerializer(String.serializer(), Timestamped.serializer(ReaderHighlight.serializer().nullable))
     private val shelfSerializer = MapSerializer(String.serializer(), Timestamped.serializer(Int.serializer().nullable))
 
-    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> = withContext(ioDispatcher) {
+    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> = locked {
         val file = bookRoot.resolve(HIGHLIGHTS_FILE_NAME)
-        if (!file.isFile) return@withContext emptyMap()
+        if (!file.isFile) return@locked emptyMap()
         val element = json.parseToJsonElement(file.readText())
         if (element is JsonArray) {
             json.decodeFromJsonElement(ListSerializer(ReaderHighlight.serializer()), element).associate { highlight ->
@@ -733,11 +756,11 @@ class BookSidecarDataSource(
     suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
         loadHighlightRecords(bookRoot).values.mapNotNull { it.value }.sortedBy { it.createdAt }
 
-    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) = withContext(ioDispatcher) {
-        bookRoot.resolve(HIGHLIGHTS_FILE_NAME).writeText(SyncFormat.json.encodeToString(highlightSerializer, records))
+    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) = locked {
+        writeBookJson(bookRoot.resolve(HIGHLIGHTS_FILE_NAME), SyncFormat.json.encodeToString(highlightSerializer, records))
     }
 
-    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) = locked {
         val records = loadHighlightRecords(bookRoot).toMutableMap()
         val now = System.currentTimeMillis()
         val ids = highlights.map { it.id.uppercase() }.toSet()
@@ -785,11 +808,11 @@ class BookSidecarDataSource(
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
-    suspend fun loadShelfList(booksRoot: File): Map<String, Timestamped<Int?>> = withContext(ioDispatcher) {
+    suspend fun loadShelfList(booksRoot: File): Map<String, Timestamped<Int?>> = locked {
         val file = booksRoot.resolve(SHELVES_FILE_NAME)
-        if (!file.isFile) return@withContext emptyMap()
+        if (!file.isFile) return@locked emptyMap()
         val element = json.parseToJsonElement(file.readText())
-        if (element !is JsonArray) return@withContext SyncFormat.json.decodeFromJsonElement(shelfSerializer, element)
+        if (element !is JsonArray) return@locked SyncFormat.json.decodeFromJsonElement(shelfSerializer, element)
         val legacy = json.decodeFromJsonElement(ListSerializer(BookShelf.serializer()), element)
         val books = booksRoot.listFiles().orEmpty().mapNotNull { root -> loadMetadata(root)?.let { root to it } }
         val shelves = legacy.mapIndexed { index, shelf -> shelf.name.syncKey() to Timestamped<Int?>(0, index) }.toMap()
@@ -802,19 +825,22 @@ class BookSidecarDataSource(
         shelves
     }
 
-    suspend fun saveShelfList(booksRoot: File, shelves: Map<String, Timestamped<Int?>>) = withContext(ioDispatcher) {
+    suspend fun saveShelfList(booksRoot: File, shelves: Map<String, Timestamped<Int?>>) = locked {
         booksRoot.mkdirs()
-        booksRoot.resolve(SHELVES_FILE_NAME).writeText(SyncFormat.json.encodeToString(shelfSerializer, shelves))
+        writeBookJson(booksRoot.resolve(SHELVES_FILE_NAME), SyncFormat.json.encodeToString(shelfSerializer, shelves))
     }
 
-    private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = withContext(ioDispatcher) {
-        if (!file.isFile) return@withContext null
+    private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = locked {
+        if (!file.isFile) return@locked null
         runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
     }
 
-    private suspend fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) = withContext(ioDispatcher) {
+    private suspend fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) = locked {
         bookRoot.mkdirs()
-        bookRoot.resolve(fileName).writeText(json.encodeToString(serializer, value))
+        writeBookJson(bookRoot.resolve(fileName), json.encodeToString(serializer, value))
+    }
+    private suspend fun <T> locked(action: suspend () -> T): T = withContext(ioDispatcher) {
+        storageLock.withLock(action)
     }
 }
 
@@ -866,3 +892,17 @@ private fun String.coverExtension(): String = when (lowercase()) {
 
 internal fun String.isUuidString(): Boolean =
     runCatching { UUID.fromString(this) }.isSuccess
+
+internal fun writeBookJson(file: File, contents: String) {
+    file.parentFile!!.mkdirs()
+    val temporary = File.createTempFile(".${file.name}-", ".tmp", file.parentFile)
+    try {
+        temporary.outputStream().use { stream ->
+            stream.write(contents.toByteArray())
+            stream.fd.sync()
+        }
+        Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    } finally {
+        temporary.delete()
+    }
+}

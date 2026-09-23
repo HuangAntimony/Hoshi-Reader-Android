@@ -2,17 +2,15 @@ package moe.antimony.hoshi.epub
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -49,16 +47,17 @@ class BookStatisticsStore private constructor(
     private val filesDir: File,
     private val ioDispatcher: CoroutineDispatcher,
     private val resetMinutes: suspend () -> Int,
+    internal val storageLock: BookStorageLock,
 ) {
     @Inject constructor(
         @FilesDir filesDir: File,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         settings: ReaderSettingsRepository,
-    ) : this(filesDir, ioDispatcher, { settings.settings.first().statisticsResetMinutes })
+        storageLock: BookStorageLock,
+    ) : this(filesDir, ioDispatcher, { settings.settings.first().statisticsResetMinutes }, storageLock)
 
-    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(filesDir, ioDispatcher, { 0 })
+    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(filesDir, ioDispatcher, { 0 }, BookStorageLock())
 
-    private val mutex = Mutex()
     private var resetTime = 0
     private val booksDirectory get() = filesDir.resolve("Books")
     private val archiveDirectory get() = booksDirectory.resolve(STATISTICS_ARCHIVE_DIRECTORY)
@@ -137,8 +136,9 @@ class BookStatisticsStore private constructor(
         val archivedMetadata = metadata.copy(
             title = metadata.displayTitle.ifBlank { bookRoot.name }, renamedTitle = null,
             folder = destination.name, cover = cover, epub = null, shelves = null,
+            characterCount = maxOf(metadata.characterCount ?: 0, runCatching { json.decodeFromString(BookInfo.serializer(), bookRoot.resolve("bookinfo.json").readText()).characterCount }.getOrDefault(0)),
         )
-        atomicWrite(destination.resolve("metadata.json"), json.encodeToString(BookMetadata.serializer(), archivedMetadata))
+        writeBookJson(destination.resolve("metadata.json"), json.encodeToString(BookMetadata.serializer(), archivedMetadata))
         writeSessions(destination, merged)
     }
 
@@ -243,25 +243,11 @@ class BookStatisticsStore private constructor(
     }
 
     private fun writeSessions(root: File, sessions: ReadingSessions) {
-        atomicWrite(root.resolve("statistics.json"), json.encodeToString(serializer, sessions))
+        writeBookJson(root.resolve("statistics.json"), json.encodeToString(serializer, sessions))
         if (root.parentFile == archiveDirectory && sessions.values.all { it.value == null }) root.resolve("cover.jpg").delete()
         revision.value += 1
     }
 
-    private fun atomicWrite(file: File, contents: String) {
-        val parent = requireNotNull(file.parentFile)
-        check(parent.isDirectory || parent.mkdirs()) { "Unable to create statistics directory." }
-        val temporary = File.createTempFile(".${file.name}-", ".tmp", parent)
-        try {
-            temporary.outputStream().use { stream ->
-                stream.write(contents.toByteArray(Charsets.UTF_8))
-                stream.fd.sync()
-            }
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        } finally {
-            temporary.delete()
-        }
-    }
 
     private fun activeRoot(folder: String): File = safeChild(booksDirectory, folder)
     private fun archiveRoot(folder: String): File = safeChild(archiveDirectory, folder)
@@ -313,7 +299,7 @@ class BookStatisticsStore private constructor(
     }
 
     private suspend fun <T> locked(block: suspend () -> T): T = withContext(ioDispatcher) {
-        mutex.withLock {
+        storageLock.withLock {
             migrateReservedStatisticsBook(booksDirectory)
             resetTime = resetMinutes()
             block()

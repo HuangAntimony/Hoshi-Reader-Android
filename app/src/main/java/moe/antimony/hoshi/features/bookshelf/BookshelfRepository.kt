@@ -282,7 +282,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
 
     override suspend fun renameBook(entry: BookEntry, title: String?) = withContext(ioDispatcher) {
         val metadata = bookRepository.loadMetadata(entry.root) ?: entry.metadata
-        bookRepository.saveMetadata(entry.root, metadata.copy(renamedTitle = title))
+        bookRepository.saveMetadata(entry.root, metadata.copy(renamedTitle = title, modified = System.currentTimeMillis()))
     }
 
     override suspend fun setBookProfile(entry: BookEntry, profileId: String?) = withContext(ioDispatcher) {
