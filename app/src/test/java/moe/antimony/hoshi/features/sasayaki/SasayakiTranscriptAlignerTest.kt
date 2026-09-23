@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.epub.EpubChapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,6 +9,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SasayakiTranscriptAlignerTest {
+    @Test fun emptyAlignmentStillRecordsTranscriptionSource() {
+        val result = SasayakiTranscriptAligner.align(book("<p>本文</p>"), emptyList())
+        assertTrue(result.matches.isEmpty())
+        assertEquals(SasayakiMatchSource.Transcription, result.source)
+    }
+
     @Test
     fun exactSpeechUsesBookSentencesAndTokenTimes() {
         val result = SasayakiTranscriptAligner.align(

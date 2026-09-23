@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.sasayaki
 
 import com.sun.management.ThreadMXBean
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.epub.EpubChapter
 import moe.antimony.hoshi.epub.EpubBookParser
 import org.junit.Assert.assertEquals
@@ -16,6 +17,12 @@ import java.lang.management.ManagementFactory
 class SasayakiMatcherTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
+
+    @Test fun emptySubtitleMatchRecordsSubtitleSource() {
+        val result = SasayakiMatcher.match(EpubBook(title = "Empty", chapters = emptyList()), emptyList())
+        assertTrue(result.matches.isEmpty())
+        assertEquals(SasayakiMatchSource.Subtitles, result.source)
+    }
 
     @Test
     fun koreanCuesUseChapterCodePointOffsetsWithoutRubyFallbackText() {

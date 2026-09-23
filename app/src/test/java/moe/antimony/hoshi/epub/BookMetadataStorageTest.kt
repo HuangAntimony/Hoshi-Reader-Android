@@ -529,6 +529,32 @@ class BookMetadataStorageTest {
     }
 
     @Test
+    fun sasayakiMatchSourceSurvivesStorageAndRecognizesLegacyTranscription() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-sasayaki-source").toFile())
+        val root = storage.createBookDirectory("book")
+        val sidecar = root.resolve("sasayaki_match.json")
+        fun legacy(id: String) = """{"matches":[{"id":"$id","startTime":1.0,"endTime":2.0,"text":"本文","chapterIndex":3,"start":10,"length":2}],"unmatched":0}"""
+        sidecar.writeText(legacy("3-10"))
+        assertEquals(SasayakiMatchSource.Transcription, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText(legacy("0"))
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText(legacy("3-11"))
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText("""{"matches":[],"unmatched":0}""")
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+
+        // Explicit provenance works even before the first successful match.
+        for (source in SasayakiMatchSource.entries) {
+            val match = SasayakiMatchData(emptyList(), 1, source)
+            storage.saveSasayakiMatch(root, match)
+            assertEquals(match, storage.loadSasayakiMatch(root))
+        }
+        // Explicit provenance takes priority over the legacy ID heuristic.
+        sidecar.writeText(legacy("3-10").dropLast(1) + """, "source":"subtitles"}""")
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+    }
+
+    @Test
     fun savesAndLoadsIosCompatibleSasayakiSidecars() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-sasayaki-sidecars").toFile())
         val root = storage.createBookDirectory("book")

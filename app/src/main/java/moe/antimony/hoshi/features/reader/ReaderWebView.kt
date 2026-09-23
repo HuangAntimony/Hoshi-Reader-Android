@@ -186,6 +186,7 @@ fun ReaderWebView(
         audioRepository = sasayakiAudioRepository,
         playback = sasayakiPlayer?.playback,
         viewModel = sasayakiTranscriptionViewModel,
+        matchSource = sasayakiSheetMatchData?.source,
         onMatchUpdated = { data ->
             sasayakiSheetMatchData = data
             pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = true)

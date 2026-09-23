@@ -15,6 +15,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   transcribing with the audiobook panel closed, and keep running when switching
   apps instead of actively pausing; exiting the Reader still saves and pauses.
   Reuse completed transcripts or clear them while keeping the current match.
+  Default to the Transcription tab when the current match comes from transcription.
   Support M4A audio and show matched character coverage for both subtitles and transcription.
   Preserve word beginnings at audio segment boundaries and recover short missing
   word fragments when matching existing transcripts.

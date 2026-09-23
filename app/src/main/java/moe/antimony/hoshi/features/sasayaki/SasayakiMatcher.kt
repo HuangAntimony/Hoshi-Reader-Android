@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import moe.antimony.hoshi.epub.EpubBook
@@ -171,6 +172,7 @@ object SasayakiMatcher {
         return SasayakiMatchData(
             matches = matches,
             unmatched = cues.size - matches.size,
+            source = SasayakiMatchSource.Subtitles,
         )
     }
 

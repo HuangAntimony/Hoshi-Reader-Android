@@ -518,6 +518,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
   joins active work before book deletion. Clearing transcription preserves
   existing matches; completed transcripts can be realigned without ASR.
+- Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android
+  transcription matches are recognized by their chapter-offset cue IDs; this
+  provenance selects the default matching tab without overriding a manual tab
+  choice in the current Reader session. Transcript presence alone is not used.
 - The Reader-route Hilt ViewModel exposes transcription state and delivers
   match revisions during transcription even after the sheet closes. Reader coalesces
   match snapshots until lookup, image holds, and restoration finish. Data refreshes

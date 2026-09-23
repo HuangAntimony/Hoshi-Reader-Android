@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.ui.UiText
 
 internal enum class SasayakiMatchMode(@param:StringRes val labelRes: Int) {
@@ -69,6 +70,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
     val uiState = _uiState.asStateFlow()
     private var root: File? = null
     private var source: String? = null
+    private var hasSelectedMode = false
     private var transcript: TranscriptSummary? = null
     private var onMatchUpdated: ((SasayakiMatchData) -> Unit)? = null
     private var observedRevision = 0L
@@ -98,13 +100,14 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         }
     }
 
-    fun bind(root: File, source: String?, onMatchUpdated: (SasayakiMatchData) -> Unit) {
+    fun bind(root: File, source: String?, matchSource: SasayakiMatchSource? = null, onMatchUpdated: (SasayakiMatchData) -> Unit) {
         this.onMatchUpdated = onMatchUpdated
         this.source = source
         if (this.root != root) {
             this.root?.let(coordinator::pause)
             startJob?.cancel()
             this.root = root
+            hasSelectedMode = false
             transcript = null
             localError = null
             observedRevision = coordinator.state.value.revision
@@ -114,11 +117,20 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             loadTranscript(root)
             coordinator.state.value.takeIf { it.root == root && it.running }?.match?.let(onMatchUpdated)
         }
+        if (!hasSelectedMode && matchSource != null) {
+            _uiState.value = _uiState.value.copy(mode = when (matchSource) {
+                SasayakiMatchSource.Subtitles -> SasayakiMatchMode.Subtitles
+                SasayakiMatchSource.Transcription -> SasayakiMatchMode.Transcription
+            })
+        }
         render(coordinator.state.value)
     }
 
     fun selectMode(mode: SasayakiMatchMode) {
-        if (!_uiState.value.controlsLocked) _uiState.value = _uiState.value.copy(mode = mode)
+        if (!_uiState.value.controlsLocked) {
+            hasSelectedMode = true
+            _uiState.value = _uiState.value.copy(mode = mode)
+        }
     }
 
     fun start() {

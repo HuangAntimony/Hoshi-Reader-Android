@@ -5,6 +5,7 @@ import kotlin.math.min
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 
 /**
  * Exact, distinctive text establishes positions; edit alignment only repairs bounded gaps.
@@ -405,6 +406,6 @@ object SasayakiTranscriptAligner {
                 start = end + 1
             }
         }
-        return SasayakiMatchData(matches.sortedBy { it.startTime }, unmatched)
+        return SasayakiMatchData(matches.sortedBy { it.startTime }, unmatched, SasayakiMatchSource.Transcription)
     }
 }

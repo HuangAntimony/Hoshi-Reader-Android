@@ -12,6 +12,7 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookWorkRegistry
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBackend
 import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBatch
 import moe.antimony.hoshi.ui.UiText
@@ -24,12 +25,57 @@ import org.junit.rules.TemporaryFolder
 class SasayakiTranscriptionViewModelTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun matchSourceSelectsDefaultEvenWithoutSavedTranscriptAndAfterReaderReopen() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        model.bind(root, "audio") {}; runCurrent()
+        // Match loading may finish after the initial Reader binding.
+        model.bind(root, "audio", SasayakiMatchSource.Transcription) {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Transcription, model.uiState.value.mode)
+        assertFalse(model.uiState.value.hasTranscript)
+        model.selectMode(SasayakiMatchMode.Subtitles)
+        model.bind(root, "audio", SasayakiMatchSource.Transcription) {}
+        assertEquals(SasayakiMatchMode.Subtitles, model.uiState.value.mode)
+
+        val reopened = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        reopened.bind(root, "audio", SasayakiMatchSource.Transcription) {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Transcription, reopened.uiState.value.mode)
+        reopened.bind(temporary.newFolder(), "audio", SasayakiMatchSource.Subtitles) {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Subtitles, reopened.uiState.value.mode)
+    }
+
+    @Test fun existingTranscriptDoesNotOverrideSubtitleMatchOrManualTabChoice() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository(SasayakiTranscript(20.0, 100.0, emptyList(), "audio"))
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        model.bind(root, "audio", SasayakiMatchSource.Subtitles) {}; runCurrent()
+        assertTrue(model.uiState.value.hasTranscript)
+        assertEquals(SasayakiMatchMode.Subtitles, model.uiState.value.mode)
+        model.selectMode(SasayakiMatchMode.Transcription)
+        model.bind(root, "different-audio", SasayakiMatchSource.Subtitles) {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Transcription, model.uiState.value.mode)
+    }
+
+    @Test fun manualSelectionWinsWhenMatchSourceArrivesLater() = runTest {
+        val root = temporary.newFolder()
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        model.bind(root, "audio") {}; runCurrent()
+        model.selectMode(SasayakiMatchMode.Subtitles)
+        model.bind(root, "audio", SasayakiMatchSource.Transcription) {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Subtitles, model.uiState.value.mode)
+    }
+
     @Test fun publishesDuringTranscriptionWithoutLockingPauseOrReloadingControls() = runTest {
         val repository = MemoryRepository()
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val matches = mutableListOf<SasayakiMatchData>()
-        model.bind(temporary.newFolder(), "audio", matches::add)
+        model.bind(temporary.newFolder(), "audio", onMatchUpdated = matches::add)
         runCurrent(); model.start(); runCurrent()
         assertEquals(listOf(repository.match), matches)
         assertTrue(model.uiState.value.canPause)
@@ -58,7 +104,7 @@ class SasayakiTranscriptionViewModelTest {
         coordinator.start(root, "audio"); runCurrent()
         val matches = mutableListOf<SasayakiMatchData>()
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
-        model.bind(root, "audio", matches::add); runCurrent()
+        model.bind(root, "audio", onMatchUpdated = matches::add); runCurrent()
         assertEquals(listOf(repository.match), matches)
         coordinator.pause(root); runCurrent()
     }
@@ -130,7 +176,7 @@ class SasayakiTranscriptionViewModelTest {
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val matches = mutableListOf<SasayakiMatchData>()
-        model.bind(root, "audio", matches::add)
+        model.bind(root, "audio", onMatchUpdated = matches::add)
         runCurrent()
         model.selectMode(SasayakiMatchMode.Transcription)
         model.start()
@@ -158,16 +204,16 @@ class SasayakiTranscriptionViewModelTest {
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val oldMatches = mutableListOf<SasayakiMatchData>()
         val newMatches = mutableListOf<SasayakiMatchData>()
-        model.bind(root, "audio", oldMatches::add)
+        model.bind(root, "audio", onMatchUpdated = oldMatches::add)
         runCurrent()
         model.start()
         runCurrent()
-        model.bind(root, "audio", newMatches::add)
+        model.bind(root, "audio", onMatchUpdated = newMatches::add)
         model.pause()
         runCurrent()
         repository.finishAlignment!!.complete(Unit)
         runCurrent()
-        model.bind(root, "audio", newMatches::add)
+        model.bind(root, "audio", onMatchUpdated = newMatches::add)
         runCurrent()
         assertTrue(oldMatches.isEmpty())
         assertEquals(listOf(repository.match), newMatches)
@@ -198,7 +244,7 @@ class SasayakiTranscriptionViewModelTest {
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val matches = mutableListOf<SasayakiMatchData>()
-        model.bind(root, "audio", matches::add)
+        model.bind(root, "audio", onMatchUpdated = matches::add)
         runCurrent()
         model.requestClear()
         assertTrue(model.uiState.value.showClearConfirmation)
@@ -241,7 +287,7 @@ class SasayakiTranscriptionViewModelTest {
         val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val matches = mutableListOf<SasayakiMatchData>()
-        model.bind(temporary.newFolder(), "audio", matches::add)
+        model.bind(temporary.newFolder(), "audio", onMatchUpdated = matches::add)
         runCurrent()
         model.start(); runCurrent()
         assertEquals(SasayakiTranscriptionStage.AwaitingDownload, model.uiState.value.stage)
@@ -298,7 +344,7 @@ class SasayakiTranscriptionViewModelTest {
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         val store = ViewModelStore().apply { put("transcription", model) }
         val matches = mutableListOf<SasayakiMatchData>()
-        model.bind(root, "audio", matches::add)
+        model.bind(root, "audio", onMatchUpdated = matches::add)
         runCurrent()
         model.start(); runCurrent()
         assertTrue(coordinator.state.value.running)
