@@ -116,6 +116,21 @@ offscreen and back must not repeatedly compose `TodayStatisticsSection`,
 still draw only visible weeks, without expanding all history into UI nodes.
 Check first entry and expanded book lists as well as the warm three-card case.
 
+## Sasayaki Transcription
+
+- Measure the complete path from the same compressed audio and resume position.
+  A native ASR benchmark with predecoded PCM omits decoding, downmixing,
+  resampling, checkpoints, and book alignment.
+- Separate model verification/loading, PCM preparation, VAD, recognition, and
+  saving/alignment. When decoding overlaps recognition, stage durations overlap;
+  do not add them or treat total minus recognition as decoder processing time.
+- Record Debug/Release, foreground state, thermal status, RSS/PSS, and both wall
+  time and process CPU time. Report whether CPU percentages use one core or the
+  whole device as 100%; system per-core utilization includes other processes.
+- Compare thread counts on the full pipeline, since extra inference workers may
+  consume CPU without reducing elapsed time. Verify PCM/token/timestamp parity,
+  bounded read-ahead, and decoder cleanup on pause or failure after optimization.
+
 ## Repeated-Entry Slowdowns
 
 For bugs that get worse after leaving and re-entering Reader, measure resource

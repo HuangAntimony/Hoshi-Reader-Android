@@ -8,6 +8,51 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Transcribe Japanese audiobooks on-device in Sasayaki, with a downloadable
+  speech model, progress, pause/resume, and matching to book text. Download
+  transcription components only when needed to keep the base app small;
+  ask once for all missing files and show transcription progress in one place. Continue
+  transcribing with the audiobook panel closed, and keep running when switching
+  apps instead of actively pausing; exiting the Reader still saves and pauses.
+  Reuse completed transcripts or clear them while keeping the current match.
+  Default to the Transcription tab when the current match comes from transcription.
+  Save or share current matches as SRT from either transcription or imported subtitles,
+  including partial results; preserve multiline subtitles when importing.
+  Show current match coverage and export together above both matching tabs.
+  Support M4A audio and show matched character coverage for both subtitles and transcription.
+  Segment clean audiobooks by adaptive audio energy to retain dialogue missed
+  by speech detection, including short replies with pauses between syllables.
+  Preserve more sentence-opening audio at segment boundaries to reduce missing
+  words and sentences, and recover short missing word fragments when matching
+  existing transcripts. Use sentence context to match kana/kanji spelling differences
+  and recognition errors without losing recognized sentence endings, short replies,
+  or adjacent cue edges around a comma. Retain recognized text at EPUB chapter edges,
+  short kana/kanji replies, contracted names, and comma-separated numeric expressions;
+  preserve recognized prefixes after pauses. Include short sentences and replies
+  omitted by recognition in the neighboring highlight that best fits their timing
+  and sentence context, including cries, without requiring a new transcription.
+  Handle omitted replies beside short cues and missing sentence-edge characters,
+  keeping those edge characters with their original sentences.
+  Keep recognized words beside omitted cues and inside long missing passages;
+  retain recognized words and supported spelling changes even when estimated token
+  durations are long, and keep a recognized sentence's ending from being assigned
+  to a later omitted sentence. Preserve recognized
+  words on both sides of overlapping audio segments, including pause/resume, while
+  removing repeated context. Match small-vowel spellings and adjacent reading changes
+  without assigning the next word's opening to an omitted reply. Use surrounding
+  matched text to recover short misrecognized replies and contracted phrases,
+  including rewritten cue edges and percentages emitted as symbols by recognition.
+  Match new transcription automatically while reading, preserving playback,
+  reading position, dictionary lookups, and image holds as coverage grows.
+  Speed up transcription with native audio decoding/resampling running alongside
+  speech recognition, while keeping audio buffers bounded. Choose Lightweight, Balanced
+  (default), or Fast transcription, with the selection remembered for later sessions;
+  recognize audio segments in parallel while preserving ordered progress and resume.
+  Show distinct localized errors for unreadable audio, transcription resource
+  preparation, recognition, book matching, and progress saving failures.
+  Show the original exception and cause chain when an unexpected transcription
+  failure cannot be classified.
+
 - Configure lookup frequency sorting per profile: Auto, Ascending, Descending,
   or Disabled, with an enabled frequency dictionary for explicit ordering.
   Both controls share the Lookup settings card with the scan controls.

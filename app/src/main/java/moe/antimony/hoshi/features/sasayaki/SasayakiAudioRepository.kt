@@ -13,10 +13,12 @@ import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.channels.NonWritableChannelException
 import java.nio.channels.SeekableByteChannel
 import java.nio.file.Files
+import java.util.UUID
 
 class SasayakiAudioRepository(private val bookRoot: File) {
     fun importedPlayback(
@@ -128,7 +130,7 @@ class SasayakiAudioRepository(private val bookRoot: File) {
         when {
             playback.audioFileName != null -> "Copied to app storage. The original audiobook file can be deleted."
             playback.audioUri != null -> "Linked to the external audiobook file. Keep the original file available."
-            else -> "Select a .mp3, .m4b, or .opus audiobook"
+            else -> "Select a .mp3, .m4b, .m4a, or .opus audiobook"
         }
 
     fun audioFile(playback: SasayakiPlaybackData): File? {
@@ -145,17 +147,26 @@ class SasayakiAudioRepository(private val bookRoot: File) {
     fun importAudio(contentResolver: ContentResolver, uri: Uri): String {
         contentResolver.validateImportFile(uri, ImportFileType.SasayakiAudiobook)
         val displayName = contentResolver.displayName(uri)
+        return contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Unable to open selected audio file." }
+            importAudio(displayName, input)
+        }
+    }
+
+    internal fun importAudio(displayName: String, input: InputStream): String {
         val extension = displayName.substringAfterLast('.', missingDelimiterValue = "")
             .lowercase()
             .takeIf { it in ImportFileType.SasayakiAudiobook.extensions }
             ?: "m4b"
-        val targetName = "sasayaki_audio.$extension"
+        val targetName = "sasayaki_audio_${UUID.randomUUID()}.$extension"
         val target = audioDirectory().resolve(targetName)
-        contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "Unable to open selected audio file." }
+        try {
             target.outputStream().use { output -> input.copyTo(output) }
+            return targetName
+        } catch (error: Throwable) {
+            target.delete()
+            throw error
         }
-        return targetName
     }
 
     private fun audioDirectory(): File =
@@ -259,7 +270,7 @@ private fun SasayakiPlaybackData.formatHint(): SasayakiAudiobookFormat {
         .substringBefore('?')
     return when (name.substringAfterLast('.', missingDelimiterValue = "").lowercase()) {
         "opus" -> SasayakiAudiobookFormat.Opus
-        "m4b" -> SasayakiAudiobookFormat.M4b
+        "m4b", "m4a" -> SasayakiAudiobookFormat.M4b
         "mp3" -> SasayakiAudiobookFormat.Mp3
         else -> SasayakiAudiobookFormat.Unknown
     }

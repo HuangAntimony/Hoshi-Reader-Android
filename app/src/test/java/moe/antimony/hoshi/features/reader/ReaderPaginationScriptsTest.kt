@@ -140,7 +140,7 @@ class ReaderPaginationScriptsTest {
         )
 
         assertEquals(
-            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true)""",
+            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true, false)""",
             command,
         )
     }

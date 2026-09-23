@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import moe.antimony.hoshi.epub.EpubBook
@@ -62,13 +63,10 @@ object SasayakiMatcher {
         val chapterTexts = mutableListOf<IntArray>()
         val chapters = mutableListOf<ChapterRange>()
         var sourceLength = 0
-        book.chapters.forEachIndexed { index, chapter ->
-            if (!chapter.linear) return@forEachIndexed
-            if (chapter.properties.hasManifestProperty("nav")) return@forEachIndexed
-            if (chapter.isGuideToc) return@forEachIndexed
-            val codePoints = chapter.html.filteredReaderText().codePointsArray()
+        SasayakiSource.chapters(book).forEach { chapter ->
+            val codePoints = chapter.text
             chapters += ChapterRange(
-                chapterIndex = index,
+                chapterIndex = chapter.index,
                 start = sourceLength,
                 length = codePoints.size,
             )
@@ -174,6 +172,7 @@ object SasayakiMatcher {
         return SasayakiMatchData(
             matches = matches,
             unmatched = cues.size - matches.size,
+            source = SasayakiMatchSource.Subtitles,
         )
     }
 
@@ -479,9 +478,3 @@ object SasayakiMatcher {
 
 internal fun String.codePointsArray(): IntArray =
     codePoints().toArray()
-
-private fun String?.hasManifestProperty(property: String): Boolean =
-    this
-        ?.trim()
-        ?.splitToSequence(Regex("\\s+"))
-        ?.any { it == property } == true

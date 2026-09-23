@@ -92,6 +92,10 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import moe.antimony.hoshi.features.sasayaki.SasayakiPlayer
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheet
+import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionViewModel
+import moe.antimony.hoshi.features.sasayaki.SasayakiSubtitleExportHost
+import moe.antimony.hoshi.features.sasayaki.SasayakiSubtitleExportViewModel
+import moe.antimony.hoshi.features.sasayaki.rememberSasayakiTranscriptionState
 import moe.antimony.hoshi.features.sasayaki.SasayakiMatchDependencies
 import moe.antimony.hoshi.features.sasayaki.sasayakiDefaultSheetTab
 import moe.antimony.hoshi.features.sasayaki.sasayakiImageHoldMillis
@@ -172,6 +176,26 @@ fun ReaderWebView(
         bookCoverFile?.takeIf { it.isFile }
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
+    var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
+    val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
+    val sasayakiSubtitleExportViewModel: SasayakiSubtitleExportViewModel = hiltViewModel()
+    SasayakiSubtitleExportHost(sasayakiSubtitleExportViewModel)
+    val onSasayakiMatchUpdated: (SasayakiMatchData) -> Unit = { data ->
+        sasayakiSheetMatchData = data
+        pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = false)
+    }
+    val sasayakiTranscriptionState = rememberSasayakiTranscriptionState(
+        root = bookRoot,
+        audioRepository = sasayakiAudioRepository,
+        playback = sasayakiPlayer?.playback,
+        viewModel = sasayakiTranscriptionViewModel,
+        matchSource = sasayakiSheetMatchData?.source,
+        onMatchUpdated = { data ->
+            sasayakiSheetMatchData = data
+            pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(data, preserveLayout = true)
+        },
+    )
     var lastSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     var pendingSasayakiCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
     var pendingSasayakiRestoreCue by remember(book) { mutableStateOf<PendingSasayakiCue?>(null) }
@@ -1370,6 +1394,15 @@ fun ReaderWebView(
             return
         }
         pendingSasayakiCue = null
+        if (source == SasayakiCueRevealSource.MatchRefresh) {
+            targetWebView.evaluateJavascript(
+                ReaderPaginationScripts.highlightSasayakiCueInvocation(
+                    cue.toCueRange(), reveal = false, preserveReveal = true,
+                ),
+                null,
+            )
+            return
+        }
         cancelSasayakiAutoPage()
         sasayakiAutoPageJob = scope.launch {
             val progress = revealSasayakiCueWithMediaStops(
@@ -1381,6 +1414,25 @@ fun ReaderWebView(
                 recordSasayakiDisplayedProgress(it, countStatistics = progress.countStatistics)
             }
         }
+    }
+    LaunchedEffect(
+        pendingSasayakiMatchUpdate,
+        webView,
+        sasayakiAutoPageJob,
+        lookupPopups.isNotEmpty(),
+        fullscreenImage,
+        stateHolder.isWebViewRestoring,
+    ) {
+        val update = pendingSasayakiMatchUpdate ?: return@LaunchedEffect
+        if (lookupPopups.isNotEmpty() || fullscreenImage != null || stateHolder.isWebViewRestoring) return@LaunchedEffect
+        // Updating cue targets can replace DOM text nodes; wait for lookup and media holds to finish.
+        awaitReaderSasayakiPresentationIdle(webView?.readerNativeSelectionState()) { sasayakiAutoPageJob }
+        if (pendingSasayakiMatchUpdate !== update) return@LaunchedEffect
+        if (stateHolder.lookupPopups.isNotEmpty() || fullscreenImage != null || stateHolder.isWebViewRestoring) return@LaunchedEffect
+        sasayakiMatchData = update.data
+        preserveSasayakiCueLayout = update.preserveLayout
+        pendingSasayakiMatchUpdate = null
+        sasayakiPlayer?.updateMatchData(update.data)
     }
     LaunchedEffect(
         webView,
@@ -1487,7 +1539,7 @@ fun ReaderWebView(
         keepScreenOnWhileReading = effectiveSettings.keepScreenOnWhileReading,
         sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
         sasayakiAutoScroll = sasayakiSettings.autoScroll,
-    )
+    ) || sasayakiTranscriptionState.running
     DisposableEffect(context, keepScreenOn) {
         val window = context.findActivity()?.window
         if (keepScreenOn) {
@@ -1825,6 +1877,7 @@ fun ReaderWebView(
                                 matchData = sasayakiMatchData,
                                 chapterIndex = readerPosition.loadPosition.index,
                             ),
+                            preserveSasayakiCueLayout = preserveSasayakiCueLayout,
                             sasayakiTextColor = currentSasayakiColors.textColor,
                             sasayakiBackgroundColor = currentSasayakiColors.backgroundColor,
                             onTextSelected = handleTextSelected,
@@ -2030,16 +2083,16 @@ fun ReaderWebView(
                         bookEntry = entry,
                         bookRepository = bookRepository,
                         epubBookParser = appContainer.epubBookParser,
+                        characterCount = book.bookInfo.characterCount,
                     )
                 },
                 selectedTab = stateHolder.selectedSasayakiTab,
                 onSelectedTabChange = stateHolder::selectSasayakiTab,
-                onSubtitleMatchUpdated = { matchData ->
-                    sasayakiMatchData = matchData
-                    sasayakiSheetMatchData = matchData
-                    sasayakiPlayer?.updateMatchData(matchData)
-                },
+                onSubtitleMatchUpdated = onSasayakiMatchUpdated,
                 onSettingsChange = ::updateSasayakiSettings,
+                transcriptionState = sasayakiTranscriptionState,
+                transcriptionViewModel = sasayakiTranscriptionViewModel,
+                subtitleExportViewModel = sasayakiSubtitleExportViewModel,
                 onDismiss = stateHolder::dismissSasayaki,
             )
         }
@@ -2145,6 +2198,11 @@ internal data class PendingSasayakiCue(
     val cue: SasayakiMatch,
     val reveal: Boolean,
     val source: SasayakiCueRevealSource,
+)
+
+private data class PendingSasayakiMatchUpdate(
+    val data: SasayakiMatchData,
+    val preserveLayout: Boolean,
 )
 
 private data class PendingSasayakiTargetMediaRestore(

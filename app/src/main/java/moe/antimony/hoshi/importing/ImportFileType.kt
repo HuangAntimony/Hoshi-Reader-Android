@@ -40,7 +40,7 @@ data class ImportFileType(
 
         val SasayakiAudiobook = ImportFileType(
             description = "audiobook",
-            extensions = listOf("mp3", "m4b", "opus"),
+            extensions = listOf("mp3", "m4b", "m4a", "opus"),
             mimeTypes = arrayOf(
                 "audio/mpeg",
                 "audio/mp4",

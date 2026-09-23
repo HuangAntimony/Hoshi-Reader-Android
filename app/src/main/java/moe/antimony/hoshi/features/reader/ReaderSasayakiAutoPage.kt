@@ -2,9 +2,22 @@ package moe.antimony.hoshi.features.reader
 
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 
 internal const val ReaderSasayakiFullscreenImageDismissPollMillis = 50L
+
+internal suspend fun awaitReaderSasayakiPresentationIdle(
+    nativeSelectionActive: StateFlow<Boolean>? = null,
+    currentJob: () -> Job?,
+) {
+    while (true) {
+        nativeSelectionActive?.first { !it }
+        val job = currentJob()?.takeUnless { it.isCompleted } ?: return
+        job.join()
+    }
+}
 
 internal fun cancelReaderSasayakiAutoPage(
     job: Job?,

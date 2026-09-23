@@ -467,7 +467,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   offline, timeout and socket connection failures; manual operations still
   report errors, as do HTTP, TLS and non-network failures.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
-- Sasayaki accepts MP3, M4B, and Ogg Opus audiobook sources. One repository
+- Sasayaki accepts MP3, M4B/M4A, and Ogg Opus audiobook sources. One repository
   inspection returns format, metadata, chapters, and static duration for
   seekable sources before playback starts. M4B inspection reads MP4 metadata, `moov/udta/chpl`, and
   `mvhd`; Opus inspection reads OpusTags and derives duration from the final
@@ -477,6 +477,200 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   may leave static duration or container-only metadata unknown until playback
   preparation. Displayed artist normalization remains `ARTIST`, then
   `ALBUMARTIST`, then `AUTHOR`.
+- Sasayaki Japanese transcription uses the repository-owned sherpa-onnx backend
+  with ReazonSpeech k2-v2 INT8 on CPU and adaptive energy segmentation for clean
+  audiobook recordings. A bounded 30-second RMS histogram estimates the noise
+  floor; its 10th percentile plus 12 dB is clamped to -55..-30 dBFS. Quiet
+  prehistory protects low-volume openings. Short pauses stay inside a candidate
+  utterance; the 250 ms minimum applies after the segment ends, except for
+  continuations after a hard cut. Silero is not loaded or downloaded.
+  SHA-256 verified models
+  download on demand to `noBackupFilesDir/SasayakiModels`; they are not bundled
+  into the APK or included in Android backup. ONNX Runtime, sherpa JNI and the FFmpeg decoder also
+  download on demand to `noBackupFilesDir/SasayakiRuntime/<abi>`, using filenames
+  addressed by content hash so app upgrades reuse unchanged files. The installed
+  APK pins URLs, sizes and SHA-256 hashes; both resource groups share one consent
+  and byte-weighted progress flow. Native files become read-only before writing
+  and are atomically published after verification. The backend loads ONNX then
+  sherpa JNI by absolute path only after preparation. This is the GitHub APK
+  distribution path; a Play distribution would require Play Feature Delivery.
+  A minimal FFmpeg 9.0.2 JNI decoder
+  reads existing SAF/private-file descriptors, respecting offset/length and
+  source timestamps, and downmixes/resamples to 16 kHz float PCM. CMake verifies
+  the upstream source archive SHA-256 and builds only local audio components;
+  no CLI, network protocols, encoders, or video decoders are bundled. Its license
+  and source link are available in Settings > About.
+  DataStore-backed Sasayaki settings persist Lightweight/Balanced/Fast transcription
+  presets, mapping to 1/2/3 concurrent ASR segments, with Balanced as the default.
+  Each start/resume snapshots its preset; the selector is locked while running.
+  ASR uses one internal model thread per inference. One shared recognizer owns
+  independent streams; energy scoring and segmentation remain sequential. A bounded queue
+  publishes completed segments in audio order, including silence, so checkpoints
+  never skip unfinished speech. Cancellation joins all streams before model release.
+  Decoding/resampling on the IO dispatcher overlaps segmentation/ASR through a bounded
+  channel (at most 4 MiB of decoded PCM queued, plus bounded speech segment copies).
+  Native reads
+  return at most 4096 samples; seek preroll preserves codec history, and the
+  resampler phase stays on the absolute sample clock. Structured cancellation
+  closes the native decoder and SAF descriptors before recognition resources
+  are released. Speech segments have a 20-second hard limit;
+  checkpoints commit only fully processed audio. ASR supplies token start
+  timestamps; token ends are bounded estimates from the next token/segment.
+  Separate utterances retain up to one second of leading ASR context and trim
+  already committed silence so early prefix timestamps cannot discard new words;
+  hard cuts and resume within speech retain half a second of leading context.
+  Ordered token stitching compares a recent suffix with the next recognized prefix,
+  retaining new words whose timestamps fall in overlapping context. Single-token
+  duplicates require close timestamps; multi-token phrases can tolerate drift within
+  the phrase. Only overlapping leading tokens are redistributed after already emitted
+  text. Core checkpoints remain independent of recognized trailing padding; resume
+  passes the saved one-second token tail by interval overlap to the same stitcher.
+- A process-wide `SasayakiTranscriptionCoordinator` serializes transcription,
+  checkpoints `sasayaki_transcript.json` approximately every 15 seconds, and
+  runs one conflated matching worker alongside recognition. The first text batch
+  requests a match immediately; subsequent updates are throttled to 15 seconds
+  and consume the latest immutable token snapshot. Pausing flushes unmatched
+  batches; completion and explicit realignment perform a full calibration.
+  Match publication has its own revision and does not enter the blocking
+  `Aligning` stage during recognition. Match sidecars use atomic replacement. The sidecar keeps iOS's
+  `through`, `duration`, and timed-token schema with an optional audio-source
+  identity to avoid resuming a different file of the same duration. Atomic
+  replacement retains the previous checkpoint on interruption. `BookWorkRegistry`
+  joins active work before book deletion. Clearing transcription preserves
+  existing matches; completed transcripts can be realigned without ASR.
+  Typed failures distinguish audio access, model/runtime resource preparation,
+  speech recognition, book matching, and transcript storage; the UI maps each
+  category to a localized message. Unknown failures show the original exception
+  and cause chain in the UI, and Logcat records the full stack with its operation
+  stage and category.
+- Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android
+  transcription matches are recognized by their chapter-offset cue IDs; this
+  provenance selects the default matching tab without overriding a manual tab
+  choice in the current Reader session. Transcript presence alone is not used.
+  A Reader-scoped subtitle export ViewModel snapshots either source through an
+  injected repository, which owns UTF-8 SRT cache files and SAF output I/O.
+  A Reader-owned launcher stays registered when the sheet closes, saving via
+  CreateDocument or sharing a temporary read-only FileProvider URI; a pending save retains its snapshot path in SavedStateHandle.
+  Exports contain matched text and original audio timestamps, without playback delay/rate
+  adjustments. Shared snapshots use separate cache paths and expire after seven days on next export.
+- The Reader-route Hilt ViewModel exposes transcription state and delivers
+  match revisions during transcription even after the sheet closes. Reader coalesces
+  match snapshots until lookup, image holds, and restoration finish. Data refreshes
+  preserve playback/hold state and repaint changed cues without navigation; reader
+  reattachment explicitly restores the current cue. Live VN cue updates defer
+  pagination changes until the next navigation and preserve the current reveal.
+  Reader owns audio-source
+  binding and the combined keep-screen-on flag. Closing the sheet or backgrounding
+  the app does not actively pause inference. Removing the Reader route clears
+  its ViewModel, which pauses and saves the task; configuration recreation keeps
+  that ViewModel. This remains process-bound work without a foreground service or
+  WorkManager guarantee: Android may freeze or reclaim the background process,
+  and a later start resumes its saved checkpoint. Transcription reuses the
+  audiobook card's imported source;
+  verified cached models do not emit download progress. The model store requests
+  confirmation only after verifying the cache and before opening a download;
+  the coordinator suspends until the Reader confirms or cancels. Cancelling
+  before any new transcription leaves existing sidecars unchanged.
+  `SasayakiSource` shares chapter exclusions with SRT matching. The transcript
+  aligner uses normalized/ruby-aware exact anchors, monotonic ordering, bounded
+  gap repair, and sentence boundaries in Reader code-point coordinates; it does
+  not invent anchors at unspoken book/audio edges. Bounded gaps between real anchors
+  can cross EPUB files, retaining chapter/cue boundaries and original chapter offsets;
+  these repairs use the same length/evidence limits and are cached until the anchors change.
+  A run-scoped alignment session
+  caches book normalization, the distinctive-text index, normalized speech, and
+  existing anchor candidates. Only new speech and an overlapping exact tail are
+  searched; bounded gaps are repaired again only when their neighboring anchors
+  change. The global monotonic chain is still reconsidered so new evidence can
+  correct an earlier position. After chain selection, a one- or two-character
+  cross-sentence anchor prefix may return to an earlier recognized sentence's short
+  ending when that remainder aligns, the intervening sentence has no equally strong
+  competing tail (including ruby readings), and the following distinctive anchor stays intact.
+  Transfers preserve whole token and ruby-base boundaries; the intervening omitted
+  sentence receives no independently borrowed token time. Resolved anchors also key the gap cache.
+  CPU matching runs on the Default dispatcher;
+  parsing and persistence remain repository-owned I/O. Bounded gap alignment includes
+  neighboring confirmed text through sentence edges when available, pinning the
+  existing text/token boundaries. Similarity is scored per sentence with that context;
+  omitted neighboring sentences cannot lower the score of a recognized sentence.
+  Commas still split display cues but retain shared sentence context for scoring.
+  Short kana/kanji rewrites spanning one comma can use that sentence's confidence when both
+  cues have recognized text and no whole omitted cue lies between them; proportional
+  token allocation gives the two cues disjoint time ranges at the comma. Cross-cue
+  error blocks compare each cue separately, retaining unique reading candidates before
+  attempting proportional allocation. Two supported cue edges may proportionally split
+  a short rewrite at a non-overlapping original token boundary; a whole neighboring cue
+  additionally requires a two-kana cue with all-kana written and spoken gaps. Other cross-cue reading
+  repairs require a unique compatible split, with competing readings left unresolved.
+  Entire cues recovered from cross-cue gaps require complete original token ranges
+  and more than a single ambiguous character.
+  One edge may be a whole reading cue, but a kana reading cannot be split between
+  two kanji words solely by script lengths. A weak omitted cue cannot take one kana
+  from a continuous reading of the next anchored kanji word when no other cue has
+  a competing reading.
+  Plain/ruby track selection weighs the affected text, not the length of surrounding
+  anchors. Symbol variants of the chosen seed track remain available until exact
+  extension; selection and cache deduplication prefer wider source coverage, then longer
+  spoken coverage. Existing plain/ruby seed precedence remains unchanged; a spoken
+  percent variant cannot let a different ruby track consume an adjacent omitted reply.
+  Gap edit alignment prefers exact letters when edit costs tie and distinguishes
+  token insertions from text deletions. Both axes remain bounded to 384 characters;
+  a length imbalance does not discard distinctive recognized islands. Unique one-kanji
+  cues or two-character cue endings immediately beside a real anchor can pin the local
+  alignment, preventing a long omission from moving them into a later repeated word.
+  Short gaps with a substantial exact run allow
+  more spelling differences; each uncertain block uses only its own tokens and requires
+  minimum evidence from its sentence before inferring changed or omitted fragments. Compatible
+  kana/kanji recovery requires existing kana to occur in order in the candidate reading
+  and uses bounded lengths, not an automatic pronunciation dictionary. When two real
+  anchors enclose exactly one short cue and complete speech tokens, its book text can
+  use that interval despite entirely different ASR wording or numeric values, subject
+  to length-ratio and token-boundary limits. Within a larger repair window, an isolated short
+  reply can likewise use a complete token range separated from both neighbors by pauses;
+  an extra spoken suffix cannot supply
+  an omitted reply. Supported phrases allow length ratios of 1:4 through 4:1, retaining
+  contracted names and wording differences without requiring the ASR to repeat each letter.
+  The internal speech projection expands `%`/`％` to `パーセント` before punctuation
+  filtering, preserving the original token's interval and boundary without changing stored ASR text.
+  Source projections retain plain/ruby tracks and offer the spoken percent spelling as
+  another track; its timing attaches to the preceding counted character so Reader offsets
+  and symbol-only spellings continue to work.
+  Bounded edit alignment treats individual Arabic/kanji digits and small/full kana
+  vowels as equivalent without changing exact anchor seeds, stored text, or cue offsets.
+  Small tsu and contracted ya/yu/yo remain distinct. A partial sentence
+  edge can be recovered beside an omitted cue only when that cue cannot plausibly
+  claim the same tokens. Recognized text and evidence-supported explicit-token repairs
+  are not rejected solely for long estimated durations: a token end can include silence
+  or omitted speech before the next token starts. Invalid/nonpositive token intervals
+  remain excluded. Ruby syllables sharing a source character merge their timings;
+  supported cues retain their token intervals without applying a duration cap or inventing
+  word endpoints. Text density still determines whether to keep a cue or its supported spans.
+  Short omitted word fragments can use the time between real neighboring anchors
+  or an adjacent token within their cue when no silence exists. Cue assembly applies the same
+  gap-duration limit before joining supported spans across intervals with no recognized
+  speech, even when text density is high; unassigned ASR wording is not treated as silence.
+  Sparse sentences keep
+  their contiguous supported spans instead of discarding all matches.
+  After precise cue assembly, short entirely omitted interior cues can share a neighboring
+  highlight: audiobook body text bounded by real matches is assumed narrated. Grouping stays
+  within one chapter, with at most 48 missing characters, a 12-second inter-cue gap
+  and 96 characters in each expanded cue. Mixed gaps first return up to two missing
+  edge characters to their own display cue, requiring at least twice as many recognized
+  characters in that cue; the remaining omission must contain whole display cues and
+  at most two sentence boundaries (commas excluded). Pure word holes still use the
+  earlier repair. Each side needs four recognized context characters and sixteen combined:
+  short cues can include consecutive original matches outward from the gap, stopping at
+  text holes or audio gaps exceeding one second. Characters added by grouping never contribute.
+  The side with more excess boundary-token time relative to its nearby cadence
+  is preferred; otherwise sentence continuity across commas, then the lower combined
+  character rate decide. The selected cue includes the intervening audio gap; the opposite
+  cue's timing and all original recognized text remain intact; edge characters added on
+  either side retain their own cue's interval. Decisions use original matches only,
+  never inferred text as new evidence. No separate timing is invented for the omission,
+  no ASR inference is run, and book/chapter ends remain unextended. Grouped text participates
+  in coverage, unmatched counts and SRT export through the existing match model.
+  Match coverage is summed
+  matched character lengths divided by the parsed book character count.
 - Sasayaki audiobook playback is owned by a Hilt-backed Media3
   `MediaSessionService`. The service `onCreate` lifecycle creates the active
   ExoPlayer and MediaSession, but Reader load paths do not connect to the
@@ -519,11 +713,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 
 ## Native And Rust Build
 
-The Android app currently has two native stacks:
+The Android app currently has three native stacks:
 
 - `app/src/main/cpp/CMakeLists.txt` builds the hoshidicts JNI bridge from the
   `third_party/hoshidicts-kotlin-bridge` submodule.
 - `app/src/main/rust/hoshiepub` builds the Rust EPUB parser through UniFFI.
+- The pinned, checksum-verified sherpa-onnx AAR supplies local speech inference
+  and its ONNX Runtime libraries. `buildSrc` extracts a bindings-only JAR and
+  redirects its native-load calls to the verified app-private loader. The unused
+  sherpa C/C++ API libraries are neither bundled nor downloaded. Release CI
+  publishes the exact hash-named inference files in a separate, pinned component
+  prerelease (excluded from app updates), with notices
+  also accessible under Settings > About. FFmpeg builds independently through
+  `tools/build-transcription-audio.py` and has a checked-in, content-addressed
+  catalog. Publish its binaries before shipping APKs that reference a new catalog;
+  app release CI verifies their deployed hashes. Neither inference nor FFmpeg
+  native code is bundled in the base APK.
+  Native JNI entry points are retained under R8.
 
 Current build wiring lives in `app/build.gradle.kts`:
 

@@ -187,6 +187,7 @@ class BookMetadataStorageTest {
         root.resolve("Sasayaki").mkdirs()
         root.resolve("Sasayaki/sasayaki_audio.m4b").writeBytes(byteArrayOf(1, 2, 3))
         root.resolve("sasayaki_playback.json").writeText("""{"lastPosition":12.0,"audioFileName":"sasayaki_audio.m4b"}""")
+        root.resolve("sasayaki_transcript.json").writeText("""{"through":12.0,"duration":60,"tokens":[]}""")
         storage.saveMetadata(
             root,
             BookMetadata(
@@ -203,9 +204,11 @@ class BookMetadataStorageTest {
         assertTrue(root.resolve("legacy-book.epub").isFile)
         assertTrue(root.resolve("Sasayaki/sasayaki_audio.m4b").isFile)
         assertTrue(root.resolve("sasayaki_playback.json").isFile)
+        assertTrue(root.resolve("sasayaki_transcript.json").isFile)
         ZipFile(root.resolve("legacy-book.epub")).use { zip ->
             assertFalse(zip.entries().asSequence().any { it.name.startsWith("Sasayaki/") })
             assertFalse(zip.entries().asSequence().any { it.name == "sasayaki_playback.json" })
+            assertFalse(zip.entries().asSequence().any { it.name == "sasayaki_transcript.json" })
         }
     }
 
@@ -523,6 +526,32 @@ class BookMetadataStorageTest {
 
         assertTrue(encoded.size <= 250)
         assertEquals(root.name, encoded.toString(Charsets.UTF_8))
+    }
+
+    @Test
+    fun sasayakiMatchSourceSurvivesStorageAndRecognizesLegacyTranscription() = runBlocking {
+        val storage = BookStorage(Files.createTempDirectory("hoshi-sasayaki-source").toFile())
+        val root = storage.createBookDirectory("book")
+        val sidecar = root.resolve("sasayaki_match.json")
+        fun legacy(id: String) = """{"matches":[{"id":"$id","startTime":1.0,"endTime":2.0,"text":"本文","chapterIndex":3,"start":10,"length":2}],"unmatched":0}"""
+        sidecar.writeText(legacy("3-10"))
+        assertEquals(SasayakiMatchSource.Transcription, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText(legacy("0"))
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText(legacy("3-11"))
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+        sidecar.writeText("""{"matches":[],"unmatched":0}""")
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
+
+        // Explicit provenance works even before the first successful match.
+        for (source in SasayakiMatchSource.entries) {
+            val match = SasayakiMatchData(emptyList(), 1, source)
+            storage.saveSasayakiMatch(root, match)
+            assertEquals(match, storage.loadSasayakiMatch(root))
+        }
+        // Explicit provenance takes priority over the legacy ID heuristic.
+        sidecar.writeText(legacy("3-10").dropLast(1) + """, "source":"subtitles"}""")
+        assertEquals(SasayakiMatchSource.Subtitles, storage.loadSasayakiMatch(root)!!.source)
     }
 
     @Test

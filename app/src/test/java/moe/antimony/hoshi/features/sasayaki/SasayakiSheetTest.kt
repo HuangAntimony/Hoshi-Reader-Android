@@ -49,24 +49,31 @@ class SasayakiSheetTest {
     }
 
     @Test
-    fun subtitleMatchSummaryShowsCurrentMatchRateWhenMatchDataExists() {
+    fun subtitleMatchSummaryCountsMatchedBookCharactersInsteadOfSubtitleCues() {
         val matchData = SasayakiMatchData(
             matches = listOf(
-                SasayakiMatch("a", 0.0, 1.0, "a", 0, 0, 1),
-                SasayakiMatch("b", 1.0, 2.0, "b", 0, 1, 1),
+                SasayakiMatch("a", 0.0, 1.0, "日本語", 0, 0, 3),
+                SasayakiMatch("b", 1.0, 2.0, "文章", 0, 3, 2),
             ),
             unmatched = 1,
         )
 
         assertEquals(
-            "2/3 (66.7%)",
-            sasayakiSubtitleMatchSummary(matchData),
+            "5/20 (25.0%)",
+            sasayakiSubtitleMatchSummary(matchData, characterCount = 20),
         )
     }
 
     @Test
     fun subtitleMatchSummaryIsAbsentWithoutMatchData() {
         assertNull(sasayakiSubtitleMatchSummary(null))
+    }
+
+    @Test
+    fun subtitleCoverageIsAbsentWhenBookCharacterCountIsUnavailable() {
+        val matchData = SasayakiMatchData(emptyList(), unmatched = 1)
+        assertNull(sasayakiSubtitleMatchSummary(matchData))
+        assertNull(sasayakiSubtitleMatchSummary(matchData, characterCount = 0))
     }
 
     @Test
@@ -196,6 +203,17 @@ class SasayakiSheetTest {
                 currentChapter = null,
             ).title,
         )
+    }
+
+    @Test
+    fun playbackHeaderHidesGeneratedCopyIdentifiers() {
+        val info = sasayakiPlaybackHeaderInfo(
+            playback = SasayakiPlaybackData(0.0, audioFileName = "sasayaki_audio_15d98183-e427-47b6-96a5-e274ae66edba.m4a"),
+            metadata = SasayakiAudiobookMetadata.Empty,
+            fallbackBookTitle = "Reader Book",
+            currentChapter = null,
+        )
+        assertEquals("Reader Book", info.title)
     }
 
     @Test

@@ -6,6 +6,9 @@
     <cache-path
         name="reader_images"
         path="reader-images/" />
+    <cache-path
+        name="sasayaki_subtitles"
+        path="sasayaki-subtitles/" />
     <files-path
         name="files"
         path="." />

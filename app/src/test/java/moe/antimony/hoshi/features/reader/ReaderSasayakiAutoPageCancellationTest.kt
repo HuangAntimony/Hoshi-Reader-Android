@@ -1,7 +1,12 @@
 package moe.antimony.hoshi.features.reader
 
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.features.sasayaki.SasayakiCueRevealSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,6 +14,72 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderSasayakiAutoPageCancellationTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun liveMatchRefreshWaitsForLatestAutoPageJobWithoutCancellingImageHold() = runTest {
+        val firstHold = Job()
+        val nextHold = Job()
+        var activeHold = firstHold
+        var refreshApplied = false
+        val refresh = launch {
+            awaitReaderSasayakiPresentationIdle { activeHold }
+            refreshApplied = true
+        }
+        runCurrent()
+        assertFalse(refreshApplied)
+        assertTrue(firstHold.isActive)
+
+        activeHold = nextHold
+        firstHold.complete()
+        runCurrent()
+        assertFalse(refreshApplied)
+        assertTrue(nextHold.isActive)
+
+        nextHold.complete()
+        refresh.join()
+        assertTrue(refreshApplied)
+        assertFalse(firstHold.isCancelled)
+        assertFalse(nextHold.isCancelled)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun liveMatchRefreshWaitsForNativeSelectionToEndAndThenApplies() = runTest {
+        val selectionActive = MutableStateFlow(true)
+        var refreshApplied = false
+        launch {
+            awaitReaderSasayakiPresentationIdle(selectionActive) { null }
+            refreshApplied = true
+        }
+        runCurrent()
+        assertFalse(refreshApplied)
+
+        selectionActive.value = false
+        runCurrent()
+        assertTrue(refreshApplied)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun selectionStartedDuringImageHoldKeepsPendingMatchRefreshDeferred() = runTest {
+        val hold = Job()
+        val selectionActive = MutableStateFlow(false)
+        var refreshApplied = false
+        launch {
+            awaitReaderSasayakiPresentationIdle(selectionActive) { hold }
+            refreshApplied = true
+        }
+        runCurrent()
+        selectionActive.value = true
+        hold.complete()
+        runCurrent()
+        assertFalse(refreshApplied)
+
+        selectionActive.value = false
+        runCurrent()
+        assertTrue(refreshApplied)
+    }
+
     @Test
     fun cancelReleasesAutoPageHoldSynchronously() {
         val job = Job()

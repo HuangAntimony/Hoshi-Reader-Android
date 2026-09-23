@@ -19,6 +19,7 @@ sealed interface SasayakiCueDisplayAction {
 
 class SasayakiCueDisplayCoordinator {
     private var currentCue: SasayakiMatch? = null
+    private var quietCrossChapterCue: SasayakiMatch? = null
 
     val currentCueStartTime: Double?
         get() = currentCue?.startTime
@@ -32,7 +33,12 @@ class SasayakiCueDisplayCoordinator {
         forceDisplay: Boolean = false,
     ): SasayakiCueDisplayAction {
         if (cue == null) return clear()
-        if (!forceDisplay && cue.id == currentCue?.id) return SasayakiCueDisplayAction.None
+        if (
+            !forceDisplay && source == SasayakiCueRevealSource.NaturalPlayback &&
+            cue == quietCrossChapterCue && cue.chapterIndex != currentChapterIndex
+        ) return SasayakiCueDisplayAction.None
+        quietCrossChapterCue = null
+        if (!forceDisplay && cue == currentCue) return SasayakiCueDisplayAction.None
         if (cue.chapterIndex == currentChapterIndex) {
             currentCue = cue
             return SasayakiCueDisplayAction.Display(
@@ -53,12 +59,30 @@ class SasayakiCueDisplayCoordinator {
         }
     }
 
+    fun refresh(cue: SasayakiMatch?, currentChapterIndex: Int): SasayakiCueDisplayAction {
+        if (cue == null) return clear()
+        if (cue.chapterIndex != currentChapterIndex) {
+            val action = clear()
+            // A data refresh must not turn into a chapter jump on the next playback tick.
+            quietCrossChapterCue = cue
+            return action
+        }
+        return update(
+            cue,
+            currentChapterIndex,
+            autoScroll = false,
+            hasPlayedOnce = false,
+            source = SasayakiCueRevealSource.MatchRefresh,
+        )
+    }
+
     fun displaySelectedCue(
         cue: SasayakiMatch,
         currentChapterIndex: Int,
         reveal: Boolean,
     ): SasayakiCueDisplayAction {
         if (cue.chapterIndex != currentChapterIndex) return SasayakiCueDisplayAction.None
+        quietCrossChapterCue = null
         currentCue = cue
         return SasayakiCueDisplayAction.Display(
             cue = cue,
@@ -68,6 +92,7 @@ class SasayakiCueDisplayCoordinator {
     }
 
     fun clear(): SasayakiCueDisplayAction {
+        quietCrossChapterCue = null
         if (currentCue == null) return SasayakiCueDisplayAction.None
         currentCue = null
         return SasayakiCueDisplayAction.Clear

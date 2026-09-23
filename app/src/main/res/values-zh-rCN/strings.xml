@@ -39,7 +39,7 @@
     <string name="dialog_error_title">错误</string>
     <string name="import_select_epub_book">请选择 .epub EPUB 书籍文件。</string>
     <string name="import_select_srt_subtitle">请选择 .srt 字幕文件。</string>
-    <string name="import_select_audiobook">请选择 .mp3、.m4b 或 .opus 有声书文件。</string>
+    <string name="import_select_audiobook">请选择 .mp3、.m4b、.m4a 或 .opus 有声书文件。</string>
     <string name="import_select_audio_database">请选择 .db 音频数据库文件。</string>
     <string name="import_select_dictionary_archive">请选择 .zip 辞典压缩包文件。</string>
     <string name="import_select_hoshi_backup">请选择 .hoshi Hoshi 备份文件。</string>
@@ -710,15 +710,18 @@
     <string name="sasayaki_remove_audio">移除</string>
     <string name="sasayaki_storage_copied">已复制到应用存储。原始有声书文件可以删除。</string>
     <string name="sasayaki_storage_linked">已链接到外部有声书文件。请保留原始文件可用。</string>
-    <string name="sasayaki_storage_select_audio">选择 .mp3、.m4b 或 .opus 有声书</string>
-    <string name="sasayaki_subtitle_match">字幕匹配</string>
+    <string name="sasayaki_storage_select_audio">选择 .mp3、.m4b、.m4a 或 .opus 有声书</string>
+    <string name="sasayaki_export_srt">导出 SRT</string>
+    <string name="sasayaki_srt_saved">SRT 文件已保存。</string>
+    <string name="sasayaki_srt_export_failed">无法导出字幕，请重试。</string>
+    <string name="sasayaki_current_match">当前匹配</string>
     <string name="sasayaki_no_subtitle_match">未匹配</string>
     <string name="sasayaki_no_chapters">这个有声书没有可用章节。</string>
     <string name="sasayaki_unknown_chapter">章节</string>
     <string name="sasayaki_current_chapter">当前章节</string>
     <string name="sasayaki_skip_cue">1 句</string>
     <string name="sasayaki_skip_seconds_format">%1$d 秒</string>
-    <string name="sasayaki_settings_description">在阅读器的有声书菜单中载入 .mp3、.m4b 或 .opus 有声书。如果有对应的 .srt 字幕文件，可以在资源页进行字幕匹配。</string>
+    <string name="sasayaki_settings_description">在阅读器的有声书菜单中载入 .mp3、.m4b、.m4a 或 .opus 有声书。可以在资源页匹配 .srt 字幕文件，或在设备上转写日语音频。</string>
     <string name="sasayaki_select_srt_file">请选择 .srt 字幕文件。</string>
     <string name="sasayaki_selected_srt">已选择 SRT</string>
     <string name="sasayaki_open_srt_failed">无法打开所选 SRT。</string>
@@ -853,4 +856,44 @@
     <string name="audio_source_jpod101" translatable="false">JapanesePod101</string>
     <string name="audio_source_language_pod101" translatable="false">LanguagePod101</string>
     <string name="audio_source_jisho" translatable="false">Jisho</string>
+    <string name="sasayaki_match_source_subtitles">字幕</string>
+    <string name="sasayaki_transcription">转写</string>
+    <string name="sasayaki_transcription_description">转写日语音频并匹配正文。</string>
+    <string name="sasayaki_transcription_select_audio">请先在上方“有声书”区域导入音频。</string>
+    <string name="sasayaki_transcription_start">开始转写</string>
+    <string name="sasayaki_transcription_resume">继续转写</string>
+    <string name="sasayaki_transcription_realign">重新匹配</string>
+    <string name="sasayaki_transcription_pause">暂停</string>
+    <string name="sasayaki_transcription_preparing">正在准备转写…</string>
+    <string name="sasayaki_transcription_downloading">正在下载转写文件… %1$d%%</string>
+    <string name="sasayaki_transcription_progress">正在转写并匹配…</string>
+    <string name="sasayaki_transcription_paused">转写已暂停</string>
+    <string name="sasayaki_transcription_complete">转写完成</string>
+    <string name="sasayaki_transcription_awaiting_download">等待确认下载</string>
+    <string name="sasayaki_transcription_download_title">下载转写文件？</string>
+    <string name="sasayaki_transcription_download_message">转写还需下载约 %1$d MiB 的文件（语音模型及运行组件），下载后可离线重复使用。音频不会上传。</string>
+    <string name="sasayaki_transcription_download_action">下载并转写</string>
+    <string name="sasayaki_transcription_saved_progress">已转写 %1$s / %2$s</string>
+    <string name="sasayaki_transcription_remaining">约剩 %1$d 分钟</string>
+    <string name="sasayaki_transcription_aligning">正在匹配正文…</string>
+    <string name="sasayaki_transcription_pausing">正在保存进度…</string>
+    <string name="sasayaki_transcription_clear">清除转写</string>
+    <string name="sasayaki_transcription_clear_confirmation">清除转写数据？</string>
+    <string name="sasayaki_transcription_clear_message">仅清除转写数据，保留当前匹配结果。</string>
+    <string name="sasayaki_transcription_error_audio">无法读取此音频。请确认文件完整、可访问且格式受支持，然后重试。</string>
+    <string name="sasayaki_transcription_error_resources">无法下载或校验转写文件。请检查网络连接和可用存储空间后重试。</string>
+    <string name="sasayaki_transcription_error_recognition">日语语音识别无法启动或完成。请重启应用后重试；若仍失败，可切换为“轻量”模式。</string>
+    <string name="sasayaki_transcription_error_match">无法将转写内容与此书匹配。请确认书籍可正常打开且内容与音频相符。</string>
+    <string name="sasayaki_transcription_error_storage">无法保存转写进度。请检查可用存储空间，并确认书籍仍可访问。</string>
+    <string name="sasayaki_transcription_busy">正在转写另一本书。</string>
+    <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
+    <string name="about_ffmpeg_source">FFmpeg 源代码</string>
+    <string name="about_transcription_license">转写组件许可证</string>
+    <string name="sasayaki_transcription_speed">转录速度</string>
+    <string name="sasayaki_transcription_light">轻量</string>
+    <string name="sasayaki_transcription_balanced">均衡</string>
+    <string name="sasayaki_transcription_fast">快速</string>
+    <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
+    <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
+    <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
 </resources>

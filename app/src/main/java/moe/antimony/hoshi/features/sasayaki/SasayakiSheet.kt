@@ -7,6 +7,7 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -112,10 +113,14 @@ internal fun SasayakiSheet(
     onSettingsChange: (SasayakiSettings) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    transcriptionState: SasayakiTranscriptionUiState,
+    transcriptionViewModel: SasayakiTranscriptionViewModel,
+    subtitleExportViewModel: SasayakiSubtitleExportViewModel,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sheetStyle = readerSheetStyle()
+    var subtitleMatching by remember { mutableStateOf(false) }
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
@@ -123,9 +128,10 @@ internal fun SasayakiSheet(
     val currentChapter = SasayakiAudiobookChapters.currentChapterAt(audiobookInfo.chapters, player.currentTime)
     val importFailedMessage = stringResource(R.string.sasayaki_import_audiobook_failed)
     val importer = rememberLauncherForActivityResult(OpenDocumentContent()) { uri ->
-        if (uri == null || isImporting) return@rememberLauncherForActivityResult
+        if (uri == null || isImporting || transcriptionState.controlsLocked || subtitleMatching) return@rememberLauncherForActivityResult
         isImporting = true
         importError = null
+        val previousPlayback = player.playback
         scope.launch {
             runCatching {
                 val copyToPrivateStorage = settings.copyAudiobookToPrivateStorage
@@ -146,6 +152,13 @@ internal fun SasayakiSheet(
                     audioUri = uri,
                     copiedAudioFileName = copiedFileName,
                 )
+                if ((previousPlayback.audioFileName != null && previousPlayback.audioFileName != copiedFileName) ||
+                    (previousPlayback.audioUri != null && (copiedFileName != null || previousPlayback.audioUri != uri.toString()))
+                ) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { audioRepository.clearAudioSource(previousPlayback, context.contentResolver) }
+                    }
+                }
             }.onFailure { error ->
                 importError = error.localizedImportMessage(context, importFailedMessage)
             }
@@ -185,12 +198,24 @@ internal fun SasayakiSheet(
                 )
                 when (selectedTab) {
                     SasayakiSheetTab.Resources -> SasayakiResourcesTab(
+                        bookTitle = bookTitle,
+                        subtitleExportViewModel = subtitleExportViewModel,
                         player = player,
                         settings = settings,
                         subtitleMatchData = subtitleMatchData,
                         matchDependencies = matchDependencies,
                         importError = importError,
                         isImporting = isImporting,
+                        transcriptionState = transcriptionState,
+                        subtitleMatching = subtitleMatching,
+                        onMatchModeChange = transcriptionViewModel::selectMode,
+                        onSubtitleMatchingChange = { subtitleMatching = it },
+                        onStartTranscription = { transcriptionViewModel.start(settings.transcriptionPreset) },
+                        onPauseTranscription = transcriptionViewModel::pause,
+                        onConfirmDownload = transcriptionViewModel::confirmDownload,
+                        onRequestClearTranscription = transcriptionViewModel::requestClear,
+                        onDismissClearTranscription = transcriptionViewModel::dismissClear,
+                        onConfirmClearTranscription = transcriptionViewModel::confirmClear,
                         onAudioAction = {
                             if (player.hasAudio) {
                                 player.clearAudio()
@@ -502,12 +527,24 @@ private fun SasayakiSheetTabs(
 
 @Composable
 private fun SasayakiResourcesTab(
+    bookTitle: String,
+    subtitleExportViewModel: SasayakiSubtitleExportViewModel,
     player: SasayakiPlayer,
     settings: SasayakiSettings,
     subtitleMatchData: SasayakiMatchData?,
     matchDependencies: SasayakiMatchDependencies?,
     importError: String?,
     isImporting: Boolean,
+    transcriptionState: SasayakiTranscriptionUiState,
+    subtitleMatching: Boolean,
+    onMatchModeChange: (SasayakiMatchMode) -> Unit,
+    onSubtitleMatchingChange: (Boolean) -> Unit,
+    onStartTranscription: () -> Unit,
+    onPauseTranscription: () -> Unit,
+    onConfirmDownload: () -> Unit,
+    onRequestClearTranscription: () -> Unit,
+    onDismissClearTranscription: () -> Unit,
+    onConfirmClearTranscription: () -> Unit,
     onAudioAction: () -> Unit,
     onSettingsChange: (SasayakiSettings) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
@@ -523,6 +560,7 @@ private fun SasayakiResourcesTab(
             player = player,
             settings = settings,
             isImporting = isImporting,
+            enabled = !transcriptionState.controlsLocked && !subtitleMatching,
             onSettingsChange = onSettingsChange,
             onAction = onAudioAction,
         )
@@ -532,11 +570,54 @@ private fun SasayakiResourcesTab(
         player.errorMessage?.let { message ->
             SasayakiErrorMessage(message = message.asString())
         }
-        SasayakiSubtitleMatchSection(
-            dependencies = matchDependencies,
-            currentMatchData = subtitleMatchData,
-            onMatchUpdated = onSubtitleMatchUpdated,
+        SasayakiResourceCard {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(R.string.sasayaki_current_match),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        sasayakiSubtitleMatchSummary(subtitleMatchData, matchDependencies?.characterCount)
+                            ?: stringResource(R.string.sasayaki_no_subtitle_match),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                SasayakiSubtitleExportControl(bookTitle, subtitleMatchData, subtitleExportViewModel)
+            }
+        }
+        SasayakiMatchModeControl(
+            selected = transcriptionState.mode,
+            enabled = !isImporting && !subtitleMatching && !transcriptionState.controlsLocked,
+            onSelected = onMatchModeChange,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
+        when (transcriptionState.mode) {
+            SasayakiMatchMode.Subtitles -> SasayakiSubtitleMatchSection(
+                dependencies = matchDependencies,
+                onMatchUpdated = onSubtitleMatchUpdated,
+                enabled = !isImporting && !transcriptionState.controlsLocked,
+                onMatchingChange = onSubtitleMatchingChange,
+            )
+            SasayakiMatchMode.Transcription -> SasayakiTranscriptionSection(
+                state = transcriptionState,
+                preset = settings.transcriptionPreset,
+                onPresetChange = { onSettingsChange(settings.copy(transcriptionPreset = it)) },
+                enabled = !isImporting && !subtitleMatching,
+                onStart = onStartTranscription,
+                onPause = onPauseTranscription,
+                onConfirmDownload = onConfirmDownload,
+                onRequestClear = onRequestClearTranscription,
+                onDismissClear = onDismissClearTranscription,
+                onConfirmClear = onConfirmClearTranscription,
+            )
+        }
     }
 }
 
@@ -545,6 +626,7 @@ private fun SasayakiAudiobookResourceCard(
     player: SasayakiPlayer,
     settings: SasayakiSettings,
     isImporting: Boolean,
+    enabled: Boolean,
     onSettingsChange: (SasayakiSettings) -> Unit,
     onAction: () -> Unit,
 ) {
@@ -568,7 +650,7 @@ private fun SasayakiAudiobookResourceCard(
                 )
             }
             Button(
-                enabled = !isImporting,
+                enabled = enabled && !isImporting,
                 onClick = onAction,
             ) {
                 Text(
@@ -595,6 +677,7 @@ private fun SasayakiAudiobookResourceCard(
             )
             Switch(
                 checked = settings.copyAudiobookToPrivateStorage,
+                enabled = enabled && !isImporting,
                 onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
             )
         }
@@ -1052,7 +1135,7 @@ private fun String.audioSourceNameTitle(): String? {
     val title = name.substringBeforeLast('.', missingDelimiterValue = name)
         .trim()
         .takeIf { it.isNotBlank() }
-        ?.takeUnless { it.equals("sasayaki_audio", ignoreCase = true) }
+        ?.takeUnless { it.equals("sasayaki_audio", ignoreCase = true) || it.startsWith("sasayaki_audio_", ignoreCase = true) }
     return title
 }
 

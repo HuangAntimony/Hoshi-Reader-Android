@@ -132,6 +132,7 @@ Hoshi Reader Android builds on this ecosystem:
 
 - [Hoshi Reader iOS](https://github.com/Manhhao/Hoshi-Reader) as the reference implementation.
 - [hoshidicts](https://github.com/Manhhao/hoshidicts) and [hoshidicts-kotlin-bridge](https://github.com/Manhhao/hoshidicts-kotlin-bridge) for Yomitan dictionary support.
+- [FFmpeg](https://ffmpeg.org/) for native audiobook decoding and resampling (LGPL 2.1 or later; license and source link in Settings > About).
 - [Yomitan](https://github.com/yomidevs/yomitan) for dictionary format and lookup inspiration.
 - [AnkiDroid](https://github.com/ankidroid/Anki-Android) for Android card creation integration.
 - [Ankiconnect Android](https://github.com/KamWithK/AnkiconnectAndroid) for local audio behavior and AnkiDroid duplicate scope/checksum query references.

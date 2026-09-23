@@ -147,6 +147,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
                     onClearCue = onClearCue,
                 )
                 controller.updateMatchData(request.matchData)
+                controller.restoreCueDisplay()
                 return controller
             }
         }

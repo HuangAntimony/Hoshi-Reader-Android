@@ -4,6 +4,9 @@ import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
 import java.io.InputStream
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
@@ -34,12 +37,14 @@ class BookRepository private constructor(
     private val sidecarDataSource: BookSidecarDataSource,
     private val clock: BookClock,
     internal val statisticsStore: BookStatisticsStore,
+    private val workRegistry: BookWorkRegistry,
 ) : ReaderRouteBookRepository, SasayakiSidecarRepository {
     @Inject
     constructor(
         @FilesDir filesDir: File,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         statisticsStore: BookStatisticsStore,
+        workRegistry: BookWorkRegistry,
     ) : this(
         filesDir = filesDir,
         ioDispatcher = ioDispatcher,
@@ -47,10 +52,14 @@ class BookRepository private constructor(
         sidecarDataSource = BookSidecarDataSource(ioDispatcher),
         clock = SystemBookClock,
         statisticsStore = statisticsStore,
+        workRegistry = workRegistry,
     )
 
-    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher = Dispatchers.IO) :
-        this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher))
+    constructor(
+        filesDir: File,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        workRegistry: BookWorkRegistry = BookWorkRegistry(),
+    ) : this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher), workRegistry)
 
     private val archiveExtractor = EpubArchiveExtractor()
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
@@ -148,7 +157,7 @@ class BookRepository private constructor(
     suspend fun deleteBook(
         bookRoot: File,
         releasePersistedSasayakiAudioUri: (String) -> Unit = {},
-    ) {
+    ) = workRegistry.delete(bookRoot) {
         val removedId = loadMetadata(bookRoot)?.id ?: bookRoot.name
         statisticsStore.archiveAndDelete(bookRoot) {
             loadSasayakiPlayback(bookRoot)?.audioUri?.let { uri ->
@@ -665,8 +674,17 @@ class BookSidecarDataSource(
     suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         loadJson(SasayakiMatchData.serializer(), bookRoot.resolve(SASAYAKI_MATCH_FILE_NAME))
 
-    suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
-        saveJson(bookRoot, SASAYAKI_MATCH_FILE_NAME, SasayakiMatchData.serializer(), match)
+    suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = withContext(ioDispatcher) {
+        bookRoot.mkdirs()
+        val temporary = File.createTempFile(".sasayaki-match-", ".tmp", bookRoot)
+        try {
+            FileOutputStream(temporary).use { output ->
+                output.write(json.encodeToString(SasayakiMatchData.serializer(), match).toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            Files.move(temporary.toPath(), bookRoot.resolve(SASAYAKI_MATCH_FILE_NAME).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Unit
+        } finally { temporary.delete() }
     }
 
     suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
@@ -724,6 +742,7 @@ private val bookSidecarFileNames = setOf(
     BOOKINFO_FILE_NAME,
     SASAYAKI_MATCH_FILE_NAME,
     SASAYAKI_PLAYBACK_FILE_NAME,
+    "sasayaki_transcript.json",
 )
 
 private fun String.sanitizeRootFileName(): String =

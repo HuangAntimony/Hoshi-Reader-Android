@@ -33,6 +33,15 @@ enum class SasayakiReaderSkipButtonAction(
     }
 }
 
+enum class SasayakiTranscriptionPreset(val parallelism: Int) {
+    Light(1), Balanced(2), Fast(3);
+
+    companion object {
+        fun fromStorage(value: String?): SasayakiTranscriptionPreset =
+            entries.firstOrNull { it.name == value } ?: Balanced
+    }
+}
+
 data class SasayakiSettings(
     val enabled: Boolean = true,
     val syncEnabled: Boolean = false,
@@ -43,6 +52,7 @@ data class SasayakiSettings(
     val copyAudiobookToPrivateStorage: Boolean = false,
     val autoScroll: Boolean = true,
     val autoPause: Boolean = true,
+    val transcriptionPreset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced,
     val imageHoldSeconds: Float = SasayakiImageHoldDefaultSeconds,
     val lightTextColor: Long = 0xFF000000,
     val lightBackgroundColor: Long = 0x6687CEEB,
@@ -180,6 +190,7 @@ class SasayakiSettingsRepository(
             copyAudiobookToPrivateStorage = this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] ?: false,
             autoScroll = this[KEY_AUTO_SCROLL] ?: true,
             autoPause = this[KEY_AUTO_PAUSE] ?: true,
+            transcriptionPreset = SasayakiTranscriptionPreset.fromStorage(this[KEY_TRANSCRIPTION_PRESET]),
             imageHoldSeconds = normalizeSasayakiImageHoldSeconds(
                 this[KEY_IMAGE_HOLD_SECONDS] ?: SasayakiImageHoldDefaultSeconds,
             ),
@@ -199,6 +210,7 @@ class SasayakiSettingsRepository(
         this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] = settings.copyAudiobookToPrivateStorage
         this[KEY_AUTO_SCROLL] = settings.autoScroll
         this[KEY_AUTO_PAUSE] = settings.autoPause
+        this[KEY_TRANSCRIPTION_PRESET] = settings.transcriptionPreset.name
         this[KEY_IMAGE_HOLD_SECONDS] = normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds)
         this[KEY_LIGHT_TEXT_COLOR] = settings.lightTextColor
         this[KEY_LIGHT_BACKGROUND_COLOR] = settings.lightBackgroundColor
@@ -223,6 +235,7 @@ class SasayakiSettingsRepository(
             booleanPreferencesKey("sasayakiCopyAudiobookToPrivateStorage")
         private val KEY_AUTO_SCROLL = booleanPreferencesKey("sasayakiAutoScroll")
         private val KEY_AUTO_PAUSE = booleanPreferencesKey("sasayakiAutoPause")
+        private val KEY_TRANSCRIPTION_PRESET = stringPreferencesKey("sasayakiTranscriptionPreset")
         private val KEY_IMAGE_HOLD_SECONDS = floatPreferencesKey("sasayakiImageHoldSeconds")
         private val KEY_LIGHT_TEXT_COLOR = longPreferencesKey("sasayakiTextColor")
         private val KEY_LIGHT_BACKGROUND_COLOR = longPreferencesKey("sasayakiBackgroundColor")
