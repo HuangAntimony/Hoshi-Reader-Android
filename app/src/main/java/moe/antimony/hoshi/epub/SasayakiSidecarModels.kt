@@ -42,4 +42,5 @@ data class SasayakiPlaybackData(
     val rate: Float = 1f,
     val audioUri: String? = null,
     val audioFileName: String? = null,
+    val modified: Long? = null,
 )

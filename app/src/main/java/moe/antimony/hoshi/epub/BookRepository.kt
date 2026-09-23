@@ -23,6 +23,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
+import moe.antimony.hoshi.features.sync.Timestamped
+import moe.antimony.hoshi.features.sync.SyncFormat
+import moe.antimony.hoshi.features.sync.appleDateMilliseconds
+import moe.antimony.hoshi.features.sync.syncKey
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
@@ -74,6 +82,7 @@ class BookRepository private constructor(
         sortOption: BookSortOption = BookSortOption.Recent,
         onLegacyBookMigrationProgress: (LegacyBookMigrationProgress) -> Unit = {},
     ): List<BookEntry> {
+        loadShelfList()
         val idReplacements = linkedMapOf<String, String>()
         val roots = loadAllBooks().map { root -> root to loadMetadata(root) }
         val legacyMigrationTotal = roots.count { (root, metadata) ->
@@ -107,6 +116,7 @@ class BookRepository private constructor(
     }
 
     override suspend fun loadBookEntry(bookId: String): BookEntry? {
+        loadShelfList()
         for (root in loadAllBooks()) {
             val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root))
             if (migration.oldId != migration.metadata.id) {
@@ -171,11 +181,44 @@ class BookRepository private constructor(
         saveShelves(cleanedShelves)
     }
 
-    suspend fun loadShelves(): List<BookShelf> =
-        sidecarDataSource.loadShelves(fileDataSource.booksDirectory).orEmpty()
+    suspend fun loadShelfList(): Map<String, Timestamped<Int?>> =
+        sidecarDataSource.loadShelfList(fileDataSource.booksDirectory)
+
+    suspend fun saveShelfList(shelves: Map<String, Timestamped<Int?>>) =
+        sidecarDataSource.saveShelfList(fileDataSource.booksDirectory, shelves)
+
+    suspend fun loadShelves(): List<BookShelf> {
+        val list = loadShelfList()
+        val books = loadAllBooks().mapNotNull { loadMetadata(it) }
+        return list.entries.filter { it.value.value != null }
+            .sortedWith(compareBy({ it.value.value }, { it.key }))
+            .map { (name, _) -> BookShelf(name, books.filter { it.shelves?.get(name)?.value == true }.map { it.id }) }
+    }
 
     suspend fun saveShelves(shelves: List<BookShelf>) {
-        sidecarDataSource.saveShelves(fileDataSource.booksDirectory, shelves)
+        val old = loadShelfList()
+        val list = old.toMutableMap()
+        val now = System.currentTimeMillis()
+        val normalized = shelves.map { it.copy(name = it.name.syncKey()) }
+        val names = normalized.map { it.name }.toSet()
+        val oldNames = old.entries.filter { it.value.value != null }.sortedWith(compareBy({ it.value.value }, { it.key })).map { it.key }
+        val reordered = oldNames.toSet() == names && oldNames != normalized.map { it.name }
+        old.filterValues { it.value != null }.keys.filterNot { it in names }.forEach { list[it] = Timestamped(now, null) }
+        var position = old.values.mapNotNull { it.value }.maxOrNull() ?: -1
+        normalized.forEachIndexed { index, shelf ->
+            if (reordered) list[shelf.name] = Timestamped(now, index)
+            else if (old[shelf.name]?.value == null) list[shelf.name] = Timestamped(now, ++position)
+        }
+        for (root in loadAllBooks()) {
+            val metadata = loadMetadata(root) ?: continue
+            val memberships = metadata.shelves.orEmpty().toMutableMap()
+            for (name in oldNames.toSet() + names) {
+                val member = normalized.firstOrNull { it.name == name }?.bookIds?.contains(metadata.id) == true
+                if ((memberships[name]?.value ?: false) != member) memberships[name] = Timestamped(now, member)
+            }
+            if (memberships != metadata.shelves.orEmpty()) saveMetadata(root, metadata.copy(shelves = memberships))
+        }
+        saveShelfList(list)
     }
 
     private suspend fun replaceShelfBookIds(idReplacements: Map<String, String>) {
@@ -212,6 +255,12 @@ class BookRepository private constructor(
         statisticsStore.restore(folder)
     }
 
+    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> =
+        sidecarDataSource.loadHighlightRecords(bookRoot)
+
+    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) =
+        sidecarDataSource.saveHighlightRecords(bookRoot, records)
+
     suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
         sidecarDataSource.loadHighlights(bookRoot).orEmpty()
 
@@ -240,11 +289,16 @@ class BookRepository private constructor(
         sidecarDataSource.loadSasayakiPlayback(bookRoot)
 
     override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
-        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
+        val stored = loadSasayakiPlayback(bookRoot)
+        val changed = stored?.lastPosition != playback.lastPosition || stored.delay != playback.delay || stored.rate != playback.rate
+        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback.copy(modified = if (changed) System.currentTimeMillis() else stored.modified))
     }
 
+    suspend fun applySasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) =
+        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
+
     suspend fun loadReadingProgress(bookRoot: File): Double {
-        val total = loadBookInfo(bookRoot)?.characterCount ?: return 0.0
+        val total = loadBookInfo(bookRoot)?.characterCount ?: loadMetadata(bookRoot)?.characterCount ?: return 0.0
         if (total <= 0) return 0.0
         val current = loadBookmark(bookRoot)?.characterCount ?: return 0.0
         return current.toDouble().div(total.toDouble()).coerceIn(0.0, 1.0)
@@ -657,11 +711,46 @@ class BookSidecarDataSource(
         saveJson(bookRoot, BOOKMARK_FILE_NAME, Bookmark.serializer(), bookmark)
     }
 
-    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight>? =
-        loadJson(ListSerializer(ReaderHighlight.serializer()), bookRoot.resolve(HIGHLIGHTS_FILE_NAME))
+    private val highlightSerializer = MapSerializer(String.serializer(), Timestamped.serializer(ReaderHighlight.serializer().nullable))
+    private val shelfSerializer = MapSerializer(String.serializer(), Timestamped.serializer(Int.serializer().nullable))
+
+    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> = withContext(ioDispatcher) {
+        val file = bookRoot.resolve(HIGHLIGHTS_FILE_NAME)
+        if (!file.isFile) return@withContext emptyMap()
+        val element = json.parseToJsonElement(file.readText())
+        if (element is JsonArray) {
+            json.decodeFromJsonElement(ListSerializer(ReaderHighlight.serializer()), element).associate { highlight ->
+                val id = highlight.id.uppercase()
+                id to Timestamped(highlight.createdAt.appleDateMilliseconds(), highlight.copy(id = id))
+            }
+        } else {
+            SyncFormat.json.decodeFromJsonElement(highlightSerializer, element)
+        }
+    }
+
+    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
+        loadHighlightRecords(bookRoot).values.mapNotNull { it.value }.sortedBy { it.createdAt }
+
+    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) = withContext(ioDispatcher) {
+        bookRoot.resolve(HIGHLIGHTS_FILE_NAME).writeText(SyncFormat.json.encodeToString(highlightSerializer, records))
+    }
 
     suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
-        saveJson(bookRoot, HIGHLIGHTS_FILE_NAME, ListSerializer(ReaderHighlight.serializer()), highlights)
+        val records = loadHighlightRecords(bookRoot).toMutableMap()
+        val now = System.currentTimeMillis()
+        val ids = highlights.map { it.id.uppercase() }.toSet()
+        records.toMap().forEach { (id, record) ->
+            if (record.value != null && id !in ids) records[id] = Timestamped(now, null)
+        }
+        highlights.forEach { value ->
+            val id = value.id.uppercase()
+            val highlight = value.copy(id = id)
+            val existing = records[id]
+            if (existing == null || (existing.value != null && existing.value != highlight)) {
+                records[id] = Timestamped(now, highlight)
+            }
+        }
+        saveHighlightRecords(bookRoot, records)
     }
 
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
@@ -694,11 +783,26 @@ class BookSidecarDataSource(
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
-    suspend fun loadShelves(booksRoot: File): List<BookShelf>? =
-        loadJson(ListSerializer(BookShelf.serializer()), booksRoot.resolve(SHELVES_FILE_NAME))
+    suspend fun loadShelfList(booksRoot: File): Map<String, Timestamped<Int?>> = withContext(ioDispatcher) {
+        val file = booksRoot.resolve(SHELVES_FILE_NAME)
+        if (!file.isFile) return@withContext emptyMap()
+        val element = json.parseToJsonElement(file.readText())
+        if (element !is JsonArray) return@withContext SyncFormat.json.decodeFromJsonElement(shelfSerializer, element)
+        val legacy = json.decodeFromJsonElement(ListSerializer(BookShelf.serializer()), element)
+        val books = booksRoot.listFiles().orEmpty().mapNotNull { root -> loadMetadata(root)?.let { root to it } }
+        val shelves = legacy.mapIndexed { index, shelf -> shelf.name.syncKey() to Timestamped<Int?>(0, index) }.toMap()
+        books.forEach { (root, book) ->
+            val memberships = book.shelves.orEmpty().toMutableMap()
+            legacy.filter { book.id in it.bookIds }.forEach { memberships[it.name.syncKey()] = Timestamped(0, true) }
+            if (memberships.isNotEmpty()) saveMetadata(root, book.copy(shelves = memberships))
+        }
+        saveShelfList(booksRoot, shelves)
+        shelves
+    }
 
-    suspend fun saveShelves(booksRoot: File, shelves: List<BookShelf>) {
-        saveJson(booksRoot, SHELVES_FILE_NAME, ListSerializer(BookShelf.serializer()), shelves)
+    suspend fun saveShelfList(booksRoot: File, shelves: Map<String, Timestamped<Int?>>) = withContext(ioDispatcher) {
+        booksRoot.mkdirs()
+        booksRoot.resolve(SHELVES_FILE_NAME).writeText(SyncFormat.json.encodeToString(shelfSerializer, shelves))
     }
 
     private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = withContext(ioDispatcher) {
