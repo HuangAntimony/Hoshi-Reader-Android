@@ -31,6 +31,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   preserve recognized prefixes after pauses. Include short sentences and replies
   omitted by recognition in the neighboring highlight that best fits their timing
   and sentence context, including cries, without requiring a new transcription.
+  Handle omitted replies beside short cues and missing sentence-edge characters,
+  keeping those edge characters with their original sentences.
   Keep recognized words beside omitted cues and inside long missing passages;
   retain recognized words and supported spelling changes even when estimated token
   durations are long, and keep a recognized sentence's ending from being assigned

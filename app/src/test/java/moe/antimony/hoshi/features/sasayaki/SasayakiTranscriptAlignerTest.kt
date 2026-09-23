@@ -183,14 +183,16 @@ class SasayakiTranscriptAlignerTest {
         }
     }
 
-    @Test fun aWholeCueReadingCannotBeSplitToInventAnUnspokenNeighbor() {
+    @Test fun omittedCueAndMissingWordOpeningShareOneCueWithoutSplittingAReading() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。最初、盛大に音漏れしてたのは。彼女は窓の外を眺めていた。</p>"),
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("さ", 4.5, 4.7),
                 token("い", 4.7, 4.9), token("し", 4.9, 5.1), token("ょ", 5.1, 5.4),
                 token("に音漏れしてたのは", 5.4, 8.0), token("彼女は窓の外を眺めていた", 9.0, 12.0)),
         )
-        assertFalse(result.matches.any { "盛大" in it.text })
+        assertEquals(listOf("雨の降る静かな朝だった", "最初盛大に音漏れしてたのは", "彼女は窓の外を眺めていた"), result.matches.map { it.text })
+        assertEquals(4.0, result.matches[1].startTime, .0001)
+        assertEquals(8.0, result.matches[1].endTime, .0001)
     }
 
     @Test fun smallVowelSpellingKeepsBothSidesOfComma() {
@@ -486,13 +488,15 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
-    fun crossCueReadingRecoveryCannotFillAnUnspokenMiddleReply() {
+    fun omittedMiddleReplyDoesNotTakeAnIndependentSliceOfACrossCueReading() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。だけど彼女の奴、はい、俺にサヨナラって言ったんだ。</p>"),
             listOf(token("雨の降る静かな朝だっただけど彼女の", 1.0, 5.0),
                 token("やつおれ", 5.0, 6.5), token("にさよならって言ったんだ", 6.5, 10.0)),
         )
-        assertFalse(result.matches.any { "はい" in it.text })
+        assertEquals(listOf("雨の降る静かな朝だった", "だけど彼女の奴", "はい俺にサヨナラって言ったんだ"), result.matches.map { it.text })
+        assertEquals(5.0, result.matches[1].endTime, .0001)
+        assertEquals(5.0, result.matches[2].startTime, .0001)
     }
 
     @Test
@@ -564,9 +568,9 @@ class SasayakiTranscriptAlignerTest {
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("いいの", 5.0, 6.0),
                 token("彼女わ窓の外を眺めていた", 7.0, 11.0)),
         )
-        assertEquals(listOf("雨の降る静かな朝だった", "いいの", "彼女は窓の外を眺めていた"),
+        assertEquals(listOf("雨の降る静かな朝だった", "ううんいいの", "彼女は窓の外を眺めていた"),
             result.matches.map { it.text })
-        assertEquals(5.0, result.matches[1].startTime, 0.0001)
+        assertEquals(4.0, result.matches[1].startTime, 0.0001)
         assertEquals(6.0, result.matches[1].endTime, 0.0001)
     }
 
@@ -679,13 +683,14 @@ class SasayakiTranscriptAlignerTest {
     }
 
     @Test
-    fun ambiguousReadingCannotMoveAcrossAnOmittedSentenceBoundary() {
+    fun omittedCueAndFollowingWordOpeningStayOnTheirRespectiveSides() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。音。訳がわからないと彼女は言った。</p>"),
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("おと", 5.0, 5.6),
                 token("がわからないと彼女は言った", 5.6, 9.0)),
         )
-        assertEquals(listOf("雨の降る静かな朝だった", "がわからないと彼女は言った"), result.matches.map { it.text })
+        assertEquals(listOf("雨の降る静かな朝だった音", "訳がわからないと彼女は言った"), result.matches.map { it.text })
+        assertEquals(5.6, result.matches.first().endTime, .0001)
         assertEquals(5.6, result.matches.last().startTime, .0001)
     }
 
@@ -926,8 +931,8 @@ class SasayakiTranscriptAlignerTest {
         val cases = listOf(
             Triple("おお、助かるぞ。", "おたすかるぞ", listOf("お", "助かるぞ")),
             Triple("お前、親切だな。", "おまえしんせつだな", listOf("お前", "親切だな")),
-            Triple("あの、ごめんね。私、そんなことになると思わなかった。", "あのわたしそんなことになると思わなかった", listOf("あの", "私", "そんなことになると思わなかった")),
-            Triple("わ、わっ、わたし、ぶん、文芸部１年のっ、です。", "わ私ぶ文芸部一年のです", listOf("わ", "わたし", "ぶん", "文芸部１年のっ", "です")),
+            Triple("あの、ごめんね。私、そんなことになると思わなかった。", "あのわたしそんなことになると思わなかった", listOf("あのごめんね", "私", "そんなことになると思わなかった")),
+            Triple("わ、わっ、わたし、ぶん、文芸部１年のっ、です。", "わ私ぶ文芸部一年のです", listOf("わわっ", "わたし", "ぶん", "文芸部１年のっ", "です")),
             Triple("これなんの場面だろう。良く分からんが。", "これなんの場面だろよく分からんが", listOf("これなんの場面だろ", "良く分からんが")),
             Triple("お、さっそく仲良くやってるねー。", "早速仲良くやってるねー", listOf("おさっそく仲良くやってるねー")),
             Triple("えー、なんなんだ。", "へえ何なんだ", listOf("え", "なんなんだ")),
@@ -953,26 +958,26 @@ class SasayakiTranscriptAlignerTest {
         assertEquals(4.5, result.matches[1].startTime, .0001)
     }
 
-    @Test fun uniqueKanjiCueKeepsOwnSpeechBeforeALongOmission() {
+    @Test fun uniqueKanjiCueCanGroupAnOmissionUsingItsRecognizedContext() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。え。誰。どこの。あっ、あの、小鞠です。文芸部、小鞠知花。私は駅へ向かって歩いた。</p>"),
             listOf(token("雨の降る静かな朝だった", 1.0, 4.0), token("えっ", 5.0, 5.5), token("誰", 5.5, 6.5),
                 token("文芸部小鞠智加", 7.0, 9.0), token("私は駅へ向かって歩いた", 10.0, 14.0)))
-        val cue = result.matches.single { it.text == "誰" }
+        val cue = result.matches.single { it.text == "誰どこのあっあの小鞠です" }
         assertEquals(5.5, cue.startTime, .0001)
-        assertEquals(6.5, cue.endTime, .0001)
-        assertFalse(result.matches.any { it.text.contains("あの") || it.text.contains("どこの") })
+        assertEquals(7.0, cue.endTime, .0001)
+        assertEquals(7.0, result.matches.single { it.text == "文芸部" }.startTime, .0001)
     }
 
-    @Test fun readingDurationUsesRecognizedSyllablesRatherThanOnlyWrittenKanjiCount() {
+    @Test fun shortWrittenReadingCanGroupAnOmissionWithoutLosingItsSpokenInterval() {
         val result = SasayakiTranscriptAligner.align(
             book("<p>雨の降る静かな朝だった。あの、ごめんね、私、そんなことになると思わなかった。</p>"),
             listOf(token("雨の降る静かな朝だったあの", 1.0, 4.0), token("わたし", 5.0, 6.88),
                 token("そんなことになると思わなかった", 6.88, 10.0)))
-        val cue = result.matches.single { it.text == "私" }
-        assertEquals(5.0, cue.startTime, .0001)
+        val cue = result.matches.single { it.text == "ごめんね私" }
+        assertEquals(4.0, cue.startTime, .0001)
         assertEquals(6.88, cue.endTime, .0001)
-        assertFalse(result.matches.any { it.text.contains("ごめんね") })
+        assertEquals(6.88, result.matches.last().startTime, .0001)
     }
 
     @Test fun longEstimatedTokenIntervalsRetainCompleteRecognizedWords() {

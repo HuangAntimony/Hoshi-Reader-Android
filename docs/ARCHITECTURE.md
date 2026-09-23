@@ -648,13 +648,19 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   their contiguous supported spans instead of discarding all matches.
   After precise cue assembly, short entirely omitted interior cues can share a neighboring
   highlight: audiobook body text bounded by real matches is assumed narrated. Grouping stays
-  within one chapter and whole display-cue boundaries, with at most 48 missing characters,
-  two sentence boundaries (commas excluded), a 12-second inter-cue gap and 96 characters
-  in the resulting cue. Both neighbors need at least four matched characters and sixteen
-  combined. The side with more excess boundary-token time relative to its nearby cadence
+  within one chapter, with at most 48 missing characters, a 12-second inter-cue gap
+  and 96 characters in each expanded cue. Mixed gaps first return up to two missing
+  edge characters to their own display cue, requiring at least twice as many recognized
+  characters in that cue; the remaining omission must contain whole display cues and
+  at most two sentence boundaries (commas excluded). Pure word holes still use the
+  earlier repair. Each side needs four recognized context characters and sixteen combined:
+  short cues can include consecutive original matches outward from the gap, stopping at
+  text holes or audio gaps exceeding one second. Characters added by grouping never contribute.
+  The side with more excess boundary-token time relative to its nearby cadence
   is preferred; otherwise sentence continuity across commas, then the lower combined
   character rate decide. The selected cue includes the intervening audio gap; the opposite
-  cue and all original recognized text remain intact. Decisions use original matches only,
+  cue's timing and all original recognized text remain intact; edge characters added on
+  either side retain their own cue's interval. Decisions use original matches only,
   never inferred text as new evidence. No separate timing is invented for the omission,
   no ASR inference is run, and book/chapter ends remain unextended. Grouped text participates
   in coverage, unmatched counts and SRT export through the existing match model.

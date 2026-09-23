@@ -955,7 +955,12 @@ Validate relevant sync/update/Sasayaki changes with:
   endings, a fully or partially recognized middle sentence, and competing endings
   including ruby readings. Check omitted questions split by commas, missing sentences
   beside long first/last tokens, and short cries/replies with ordinary token durations,
-  both with and without an inter-cue pause. Grouping must preserve the opposite cue,
+  both with and without an inter-cue pause. Include mixed gaps containing a missing
+  sentence-ending character, a whole omitted reply and/or a missing next-word opening:
+  restore edge fragments only to their own cues before assigning the whole reply.
+  Check short neighboring cues with contiguous recognized context; context must stop
+  at missing text or a long audio pause, and inferred text must not become new evidence.
+  Grouping must preserve the opposite cue's timing,
   keep text/time ranges non-overlapping, update IDs/offsets and unmatched counts, stop
   at real intervening matches and never propagate across chapter boundaries or book ends.
   Sparse sentences must retain supported fragments; dense cues must also split around

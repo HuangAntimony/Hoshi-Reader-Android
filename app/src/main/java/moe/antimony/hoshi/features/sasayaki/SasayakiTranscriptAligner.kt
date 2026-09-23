@@ -973,6 +973,22 @@ object SasayakiTranscriptAligner {
             if (nearby.isEmpty()) return 0.0
             return max(0.0, timing.end - timing.start - nearby[nearby.size / 2])
         }
+        fun contextLength(index: Int, direction: Int): Int {
+            var cursor = index
+            var count = original[cursor].length
+            while (count < seedLength * 2 && cursor + direction in original.indices) {
+                val a = original[min(cursor, cursor + direction)]
+                val b = original[max(cursor, cursor + direction)]
+                if (a.start + a.length != b.start || b.startTime - a.endTime !in -0.000001..1.0) break
+                cursor += direction
+                count += original[cursor].length
+            }
+            return count
+        }
+        fun resized(cue: SasayakiMatch, start: Int, end: Int, from: Double, to: Double) = cue.copy(
+            id = "${chapter.source.index}-$start", start = start, length = end - start,
+            text = String(chapter.source.text, start, end - start), startTime = from, endTime = to,
+        )
         // Decisions always use the original anchors, never a previously enlarged
         // cue. This prevents an inferred range from becoming evidence for another.
         original.zipWithNext().forEachIndexed { index, (left, right) ->
@@ -980,34 +996,43 @@ object SasayakiTranscriptAligner {
             val upper = right.start
             val missing = upper - lower
             val pause = right.startTime - left.endTime
-            // This is a short cue grouping, not a new word/phoneme alignment or a
-            // chapter-sized highlight. Partial words still use the existing repair.
-            if (missing !in 1..48 || left.length < 4 || right.length < 4 || left.length + right.length < seedLength * 2 ||
-                pause < -0.000001 || pause > 12.0 ||
-                !chapter.boundaries[lower - 1] || !chapter.boundaries[upper - 1] ||
-                (lower until upper).any { times[it] != null } ||
-                (lower until upper).count { chapter.sentences[it] } > 2) return@forEachIndexed
+            if (missing !in 1..48 || pause < -0.000001 || pause > 12.0 ||
+                (lower until upper).any { times[it] != null }) return@forEachIndexed
+
+            // Split a mixed gap at its display-cue boundaries. A short trailing
+            // or leading fragment belongs to its own cue, not the omitted reply.
+            // Pure word holes remain the responsibility of the earlier repair.
+            val bodyStart = if (chapter.boundaries[lower - 1]) lower else
+                (lower until min(upper, lower + min(2, left.length / 2)))
+                    .firstOrNull { chapter.boundaries[it] }?.plus(1) ?: return@forEachIndexed
+            val bodyEnd = if (chapter.boundaries[upper - 1]) upper else
+                (max(bodyStart, upper - min(2, right.length / 2) - 1) until upper - 1)
+                    .lastOrNull { chapter.boundaries[it] }?.plus(1) ?: return@forEachIndexed
+            if (bodyStart >= bodyEnd || (bodyStart until bodyEnd).count { chapter.sentences[it] } > 2) return@forEachIndexed
+            val leftContext = contextLength(index, -1)
+            val rightContext = contextLength(index + 1, 1)
+            if (leftContext < 4 || rightContext < 4 || leftContext + rightContext < seedLength * 2) return@forEachIndexed
 
             val leftExtra = edgeExcess(left, atEnd = true)
             val rightExtra = edgeExcess(right, atEnd = false)
-            val continuesLeft = !chapter.sentences[lower - 1]
-            val continuesRight = !chapter.sentences[upper - 1]
+            val continuesLeft = !chapter.sentences[bodyStart - 1]
+            val continuesRight = !chapter.sentences[bodyEnd - 1]
             val preferLeft = when {
                 kotlin.math.abs(leftExtra - rightExtra) > .15 -> leftExtra > rightExtra
                 continuesLeft != continuesRight -> continuesLeft
-                else -> (left.length + missing) / (right.startTime - left.startTime) <=
-                    (right.length + missing) / (right.endTime - left.endTime)
+                else -> (left.length + bodyEnd - lower) / (right.startTime - left.startTime) <=
+                    (right.length + upper - bodyStart) / (right.endTime - left.endTime)
             }
-            val target = if (preferLeft) index else index + 1
-            val current = result[target]
-            if (current.length + missing > 96) return@forEachIndexed
-            val start = if (preferLeft) current.start else lower
-            val end = if (preferLeft) upper else current.start + current.length
-            result[target] = current.copy(
-                id = "${chapter.source.index}-$start", start = start, length = end - start,
-                text = String(chapter.source.text, start, end - start),
-                startTime = if (preferLeft) current.startTime else min(current.startTime, left.endTime),
-                endTime = if (preferLeft) max(current.endTime, right.startTime) else current.endTime,
+            val split = if (preferLeft) bodyEnd else bodyStart
+            val before = result[index]
+            val after = result[index + 1]
+            if (split > lower && split - before.start > 96 ||
+                split < upper && after.start + after.length - split > 96) return@forEachIndexed
+            result[index] = resized(before, before.start, split, before.startTime,
+                if (preferLeft) max(before.endTime, right.startTime) else before.endTime,
+            )
+            result[index + 1] = resized(after, split, after.start + after.length,
+                if (preferLeft) after.startTime else min(after.startTime, left.endTime), after.endTime,
             )
         }
         return result
