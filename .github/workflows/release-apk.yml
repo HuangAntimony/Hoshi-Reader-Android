@@ -70,8 +70,17 @@ jobs:
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      HOSHI_GOOGLE_CLIENT_ID_RELEASE: ${{ secrets.HOSHI_GOOGLE_CLIENT_ID_RELEASE }}
 
     steps:
+      - name: Check Google OAuth configuration
+        shell: bash
+        run: |
+          if [[ -z "${HOSHI_GOOGLE_CLIENT_ID_RELEASE}" ]]; then
+            echo "HOSHI_GOOGLE_CLIENT_ID_RELEASE secret is required." >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:

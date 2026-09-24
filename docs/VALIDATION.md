@@ -71,6 +71,28 @@ For reader web asset changes, run the focused JavaScript tests:
 node --test app/src/test/js/*.test.mjs
 ```
 
+## Google Drive OAuth Build Configuration
+
+Copy `secrets.properties.example` to ignored `secrets.properties` and set
+`HOSHI_GOOGLE_CLIENT_ID_DEBUG` and `HOSHI_GOOGLE_CLIENT_ID_RELEASE` to the
+corresponding Android OAuth client IDs. Use the same Google Cloud project as iOS,
+register each build's package and signing certificate, and enable Custom URI
+scheme in each client's advanced settings for browser authorization. These are
+public client IDs; no OAuth client secret is needed. Environment variables with
+the same names override the file.
+
+The release workflow reads the repository secret `HOSHI_GOOGLE_CLIENT_ID_RELEASE`
+and requires it before building. The test/lint workflow needs no OAuth values,
+including for fork pull requests. Browser sign-in reports missing configuration
+when its client ID is absent. Play Services authorization continues to use
+package/signing registration independently.
+
+When changing auth, check both generated `BuildConfig` values and merged manifest
+redirect schemes, including a build with empty environment values. Run
+`GoogleDriveBrowserAuthTest` on a device using a separately built test APK and
+the explicit instrumentation runner; its token fixtures and DataStore files are
+test-owned, and it does not change the user's connection. Require `OK (9 tests)`.
+
 ## Sasayaki Subtitle Export
 
 - From Resources, export the current match using both Subtitles and Transcription.
@@ -844,7 +866,11 @@ Validate relevant sync/update/Sasayaki changes with:
   picker and test a rejected authorization: both must show a localized error
   dialog and re-enable Connect. Pass every GIS activity result to
   `getAuthorizationResultFromIntent`, including non-`RESULT_OK` results, so SDK
-  failures are surfaced. Test first upload,
+  failures are surfaced. On a device without Play Services, Connect must open a
+  browser, return through the build's custom URI scheme and show Connected only
+  after token exchange. Check browser cancellation, denied consent, restart,
+  expired/rejected tokens and local sign-out. A browser login must keep working
+  if Play Services later becomes available. Test first upload,
   cloud-only download on tap, canceled downloads, Delete Local/Everywhere,
   offline metadata/bookmark/highlight/shelf/session conflicts, session deletion,
   reimport generations, live reader updates/deletion, Sasayaki position/matches,

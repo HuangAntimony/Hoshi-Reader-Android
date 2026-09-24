@@ -162,6 +162,24 @@ fun SyncSettingsView(
         }
     }
 
+    val browserAuthorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        scope.launch {
+            try {
+                hoshiSync.stop()
+                googleAuth.acceptBrowserAuthorization(result.data)
+                hoshiSync.resetConnection()
+                authStatus = DriveAuthStatus.Connected
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                showAuthorizationError = true
+            } finally {
+                isAuthorizing = false
+                hoshiSync.start()
+            }
+        }
+    }
+
     LaunchedEffect(authorizer) {
         authorizer.configuredClient()?.let { client ->
             clientId = client.clientId
@@ -174,6 +192,10 @@ fun SyncSettingsView(
         message = null
         devicePrompt = null
         isAuthorizing = false
+    }
+
+    LaunchedEffect(hoshiState.errorMessage) {
+        if (settings?.provider == SyncProvider.Gdrive) authStatus = googleAuth.status(SyncProvider.Gdrive)
     }
 
     LaunchedEffect(devicePrompt, isAuthorizing) {
@@ -242,6 +264,10 @@ fun SyncSettingsView(
         scope.launch {
             if (currentSettings?.provider == SyncProvider.Gdrive) {
                 try {
+                    if (googleAuth.usesBrowserAuthorization()) {
+                        browserAuthorizationLauncher.launch(googleAuth.browser.authorizationIntent())
+                        return@launch
+                    }
                     val result = googleAuth.authorize(selectAccount = true)
                     if (result.hasResolution()) {
                         authorizationLauncher.launch(IntentSenderRequest.Builder(result.pendingIntent!!).build())
