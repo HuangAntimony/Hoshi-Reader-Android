@@ -6,6 +6,7 @@ import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.webkit.WebView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -626,6 +627,15 @@ internal fun DictionarySearchView(
         }
     }
     readerPopupBridgeHolder.callbacks = ReaderLookupPopupBridgeCallbacks(::handleReaderPopupBridgeMessage)
+
+    BackHandler(enabled = uiState.popups.isNotEmpty() || uiState.backCount > 0) {
+        if (uiState.popups.isNotEmpty()) {
+            childHistories = emptyMap()
+            searchViewModel.dismissRootPopup()
+        } else {
+            navigateRootIframeBack()
+        }
+    }
 
     Box(
         modifier = modifier
