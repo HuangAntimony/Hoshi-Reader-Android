@@ -219,6 +219,9 @@ class SyncStorage @Inject constructor(
             applyReaderState?.invoke(key, book, bookmarkChanged)
         } else {
             record = record.copy(sources = record.sources - SyncFileType.epub - SyncFileType.sasayaki)
+            if (oldRecord?.deleted != true || oldRecord.generation != book.generation) {
+                record = record.copy(sources = record.sources - SyncFileType.cover)
+            }
         }
         state = state.copy(books = state.books + (key to record))
         clearUnusedCover(key, book.sessions)
