@@ -151,6 +151,27 @@ class GoogleDriveSyncManagerTest {
         assertEquals("First edit", SyncFormat.decode<SyncBook>(f.remote.entries.getValue("a").data).metadata.value.title)
     }
 
+    @Test fun reusesOwnWrittenStateUntilAnotherDeviceWrites() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        assertEquals(1, f.remote.reads["a"])
+        val root = f.store.bookDirectory("book-a")
+        f.books.saveMetadata(root, f.books.loadMetadata(root)!!.copy(renamedTitle = "First edit", modified = 2000))
+        f.manager.sync()
+        f.books.saveMetadata(root, f.books.loadMetadata(root)!!.copy(renamedTitle = "Second edit", modified = 3000))
+        f.manager.sync()
+        assertEquals(1, f.remote.reads["a"])
+        assertEquals("Second edit", SyncFormat.decode<SyncBook>(f.remote.entries.getValue("a").data).metadata.value.title)
+        f.remote.entries.getValue("a").apply {
+            file = file.copy(version = "9")
+            data = SyncFormat.encode(remoteBook.copy(metadata = Timestamped(4000, SyncMetadata("Other device"))))
+        }
+        f.manager.sync()
+        assertEquals(2, f.remote.reads["a"])
+        assertEquals("Other device", f.store.loadBook("book-a")!!.metadata.value.title)
+    }
+
     @Test fun publishesFilesOnlyAfterUploadAndDownloadsEpubOnlyOnDemand() = runTest {
         val f = fixture()
         val root = f.books.createBookDirectory("book-a")

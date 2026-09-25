@@ -90,6 +90,7 @@ class GoogleDriveSyncManager internal constructor(
     val state = mutableState.asStateFlow()
     var cache = GoogleDriveSyncCache()
         private set
+    private var remoteBooks = mapOf<String, Pair<Map<String, String>, SyncBook>>()
     private var stateTask: Job? = null
     private var fileTransferTask: Job? = null
     private var pollTask: Job? = null
@@ -379,12 +380,13 @@ class GoogleDriveSyncManager internal constructor(
             cache = cache.copy(bookVersions = cache.bookVersions - key)
             saveCache()
         }
-        val remote = readState(files, SyncBook::merge)
+        var remote = remoteBooks[key]?.takeIf { it.first == versions }?.second ?: readState(files, SyncBook::merge)
         mergeBook(key, remote)
         val book = store.loadBook(key) ?: return
         if (book.needsUpload(remote) || files.size > 1) {
             val written = writeState(book, "$key.json", files)
             versions = mapOf(written.id to written.version)
+            remote = book
         }
         store.transaction {
             if (store.state.books.getValue(key).pending && store.loadBook(key) == book) {
@@ -392,6 +394,7 @@ class GoogleDriveSyncManager internal constructor(
                 store.save()
             }
         }
+        remoteBooks = remoteBooks + (key to (versions to remote!!))
         cache = cache.copy(bookVersions = cache.bookVersions + (key to versions))
         saveCache()
     }
