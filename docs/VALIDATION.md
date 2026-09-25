@@ -92,18 +92,17 @@ redirect schemes, including a build with empty environment values. Run
 `GoogleDriveBrowserAuthTest` and `GoogleDriveBrowserAuthActivityTest` on a device
 using a separately built test APK and the explicit instrumentation runner. Their
 token fixtures, DataStore files and intercepted browser launches are test-owned;
-they do not change the user's connection or contact Google. Require `OK (19 tests)`.
+they do not change the user's connection or contact Google. Require `OK (18 tests)`.
 Run the activity tests through the debug caller fixture so callback routing uses
 an app-owned task. Keep the external browser fixture framework-only Java: an
 activity launched in the test APK's own process cannot rely on Kotlin or other
 target-app dependencies being packaged in that APK.
 The tests cover PKCE/state/redirect validation, one-time exchange, cancellation,
-activity recreation, pending-request persistence, AppAuth token compatibility and
+activity recreation, pending-request persistence, token persistence and
 refresh failure handling. `GoogleDriveBrowserTokenTest` uses a local HTTP server
 to verify form encoding, token responses, failures and rejected HTTP redirects.
 Also verify real Custom Tab sign-in, Back/close cancellation and return to Sync
-settings on a device without Play Services. Compare release APK size and confirm
-AppAuth and full AppCompat are absent while AndroidX Browser remains packaged.
+settings on a device without Play Services.
 
 ## Sasayaki Subtitle Export
 

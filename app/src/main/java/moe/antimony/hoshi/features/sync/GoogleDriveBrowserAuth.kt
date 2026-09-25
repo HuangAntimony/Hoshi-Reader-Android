@@ -20,9 +20,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.di.IoDispatcher
 
@@ -48,7 +45,6 @@ class GoogleDriveBrowserAuth internal constructor(
     private val mutex = Mutex()
     private val tokensKey = stringPreferencesKey("tokens")
     private val pendingKey = stringPreferencesKey("pendingAuthorization")
-    private val legacyStateKey = stringPreferencesKey("state")
     private val refreshKey = booleanPreferencesKey("needsTokenRefresh")
 
     internal suspend fun authorizationRequest(): BrowserAuthorizationRequest = mutex.withLock {
@@ -109,7 +105,6 @@ class GoogleDriveBrowserAuth internal constructor(
             if (error.error in setOf("invalid_grant", "invalid_client", "unauthorized_client")) {
                 dataStore.edit {
                     it.remove(tokensKey)
-                    it.remove(legacyStateKey)
                     it.remove(refreshKey)
                 }
                 throw DriveAuthorizationRequiredException()
@@ -136,24 +131,12 @@ class GoogleDriveBrowserAuth internal constructor(
         Unit
     }
 
-    private fun readTokens(preferences: Preferences): BrowserTokens? {
-        preferences[tokensKey]?.let { return BrowserAuthJson.decodeFromString<BrowserTokens>(it) }
-        val legacy = preferences[legacyStateKey]?.let { BrowserAuthJson.parseToJsonElement(it).jsonObject } ?: return null
-        if (legacy["mAuthorizationException"] != null) return null
-        val request = legacy["lastAuthorizationResponse"]?.jsonObject?.get("request")?.jsonObject ?: return null
-        val response = legacy["mLastTokenResponse"]?.jsonObject ?: return null
-        return BrowserTokens(
-            clientId = request.getValue("clientId").jsonPrimitive.content,
-            accessToken = response["access_token"]?.jsonPrimitive?.content ?: return null,
-            refreshToken = legacy["refreshToken"]?.jsonPrimitive?.content ?: return null,
-            expiresAt = response["expires_at"]?.jsonPrimitive?.longOrNull ?: 0,
-        )
-    }
+    private fun readTokens(preferences: Preferences): BrowserTokens? =
+        preferences[tokensKey]?.let { BrowserAuthJson.decodeFromString<BrowserTokens>(it) }
 
     private suspend fun saveTokens(tokens: BrowserTokens) {
         dataStore.edit {
             it[tokensKey] = BrowserAuthJson.encodeToString(tokens)
-            it.remove(legacyStateKey)
             it.remove(refreshKey)
         }
     }

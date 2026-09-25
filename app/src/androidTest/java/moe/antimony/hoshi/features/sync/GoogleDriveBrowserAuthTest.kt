@@ -6,9 +6,6 @@ import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
@@ -265,31 +262,6 @@ class GoogleDriveBrowserAuthTest {
         tokenResponse = { token(access = "other", refresh = null) }
         assertTrue(runCatching { connect(auth) }.isFailure)
         assertEquals("access", auth.accessToken())
-    }
-
-    @Test
-    fun readsAppAuthTokensAndPreservesForcedRefreshOnUpgrade() = runBlocking {
-        dataStore.edit {
-            it[stringPreferencesKey("state")] = """
-                {"refreshToken":"legacy-refresh",
-                 "lastAuthorizationResponse":{"request":{"clientId":"$ClientId"}},
-                 "mLastTokenResponse":{"access_token":"legacy-access","expires_at":${System.currentTimeMillis() + 3_600_000}}}
-            """.trimIndent()
-        }
-        val auth = authorizer()
-        assertEquals(DriveAuthStatus.Connected, auth.status())
-        assertEquals("legacy-access", auth.accessToken())
-        assertTrue(requests.isEmpty())
-        dataStore.edit { it[booleanPreferencesKey("needsTokenRefresh")] = true }
-        tokenResponse = { token(access = "new-access", refresh = null) }
-        assertEquals("new-access", auth.accessToken())
-        assertEquals("legacy-refresh", requests.single()["refresh_token"])
-        job.cancelAndJoin()
-        openStore()
-        val restarted = authorizer()
-        restarted.clearAccessToken("new-access")
-        assertEquals("new-access", restarted.accessToken())
-        assertEquals("legacy-refresh", requests.last()["refresh_token"])
     }
 
     private fun openStore() {
