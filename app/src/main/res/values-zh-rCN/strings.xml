@@ -896,4 +896,15 @@
     <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
+    <string name="statistics_sessions_heading">阅读记录</string>
+    <string name="sync_provider">同步服务</string>
+    <string name="sync_provider_ttu">ッツ/yatsu</string>
+    <string name="sync_hoshi_description">在 Hoshi Reader 设备之间同步书库。</string>
+    <string name="sync_unsupported_format">此书库使用不支持的同步格式。请更新 Hoshi Reader 后再同步。</string>
+    <string name="sync_book_deleted">此书籍已被删除。</string>
+    <string name="sync_book_not_uploaded">此书籍尚未上传。</string>
+    <string name="sync_last_sync">上次同步</string>
+    <string name="sync_now">立即同步</string>
+    <string name="sync_delete_local">删除本地副本</string>
+    <string name="sync_delete_everywhere">在所有设备上删除</string>
 </resources>

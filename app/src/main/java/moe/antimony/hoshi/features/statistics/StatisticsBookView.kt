@@ -69,7 +69,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSession
+import java.time.Instant
+import java.time.ZoneId
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
@@ -124,16 +126,17 @@ internal fun StatisticsBookView(
         ) {
             if (state.isLoading) item { CircularProgressIndicator() }
             val book = state.book
+            val sessions = book?.sessions.orEmpty().entries.filter { it.value.value != null }.sortedBy { it.value.value!!.startedAt }
             if (!state.isLoading && book == null) {
                 item { Text(stringResource(R.string.statistics_book_unavailable)) }
             } else if (book != null) {
-                if (book.statistics.isEmpty()) item { Text(stringResource(R.string.statistics_no_reading_records)) }
-                if (book.statistics.isNotEmpty()) item {
-                    StatisticsSectionHeading(stringResource(R.string.statistics_days_heading), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                if (sessions.isEmpty()) item { Text(stringResource(R.string.statistics_no_reading_records)) }
+                if (sessions.isNotEmpty()) item {
+                    StatisticsSectionHeading(stringResource(R.string.statistics_sessions_heading), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
                 }
-                itemsIndexed(book.statistics, key = { _, statistic -> statistic.dateKey }) { index, statistic ->
+                itemsIndexed(sessions, key = { _, statistic -> statistic.key }) { index, statistic ->
                     val first = index == 0
-                    val last = index == book.statistics.lastIndex
+                    val last = index == sessions.lastIndex
                     Surface(
                         modifier = if (eInkMode) Modifier.hoshiGroupOutline(first, last, outlineColor, StatisticsDayGroupCornerRadius) else Modifier,
                         shape = RoundedCornerShape(
@@ -145,12 +148,12 @@ internal fun StatisticsBookView(
                         color = hoshiSurfaces.group,
                     ) {
                         Column {
-                            StatisticsDayRow(statistic, enabled = !state.isSaving, onClick = { viewModel.edit(statistic.dateKey) })
+                            StatisticsSessionRow(statistic.value.value!!, enabled = !state.isSaving, onClick = { viewModel.edit(statistic.key) })
                             if (!last) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
-                if (book.statistics.isNotEmpty()) item {
+                if (sessions.isNotEmpty()) item {
                     Surface(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         shape = RoundedCornerShape(24.dp),
@@ -187,7 +190,7 @@ internal fun StatisticsBookView(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !state.isSaving }),
         ) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(statisticsEditorDate(draft.dateKey), style = MaterialTheme.typography.titleLarge)
+                Text(statisticsEditorDate(draft.startedAt), style = MaterialTheme.typography.titleLarge)
                 OutlinedTextField(
                     value = draft.characters,
                     onValueChange = { value -> viewModel.changeDraft { it.copy(characters = value) } },
@@ -218,12 +221,12 @@ internal fun StatisticsBookView(
                     )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(enabled = !state.isSaving, onClick = { viewModel.deleteDay(draft.dateKey) }) {
+                    TextButton(enabled = !state.isSaving, onClick = { viewModel.deleteSession(draft.id) }) {
                         Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                     }
                     Row {
                         TextButton(enabled = !state.isSaving, onClick = viewModel::cancelEdit) { Text(stringResource(R.string.action_cancel)) }
-                        TextButton(enabled = draft.canSave && !state.isSaving, onClick = viewModel::saveDay) { Text(stringResource(R.string.action_save)) }
+                        TextButton(enabled = draft.canSave && !state.isSaving, onClick = viewModel::saveSession) { Text(stringResource(R.string.action_save)) }
                     }
                 }
             }
@@ -239,7 +242,7 @@ internal fun StatisticsBookView(
 }
 
 @Composable
-private fun StatisticsDayRow(statistic: ReadingStatistics, enabled: Boolean, onClick: () -> Unit) {
+private fun StatisticsSessionRow(statistic: ReadingSession, enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -247,7 +250,7 @@ private fun StatisticsDayRow(statistic: ReadingStatistics, enabled: Boolean, onC
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                statisticsEditorDate(statistic.dateKey), style = MaterialTheme.typography.bodyLarge,
+                statisticsEditorDate(statistic.startedAt), style = MaterialTheme.typography.bodyLarge,
                 autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp), maxLines = 1,
             )
             Text(formatStatisticsGroupedCount(statistic.charactersRead), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -261,6 +264,5 @@ private fun StatisticsDayRow(statistic: ReadingStatistics, enabled: Boolean, onC
     }
 }
 
-private fun statisticsEditorDate(dateKey: String): String =
-    runCatching { LocalDate.parse(dateKey).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) }
-        .getOrDefault(dateKey)
+private fun statisticsEditorDate(startedAt: Long): String =
+    Instant.ofEpochMilli(startedAt).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))

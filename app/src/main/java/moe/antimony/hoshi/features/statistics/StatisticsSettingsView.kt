@@ -4,11 +4,9 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
-import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.CenterAlignedTopAppBar
-import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
@@ -52,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderSettings
-import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.runtime.DisposableEffect
@@ -77,7 +72,6 @@ internal fun StatisticsSettingsView(
     state.settings?.let { settings ->
         StatisticsSettingsContent(
             settings = settings,
-            syncEnabled = state.syncEnabled,
             archivedBookCount = state.archivedBookCount,
             isWorking = state.isWorking,
             onSettingsChange = viewModel::update,
@@ -102,7 +96,6 @@ internal fun StatisticsSettingsView(
 private fun StatisticsSettingsContent(
     settings: ReaderSettings,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
-    syncEnabled: Boolean,
     archivedBookCount: Int,
     isWorking: Boolean,
     onClearArchive: () -> Unit,
@@ -110,7 +103,6 @@ private fun StatisticsSettingsContent(
     modifier: Modifier = Modifier,
 ) {
     var showClearArchiveConfirmation by remember { mutableStateOf(false) }
-    var syncModeMenuExpanded by remember { mutableStateOf(false) }
     var showResetTimePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val locale = LocalConfiguration.current.locales[0]
@@ -197,53 +189,6 @@ private fun StatisticsSettingsContent(
                         },
                         modifier = Modifier.clickable { showResetTimePicker = true },
                     )
-                }
-            }
-            if (syncEnabled) {
-                item(key = "sync") {
-                    StatisticsSettingsSection(
-                        title = stringResource(R.string.statistics_sync_heading),
-                        footer = stringResource(R.string.reader_statistics_sync_behaviour_hint),
-                    ) {
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.sync_ttu_sync)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = settings.statisticsSyncEnabled,
-                                    onCheckedChange = {
-                                        onSettingsChange { current -> current.copy(statisticsSyncEnabled = it) }
-                                    },
-                                )
-                            },
-                        )
-                        StatisticsSettingsDivider()
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(stringResource(R.string.reader_statistics_sync_behaviour)) },
-                            trailingContent = {
-                                Box {
-                                    TextButton(onClick = { syncModeMenuExpanded = true }) {
-                                        Text(stringResource(settings.statisticsSyncMode.labelRes))
-                                    }
-                                    DropdownMenu(
-                                        expanded = syncModeMenuExpanded,
-                                        onDismissRequest = { syncModeMenuExpanded = false },
-                                    ) {
-                                        StatisticsSyncMode.entries.forEach { mode ->
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(mode.labelRes)) },
-                                                onClick = {
-                                                    syncModeMenuExpanded = false
-                                                    onSettingsChange { current -> current.copy(statisticsSyncMode = mode) }
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                        )
-                    }
                 }
             }
             if (archivedBookCount > 0) {
@@ -358,10 +303,3 @@ private fun StatisticsSettingsDivider() {
         color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
-
-@get:StringRes
-private val StatisticsSyncMode.labelRes: Int
-    get() = when (this) {
-        StatisticsSyncMode.Merge -> R.string.reader_statistics_sync_mode_merge
-        StatisticsSyncMode.Replace -> R.string.reader_statistics_sync_mode_replace
-    }

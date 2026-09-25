@@ -23,6 +23,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
+import moe.antimony.hoshi.features.sync.Timestamped
+import moe.antimony.hoshi.features.sync.SyncFormat
+import moe.antimony.hoshi.features.sync.appleDateMilliseconds
+import moe.antimony.hoshi.features.sync.syncKey
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
@@ -34,10 +42,10 @@ class BookRepository private constructor(
     private val filesDir: File,
     private val ioDispatcher: CoroutineDispatcher,
     private val fileDataSource: BookFileDataSource,
-    private val sidecarDataSource: BookSidecarDataSource,
+    internal val sidecarDataSource: BookSidecarDataSource,
     private val clock: BookClock,
     internal val statisticsStore: BookStatisticsStore,
-    private val workRegistry: BookWorkRegistry,
+    internal val workRegistry: BookWorkRegistry,
 ) : ReaderRouteBookRepository, SasayakiSidecarRepository {
     @Inject
     constructor(
@@ -49,7 +57,7 @@ class BookRepository private constructor(
         filesDir = filesDir,
         ioDispatcher = ioDispatcher,
         fileDataSource = BookFileDataSource(filesDir, ioDispatcher),
-        sidecarDataSource = BookSidecarDataSource(ioDispatcher),
+        sidecarDataSource = BookSidecarDataSource(ioDispatcher, statisticsStore.storageLock),
         clock = SystemBookClock,
         statisticsStore = statisticsStore,
         workRegistry = workRegistry,
@@ -62,7 +70,11 @@ class BookRepository private constructor(
     ) : this(filesDir, ioDispatcher, BookStatisticsStore(filesDir, ioDispatcher), workRegistry)
 
     private val archiveExtractor = EpubArchiveExtractor()
-    private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher)
+    private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher, sidecarDataSource = sidecarDataSource)
+
+    internal val storageLock get() = statisticsStore.storageLock
+    var onBookChange: (suspend (String, moe.antimony.hoshi.features.sync.SyncFileType?) -> Unit)? = null
+    var onShelvesChange: (suspend () -> Unit)? = null
 
     private val legacyPackedMigrationMutex = Mutex()
 
@@ -74,6 +86,7 @@ class BookRepository private constructor(
         sortOption: BookSortOption = BookSortOption.Recent,
         onLegacyBookMigrationProgress: (LegacyBookMigrationProgress) -> Unit = {},
     ): List<BookEntry> {
+        loadShelfList()
         val idReplacements = linkedMapOf<String, String>()
         val roots = loadAllBooks().map { root -> root to loadMetadata(root) }
         val legacyMigrationTotal = roots.count { (root, metadata) ->
@@ -107,6 +120,7 @@ class BookRepository private constructor(
     }
 
     override suspend fun loadBookEntry(bookId: String): BookEntry? {
+        loadShelfList()
         for (root in loadAllBooks()) {
             val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root))
             if (migration.oldId != migration.metadata.id) {
@@ -128,8 +142,11 @@ class BookRepository private constructor(
     suspend fun loadMetadata(bookRoot: File): BookMetadata? =
         sidecarDataSource.loadMetadata(bookRoot)
 
-    override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
+    override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) = storageLock.withLock {
+        val old = loadMetadata(bookRoot)
+        val changed = old != null && (old.displayTitle != metadata.displayTitle || old.author != metadata.author)
         sidecarDataSource.saveMetadata(bookRoot, metadata)
+        if (changed || old?.shelves != metadata.shelves || old?.characterCount != metadata.characterCount) onBookChange?.invoke(bookRoot.name.syncKey(), null)
     }
 
     suspend fun coverFile(entry: BookEntry): File? = fileDataSource.coverFile(entry)
@@ -171,11 +188,46 @@ class BookRepository private constructor(
         saveShelves(cleanedShelves)
     }
 
-    suspend fun loadShelves(): List<BookShelf> =
-        sidecarDataSource.loadShelves(fileDataSource.booksDirectory).orEmpty()
+    suspend fun loadShelfList(): Map<String, Timestamped<Int?>> =
+        sidecarDataSource.loadShelfList(fileDataSource.booksDirectory)
 
-    suspend fun saveShelves(shelves: List<BookShelf>) {
-        sidecarDataSource.saveShelves(fileDataSource.booksDirectory, shelves)
+    suspend fun saveShelfList(shelves: Map<String, Timestamped<Int?>>) =
+        sidecarDataSource.saveShelfList(fileDataSource.booksDirectory, shelves)
+
+    suspend fun loadShelves(): List<BookShelf> {
+        val list = loadShelfList()
+        val books = loadAllBooks().mapNotNull { loadMetadata(it) }
+        return list.entries.filter { it.value.value != null }
+            .sortedWith(compareBy({ it.value.value }, { it.key }))
+            .map { (name, _) -> BookShelf(name, books.filter { it.shelves?.get(name)?.value == true }.map { it.id }) }
+    }
+
+    suspend fun saveShelves(shelves: List<BookShelf>) = storageLock.withLock {
+        val old = loadShelfList()
+        val list = old.toMutableMap()
+        val now = System.currentTimeMillis()
+        val normalized = shelves.map { it.copy(name = it.name.syncKey()) }
+        val names = normalized.map { it.name }.toSet()
+        val oldNames = old.entries.filter { it.value.value != null }.sortedWith(compareBy({ it.value.value }, { it.key })).map { it.key }
+        val reordered = oldNames.toSet() == names && oldNames != normalized.map { it.name }
+        old.filterValues { it.value != null }.keys.filterNot { it in names }.forEach { list[it] = Timestamped(now, null) }
+        var position = old.values.mapNotNull { it.value }.maxOrNull() ?: -1
+        normalized.forEachIndexed { index, shelf ->
+            if (reordered) list[shelf.name] = Timestamped(now, index)
+            else if (old[shelf.name]?.value == null) list[shelf.name] = Timestamped(now, ++position)
+        }
+        for (root in loadAllBooks()) {
+            val metadata = loadMetadata(root) ?: continue
+            val memberships = metadata.shelves.orEmpty().toMutableMap()
+            for (name in oldNames.toSet() + names) {
+                val member = normalized.firstOrNull { it.name == name }?.bookIds?.contains(metadata.id) == true
+                if ((memberships[name]?.value ?: false) != member) memberships[name] = Timestamped(now, member)
+            }
+            if (memberships != metadata.shelves.orEmpty()) saveMetadata(root, metadata.copy(shelves = memberships))
+        }
+        saveShelfList(list)
+        if (old != list) onShelvesChange?.invoke()
+        Unit
     }
 
     private suspend fun replaceShelfBookIds(idReplacements: Map<String, String>) {
@@ -189,19 +241,24 @@ class BookRepository private constructor(
     override suspend fun loadBookmark(bookRoot: File): Bookmark? =
         sidecarDataSource.loadBookmark(bookRoot)
 
-    override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
+    override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) = storageLock.withLock {
+        val old = loadBookmark(bookRoot)
         sidecarDataSource.saveBookmark(bookRoot, bookmark)
+        if (old?.characterCount != bookmark.characterCount || old.lastModified != bookmark.lastModified) onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
-    override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
+    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> =
         statisticsStore.load(bookRoot).orEmpty()
 
     suspend fun saveStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
         statisticsStore.save(bookRoot, statistics)
     }
 
-    override suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
-        statisticsStore.saveTrackedDays(bookRoot, statistics)
+    override suspend fun loadSessions(bookRoot: File): ReadingSessions = statisticsStore.loadSessions(bookRoot)
+
+    override suspend fun saveTrackedSessions(bookRoot: File, sessions: ReadingSessions) {
+        for ((id, change) in sessions) statisticsStore.saveTrackedSession(bookRoot, id, change.value!!)
     }
 
     suspend fun updateStatistics(bookRoot: File, transform: (List<ReadingStatistics>) -> List<ReadingStatistics>) {
@@ -212,11 +269,19 @@ class BookRepository private constructor(
         statisticsStore.restore(folder)
     }
 
+    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> =
+        sidecarDataSource.loadHighlightRecords(bookRoot)
+
+    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) =
+        sidecarDataSource.saveHighlightRecords(bookRoot, records)
+
     suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
         sidecarDataSource.loadHighlights(bookRoot).orEmpty()
 
-    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) = storageLock.withLock {
         sidecarDataSource.saveHighlights(bookRoot, highlights)
+        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
@@ -225,26 +290,37 @@ class BookRepository private constructor(
     override suspend fun loadReaderBookInfo(bookRoot: File): BookInfo? =
         loadBookInfo(bookRoot)
 
-    override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) {
+    override suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo) = storageLock.withLock {
         sidecarDataSource.saveBookInfo(bookRoot, bookInfo)
+        onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
     override suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? =
         sidecarDataSource.loadSasayakiMatch(bookRoot)
 
-    override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) {
+    override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = storageLock.withLock {
         sidecarDataSource.saveSasayakiMatch(bookRoot, match)
+        onBookChange?.invoke(bookRoot.name.syncKey(), moe.antimony.hoshi.features.sync.SyncFileType.sasayaki)
+        Unit
     }
 
     override suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? =
         sidecarDataSource.loadSasayakiPlayback(bookRoot)
 
-    override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
-        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
+    override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) = storageLock.withLock {
+        val stored = loadSasayakiPlayback(bookRoot)
+        val changed = stored?.lastPosition != playback.lastPosition || stored.delay != playback.delay || stored.rate != playback.rate
+        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback.copy(modified = if (changed) System.currentTimeMillis() else stored.modified))
+        if (changed) onBookChange?.invoke(bookRoot.name.syncKey(), null)
+        Unit
     }
 
+    suspend fun applySasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) =
+        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
+
     suspend fun loadReadingProgress(bookRoot: File): Double {
-        val total = loadBookInfo(bookRoot)?.characterCount ?: return 0.0
+        val total = loadBookInfo(bookRoot)?.characterCount ?: loadMetadata(bookRoot)?.characterCount ?: return 0.0
         if (total <= 0) return 0.0
         val current = loadBookmark(bookRoot)?.characterCount ?: return 0.0
         return current.toDouble().div(total.toDouble()).coerceIn(0.0, 1.0)
@@ -252,8 +328,8 @@ class BookRepository private constructor(
 
     override fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()
 
-    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File =
-        importDataSource.importBook(contentResolver, uri)
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri, onImported: suspend (File, File) -> Unit = { _, _ -> }): File =
+        importDataSource.importBook(contentResolver, uri, onImported)
 
     private suspend fun File.fallbackMetadata(): BookMetadata = withContext(ioDispatcher) {
         BookMetadata(
@@ -395,8 +471,8 @@ interface ReaderRouteBookRepository {
     suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
     suspend fun loadBookmark(bookRoot: File): Bookmark?
     suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
-    suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics>
-    suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>)
+    suspend fun loadSessions(bookRoot: File): ReadingSessions
+    suspend fun saveTrackedSessions(bookRoot: File, sessions: ReadingSessions)
     suspend fun loadReaderBookInfo(bookRoot: File): BookInfo?
     suspend fun saveBookInfo(bookRoot: File, bookInfo: BookInfo)
     fun currentAppleReferenceDateSeconds(): Double
@@ -527,18 +603,20 @@ class BookImportDataSource(
     private val parser: EpubBookParser = EpubBookParser(),
     private val archiveExtractor: EpubArchiveExtractor = EpubArchiveExtractor(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val sidecarDataSource: BookSidecarDataSource = BookSidecarDataSource(ioDispatcher),
 ) {
-    suspend fun importBook(contentResolver: ContentResolver, uri: Uri): File = withContext(ioDispatcher) {
+    suspend fun importBook(contentResolver: ContentResolver, uri: Uri, onImported: suspend (File, File) -> Unit = { _, _ -> }): File = withContext(ioDispatcher) {
         val displayName = contentResolver.validateImportFile(uri, ImportFileType.Epub)
         contentResolver.openInputStream(uri).use { input ->
             importBook(
                 displayName = displayName,
                 input = requireNotNull(input) { "Unable to open selected EPUB" },
+                onImported = onImported,
             )
         }
     }
 
-    internal suspend fun importBook(displayName: String, input: InputStream): File = withContext(ioDispatcher) {
+    internal suspend fun importBook(displayName: String, input: InputStream, onImported: suspend (File, File) -> Unit = { _, _ -> }): File = withContext(ioDispatcher) {
         val fallbackTitle = displayName
             .substringBeforeLast('.', missingDelimiterValue = displayName)
             .takeIf { it.isNotBlank() }
@@ -551,12 +629,18 @@ class BookImportDataSource(
             archiveExtractor.extract(archiveFile, extractedRoot)
             val parsedBook = parser.parse(extractedRoot, fallbackTitle = fallbackTitle)
             val targetRoot = fileDataSource.createBookDirectoryForImportedTitle(parsedBook.title)
-            if (targetRoot.listFiles()?.isNotEmpty() == true) {
+            if (sidecarDataSource.loadMetadata(targetRoot)?.epub != null) {
                 targetRoot
             } else {
                 targetRoot.mkdirs()
-                val packedEpub = targetRoot.resolve("${targetRoot.name}.epub")
+                val packedEpub = targetRoot.resolve(File(displayName).name)
                 archiveFile.copyTo(packedEpub, overwrite = true)
+                try {
+                    onImported(targetRoot, packedEpub)
+                } catch (error: Exception) {
+                    packedEpub.delete()
+                    throw error
+                }
                 targetRoot
             }
         } finally {
@@ -633,6 +717,7 @@ class EpubArchiveExtractor {
 
 class BookSidecarDataSource(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val storageLock: BookStorageLock = BookStorageLock(),
 ) {
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
@@ -657,11 +742,46 @@ class BookSidecarDataSource(
         saveJson(bookRoot, BOOKMARK_FILE_NAME, Bookmark.serializer(), bookmark)
     }
 
-    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight>? =
-        loadJson(ListSerializer(ReaderHighlight.serializer()), bookRoot.resolve(HIGHLIGHTS_FILE_NAME))
+    private val highlightSerializer = MapSerializer(String.serializer(), Timestamped.serializer(ReaderHighlight.serializer().nullable))
+    private val shelfSerializer = MapSerializer(String.serializer(), Timestamped.serializer(Int.serializer().nullable))
 
-    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) {
-        saveJson(bookRoot, HIGHLIGHTS_FILE_NAME, ListSerializer(ReaderHighlight.serializer()), highlights)
+    suspend fun loadHighlightRecords(bookRoot: File): Map<String, Timestamped<ReaderHighlight?>> = locked {
+        val file = bookRoot.resolve(HIGHLIGHTS_FILE_NAME)
+        if (!file.isFile) return@locked emptyMap()
+        val element = json.parseToJsonElement(file.readText())
+        if (element is JsonArray) {
+            json.decodeFromJsonElement(ListSerializer(ReaderHighlight.serializer()), element).associate { highlight ->
+                val id = highlight.id.uppercase()
+                id to Timestamped(highlight.createdAt.appleDateMilliseconds(), highlight.copy(id = id))
+            }
+        } else {
+            SyncFormat.json.decodeFromJsonElement(highlightSerializer, element)
+        }
+    }
+
+    suspend fun loadHighlights(bookRoot: File): List<ReaderHighlight> =
+        loadHighlightRecords(bookRoot).values.mapNotNull { it.value }.sortedBy { it.createdAt }
+
+    suspend fun saveHighlightRecords(bookRoot: File, records: Map<String, Timestamped<ReaderHighlight?>>) = locked {
+        writeBookJson(bookRoot.resolve(HIGHLIGHTS_FILE_NAME), SyncFormat.json.encodeToString(highlightSerializer, records))
+    }
+
+    suspend fun saveHighlights(bookRoot: File, highlights: List<ReaderHighlight>) = locked {
+        val records = loadHighlightRecords(bookRoot).toMutableMap()
+        val now = System.currentTimeMillis()
+        val ids = highlights.map { it.id.uppercase() }.toSet()
+        records.toMap().forEach { (id, record) ->
+            if (record.value != null && id !in ids) records[id] = Timestamped(now, null)
+        }
+        highlights.forEach { value ->
+            val id = value.id.uppercase()
+            val highlight = value.copy(id = id)
+            val existing = records[id]
+            if (existing == null || (existing.value != null && existing.value != highlight)) {
+                records[id] = Timestamped(now, highlight)
+            }
+        }
+        saveHighlightRecords(bookRoot, records)
     }
 
     suspend fun loadBookInfo(bookRoot: File): BookInfo? =
@@ -694,21 +814,39 @@ class BookSidecarDataSource(
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
     }
 
-    suspend fun loadShelves(booksRoot: File): List<BookShelf>? =
-        loadJson(ListSerializer(BookShelf.serializer()), booksRoot.resolve(SHELVES_FILE_NAME))
-
-    suspend fun saveShelves(booksRoot: File, shelves: List<BookShelf>) {
-        saveJson(booksRoot, SHELVES_FILE_NAME, ListSerializer(BookShelf.serializer()), shelves)
+    suspend fun loadShelfList(booksRoot: File): Map<String, Timestamped<Int?>> = locked {
+        val file = booksRoot.resolve(SHELVES_FILE_NAME)
+        if (!file.isFile) return@locked emptyMap()
+        val element = json.parseToJsonElement(file.readText())
+        if (element !is JsonArray) return@locked SyncFormat.json.decodeFromJsonElement(shelfSerializer, element)
+        val legacy = json.decodeFromJsonElement(ListSerializer(BookShelf.serializer()), element)
+        val books = booksRoot.listFiles().orEmpty().mapNotNull { root -> loadMetadata(root)?.let { root to it } }
+        val shelves = legacy.mapIndexed { index, shelf -> shelf.name.syncKey() to Timestamped<Int?>(0, index) }.toMap()
+        books.forEach { (root, book) ->
+            val memberships = book.shelves.orEmpty().toMutableMap()
+            legacy.filter { book.id in it.bookIds }.forEach { memberships[it.name.syncKey()] = Timestamped(0, true) }
+            if (memberships.isNotEmpty()) saveMetadata(root, book.copy(shelves = memberships))
+        }
+        saveShelfList(booksRoot, shelves)
+        shelves
     }
 
-    private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = withContext(ioDispatcher) {
-        if (!file.isFile) return@withContext null
+    suspend fun saveShelfList(booksRoot: File, shelves: Map<String, Timestamped<Int?>>) = locked {
+        booksRoot.mkdirs()
+        writeBookJson(booksRoot.resolve(SHELVES_FILE_NAME), SyncFormat.json.encodeToString(shelfSerializer, shelves))
+    }
+
+    private suspend fun <T> loadJson(serializer: KSerializer<T>, file: File): T? = locked {
+        if (!file.isFile) return@locked null
         runCatching { json.decodeFromString(serializer, file.readText()) }.getOrNull()
     }
 
-    private suspend fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) = withContext(ioDispatcher) {
+    private suspend fun <T> saveJson(bookRoot: File, fileName: String, serializer: KSerializer<T>, value: T) = locked {
         bookRoot.mkdirs()
-        bookRoot.resolve(fileName).writeText(json.encodeToString(serializer, value))
+        writeBookJson(bookRoot.resolve(fileName), json.encodeToString(serializer, value))
+    }
+    private suspend fun <T> locked(action: suspend () -> T): T = withContext(ioDispatcher) {
+        storageLock.withLock(action)
     }
 }
 
@@ -760,3 +898,17 @@ private fun String.coverExtension(): String = when (lowercase()) {
 
 internal fun String.isUuidString(): Boolean =
     runCatching { UUID.fromString(this) }.isSuccess
+
+internal fun writeBookJson(file: File, contents: String) {
+    file.parentFile!!.mkdirs()
+    val temporary = File.createTempFile(".${file.name}-", ".tmp", file.parentFile)
+    try {
+        temporary.outputStream().use { stream ->
+            stream.write(contents.toByteArray())
+            stream.fd.sync()
+        }
+        Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    } finally {
+        temporary.delete()
+    }
+}

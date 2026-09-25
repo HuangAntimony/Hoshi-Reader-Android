@@ -25,7 +25,8 @@ import moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer
 import moe.antimony.hoshi.features.sync.DriveAccessTokenProvider
 import moe.antimony.hoshi.features.sync.DriveAuthorizer
 import moe.antimony.hoshi.features.sync.DriveSyncDataSource
-import moe.antimony.hoshi.features.sync.GoogleDriveClient
+import moe.antimony.hoshi.features.sync.TtuDriveHandler
+import moe.antimony.hoshi.features.sync.GoogleDriveAuth
 import moe.antimony.hoshi.features.update.AndroidUpdateDownloadManager
 import moe.antimony.hoshi.features.update.GitHubReleaseUpdateRepository
 import moe.antimony.hoshi.features.update.ReleaseUpdateRepository
@@ -40,15 +41,15 @@ internal interface HoshiBindingsModule {
 
     @Binds
     @Singleton
-    fun bindDriveAuthorizer(authorizer: DeviceCodeDriveAuthorizer): DriveAuthorizer
+    fun bindDriveAuthorizer(authorizer: GoogleDriveAuth): DriveAuthorizer
 
     @Binds
     @Singleton
-    fun bindDriveAccessTokenProvider(authorizer: DeviceCodeDriveAuthorizer): DriveAccessTokenProvider
+    fun bindDriveAccessTokenProvider(authorizer: GoogleDriveAuth): DriveAccessTokenProvider
 
     @Binds
     @Singleton
-    fun bindDriveSyncDataSource(client: GoogleDriveClient): DriveSyncDataSource
+    fun bindDriveSyncDataSource(client: TtuDriveHandler): DriveSyncDataSource
 
     @Binds
     @Singleton

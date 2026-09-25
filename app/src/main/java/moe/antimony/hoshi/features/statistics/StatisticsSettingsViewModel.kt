@@ -10,19 +10,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
-import moe.antimony.hoshi.features.sync.SyncSettingsRepository
+import moe.antimony.hoshi.features.sync.SyncStorage
 import moe.antimony.hoshi.ui.UiText
 
 internal data class StatisticsSettingsUiState(
     val settings: ReaderSettings? = null,
-    val syncEnabled: Boolean = false,
     val archivedBookCount: Int = 0,
     val isWorking: Boolean = false,
     val error: UiText? = null,
@@ -31,7 +28,6 @@ internal data class StatisticsSettingsUiState(
 @HiltViewModel
 internal class StatisticsSettingsViewModel internal constructor(
     readerSettings: Flow<ReaderSettings>,
-    syncEnabled: Flow<Boolean>,
     private val updateSettings: suspend ((ReaderSettings) -> ReaderSettings) -> Unit,
     private val repository: StatisticsRepository,
     private val coroutineScope: CoroutineScope?,
@@ -39,15 +35,16 @@ internal class StatisticsSettingsViewModel internal constructor(
     @Inject
     constructor(
         readerSettingsRepository: ReaderSettingsRepository,
-        syncSettingsRepository: SyncSettingsRepository,
+        syncStorage: SyncStorage,
         repository: StatisticsRepository,
     ) : this(
         readerSettingsRepository.settings,
-        syncSettingsRepository.settings.map { it.enabled },
         readerSettingsRepository::update,
         repository,
         null,
-    )
+    ) {
+        scope.launch { syncStorage.booksChanged.collect { reload() } }
+    }
 
     private val scope get() = coroutineScope ?: viewModelScope
     private val _uiState = MutableStateFlow(StatisticsSettingsUiState())
@@ -57,10 +54,7 @@ internal class StatisticsSettingsViewModel internal constructor(
 
     init {
         scope.launch {
-            combine(readerSettings, syncEnabled) { settings, enabled -> settings to enabled }
-                .collect { (settings, enabled) ->
-                    _uiState.update { it.copy(settings = settings, syncEnabled = enabled) }
-                }
+            readerSettings.collect { settings -> _uiState.update { it.copy(settings = settings) } }
         }
     }
 

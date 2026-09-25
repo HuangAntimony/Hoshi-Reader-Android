@@ -8,16 +8,18 @@ import kotlin.math.roundToLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSession
 import moe.antimony.hoshi.ui.UiText
 
-internal data class StatisticsDayDraft(
-    val dateKey: String,
+internal data class StatisticsSessionDraft(
+    val id: String,
+    val startedAt: Long,
     val characters: String,
     val hours: String,
     val minutes: String,
@@ -31,9 +33,9 @@ internal data class StatisticsDayDraft(
     val canSave: Boolean get() = characters.toIntOrNull()?.let { it >= 0 } == true && totalMinutes != null
 
     companion object {
-        fun from(statistic: ReadingStatistics): StatisticsDayDraft {
+        fun from(id: String, statistic: ReadingSession): StatisticsSessionDraft {
             val minutes = (statistic.readingTime / 60).roundToLong().coerceIn(0, Int.MAX_VALUE.toLong())
-            return StatisticsDayDraft(statistic.dateKey, statistic.charactersRead.toString(), (minutes / 60).toString(), (minutes % 60).toString())
+            return StatisticsSessionDraft(id, statistic.startedAt, statistic.charactersRead.toString(), (minutes / 60).toString(), (minutes % 60).toString())
         }
     }
 }
@@ -42,7 +44,7 @@ internal data class StatisticsBookUiState(
     val book: StatisticsBookRecords? = null,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
-    val draft: StatisticsDayDraft? = null,
+    val draft: StatisticsSessionDraft? = null,
     val error: UiText? = null,
     val closeRequested: Boolean = false,
 )
@@ -52,7 +54,9 @@ internal class StatisticsBookViewModel internal constructor(
     private val repository: StatisticsRepository,
     private val coroutineScope: CoroutineScope?,
 ) : ViewModel() {
-    @Inject constructor(repository: StatisticsRepository) : this(repository, null)
+    @Inject constructor(repository: StatisticsRepository, statisticsStore: moe.antimony.hoshi.epub.BookStatisticsStore, syncStorage: moe.antimony.hoshi.features.sync.SyncStorage) : this(repository, null) {
+        scope.launch { combine(statisticsStore.changes, syncStorage.booksChanged) { _, _ -> Unit }.collect { folder?.let(::load) } }
+    }
 
     private val scope get() = coroutineScope ?: viewModelScope
     private val _uiState = MutableStateFlow(StatisticsBookUiState())
@@ -79,13 +83,13 @@ internal class StatisticsBookViewModel internal constructor(
         }
     }
 
-    fun edit(dateKey: String) {
+    fun edit(id: String) {
         if (_uiState.value.isSaving) return
-        val statistic = _uiState.value.book?.statistics?.firstOrNull { it.dateKey == dateKey } ?: return
-        _uiState.update { it.copy(draft = StatisticsDayDraft.from(statistic)) }
+        val statistic = _uiState.value.book?.sessions?.get(id)?.value ?: return
+        _uiState.update { it.copy(draft = StatisticsSessionDraft.from(id, statistic)) }
     }
 
-    fun changeDraft(transform: (StatisticsDayDraft) -> StatisticsDayDraft) {
+    fun changeDraft(transform: (StatisticsSessionDraft) -> StatisticsSessionDraft) {
         if (!_uiState.value.isSaving) _uiState.update { it.copy(draft = it.draft?.let(transform)) }
     }
 
@@ -93,14 +97,21 @@ internal class StatisticsBookViewModel internal constructor(
         if (!_uiState.value.isSaving) _uiState.update { it.copy(draft = null) }
     }
 
-    fun saveDay() {
+    fun saveSession() {
         val draft = _uiState.value.draft?.takeIf { it.canSave } ?: return
-        mutate { folder -> repository.updateDay(folder, draft.dateKey, draft.characters.toInt(), requireNotNull(draft.totalMinutes)) }
+        val original = _uiState.value.book!!.sessions.getValue(draft.id).value!!
+        val previous = StatisticsSessionDraft.from(draft.id, original)
+        val characters = draft.characters.toInt().takeIf { draft.characters != previous.characters }
+        val seconds = (requireNotNull(draft.totalMinutes) * 60.0).takeIf { draft.hours != previous.hours || draft.minutes != previous.minutes }
+        mutate { folder -> repository.editSession(folder, draft.id, characters, seconds) }
     }
 
-    fun deleteDay(dateKey: String) = mutate { folder -> repository.deleteDay(folder, dateKey) }
+    fun deleteSession(id: String) = mutate { folder -> repository.deleteSessions(folder, listOf(id)) }
 
-    fun deleteAll() = mutate(closeAfter = true) { folder -> repository.deleteAll(folder) }
+    fun deleteAll() {
+        val ids = _uiState.value.book?.sessions?.keys.orEmpty().toList()
+        mutate(closeAfter = true) { folder -> repository.deleteSessions(folder, ids) }
+    }
 
     fun dismissError() = _uiState.update { it.copy(error = null) }
 

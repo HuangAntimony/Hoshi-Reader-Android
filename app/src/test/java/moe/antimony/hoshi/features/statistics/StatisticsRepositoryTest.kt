@@ -117,7 +117,7 @@ class StatisticsRepositoryTest {
     }
 
     @Test
-    fun ignoresBlankUnparseableAndInactiveRecords() = runBlocking {
+    fun malformedLegacyDateMarksTheBookCorruptWithoutRewritingHistory() = runBlocking {
         val bookRepository = BookRepository(tempFolder.newFolder("app"))
         val root = bookRepository.createStoredBook(
             id = "book-id",
@@ -138,8 +138,8 @@ class StatisticsRepositoryTest {
 
         val snapshot = AndroidStatisticsRepository(bookRepository.statisticsStore).loadSnapshot()
 
-        assertEquals(listOf("2026-06-30"), snapshot.days.map { it.date.toString() })
-        assertTrue(snapshot.skippedCorruptBookIds.isEmpty())
+        assertTrue(snapshot.days.isEmpty())
+        assertEquals(setOf("book-id"), snapshot.skippedCorruptBookIds)
     }
 
     @Test
@@ -149,7 +149,7 @@ class StatisticsRepositoryTest {
         val active = books.createStoredBook("active-id", "book", "Current title", listOf(ReadingStatistics("Book", "2026-06-30", charactersRead = 20, lastStatisticModified = 10)))
         val archive = files.resolve("Books/statistics_archive/book").apply { mkdirs() }
         books.saveMetadata(archive, BookMetadata("archive-id", "Old title", null, "book", 0.0))
-        books.saveStatistics(archive, listOf(
+        books.statisticsStore.importHistory(archive, listOf(
             ReadingStatistics("Book", "2026-06-30", charactersRead = 99, lastStatisticModified = 10),
             ReadingStatistics("Book", "2026-06-29", charactersRead = 5),
         ))
@@ -158,7 +158,7 @@ class StatisticsRepositoryTest {
         assertEquals(listOf(5, 20), snapshot.days.map { it.totalCharacters })
         assertTrue(snapshot.days.all { it.activeBookCount == 1 })
         assertTrue(snapshot.days.flatMap { it.bookContributions }.all { it.bookId == "active-id" && it.folder == "book" && !it.isArchived })
-        repository.deleteDay("book", "2026-06-30")
+        repository.deleteSessions("book", listOf(moe.antimony.hoshi.features.sync.TtuStatistics.legacyId("book", "2026-06-30")))
         assertEquals(listOf("2026-06-29"), books.loadStatistics(active).map { it.dateKey })
         assertTrue(!archive.exists())
     }
@@ -175,10 +175,10 @@ class StatisticsRepositoryTest {
         assertEquals(1, repository.loadArchiveSummary())
         assertEquals(setOf("corrupt"), repository.loadSnapshot().skippedCorruptBookIds)
         assertTrue(repository.loadBookStatistics("book")!!.isArchived)
-        repository.updateDay("book", "2026-06-30", 60, 2)
-        assertEquals(120.0, repository.loadBookStatistics("book")!!.statistics.single().readingTime, 0.0)
-        repository.deleteAll("book")
-        assertEquals(null, repository.loadBookStatistics("book"))
+        repository.editSession("book", moe.antimony.hoshi.features.sync.TtuStatistics.legacyId("book", "2026-06-30"), 60, 120.0)
+        assertEquals(120.0, repository.loadBookStatistics("book")!!.sessions.values.single().value!!.readingTime, 0.0)
+        repository.deleteSessions("book", repository.loadBookStatistics("book")!!.sessions.keys)
+        assertTrue(repository.loadBookStatistics("book")!!.sessions.values.all { it.value == null })
         repository.clearArchive()
         assertEquals(0, repository.loadArchiveSummary())
     }
@@ -201,7 +201,7 @@ class StatisticsRepositoryTest {
             ),
         )
         if (statistics.isNotEmpty()) {
-            saveStatistics(root, statistics)
+            statisticsStore.importHistory(root, statistics)
         }
         return root
     }

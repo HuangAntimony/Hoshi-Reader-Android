@@ -26,7 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingTotal
 import kotlin.math.max
 
 internal data class ReaderStatisticsSheetChrome(
@@ -72,7 +72,7 @@ internal fun ReaderStatisticsSheet(
             item {
                 StatisticsSection(
                     title = stringResource(R.string.reader_statistics_session),
-                    statistic = state.session,
+                    statistic = ReadingTotal(state.session.charactersRead, state.session.readingTime),
                     progressDisplay = progressDisplay,
                     isTracking = state.isTracking,
                     onToggleTracking = onToggleTracking,
@@ -80,14 +80,14 @@ internal fun ReaderStatisticsSheet(
                         stringResource(R.string.reader_statistics_time_to_finish_book) to formatDurationSeconds(
                             secondsRemaining(
                                 remainingCharacters = totalCharacters - currentCharacter,
-                                speed = state.session.lastReadingSpeed,
+                                speed = state.session.readingSpeed,
                                 progressDisplay = progressDisplay,
                             ),
                         ),
                         stringResource(R.string.reader_statistics_time_to_finish_chapter) to formatDurationSeconds(
                             secondsRemaining(
                                 remainingCharacters = currentChapterEndCharacter - currentCharacter,
-                                speed = state.session.lastReadingSpeed,
+                                speed = state.session.readingSpeed,
                                 progressDisplay = progressDisplay,
                             ),
                         ),
@@ -115,7 +115,7 @@ internal fun ReaderStatisticsSheet(
 @Composable
 private fun StatisticsSection(
     title: String,
-    statistic: ReadingStatistics,
+    statistic: ReadingTotal,
     progressDisplay: ReaderProgressDisplay,
     isTracking: Boolean? = null,
     onToggleTracking: () -> Unit = {},
@@ -168,7 +168,7 @@ private fun StatisticsSection(
                     progressDisplay.countText(statistic.charactersRead),
                 )
                 StatisticsDivider()
-                StatisticRow(stringResource(R.string.reader_statistics_reading_speed), progressDisplay.speedText(statistic.lastReadingSpeed))
+                StatisticRow(stringResource(R.string.reader_statistics_reading_speed), progressDisplay.speedText(statistic.readingSpeed))
                 StatisticsDivider()
                 StatisticRow(stringResource(R.string.reader_statistics_reading_time), formatDurationSeconds(statistic.readingTime))
                 extraRows.forEach { (label, value) ->

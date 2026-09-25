@@ -135,8 +135,12 @@ fun BackupSettingsView(
         scope.launch {
             val result = runCatching {
                 context.contentResolver.validateImportFile(uri, ImportFileType.HoshiBackup)
+                appContainer.googleDriveSyncManager.stop()
                 repository.restoreBooks(context.contentResolver, uri)
+                appContainer.googleDriveSyncManager.resetConnection(restoringBackup = true)
             }
+            if (result.isFailure) appContainer.syncSettingsRepository.update { it.copy(enabled = false) }
+            appContainer.googleDriveSyncManager.start()
             operation = null
             if (result.isSuccess) {
                 onBooksRestored()

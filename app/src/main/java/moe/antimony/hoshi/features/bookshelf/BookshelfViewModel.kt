@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.features.bookshelf
 
+import moe.antimony.hoshi.features.sync.SyncFileType
+import moe.antimony.hoshi.features.sync.syncKey
+import moe.antimony.hoshi.features.sync.SyncStorage
+import moe.antimony.hoshi.features.sync.syncMessage
+
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -42,12 +47,21 @@ internal class BookshelfViewModel : ViewModel {
         get() = injectedScope ?: viewModelScope
 
     @Inject
-    constructor(repository: BookshelfRepository) : this(
+    constructor(repository: BookshelfRepository, syncStorage: SyncStorage) : this(
         repository = repository,
         coroutineScope = null,
         importGate = PendingImportGate(),
         marker = Unit,
-    )
+    ) {
+        viewModelScope.launch { syncStorage.booksChanged.collect { if (uiState.value.hasLoadedBooks) reloadBookEntries() } }
+        viewModelScope.launch {
+            syncStorage.records.collect { records ->
+                _uiState.update { state ->
+                    state.copy(canDeleteLocalBookIds = state.bookEntries.filter { it.metadata.epub != null && records.books[it.root.name.syncKey()]?.files?.get(SyncFileType.epub)?.value != null }.mapTo(mutableSetOf()) { it.metadata.id })
+                }
+            }
+        }
+    }
 
     internal constructor(
         repository: BookshelfRepository,
@@ -73,7 +87,8 @@ internal class BookshelfViewModel : ViewModel {
 
     private val _uiState = MutableStateFlow(BookshelfUiState())
     val uiState: StateFlow<BookshelfUiState> = _uiState
-    private var openBookInFlight = false
+    private var openBookJob: Job? = null
+    private var openingBookId: String? = null
     private var reloadGeneration = 0
     private var remoteLoadJob: Job? = null
     private val remoteImportsInFlight = mutableSetOf<String>()
@@ -86,10 +101,17 @@ internal class BookshelfViewModel : ViewModel {
     fun refreshRemoteBooks() {
         if (!_uiState.value.hasLoadedBooks) return
         remoteLoadJob?.cancel()
-        val generation = reloadGeneration
-        val localEntries = _uiState.value.bookEntries
-        _uiState.update { it.copy(errorMessage = null) }
-        reloadRemoteBookEntries(localEntries, generation, suppressTransientNetworkErrors = false)
+        workScope.launch {
+            _uiState.update { it.copy(errorMessage = null) }
+            try {
+                repository.syncLibrary()
+                reloadRemoteBookEntries(_uiState.value.bookEntries, reloadGeneration, suppressTransientNetworkErrors = false)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _uiState.update { it.copy(errorMessage = error.syncMessage()) }
+            }
+        }
     }
 
     fun changeSort(sortOption: BookSortOption) {
@@ -106,24 +128,25 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     fun openBook(entry: BookEntry) {
-        if (openBookInFlight) {
-            return
-        }
-        openBookInFlight = true
-        workScope.launch {
-            _uiState.update { it.copy(errorMessage = null) }
+        if (openingBookId == entry.metadata.id) return
+        openBookJob?.cancel()
+        openingBookId = entry.metadata.id
+        val cloud = entry.metadata.epub == null
+        openBookJob = workScope.launch {
+            _uiState.update { it.copy(errorMessage = null, remoteImportProgressById = if (cloud) it.remoteImportProgressById + (entry.metadata.id to 0.0) else it.remoteImportProgressById) }
             try {
-                val bookId = repository.openBook(entry)
-                _uiState.update { it.copy(openReaderBookId = bookId) }
-            } catch (error: Throwable) {
-                _uiState.update {
-                    it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.bookshelf_open_failed),
-                    )
+                val bookId = repository.openBook(entry) { progress ->
+                    _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById + (entry.metadata.id to progress)) }
                 }
+                if (cloud) reloadBookEntriesSync()
+                _uiState.update { it.copy(openReaderBookId = bookId, openReaderSkipSync = cloud) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _uiState.update { it.copy(errorMessage = if (cloud) error.syncMessage() else UiText.Resource(R.string.bookshelf_open_failed)) }
             } finally {
-                openBookInFlight = false
+                if (openingBookId == entry.metadata.id) openingBookId = null
+                _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById - entry.metadata.id) }
             }
         }
     }
@@ -298,6 +321,16 @@ internal class BookshelfViewModel : ViewModel {
         runLoading(errorPrefix = UiText.Resource(R.string.bookshelf_delete_failed), preferErrorPrefix = true) {
             try {
                 repository.deleteBook(entry)
+            } finally {
+                reloadBookEntriesSync()
+            }
+        }
+    }
+
+    fun deleteLocalBook(entry: BookEntry) {
+        runLoading(errorPrefix = UiText.Resource(R.string.bookshelf_delete_failed), preferErrorPrefix = true) {
+            try {
+                repository.deleteLocalBook(entry)
             } finally {
                 reloadBookEntriesSync()
             }
@@ -724,6 +757,7 @@ internal class BookshelfViewModel : ViewModel {
             val validSelectedIds = it.selectedBookIds.intersect(result.entries.mapTo(mutableSetOf()) { entry -> entry.metadata.id })
             it.copy(
                 bookEntries = result.entries,
+                canDeleteLocalBookIds = result.canDeleteLocalBookIds,
                 bookProgressById = result.progressById,
                 coverSourcesById = result.coverSourcesById,
                 shelves = result.shelves,

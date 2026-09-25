@@ -898,4 +898,15 @@
     <string name="sasayaki_transcription_light_description">Uses fewer resources, with slower transcription.</string>
     <string name="sasayaki_transcription_balanced_description">Balances transcription speed and everyday use.</string>
     <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
+    <string name="statistics_sessions_heading">Sessions</string>
+    <string name="sync_provider">Provider</string>
+    <string name="sync_provider_ttu">ッツ/yatsu</string>
+    <string name="sync_hoshi_description">Sync your library between Hoshi Reader devices.</string>
+    <string name="sync_unsupported_format">This library uses an unsupported sync format. Update Hoshi Reader to sync.</string>
+    <string name="sync_book_deleted">This book was deleted.</string>
+    <string name="sync_book_not_uploaded">This book has not been uploaded yet.</string>
+    <string name="sync_last_sync">Last Sync</string>
+    <string name="sync_now">Sync Now</string>
+    <string name="sync_delete_local">Delete Local</string>
+    <string name="sync_delete_everywhere">Delete Everywhere</string>
 </resources>

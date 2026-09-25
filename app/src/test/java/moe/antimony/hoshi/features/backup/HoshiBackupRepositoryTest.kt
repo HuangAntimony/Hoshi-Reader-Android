@@ -567,7 +567,7 @@ class HoshiBackupRepositoryTest {
     }
 
     @Test
-    fun ttuRestoreMergesArchiveAfterExternalStatisticsHaveBeenWritten() = runBlocking {
+    fun ttuRestorePreservesNewerArchivedSessionsBeforeMergingExternalStatistics() = runBlocking {
         val sourceDir = Files.createTempDirectory("hoshi-ttu-archive-source").toFile()
         val source = BookRepository(sourceDir)
         val sourceBook = source.createPackedTestBook("Book")
@@ -584,7 +584,7 @@ class HoshiBackupRepositoryTest {
         target.deleteBook(targetBook.root)
         HoshiBackupRepository(targetDir).restoreTtuBookData(ByteArrayInputStream(output.toByteArray()))
         val restored = target.loadBookEntries().single()
-        assertEquals(listOf(20, 30), target.loadStatistics(restored.root).map { it.charactersRead })
+        assertEquals(listOf(99, 30), target.loadStatistics(restored.root).map { it.charactersRead })
         assertFalse(targetDir.resolve("Books/statistics_archive/Book").exists())
     }
 
