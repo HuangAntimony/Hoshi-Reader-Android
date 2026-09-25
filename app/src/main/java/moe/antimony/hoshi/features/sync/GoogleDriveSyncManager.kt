@@ -542,7 +542,7 @@ class GoogleDriveSyncManager internal constructor(
         if (existing != null && fileType != SyncFileType.sasayaki) {
             val oldPath = if (fileType == SyncFileType.epub) existing.epub?.let { root.resolve(it) } else books.coverFile(BookEntry(root, existing))
             val newPath = path?.let { filesDir.resolve(it) }
-            if (oldPath != null && oldPath != newPath) oldPath.delete()
+            if (oldPath != null && oldPath.canonicalFile != newPath?.canonicalFile) oldPath.delete()
             val metadata = if (fileType == SyncFileType.epub) existing.copy(epub = path?.let { File(it).name }) else existing.copy(cover = path)
             books.sidecarDataSource.saveMetadata(root, metadata)
         }
