@@ -100,7 +100,7 @@ android {
             val key = "HOSHI_GOOGLE_CLIENT_ID_${name.uppercase()}"
             val clientId = providers.environmentVariable(key).getOrElse(secrets.getProperty(key, "")).trim()
             buildConfigField("String", "HOSHI_GOOGLE_CLIENT_ID", "\"$clientId\"")
-            manifestPlaceholders["appAuthRedirectScheme"] = clientId.split('.').reversed().joinToString(".")
+            manifestPlaceholders["googleOAuthRedirectScheme"] = clientId.split('.').reversed().joinToString(".")
                 .ifEmpty { "moe.antimony.hoshi.$name.oauth" }
         }
         debug {
@@ -167,7 +167,7 @@ dependencies {
     sherpaOnnxArchive(sherpaOnnxArtifact)
     implementation(libs.google.play.services.auth)
     implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.appauth)
+    implementation(libs.androidx.browser)
     implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(platform(libs.androidx.compose.bom))

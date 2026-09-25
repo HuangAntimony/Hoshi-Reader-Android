@@ -471,10 +471,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Google Drive sync has Hoshi (`gdrive`) and TTU (`ttu`) providers. Hoshi is the
   default; existing TTU logins migrate to TTU. Hoshi uses Google Identity Services
   `AuthorizationClient` with `drive.file` and Android package/signing registration;
-  when Play Services is unavailable, `GoogleDriveBrowserAuth` uses AppAuth browser
-  authorization with PKCE and the same scope. Browser tokens persist in DataStore
+  when Play Services is unavailable, `GoogleDriveBrowserAuth` owns Google's browser
+  authorization-code flow with S256 PKCE and the same scope. AndroidX Browser opens
+  Custom Tabs; platform activities handle cancellation and the redirect without
+  AppCompat. The auth window waits to regain focus before reporting a result,
+  preserving sign-in across hidden activity recreation. Pending requests persist
+  in DataStore and validate the redirect and state before a one-time code exchange.
+  Browser tokens persist in DataStore
   under `noBackupFilesDir`, refresh independently of Play Services, and are cleared
-  locally on sign-out. Debug/release browser client IDs and redirect schemes come
+  locally on sign-out. Existing AppAuth tokens remain readable and are replaced
+  when refreshed. Debug/release browser client IDs and redirect schemes come
   from ignored `secrets.properties` or build environment variables; no client secret
   is used. TTU retains its device-code authorization. Preferences remain DataStore-backed.
 - `GoogleDriveClient` shares cancellable HTTP transport, token refresh and network

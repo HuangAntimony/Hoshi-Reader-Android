@@ -10,109 +10,124 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import moe.antimony.hoshi.BuildConfig
-import net.openid.appauth.AuthState
-import net.openid.appauth.AuthorizationException
-import net.openid.appauth.AuthorizationRequest
-import net.openid.appauth.AuthorizationResponse
-import net.openid.appauth.AuthorizationService
-import net.openid.appauth.AuthorizationServiceConfiguration
-import net.openid.appauth.ResponseTypeValues
-import net.openid.appauth.TokenRequest
-import net.openid.appauth.TokenResponse
+import moe.antimony.hoshi.di.IoDispatcher
 
 @Singleton
 class GoogleDriveBrowserAuth internal constructor(
     private val context: Context,
     private val dataStore: DataStore<Preferences>,
     private val clientId: String,
-    private val requestToken: suspend (TokenRequest) -> TokenResponse,
+    private val requestToken: suspend (Map<String, String>) -> BrowserTokenResponse,
 ) : DriveAuthorizer {
-    @Inject constructor(@ApplicationContext context: Context) : this(
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+    ) : this(
         context,
         PreferenceDataStoreFactory.create {
             context.noBackupFilesDir.resolve("hoshi-drive-browser-auth.preferences_pb")
         },
         BuildConfig.HOSHI_GOOGLE_CLIENT_ID,
-        { request -> requestBrowserToken(context, request) },
+        { request -> requestBrowserToken(request, ioDispatcher) },
     )
 
     private val mutex = Mutex()
-    private val stateKey = stringPreferencesKey("state")
+    private val tokensKey = stringPreferencesKey("tokens")
+    private val pendingKey = stringPreferencesKey("pendingAuthorization")
+    private val legacyStateKey = stringPreferencesKey("state")
     private val refreshKey = booleanPreferencesKey("needsTokenRefresh")
 
-    internal fun authorizationRequest(): AuthorizationRequest {
+    internal suspend fun authorizationRequest(): BrowserAuthorizationRequest = mutex.withLock {
         if (clientId.isEmpty()) throw DriveAuthorizationRequiredException()
-        val scheme = clientId.split('.').reversed().joinToString(".")
-        return AuthorizationRequest.Builder(
-            AuthorizationServiceConfiguration(
-                Uri.parse("https://accounts.google.com/o/oauth2/v2/auth"),
-                Uri.parse("https://oauth2.googleapis.com/token"),
-            ),
-            clientId,
-            ResponseTypeValues.CODE,
-            Uri.parse("$scheme:/oauth2callback"),
-        )
-            .setScope(GoogleDriveAuth.DriveFileScope)
-            .setPrompt("consent select_account")
-            .setAdditionalParameters(mapOf("access_type" to "offline"))
-            .build()
+        val request = BrowserAuthorizationRequest(clientId, randomSecret(), randomSecret())
+        dataStore.edit { it[pendingKey] = BrowserAuthJson.encodeToString(request) }
+        request
     }
 
-    fun authorizationIntent(): Intent {
-        val request = authorizationRequest()
-        val service = AuthorizationService(context)
-        return try {
-            service.getAuthorizationRequestIntent(request)
-        } finally {
-            service.dispose()
-        }
-    }
+    suspend fun authorizationIntent(): Intent = Intent(context, GoogleDriveBrowserAuthActivity::class.java)
+        .putExtra(GoogleDriveBrowserAuthActivity.AuthorizationUri, authorizationRequest().toUri().toString())
 
     suspend fun accept(intent: Intent?) = mutex.withLock {
-        if (intent == null) throw AuthorizationException.GeneralErrors.USER_CANCELED_AUTH_FLOW
-        AuthorizationException.fromIntent(intent)?.let { throw it }
-        val response = AuthorizationResponse.fromIntent(intent)!!
-        val state = AuthState(response, null)
-        state.update(requestToken(response.createTokenExchangeRequest()), null)
-        if (!state.isAuthenticated()) throw DriveAuthorizationRequiredException()
-        saveState(state)
+        val pending = dataStore.data.first()[pendingKey]
+        dataStore.edit { it.remove(pendingKey) }
+        val request = pending?.let { BrowserAuthJson.decodeFromString<BrowserAuthorizationRequest>(it) }
+        val response = intent?.data
+        if (request == null || response == null || request.clientId != clientId ||
+            response.buildUpon().clearQuery().fragment(null).build().toString() != request.redirectUri ||
+            response.fragment != null || response.getQueryParameters("state") != listOf(request.state) ||
+            response.getQueryParameter("error") != null
+        ) throw DriveAuthorizationRequiredException()
+        val code = response.getQueryParameters("code").singleOrNull()?.takeIf { it.isNotEmpty() }
+            ?: throw DriveAuthorizationRequiredException()
+        val token = requestToken(
+            mapOf(
+                "client_id" to clientId,
+                "grant_type" to "authorization_code",
+                "code" to code,
+                "code_verifier" to request.codeVerifier,
+                "redirect_uri" to request.redirectUri,
+            ),
+        )
+        val refresh = token.refreshToken?.takeIf { it.isNotEmpty() } ?: throw DriveAuthorizationRequiredException()
+        saveTokens(BrowserTokens(clientId, token.accessToken, refresh, token.expiresAt()))
     }
 
-    override suspend fun status(): DriveAuthStatus = when {
-        clientId.isEmpty() -> DriveAuthStatus.MissingConfiguration
-        readState()?.isAuthenticated() == true -> DriveAuthStatus.Connected
-        else -> DriveAuthStatus.NotConnected
+    override suspend fun status(): DriveAuthStatus = mutex.withLock {
+        when {
+            clientId.isEmpty() -> DriveAuthStatus.MissingConfiguration
+            readTokens(dataStore.data.first())?.clientId == clientId -> DriveAuthStatus.Connected
+            else -> DriveAuthStatus.NotConnected
+        }
     }
 
     override suspend fun accessToken(): String = mutex.withLock {
-        val state = readState()?.takeIf { it.isAuthenticated() } ?: throw DriveAuthorizationRequiredException()
-        if (state.needsTokenRefresh) {
-            try {
-                state.update(requestToken(state.createTokenRefreshRequest()), null)
-                state.needsTokenRefresh = false
-                saveState(state)
-            } catch (error: AuthorizationException) {
-                if (error.type == AuthorizationException.TYPE_OAUTH_TOKEN_ERROR) {
-                    dataStore.edit { it.clear() }
-                    throw DriveAuthorizationRequiredException()
-                }
-                throw error
-            }
+        val preferences = dataStore.data.first()
+        val tokens = readTokens(preferences)?.takeIf { it.clientId == clientId && clientId.isNotEmpty() }
+            ?: throw DriveAuthorizationRequiredException()
+        if (preferences[refreshKey] != true && tokens.expiresAt > System.currentTimeMillis() + 60_000) {
+            return@withLock tokens.accessToken
         }
-        state.accessToken!!
+        val response = try {
+            requestToken(
+                mapOf("client_id" to clientId, "grant_type" to "refresh_token", "refresh_token" to tokens.refreshToken),
+            )
+        } catch (error: BrowserTokenException) {
+            if (error.error in setOf("invalid_grant", "invalid_client", "unauthorized_client")) {
+                dataStore.edit {
+                    it.remove(tokensKey)
+                    it.remove(legacyStateKey)
+                    it.remove(refreshKey)
+                }
+                throw DriveAuthorizationRequiredException()
+            }
+            throw error
+        }
+        saveTokens(
+            tokens.copy(
+                accessToken = response.accessToken,
+                refreshToken = response.refreshToken ?: tokens.refreshToken,
+                expiresAt = response.expiresAt(),
+            ),
+        )
+        response.accessToken
     }
 
     override suspend fun clearAccessToken(token: String) = mutex.withLock {
-        if (readState()?.accessToken == token) dataStore.edit { it[refreshKey] = true }
+        if (readTokens(dataStore.data.first())?.accessToken == token) dataStore.edit { it[refreshKey] = true }
         Unit
     }
 
@@ -121,36 +136,53 @@ class GoogleDriveBrowserAuth internal constructor(
         Unit
     }
 
-    private fun AuthState.isAuthenticated(): Boolean = isAuthorized && refreshToken != null &&
-        lastAuthorizationResponse?.request?.clientId == clientId
-
-    private suspend fun readState(): AuthState? {
-        val preferences = dataStore.data.first()
-        return preferences[stateKey]?.let { json ->
-            AuthState.jsonDeserialize(json).apply {
-                if (preferences[refreshKey] == true) needsTokenRefresh = true
-            }
-        }
+    private fun readTokens(preferences: Preferences): BrowserTokens? {
+        preferences[tokensKey]?.let { return BrowserAuthJson.decodeFromString<BrowserTokens>(it) }
+        val legacy = preferences[legacyStateKey]?.let { BrowserAuthJson.parseToJsonElement(it).jsonObject } ?: return null
+        if (legacy["mAuthorizationException"] != null) return null
+        val request = legacy["lastAuthorizationResponse"]?.jsonObject?.get("request")?.jsonObject ?: return null
+        val response = legacy["mLastTokenResponse"]?.jsonObject ?: return null
+        return BrowserTokens(
+            clientId = request.getValue("clientId").jsonPrimitive.content,
+            accessToken = response["access_token"]?.jsonPrimitive?.content ?: return null,
+            refreshToken = legacy["refreshToken"]?.jsonPrimitive?.content ?: return null,
+            expiresAt = response["expires_at"]?.jsonPrimitive?.longOrNull ?: 0,
+        )
     }
 
-    private suspend fun saveState(state: AuthState) {
+    private suspend fun saveTokens(tokens: BrowserTokens) {
         dataStore.edit {
-            it[stateKey] = state.jsonSerializeString()
-            it[refreshKey] = state.needsTokenRefresh
+            it[tokensKey] = BrowserAuthJson.encodeToString(tokens)
+            it.remove(legacyStateKey)
+            it.remove(refreshKey)
         }
     }
 }
 
-private suspend fun requestBrowserToken(context: Context, request: TokenRequest): TokenResponse {
-    val service = AuthorizationService(context)
-    return try {
-        suspendCancellableCoroutine { continuation ->
-            service.performTokenRequest(request) { response, error ->
-                if (error != null) continuation.resumeWithException(error)
-                else continuation.resume(response!!)
-            }
-        }
-    } finally {
-        service.dispose()
-    }
+@Serializable
+internal data class BrowserAuthorizationRequest(val clientId: String, val state: String, val codeVerifier: String) {
+    val redirectUri: String get() = "${clientId.split('.').reversed().joinToString(".")}:/oauth2callback"
+
+    fun toUri(): Uri = Uri.parse("https://accounts.google.com/o/oauth2/v2/auth").buildUpon().apply {
+        appendQueryParameter("client_id", clientId)
+        appendQueryParameter("redirect_uri", redirectUri)
+        appendQueryParameter("response_type", "code")
+        appendQueryParameter("scope", GoogleDriveAuth.DriveFileScope)
+        appendQueryParameter("access_type", "offline")
+        appendQueryParameter("prompt", "consent select_account")
+        appendQueryParameter("state", state)
+        appendQueryParameter("code_challenge_method", "S256")
+        appendQueryParameter(
+            "code_challenge",
+            Base64.getUrlEncoder().withoutPadding().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(codeVerifier.toByteArray(Charsets.US_ASCII)),
+            ),
+        )
+    }.build()
 }
+
+@Serializable
+private data class BrowserTokens(val clientId: String, val accessToken: String, val refreshToken: String, val expiresAt: Long)
+
+private fun randomSecret(): String = Base64.getUrlEncoder().withoutPadding()
+    .encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
