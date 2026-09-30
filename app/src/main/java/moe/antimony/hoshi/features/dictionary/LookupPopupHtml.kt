@@ -183,7 +183,6 @@ internal object LookupPopupHtml {
                             textSelected: { postMessage: function(selection) { window.HoshiAndroidPopup.postMessage('textSelected', selection); } },
                             tapOutside: { postMessage: function() { window.HoshiAndroidPopup.postMessage('tapOutside'); } },
                             swipeDismiss: { postMessage: function() { window.HoshiAndroidPopup.postMessage('swipeDismiss'); } },
-                            createPronunciation: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('createPronunciation', content); } },
                             playWordAudio: { postMessage: function(content) { window.HoshiAndroidPopup.postMessage('playWordAudio', content); } },
                             shellReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('shellReady'); } },
                             contentReady: { postMessage: function() { window.HoshiAndroidPopup.postMessage('contentReady'); } },
@@ -347,10 +346,6 @@ internal object LookupPopupHtml {
                             }
                             if (message.type === 'navigateForward') {
                                 window.navigateForward?.();
-                                return;
-                            }
-                            if (message.type === 'createPronunciation') {
-                                window.createPopupPronunciation?.();
                                 return;
                             }
                             if (message.type === 'navigateTerm') {

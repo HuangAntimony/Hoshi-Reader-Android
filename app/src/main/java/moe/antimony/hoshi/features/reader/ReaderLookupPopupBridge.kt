@@ -109,7 +109,6 @@ internal data class ReaderLookupPopupFramePayload(
     val contentKey: String? = null,
     val sourceText: String? = null,
     val sourceSentenceOffset: Int? = null,
-    val pronunciationEnabled: Boolean = false,
     val ttsVisible: Boolean = false,
     val ttsWasPaused: Boolean = false,
     val ttsIsPlaying: Boolean = false,
@@ -167,7 +166,6 @@ internal data class ReaderLookupPopupFramePayload(
                 backCount = backCount,
                 forwardCount = forwardCount,
                 sasayakiVisible = hasSasayakiCue,
-                pronunciationEnabled = entriesCount > 0,
                 ttsVisible = ttsAvailable && !hasSasayakiCue && popup.readerChapterIndex != null && state.selection.normalizedOffset != null,
                 ttsWasPaused = ttsWasPaused,
                 ttsIsPlaying = ttsIsPlaying,
@@ -178,7 +176,7 @@ internal data class ReaderLookupPopupFramePayload(
                 clearSelectionSignal = popup.clearSelectionSignal,
                 selectionOffsetY = popupSelectionOffsetY(
                     frameTopDp = top,
-                    popupActionBar = state.popupActionBar || entriesCount > 0,
+                    popupActionBar = state.popupActionBar,
                     backCount = backCount,
                     forwardCount = forwardCount,
                     hasSasayakiCue = hasSasayakiCue,
@@ -320,13 +318,6 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         override val messageId: String?,
     ) : ReaderLookupPopupBridgeMessage()
 
-    data class CreatePronunciation(
-        override val popupId: String,
-        override val messageId: String?,
-        val expression: String,
-        val reading: String,
-    ) : ReaderLookupPopupBridgeMessage()
-
     data class TtsReplaySentence(override val popupId: String, override val messageId: String?) : ReaderLookupPopupBridgeMessage()
 
     data class TtsTogglePlayback(override val popupId: String, override val messageId: String?) : ReaderLookupPopupBridgeMessage()
@@ -437,12 +428,6 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                 }
                 "navigateBack" -> NavigateBack(popupId, messageId)
                 "navigateForward" -> NavigateForward(popupId, messageId)
-                "createPronunciation" -> {
-                    val body = payload.obj("body") ?: return null
-                    CreatePronunciation(popupId, messageId,
-                        body.string("expression")?.takeIf { it.isNotBlank() } ?: return null,
-                        body.string("reading") ?: return null)
-                }
                 "ttsReplaySentence" -> TtsReplaySentence(popupId, messageId)
                 "ttsTogglePlayback" -> TtsTogglePlayback(popupId, messageId)
                 "ttsPlayForward" -> TtsPlayForward(popupId, messageId)

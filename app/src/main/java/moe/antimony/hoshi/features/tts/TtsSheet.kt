@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.content.ContentLanguageProfile
+import moe.antimony.hoshi.ui.hoshiContentKeyboardOptions
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -270,8 +272,10 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
     DisposableEffect(Unit) { onDispose { viewModel.stopPreview() } }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_set_reading)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(surface, { surface = it }, label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true, colors = hoshiOutlinedTextFieldColors())
-            OutlinedTextField(reading, { reading = it }, label = { Text(stringResource(R.string.tts_reading)) }, singleLine = true, colors = hoshiOutlinedTextFieldColors())
+            OutlinedTextField(surface, { surface = it }, label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true,
+                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
+            OutlinedTextField(reading, { reading = it }, label = { Text(stringResource(R.string.tts_reading)) }, singleLine = true,
+                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
             Row {
                 FilterChip(global, { global = true }, label = { Text(stringResource(R.string.tts_global)) })
                 Spacer(Modifier.width(8.dp))

@@ -60,7 +60,7 @@
     }
 
     function frameContentTop(payload) {
-        return ((payload.actionBarVisible || payload.pronunciationEnabled) ? ACTION_BAR_HEIGHT : 0) + ((payload.sasayakiVisible || payload.ttsVisible) ? SASAYAKI_BAR_HEIGHT : 0);
+        return (payload.actionBarVisible ? ACTION_BAR_HEIGHT : 0) + ((payload.sasayakiVisible || payload.ttsVisible) ? SASAYAKI_BAR_HEIGHT : 0);
     }
 
     function button(iconName, enabled, action, label, className = '') {
@@ -94,19 +94,16 @@
 
     function renderControls(shell, payload, iframe) {
         shell.querySelectorAll('.hoshi-reader-popup-bar').forEach(node => node.remove());
-        if (payload.actionBarVisible || payload.pronunciationEnabled) {
-            const controls = payload.actionBarVisible ? [
-                button('arrow_back', payload.backCount > 0, () => navigateBack(payload.id), 'Back'),
-                button('arrow_forward', payload.forwardCount > 0, () => navigateForward(payload.id), 'Forward'),
-                spacer(),
-                button('close', true, () => postNative({ name: 'swipeDismiss', popupId: payload.id }), 'Close')
-            ] : [spacer()];
-            if (payload.pronunciationEnabled) {
-                controls.push(button('record_voice_over', true, () => {
-                    iframe.contentWindow?.postMessage({ type: 'createPronunciation' }, ORIGIN);
-                }, '', 'hoshi-reader-popup-pronunciation-control'));
-            }
-            shell.insertBefore(buildBar('hoshi-reader-popup-bar hoshi-reader-popup-action-bar', controls), iframe);
+        if (payload.actionBarVisible) {
+            shell.insertBefore(
+                buildBar('hoshi-reader-popup-bar hoshi-reader-popup-action-bar', [
+                    button('arrow_back', payload.backCount > 0, () => navigateBack(payload.id), 'Back'),
+                    button('arrow_forward', payload.forwardCount > 0, () => navigateForward(payload.id), 'Forward'),
+                    spacer(),
+                    button('close', true, () => postNative({ name: 'swipeDismiss', popupId: payload.id }), 'Close')
+                ]),
+                iframe,
+            );
         }
         if (payload.sasayakiVisible || payload.ttsVisible) {
             const tts = payload.ttsVisible && !payload.sasayakiVisible;

@@ -35,8 +35,7 @@ class DictionarySearchIframeTest {
         assertEquals(LookupPopupHtml.entryJsonString(lookupResult("猫")), payload.initialEntryJson)
         assertFalse(payload.popupActionBar)
         assertFalse(payload.actionBarVisible)
-        assertEquals(123.0, payload.selectionOffsetY, 0.0)
-        org.junit.Assert.assertTrue(payload.pronunciationEnabled)
+        assertEquals(86.0, payload.selectionOffsetY, 0.0)
         assertEquals("https://appassets.androidplatform.net/popup/iframe.html?v=5", payload.iframeUrl)
     }
 

@@ -765,6 +765,13 @@ Hard constraints:
 Durable validation commands, emulator data-safety rules, test data, and manual
 QA matrices live in `docs/VALIDATION.md`.
 
+## Content Input
+
+- `HoshiTextFields.hoshiContentKeyboardOptions` supplies content-language IME locale hints,
+  keyboard type and focus behavior independently of app display language. Dictionary search
+  uses its current content profile with the Search action; pronunciation written-form and
+  reading fields request Japanese. IMEs decide whether to honor the locale hint.
+
 ## Japanese TTS
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists engine,
@@ -818,10 +825,6 @@ QA matrices live in `docs/VALIDATION.md`.
   routes to the active source: TTS replay stops after one sentence, toggle can cancel
   lookup auto-resume, and play-forward closes the popup. Dictionary child popups have
   no book source anchor and do not expose TTS controls. Audiobook controls remain unchanged.
-- The popup's rightmost top-bar pronunciation action asks its iframe for the first current
-  term's expression/reading, including restored history. Reader defaults to book scope;
-  Dictionary and Process Text default to global scope. It opens an editable draft and
-  does not alter the existing selection-based pronunciation action.
 - Anki `{sentence-audio}` has its own mining context field and selected-format media
   preparation. Associated audiobooks require an existing cue; otherwise TTS synthesizes
   the full source sentence. Missing audiobook cues never trigger TTS. Existing

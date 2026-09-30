@@ -162,11 +162,6 @@ private fun ProcessTextLookupOverlay(
     val topInset = with(density) {
         WindowInsets.statusBars.getTop(this).toDp().value
     }
-    var pronunciationDraft by remember { mutableStateOf<moe.antimony.hoshi.features.tts.TtsWord?>(null) }
-    pronunciationDraft?.let { word ->
-        val ttsViewModel: moe.antimony.hoshi.features.tts.TtsViewModel = hiltViewModel()
-        moe.antimony.hoshi.features.tts.TtsWordEditor(ttsViewModel, word, null, null, { pronunciationDraft = null })
-    }
     val ankiViewModel: AnkiViewModel = hiltViewModel()
     val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
     val assets = remember(context) { LookupPopupAssets.load(context) }
@@ -357,12 +352,6 @@ private fun ProcessTextLookupOverlay(
             )
         fun handleReaderPopupBridgeMessage(message: ReaderLookupPopupBridgeMessage) {
             when (message) {
-                is ReaderLookupPopupBridgeMessage.CreatePronunciation -> {
-                    if (popupById(message.popupId) != null) {
-                        pronunciationDraft = moe.antimony.hoshi.features.tts.TtsWord(
-                            java.util.UUID.randomUUID().toString(), message.expression, message.reading)
-                    }
-                }
                 is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
                 is ReaderLookupPopupBridgeMessage.TapOutside -> {
                     val index = popupIndex(message.popupId).takeIf { it >= 0 } ?: return

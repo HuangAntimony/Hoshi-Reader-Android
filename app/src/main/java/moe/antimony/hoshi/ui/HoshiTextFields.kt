@@ -1,5 +1,11 @@
 package moe.antimony.hoshi.ui
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.text.intl.LocaleList
+import moe.antimony.hoshi.content.ContentLanguageProfile
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
@@ -19,6 +25,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextRange
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+fun hoshiContentKeyboardOptions(
+    contentLanguageProfile: ContentLanguageProfile = ContentLanguageProfile.Default,
+    imeAction: ImeAction = ImeAction.Default,
+): KeyboardOptions = KeyboardOptions(
+    keyboardType = if (contentLanguageProfile.dictionaryLanguageId == ContentLanguageProfile.EnglishLanguageId) {
+        KeyboardType.Ascii
+    } else {
+        KeyboardType.Unspecified
+    },
+    imeAction = imeAction,
+    showKeyboardOnFocus = true,
+    hintLocales = LocaleList(Locale(contentLanguageProfile.inputLocaleTag)),
+)
 
 internal fun hoshiTextFieldCursorColor(textColor: Color): Color = textColor
 

@@ -3,11 +3,38 @@ package moe.antimony.hoshi.ui
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import moe.antimony.hoshi.content.ContentLanguageProfile
 import androidx.compose.ui.text.TextRange
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class HoshiTextFieldsTest {
+    @Test
+    fun contentKeyboardHintsJapaneseInputAndShowsOnFocus() {
+        val options = hoshiContentKeyboardOptions()
+
+        assertEquals("ja-JP", options.hintLocales?.single()?.toLanguageTag())
+        assertEquals(KeyboardType.Unspecified, options.keyboardType)
+        assertEquals(true, options.showKeyboardOnFocus)
+    }
+
+    @Test
+    fun contentKeyboardRequestsAsciiInputForEnglishProfiles() {
+        val options = hoshiContentKeyboardOptions(ContentLanguageProfile.English)
+
+        assertEquals("en-US", options.hintLocales?.single()?.toLanguageTag())
+        assertEquals(KeyboardType.Ascii, options.keyboardType)
+        assertEquals(true, options.showKeyboardOnFocus)
+    }
+
+    @Test
+    fun contentKeyboardPreservesCallerImeAction() {
+        assertEquals(ImeAction.Default, hoshiContentKeyboardOptions().imeAction)
+        assertEquals(ImeAction.Search, hoshiContentKeyboardOptions(imeAction = ImeAction.Search).imeAction)
+    }
+
     @Test
     fun cursorColorUsesCurrentTextColor() {
         val darkSurfaceText = Color(0xFFECE6F0)

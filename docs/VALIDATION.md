@@ -1049,11 +1049,13 @@ Validate relevant sync/update/Sasayaki changes with:
   TTS must not expose seconds-based navigation or change audiobook-only preferences.
   Check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
-- From Reader, Dictionary and Process Text, use the rightmost popup toolbar button.
-  Confirm its editable expression/reading come from the first term, including deinflected
-  results and popup back/forward history; Reader defaults to book scope, standalone lookup
-  to global scope. Cancel without saving. Separately long-press book text and create a
-  pronunciation: it must still prefill selected text and an empty reading.
+- Long-press book text and create a pronunciation: prefill the selected text and an
+  empty reading, and preview the full source sentence including ruby and VN text outside
+  the screen. Cancel without saving. With a multilingual IME, start in another input
+  language and focus each written-form/reading field: both should request Japanese.
+  Repeat from the TTS dictionary editor. Check Dictionary search still requests the
+  selected content language and retains its Search action; no system keyboard preference
+  should be changed. IMEs without locale-hint support may retain their current language.
 
 - Run `TtsTextTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
   `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
