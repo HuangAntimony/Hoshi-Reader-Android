@@ -275,28 +275,31 @@ internal fun TtsChoice(
     supporting: String? = null, singleLine: Boolean = false, onSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val valueMaxWidth = (maxWidth * .65f - 32.dp).coerceAtLeast(0.dp)
         Row(Modifier.fillMaxWidth().clickable { expanded = true }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(label, modifier = Modifier.weight(.3f), style = MaterialTheme.typography.bodyLarge)
-            Column(Modifier.weight(.7f), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
+            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Column(Modifier.widthIn(max = valueMaxWidth), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
                 Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
                     maxLines = if (singleLine) 1 else 2,
                     overflow = if (singleLine) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis)
                 supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End, color = hoshiSurfaces.muted) }
             }
-            Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
-        }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(max = 320.dp)) {
-            choices.forEach { choice ->
-                DropdownMenuItem(text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(choice.label, style = MaterialTheme.typography.bodyMedium)
-                        choice.supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted) }
+            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
+                DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(max = 320.dp)) {
+                    choices.forEach { choice ->
+                        DropdownMenuItem(text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(choice.label, style = MaterialTheme.typography.bodyMedium)
+                                choice.supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted) }
+                            }
+                        },
+                            trailingIcon = { if (choice.id == selected) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) },
+                            onClick = { expanded = false; onSelected(choice.id) })
                     }
-                },
-                    trailingIcon = { if (choice.id == selected) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) },
-                    onClick = { expanded = false; onSelected(choice.id) })
+                }
             }
         }
     }

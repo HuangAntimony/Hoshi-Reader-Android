@@ -1087,6 +1087,10 @@ Validate relevant sync/update/Sasayaki changes with:
   Check long source names stay on one line with middle ellipsis and remain complete in
   the dropdown; check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
+  With Azure or Google Cloud selected, expand synthesis parameters and check Audio
+  format and Sample rate: short labels/values fit on one line at normal font size,
+  while dropdowns open from the right-side arrow. Short values must leave remaining
+  width to the label; long values must stay bounded without pushing the arrow out.
 - Long-press book text and create a pronunciation: prefill the selected text and an
   empty reading, and preview the full source sentence including ruby and VN text outside
   the screen. Cancel without saving. With a multilingual IME, start in another input

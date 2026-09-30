@@ -24,7 +24,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Recognizes Samsung's Japanese voices and refreshes available voices when returning
   from system settings. Configure cloud credentials and test synthesis in the current
   panel. Adjust supported pitch, volume, Azure speaking styles/roles/intensity and
-  punctuation silence, cloud audio format/sample rate, Google device profiles, and
+  punctuation silence, cloud audio format/sample rate with compact dropdown rows
+  anchored at the right-side control, Google device profiles, and
   extra playback pauses between sentences. Japanese ellipses use adjustable explicit
   pauses on Azure and optional sentence-pause normalization on Edge.
   MP3 sources retain MP3 for playback and Anki.
