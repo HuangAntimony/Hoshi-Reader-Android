@@ -20,9 +20,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 data class TtsEngineInfo(val id: String, val label: String)
-data class TtsVoiceInfo(val id: String, val network: Boolean)
+data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList())
 data class TtsCatalog(val engines: List<TtsEngineInfo>, val selectedEngine: String, val voices: List<TtsVoiceInfo>)
-enum class TtsFailure { NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage }
+enum class TtsFailure {
+    NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage,
+    Configuration, Authentication, RateLimited, Network, InvalidResponse,
+}
 class TtsException(val failure: TtsFailure) : Exception(failure.name)
 
 // Engines may expose ISO 639-1 (Google) or ISO 639-2 (Samsung) locale language codes.
@@ -100,6 +103,8 @@ class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val
                     else voices.firstOrNull()
                 if (voice == null || tts.setVoice(voice) != TextToSpeech.SUCCESS) throw TtsException(TtsFailure.MissingJapanese)
                 if (tts.setSpeechRate(settings.rate) != TextToSpeech.SUCCESS) throw TtsException(TtsFailure.Synthesis)
+                if (tts.setPitch(Math.pow(2.0, settings.pitch.coerceIn(-12f, 12f) / 12.0).toFloat()) != TextToSpeech.SUCCESS)
+                    throw TtsException(TtsFailure.Synthesis)
                 if (text.isBlank()) throw TtsException(TtsFailure.EmptyText)
                 directory.mkdirs()
                 try {

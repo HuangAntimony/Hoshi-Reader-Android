@@ -67,6 +67,38 @@ class TtsPlaybackControllerTest {
             assertEquals(0, controller.state.value.index)
         }
     }
+    @Test fun sentencePauseWaitsBetweenAutomaticSentencesAndStopCancelsIt() = runTest {
+        fixture { controller, output, _, repository ->
+            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertEquals(1, output.playCount)
+            assertTrue(controller.state.value.preparing)
+            advanceTimeBy(999); runCurrent()
+            assertEquals(1, output.playCount)
+            advanceTimeBy(1); runCurrent()
+            assertEquals(2, output.playCount)
+            output.onEnded(); runCurrent()
+            controller.stop()
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(2, output.playCount)
+        }
+    }
+    @Test fun resumingDuringSentencePauseStartsNextSentenceAndManualNavigationDoesNotWait() = runTest {
+        fixture { controller, output, _, repository ->
+            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            controller.pause(); controller.play(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+            controller.next(); runCurrent()
+            assertEquals(2, controller.state.value.index)
+            assertEquals(3, output.playCount)
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(3, output.playCount)
+        }
+    }
     @Test fun loadingAudiobookDiscardsLateSynthesisAndCannotResume() = runTest {
         fixture { controller, output, audio, _ ->
             val done = CompletableDeferred<Unit>()
@@ -97,6 +129,16 @@ class TtsPlaybackControllerTest {
         fixture { controller, output, _, repository ->
             controller.play(); runCurrent()
             repository.settings(TtsSettings(voice = "new")); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertTrue(output.prepared.isEmpty())
+            controller.play(); runCurrent()
+            assertEquals(2, output.playCount)
+        }
+    }
+    @Test fun synthesisOptionsPauseAndInvalidatePreparedAudio() = runTest {
+        fixture { controller, output, _, repository ->
+            controller.play(); runCurrent()
+            repository.settings(TtsSettings(pitch = 3f, parameters = mapOf("" to TtsSynthesisOptions(volume = -10f)))); runCurrent()
             assertFalse(controller.state.value.playing)
             assertTrue(output.prepared.isEmpty())
             controller.play(); runCurrent()

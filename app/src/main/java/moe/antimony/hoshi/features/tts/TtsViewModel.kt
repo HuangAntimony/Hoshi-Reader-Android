@@ -21,7 +21,8 @@ import kotlinx.coroutines.flow.*
 class TtsViewModel @Inject constructor(
     private val repository: TtsRepository,
     private val readingSettingsRepository: SasayakiSettingsRepository,
-    private val engine: AndroidTtsEngine,
+    private val engine: TtsEngineRouter,
+    private val cipher: TtsCredentialCipher,
     private val audio: TtsAudioRepository,
     private val books: TtsBookRepository,
     val playback: TtsPlaybackController,
@@ -47,18 +48,24 @@ class TtsViewModel @Inject constructor(
     private val mutableEngines = MutableStateFlow<List<TtsEngineInfo>>(emptyList())
     val engines = mutableEngines.asStateFlow()
     val error = mutableError.asStateFlow()
-    private val mutableBusy = MutableStateFlow(false)
-    val busy = mutableBusy.asStateFlow()
+    private val catalogBusy = MutableStateFlow(false)
+    private val previewBusy = MutableStateFlow(false)
+    val busy = combine(catalogBusy, previewBusy) { catalog, preview -> catalog || preview }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private var catalogGeneration = 0L
+    private var previewGeneration = 0L
     private var refreshJob: Job? = null
     private var previewJob: Job? = null
     private var previewPlayer: ExoPlayer? = null
     private var previewFile: java.io.File? = null
 
     fun refresh() {
+        val generation = ++catalogGeneration
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            mutableBusy.value = true
+            catalogBusy.value = true
             mutableError.value = null
+            mutableCatalog.value = null
             try {
                 val settings = repository.preferences.first().settings
                 mutableEngines.value = engine.installedEngines()
@@ -67,13 +74,50 @@ class TtsViewModel @Inject constructor(
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableCatalog.value = null; mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.EngineUnavailable }
-            finally { mutableBusy.value = false }
+            finally { if (generation == catalogGeneration) catalogBusy.value = false }
         }
     }
     fun settings(value: TtsSettings) {
         stopPreview()
-        viewModelScope.launch { try { repository.settings(value); refresh() } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
+        viewModelScope.launch { try {
+            val previous = repository.preferences.first().settings
+            repository.settings(value)
+            if (previous.engine != value.engine || previous.online != value.online || catalog.value == null) refresh()
+        } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
     }
+    private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
+        val current = repository.preferences.first().settings.online[source.id] ?: TtsOnlineConfig()
+        val cleanedRegion = region.trim().lowercase(java.util.Locale.ROOT)
+        if (source == TtsOnlineSource.Azure) OnlineTtsProtocol.azureBase(cleanedRegion)
+        val encrypted = if (key.isNotBlank()) {
+            val value = key.trim()
+            if (value.any { it <= ' ' || it >= '\u007f' }) throw TtsException(TtsFailure.Configuration)
+            cipher.encrypt(value, source.id)
+        } else current.encryptedKey
+        if (source.needsKey && encrypted.isBlank()) throw TtsException(TtsFailure.Configuration)
+        return TtsOnlineConfig(cleanedRegion, encrypted)
+    }
+
+    suspend fun configure(source: TtsOnlineSource, region: String, key: String): TtsFailure? = try {
+        val config = configuration(source, region, key)
+        stopPreview()
+        repository.configure(source, config)
+        refresh()
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
+
+    /** Tests the draft by synthesizing a sample without saving it or changing the active voice. */
+    suspend fun testConfiguration(source: TtsOnlineSource, region: String, key: String, sample: String): TtsFailure? = try {
+        val config = configuration(source, region, key)
+        val current = repository.preferences.first()
+        val draft = current.copy(settings = current.settings.copy(engine = source.id, voice = "", rate = 1f, pitch = 0f,
+            online = current.settings.online + (source.id to config), parameters = emptyMap()))
+        audio.export(TtsSentence(0, 0, 0, sample), null, draft).delete()
+        null
+    } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
+    catch (error: CancellationException) { throw error }
+    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
     suspend fun save(word: TtsWord): TtsWordError? = try {
         repository.save(word.copy(surface = word.surface.trim(), reading = word.reading.trim()))
     } catch (error: CancellationException) { throw error } catch (_: Exception) { TtsWordError.Storage }
@@ -81,8 +125,9 @@ class TtsViewModel @Inject constructor(
     fun preview(sentence: TtsSentence, bookId: String?, word: TtsWord? = null) {
         stopPreview()
         playback.pause()
+        val generation = previewGeneration
         previewJob = viewModelScope.launch {
-            mutableBusy.value = true
+            previewBusy.value = true
             try {
                 val current = repository.preferences.first()
                 val config = if (word == null) current else current.copy(words = current.words.filterNot { it.id == word.id || it.surface == word.surface && it.bookId == word.bookId } + word)
@@ -99,10 +144,12 @@ class TtsViewModel @Inject constructor(
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
-            finally { mutableBusy.value = false }
+            finally { if (generation == previewGeneration) previewBusy.value = false }
         }
     }
     fun stopPreview() {
+        previewGeneration++
+        previewBusy.value = false
         previewJob?.cancel(); previewJob = null
         previewPlayer?.release(); previewPlayer = null
         previewFile?.delete(); previewFile = null

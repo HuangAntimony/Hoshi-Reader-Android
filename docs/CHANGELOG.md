@@ -8,7 +8,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
-- Read Japanese books aloud using installed Android TTS engines, with a separate
+- Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
+  Google Cloud and Google Translate online sources, with a separate
   TTS panel styled like Sasayaki, with compact playback controls and Voice,
   Pronunciations and Settings tabs. Choose sources and voices from dropdown rows with
   readable labels and single-line source names, open system TTS settings beside the selected source, and preview
@@ -21,7 +22,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Linking an audiobook hides TTS and preserves Sasayaki's audiobook controls.
   Reopening or switching books after narration keeps playback idle until explicitly started.
   Recognizes Samsung's Japanese voices and refreshes available voices when returning
-  from system settings.
+  from system settings. Configure cloud credentials and test synthesis in the current
+  panel. Adjust supported pitch, volume, Azure speaking styles/roles/intensity and
+  punctuation silence, cloud audio format/sample rate, Google device profiles, and
+  extra playback pauses between sentences. Japanese ellipses use adjustable explicit
+  pauses on Azure and optional sentence-pause normalization on Edge.
+  MP3 sources retain MP3 for playback and Anki.
 - Customize word readings for one book or all books from text selection or the TTS
   pronunciation dictionary in Settings. Text-selection creation previews the full original
   sentence; both pronunciation fields request Japanese keyboard input. EPUB ruby remains

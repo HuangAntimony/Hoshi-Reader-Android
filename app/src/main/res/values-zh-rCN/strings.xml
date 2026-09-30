@@ -234,7 +234,7 @@
     <string name="dictionary_download_item_format">%1$s（%2$s）</string>
     <string name="dictionary_type_term">词条</string>
     <string name="dictionary_type_frequency">词频</string>
-    <string name="dictionary_type_pitch">音调</string>
+    <string name="dictionary_type_pitch" comment="Dictionary type: Japanese pitch accent, distinct from TTS acoustic pitch">音调</string>
     <string name="dictionary_type_kanji">汉字</string>
     <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">无</string>
     <string name="dictionary_category_monolingual">单语</string>
@@ -936,4 +936,62 @@
     <string name="tts_read_selection">从此处朗读</string>
     <string name="tts_storage_error">无法保存读音，请重试。</string>
     <string name="anki_handlebar_sentence_audio">句子音频：使用有声书；未关联有声书时使用 TTS。</string>
+    <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
+    <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>
+    <string name="tts_source_google_cloud" comment="TTS online source configuration">Google Cloud TTS</string>
+    <string name="tts_source_google_translate" comment="TTS online source configuration">Google 翻译</string>
+    <string name="tts_cloud_credentials_hint" comment="TTS online source configuration">填写你自己的服务凭据。测试连接会合成一段示例，可能消耗服务配额。</string>
+    <string name="tts_unofficial_hint" comment="TTS online source configuration">使用非官方在线接口，朗读文本会发送至该服务；可用性可能变化。</string>
+    <string name="tts_cloud_source_hint" comment="TTS online source configuration">使用你的云服务账户，朗读文本会发送至该服务，并可能产生费用。</string>
+    <string name="tts_azure_region" comment="TTS online source configuration">语音资源区域</string>
+    <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
+    <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">此设备已保存密钥；留空可继续使用。</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">测试合成</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">示例合成成功。</string>
+    <string name="tts_rate_slow" comment="TTS online source configuration">慢速</string>
+    <string name="tts_rate_normal" comment="TTS online source configuration">普通</string>
+    <string name="tts_configuration_error" comment="TTS online source configuration">请先配置此来源，检查区域和 API 密钥；恢复的设置可能需要重新填写密钥。</string>
+    <string name="tts_authentication_error" comment="TTS online source configuration">服务拒绝访问。请检查凭据与 API 权限；非官方来源可稍后重试。</string>
+    <string name="tts_rate_limit_error" comment="TTS online source configuration">已达到服务配额或请求上限，请检查账户或稍后重试。</string>
+    <string name="tts_network_error" comment="TTS online source configuration">无法连接语音服务，请检查网络后重试。</string>
+    <string name="tts_response_error" comment="TTS online source configuration">服务未返回可用音频或音色，请检查配置或稍后重试。</string>
+    <string name="tts_pitch" comment="TTS synthesis pitch">音高</string>
+    <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
+    <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d 半音</string>
+    <string name="tts_more_parameters" comment="TTS synthesis parameter">合成参数</string>
+    <string name="tts_sentence_pause" comment="TTS synthesis parameter">句间额外停顿</string>
+    <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">连续朗读时由 Hoshi 在两句间等待，此时长不会加入导出的音频。</string>
+    <string name="tts_synthesis_volume" comment="TTS synthesis parameter">合成音量</string>
+    <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d 毫秒</string>
+    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
+    <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
+    <string name="tts_speaking_style" comment="TTS synthesis parameter">语气</string>
+    <string name="tts_style_degree" comment="TTS synthesis parameter">语气强度</string>
+    <string name="tts_speaking_role" comment="TTS synthesis parameter">朗读角色</string>
+    <string name="tts_leading_pause" comment="TTS synthesis parameter">开头静音</string>
+    <string name="tts_trailing_pause" comment="TTS synthesis parameter">结尾静音</string>
+    <string name="tts_comma_pause" comment="TTS synthesis parameter">逗号停顿</string>
+    <string name="tts_semicolon_pause" comment="TTS synthesis parameter">分号停顿</string>
+    <string name="tts_enumeration_pause" comment="TTS synthesis parameter">顿号停顿</string>
+    <string name="tts_boundary_pause" comment="TTS synthesis parameter">句子边界静音</string>
+    <string name="tts_provider_default" comment="TTS synthesis parameter">音色默认值</string>
+    <string name="tts_pause_override" comment="TTS synthesis parameter">替换自然停顿</string>
+    <string name="tts_output_format" comment="TTS synthesis parameter">音频格式</string>
+    <string name="tts_format_wav" comment="TTS synthesis parameter">WAV（PCM）</string>
+    <string name="tts_format_mp3" comment="TTS synthesis parameter">MP3</string>
+    <string name="tts_sample_rate" comment="TTS synthesis parameter">采样率</string>
+    <string name="tts_sample_rate_hz" comment="TTS synthesis parameter">%1$d Hz</string>
+    <string name="tts_audio_profile" comment="TTS synthesis parameter">播放设备音效</string>
+    <string name="tts_profile_none" comment="TTS synthesis parameter">无设备音效</string>
+    <string name="tts_profile_wearable" comment="TTS synthesis parameter">可穿戴设备</string>
+    <string name="tts_profile_handset" comment="TTS synthesis parameter">手机扬声器</string>
+    <string name="tts_profile_headphones" comment="TTS synthesis parameter">耳机</string>
+    <string name="tts_profile_small_speaker" comment="TTS synthesis parameter">小型蓝牙音箱</string>
+    <string name="tts_profile_medium_speaker" comment="TTS synthesis parameter">中型蓝牙音箱</string>
+    <string name="tts_profile_home" comment="TTS synthesis parameter">家庭影音</string>
+    <string name="tts_profile_car" comment="TTS synthesis parameter">车载音响</string>
+    <string name="tts_profile_telephone" comment="TTS synthesis parameter">电话线路</string>
+    <string name="tts_ellipsis_pause" comment="TTS ellipsis handling">省略号停顿</string>
+    <string name="tts_edge_ellipsis_hint" comment="TTS ellipsis handling">将省略号作为句末停顿朗读，时长由音色决定。</string>
 </resources>

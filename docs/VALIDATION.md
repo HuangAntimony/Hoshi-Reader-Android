@@ -1041,6 +1041,38 @@ Validate relevant sync/update/Sasayaki changes with:
 
 ## Japanese TTS
 
+- Online-source regressions: run `OnlineTtsProtocolTest`, `OnlineTtsTransportTest`,
+  `OnlineTtsEngineTest` and `TtsMp3Test` with the JVM suite. Cover literal SSML/JSON,
+  UTF-8/surrogate-safe chunking, credential headers, provider errors, cancellation,
+  complete WebSocket turns, partial-file cleanup, MP3 frame concatenation, supported
+  styles/roles and synthesis parameters. Keep live network calls out of JVM tests.
+- With a connected non-disposable device, build the test APK with
+  `:app:assembleDebugAndroidTest`, install APKs via `adb install -r`, and explicitly run
+  `OnlineTtsDeviceTest` through `am instrument`. It uses public Japanese samples,
+  test-owned cache and encrypted test values, without changing saved settings. Require
+  the final `OK` summary. Verify Edge and Translate MP3 exports with MediaExtractor,
+  including multi-part sentences; verify source-bound Keystore credential round trips.
+- Azure/Google Cloud live verification requires the user's configured account. Check
+  missing/invalid credentials, 429/quota and offline errors, draft test/cancel/save,
+  Japanese catalogs, WAV/MP3 exports, and supported parameters. Never claim mocked
+  response coverage as a successful live account test. Reopening configuration must
+  keep the saved key masked; leaving it empty preserves it. Restored settings without
+  the Keystore key must request reconfiguration.
+- For explicitly authorized live Azure checks, run `ConfiguredAzureTtsDeviceTest` with
+  `am instrument -e hoshiAzureTtsLive true`; it consumes the already saved key entirely
+  inside the app, does not print credentials or change preferences, and compares two
+  public samples with different explicit ellipsis durations. Without that argument or
+  a saved key, it is skipped. `OnlineTtsDeviceTest` compares Edge ellipsis normalization
+  against natural punctuation. Cover `…`, `……`, `‥‥`, ASCII `...`, XML-special text and
+  disabling the override; the displayed/source sentence must remain unchanged.
+- Compare default/modified pitch and volume in preview and Anki. Azure style/role choices
+  must come from the selected voice, reset when changing voices, and include only valid
+  styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
+  Translate offers normal/slow only. Unsupported pitch controls must be hidden.
+  Verify extra sentence delay waits only during continuous playback, is cancelled by
+  stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
+  this application delay must not be inserted into Anki exports.
+
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
   Voice/Pronunciations/Settings, without a cover, book title or sentence preview.
   Confirm source/voice dropdowns open next to their rows and dismiss on selection or

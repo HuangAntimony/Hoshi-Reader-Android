@@ -20,7 +20,7 @@ internal interface TtsAudioSource {
 
 @Singleton
 class TtsAudioRepository @Inject constructor(
-    private val engine: AndroidTtsEngine,
+    private val engine: TtsEngineRouter,
     @param:CacheDir private val cache: File,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : TtsAudioSource {
@@ -51,10 +51,10 @@ class TtsAudioRepository @Inject constructor(
 
     /** Export has its own lifetime so changing books cannot delete Anki's pending upload. */
     suspend fun export(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): File =
-        withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.wav"), ioDispatcher) { target ->
+        withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.${engine.extension(preferences.settings)}"), ioDispatcher) { target ->
             val parts = engine.synthesize(TtsText.spoken(sentence, bookId, preferences.words), preferences.settings, File(cache, "tts/export"))
             try {
-                TtsWav.concatenate(parts, target)
+                if (target.extension == "mp3") TtsMp3.concatenate(parts, target) else TtsWav.concatenate(parts, target)
             } finally { parts.forEach { it.delete() } }
         }
 }

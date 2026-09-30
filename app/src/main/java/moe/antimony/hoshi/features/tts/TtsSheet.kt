@@ -77,6 +77,11 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
     val error by viewModel.error.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editor by remember { mutableStateOf<TtsWord?>(null) }
+    var configureSource by remember { mutableStateOf<TtsOnlineSource?>(null) }
+    val onlineSource = TtsOnlineSource.from(preferences.settings.engine)
+    val sourceOptions = listOf(TtsChoiceOption("", stringResource(R.string.tts_system_default))) +
+        engines.map { TtsChoiceOption(it.id, it.label) } +
+        TtsOnlineSource.entries.map { TtsChoiceOption(it.id, stringResource(it.labelRes), stringResource(R.string.tts_network)) }
     val context = LocalContext.current
     val sample = stringResource(R.string.tts_sample)
     val automaticLabel = stringResource(R.string.tts_system_default)
@@ -120,15 +125,18 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(Modifier.weight(1f)) {
                             TtsChoice(stringResource(R.string.tts_source),
-                                engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
+                                onlineSource?.let { stringResource(it.labelRes) }
+                                    ?: engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
                                     ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
                                 preferences.settings.engine,
-                                listOf(TtsChoiceOption("", automaticLabel)) + engines.map { TtsChoiceOption(it.id, it.label) },
+                                sourceOptions,
                                 singleLine = true,
-                            ) { viewModel.settings(preferences.settings.copy(engine = it, voice = "")) }
+                            ) { val next = preferences.settings.copy(engine = it, voice = "", pitch = 0f)
+                                viewModel.settings(next.withOptions(next.options().copy(style = "", role = ""))) }
                         }
                         IconButton(onClick = {
-                            try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                            if (onlineSource != null) configureSource = onlineSource
+                            else try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                             catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
                         }) { Icon(Icons.Rounded.Settings, null, tint = hoshiSurfaces.muted) }
                     }
@@ -139,14 +147,38 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                             TtsChoiceOption(it.id, it.id, if (it.network) networkLabel else offlineLabel)
                         },
                         supporting = selectedVoice?.let { if (it.network) networkLabel else offlineLabel },
-                    ) { viewModel.settings(preferences.settings.copy(voice = it)) }
+                    ) { viewModel.settings(preferences.settings.copy(voice = it).withOptions(preferences.settings.options().copy(style = "", role = ""))) }
                 }
+                if (onlineSource != null) Text(
+                    stringResource(if (onlineSource.needsKey) R.string.tts_cloud_source_hint else R.string.tts_unofficial_hint),
+                    style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
                 var rate by remember(preferences.settings.rate) { mutableFloatStateOf(preferences.settings.rate) }
-                ReaderSheetSliderRow(
+                if (onlineSource == TtsOnlineSource.GoogleTranslate) ReaderSheetCard {
+                    TtsChoice(stringResource(R.string.tts_rate_label),
+                        stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
+                        if (rate < 1f) "slow" else "normal",
+                        listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)),
+                            TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
+                    ) { viewModel.settings(preferences.settings.copy(rate = if (it == "slow") .5f else 1f)) }
+                } else ReaderSheetSliderRow(
                     label = stringResource(R.string.tts_rate_label), valueText = stringResource(R.string.tts_rate_value, rate),
-                    value = rate, range = .5f..3f, steps = 49, onValueChange = { rate = it },
+                    value = rate, range = (if (onlineSource == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (onlineSource == TtsOnlineSource.GoogleCloud || onlineSource == TtsOnlineSource.Azure) 2f else 3f),
+                    steps = when (onlineSource) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure -> 29; else -> 49 }, onValueChange = { rate = it },
                     onValueChangeFinished = { viewModel.settings(preferences.settings.copy(rate = rate)) },
                 )
+                ttsPitchRange(onlineSource, selectedVoice?.id.orEmpty())?.let { range ->
+                    var pitch by remember(preferences.settings.pitch) { mutableFloatStateOf(preferences.settings.pitch) }
+                    ReaderSheetSliderRow(
+                        label = stringResource(R.string.tts_pitch),
+                        valueText = stringResource(if (onlineSource == TtsOnlineSource.Edge) R.string.tts_pitch_hz else R.string.tts_pitch_semitones, pitch.toInt()),
+                        value = pitch, range = range, steps = (range.endInclusive - range.start).toInt() - 1,
+                        onValueChange = { pitch = it },
+                        onValueChangeFinished = { viewModel.settings(preferences.settings.copy(pitch = pitch)) },
+                    )
+                }
+                TtsSynthesisControls(preferences.settings, selectedVoice, viewModel::settings)
                 HoshiButton(
                     onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).heightIn(min = 48.dp),
@@ -164,6 +196,9 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                 }
             }
         }
+    }
+    configureSource?.let { source ->
+        TtsSourceConfigurationDialog(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }
     }
     colorRow?.let { row ->
         readingSettings?.let { settings ->
@@ -235,7 +270,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
 }
 
 @Composable
-private fun TtsChoice(
+internal fun TtsChoice(
     label: String, value: String, selected: String, choices: List<TtsChoiceOption>,
     supporting: String? = null, singleLine: Boolean = false, onSelected: (String) -> Unit,
 ) {
@@ -267,7 +302,7 @@ private fun TtsChoice(
     }
 }
 
-private data class TtsChoiceOption(val id: String, val label: String, val supporting: String? = null)
+internal data class TtsChoiceOption(val id: String, val label: String, val supporting: String? = null)
 
 @Composable
 fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, sentence: TtsSentence?, onDismiss: () -> Unit) {
@@ -308,6 +343,11 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
 }
 
 internal fun TtsFailure.messageRes(): Int = when (this) {
+    TtsFailure.Configuration -> R.string.tts_configuration_error
+    TtsFailure.Authentication -> R.string.tts_authentication_error
+    TtsFailure.RateLimited -> R.string.tts_rate_limit_error
+    TtsFailure.Network -> R.string.tts_network_error
+    TtsFailure.InvalidResponse -> R.string.tts_response_error
     TtsFailure.Storage -> R.string.tts_storage_error
     TtsFailure.NoEngine -> R.string.tts_no_engine
     TtsFailure.MissingJapanese -> R.string.tts_missing_japanese

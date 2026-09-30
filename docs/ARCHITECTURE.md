@@ -774,9 +774,13 @@ QA matrices live in `docs/VALIDATION.md`.
 
 ## Japanese TTS
 
-- `features/tts` is an independent Hilt feature. `TtsRepository` persists engine,
-  Japanese voice, rate and scoped pronunciation entries in the `japanese_tts`
+- `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
+  Japanese voice, rate, pitch, provider parameters, playback sentence delay and scoped pronunciation entries in the `japanese_tts`
   Preferences DataStore. It does not extend Sasayaki sidecars or sync payloads.
+  Cloud API keys are AES-GCM ciphertext bound to the provider ID, using a non-exportable
+  Android Keystore key through `TtsCredentialCipher`; restored ciphertext without its
+  device key requires configuration again. UI fields never read keys back or put them
+  in saveable state, URLs, logs or visible errors.
 - `TtsBookRepository` reads complete linear chapter source, including file-backed
   cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
@@ -790,11 +794,29 @@ QA matrices live in `docs/VALIDATION.md`.
   dispatcher, including calls made by the main-thread playback controller.
 - `AndroidTtsEngine` serializes installed-engine discovery and `synthesizeToFile`,
   filters Japanese voices, bounds initialization/utterance waits, splits oversized
-  inputs, and accepts files only after completion. No remote TTS client or voice model
-  ships with Hoshi. Network-required engine voices are explicitly labeled in the UI.
+  inputs, and accepts files only after completion. `TtsEngineRouter` dispatches installed
+  engines to this adapter and the four explicit online sources to `OnlineTtsEngine`:
+  Edge Read Aloud WebSocket, Azure Speech REST, Google Cloud Text-to-Speech REST and
+  Google Translate's unofficial speech RPC. Network-required voices and unofficial
+  sources are labeled in the UI. No voice model is bundled and failures never select
+  another provider automatically.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
   Samsung's ISO 639-2 locales). TTS panels refresh the engine catalog on resume so
   returning from system voice installation updates their available voices.
+- `OnlineTtsProtocol` owns service JSON/SSML, Japanese catalog filtering, UTF-8 length
+  limits and Edge framing. `OnlineTtsTransport` owns bounded HTTPS/WebSocket requests;
+  cancellation closes the active call/socket, and only a completed Edge turn may return
+  audio. Source adapters synthesize chunks serially and remove partial files on failure
+  or cancellation. Azure exposes advertised styles/roles, intensity and exact silence
+  controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
+  supports prosody rate/pitch/volume; Translate exposes only normal/slow speech.
+  Pitch controls use provider units and omit unsupported Google voice families.
+  Azure ellipsis runs become an escaped SSML break (600 ms by default); Edge can
+  normalize them to sentence punctuation because its consumer endpoint rejects break
+  elements. Edge pause duration remains voice-defined. These transformations affect
+  synthesis only, preserving Reader offsets, dictionary lookup and Anki sentence text.
+  `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
+  removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
   configuration invalidation and two-sentence prefetch, and rejects stale operations
   after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by
@@ -816,11 +838,16 @@ QA matrices live in `docs/VALIDATION.md`.
   own settings scaffold; the pronunciation list is lazy and keeps playback controls
   outside its scroll area. Voice-source and voice choices use anchored `HoshiDropdownMenu`
   rows in shared cards; a separate settings icon beside the source selector opens system
-  TTS settings. Voice preview uses a full-width `HoshiButton` with the same default styling
+  TTS settings or a source-specific credential/test dialog. Additional synthesis controls
+  expand in the Voice tab and use source/voice capabilities. Connection tests synthesize
+  a public sample using the unsaved configuration without changing the active source.
+  Voice preview uses a full-width `HoshiButton` with the same default styling
   as Theme's control preview. Source/voice labels use body typography.
   `SharedReaderPlaybackSettings` edits the same Sasayaki settings
   repository from both panels; TTS merges only shared reading fields, preserving audiobook
-  preferences and keeping its own engine/voice/rate. TTS navigation remains sentence-based
+  preferences and keeping its own synthesis settings. Extra sentence delay is owned by
+  playback, is cancellable and is excluded from preview/Anki audio; provider silence
+  controls are part of synthesized audio. TTS navigation remains sentence-based
   without a timeline or the audiobook skip-action setting.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.

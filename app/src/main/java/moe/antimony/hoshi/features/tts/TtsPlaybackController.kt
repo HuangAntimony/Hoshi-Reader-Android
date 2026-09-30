@@ -55,6 +55,7 @@ class TtsPlaybackController internal constructor(
     var imageHoldMillis: Long = 1_000
     var presentSentence: (suspend (TtsSentence, Boolean) -> Unit)? = null
     private var heldImageIndex: Int? = null
+    private var waitingForNextSentence = false
 
     init {
         output.onEnded = { if (state.value.playing) advance() }
@@ -108,12 +109,21 @@ class TtsPlaybackController internal constructor(
     fun next() = seek((state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
     fun repeat() = seek(state.value.index)
     private fun advance() {
-        if (!stopAfterSentence && state.value.index < state.value.sentences.lastIndex) next()
-        else { pause(); preparedIndex = null }
+        if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) { pause(); preparedIndex = null; return }
+        val waitMillis = preferences.settings.sentencePauseMs
+        if (waitMillis == 0L) { next(); return }
+        val token = generation
+        waitingForNextSentence = true
+        mutableState.value = state.value.copy(preparing = true)
+        job = scope.launch(Dispatchers.Main.immediate) {
+            delay(waitMillis)
+            if (token == generation && state.value.playing) next()
+        }
     }
     private fun seek(index: Int, singleSentence: Boolean = false) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
+        waitingForNextSentence = false
         output.clear()
         stopAfterSentence = singleSentence
         preparedIndex = null
@@ -122,6 +132,12 @@ class TtsPlaybackController internal constructor(
     }
     fun play() {
         if (associated || state.value.sentence == null || state.value.playing) return
+        if (waitingForNextSentence) {
+            waitingForNextSentence = false
+            preparedIndex = null
+            output.clear()
+            mutableState.value = state.value.copy(index = (state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
+        }
         val snapshot = state.value
         val config = preferences
         val token = ++generation
@@ -171,6 +187,7 @@ class TtsPlaybackController internal constructor(
     }
     private fun fail(failure: TtsFailure) { pause(); mutableState.value = state.value.copy(error = failure) }
     fun stop() {
+        waitingForNextSentence = false
         stopAfterSentence = false
         loadGeneration++
         pause()

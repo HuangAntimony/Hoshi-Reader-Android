@@ -16,7 +16,11 @@ import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.epub.EpubBook
 
 @Serializable
-data class TtsSettings(val engine: String = "", val voice: String = "", val rate: Float = 1f)
+data class TtsSettings(
+    val engine: String = "", val voice: String = "", val rate: Float = 1f,
+    val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
+    val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
+)
 @Serializable
 data class TtsPreferences(val settings: TtsSettings = TtsSettings(), val words: List<TtsWord> = emptyList())
 private val Context.ttsStore by preferencesDataStore("japanese_tts")
@@ -30,7 +34,19 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     private fun decode(value: String?) = value?.let { json.decodeFromString<TtsPreferences>(it) } ?: TtsPreferences()
 
     suspend fun settings(settings: TtsSettings) {
-        store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = settings.copy(rate = settings.rate.coerceIn(.5f, 3f)))) }
+        val rate = TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
+            ?: settings.rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
+        val pitchRange = ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
+        val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
+        val normalized = settings.copy(rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
+            parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
+        store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = normalized)) }
+    }
+    suspend fun configure(source: TtsOnlineSource, config: TtsOnlineConfig) {
+        store.edit {
+            val old = decode(it[key])
+            it[key] = json.encodeToString(old.copy(settings = old.settings.copy(online = old.settings.online + (source.id to config))))
+        }
     }
     suspend fun save(word: TtsWord): TtsWordError? {
         var error: TtsWordError? = null

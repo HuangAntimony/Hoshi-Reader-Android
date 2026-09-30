@@ -98,7 +98,8 @@ class LocalizationResourceTest {
             .filterValues { it.translatable }
             .flatMap { (name, value) ->
                 forbiddenTerms
-                    .filter { term -> value.value.contains(term) }
+                    // TTS pitch is acoustic pitch, not the dictionary's Japanese pitch accent.
+                    .filter { term -> value.value.contains(term) && !(name == "tts_pitch" && term == "音高") }
                     .map { term -> "$name contains $term" }
             } + zhResources.arrays.flatMap { (name, items) ->
             items.flatMapIndexed { index, item ->

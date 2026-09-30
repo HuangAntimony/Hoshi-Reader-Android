@@ -236,7 +236,7 @@
     <string name="dictionary_download_item_format">%1$s (%2$s)</string>
     <string name="dictionary_type_term">Term</string>
     <string name="dictionary_type_frequency">Frequency</string>
-    <string name="dictionary_type_pitch">Pitch</string>
+    <string name="dictionary_type_pitch" comment="Dictionary type: Japanese pitch accent, distinct from TTS acoustic pitch">Pitch</string>
     <string name="dictionary_type_kanji">Kanji</string>
     <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">None</string>
     <string name="dictionary_category_monolingual">Monolingual</string>
@@ -938,4 +938,62 @@
     <string name="tts_read_selection">Read from here</string>
     <string name="tts_storage_error">Could not save the pronunciation. Please retry.</string>
     <string name="anki_handlebar_sentence_audio">Sentence audio from the audiobook, or TTS when no audiobook is linked.</string>
+    <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
+    <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>
+    <string name="tts_source_google_cloud" comment="TTS online source configuration">Google Cloud TTS</string>
+    <string name="tts_source_google_translate" comment="TTS online source configuration">Google Translate</string>
+    <string name="tts_cloud_credentials_hint" comment="TTS online source configuration">Enter your own service credentials. Connection tests synthesize a short sample and may use your service quota.</string>
+    <string name="tts_unofficial_hint" comment="TTS online source configuration">Uses an unofficial online interface. Text is sent to this provider; availability may change.</string>
+    <string name="tts_cloud_source_hint" comment="TTS online source configuration">Uses your cloud account. Text is sent to this provider and usage may be billed.</string>
+    <string name="tts_azure_region" comment="TTS online source configuration">Speech resource region</string>
+    <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
+    <string name="tts_api_key" comment="TTS online source configuration">Service API key</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">A key is saved on this device. Leave this field empty to keep it.</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">Test synthesis</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">Sample synthesized successfully.</string>
+    <string name="tts_rate_slow" comment="TTS online source configuration">Slow</string>
+    <string name="tts_rate_normal" comment="TTS online source configuration">Normal</string>
+    <string name="tts_configuration_error" comment="TTS online source configuration">Configure this source first. Check its region and API key; restored settings may need a new key.</string>
+    <string name="tts_authentication_error" comment="TTS online source configuration">The service rejected access. Check credentials and API permissions, or try again later for an unofficial source.</string>
+    <string name="tts_rate_limit_error" comment="TTS online source configuration">The service quota or request limit was reached. Check your account or retry later.</string>
+    <string name="tts_network_error" comment="TTS online source configuration">Cannot reach the speech service. Check your connection and retry.</string>
+    <string name="tts_response_error" comment="TTS online source configuration">The service did not return usable audio or voices. Check the configuration or retry later.</string>
+    <string name="tts_pitch" comment="TTS synthesis pitch">Pitch</string>
+    <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
+    <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d semitones</string>
+    <string name="tts_more_parameters" comment="TTS synthesis parameter">Synthesis parameters</string>
+    <string name="tts_sentence_pause" comment="TTS synthesis parameter">Extra pause between sentences</string>
+    <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">Hoshi waits between sentences during continuous reading. This delay is not included in exported audio.</string>
+    <string name="tts_synthesis_volume" comment="TTS synthesis parameter">Synthesis volume</string>
+    <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d ms</string>
+    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
+    <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
+    <string name="tts_speaking_style" comment="TTS synthesis parameter">Speaking style</string>
+    <string name="tts_style_degree" comment="TTS synthesis parameter">Style intensity</string>
+    <string name="tts_speaking_role" comment="TTS synthesis parameter">Speaking role</string>
+    <string name="tts_leading_pause" comment="TTS synthesis parameter">Leading silence</string>
+    <string name="tts_trailing_pause" comment="TTS synthesis parameter">Trailing silence</string>
+    <string name="tts_comma_pause" comment="TTS synthesis parameter">Comma pause</string>
+    <string name="tts_semicolon_pause" comment="TTS synthesis parameter">Semicolon pause</string>
+    <string name="tts_enumeration_pause" comment="TTS synthesis parameter">Enumeration comma pause</string>
+    <string name="tts_boundary_pause" comment="TTS synthesis parameter">Sentence boundary silence</string>
+    <string name="tts_provider_default" comment="TTS synthesis parameter">Voice default</string>
+    <string name="tts_pause_override" comment="TTS synthesis parameter">Override natural pause</string>
+    <string name="tts_output_format" comment="TTS synthesis parameter">Audio format</string>
+    <string name="tts_format_wav" comment="TTS synthesis parameter">WAV (PCM)</string>
+    <string name="tts_format_mp3" comment="TTS synthesis parameter">MP3</string>
+    <string name="tts_sample_rate" comment="TTS synthesis parameter">Sample rate</string>
+    <string name="tts_sample_rate_hz" comment="TTS synthesis parameter">%1$d Hz</string>
+    <string name="tts_audio_profile" comment="TTS synthesis parameter">Playback device profile</string>
+    <string name="tts_profile_none" comment="TTS synthesis parameter">No device effect</string>
+    <string name="tts_profile_wearable" comment="TTS synthesis parameter">Wearable</string>
+    <string name="tts_profile_handset" comment="TTS synthesis parameter">Phone speaker</string>
+    <string name="tts_profile_headphones" comment="TTS synthesis parameter">Headphones</string>
+    <string name="tts_profile_small_speaker" comment="TTS synthesis parameter">Small Bluetooth speaker</string>
+    <string name="tts_profile_medium_speaker" comment="TTS synthesis parameter">Medium Bluetooth speaker</string>
+    <string name="tts_profile_home" comment="TTS synthesis parameter">Home entertainment</string>
+    <string name="tts_profile_car" comment="TTS synthesis parameter">Car audio</string>
+    <string name="tts_profile_telephone" comment="TTS synthesis parameter">Telephone line</string>
+    <string name="tts_ellipsis_pause" comment="TTS ellipsis handling">Ellipsis pause</string>
+    <string name="tts_edge_ellipsis_hint" comment="TTS ellipsis handling">Read ellipses as sentence pauses. The voice determines the duration.</string>
 </resources>
