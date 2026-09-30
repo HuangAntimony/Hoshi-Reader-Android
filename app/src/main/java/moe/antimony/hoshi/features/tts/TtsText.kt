@@ -19,6 +19,7 @@ fun validateTtsWord(word: TtsWord, words: List<TtsWord>): TtsWordError? = when {
     else -> null
 }
 
+/** A zero-width range inserts the reading of an image-backed glyph without changing source offsets. */
 data class TtsRuby(val start: Int, val end: Int, val reading: String)
 data class TtsSentence(
     val chapter: Int,
@@ -78,7 +79,10 @@ object TtsText {
                     "br" -> flush()
                     "ruby" -> {
                         val reading = node.select("rt").joinToString("") { it.wholeText() }
-                        append(rubyBase(node), reading.takeIf { it.isNotBlank() })
+                        val base = rubyBase(node)
+                        if (base.isNotEmpty() || node.selectFirst("img, svg") != null) {
+                            append(base, reading.takeIf { it.isNotBlank() })
+                        }
                     }
                     else -> {
                         node.childNodes().forEach(::visit)
@@ -106,8 +110,15 @@ object TtsText {
             source.ruby.mapNotNull { ruby ->
                 val from = source.start + count(source.text.take(ruby.start)) - start
                 val until = source.start + count(source.text.take(ruby.end)) - start
-                if (from >= 0 && until > from && until <= starts.size)
-                    TtsRuby(starts[from], ends[until - 1], ruby.reading) else null
+                when {
+                    from >= 0 && until > from && until <= starts.size -> TtsRuby(starts[from], ends[until - 1], ruby.reading)
+                    ruby.start == ruby.end && from >= 0 && from <= starts.size &&
+                        source.start >= start && source.start + source.length <= start + starts.size -> {
+                        val position = starts.getOrNull(from) ?: text.length
+                        TtsRuby(position, position, ruby.reading)
+                    }
+                    else -> null
+                }
             }
         }
         val chapter = sentences.firstOrNull()?.chapter ?: 0
@@ -119,9 +130,13 @@ object TtsText {
             .sortedWith(compareByDescending<TtsWord> { it.surface.length }.thenByDescending { it.bookId != null })
         return buildString {
             var cursor = 0
-            while (cursor < sentence.text.length) {
+            while (cursor <= sentence.text.length) {
+                // Image-backed glyphs have no matchable source text. Emit each insertion once,
+                // then consume source text; never use an empty/backward range to advance cursor.
+                sentence.ruby.filter { it.start == cursor && it.end == cursor }.forEach { append(it.reading) }
+                if (cursor == sentence.text.length) break
                 val word = applicable.firstOrNull { it.surface.isNotEmpty() && sentence.text.startsWith(it.surface, cursor) }
-                val ruby = sentence.ruby.firstOrNull { it.start == cursor }
+                val ruby = sentence.ruby.firstOrNull { it.start == cursor && it.end > cursor && it.end <= sentence.text.length }
                 when {
                     word != null -> { append(word.reading); cursor += word.surface.length }
                     ruby != null && (cursor until ruby.end).none { start -> applicable.any { sentence.text.startsWith(it.surface, start) } } -> {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.CacheDir
+import moe.antimony.hoshi.di.IoDispatcher
 
 internal interface TtsAudioSource {
     suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File>
@@ -21,23 +22,27 @@ internal interface TtsAudioSource {
 class TtsAudioRepository @Inject constructor(
     private val engine: AndroidTtsEngine,
     @param:CacheDir private val cache: File,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : TtsAudioSource {
     private val lock = Mutex()
     private val files = linkedMapOf<String, List<File>>()
-    override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> = lock.withLock {
-        val spoken = TtsText.spoken(sentence, bookId, preferences.words)
-        val identity = "${preferences.settings}\u0000$spoken"
-        val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
-        files[key]?.takeIf { list -> list.all { it.isFile } }?.let { return@withLock it }
-        engine.synthesize(spoken, preferences.settings, File(cache, "tts/playback")).also {
-            files[key] = it
-            // Keep references bounded. Files are pruned after they are no longer part of an active session.
-            if (files.size > 32) withContext(Dispatchers.IO) { files.remove(files.keys.first())?.forEach { old -> old.delete() } }
+    override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
+        withContext(ioDispatcher) {
+            lock.withLock {
+                val spoken = TtsText.spoken(sentence, bookId, preferences.words)
+                val identity = "${preferences.settings}\u0000$spoken"
+                val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+                files[key]?.takeIf { list -> list.all { it.isFile } }?.let { return@withLock it }
+                engine.synthesize(spoken, preferences.settings, File(cache, "tts/playback")).also {
+                    files[key] = it
+                    // Keep references bounded. Files are pruned after they are no longer part of an active session.
+                    if (files.size > 32) files.remove(files.keys.first())?.forEach { old -> old.delete() }
+                }
+            }
         }
-    }
 
     override suspend fun clearPlaybackCache() = lock.withLock {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             files.clear()
             File(cache, "tts/playback").deleteRecursively()
             Unit
@@ -46,7 +51,7 @@ class TtsAudioRepository @Inject constructor(
 
     /** Export has its own lifetime so changing books cannot delete Anki's pending upload. */
     suspend fun export(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): File =
-        withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.wav")) { target ->
+        withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.wav"), ioDispatcher) { target ->
             val parts = engine.synthesize(TtsText.spoken(sentence, bookId, preferences.words), preferences.settings, File(cache, "tts/export"))
             try {
                 TtsWav.concatenate(parts, target)

@@ -8,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +17,26 @@ import org.junit.runner.RunWith
 /** Read-only engine discovery and synthesis into test-owned cache; never changes system voices or preferences. */
 @RunWith(AndroidJUnit4::class)
 class TtsEngineDeviceTest {
+    @Test fun imageGlyphRubySynthesizesThroughPlaybackRepositoryFromMain() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val directory = File(context.cacheDir, "tts-image-ruby-device-test")
+        val audio = TtsAudioRepository(AndroidTtsEngine(context), directory, Dispatchers.IO)
+        val sentences = TtsText.chapter(0, "<p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。次を<ruby><img src='glyph.png'/><rt>き</rt></ruby>く。</p>")
+        try {
+            withContext(Dispatchers.Main) {
+                sentences.forEach { sentence ->
+                    val files = audio.audio(sentence, null, TtsPreferences())
+                    assertTrue(files.isNotEmpty())
+                    assertTrue(files.all { it.length() > 44 })
+                    assertEquals(files, audio.audio(sentence, null, TtsPreferences()))
+                }
+            }
+        } finally {
+            audio.clearPlaybackCache()
+            withContext(Dispatchers.IO) { directory.deleteRecursively() }
+        }
+    }
+
     @Test fun installedJapaneseEngineProducesPlayableSentenceFile() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val engine = AndroidTtsEngine(context)

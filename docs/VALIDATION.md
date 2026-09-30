@@ -1053,7 +1053,12 @@ Validate relevant sync/update/Sasayaki changes with:
   `moe.antimony.hoshi.features.tts.TtsSessionPlayerTest`, plus
   `moe.antimony.hoshi.features.reader.ReaderTtsHighlightWebViewTest` via `am instrument`.
   These discover installed voices and synthesize into test-owned cache, without changing
-  engine preferences or library data. Require `OK (5 tests)` (or the current test count).
+  engine preferences or library data. Require `OK (6 tests)` (or the current test count).
+  The engine tests include image-backed ruby through the playback repository invoked
+  from Main. `TtsTextTest` covers zero-width insertions (including shared/end positions),
+  invalid ranges and sentence export: every source cursor step must advance or finish,
+  and glyph readings must not alter Reader offsets. Include a chapter with image-backed
+  ruby in continuous playback checks so the two-sentence prefetch path is exercised.
   The Reader fixture verifies actual sentence highlight pixels across all six
   mode/writing-direction combinations using an explicit saturated highlight color;
   do not apply opaque-color thresholds to the default translucent highlight.

@@ -777,6 +777,10 @@ QA matrices live in `docs/VALIDATION.md`.
   scope; ruby is used where no custom reading overlaps. Replacements affect synthesis
   only. Mining rebases ruby against the selected source occurrence, including full
   VN source sentences, rather than looking up the first matching text.
+  Image-backed ruby uses zero-width insertions, emitted once at each source position;
+  only positive, in-bounds ruby ranges may advance the source cursor. Playback text
+  preprocessing, cache hashing and file access run on the repository's injected IO
+  dispatcher, including calls made by the main-thread playback controller.
 - `AndroidTtsEngine` serializes installed-engine discovery and `synthesizeToFile`,
   filters Japanese voices, bounds initialization/utterance waits, splits oversized
   inputs, and accepts files only after completion. No remote TTS client or voice model

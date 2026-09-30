@@ -4,6 +4,41 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TtsTextTest {
+    @Test fun imageBackedRubyIsSpokenOnceWithoutAddingSourceCharacters() {
+        val sentence = TtsText.chapter(0, "<p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。<ruby><img src='glyph.png'/><rt>き</rt></ruby>く。</p>")
+        assertEquals(listOf("ねた。", "く。"), sentence.map { it.text })
+        assertEquals(listOf(0, 2), sentence.map { it.start })
+        assertEquals(listOf("たずねた。", "きく。"), sentence.map { TtsText.spoken(it, null, emptyList()) })
+    }
+
+    @Test fun zeroWidthReadingsAtSharedAndEndPositionsAreEmittedOnlyOnce() {
+        val sentence = TtsSentence(0, 0, 1, "字", listOf(
+            TtsRuby(0, 0, "あ"), TtsRuby(0, 0, "い"), TtsRuby(0, 1, "じ"), TtsRuby(1, 1, "う"),
+        ))
+        assertEquals("あいじう", TtsText.spoken(sentence, null, emptyList()))
+        assertEquals("あいしう", TtsText.spoken(sentence, null, listOf(TtsWord("a", "字", "し"))))
+    }
+
+    @Test fun sentenceSelectionRetainsImageGlyphReadingsFromItsOwnSourceSentence() {
+        val source = TtsText.chapter(0, "<p>前。</p><p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。</p><p><ruby><img src='glyph.png'/><rt>き</rt></ruby>く。</p>")
+        val selected = TtsText.selection(source, "ねた。", 1, 0)
+        assertEquals("たずねた。", TtsText.spoken(selected, null, emptyList()))
+        assertEquals("ねた。", selected.text)
+        assertEquals(1, selected.start)
+    }
+
+    @Test fun invalidRubyRangesCannotMoveBackwardsOrSkipSourceText() {
+        val sentence = TtsSentence(0, 0, 2, "文字", listOf(TtsRuby(0, -1, "あ"), TtsRuby(0, 8, "い"), TtsRuby(1, 0, "う")))
+        assertEquals("文字", TtsText.spoken(sentence, null, emptyList()))
+    }
+
+    @Test fun rubyWithoutBaseDoesNotCreateAnEmptySourceRange() {
+        val sentence = TtsText.chapter(0, "<p>前<ruby><rt>から</rt></ruby><ruby>東京<rt>とうきょう</rt></ruby>です。</p>").single()
+        assertEquals("前東京です。", sentence.text)
+        assertEquals(listOf(TtsRuby(1, 3, "とうきょう")), sentence.ruby)
+        assertEquals("前とうきょうです。", TtsText.spoken(sentence, null, emptyList()))
+    }
+
     @Test fun selectionUsesTheAnchoredOccurrenceAndRebasesRubyAfterBracketTrimming() {
         val source = TtsText.chapter(0, "<p><ruby>東京<rt>とうきょう</rt></ruby>です。</p><p>「<ruby>東京<rt>とうけい</rt></ruby>です。</p>")
         val selected = TtsText.selection(source, "東京です。", 4, 0)
