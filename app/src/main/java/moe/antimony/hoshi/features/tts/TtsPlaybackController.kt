@@ -51,6 +51,7 @@ class TtsPlaybackController internal constructor(
     private var preparedIndex: Int? = null
     private var preferences = TtsPreferences()
     private var associated = false
+    private var stopAfterSentence = false
     var imageHoldMillis: Long = 1_000
     var presentSentence: (suspend (TtsSentence, Boolean) -> Unit)? = null
     private var heldImageIndex: Int? = null
@@ -96,24 +97,25 @@ class TtsPlaybackController internal constructor(
     fun attachPlayer(next: ExoPlayer) { (output as? AndroidTtsPlaybackOutput)?.attach(next) }
     fun detachPlayer() { (output as? AndroidTtsPlaybackOutput)?.detach(); pause(); preparedIndex = null }
 
-    fun startAt(chapter: Int, offset: Int) {
+    fun startAt(chapter: Int, offset: Int, singleSentence: Boolean = false) {
         val values = state.value.sentences
         val selected = values.indexOfFirst { it.chapter > chapter || it.chapter == chapter && it.start + it.length > offset }
-        if (selected >= 0) seek(selected)
-        else if (values.isNotEmpty()) seek(values.lastIndex)
+        if (selected >= 0) seek(selected, singleSentence)
+        else if (values.isNotEmpty()) seek(values.lastIndex, singleSentence)
     }
     fun toggle() { if (state.value.playing) pause() else play() }
     fun previous() = seek((state.value.index - 1).coerceAtLeast(0))
     fun next() = seek((state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
     fun repeat() = seek(state.value.index)
     private fun advance() {
-        if (state.value.index < state.value.sentences.lastIndex) next()
+        if (!stopAfterSentence && state.value.index < state.value.sentences.lastIndex) next()
         else { pause(); preparedIndex = null }
     }
-    private fun seek(index: Int) {
+    private fun seek(index: Int, singleSentence: Boolean = false) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
         output.clear()
+        stopAfterSentence = singleSentence
         preparedIndex = null
         mutableState.value = state.value.copy(index = index)
         play()
@@ -169,6 +171,7 @@ class TtsPlaybackController internal constructor(
     }
     private fun fail(failure: TtsFailure) { pause(); mutableState.value = state.value.copy(error = failure) }
     fun stop() {
+        stopAfterSentence = false
         loadGeneration++
         pause()
         loadJob?.cancel(); loadJob = null

@@ -60,7 +60,7 @@
     }
 
     function frameContentTop(payload) {
-        return (payload.actionBarVisible ? ACTION_BAR_HEIGHT : 0) + (payload.sasayakiVisible ? SASAYAKI_BAR_HEIGHT : 0);
+        return (payload.actionBarVisible ? ACTION_BAR_HEIGHT : 0) + ((payload.sasayakiVisible || payload.ttsVisible) ? SASAYAKI_BAR_HEIGHT : 0);
     }
 
     function button(iconName, enabled, action, label, className = '') {
@@ -105,12 +105,14 @@
                 iframe,
             );
         }
-        if (payload.sasayakiVisible) {
+        if (payload.sasayakiVisible || payload.ttsVisible) {
+            const tts = payload.ttsVisible && !payload.sasayakiVisible;
+            const playing = tts ? payload.ttsIsPlaying || payload.ttsWasPaused : payload.sasayakiIsPlaying || payload.sasayakiWasPaused;
             shell.insertBefore(
                 buildBar('hoshi-reader-popup-bar hoshi-reader-popup-sasayaki-bar', [
-                    button('replay', true, () => postNative({ name: 'sasayakiReplayCue', popupId: payload.id }), 'Replay cue', 'hoshi-reader-popup-sasayaki-control'),
-                    button((payload.sasayakiIsPlaying || payload.sasayakiWasPaused) ? 'pause' : 'play_arrow', true, () => postNative({ name: 'sasayakiTogglePlayback', popupId: payload.id }), 'Play or pause', 'hoshi-reader-popup-sasayaki-control'),
-                    button('start', true, () => postNative({ name: 'sasayakiPlayForward', popupId: payload.id }), 'Play from cue', 'hoshi-reader-popup-sasayaki-control')
+                    button('replay', true, () => postNative({ name: tts ? 'ttsReplaySentence' : 'sasayakiReplayCue', popupId: payload.id }), 'Replay cue', 'hoshi-reader-popup-sasayaki-control'),
+                    button((playing) ? 'pause' : 'play_arrow', true, () => postNative({ name: tts ? 'ttsTogglePlayback' : 'sasayakiTogglePlayback', popupId: payload.id }), 'Play or pause', 'hoshi-reader-popup-sasayaki-control'),
+                    button('start', true, () => postNative({ name: tts ? 'ttsPlayForward' : 'sasayakiPlayForward', popupId: payload.id }), 'Play from cue', 'hoshi-reader-popup-sasayaki-control')
                 ]),
                 iframe,
             );

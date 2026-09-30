@@ -368,6 +368,9 @@ fun ReaderWebView(
     val showSasayaki = stateHolder.showSasayaki
     val showStatistics = stateHolder.showStatistics
     val focusMode = stateHolder.focusMode
+    LaunchedEffect(ttsState.error) {
+        if (ttsAvailable && ttsState.error != null && stateHolder.lookupPopups.isNotEmpty()) showTts = true
+    }
     val sasayakiWasPausedByLookup = stateHolder.sasayakiWasPausedByLookup
     var persistedStatistics by remember(bookRoot) {
         mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
@@ -591,7 +594,7 @@ fun ReaderWebView(
                 contentLanguageProfile = popupContentLanguageProfile,
             ),
         )?.let { (popup, highlightCount) ->
-            popup.copy(sasayakiCue = sasayakiCueForSelection(selection)) to highlightCount
+            popup.copy(sasayakiCue = sasayakiCueForSelection(selection), readerChapterIndex = readerPosition.displayedPosition.index) to highlightCount
         }
     fun lookupChildPopup(selection: ReaderSelectionData): Pair<LookupPopupItem, Int>? =
         createLookupPopupItem(
@@ -848,7 +851,7 @@ fun ReaderWebView(
                 val needsSasayaki = ankiUiState.usesHandlebar(message.formatId, "{sasayaki-audio}")
                 val linkedAudio = ttsAssociated
                 val audioPlayer = sasayakiPlayer
-                val selectionChapter = readerPosition.displayedPosition.index
+                val selectionChapter = popup.readerChapterIndex ?: readerPosition.displayedPosition.index
                 ttsMiningJobs[message.popupId] = scope.launch {
                     var generated: File? = null
                     try {
@@ -964,6 +967,30 @@ fun ReaderWebView(
                 }
             }
             is ReaderLookupPopupBridgeMessage.ContentReady -> Unit
+            is ReaderLookupPopupBridgeMessage.TtsReplaySentence,
+            is ReaderLookupPopupBridgeMessage.TtsTogglePlayback,
+            is ReaderLookupPopupBridgeMessage.TtsPlayForward -> {
+                val popup = popupById(message.popupId) ?: return
+                val chapter = popup.readerChapterIndex ?: return
+                val offset = popup.state.selection.normalizedOffset ?: return
+                if (!ttsAvailable) return
+                WordAudioPlayer.get(context).stop()
+                val wasPaused = ttsLookupResume != null
+                ttsLookupResume = null
+                when (message) {
+                    is ReaderLookupPopupBridgeMessage.TtsReplaySentence ->
+                        ttsViewModel.playback.startAt(chapter, offset, singleSentence = true)
+                    is ReaderLookupPopupBridgeMessage.TtsPlayForward -> {
+                        ttsViewModel.playback.startAt(chapter, offset)
+                        closeLookupPopupsAndSelection()
+                    }
+                    else -> {
+                        if (wasPaused) ttsViewModel.playback.pause()
+                        else if (ttsState.started) ttsViewModel.playback.toggle()
+                        else ttsViewModel.playback.startAt(chapter, offset)
+                    }
+                }
+            }
             is ReaderLookupPopupBridgeMessage.SasayakiReplayCue -> {
                 popupById(message.popupId)?.sasayakiCue?.let { cue ->
                     WordAudioPlayer.get(context).stop()
@@ -1875,6 +1902,7 @@ fun ReaderWebView(
                     readerLookupPopupViewport,
                     sasayakiWasPausedByLookup,
                     sasayakiPlayer?.isPlaying == true,
+                    ttsAvailable, ttsState.playing, ttsState.sentences.isNotEmpty(), ttsLookupResume,
                     readerPopupIframeUrl,
                     rootSelectionHighlight,
                 ) {
@@ -1883,7 +1911,10 @@ fun ReaderWebView(
                         histories = readerPopupHistories,
                         viewport = readerLookupPopupViewport,
                         sasayakiWasPaused = sasayakiWasPausedByLookup,
-                        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true || ttsState.playing,
+                        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                        ttsAvailable = ttsAvailable && ttsState.sentences.isNotEmpty(),
+                        ttsIsPlaying = ttsState.playing,
+                        ttsWasPaused = ttsLookupResume != null,
                         iframeUrl = readerPopupIframeUrl,
                         rootSelectionHighlight = rootSelectionHighlight,
                     )

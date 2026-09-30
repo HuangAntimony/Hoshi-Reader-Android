@@ -621,6 +621,9 @@ internal fun DictionarySearchView(
             }
             is ReaderLookupPopupBridgeMessage.SasayakiReplayCue,
             is ReaderLookupPopupBridgeMessage.SasayakiTogglePlayback,
+            is ReaderLookupPopupBridgeMessage.TtsReplaySentence,
+            is ReaderLookupPopupBridgeMessage.TtsTogglePlayback,
+            is ReaderLookupPopupBridgeMessage.TtsPlayForward,
             is ReaderLookupPopupBridgeMessage.SasayakiPlayForward,
             -> Unit
         }

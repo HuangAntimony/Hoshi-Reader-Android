@@ -1063,6 +1063,12 @@ Validate relevant sync/update/Sasayaki changes with:
   while preparing and verify playback pauses. Edit readings during playback, while
   paused and while preparing; replay/next must use the new reading. Check overlapping
   entries, book/global scope, duplicate errors, persistence and context preview.
+- Open a source lookup popup with and without TTS already playing. Verify replay stops
+  after its selected sentence, toggle reflects playback and cancels pending lookup
+  auto-resume, and play-forward closes the popup and continues from that source sentence.
+  Nested dictionary popups must not acquire a book playback anchor; linked audiobooks
+  keep their original controls. `ReaderTtsPopupTest` and the reader popup JS tests cover
+  source visibility and command routing; controller tests cover replay/forward boundaries.
 - Test Home/lock screen, notification/headset previous/next sentence and pause/resume,
   interruptions, task removal while preparing, and explicit Reader exit. After TTS has
   created a media session, leave and reopen a book and switch to another book before

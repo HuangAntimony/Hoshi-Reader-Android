@@ -157,4 +157,17 @@ class TtsPlaybackControllerTest {
             assertFalse(controller.state.value.playing)
         }
     }
+    @Test fun popupReplayStopsAfterOneSentenceAndForwardRestoresContinuousPlayback() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.startAt(0, 0, singleSentence = true); runCurrent()
+            output.onEnded(); runCurrent()
+            assertEquals(0, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            controller.startAt(0, 0); runCurrent()
+            output.onEnded(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertTrue(controller.state.value.playing)
+        }
+    }
+
 }

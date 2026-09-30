@@ -45,8 +45,8 @@ class FakeElement {
         this.eventListeners.set(type, listeners);
     }
 
-    dispatchEvent(type) {
-        (this.eventListeners.get(type) ?? []).forEach((listener) => listener());
+    dispatchEvent(type, event = { preventDefault() {}, stopPropagation() {} }) {
+        (this.eventListeners.get(type) ?? []).forEach((listener) => listener(event));
     }
 
     getClientRects() {
@@ -870,4 +870,20 @@ test('horizontal e-ink sasayaki line follows the ruby-aware height for the whole
     assert.equal(sasayakiHighlights[0].style.top, '42.5px');
     assert.equal(sasayakiHighlights[0].style.width, '32px');
     assert.equal(sasayakiHighlights[0].style.height, '1.5px');
+});
+
+test('TTS popup controls are visible without an audiobook and dispatch only TTS actions', () => {
+    const { host, document, window } = popupHost();
+    const messages = [];
+    window.HoshiReaderPopup = { postMessage: value => messages.push(JSON.parse(value)) };
+    const payload = { ...rootPopupPayload(), sasayakiVisible: false, ttsVisible: true, ttsIsPlaying: false, ttsWasPaused: true };
+    host.renderStack({ popups: [payload] });
+    const bar = document.querySelectorAll('.hoshi-reader-popup-sasayaki-bar')[0];
+    assert.ok(bar);
+    assert.equal(bar.children.length, 3);
+    assert.match(bar.children[1].style['--icon-url'], /pause.svg/);
+    bar.children.forEach(button => button.dispatchEvent('click'));
+    assert.deepEqual(messages.map(m => m.name), ['ttsReplaySentence', 'ttsTogglePlayback', 'ttsPlayForward']);
+    host.renderStack({ popups: [{ ...payload, ttsWasPaused: false }] });
+    assert.match(document.querySelectorAll('.hoshi-reader-popup-sasayaki-bar')[0].children[1].style['--icon-url'], /play_arrow.svg/);
 });

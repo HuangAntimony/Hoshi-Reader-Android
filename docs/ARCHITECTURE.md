@@ -797,6 +797,11 @@ QA matrices live in `docs/VALIDATION.md`.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.
+- Root Reader lookup popups retain their source chapter and expose independent TTS
+  visibility/playback state and typed bridge commands. The shared three-button toolbar
+  routes to the active source: TTS replay stops after one sentence, toggle can cancel
+  lookup auto-resume, and play-forward closes the popup. Dictionary child popups have
+  no book source anchor and do not expose TTS controls. Audiobook controls remain unchanged.
 - Anki `{sentence-audio}` has its own mining context field and selected-format media
   preparation. Associated audiobooks require an existing cue; otherwise TTS synthesizes
   the full source sentence. Missing audiobook cues never trigger TTS. Existing

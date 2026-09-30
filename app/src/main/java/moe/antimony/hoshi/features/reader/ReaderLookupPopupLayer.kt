@@ -24,6 +24,9 @@ internal fun readerLookupPopupFramePayloads(
     sasayakiIsPlaying: Boolean,
     iframeUrl: String,
     rootSelectionHighlight: ReaderRootSelectionHighlight?,
+    ttsAvailable: Boolean = false,
+    ttsWasPaused: Boolean = false,
+    ttsIsPlaying: Boolean = false,
 ): List<ReaderLookupPopupFramePayload> =
     popups.mapIndexed { index, popup ->
         val history = histories[popup.id] ?: ReaderPopupHistoryCounts()
@@ -33,6 +36,9 @@ internal fun readerLookupPopupFramePayloads(
             viewport = viewport,
             backCount = history.backCount,
             forwardCount = history.forwardCount,
+            ttsAvailable = ttsAvailable,
+            ttsWasPaused = ttsWasPaused,
+            ttsIsPlaying = ttsIsPlaying,
             sasayakiWasPaused = sasayakiWasPaused,
             sasayakiIsPlaying = sasayakiIsPlaying,
             iframeUrl = iframeUrl,
@@ -48,6 +54,9 @@ private fun shouldSendInitialEntryJson(
     popup: LookupPopupItem,
     popupIndex: Int,
     rootSelectionHighlight: ReaderRootSelectionHighlight?,
+    ttsAvailable: Boolean = false,
+    ttsWasPaused: Boolean = false,
+    ttsIsPlaying: Boolean = false,
 ): Boolean =
     popupIndex != 0 ||
         rootSelectionHighlight?.popupId != popup.id ||
