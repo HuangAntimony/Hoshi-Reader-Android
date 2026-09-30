@@ -28,6 +28,10 @@ internal sealed interface ReaderSelectionCommand {
             "JSON.stringify(window.hoshiSelection.selectionRects($count))"
     }
 
+    data object NativeContext : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.nativeSelectionContext()"
+    }
+
     data object ClearSelection : ReaderSelectionCommand {
         override val source: String =
             "window.hoshiSelection.clearSelection()"

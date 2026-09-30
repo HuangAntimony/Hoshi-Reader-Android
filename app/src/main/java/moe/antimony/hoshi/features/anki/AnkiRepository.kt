@@ -219,6 +219,11 @@ internal class AnkiRepository(
             ?: return@withContext false
         val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")
         val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
+        val needsSentenceAudio = fieldMappings.referencesAnkiHandlebar("{sentence-audio}")
+        val uploadedAudio = mutableMapOf<String, String?>()
+        fun uploadSentence(path: String): String? = if (uploadedAudio.containsKey(path)) uploadedAudio[path] else {
+            addHashedMediaFile(path, "hoshi_sasayaki", activeBackend, settings.backendKind).also { uploadedAudio[path] = it }
+        }
         val needsAudio = fieldMappings.referencesAnkiHandlebar("{audio}")
         val mediaContext = AnkiMiningContext(
             sentence = context.sentence,
@@ -227,10 +232,12 @@ internal class AnkiRepository(
                 addHashedMediaFile(it, "hoshi_cover", activeBackend, settings.backendKind)
             },
             sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
-                addHashedMediaFile(it, "hoshi_sasayaki", activeBackend, settings.backendKind)
+                uploadSentence(it)
             },
+            sentenceAudioPath = context.sentenceAudioPath?.takeIf { needsSentenceAudio }?.let(::uploadSentence),
             sentenceOffset = context.sentenceOffset,
         )
+        if (needsSentenceAudio && mediaContext.sentenceAudioPath.isNullOrBlank()) return@withContext false
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { needsAudio && it.isNotBlank() }
                 ?.let { addRemoteAudio(it, activeBackend, settings.backendKind) }

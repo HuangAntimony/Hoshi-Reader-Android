@@ -47,6 +47,7 @@ fun AdvancedSettingsView(
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit = {},
+    onOpenTts: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var destination by remember { mutableStateOf<AdvancedDestination?>(null) }
@@ -117,7 +118,7 @@ fun AdvancedSettingsView(
                                 leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
                                 headlineContent = { Text(stringResource(row.titleRes)) },
                                 supportingContent = row.subtitleRes?.let { subtitleRes -> { Text(stringResource(subtitleRes)) } },
-                                modifier = Modifier.clickable { destination = row.destination },
+                                modifier = Modifier.clickable { if (row.destination == AdvancedDestination.Tts) onOpenTts() else destination = row.destination },
                             )
                             if (index != section.rows.lastIndex) {
                                 GroupDivider()
@@ -144,6 +145,7 @@ fun AdvancedSettingsView(
 internal enum class AdvancedDestination {
     Audio,
     Sasayaki,
+    Tts,
     Backup,
     Syncing,
     AnkiConnect,
@@ -179,6 +181,7 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     destination = AdvancedDestination.Audio,
                     icon = AdvancedSettingsIcon.Speaker,
                 ),
+                AdvancedSettingsRow(titleRes = R.string.tts_title, destination = AdvancedDestination.Tts, icon = AdvancedSettingsIcon.Speaker),
                 AdvancedSettingsRow(
                     titleRes = R.string.advanced_sasayaki_audiobooks,
                     destination = AdvancedDestination.Sasayaki,

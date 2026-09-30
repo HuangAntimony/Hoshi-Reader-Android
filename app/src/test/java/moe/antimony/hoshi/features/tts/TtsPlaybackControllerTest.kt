@@ -1,0 +1,160 @@
+package moe.antimony.hoshi.features.tts
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import java.io.File
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.test.*
+import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubChapter
+import org.junit.Assert.*
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class TtsPlaybackControllerTest {
+    private class MemoryStore : DataStore<Preferences> {
+        override val data = MutableStateFlow(emptyPreferences())
+        override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = transform(data.value).also { data.value = it }
+    }
+    private class Output : TtsPlaybackOutput {
+        override var onEnded: () -> Unit = {}
+        override var onPaused: () -> Unit = {}
+        override var onError: () -> Unit = {}
+        var playCount = 0
+        var prepared = emptyList<File>()
+        override suspend fun connect() = Unit
+        override fun prepare(files: List<File>, title: String, sentence: String) { prepared = files }
+        override fun play() { playCount++ }
+        override fun pause() = Unit
+        override fun clear() { prepared = emptyList() }
+        override fun disconnect() = Unit
+    }
+    private class Audio : TtsAudioSource {
+        val requests = mutableListOf<String>()
+        var synthesize: suspend (TtsSentence) -> Unit = {}
+        override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> {
+            requests += TtsText.spoken(sentence, bookId, preferences.words)
+            synthesize(sentence)
+            return listOf(File("${sentence.start}.wav"))
+        }
+        override suspend fun clearPlaybackCache() = Unit
+    }
+    private val book = EpubBook("Fixture", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>東京です。次です。三つです。四つです。</p>")))
+    private suspend fun TestScope.fixture(body: suspend (TtsPlaybackController, Output, Audio, TtsRepository) -> Unit) {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val repository = TtsRepository(MemoryStore())
+            val output = Output()
+            val audio = Audio()
+            val controller = TtsPlaybackController(TtsBookRepository(UnconfinedTestDispatcher(testScheduler)), repository, audio, output, backgroundScope)
+            controller.load("book", book, false)
+            withTimeout(5_000) { controller.state.first { it.sentences.isNotEmpty() } }
+            body(controller, output, audio, repository)
+            controller.stop()
+        } finally { backgroundScope.cancel(); runCurrent(); Dispatchers.resetMain() }
+    }
+    @Test fun prefetchIsBoundedAndNavigationUsesSentences() = runTest {
+        fixture { controller, output, audio, _ ->
+            controller.play(); runCurrent()
+            assertEquals(1, output.playCount)
+            assertEquals(3, audio.requests.size)
+            output.onEnded(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+            controller.previous(); runCurrent()
+            assertEquals(0, controller.state.value.index)
+        }
+    }
+    @Test fun loadingAudiobookDiscardsLateSynthesisAndCannotResume() = runTest {
+        fixture { controller, output, audio, _ ->
+            val done = CompletableDeferred<Unit>()
+            audio.synthesize = { withContext(NonCancellable) { done.await() } }
+            controller.play(); runCurrent()
+            assertTrue(controller.state.value.preparing)
+            controller.load("book", book, true)
+            done.complete(Unit); runCurrent()
+            controller.play(); runCurrent()
+            assertEquals(0, output.playCount)
+            assertFalse(controller.state.value.playing)
+            assertNull(controller.state.value.bookId)
+        }
+    }
+    @Test fun engineFailureIsVisibleAndRetryCanPlay() = runTest {
+        fixture { controller, output, audio, _ ->
+            audio.synthesize = { throw TtsException(TtsFailure.MissingJapanese) }
+            controller.play(); runCurrent()
+            assertEquals(TtsFailure.MissingJapanese, controller.state.value.error)
+            assertFalse(controller.state.value.playing)
+            audio.synthesize = {}
+            controller.play(); runCurrent()
+            assertEquals(1, output.playCount)
+            assertNull(controller.state.value.error)
+        }
+    }
+    @Test fun changingVoicePausesAndNextPlayUsesNewSettings() = runTest {
+        fixture { controller, output, _, repository ->
+            controller.play(); runCurrent()
+            repository.settings(TtsSettings(voice = "new")); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertTrue(output.prepared.isEmpty())
+            controller.play(); runCurrent()
+            assertEquals(2, output.playCount)
+        }
+    }
+    @Test fun dictionaryEditDoesNotInterruptCurrentSentenceButReplayUsesNewReading() = runTest {
+        fixture { controller, output, audio, repository ->
+            controller.play(); runCurrent()
+            repository.save(TtsWord("a", "東京", "とうけい", "book")); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            controller.repeat(); runCurrent()
+            assertTrue(audio.requests.contains("とうけいです。"))
+        }
+    }
+    @Test fun dictionaryEditDuringSynthesisCannotPlayTheOldReading() = runTest {
+        fixture { controller, output, audio, repository ->
+            val done = CompletableDeferred<Unit>()
+            var first = true
+            audio.synthesize = { if (first) { first = false; withContext(NonCancellable) { done.await() } } }
+            controller.play(); runCurrent()
+            repository.save(TtsWord("a", "東京", "とうけい", "book")); runCurrent()
+            done.complete(Unit); runCurrent()
+            assertEquals(1, output.playCount)
+            assertTrue(audio.requests.contains("とうけいです。"))
+        }
+    }
+    @Test fun dictionaryEditWhilePausedInvalidatesPreparedAudio() = runTest {
+        fixture { controller, output, audio, repository ->
+            controller.play(); runCurrent()
+            controller.pause()
+            repository.save(TtsWord("a", "東京", "とうけい", "book")); runCurrent()
+            assertFalse(controller.state.value.playing)
+            controller.play(); runCurrent()
+            assertEquals(2, output.playCount)
+            assertTrue(audio.requests.contains("とうけいです。"))
+        }
+    }
+    @Test fun explicitPauseAfterLookupPreventsAutomaticResume() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            val resume = controller.pauseForLookup()
+            controller.pause()
+            resume(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+        }
+    }
+    @Test fun stopDuringPreparationNeverResurrectsPlayback() = runTest {
+        fixture { controller, output, audio, _ ->
+            val done = CompletableDeferred<Unit>()
+            audio.synthesize = { withContext(NonCancellable) { done.await() } }
+            controller.play(); runCurrent()
+            controller.stop()
+            done.complete(Unit); runCurrent()
+            assertEquals(0, output.playCount)
+            assertFalse(controller.state.value.playing)
+        }
+    }
+}

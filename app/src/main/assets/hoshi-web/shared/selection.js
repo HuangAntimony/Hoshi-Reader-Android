@@ -877,6 +877,35 @@ window.hoshiSelection = {
         return count;
     },
 
+    nativeSelectionContext() {
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return null;
+        const range = selection.getRangeAt(0);
+        if (range.collapsed) return null;
+        let node = range.startContainer;
+        let offset = range.startOffset;
+        if (node.nodeType !== Node.TEXT_NODE) {
+            node = node.childNodes[offset];
+            while (node && node.nodeType !== Node.TEXT_NODE) node = node.firstChild;
+            offset = 0;
+        }
+        if (!node) return null;
+        const projection = this.options.textProjection;
+        const hit = projection ? projection.toSemanticHit?.({ node, offset }) : { node, offset };
+        if (!hit) return null;
+        const fragment = range.cloneContents();
+        fragment.querySelectorAll('rt, rp').forEach(element => element.remove());
+        const context = this.getSentenceContext(hit.node, hit.offset);
+        const rect = range.getBoundingClientRect();
+        return {
+            text: fragment.textContent,
+            sentence: context.sentence,
+            sentenceOffset: context.sentenceOffset,
+            normalizedOffset: projection ? projection.normalizedOffsetForHit?.(hit) : this.getNormalizedOffset(hit.node, hit.offset),
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        };
+    },
+
     clearSelection() {
         window.getSelection()?.removeAllRanges();
         CSS.highlights?.get('hoshi-selection')?.clear();

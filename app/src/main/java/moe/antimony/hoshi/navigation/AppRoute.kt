@@ -40,6 +40,9 @@ sealed interface AppRoute : NavKey {
     data object AnkiAdvancedRoute : AppRoute
 
     @Serializable
+    data object TtsSettingsRoute : AppRoute
+
+    @Serializable
     data class ReaderRoute(
         val bookId: String,
     ) : AppRoute

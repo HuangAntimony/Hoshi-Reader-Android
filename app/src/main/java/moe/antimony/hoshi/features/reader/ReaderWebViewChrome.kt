@@ -387,6 +387,7 @@ internal fun BoxScope.ReaderBottomChrome(
     onReadingSettings: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
+    onTts: (() -> Unit)? = null,
     metrics: ReaderBottomChromeMetrics,
     modifier: Modifier = Modifier,
 ) {
@@ -417,6 +418,7 @@ internal fun BoxScope.ReaderBottomChrome(
             onReadingSettings = onReadingSettings,
             onStatistics = onStatistics,
             onSasayaki = onSasayaki,
+            onTts = onTts,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = metrics.horizontalPaddingDp.dp, bottom = metrics.menuBottomOffsetDp.dp),
@@ -646,6 +648,7 @@ private fun ReaderMenuCard(
     onReadingSettings: () -> Unit,
     onStatistics: (() -> Unit)?,
     onSasayaki: (() -> Unit)?,
+    onTts: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -676,6 +679,7 @@ private fun ReaderMenuCard(
             readerBottomMenuVisualOrder(
                 showStatistics = onStatistics != null,
                 showSasayaki = onSasayaki != null,
+                showTts = onTts != null,
             ).forEachIndexed { index, destination ->
                 if (index > 0) {
                     HorizontalDivider(
@@ -740,6 +744,11 @@ private fun ReaderMenuCard(
                         onClick = onStatistics ?: return@forEachIndexed,
                     )
 
+                    ReaderMenuDestination.Tts -> ReaderMenuItem(
+                        text = stringResource(R.string.tts_title),
+                        icon = { Icon(readerBottomMenuIcon(ReaderMenuDestination.Tts), contentDescription = null, tint = Color(colors.menuContent)) },
+                        colors = colors, metrics = metrics, onClick = onTts ?: return@forEachIndexed,
+                    )
                     ReaderMenuDestination.Sasayaki -> ReaderMenuItem(
                         text = stringResource(R.string.sasayaki_title),
                         icon = {
@@ -765,6 +774,7 @@ internal fun readerBottomMenuIcon(destination: ReaderMenuDestination): ImageVect
         ReaderMenuDestination.ReadingSettings -> Icons.Rounded.FormatSize
         ReaderMenuDestination.GoTo -> Icons.Rounded.TravelExplore
         ReaderMenuDestination.Statistics -> Icons.AutoMirrored.Rounded.ShowChart
+        ReaderMenuDestination.Tts -> Icons.Rounded.GraphicEq
         ReaderMenuDestination.Sasayaki -> Icons.Rounded.GraphicEq
     }
 

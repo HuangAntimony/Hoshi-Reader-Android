@@ -764,3 +764,39 @@ Hard constraints:
 
 Durable validation commands, emulator data-safety rules, test data, and manual
 QA matrices live in `docs/VALIDATION.md`.
+
+## Japanese TTS
+
+- `features/tts` is an independent Hilt feature. `TtsRepository` persists engine,
+  Japanese voice, rate and scoped pronunciation entries in the `japanese_tts`
+  Preferences DataStore. It does not extend Sasayaki sidecars or sync payloads.
+- `TtsBookRepository` reads complete linear chapter source, including file-backed
+  cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
+  matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
+  Literal dictionary matching prefers longest surfaces, then book scope over global
+  scope; ruby is used where no custom reading overlaps. Replacements affect synthesis
+  only. Mining rebases ruby against the selected source occurrence, including full
+  VN source sentences, rather than looking up the first matching text.
+- `AndroidTtsEngine` serializes installed-engine discovery and `synthesizeToFile`,
+  filters Japanese voices, bounds initialization/utterance waits, splits oversized
+  inputs, and accepts files only after completion. No remote TTS client or voice model
+  ships with Hoshi. Network-required engine voices are explicitly labeled in the UI.
+- `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
+  configuration invalidation and two-sentence prefetch, and rejects stale operations
+  after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by
+  configuration and resolved spoken text; independent export files are owned by their
+  caller and cleaned on cancellation, including cancelled dispatcher return delivery.
+- `TtsPlaybackService` owns the Media3 ExoPlayer/session. `TtsSessionPlayer` exposes a
+  nonseekable sentence transport without seconds or a fabricated duration, and represents
+  synthesis/image holds as ongoing buffering. Media3 owns foreground notification and
+  audio focus. Reader attaches an optional presentation callback using the existing
+  cue-range commands and shared behavior settings; background progress needs no WebView.
+  Explicit Reader exit/route disposal stops playback; configuration recreation retains it.
+- Reader only offers the independent TTS sheet when no audiobook is associated.
+  Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
+  Settings route and dictionary remain available regardless of that association.
+- Anki `{sentence-audio}` has its own mining context field and selected-format media
+  preparation. Associated audiobooks require an existing cue; otherwise TTS synthesizes
+  the full source sentence. Missing audiobook cues never trigger TTS. Existing
+  `{sasayaki-audio}` remains audiobook-only. Shared audiobook paths upload once, and
+  a failed requested sentence upload prevents silently creating a card without audio.

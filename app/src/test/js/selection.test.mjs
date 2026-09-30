@@ -787,3 +787,22 @@ test('ruby reveal stops at styled siblings and non-ASCII whitespace as in iOS', 
         assert.equal(nodes[2].classList.contains('furigana-hidden'), false);
     }
 });
+
+test('native pronunciation selection uses full source sentence and excludes ruby annotations', () => {
+    const { selection, textNode, window } = loadSelection('東京へ行きました。');
+    const source = { node: textNode, offset: 0 };
+    selection.configure({ textProjection: {
+        toSemanticHit: () => source,
+        normalizedOffsetForHit: () => 42,
+    }});
+    const fragment = { textContent: '東京', querySelectorAll: () => [] };
+    window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => ({
+        collapsed: false, startContainer: textNode, startOffset: 0,
+        cloneContents: () => fragment,
+        getBoundingClientRect: () => ({ x: 0, y: 0, width: 10, height: 20 }),
+    }) });
+    const result = selection.nativeSelectionContext();
+    assert.equal(result.text, '東京');
+    assert.equal(result.sentence, '東京へ行きました。');
+    assert.equal(result.normalizedOffset, 42);
+});

@@ -132,6 +132,7 @@ enum class ReaderMenuDestination {
     GoTo,
     Statistics,
     Sasayaki,
+    Tts,
 }
 
 data class ReaderSasayakiBottomPlaybackControls(
@@ -342,7 +343,9 @@ private fun readerTopJumpHistoryIconSizeDp(topSafeAreaDp: Int): Int =
 fun readerBottomMenuVisualOrder(
     showStatistics: Boolean,
     showSasayaki: Boolean,
+    showTts: Boolean = false,
 ): List<ReaderMenuDestination> = buildList {
+    if (showTts) add(ReaderMenuDestination.Tts)
     if (showSasayaki) add(ReaderMenuDestination.Sasayaki)
     if (showStatistics) add(ReaderMenuDestination.Statistics)
     add(ReaderMenuDestination.GoTo)

@@ -49,6 +49,14 @@ data class AnkiUiState(
             } == true
         }
 
+    fun usesHandlebar(formatId: String?, handlebar: String): Boolean {
+        val formats = settings.effectiveCardFormats()
+        val format = (if (formatId == null) formats.firstOrNull() else formats.firstOrNull { it.id == formatId }) ?: return false
+        val noteType = availableNoteTypes.firstOrNull { it.id == format.selectedNoteTypeId || it.name == format.selectedNoteTypeName }
+        val mappings = noteType?.let(format.fieldMappings::activeAnkiFieldMappings) ?: format.fieldMappings
+        return mappings.values.any { handlebar in it }
+    }
+
     val popupSettings: AnkiPopupSettings
         get() {
             val backendAvailable = when (settings.backendKind) {
@@ -86,6 +94,7 @@ data class AnkiUiState(
                 useAnkiConnect = settings.backendKind == AnkiBackendKind.AnkiConnect,
                 needsAudio = activeMappings.any { "{audio}" in it },
                 needsSasayakiAudio = activeMappings.any { "{sasayaki-audio}" in it },
+                needsSentenceAudio = activeMappings.any { "{sentence-audio}" in it },
                 allowDupes = settings.allowDupes,
                 compactGlossaries = settings.compactGlossaries,
                 disableShowNotes = settings.disableShowNotes,
@@ -390,6 +399,9 @@ internal class AnkiViewModel @Inject constructor(
     fun updateShowAllHandlebars(value: Boolean) {
         viewModelScope.launch { repository.updateSettings { it.copy(showAllHandlebars = value) } }
     }
+
+    suspend fun minePreparedEntry(formatId: String?, rawPayload: String, context: AnkiMiningContext): Boolean =
+        repository.mineEntry(rawPayload, context, _uiState.value.availableDecks, _uiState.value.availableNoteTypes, formatId)
 
     fun mineEntryAsync(formatId: String?, rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {

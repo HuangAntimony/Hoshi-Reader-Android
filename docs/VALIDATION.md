@@ -1038,3 +1038,41 @@ Validate relevant sync/update/Sasayaki changes with:
   Media3 lifecycle regression until the same flow is reproduced with the app
   allowed to run in the background. Record both restriction states in manual QA
   notes.
+
+## Japanese TTS
+
+- Run `TtsTextTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
+  `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
+  ruby/offsets, file-backed chapters, literal scope precedence, long input splitting,
+  pending/paused pronunciation edits, stale callbacks, audiobook exclusion, cancellation
+  cleanup and the independent Anki handlebars. JS selection tests include full VN source
+  context rather than screen-clone text.
+- With a Japanese engine installed, build `assembleDebugAndroidTest`, install both
+  APKs using `adb install -r`, and run only the explicit classes
+  `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` and
+  `moe.antimony.hoshi.features.tts.TtsSessionPlayerTest`, plus
+  `moe.antimony.hoshi.features.reader.ReaderTtsHighlightWebViewTest` via `am instrument`.
+  These discover installed voices and synthesize into test-owned cache, without changing
+  engine preferences or library data. Require `OK (4 tests)` (or the current test count).
+  The Reader fixture verifies actual sentence highlight pixels across all six
+  mode/writing-direction combinations using an explicit saturated highlight color;
+  do not apply opaque-color thresholds to the default translucent highlight.
+- In each paginated/continuous/VN mode and writing direction, play from the current
+  position and selected sentence; check full source ruby, highlight position, chapter
+  transitions, page following, image holds and lookup pause/resume. Change voice/rate
+  while preparing and verify playback pauses. Edit readings during playback, while
+  paused and while preparing; replay/next must use the new reading. Check overlapping
+  entries, book/global scope, duplicate errors, persistence and context preview.
+- Test Home/lock screen, notification/headset previous/next sentence and pause/resume,
+  interruptions, task removal while preparing, and explicit Reader exit. The session
+  must expose no time seek commands. Check no engine, missing Japanese data, removed
+  selected engine, offline network voice, timeout and retry without clearing app data.
+- Associate/remove an audiobook: TTS stops, its sheet closes and Reader entry hides;
+  removal restores the entry without autoplay. A missing associated file must stay in
+  Sasayaki recovery. TTS Settings/dictionary stay accessible. Sasayaki's enable switch
+  must not disable TTS; behavior colors/auto-follow/image holds/pause are shared.
+- In Anki, verify old/default mappings never synthesize TTS. Only a selected template
+  containing `{sentence-audio}` prepares audio; no match for an associated audiobook
+  reports failure without TTS fallback. Referencing both audio handles for the same cue
+  uploads once. Cancel a popup during synthesis, retry errors, and check no temporary
+  export survives cancellation. Create test cards only with explicit user authorization.

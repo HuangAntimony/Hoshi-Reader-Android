@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -52,9 +53,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiUiDependencies
+import moe.antimony.hoshi.features.tts.*
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.BookEntry
@@ -176,6 +179,22 @@ fun ReaderWebView(
         bookCoverFile?.takeIf { it.isFile }
     }
     var sasayakiPlayer by remember { mutableStateOf<SasayakiPlayer?>(null) }
+    val ttsViewModel: TtsViewModel = hiltViewModel()
+    val ttsLifetime: ReaderTtsLifetime = hiltViewModel()
+    val ttsState by ttsViewModel.playback.state.collectAsStateWithLifecycle()
+    val ttsBookId = bookRoot?.name ?: book.title
+    ttsLifetime.bookId = ttsBookId
+    val ttsAssociated = (sasayakiPlayer?.playback ?: sasayakiPlaybackData).hasStoredAudioSource() || sasayakiPlayer?.hasAudio == true
+    val ttsAvailable = isSasayakiPlaybackLoaded && !ttsAssociated
+    var showTts by remember(bookRoot) { mutableStateOf(false) }
+    var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
+    var ttsLookupResume by remember(bookRoot) { mutableStateOf<(() -> Unit)?>(null) }
+    var ttsMiningError by remember { mutableStateOf(false) }
+    val ttsMiningJobs = remember { mutableMapOf<String, Job>() }
+    LaunchedEffect(book, ttsBookId, isSasayakiPlaybackLoaded, ttsAssociated) {
+        if (isSasayakiPlaybackLoaded) ttsViewModel.playback.load(ttsBookId, book, ttsAssociated)
+        if (ttsAssociated) { showTts = false; ttsLookupResume = null }
+    }
     var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
     var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
     val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
@@ -615,6 +634,7 @@ fun ReaderWebView(
             onFlushAutoSyncExport()
         }
         cancelSasayakiAutoPage()
+        ttsViewModel.playback.stop()
         sasayakiPlayer?.stopPlayback()
         sasayakiPlayer = null
         onClose()
@@ -636,7 +656,14 @@ fun ReaderWebView(
         }
     }
     fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
+        if (nextPopups.isEmpty()) {
+            val resume = ttsLookupResume
+            ttsLookupResume = null
+            if (ttsAvailable) resume?.invoke()
+        }
         val activeIds = nextPopups.mapTo(mutableSetOf()) { it.id }
+        ttsMiningJobs.filterKeys { it !in activeIds }.values.forEach { it.cancel() }
+        ttsMiningJobs.keys.retainAll(activeIds)
         readerPopupHistories = readerPopupHistories.filterKeys(activeIds::contains)
         rootSelectionHighlight = rootSelectionHighlight?.takeIf { highlight ->
             highlight.popupId == null || highlight.popupId in activeIds
@@ -742,6 +769,9 @@ fun ReaderWebView(
         return true
     }
     fun pauseSasayakiForLookupIfNeeded() {
+        if (sasayakiSettings.autoPause && ttsState.playing) {
+            ttsLookupResume = ttsViewModel.playback.pauseForLookup()
+        }
         val player = sasayakiPlayer
         if (stateHolder.shouldPauseSasayakiForLookup(
                 enabled = sasayakiSettings.enabled,
@@ -813,13 +843,36 @@ fun ReaderWebView(
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val popup = popupById(message.popupId) ?: return
                 val messageId = message.messageId ?: return
-                val ankiContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
-                    popup.state.ankiContext.copy(
-                        sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
-                    )
-                } ?: popup.state.ankiContext
-                ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, ankiContext) { mined ->
-                    replyReaderPopupMessage(message.popupId, messageId, mined.toString())
+                if (ttsMiningJobs[message.popupId]?.isActive == true) return
+                val needsSentence = ankiUiState.usesHandlebar(message.formatId, "{sentence-audio}")
+                val needsSasayaki = ankiUiState.usesHandlebar(message.formatId, "{sasayaki-audio}")
+                val linkedAudio = ttsAssociated
+                val audioPlayer = sasayakiPlayer
+                val selectionChapter = readerPosition.displayedPosition.index
+                ttsMiningJobs[message.popupId] = scope.launch {
+                    var generated: File? = null
+                    try {
+                        val cue = popup.sasayakiCue
+                        val audiobook = if ((needsSasayaki || needsSentence && linkedAudio) && cue != null)
+                            withContext(Dispatchers.IO) { audioPlayer?.exportCueAudio(cue, popup.state.selection.sentence) } else null
+                        val sentenceAudio = if (needsSentence) {
+                            if (linkedAudio) audiobook ?: throw TtsException(TtsFailure.AudioUnavailable)
+                            else {
+                                val sourceSentence = ttsViewModel.sourceSentence(book, selectionChapter, popup.state.selection)
+                                ttsViewModel.sentenceAudio(sourceSentence, ttsBookId).also { generated = it }
+                            }
+                        } else null
+                        val ankiContext = popup.state.ankiContext.copy(
+                            sasayakiAudioPath = if (needsSasayaki) audiobook?.absolutePath else null,
+                            sentenceAudioPath = sentenceAudio?.absolutePath,
+                        )
+                        val mined = ankiViewModel.minePreparedEntry(message.formatId, message.payloadJson, ankiContext)
+                        replyReaderPopupMessage(message.popupId, messageId, mined.toString())
+                    } catch (error: CancellationException) { throw error }
+                    catch (_: Exception) {
+                        ttsMiningError = true
+                        replyReaderPopupMessage(message.popupId, messageId, "false")
+                    } finally { generated?.delete() }
                 }
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {
@@ -1448,6 +1501,52 @@ fun ReaderWebView(
         }
         dispatchSasayakiCueToReader(pending.cue, pending.reveal, pending.source)
     }
+    suspend fun evaluateTtsJavascript(source: String): String? =
+        withTimeoutOrNull(5_000) { evaluateReaderJavascript(source) }
+    val ttsPresenter: suspend (TtsSentence, Boolean) -> Unit = { sentence, allowImages ->
+        val foreground = view.findViewTreeLifecycleOwner()?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true
+        if (foreground && ttsAvailable) {
+            val range = SasayakiCueRange("tts-${sentence.chapter}-${sentence.start}", sentence.start, sentence.length)
+            if (sasayakiSettings.autoScroll && readerPosition.displayedPosition.index != sentence.chapter) {
+                if (allowImages && sentence.chapter > readerPosition.displayedPosition.index) {
+                    for (chapter in readerPosition.displayedPosition.index until sentence.chapter) {
+                        if (chapter != readerPosition.displayedPosition.index) loadSasayakiChapter(chapter)
+                        if (awaitReaderChapterReady(chapter)) {
+                            val stops = decodeSasayakiMediaStops(evaluateTtsJavascript(ReaderPaginationScripts.sasayakiMediaStopsToChapterEndInvocation()))
+                            stops.forEach { stop ->
+                                withTimeoutOrNull(5_000) { showSasayakiMediaStop(stop) }
+                                delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
+                            }
+                        }
+                    }
+                }
+                loadSasayakiChapter(sentence.chapter)
+            }
+            if (readerPosition.displayedPosition.index == sentence.chapter && awaitReaderChapterReady(sentence.chapter)) {
+                if (sasayakiSettings.autoScroll && allowImages) {
+                    val stops = decodeSasayakiMediaStops(evaluateTtsJavascript(ReaderPaginationScripts.sasayakiMediaStopsBeforeCueInvocation(range)))
+                    stops.forEach { stop ->
+                        withTimeoutOrNull(5_000) { showSasayakiMediaStop(stop) }
+                        delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
+                    }
+                }
+                val progress = ReaderPaginationScripts.doubleResult(evaluateTtsJavascript(
+                    ReaderPaginationScripts.highlightSasayakiCueInvocation(range, sasayakiSettings.autoScroll)))
+                progress?.let { recordSasayakiDisplayedProgress(it) }
+            }
+        } else if (sentence.imageBefore && allowImages) {
+            delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
+        }
+    }
+    ttsViewModel.playback.imageHoldMillis = sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds)
+    val currentTtsPresenter = rememberUpdatedState(ttsPresenter)
+    DisposableEffect(ttsViewModel) {
+        ttsViewModel.playback.presentSentence = { sentence, images -> currentTtsPresenter.value(sentence, images) }
+        onDispose { ttsViewModel.playback.presentSentence = null }
+    }
+    LaunchedEffect(ttsAvailable, ttsState.started, webView, stateHolder.isWebViewRestoring) {
+        if (ttsAvailable && ttsState.started && !stateHolder.isWebViewRestoring) ttsState.sentence?.let { currentTtsPresenter.value(it, false) }
+    }
     LaunchedEffect(bookRoot, isSasayakiMatchLoaded, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         cancelSasayakiAutoPage()
         sasayakiPlayer?.release()
@@ -1537,7 +1636,7 @@ fun ReaderWebView(
     }
     val keepScreenOn = ReaderScreenAwake.shouldKeepScreenOn(
         keepScreenOnWhileReading = effectiveSettings.keepScreenOnWhileReading,
-        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true || ttsState.playing,
         sasayakiAutoScroll = sasayakiSettings.autoScroll,
     ) || sasayakiTranscriptionState.running
     DisposableEffect(context, keepScreenOn) {
@@ -1554,6 +1653,7 @@ fun ReaderWebView(
 
     var lastInactiveAtMillis by remember { mutableStateOf<Long?>(null) }
     val currentLifecycleResume = rememberUpdatedState {
+        if (ttsAvailable && ttsState.started) ttsState.sentence?.let { sentence -> scope.launch { currentTtsPresenter.value(sentence, false) } }
         val inactiveAt = lastInactiveAtMillis
         lastInactiveAtMillis = null
         val plan = readerLifecycleAutoSyncPlan(
@@ -1783,7 +1883,7 @@ fun ReaderWebView(
                         histories = readerPopupHistories,
                         viewport = readerLookupPopupViewport,
                         sasayakiWasPaused = sasayakiWasPausedByLookup,
-                        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
+                        sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true || ttsState.playing,
                         iframeUrl = readerPopupIframeUrl,
                         rootSelectionHighlight = rootSelectionHighlight,
                     )
@@ -1886,6 +1986,13 @@ fun ReaderWebView(
                             onReaderInteraction = ::handleReaderInteraction,
                             onImageTapped = ::openFullscreenImage,
                             onHighlightChanged = ::changeHighlight,
+                            ttsAvailable = ttsAvailable,
+                            onTtsSelection = { selection, read ->
+                                if (read && ttsAvailable) {
+                                    ttsViewModel.playback.startAt(readerPosition.displayedPosition.index, selection.normalizedOffset ?: 0)
+                                    showTts = true
+                                } else if (!read) ttsSelection = selection
+                            },
                             readerPopupBridgeHolder = readerPopupBridgeHolder,
                             readerPopupResourceHandler = readerPopupResourceHandler,
                             readerPopupFrames = readerLookupPopupPayloads,
@@ -1964,12 +2071,12 @@ fun ReaderWebView(
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
             metrics = bottomChromeMetrics,
             focusMode = focusMode,
-            sasayakiPlaybackControls = sasayakiBottomPlaybackControls,
-            sasayakiPlaying = sasayakiPlayer?.isPlaying == true,
+            sasayakiPlaybackControls = if (ttsAvailable && ttsState.started) sasayakiBottomPlaybackControls.copy(visible = sasayakiSettings.showReaderBottomPlaybackControls) else sasayakiBottomPlaybackControls,
+            sasayakiPlaying = if (ttsAvailable) ttsState.playing else sasayakiPlayer?.isPlaying == true,
             onTapSafeArea = ::handleReaderTapOutside,
-            onSasayakiSkipBackward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
-            onSasayakiTogglePlayback = { sasayakiPlayer?.togglePlayback() },
-            onSasayakiSkipForward = { performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
+            onSasayakiSkipBackward = { if (ttsAvailable) { if (sasayakiBottomSkipButtonActions.left == ReaderSasayakiBottomSkipButtonAction.Backward) ttsViewModel.playback.previous() else ttsViewModel.playback.next() } else performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },
+            onSasayakiTogglePlayback = { if (ttsAvailable) ttsViewModel.playback.toggle() else sasayakiPlayer?.togglePlayback() },
+            onSasayakiSkipForward = { if (ttsAvailable) { if (sasayakiBottomSkipButtonActions.right == ReaderSasayakiBottomSkipButtonAction.Backward) ttsViewModel.playback.previous() else ttsViewModel.playback.next() } else performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.right) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
         if (chromeVisibility.showBottomChrome) ReaderBottomChrome(
@@ -1986,6 +2093,7 @@ fun ReaderWebView(
             onDisplaySettings = stateHolder::openDisplaySettingsFromMenu,
             onReadingSettings = stateHolder::openAppearanceFromMenu,
             onStatistics = stateHolder::openStatisticsFromMenu,
+            onTts = if (ttsAvailable) ({ stateHolder.dismissReaderMenu(); showTts = true }) else null,
             onSasayaki = if (sasayakiSettings.enabled && bookRoot != null) {
                 {
                     stateHolder.openSasayakiFromMenu(
@@ -2069,6 +2177,26 @@ fun ReaderWebView(
                 onDismiss = stateHolder::dismissGoTo,
             )
         }
+        if (showTts && ttsAvailable) {
+            TtsSheet(ttsViewModel, ttsBookId, onStart = {
+                val position = readerPosition.displayedPosition
+                val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
+                ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())
+            }, onDismiss = { showTts = false })
+        }
+        ttsSelection?.let { selection ->
+            val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "", ttsBookId) }
+            val chapter = readerPosition.displayedPosition.index
+            val previewSentence by produceState(TtsSentence(chapter, selection.normalizedOffset ?: 0, 0, selection.sentence), selection) {
+                try { value = ttsViewModel.sourceSentence(book, chapter, selection) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { /* Plain source remains available for the editor's preview. */ }
+            }
+            TtsWordEditor(ttsViewModel, draft, ttsBookId, previewSentence, onDismiss = { ttsSelection = null })
+        }
+        if (ttsMiningError) AlertDialog(onDismissRequest = { ttsMiningError = false },
+            title = { Text(stringResource(R.string.tts_title)) }, text = { Text(stringResource(R.string.tts_failed)) },
+            confirmButton = { TextButton(onClick = { ttsMiningError = false }) { Text(stringResource(R.string.action_back)) } })
         if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
             SasayakiSheet(
                 player = requireNotNull(sasayakiPlayer),

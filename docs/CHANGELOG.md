@@ -8,6 +8,15 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Read Japanese books aloud using installed Android TTS engines, with a separate
+  Reader panel, Japanese voice/rate controls, sentence navigation, background playback,
+  and shared Reader highlighting, page following, lookup pause, and image holds.
+  Linking an audiobook hides TTS and preserves Sasayaki's audiobook controls.
+- Customize word readings for one book or all books from text selection or the TTS
+  pronunciation dictionary in Settings. EPUB ruby remains the fallback reading.
+- Add the opt-in Anki `{sentence-audio}` handlebar for audiobook or TTS sentence audio;
+  `{sasayaki-audio}` and existing field mappings keep their audiobook-only behavior.
+
 - Add LINE Seed JP to the rounded recommended reader fonts, with Thin, Regular, Bold,
   and ExtraBold variants.
 

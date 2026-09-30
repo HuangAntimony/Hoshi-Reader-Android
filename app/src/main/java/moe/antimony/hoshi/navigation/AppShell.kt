@@ -340,6 +340,7 @@ fun AppShell(
                     onSelectedTabChange = ::selectMainTab,
                     onOpenAnkiFormat = ::openAnkiFormat,
                     onOpenAnkiAdvanced = ::openAnkiAdvanced,
+                    onOpenTts = { settingsBackStack.add(AppRoute.TtsSettingsRoute) },
                 )
                 is AppRoute.AnkiCardFormatRoute -> AnkiCardFormatView(
                     formatId = route.formatId,
@@ -347,6 +348,7 @@ fun AppShell(
                     onDuplicated = ::returnFromDuplicatedAnkiFormat,
                     modifier = Modifier.fillMaxSize(),
                 )
+                AppRoute.TtsSettingsRoute -> moe.antimony.hoshi.features.tts.TtsSettingsView(onClose = ::popRoute)
                 AppRoute.AnkiAdvancedRoute -> AnkiAdvancedView(
                     onClose = ::popRoute,
                     modifier = Modifier.fillMaxSize(),
@@ -519,6 +521,7 @@ private fun SettingsDetailDestination(
     onSelectedTabChange: (MainTab) -> Unit,
     onOpenAnkiFormat: (String) -> Unit,
     onOpenAnkiAdvanced: () -> Unit,
+    onOpenTts: () -> Unit,
 ) {
     when (route.section) {
         SettingsDetailSection.Dictionaries -> DictionaryView(
@@ -556,6 +559,7 @@ private fun SettingsDetailDestination(
             modifier = Modifier.fillMaxSize(),
         )
         SettingsDetailSection.Advanced -> AdvancedSettingsView(
+            onOpenTts = onOpenTts,
             readerSettings = readerSettings,
             onReaderSettingsChange = onReaderSettingsChange,
             onClose = onClose,
@@ -598,7 +602,7 @@ private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
     is AppRoute.SettingsDetailRoute -> MainTab.Settings
-    is AppRoute.AnkiCardFormatRoute, AppRoute.AnkiAdvancedRoute -> MainTab.Settings
+    is AppRoute.AnkiCardFormatRoute, AppRoute.AnkiAdvancedRoute, AppRoute.TtsSettingsRoute -> MainTab.Settings
 }
 
 private fun SettingsDestination.toSection(): SettingsDetailSection = when (this) {

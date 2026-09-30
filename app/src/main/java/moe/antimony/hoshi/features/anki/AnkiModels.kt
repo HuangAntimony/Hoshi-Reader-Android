@@ -228,6 +228,7 @@ data class AnkiPopupSettings(
     val useAnkiConnect: Boolean = false,
     val needsAudio: Boolean = false,
     val needsSasayakiAudio: Boolean = false,
+    val needsSentenceAudio: Boolean = false,
     val allowDupes: Boolean = false,
     val compactGlossaries: Boolean = false,
     val disableShowNotes: Boolean = false,
@@ -312,6 +313,7 @@ data class AnkiMiningContext(
     val documentTitle: String? = null,
     val coverPath: String? = null,
     val sasayakiAudioPath: String? = null,
+    val sentenceAudioPath: String? = null,
     val sentenceOffset: Int? = null,
 )
 
@@ -468,6 +470,7 @@ internal object AnkiHandlebarRenderer {
             "{document-title}" -> context.documentTitle.orEmpty()
             "{book-cover}" -> context.coverPath.orEmpty()
             "{sasayaki-audio}" -> context.sasayakiAudioPath.orEmpty()
+            "{sentence-audio}" -> context.sentenceAudioPath.orEmpty()
             else -> ""
         }
     }
