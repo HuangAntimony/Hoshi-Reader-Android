@@ -1137,6 +1137,13 @@ Validate relevant sync/update/Sasayaki changes with:
   while preparing and verify playback pauses. Edit readings during playback, while
   paused and while preparing; replay/next must use the new reading. Check overlapping
   entries, book/global scope, duplicate errors, persistence and context preview.
+  Pause narration and navigate within the chapter, then use Contents to select both
+  earlier and later chapters. Reader must retain the manual position after chapter
+  restoration and after background/foreground. Returning to the narrated chapter may
+  restore its highlight without jumping to it or completing a VN reveal. Resuming
+  narration follows its retained sentence only when auto-follow is enabled.
+  `ReaderTtsPresentationTest` covers paused/playing, same/different chapters,
+  auto-follow and obsolete sentence/stop states.
 - Open a source lookup popup with and without TTS already playing. Verify replay stops
   after its selected sentence, toggle reflects playback and cancels pending lookup
   auto-resume, and play-forward closes the popup and continues from that source sentence.

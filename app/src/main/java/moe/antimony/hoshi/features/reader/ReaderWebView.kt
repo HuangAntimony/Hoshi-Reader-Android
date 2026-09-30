@@ -1530,36 +1530,48 @@ fun ReaderWebView(
     }
     suspend fun evaluateTtsJavascript(source: String): String? =
         withTimeoutOrNull(5_000) { evaluateReaderJavascript(source) }
-    val ttsPresenter: suspend (TtsSentence, Boolean) -> Unit = { sentence, allowImages ->
+    val ttsPresenter: suspend (TtsSentence, Boolean) -> Unit = present@{ sentence, allowImages ->
+        fun presentation() = readerTtsPresentation(
+            ttsViewModel.playback.state.value, sentence,
+            stateHolder.readerPosition.displayedPosition.index, sasayakiSettings.autoScroll,
+        )
         val foreground = view.findViewTreeLifecycleOwner()?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true
         if (foreground && ttsAvailable) {
+            if (presentation() == ReaderTtsPresentation.None) return@present
             val range = SasayakiCueRange("tts-${sentence.chapter}-${sentence.start}", sentence.start, sentence.length)
-            if (sasayakiSettings.autoScroll && readerPosition.displayedPosition.index != sentence.chapter) {
-                if (allowImages && sentence.chapter > readerPosition.displayedPosition.index) {
-                    for (chapter in readerPosition.displayedPosition.index until sentence.chapter) {
-                        if (chapter != readerPosition.displayedPosition.index) loadSasayakiChapter(chapter)
+            if (presentation() == ReaderTtsPresentation.Follow && stateHolder.readerPosition.displayedPosition.index != sentence.chapter) {
+                if (allowImages && sentence.chapter > stateHolder.readerPosition.displayedPosition.index) {
+                    for (chapter in stateHolder.readerPosition.displayedPosition.index until sentence.chapter) {
+                        if (presentation() != ReaderTtsPresentation.Follow) return@present
+                        if (chapter != stateHolder.readerPosition.displayedPosition.index) loadSasayakiChapter(chapter)
                         if (awaitReaderChapterReady(chapter)) {
                             val stops = decodeSasayakiMediaStops(evaluateTtsJavascript(ReaderPaginationScripts.sasayakiMediaStopsToChapterEndInvocation()))
                             stops.forEach { stop ->
+                                if (presentation() != ReaderTtsPresentation.Follow) return@present
                                 withTimeoutOrNull(5_000) { showSasayakiMediaStop(stop) }
                                 delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
                             }
                         }
                     }
                 }
+                if (presentation() != ReaderTtsPresentation.Follow) return@present
                 loadSasayakiChapter(sentence.chapter)
             }
-            if (readerPosition.displayedPosition.index == sentence.chapter && awaitReaderChapterReady(sentence.chapter)) {
-                if (sasayakiSettings.autoScroll && allowImages) {
+            if (stateHolder.readerPosition.displayedPosition.index == sentence.chapter && awaitReaderChapterReady(sentence.chapter)) {
+                if (presentation() == ReaderTtsPresentation.Follow && allowImages) {
                     val stops = decodeSasayakiMediaStops(evaluateTtsJavascript(ReaderPaginationScripts.sasayakiMediaStopsBeforeCueInvocation(range)))
                     stops.forEach { stop ->
+                        if (presentation() != ReaderTtsPresentation.Follow) return@present
                         withTimeoutOrNull(5_000) { showSasayakiMediaStop(stop) }
                         delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
                     }
                 }
+                val mode = presentation()
+                if (mode == ReaderTtsPresentation.None) return@present
                 val progress = ReaderPaginationScripts.doubleResult(evaluateTtsJavascript(
-                    ReaderPaginationScripts.highlightSasayakiCueInvocation(range, sasayakiSettings.autoScroll)))
-                progress?.let { recordSasayakiDisplayedProgress(it) }
+                    ReaderPaginationScripts.highlightSasayakiCueInvocation(range,
+                        reveal = mode == ReaderTtsPresentation.Follow, preserveReveal = mode == ReaderTtsPresentation.Highlight)))
+                if (mode == ReaderTtsPresentation.Follow) progress?.let { recordSasayakiDisplayedProgress(it) }
             }
         } else if (sentence.imageBefore && allowImages) {
             delay(sasayakiImageHoldMillis(sasayakiSettings.imageHoldSeconds))
@@ -1571,7 +1583,7 @@ fun ReaderWebView(
         ttsViewModel.playback.presentSentence = { sentence, images -> currentTtsPresenter.value(sentence, images) }
         onDispose { ttsViewModel.playback.presentSentence = null }
     }
-    LaunchedEffect(ttsAvailable, ttsState.started, webView, stateHolder.isWebViewRestoring) {
+    LaunchedEffect(ttsAvailable, ttsState.started, ttsState.playing, webView, stateHolder.isWebViewRestoring) {
         if (ttsAvailable && ttsState.started && !stateHolder.isWebViewRestoring) ttsState.sentence?.let { currentTtsPresenter.value(it, false) }
     }
     LaunchedEffect(bookRoot, isSasayakiMatchLoaded, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
