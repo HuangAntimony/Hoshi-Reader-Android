@@ -2209,7 +2209,7 @@ fun ReaderWebView(
             )
         }
         if (showTts && ttsAvailable) {
-            TtsSheet(ttsViewModel, ttsBookId, onStart = {
+            TtsSheet(ttsViewModel, ttsBookId, bookCoverFile = sasayakiCoverFile, onStart = {
                 val position = readerPosition.displayedPosition
                 val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
                 ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())

@@ -802,6 +802,12 @@ QA matrices live in `docs/VALIDATION.md`.
   cue-range commands and shared behavior settings; background progress needs no WebView.
   Explicit Reader exit/route disposal stops playback; configuration recreation retains it.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
+  Its fixed book/playback header and Voice/Pronunciations tabs use `ReaderBottomPanel`,
+  `ReaderChapterCover` and `ReaderSheetControls`. The segmented tabs, group card and
+  slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
+  surface roles and e-ink outlines. TTS Settings uses the same tab content with its
+  own settings scaffold; the pronunciation list is lazy and keeps playback controls
+  outside its scroll area. TTS navigation remains sentence-based without a timeline.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.
 - Root Reader lookup popups retain their source chapter and expose independent TTS

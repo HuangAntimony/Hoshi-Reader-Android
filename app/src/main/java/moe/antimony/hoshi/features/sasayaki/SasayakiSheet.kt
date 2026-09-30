@@ -78,6 +78,9 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.features.reader.ReaderSheetCard
+import moe.antimony.hoshi.features.reader.ReaderSheetTabs
+import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
@@ -485,44 +488,12 @@ private fun SasayakiSheetTabs(
     onSelectedTabChange: (SasayakiSheetTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .selectableGroup()
-            .background(hoshiSurfaces.nested, RoundedCornerShape(12.dp))
-            .hoshiContainerOutline(RoundedCornerShape(12.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        SasayakiSheetTab.entries.forEach { tab ->
-            val selected = tab == selectedTab
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        color = if (selected) hoshiSurfaces.selected else Color.Transparent,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .then(if (selected) Modifier.hoshiContainerOutline(RoundedCornerShape(10.dp)) else Modifier)
-                    .selectable(
-                        selected = selected,
-                        role = SasayakiSheetTabRole,
-                        onClick = { onSelectedTabChange(tab) },
-                    )
-                    .padding(vertical = 7.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(tab.labelRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) hoshiSurfaces.onSelected else hoshiSurfaces.muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
+    ReaderSheetTabs(
+        labels = SasayakiSheetTab.entries.map { stringResource(it.labelRes) },
+        selectedIndex = selectedTab.ordinal,
+        onSelected = { onSelectedTabChange(SasayakiSheetTab.entries[it]) },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -811,7 +782,7 @@ private fun SasayakiSettingsTab(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 28.dp),
     ) {
-        SliderRow(
+        ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_delay),
             valueText = String.format(Locale.US, "%+.2fs", player.delay),
             value = player.delay.toFloat(),
@@ -819,7 +790,7 @@ private fun SasayakiSettingsTab(
             steps = 159,
             onValueChange = { player.setDelay(it.toDouble()) },
         )
-        SliderRow(
+        ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_speed),
             valueText = String.format(Locale.US, "%.2fx", player.rate),
             value = player.rate,
@@ -870,7 +841,7 @@ private fun SasayakiSettingsTab(
             checked = settings.autoScroll,
             onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
         )
-        SliderRow(
+        ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_image_hold),
             valueText = sasayakiImageHoldText(settings.imageHoldSeconds),
             value = normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds),
@@ -927,45 +898,8 @@ private fun SasayakiColorSheetSection(
 }
 
 @Composable
-private fun SliderRow(
-    label: String,
-    valueText: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit,
-) {
-    val metrics = readerSheetDensityMetrics()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = metrics.sasayakiSliderVerticalPaddingDp.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, modifier = Modifier.weight(1f))
-            Text(valueText, fontWeight = FontWeight.SemiBold)
-        }
-        Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
-    }
-}
-
-@Composable
 internal fun SasayakiResourceCard(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = hoshiSurfaces.group,
-        border = hoshiContainerBorder(),
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        ) {
-            content()
-        }
-    }
+    ReaderSheetCard { content() }
 }
 
 @Composable

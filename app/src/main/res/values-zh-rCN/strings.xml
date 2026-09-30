@@ -896,6 +896,11 @@
     <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
+    <string name="tts_tab_voice">音源</string>
+    <string name="tts_tab_dictionary">读音辞典</string>
+    <string name="tts_rate_label">朗读语速</string>
+    <string name="tts_rate_value">%1$.2f×</string>
+    <string name="tts_start_hint">从当前阅读位置开始朗读。</string>
     <string name="tts_title">日语朗读</string>
     <string name="tts_dictionary">读音辞典</string>
     <string name="tts_add_word">添加读音</string>

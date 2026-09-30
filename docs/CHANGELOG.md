@@ -9,7 +9,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Read Japanese books aloud using installed Android TTS engines, with a separate
-  Reader panel, Japanese voice/rate controls, sentence navigation, background playback,
+  Reader panel styled like Sasayaki, with a fixed book/playback header, Voice and
+  Pronunciations tabs, Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.
   Control narration from lookup popups: replay the selected sentence once, toggle
   playback, or close the popup and continue from that sentence.
