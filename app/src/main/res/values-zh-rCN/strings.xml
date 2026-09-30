@@ -896,7 +896,7 @@
     <string name="sasayaki_transcription_light_description">减少资源占用，转录较慢。</string>
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
-    <string name="tts_tab_voice">音源</string>
+    <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">音源</string>
     <string name="tts_tab_dictionary">读音辞典</string>
     <string name="tts_rate_label">朗读语速</string>
     <string name="tts_rate_value">%1$.2f×</string>
@@ -911,9 +911,8 @@
     <string name="tts_pause" comment="Pause synthesized book narration.">暂停</string>
     <string name="tts_play">播放</string>
     <string name="tts_repeat">重播本句</string>
-    <string name="tts_source">语音来源</string>
-    <string name="tts_installed_source">系统已安装引擎</string>
-    <string name="tts_voice">日语音色</string>
+    <string name="tts_source">来源</string>
+    <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>
     <string name="tts_network">需要联网</string>
     <string name="tts_offline">离线</string>
@@ -921,7 +920,6 @@
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
-    <string name="tts_system_settings">系统文字转语音设置</string>
     <string name="tts_set_reading">设置读音</string>
     <string name="tts_surface">表记</string>
     <string name="tts_reading">假名读音</string>

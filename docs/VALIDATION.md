@@ -1045,8 +1045,10 @@ Validate relevant sync/update/Sasayaki changes with:
   Voice/Pronunciations/Settings, without a cover, book title or sentence preview.
   Confirm source/voice dropdowns open next to their rows and dismiss on selection or
   outside tap; voice items show their network requirement and selected checkmark.
-  Check the full-width preview button, rate save on release, dictionary add/edit/cancel,
-  and the source card's system-settings action and return. Edit shared behavior and colors
+  Check source/voice label readability and the full-width preview button's fill and outline
+  while enabled and loading, including sepia and e-ink themes. Check rate save on release, dictionary add/edit/cancel,
+  and the source row's settings icon and return. Tapping this icon must not open the source
+  dropdown. Edit shared behavior and colors
   in Settings and confirm Sasayaki reflects them, and vice versa; restore original values.
   TTS must not expose seconds-based navigation or change audiobook-only preferences.
   Check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS

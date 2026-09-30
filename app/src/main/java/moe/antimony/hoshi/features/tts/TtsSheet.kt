@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.tts
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.ui.hoshiContentKeyboardOptions
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +41,7 @@ import moe.antimony.hoshi.features.reader.ReaderSheetTabs
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
+import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
@@ -115,20 +117,20 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
         } else {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
                 ReaderSheetCard {
-                    TtsChoice(stringResource(R.string.tts_source),
-                        engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
-                            ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
-                        preferences.settings.engine,
-                        listOf(TtsChoiceOption("", automaticLabel)) + engines.map { TtsChoiceOption(it.id, it.label) },
-                    ) { viewModel.settings(preferences.settings.copy(engine = it, voice = "")) }
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.tts_installed_source), modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
-                        TextButton(onClick = {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(Modifier.weight(1f)) {
+                            TtsChoice(stringResource(R.string.tts_source),
+                                engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
+                                    ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
+                                preferences.settings.engine,
+                                listOf(TtsChoiceOption("", automaticLabel)) + engines.map { TtsChoiceOption(it.id, it.label) },
+                            ) { viewModel.settings(preferences.settings.copy(engine = it, voice = "")) }
+                        }
+                        IconButton(onClick = {
                             try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                             catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                        }) { Text(stringResource(R.string.tts_system_settings), style = MaterialTheme.typography.labelMedium) }
+                        }) { Icon(Icons.Rounded.Settings, null, tint = hoshiSurfaces.muted) }
                     }
                 }
                 ReaderSheetCard {
@@ -145,14 +147,20 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                     value = rate, range = .5f..3f, steps = 49, onValueChange = { rate = it },
                     onValueChangeFinished = { viewModel.settings(preferences.settings.copy(rate = rate)) },
                 )
-                OutlinedButton(
+                HoshiButton(
                     onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).heightIn(min = 48.dp),
                     shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        disabledContainerColor = hoshiSurfaces.nested,
+                        disabledContentColor = hoshiSurfaces.muted,
+                    ),
+                    border = BorderStroke(1.dp, hoshiSurfaces.outline),
+                    elevation = null,
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.tts_preview_voice))
+                    Text(stringResource(R.string.tts_preview_voice), style = MaterialTheme.typography.bodyLarge)
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp))
                 (error ?: playback.error)?.let { failure ->
@@ -242,10 +250,10 @@ private fun TtsChoice(
     Box(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().clickable { expanded = true }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(label, modifier = Modifier.weight(.28f), style = MaterialTheme.typography.labelMedium, color = hoshiSurfaces.muted)
-            Column(Modifier.weight(.72f), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
+            Text(label, modifier = Modifier.weight(.3f), style = MaterialTheme.typography.bodyLarge)
+            Column(Modifier.weight(.7f), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
                 Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    maxLines = 3, overflow = TextOverflow.Ellipsis)
                 supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End, color = hoshiSurfaces.muted) }
             }
             Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
