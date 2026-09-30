@@ -160,17 +160,28 @@ class TtsPlaybackController internal constructor(
                 if (generation != token || associated) return@launch
                 mutableState.value = state.value.copy(preparing = false)
                 output.play()
-                prefetch?.cancel()
-                prefetch = scope.launch(Dispatchers.Main.immediate) {
-                    try {
-                        snapshot.sentences.drop(snapshot.index + 1).take(2).forEach { audio.audio(it, snapshot.bookId, preferences) }
-                    } catch (error: CancellationException) { throw error }
-                    catch (_: Exception) { /* Retry visibly when this sentence is requested. */ }
-                }
+                prefetchAhead()
             } catch (error: TimeoutCancellationException) {
                 if (generation == token) fail(TtsFailure.Timeout)
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { if (generation == token) fail((error as? TtsException)?.failure ?: TtsFailure.Synthesis) }
+        }
+    }
+    private fun prefetchAhead() {
+        if (prefetch?.isActive == true) return
+        prefetch = scope.launch(Dispatchers.Main.immediate) {
+            try {
+                var index = state.value.index + 1
+                while (true) {
+                    val current = state.value
+                    index = maxOf(index, current.index + 1)
+                    if (index > current.index + 2) break
+                    val sentence = current.sentences.getOrNull(index) ?: break
+                    audio.audio(sentence, current.bookId, preferences)
+                    index++
+                }
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { /* Retry visibly when this sentence is requested. */ }
         }
     }
     fun pauseForLookup(): () -> Unit {

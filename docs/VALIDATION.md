@@ -1052,6 +1052,10 @@ Validate relevant sync/update/Sasayaki changes with:
   test-owned cache and encrypted test values, without changing saved settings. Require
   the final `OK` summary. Verify Edge and Translate MP3 exports with MediaExtractor,
   including multi-part sentences; verify source-bound Keystore credential round trips.
+  Run `TtsContinuousPlaybackDeviceTest` for high-rate Edge playback through the real
+  controller, audio repository and Media3 decoder. It uses public sentences, an isolated
+  player/cache and in-memory preferences, and must complete every sentence without
+  changing the installed user's source, credentials or book data.
 - Azure/Google Cloud live verification requires the user's configured account. Check
   missing/invalid credentials, 429/quota and offline errors, draft test/cancel/save,
   Japanese catalogs, WAV/MP3 exports, and supported parameters. Never claim mocked
@@ -1100,11 +1104,14 @@ Validate relevant sync/update/Sasayaki changes with:
   should be changed. IMEs without locale-hint support may retain their current language.
 
 - Run `TtsTextTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
-  `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
+  `TtsAudioRepositoryTest`, `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
   ruby/offsets, file-backed chapters, literal scope precedence, long input splitting,
   pending/paused pronunciation edits, stale callbacks, audiobook exclusion, cancellation
   cleanup and the independent Anki handlebars. JS selection tests include full VN source
   context rather than screen-clone text.
+  Hold a later synthesis pending while requesting already cached audio: it must return
+  immediately. Concurrent misses for one sentence share synthesis; clearing requires a
+  fresh file. Advancing playback must retain pending prefetch and extend its horizon.
 - With a Japanese engine installed, build `assembleDebugAndroidTest`, install both
   APKs using `adb install -r`, and run only the explicit classes
   `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` and

@@ -67,6 +67,31 @@ class TtsPlaybackControllerTest {
             assertEquals(0, controller.state.value.index)
         }
     }
+    @Test fun advancingToCachedSentenceKeepsPendingPrefetchAndMovesItsHorizon() = runTest {
+        fixture { controller, output, audio, _ ->
+            val pending = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var cancelled = false
+            audio.synthesize = { sentence ->
+                if (sentence.text == "三つです。") {
+                    pending.complete(Unit)
+                    try { release.await() }
+                    catch (error: CancellationException) { cancelled = true; throw error }
+                }
+            }
+            controller.play(); runCurrent()
+            pending.await()
+            output.onEnded(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+            assertFalse("Advancing must not discard pending sentence audio", cancelled)
+            release.complete(Unit); runCurrent()
+            assertTrue(audio.requests.contains("四つです。"))
+            output.onEnded(); runCurrent()
+            assertEquals(2, controller.state.value.index)
+            assertEquals(3, output.playCount)
+        }
+    }
     @Test fun sentencePauseWaitsBetweenAutomaticSentencesAndStopCancelsIt() = runTest {
         fixture { controller, output, _, repository ->
             repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()

@@ -24,28 +24,41 @@ class TtsAudioRepository @Inject constructor(
     @param:CacheDir private val cache: File,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : TtsAudioSource {
-    private val lock = Mutex()
+    private val synthesis = Mutex()
+    private val cacheLock = Mutex()
     private val files = linkedMapOf<String, List<File>>()
     override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
         withContext(ioDispatcher) {
-            lock.withLock {
-                val spoken = TtsText.spoken(sentence, bookId, preferences.words)
-                val identity = "${preferences.settings}\u0000$spoken"
-                val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
-                files[key]?.takeIf { list -> list.all { it.isFile } }?.let { return@withLock it }
-                engine.synthesize(spoken, preferences.settings, File(cache, "tts/playback")).also {
-                    files[key] = it
-                    // Keep references bounded. Files are pruned after they are no longer part of an active session.
-                    if (files.size > 32) files.remove(files.keys.first())?.forEach { old -> old.delete() }
+            val spoken = TtsText.spoken(sentence, bookId, preferences.words)
+            val identity = "${preferences.settings}\u0000$spoken"
+            val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+            cached(key)?.let { return@withContext it }
+            synthesis.withLock {
+                cached(key)?.let { return@withLock it }
+                engine.synthesize(spoken, preferences.settings, File(cache, "tts/playback")).also { generated ->
+                    // Once returned by the engine, the cache owns these files even if the caller is cancelled.
+                    withContext(NonCancellable) {
+                        cacheLock.withLock {
+                            files[key] = generated
+                            // Keep references bounded. Files are pruned after they are no longer part of an active session.
+                            if (files.size > 32) files.remove(files.keys.first())?.forEach { old -> old.delete() }
+                        }
+                    }
                 }
             }
         }
 
-    override suspend fun clearPlaybackCache() = lock.withLock {
+    private suspend fun cached(key: String): List<File>? = cacheLock.withLock {
+        files[key]?.takeIf { list -> list.all { it.isFile } }
+    }
+
+    override suspend fun clearPlaybackCache() = synthesis.withLock {
         withContext(ioDispatcher) {
-            files.clear()
-            File(cache, "tts/playback").deleteRecursively()
-            Unit
+            cacheLock.withLock {
+                files.clear()
+                File(cache, "tts/playback").deleteRecursively()
+                Unit
+            }
         }
     }
 

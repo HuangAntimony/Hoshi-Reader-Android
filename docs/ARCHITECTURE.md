@@ -822,6 +822,11 @@ QA matrices live in `docs/VALIDATION.md`.
   after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by
   configuration and resolved spoken text; independent export files are owned by their
   caller and cleaned on cancellation, including cancelled dispatcher return delivery.
+  Cache lookups use a short metadata lock independently of the serial synthesis queue,
+  so ready audio never waits for another sentence's network request. Continuous playback
+  keeps valid in-flight prefetch and rolls its horizon forward to two sentences ahead;
+  settings/dictionary changes and stop still cancel it. Cache clearing serializes with
+  synthesis so late completions cannot repopulate a cleared cache.
 - `TtsPlaybackService` owns the Media3 ExoPlayer/session. `TtsSessionPlayer` exposes a
   nonseekable sentence transport without seconds or a fabricated duration, and represents
   synthesis/image holds as ongoing buffering only when a sentence has been explicitly
