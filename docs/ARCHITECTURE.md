@@ -788,7 +788,9 @@ QA matrices live in `docs/VALIDATION.md`.
   caller and cleaned on cancellation, including cancelled dispatcher return delivery.
 - `TtsPlaybackService` owns the Media3 ExoPlayer/session. `TtsSessionPlayer` exposes a
   nonseekable sentence transport without seconds or a fabricated duration, and represents
-  synthesis/image holds as ongoing buffering. Media3 owns foreground notification and
+  synthesis/image holds as ongoing buffering only when a sentence has been explicitly
+  started. Book source parsing leaves an empty session idle and not loading, including
+  when the service survives a Reader exit or book switch. Media3 owns foreground notification and
   audio focus. Reader attaches an optional presentation callback using the existing
   cue-range commands and shared behavior settings; background progress needs no WebView.
   Explicit Reader exit/route disposal stops playback; configuration recreation retains it.

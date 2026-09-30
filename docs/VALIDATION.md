@@ -1053,7 +1053,7 @@ Validate relevant sync/update/Sasayaki changes with:
   `moe.antimony.hoshi.features.tts.TtsSessionPlayerTest`, plus
   `moe.antimony.hoshi.features.reader.ReaderTtsHighlightWebViewTest` via `am instrument`.
   These discover installed voices and synthesize into test-owned cache, without changing
-  engine preferences or library data. Require `OK (4 tests)` (or the current test count).
+  engine preferences or library data. Require `OK (5 tests)` (or the current test count).
   The Reader fixture verifies actual sentence highlight pixels across all six
   mode/writing-direction combinations using an explicit saturated highlight color;
   do not apply opaque-color thresholds to the default translucent highlight.
@@ -1064,7 +1064,11 @@ Validate relevant sync/update/Sasayaki changes with:
   paused and while preparing; replay/next must use the new reading. Check overlapping
   entries, book/global scope, duplicate errors, persistence and context preview.
 - Test Home/lock screen, notification/headset previous/next sentence and pause/resume,
-  interruptions, task removal while preparing, and explicit Reader exit. The session
+  interruptions, task removal while preparing, and explicit Reader exit. After TTS has
+  created a media session, leave and reopen a book and switch to another book before
+  starting playback. Source parsing must keep the empty media session idle with
+  `isLoading=false`; only preparation of an explicitly started sentence is media
+  buffering. `TtsSessionPlayerTest` covers this transition without changing library data. The session
   must expose no time seek commands. Check no engine, missing Japanese data, removed
   selected engine, offline network voice, timeout and retry without clearing app data.
 - Associate/remove an audiobook: TTS stops, its sheet closes and Reader entry hides;

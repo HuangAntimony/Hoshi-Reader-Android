@@ -43,4 +43,39 @@ class TtsSessionPlayerTest {
             } finally { transport.release(); decoder.release() }
         }
     }
+    @Test fun reloadingBookKeepsSessionIdleUntilASentenceIsExplicitlyStarted() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val decoder = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Context>()).build()
+            val sentences = listOf(TtsSentence(0, 0, 2, "一。"))
+            var state = TtsPlaybackState(bookId = "first", sentences = sentences,
+                started = true, playing = true, preparing = true)
+            val transport = TtsSessionPlayer(decoder, { state }, {}, {}, {}, {}, {})
+            try {
+                assertEquals(Player.STATE_BUFFERING, transport.playbackState)
+                assertTrue(transport.isLoading)
+                // The service may still be bound after leaving Reader or stopping narration.
+                state = TtsPlaybackState()
+                transport.refresh()
+                assertEquals(Player.STATE_IDLE, transport.playbackState)
+                assertFalse(transport.isLoading)
+                // load() reads the next book before any sentence or playback intent exists.
+                state = TtsPlaybackState(bookId = "second", preparing = true)
+                transport.refresh()
+                assertEquals(Player.STATE_IDLE, transport.playbackState)
+                assertFalse(transport.isLoading)
+                assertTrue(transport.currentTimeline.isEmpty)
+                assertFalse(transport.playWhenReady)
+                state = state.copy(sentences = sentences, preparing = false)
+                transport.refresh()
+                assertEquals(Player.STATE_IDLE, transport.playbackState)
+                assertFalse(transport.isLoading)
+                state = state.copy(started = true, playing = true, preparing = true)
+                transport.refresh()
+                assertEquals(Player.STATE_BUFFERING, transport.playbackState)
+                assertTrue(transport.isLoading)
+                assertTrue(transport.playWhenReady)
+            } finally { transport.release(); decoder.release() }
+        }
+    }
+
 }

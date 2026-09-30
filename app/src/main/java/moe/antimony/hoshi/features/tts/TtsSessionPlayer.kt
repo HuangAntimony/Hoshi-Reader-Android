@@ -23,6 +23,8 @@ internal class TtsSessionPlayer(
         val actual = super.getState()
         val value = snapshot()
         val sentence = value.sentence.takeIf { value.started }
+        // Reading a book's source is not media loading: an empty session must remain idle.
+        val preparingSentence = sentence != null && value.preparing
         val commands = Player.Commands.Builder().addAll(
             Player.COMMAND_PLAY_PAUSE, Player.COMMAND_STOP, Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
             Player.COMMAND_GET_TIMELINE, Player.COMMAND_GET_METADATA, Player.COMMAND_GET_AUDIO_ATTRIBUTES,
@@ -44,8 +46,8 @@ internal class TtsSessionPlayer(
             .setContentBufferedPositionMs { 0 }
             .setTotalBufferedDurationMs { 0 }
             .setPlayWhenReady(value.playing, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
-            .setPlaybackState(if (sentence == null) Player.STATE_IDLE else if (value.preparing) Player.STATE_BUFFERING else actual.playbackState)
-            .setIsLoading(value.preparing)
+            .setPlaybackState(if (sentence == null) Player.STATE_IDLE else if (preparingSentence) Player.STATE_BUFFERING else actual.playbackState)
+            .setIsLoading(preparingSentence)
             .build()
     }
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
