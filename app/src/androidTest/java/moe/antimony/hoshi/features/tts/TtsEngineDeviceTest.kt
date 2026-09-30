@@ -4,12 +4,16 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.util.Log
+import android.speech.tts.TextToSpeech
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import java.util.Locale
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,6 +21,33 @@ import org.junit.runner.RunWith
 /** Read-only engine discovery and synthesis into test-owned cache; never changes system voices or preferences. */
 @RunWith(AndroidJUnit4::class)
 class TtsEngineDeviceTest {
+    @Test fun installedJapaneseEnginesExposePlayableOfflineVoices() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = AndroidTtsEngine(context)
+        for (installed in engine.installedEngines()) {
+            val ready = CompletableDeferred<Int>()
+            val raw = withContext(Dispatchers.Main) { TextToSpeech(context, { ready.complete(it) }, installed.id) }
+            try {
+                assertEquals(TextToSpeech.SUCCESS, withTimeout(15_000) { ready.await() })
+                val language = raw.isLanguageAvailable(Locale.JAPANESE)
+                val country = raw.isLanguageAvailable(Locale.JAPAN)
+                Log.i("HoshiTtsTest", "Engine=${installed.id} ja=$language ja_JP=$country")
+                if (language >= TextToSpeech.LANG_AVAILABLE || country >= TextToSpeech.LANG_AVAILABLE) {
+                    val voices = engine.catalog(TtsSettings(engine = installed.id)).voices
+                    assertTrue("${installed.id} supports Japanese but no voices were recognized", voices.isNotEmpty())
+                    val directory = File(context.cacheDir, "tts-installed-voices-device-test")
+                    try {
+                        voices.filterNot { it.network }.forEach { voice ->
+                            val files = engine.synthesize("日本語の音声です。", TtsSettings(engine = installed.id, voice = voice.id), directory)
+                            assertTrue(files.isNotEmpty() && files.all { it.length() > 44 })
+                            Log.i("HoshiTtsTest", "Synthesized ${installed.id}/${voice.id}")
+                        }
+                    } finally { directory.deleteRecursively() }
+                }
+            } finally { raw.shutdown() }
+        }
+    }
+
     @Test fun imageGlyphRubySynthesizesThroughPlaybackRepositoryFromMain() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "tts-image-ruby-device-test")

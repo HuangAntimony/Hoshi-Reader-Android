@@ -1053,7 +1053,11 @@ Validate relevant sync/update/Sasayaki changes with:
   `moe.antimony.hoshi.features.tts.TtsSessionPlayerTest`, plus
   `moe.antimony.hoshi.features.reader.ReaderTtsHighlightWebViewTest` via `am instrument`.
   These discover installed voices and synthesize into test-owned cache, without changing
-  engine preferences or library data. Require `OK (6 tests)` (or the current test count).
+  engine preferences or library data. Require `OK (7 tests)` (or the current test count).
+  Discovery tests query every installed engine reporting Japanese support and synthesize
+  each of its offline Japanese voices. `TtsLocaleTest` covers both `ja` and Samsung's
+  `jpn` locales. After installing voice data in system settings, return to an already-open
+  TTS panel and verify that its voice choices/error state refresh without reopening it.
   The engine tests include image-backed ruby through the playback repository invoked
   from Main. `TtsTextTest` covers zero-width insertions (including shared/end positions),
   invalid ranges and sentence export: every source cursor step must advance or finish,

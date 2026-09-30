@@ -15,6 +15,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   playback, or close the popup and continue from that sentence.
   Linking an audiobook hides TTS and preserves Sasayaki's audiobook controls.
   Reopening or switching books after narration keeps playback idle until explicitly started.
+  Recognizes Samsung's Japanese voices and refreshes available voices when returning
+  from system settings.
 - Customize word readings for one book or all books from text selection or the TTS
   pronunciation dictionary in Settings. EPUB ruby remains the fallback reading.
   Image-backed characters with ruby are read without freezing or exhausting memory.

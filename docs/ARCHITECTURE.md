@@ -785,6 +785,9 @@ QA matrices live in `docs/VALIDATION.md`.
   filters Japanese voices, bounds initialization/utterance waits, splits oversized
   inputs, and accepts files only after completion. No remote TTS client or voice model
   ships with Hoshi. Network-required engine voices are explicitly labeled in the UI.
+  Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
+  Samsung's ISO 639-2 locales). TTS panels refresh the engine catalog on resume so
+  returning from system voice installation updates their available voices.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
   configuration invalidation and two-sentence prefetch, and rejects stale operations
   after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by

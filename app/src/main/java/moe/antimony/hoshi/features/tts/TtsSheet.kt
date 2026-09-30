@@ -16,6 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import java.util.UUID
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
@@ -63,7 +65,7 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
     }
     val voiceLabel = (preferences.settings.voice.ifBlank { automaticLabel }) +
         (selectedVoice?.let { " · " + if (it.network) networkLabel else offlineLabel }.orEmpty())
-    LaunchedEffect(viewModel) { viewModel.refresh() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     DisposableEffect(viewModel) { onDispose { viewModel.stopPreview() } }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(if (dictionary) R.string.tts_dictionary else R.string.tts_title), style = MaterialTheme.typography.headlineSmall)

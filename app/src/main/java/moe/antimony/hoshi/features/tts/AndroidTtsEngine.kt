@@ -25,6 +25,9 @@ data class TtsCatalog(val engines: List<TtsEngineInfo>, val selectedEngine: Stri
 enum class TtsFailure { NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage }
 class TtsException(val failure: TtsFailure) : Exception(failure.name)
 
+// Engines may expose ISO 639-1 (Google) or ISO 639-2 (Samsung) locale language codes.
+internal fun isJapaneseTtsLocale(locale: Locale): Boolean = locale.language == "ja" || locale.language == "jpn"
+
 /** Android engines share one serial queue. Cancellation stops the exact active utterance. */
 @Singleton
 class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val context: Context) {
@@ -74,7 +77,7 @@ class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val
     }
 
     private fun japaneseVoices(tts: TextToSpeech) = tts.voices.orEmpty()
-        .filter { it.locale.language == "ja" }.sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.name }))
+        .filter { isJapaneseTtsLocale(it.locale) }.sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.name }))
 
     suspend fun catalog(settings: TtsSettings): TtsCatalog = withContext(Dispatchers.IO) {
         mutex.withLock {
