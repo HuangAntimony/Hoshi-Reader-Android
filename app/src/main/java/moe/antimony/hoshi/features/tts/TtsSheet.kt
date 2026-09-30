@@ -3,7 +3,6 @@ package moe.antimony.hoshi.features.tts
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.ui.hoshiContentKeyboardOptions
 import android.content.Intent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -125,6 +124,7 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                                     ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
                                 preferences.settings.engine,
                                 listOf(TtsChoiceOption("", automaticLabel)) + engines.map { TtsChoiceOption(it.id, it.label) },
+                                singleLine = true,
                             ) { viewModel.settings(preferences.settings.copy(engine = it, voice = "")) }
                         }
                         IconButton(onClick = {
@@ -150,17 +150,10 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                 HoshiButton(
                     onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).heightIn(min = 48.dp),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        disabledContainerColor = hoshiSurfaces.nested,
-                        disabledContentColor = hoshiSurfaces.muted,
-                    ),
-                    border = BorderStroke(1.dp, hoshiSurfaces.outline),
-                    elevation = null,
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.tts_preview_voice), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.tts_preview_voice))
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp))
                 (error ?: playback.error)?.let { failure ->
@@ -244,7 +237,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
 @Composable
 private fun TtsChoice(
     label: String, value: String, selected: String, choices: List<TtsChoiceOption>,
-    supporting: String? = null, onSelected: (String) -> Unit,
+    supporting: String? = null, singleLine: Boolean = false, onSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
@@ -253,7 +246,8 @@ private fun TtsChoice(
             Text(label, modifier = Modifier.weight(.3f), style = MaterialTheme.typography.bodyLarge)
             Column(Modifier.weight(.7f), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
                 Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
-                    maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    maxLines = if (singleLine) 1 else 2,
+                    overflow = if (singleLine) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis)
                 supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End, color = hoshiSurfaces.muted) }
             }
             Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
