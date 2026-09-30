@@ -911,13 +911,15 @@
     <string name="tts_pause" comment="Pause synthesized book narration.">暂停</string>
     <string name="tts_play">播放</string>
     <string name="tts_repeat">重播本句</string>
-    <string name="tts_engine">已安装引擎</string>
+    <string name="tts_source">语音来源</string>
+    <string name="tts_installed_source">系统已安装引擎</string>
     <string name="tts_voice">日语音色</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>
     <string name="tts_network">需要联网</string>
     <string name="tts_offline">离线</string>
     <string name="tts_rate">朗读速度：%1$.2f×</string>
     <string name="tts_preview">试听</string>
+    <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
     <string name="tts_system_settings">系统文字转语音设置</string>
     <string name="tts_set_reading">设置读音</string>

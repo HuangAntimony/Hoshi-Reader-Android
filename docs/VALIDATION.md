@@ -1043,8 +1043,10 @@ Validate relevant sync/update/Sasayaki changes with:
 
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
   Voice/Pronunciations/Settings, without a cover, book title or sentence preview.
-  Confirm engine/voice menus, selected-voice checkmarks, rate save on release, preview,
-  dictionary add/edit/cancel, and system-settings return. Edit shared behavior and colors
+  Confirm source/voice dropdowns open next to their rows and dismiss on selection or
+  outside tap; voice items show their network requirement and selected checkmark.
+  Check the full-width preview button, rate save on release, dictionary add/edit/cancel,
+  and the source card's system-settings action and return. Edit shared behavior and colors
   in Settings and confirm Sasayaki reflects them, and vice versa; restore original values.
   TTS must not expose seconds-based navigation or change audiobook-only preferences.
   Check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS

@@ -814,7 +814,9 @@ QA matrices live in `docs/VALIDATION.md`.
   slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
   surface roles and e-ink outlines. TTS Settings uses the same tab content with its
   own settings scaffold; the pronunciation list is lazy and keeps playback controls
-  outside its scroll area. `SharedReaderPlaybackSettings` edits the same Sasayaki settings
+  outside its scroll area. Voice-source and voice choices use anchored `HoshiDropdownMenu`
+  rows in shared cards; the system TTS settings action belongs to the source card and
+  voice preview uses a full-width outlined button. `SharedReaderPlaybackSettings` edits the same Sasayaki settings
   repository from both panels; TTS merges only shared reading fields, preserving audiobook
   preferences and keeping its own engine/voice/rate. TTS navigation remains sentence-based
   without a timeline or the audiobook skip-action setting.

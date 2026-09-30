@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
@@ -21,7 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -116,16 +115,26 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
         } else {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
                 ReaderSheetCard {
-                    TtsChoice(stringResource(R.string.tts_engine),
+                    TtsChoice(stringResource(R.string.tts_source),
                         engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
                             ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
                         preferences.settings.engine,
-                        listOf("" to automaticLabel) + engines.map { it.id to it.label },
+                        listOf(TtsChoiceOption("", automaticLabel)) + engines.map { TtsChoiceOption(it.id, it.label) },
                     ) { viewModel.settings(preferences.settings.copy(engine = it, voice = "")) }
-                    HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.tts_installed_source), modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
+                        TextButton(onClick = {
+                            try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                            catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                        }) { Text(stringResource(R.string.tts_system_settings), style = MaterialTheme.typography.labelMedium) }
+                    }
+                }
+                ReaderSheetCard {
                     TtsChoice(stringResource(R.string.tts_voice), voiceLabel, preferences.settings.voice,
-                        listOf("" to automaticLabel) + catalog?.voices.orEmpty().map {
-                            it.id to (it.id + " · " + if (it.network) networkLabel else offlineLabel)
+                        listOf(TtsChoiceOption("", automaticLabel)) + catalog?.voices.orEmpty().map {
+                            TtsChoiceOption(it.id, it.id, if (it.network) networkLabel else offlineLabel)
                         },
                         supporting = selectedVoice?.let { if (it.network) networkLabel else offlineLabel },
                     ) { viewModel.settings(preferences.settings.copy(voice = it)) }
@@ -136,12 +145,14 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                     value = rate, range = .5f..3f, steps = 49, onValueChange = { rate = it },
                     onValueChangeFinished = { viewModel.settings(preferences.settings.copy(rate = rate)) },
                 )
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy) {
-                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.tts_preview))
-                    }
+                OutlinedButton(
+                    onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).heightIn(min = 48.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.tts_preview_voice))
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp))
                 (error ?: playback.error)?.let { failure ->
@@ -150,15 +161,6 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                         TextButton(onClick = { viewModel.dismissError(); viewModel.refresh() }) { Text(stringResource(R.string.tts_retry)) }
                     }
                 }
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                Row(Modifier.fillMaxWidth().clickable {
-                    try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
-                    catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.tts_system_settings), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, Modifier.size(18.dp), tint = hoshiSurfaces.muted)
-                }
-
             }
         }
     }
@@ -233,29 +235,37 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
 
 @Composable
 private fun TtsChoice(
-    label: String, value: String, selected: String, choices: List<Pair<String, String>>,
+    label: String, value: String, selected: String, choices: List<TtsChoiceOption>,
     supporting: String? = null, onSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        Row(Modifier.fillMaxWidth().clickable { expanded = true }, verticalAlignment = Alignment.CenterVertically,
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().clickable { expanded = true }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(label, style = MaterialTheme.typography.labelMedium, color = hoshiSurfaces.muted)
-                Text(value, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted) }
+            Text(label, modifier = Modifier.weight(.28f), style = MaterialTheme.typography.labelMedium, color = hoshiSurfaces.muted)
+            Column(Modifier.weight(.72f), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
+                Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End, color = hoshiSurfaces.muted) }
             }
-            Icon(Icons.Rounded.UnfoldMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
+            Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
         }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            choices.forEach { (id, title) ->
-                DropdownMenuItem(text = { Text(title) },
-                    trailingIcon = { if (id == selected) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) },
-                    onClick = { expanded = false; onSelected(id) })
+        DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(max = 320.dp)) {
+            choices.forEach { choice ->
+                DropdownMenuItem(text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(choice.label, style = MaterialTheme.typography.bodyMedium)
+                        choice.supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted) }
+                    }
+                },
+                    trailingIcon = { if (choice.id == selected) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) },
+                    onClick = { expanded = false; onSelected(choice.id) })
             }
         }
     }
 }
+
+private data class TtsChoiceOption(val id: String, val label: String, val supporting: String? = null)
 
 @Composable
 fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, sentence: TtsSentence?, onDismiss: () -> Unit) {
