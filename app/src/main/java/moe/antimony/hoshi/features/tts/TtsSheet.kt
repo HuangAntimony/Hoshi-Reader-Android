@@ -1,7 +1,6 @@
 package moe.antimony.hoshi.features.tts
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,8 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,14 +26,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.io.File
 import java.util.UUID
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.sasayaki.SasayakiColorRow
+import moe.antimony.hoshi.features.sasayaki.SharedReaderPlaybackSettings
+import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
-import moe.antimony.hoshi.features.reader.ReaderChapterCover
 import moe.antimony.hoshi.features.reader.ReaderSheetCard
 import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
@@ -53,17 +49,9 @@ fun TtsSheet(
     bookId: String,
     onStart: () -> Unit,
     onDismiss: () -> Unit,
-    bookCoverFile: File? = null,
 ) {
-    val cover by produceState<ImageBitmap?>(null, bookCoverFile) {
-        value = withContext(Dispatchers.IO) {
-            bookCoverFile?.let { file ->
-                BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = 4 })?.asImageBitmap()
-            }
-        }
-    }
     ReaderBottomPanel(sheetStyle = readerSheetStyle(), onDismiss = onDismiss) {
-        TtsPanel(viewModel, bookId, onStart, Modifier.fillMaxWidth().weight(1f), cover)
+        TtsPanel(viewModel, bookId, onStart, Modifier.fillMaxWidth().weight(1f))
     }
 }
 
@@ -76,7 +64,9 @@ fun TtsSettingsView(onClose: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> Unit)?, modifier: Modifier, cover: ImageBitmap? = null) {
+private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> Unit)?, modifier: Modifier) {
+    val readingSettings by viewModel.readingSettings.collectAsStateWithLifecycle()
+    var colorRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     val engines by viewModel.engines.collectAsStateWithLifecycle()
@@ -98,13 +88,13 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
     DisposableEffect(viewModel) { onDispose { viewModel.stopPreview() } }
     Column(modifier) {
         if (onStart != null) {
-            TtsPlaybackHeader(playback, cover, busy,
+            TtsPlaybackControls(playback, busy,
                 onPrevious = viewModel.playback::previous, onNext = viewModel.playback::next,
                 onRepeat = viewModel.playback::repeat,
                 onToggle = { if (playback.playing) viewModel.playback.pause() else if (playback.started) viewModel.playback.play() else onStart() })
         }
         ReaderSheetTabs(
-            labels = listOf(stringResource(R.string.tts_tab_voice), stringResource(R.string.tts_tab_dictionary)),
+            labels = listOf(stringResource(R.string.tts_tab_voice), stringResource(R.string.tts_tab_dictionary), stringResource(R.string.settings_title)),
             selectedIndex = selectedTab, onSelected = { selectedTab = it },
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = if (onStart == null) 12.dp else 0.dp, bottom = 10.dp),
         )
@@ -114,6 +104,13 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                 onAdd = { editor = TtsWord(UUID.randomUUID().toString(), "", "", bookId) },
                 onEdit = { editor = it }, modifier = Modifier.weight(1f),
             )
+        } else if (selectedTab == 2) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
+                readingSettings?.let { settings ->
+                    SharedReaderPlaybackSettings(settings, viewModel::readingSettings, { colorRow = it })
+                } ?: LinearProgressIndicator(Modifier.fillMaxWidth().padding(20.dp))
+                error?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) }
+            }
         } else {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
                 ReaderSheetCard {
@@ -159,31 +156,27 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                     Text(stringResource(R.string.tts_system_settings), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, Modifier.size(18.dp), tint = hoshiSurfaces.muted)
                 }
-                Text(stringResource(R.string.tts_shared_behaviors), style = MaterialTheme.typography.bodySmall,
-                    color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+
             }
+        }
+    }
+    colorRow?.let { row ->
+        readingSettings?.let { settings ->
+            ReaderColorPickerDialog(title = stringResource(row.labelRes), initialColor = row.color(settings),
+                defaultColor = row.defaultColor,
+                onColorChange = { viewModel.readingSettings(row.updated(settings, it)); colorRow = null },
+                onDismiss = { colorRow = null })
         }
     }
     editor?.let { word -> TtsWordEditor(viewModel, word, bookId ?: word.bookId, null, { editor = null }) }
 }
 
 @Composable
-private fun TtsPlaybackHeader(
-    state: TtsPlaybackState, cover: ImageBitmap?, busy: Boolean,
+private fun TtsPlaybackControls(
+    state: TtsPlaybackState, busy: Boolean,
     onPrevious: () -> Unit, onNext: () -> Unit, onRepeat: () -> Unit, onToggle: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            ReaderChapterCover(cover, Modifier.size(56.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(state.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(stringResource(R.string.tts_title), style = MaterialTheme.typography.labelMedium, color = hoshiSurfaces.muted)
-                Text(if (state.started) state.sentence?.text.orEmpty() else stringResource(R.string.tts_start_hint),
-                    style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted,
-                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {
                 IconButton(onClick = onRepeat, enabled = state.started && state.sentence != null) {

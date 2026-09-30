@@ -2801,3 +2801,13 @@ window.renderPopup = function() {
 document.addEventListener('scroll', () => {
     webkit.messageHandlers.popupScrolled.postMessage(null);
 }, { passive: true });
+
+// Read the visible entry cache so popup back/forward history never prefills a stale term.
+window.createPopupPronunciation = function() {
+    const first = window.lookupEntries?.[0];
+    if (!first || typeof first.expression !== 'string' || !first.expression.trim()) return;
+    webkit.messageHandlers.createPronunciation.postMessage({
+        expression: first.expression,
+        reading: typeof first.reading === 'string' ? first.reading : ''
+    });
+};

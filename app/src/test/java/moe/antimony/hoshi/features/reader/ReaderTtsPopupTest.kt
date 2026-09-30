@@ -30,6 +30,9 @@ class ReaderTtsPopupTest {
         assertFalse(audiobook.ttsVisible)
     }
     @Test fun ttsMessagesKeepTheirOwnSourceIdentity() {
+        assertEquals(ReaderLookupPopupBridgeMessage.CreatePronunciation("root", null, "食べる", "たべる"),
+            ReaderLookupPopupBridgeMessage.fromJson("""{"name":"createPronunciation","popupId":"root","body":{"expression":"食べる","reading":"たべる"}}"""))
+        assertNull(ReaderLookupPopupBridgeMessage.fromJson("""{"name":"createPronunciation","popupId":"root","body":{"expression":"","reading":""}}"""))
         assertEquals(ReaderLookupPopupBridgeMessage.TtsReplaySentence("root", null), ReaderLookupPopupBridgeMessage.fromJson("""{"name":"ttsReplaySentence","popupId":"root"}"""))
         assertEquals(ReaderLookupPopupBridgeMessage.TtsTogglePlayback("root", null), ReaderLookupPopupBridgeMessage.fromJson("""{"name":"ttsTogglePlayback","popupId":"root"}"""))
         assertEquals(ReaderLookupPopupBridgeMessage.TtsPlayForward("root", null), ReaderLookupPopupBridgeMessage.fromJson("""{"name":"ttsPlayForward","popupId":"root"}"""))

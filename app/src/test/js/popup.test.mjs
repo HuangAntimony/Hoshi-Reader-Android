@@ -1762,3 +1762,21 @@ for (const zoom of [0.8, 1, 2]) {
         });
     }
 }
+
+test('pronunciation creation prefills only the first visible term and follows restored cache', () => {
+    const { context } = popupContext();
+    const messages = [];
+    context.webkit.messageHandlers.createPronunciation = { postMessage: value => messages.push(JSON.parse(JSON.stringify(value))) };
+    context.window.lookupEntries = [
+        { expression: '食べる', reading: 'たべる', matched: '食べた' },
+        { expression: '食', reading: 'しょく' },
+    ];
+    context.window.createPopupPronunciation();
+    assert.deepEqual(messages, [{ expression: '食べる', reading: 'たべる' }]);
+    context.window.lookupEntries = [{ expression: '東京', reading: 'とうきょう' }];
+    context.window.createPopupPronunciation();
+    assert.deepEqual(messages[1], { expression: '東京', reading: 'とうきょう' });
+    context.window.lookupEntries = undefined;
+    context.window.createPopupPronunciation();
+    assert.equal(messages.length, 2);
+});

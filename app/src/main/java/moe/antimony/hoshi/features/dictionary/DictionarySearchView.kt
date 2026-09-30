@@ -190,6 +190,11 @@ internal fun DictionarySearchView(
     val appContainer = LocalHoshiUiDependencies.current
     val assets = remember(context) { LookupPopupAssets.load(context) }
     val searchViewModel: DictionarySearchViewModel = hiltViewModel()
+    var pronunciationDraft by remember { mutableStateOf<moe.antimony.hoshi.features.tts.TtsWord?>(null) }
+    pronunciationDraft?.let { word ->
+        val ttsViewModel: moe.antimony.hoshi.features.tts.TtsViewModel = hiltViewModel()
+        moe.antimony.hoshi.features.tts.TtsWordEditor(ttsViewModel, word, null, null, { pronunciationDraft = null })
+    }
     val ankiViewModel: AnkiViewModel = hiltViewModel()
     val uiState by searchViewModel.uiState.collectAsStateWithLifecycle()
     val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
@@ -436,6 +441,12 @@ internal fun DictionarySearchView(
     }
     fun handleReaderPopupBridgeMessage(message: ReaderLookupPopupBridgeMessage) {
         when (message) {
+            is ReaderLookupPopupBridgeMessage.CreatePronunciation -> {
+                if ((message.popupId == DictionarySearchRootPopupId && uiState.results.isNotEmpty()) || popupById(message.popupId) != null) {
+                    pronunciationDraft = moe.antimony.hoshi.features.tts.TtsWord(
+                        java.util.UUID.randomUUID().toString(), message.expression, message.reading)
+                }
+            }
             is ReaderLookupPopupBridgeMessage.OpenLink -> context.openPopupExternalLink(message.url)
             is ReaderLookupPopupBridgeMessage.TapOutside -> {
                 if (message.popupId == DictionarySearchRootPopupId) {

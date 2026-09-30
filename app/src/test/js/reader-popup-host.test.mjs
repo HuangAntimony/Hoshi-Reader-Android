@@ -887,3 +887,16 @@ test('TTS popup controls are visible without an audiobook and dispatch only TTS 
     host.renderStack({ popups: [{ ...payload, ttsWasPaused: false }] });
     assert.match(document.querySelectorAll('.hoshi-reader-popup-sasayaki-bar')[0].children[1].style['--icon-url'], /play_arrow.svg/);
 });
+
+test('pronunciation button is the last top control and asks the visible iframe for its first term', () => {
+    const { host, document } = popupHost();
+    host.renderStack({ popups: [{ ...rootPopupPayload(), actionBarVisible: false, pronunciationEnabled: true }] });
+    const bar = document.querySelectorAll('.hoshi-reader-popup-action-bar')[0];
+    const button = document.querySelectorAll('.hoshi-reader-popup-pronunciation-control')[0];
+    assert.equal(bar.children.at(-1), button);
+    const iframe = document.querySelectorAll('.hoshi-reader-popup-iframe')[0];
+    const messages = [];
+    iframe.contentWindow.postMessage = message => messages.push(message.type);
+    button.dispatchEvent('click');
+    assert.deepEqual(messages, ['createPronunciation']);
+});

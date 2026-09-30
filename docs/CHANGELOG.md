@@ -9,8 +9,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Read Japanese books aloud using installed Android TTS engines, with a separate
-  Reader panel styled like Sasayaki, with a fixed book/playback header, Voice and
-  Pronunciations tabs, Japanese voice/rate controls, sentence navigation, background playback,
+  TTS panel styled like Sasayaki, with compact playback controls and Voice,
+  Pronunciations and Settings tabs. Edit shared reading behavior directly in either panel,
+  with independent Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.
   Control narration from lookup popups: replay the selected sentence once, toggle
   playback, or close the popup and continue from that sentence.
@@ -18,8 +19,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Reopening or switching books after narration keeps playback idle until explicitly started.
   Recognizes Samsung's Japanese voices and refreshes available voices when returning
   from system settings.
-- Customize word readings for one book or all books from text selection or the TTS
-  pronunciation dictionary in Settings. EPUB ruby remains the fallback reading.
+- Customize word readings for one book or all books from text selection, the TTS
+  pronunciation dictionary, or the new button at the right of the lookup popup toolbar.
+  The popup button prefills the first term's expression and reading for editing;
+  text-selection creation keeps the selected text. EPUB ruby remains the fallback reading.
   Image-backed characters with ruby are read without freezing or exhausting memory.
 - Add the opt-in Anki `{sentence-audio}` handlebar for audiobook or TTS sentence audio;
   `{sasayaki-audio}` and existing field mappings keep their audiobook-only behavior.

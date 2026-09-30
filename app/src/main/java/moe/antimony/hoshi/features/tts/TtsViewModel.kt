@@ -11,6 +11,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.*
 @HiltViewModel
 class TtsViewModel @Inject constructor(
     private val repository: TtsRepository,
+    private val readingSettingsRepository: SasayakiSettingsRepository,
     private val engine: AndroidTtsEngine,
     private val audio: TtsAudioRepository,
     private val books: TtsBookRepository,
@@ -25,6 +28,19 @@ class TtsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val mutableError = MutableStateFlow<TtsFailure?>(null)
+    val readingSettings = readingSettingsRepository.settings
+        .map<SasayakiSettings, SasayakiSettings?> { it }
+        .catch { mutableError.value = TtsFailure.Storage; emit(null) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun readingSettings(value: SasayakiSettings) {
+        viewModelScope.launch {
+            try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(value) } }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { mutableError.value = TtsFailure.Storage }
+        }
+    }
+
     val preferences = repository.preferences.catch { mutableError.value = TtsFailure.Storage; emit(TtsPreferences()) }.stateIn(viewModelScope, SharingStarted.Eagerly, TtsPreferences())
     private val mutableCatalog = MutableStateFlow<TtsCatalog?>(null)
     val catalog = mutableCatalog.asStateFlow()

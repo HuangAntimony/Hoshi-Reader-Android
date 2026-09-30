@@ -1041,13 +1041,19 @@ Validate relevant sync/update/Sasayaki changes with:
 
 ## Japanese TTS
 
-- Check Reader TTS in the shared 70% bottom panel: book header and sentence controls
-  stay visible while scrolling Voice or Pronunciations. Confirm engine/voice menus,
-  selected-voice checkmarks, rate save on release, preview, dictionary add/edit/cancel,
-  and system-settings return. Before starting, show the current-position hint rather
-  than the book's first sentence. Check long voice names, empty/long dictionaries,
-  e-ink outlines, and the standalone TTS Settings screen. Compare Sasayaki's tabs,
-  resource cards and sliders after changes to shared `ReaderSheetControls`.
+- Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
+  Voice/Pronunciations/Settings, without a cover, book title or sentence preview.
+  Confirm engine/voice menus, selected-voice checkmarks, rate save on release, preview,
+  dictionary add/edit/cancel, and system-settings return. Edit shared behavior and colors
+  in Settings and confirm Sasayaki reflects them, and vice versa; restore original values.
+  TTS must not expose seconds-based navigation or change audiobook-only preferences.
+  Check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS
+  Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
+- From Reader, Dictionary and Process Text, use the rightmost popup toolbar button.
+  Confirm its editable expression/reading come from the first term, including deinflected
+  results and popup back/forward history; Reader defaults to book scope, standalone lookup
+  to global scope. Cancel without saving. Separately long-press book text and create a
+  pronunciation: it must still prefill selected text and an empty reading.
 
 - Run `TtsTextTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
   `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source

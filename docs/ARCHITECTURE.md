@@ -802,12 +802,15 @@ QA matrices live in `docs/VALIDATION.md`.
   cue-range commands and shared behavior settings; background progress needs no WebView.
   Explicit Reader exit/route disposal stops playback; configuration recreation retains it.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
-  Its fixed book/playback header and Voice/Pronunciations tabs use `ReaderBottomPanel`,
-  `ReaderChapterCover` and `ReaderSheetControls`. The segmented tabs, group card and
+  Its fixed sentence controls and Voice/Pronunciations/Settings tabs use `ReaderBottomPanel`
+  and `ReaderSheetControls`, without book metadata or sentence previews. The segmented tabs, group card and
   slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
   surface roles and e-ink outlines. TTS Settings uses the same tab content with its
   own settings scaffold; the pronunciation list is lazy and keeps playback controls
-  outside its scroll area. TTS navigation remains sentence-based without a timeline.
+  outside its scroll area. `SharedReaderPlaybackSettings` edits the same Sasayaki settings
+  repository from both panels; TTS merges only shared reading fields, preserving audiobook
+  preferences and keeping its own engine/voice/rate. TTS navigation remains sentence-based
+  without a timeline or the audiobook skip-action setting.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.
 - Root Reader lookup popups retain their source chapter and expose independent TTS
@@ -815,6 +818,10 @@ QA matrices live in `docs/VALIDATION.md`.
   routes to the active source: TTS replay stops after one sentence, toggle can cancel
   lookup auto-resume, and play-forward closes the popup. Dictionary child popups have
   no book source anchor and do not expose TTS controls. Audiobook controls remain unchanged.
+- The popup's rightmost top-bar pronunciation action asks its iframe for the first current
+  term's expression/reading, including restored history. Reader defaults to book scope;
+  Dictionary and Process Text default to global scope. It opens an editable draft and
+  does not alter the existing selection-based pronunciation action.
 - Anki `{sentence-audio}` has its own mining context field and selected-format media
   preparation. Associated audiobooks require an existing cue; otherwise TTS synthesizes
   the full source sentence. Missing audiobook cues never trigger TTS. Existing

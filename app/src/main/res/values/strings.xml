@@ -902,8 +902,7 @@
     <string name="tts_tab_dictionary">Pronunciations</string>
     <string name="tts_rate_label">Speech rate</string>
     <string name="tts_rate_value">%1$.2f×</string>
-    <string name="tts_start_hint">Start reading aloud from your current position.</string>
-    <string name="tts_title">Japanese TTS</string>
+    <string name="tts_title">TTS</string>
     <string name="tts_dictionary">Pronunciation dictionary</string>
     <string name="tts_add_word">Add pronunciation</string>
     <string name="tts_global">All books</string>
@@ -921,7 +920,6 @@
     <string name="tts_offline">Offline</string>
     <string name="tts_rate">Speech rate: %1$.2f×</string>
     <string name="tts_preview">Preview</string>
-    <string name="tts_shared_behaviors">Auto page, pause on lookup, image hold and highlight colors follow the shared reading settings in Sasayaki.</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
     <string name="tts_system_settings">System TTS settings</string>
     <string name="tts_set_reading">Set pronunciation</string>

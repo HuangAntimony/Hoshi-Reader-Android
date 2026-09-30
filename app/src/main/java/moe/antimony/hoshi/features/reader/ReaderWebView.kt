@@ -187,6 +187,7 @@ fun ReaderWebView(
     val ttsAssociated = (sasayakiPlayer?.playback ?: sasayakiPlaybackData).hasStoredAudioSource() || sasayakiPlayer?.hasAudio == true
     val ttsAvailable = isSasayakiPlaybackLoaded && !ttsAssociated
     var showTts by remember(bookRoot) { mutableStateOf(false) }
+    var ttsPopupWord by remember(bookRoot) { mutableStateOf<TtsWord?>(null) }
     var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
     var ttsLookupResume by remember(bookRoot) { mutableStateOf<(() -> Unit)?>(null) }
     var ttsMiningError by remember { mutableStateOf(false) }
@@ -967,6 +968,11 @@ fun ReaderWebView(
                 }
             }
             is ReaderLookupPopupBridgeMessage.ContentReady -> Unit
+            is ReaderLookupPopupBridgeMessage.CreatePronunciation -> {
+                if (popupById(message.popupId) != null) {
+                    ttsPopupWord = TtsWord(java.util.UUID.randomUUID().toString(), message.expression, message.reading, ttsBookId)
+                }
+            }
             is ReaderLookupPopupBridgeMessage.TtsReplaySentence,
             is ReaderLookupPopupBridgeMessage.TtsTogglePlayback,
             is ReaderLookupPopupBridgeMessage.TtsPlayForward -> {
@@ -2209,11 +2215,14 @@ fun ReaderWebView(
             )
         }
         if (showTts && ttsAvailable) {
-            TtsSheet(ttsViewModel, ttsBookId, bookCoverFile = sasayakiCoverFile, onStart = {
+            TtsSheet(ttsViewModel, ttsBookId, onStart = {
                 val position = readerPosition.displayedPosition
                 val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
                 ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())
             }, onDismiss = { showTts = false })
+        }
+        ttsPopupWord?.let { word ->
+            TtsWordEditor(ttsViewModel, word, ttsBookId, null, onDismiss = { ttsPopupWord = null })
         }
         ttsSelection?.let { selection ->
             val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "", ttsBookId) }
