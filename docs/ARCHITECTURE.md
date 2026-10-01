@@ -835,11 +835,18 @@ QA matrices live in `docs/VALIDATION.md`.
   audio focus. Reader attaches an optional presentation callback using the existing
   cue-range commands and shared behavior settings; background progress needs no WebView.
   Explicit Reader exit/route disposal stops playback; configuration recreation retains it.
-  `ReaderTtsPresentation` separates active playback following from passive highlight
-  restoration. Paused narration may only restore its highlight in the displayed chapter,
+  `ReaderPlaybackPresentation` owns the ordered media-stop/chapter traversal shared
+  by Sasayaki and TTS. Both use the same image-hold/fullscreen-dismiss wait and
+  before-visible target restore; audio pause/resume stays in each playback adapter.
+  Only natural forward playback inspects intervening media; manual jumps and zero
+  image-hold duration restore directly. `ReaderTtsPresentation` separates active
+  playback following from passive highlight restoration. Paused narration may only
+  restore its highlight in the displayed chapter,
   without revealing text or moving the page. Chapter loads, image holds and post-restore
   reveal decisions read current playback/sentence state, rejecting stopped or obsolete
-  presentations; returning to foreground uses the same policy.
+  presentations; returning to foreground uses the same policy. Restoration cannot
+  reveal a TTS sentence while synthesis or its image presentation is preparing;
+  the playback callback completes image holds before sentence reveal and audio.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
   Its fixed sentence controls and Voice/Pronunciations/Settings tabs use `ReaderBottomPanel`
   and `ReaderSheetControls`, without book metadata or sentence previews. The segmented tabs, group card and

@@ -31,4 +31,12 @@ class ReaderTtsPresentationTest {
         val changed = paused.copy(sentences = listOf(sentence.copy(start = 40)), playing = true)
         assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(changed, sentence, 1, autoScroll = true))
     }
+
+    @Test fun restoringDuringPreparationCannotBypassPendingImageHolds() {
+        val preparing = paused.copy(playing = true, preparing = true)
+        assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(preparing, sentence, 1, autoScroll = true))
+        assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(preparing, sentence, 2, autoScroll = true))
+        assertEquals(ReaderTtsPresentation.Follow,
+            readerTtsPresentation(preparing, sentence, 1, autoScroll = true, restoring = false))
+    }
 }

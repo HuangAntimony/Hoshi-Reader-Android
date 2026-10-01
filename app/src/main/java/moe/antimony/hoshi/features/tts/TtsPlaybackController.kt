@@ -55,6 +55,7 @@ class TtsPlaybackController internal constructor(
     var imageHoldMillis: Long = 1_000
     var presentSentence: (suspend (TtsSentence, Boolean) -> Unit)? = null
     private var heldImageIndex: Int? = null
+    private var naturalAdvance = false
     private var waitingForNextSentence = false
 
     init {
@@ -111,21 +112,22 @@ class TtsPlaybackController internal constructor(
     private fun advance() {
         if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) { pause(); preparedIndex = null; return }
         val waitMillis = preferences.settings.sentencePauseMs
-        if (waitMillis == 0L) { next(); return }
+        if (waitMillis == 0L) { seek(state.value.index + 1, natural = true); return }
         val token = generation
         waitingForNextSentence = true
         mutableState.value = state.value.copy(preparing = true)
         job = scope.launch(Dispatchers.Main.immediate) {
             delay(waitMillis)
-            if (token == generation && state.value.playing) next()
+            if (token == generation && state.value.playing) seek(state.value.index + 1, natural = true)
         }
     }
-    private fun seek(index: Int, singleSentence: Boolean = false) {
+    private fun seek(index: Int, singleSentence: Boolean = false, natural: Boolean = false) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
         waitingForNextSentence = false
         output.clear()
         stopAfterSentence = singleSentence
+        naturalAdvance = natural
         preparedIndex = null
         mutableState.value = state.value.copy(index = index)
         play()
@@ -137,6 +139,7 @@ class TtsPlaybackController internal constructor(
             preparedIndex = null
             output.clear()
             mutableState.value = state.value.copy(index = (state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
+            naturalAdvance = true
         }
         val snapshot = state.value
         val config = preferences
@@ -151,8 +154,9 @@ class TtsPlaybackController internal constructor(
                     output.prepare(files, snapshot.title, snapshot.sentence?.text.orEmpty())
                     preparedIndex = snapshot.index
                 }
-                presentSentence?.invoke(requireNotNull(snapshot.sentence), heldImageIndex != snapshot.index)
-                if (snapshot.sentence?.imageBefore == true && heldImageIndex != snapshot.index && presentSentence == null) {
+                val holdImages = naturalAdvance && heldImageIndex != snapshot.index
+                presentSentence?.invoke(requireNotNull(snapshot.sentence), holdImages)
+                if (snapshot.sentence?.imageBefore == true && holdImages && presentSentence == null) {
                     heldImageIndex = snapshot.index
                     delay(imageHoldMillis)
                 }
@@ -206,6 +210,7 @@ class TtsPlaybackController internal constructor(
         prefetch?.cancel(); prefetch = null
         preparedIndex = null
         heldImageIndex = null
+        naturalAdvance = false
         output.clear()
         output.disconnect()
         mutableState.value = TtsPlaybackState()

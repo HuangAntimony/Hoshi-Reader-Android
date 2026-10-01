@@ -1143,7 +1143,16 @@ Validate relevant sync/update/Sasayaki changes with:
   restore its highlight without jumping to it or completing a VN reveal. Resuming
   narration follows its retained sentence only when auto-follow is enabled.
   `ReaderTtsPresentationTest` covers paused/playing, same/different chapters,
-  auto-follow and obsolete sentence/stop states.
+  auto-follow, preparation/restore races and obsolete sentence/stop states.
+  `ReaderPlaybackPresentationTest` covers ordered tail/intermediate/target chapter
+  image holds, direct jumps, zero-duration holds and pausing during a hold. Both
+  TTS and Sasayaki must use this shared traversal. During natural TTS playback,
+  bring Reader back to foreground while an image is held: the image must remain
+  visible for its configured duration; opening it fullscreen must defer continuation
+  until dismissal. Manual next/previous/replay must skip intervening media.
+  `ReaderTtsHighlightWebViewTest` exercises actual image pixels followed by sentence
+  highlight pixels across all six mode/direction combinations, including a simulated
+  restore callback while TTS is preparing.
 - Open a source lookup popup with and without TTS already playing. Verify replay stops
   after its selected sentence, toggle reflects playback and cancels pending lookup
   auto-resume, and play-forward closes the popup and continues from that source sentence.

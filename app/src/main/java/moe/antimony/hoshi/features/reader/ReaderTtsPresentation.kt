@@ -10,8 +10,10 @@ internal fun readerTtsPresentation(
     sentence: TtsSentence,
     currentChapter: Int,
     autoScroll: Boolean,
+    restoring: Boolean = true,
 ): ReaderTtsPresentation = when {
     !playback.started || playback.sentence != sentence -> ReaderTtsPresentation.None
+    restoring && playback.playing && playback.preparing -> ReaderTtsPresentation.None
     playback.playing && autoScroll -> ReaderTtsPresentation.Follow
     currentChapter == sentence.chapter -> ReaderTtsPresentation.Highlight
     else -> ReaderTtsPresentation.None

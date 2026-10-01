@@ -32,7 +32,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Ready sentence audio plays without waiting for later network synthesis, and continuous
   playback keeps ongoing prefetch when moving to the next sentence.
   While narration is paused, chapter navigation and returning to Reader keep the selected
-  reading position instead of jumping back to the narrated sentence.
+  reading position instead of jumping back to the narrated sentence. TTS shares
+  Sasayaki's image holds and chapter presentation, keeping images visible for the
+  configured duration before continuing; manual sentence jumps skip intervening images.
 - Customize word readings for one book or all books from text selection or the TTS
   pronunciation dictionary in Settings. Text-selection creation previews the full original
   sentence; both pronunciation fields request Japanese keyboard input. EPUB ruby remains

@@ -67,6 +67,36 @@ class TtsPlaybackControllerTest {
             assertEquals(0, controller.state.value.index)
         }
     }
+    @Test fun onlyNaturalSentenceAdvancesRequestImageHolds() = runTest {
+        fixture { controller, output, _, _ ->
+            val holds = mutableListOf<Boolean>()
+            controller.presentSentence = { _, hold -> holds += hold }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            controller.repeat(); runCurrent()
+            controller.next(); runCurrent()
+            assertEquals(listOf(false, true, false, false), holds)
+        }
+    }
+    @Test fun pausingDuringImagePresentationCancelsAudioUntilTheHoldIsResumed() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.presentSentence = { _, hold -> if (hold) delay(1000) }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertTrue(controller.state.value.preparing)
+            assertEquals(1, output.playCount)
+            controller.pause()
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(1, output.playCount)
+            assertFalse(controller.state.value.playing)
+            controller.play(); runCurrent()
+            advanceTimeBy(999); runCurrent()
+            assertEquals(1, output.playCount)
+            advanceTimeBy(1); runCurrent()
+            assertEquals(2, output.playCount)
+            assertFalse(controller.state.value.preparing)
+        }
+    }
     @Test fun advancingToCachedSentenceKeepsPendingPrefetchAndMovesItsHorizon() = runTest {
         fixture { controller, output, audio, _ ->
             val pending = CompletableDeferred<Unit>()
