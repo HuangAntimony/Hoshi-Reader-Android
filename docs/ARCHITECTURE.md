@@ -776,7 +776,7 @@ QA matrices live in `docs/VALIDATION.md`.
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
   Japanese voice, engine speech rate, independent Hoshi playback speed, pitch, provider parameters, playback sentence delay, prefetch
-  depth and scoped text-replacement entries in the `japanese_tts`
+  depth, the global `useRubyReadings` flag (default true), and scoped text-replacement entries in the `japanese_tts`
   Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
   so existing pronunciation entries remain compatible. It does not extend Sasayaki
   sidecars or sync payloads.
@@ -788,7 +788,11 @@ QA matrices live in `docs/VALIDATION.md`.
   cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
   Literal dictionary matching prefers longest surfaces, then book scope over global
-  scope; ruby is used where no custom replacement overlaps. Replacement values accept
+  scope; ruby is used where no custom replacement overlaps and the global Use Ruby readings
+  preference is enabled. Disabling it leaves original base text for the engine and suppresses
+  zero-width image-glyph readings; custom replacements still apply. Playback, preview and Anki
+  exports all read this flag through `TtsAudioRepository`, retaining source ruby/ranges for
+  later re-enabling. It participates in synthesis invalidation and audio cache identity. Replacement values accept
   any non-blank plain text, preserving whitespace. Matching is a single pass over the
   original sentence; inserted text is never matched again. Replacements affect synthesis
   only, preserving original sentence boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
@@ -883,8 +887,8 @@ QA matrices live in `docs/VALIDATION.md`.
   the playback callback completes image holds before sentence reveal and audio.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
   Its fixed sentence controls and Voice/Replacements/Settings tabs use `ReaderBottomPanel`
-  and `ReaderSheetControls`, without book metadata or sentence previews. The segmented tabs, group card and
-  slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
+  and `ReaderSheetControls`, without book metadata or sentence previews. The segmented tabs, group card,
+  switch row and slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
   surface roles and e-ink outlines. TTS Settings uses the same tab content with its
   own settings scaffold; the replacement list is lazy and keeps playback controls
   outside its scroll area. Additional provider choices use anchored `HoshiDropdownMenu`
@@ -910,7 +914,10 @@ QA matrices live in `docs/VALIDATION.md`.
   selected voice and its catalog network requirement, not the source. Unknown saved
   voices keep their raw identifiers without an inferred connection status.
   `SharedReaderPlaybackSettings` edits the same Sasayaki settings
-  repository from both panels; TTS merges only shared reading fields, preserving audiobook
+  repository from both panels; TTS Settings also exposes its own global Ruby switch above
+  the shared controls. Its dedicated field update preserves other TTS preferences and reports
+  write errors through the Settings error flow without clearing source errors.
+  TTS merges only shared reading fields, preserving audiobook
   preferences and keeping its own synthesis settings. Extra sentence delay is owned by
   playback, is cancellable and is excluded from preview/Anki audio; provider silence
   controls are part of synthesized audio. Preview uses the Hoshi playback speed and applies

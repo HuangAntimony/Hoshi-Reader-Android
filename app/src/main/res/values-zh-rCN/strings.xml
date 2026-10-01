@@ -911,6 +911,7 @@
     <string name="tts_pause" comment="Pause synthesized book narration.">暂停</string>
     <string name="tts_play">播放</string>
     <string name="tts_repeat">重播本句</string>
+    <string name="tts_use_ruby">使用 Ruby 读音</string>
     <string name="tts_loading_voices">正在加载音色…</string>
     <string name="tts_source">来源</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>

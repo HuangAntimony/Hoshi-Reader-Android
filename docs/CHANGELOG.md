@@ -24,6 +24,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   e-ink shows readable loading text instead of a solid black progress line.
+  TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
+  sends original base text to the engine while preserving custom replacements for reading,
+  preview and Anki sentence audio.
   Edit shared reading behavior directly in either panel,
   with independent Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.

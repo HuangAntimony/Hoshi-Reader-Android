@@ -20,7 +20,7 @@ data class TtsSettings(
     val engine: String = "", val voice: String = "", val rate: Float = 1f,
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
-    val prefetchSentences: Int = 2, val playbackRate: Float = 1f,
+    val prefetchSentences: Int = 2, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
 )
 internal val ttsPlaybackRateRange = .5f..3f
 internal fun normalizeTtsPlaybackRate(rate: Float): Float = if (rate.isFinite()) rate.coerceIn(ttsPlaybackRateRange) else 1f
@@ -50,6 +50,12 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
             playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
         store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = normalized)) }
+    }
+    suspend fun useRubyReadings(enabled: Boolean) {
+        store.edit {
+            val current = decode(it[key])
+            it[key] = json.encodeToString(current.copy(settings = current.settings.copy(useRubyReadings = enabled)))
+        }
     }
     suspend fun configure(source: TtsOnlineSource, config: TtsOnlineConfig) {
         store.edit {

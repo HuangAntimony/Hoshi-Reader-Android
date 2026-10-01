@@ -89,3 +89,25 @@ internal fun ReaderSheetCard(verticalPadding: Dp = 14.dp, shape: Shape = Rounded
         Column(Modifier.padding(horizontal = 16.dp, vertical = verticalPadding), content = content)
     }
 }
+
+@Composable
+internal fun ReaderSheetSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val metrics = readerSheetDensityMetrics()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}

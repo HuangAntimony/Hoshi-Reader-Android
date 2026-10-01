@@ -39,7 +39,7 @@ class TtsPlaybackControllerTest {
         val requests = mutableListOf<String>()
         var synthesize: suspend (TtsSentence) -> Unit = {}
         override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> {
-            requests += TtsText.spoken(sentence, bookId, preferences.words)
+            requests += TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings)
             synthesize(sentence)
             return listOf(File("${sentence.start}.wav"))
         }
@@ -64,6 +64,25 @@ class TtsPlaybackControllerTest {
     private fun prefetchPreferences(count: Int) = preferencesOf(preferencesKey to """{"settings":{"prefetchSentences":$count}}""")
     private val shortSentencesBook = EpubBook("Short sentences", chapters = listOf(EpubChapter("one", "one.xhtml",
         "application/xhtml+xml", "<p>一。二。三。四。五。六。七。八。九。十。</p>")))
+
+    @Test fun changingRubyPreferenceInvalidatesPendingAudioWithoutResumingOldSynthesis() = runTest {
+        val rubyBook = EpubBook("Ruby fixture", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml",
+            "<p><ruby>今日<rt>キヨウ</rt></ruby>です。次です。</p>")))
+        fixture(fixtureBook = rubyBook) { controller, output, audio, repository ->
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { if (audio.requests.size == 1) release.await() }
+            controller.play(); runCurrent()
+            assertEquals(listOf("キヨウです。"), audio.requests)
+            repository.settings(repository.preferences.first().settings.copy(useRubyReadings = false)); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertFalse(controller.state.value.preparing)
+            release.complete(Unit); runCurrent()
+            assertEquals(0, output.playCount)
+            controller.play(); runCurrent()
+            assertEquals(listOf("キヨウです。", "今日です。", "次です。"), audio.requests)
+            assertEquals(1, output.playCount)
+        }
+    }
 
     @Test fun playbackRateChangesDoNotInterruptCurrentAudioOrPrefetchAndPreservePause() = runTest {
         fixture { controller, output, audio, repository ->

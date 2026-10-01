@@ -131,18 +131,19 @@ object TtsText {
         return TtsSentence(chapter, start, starts.size, text, rubies)
     }
 
-    fun spoken(sentence: TtsSentence, bookId: String?, words: List<TtsWord>): String {
+    fun spoken(sentence: TtsSentence, bookId: String?, words: List<TtsWord>, useRubyReadings: Boolean = true): String {
         val applicable = words.filter { it.bookId == null || it.bookId == bookId }
             .sortedWith(compareByDescending<TtsWord> { it.surface.length }.thenByDescending { it.bookId != null })
+        val rubies = if (useRubyReadings) sentence.ruby else emptyList()
         return buildString {
             var cursor = 0
             while (cursor <= sentence.text.length) {
                 // Image-backed glyphs have no matchable source text. Emit each insertion once,
                 // then consume source text; never use an empty/backward range to advance cursor.
-                sentence.ruby.filter { it.start == cursor && it.end == cursor }.forEach { append(it.reading) }
+                rubies.filter { it.start == cursor && it.end == cursor }.forEach { append(it.reading) }
                 if (cursor == sentence.text.length) break
                 val word = applicable.firstOrNull { it.surface.isNotEmpty() && sentence.text.startsWith(it.surface, cursor) }
-                val ruby = sentence.ruby.firstOrNull { it.start == cursor && it.end > cursor && it.end <= sentence.text.length }
+                val ruby = rubies.firstOrNull { it.start == cursor && it.end > cursor && it.end <= sentence.text.length }
                 when {
                     word != null -> { append(word.replacement); cursor += word.surface.length }
                     ruby != null && (cursor until ruby.end).none { start -> applicable.any { sentence.text.startsWith(it.surface, start) } } -> {

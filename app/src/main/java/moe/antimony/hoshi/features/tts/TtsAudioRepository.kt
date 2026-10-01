@@ -29,7 +29,7 @@ class TtsAudioRepository @Inject constructor(
     private val files = linkedMapOf<String, List<File>>()
     override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
         withContext(ioDispatcher) {
-            val spoken = TtsText.spoken(sentence, bookId, preferences.words)
+            val spoken = TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings)
             // Prefetch depth and player speed do not change the synthesized audio.
             val identity = "${preferences.settings.copy(prefetchSentences = 0, playbackRate = 1f)}\u0000$spoken"
             val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
@@ -66,7 +66,7 @@ class TtsAudioRepository @Inject constructor(
     /** Export has its own lifetime so changing books cannot delete Anki's pending upload. */
     suspend fun export(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): File =
         withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.${engine.extension(preferences.settings)}"), ioDispatcher) { target ->
-            val parts = engine.synthesize(TtsText.spoken(sentence, bookId, preferences.words), preferences.settings, File(cache, "tts/export"))
+            val parts = engine.synthesize(TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings), preferences.settings, File(cache, "tts/export"))
             try {
                 if (target.extension == "mp3") TtsMp3.concatenate(parts, target) else TtsWav.concatenate(parts, target)
             } finally { parts.forEach { it.delete() } }

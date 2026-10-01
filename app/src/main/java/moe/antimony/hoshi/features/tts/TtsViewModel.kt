@@ -46,6 +46,15 @@ class TtsViewModel @Inject constructor(
         }
     }
 
+    fun useRubyReadings(enabled: Boolean) {
+        stopPreview()
+        viewModelScope.launch {
+            try { repository.useRubyReadings(enabled); mutableReadingError.value = null }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { mutableReadingError.value = TtsFailure.Storage }
+        }
+    }
+
     val preferences = repository.preferences.catch { mutableError.value = TtsFailure.Storage; emit(TtsPreferences()) }.stateIn(viewModelScope, SharingStarted.Eagerly, TtsPreferences())
     private val mutableCatalog = MutableStateFlow<TtsCatalog?>(null)
     val catalog = mutableCatalog.asStateFlow()

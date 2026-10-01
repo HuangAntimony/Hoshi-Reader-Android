@@ -21,6 +21,20 @@ class TtsRepositoryTest {
             transform(data.value).also { data.value = it }
     }
 
+    @Test fun rubyDefaultsOnForLegacyPreferencesAndIsPersistedGloballyAcrossSourceChanges() = runTest {
+        val key = stringPreferencesKey("preferences")
+        val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))
+        val repository = TtsRepository(store)
+        assertTrue(repository.preferences.first().settings.useRubyReadings)
+        repository.useRubyReadings(false)
+        assertNull(repository.save(TtsWord("fixture", "今日", "きょう", "book")))
+        val restored = TtsRepository(store).preferences.first()
+        assertFalse(restored.settings.useRubyReadings)
+        assertEquals(1.5f, restored.settings.rate)
+        repository.settings(restored.settings.copy(engine = TtsOnlineSource.Edge.id))
+        assertFalse(TtsRepository(store).preferences.first().settings.useRubyReadings)
+    }
+
     @Test fun legacyPlaybackDefaultsToNormalAndPersistsIndependentlyOfEngineRate() = runTest {
         val key = stringPreferencesKey("preferences")
         val store = MemoryStore(preferencesOf(key to """{"settings":{"engine":"online:google-translate","rate":0.5}}"""))

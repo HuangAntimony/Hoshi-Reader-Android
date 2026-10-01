@@ -48,11 +48,13 @@ class TtsPanelStateTest {
     private val panelVisible = androidx.compose.runtime.mutableStateOf(true)
     private var onlineRequests = 0
     private lateinit var model: TtsViewModel
+    private lateinit var speech: MemoryStore
     private val configMessage get() = context.getString(R.string.tts_configuration_error)
 
     private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false) {
         val source = if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
-        val repository = TtsRepository(MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"}}""")))
+        speech = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"}}"""))
+        val repository = TtsRepository(speech)
         val cipher = TtsCredentialCipher(Dispatchers.IO)
         val transport = OnlineTtsTransport(OkHttpClient.Builder().addInterceptor {
             if (!online) throw IOException("UI fixture prohibits network")
@@ -82,6 +84,39 @@ class TtsPanelStateTest {
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
+
+    @Test fun rubyWriteFailureIsShownInSettingsAndDoesNotOverwriteSourceFailure() {
+        panel()
+        compose.onNodeWithText("Settings").performClick()
+        compose.runOnIdle { speech.failWrites = true }
+        compose.onAllNodes(isToggleable()).onFirst().performClick()
+        compose.waitUntil(5_000) { model.readingError.value == TtsFailure.Storage }
+        compose.onNodeWithText(context.getString(TtsFailure.Storage.messageRes())).assertExists()
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOn()
+        compose.runOnIdle { Assert.assertEquals(TtsFailure.Configuration, model.error.value) }
+        compose.runOnIdle { speech.failWrites = false }
+        compose.onAllNodes(isToggleable()).onFirst().performClick()
+        compose.waitUntil(5_000) { !model.preferences.value.settings.useRubyReadings && model.readingError.value == null }
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+    }
+
+    @Test fun rubySwitchDefaultsOnAndRetainsItsOwnSettingAcrossTabsAndPanelReopen() {
+        panel(online = true)
+        val shared = model.readingSettings.value
+        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithText("Use Ruby readings").assertIsDisplayed()
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOn().performClick()
+        compose.waitUntil(5_000) { !model.preferences.value.settings.useRubyReadings }
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+        compose.onNodeWithText("Replacements").performClick()
+        compose.onNodeWithText("Settings").performClick()
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+        compose.runOnIdle { panelVisible.value = false }
+        compose.runOnIdle { panelVisible.value = true }
+        compose.onNodeWithText("Settings").performClick()
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOff()
+        compose.runOnIdle { Assert.assertEquals(shared, model.readingSettings.value) }
+    }
 
     @Test fun reopeningOnlinePanelKeepsCatalogWithoutLoadingOrNetworkRequests() {
         panel(online = true)

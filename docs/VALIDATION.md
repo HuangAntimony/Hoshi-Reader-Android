@@ -1158,6 +1158,16 @@ Validate relevant sync/update/Sasayaki changes with:
   and check Audio format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
+- In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
+  Toggle it off with a ruby sample such as 今日 annotated キヨウ: playback, full-sentence
+  preview and Anki sentence audio must send 今日 to the engine. Re-enable to use キヨウ;
+  custom replacement 今日 → きょう must win in either state, retaining book/global scope
+  precedence. Source text, ruby visibility, lookup and highlight offsets stay unchanged.
+  The flag is global across books/sources and survives panel/app reopening; shared Sasayaki
+  settings must remain unchanged. During pending synthesis, toggling it pauses/invalidates
+  preparation so obsolete callbacks cannot resume; resume uses the new setting/cache key.
+  `TtsTextTest`, `TtsRepositoryTest`, `TtsAudioRepositoryTest` and `TtsPlaybackControllerTest`
+  cover these boundaries; `TtsPanelStateTest` covers the actual Settings switch and reopening.
 - Long-press book text and choose Replace beside Highlight: prefill the selected original and
   empty replacement text, and preview the full source sentence including ruby and VN
   text outside the screen. Check the dialog title identifies TTS, the equal-width

@@ -34,6 +34,7 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiColorRow
 import moe.antimony.hoshi.features.sasayaki.SharedReaderPlaybackSettings
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
+import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
@@ -102,6 +103,8 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
             )
         } else if (selectedTab == 2) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
+                ReaderSheetSwitchRow(stringResource(R.string.tts_use_ruby), preferences.settings.useRubyReadings,
+                    onCheckedChange = viewModel::useRubyReadings)
                 readingSettings?.let { settings ->
                     SharedReaderPlaybackSettings(settings, viewModel::readingSettings, { colorRow = it })
                 } ?: LinearProgressIndicator(Modifier.fillMaxWidth().padding(20.dp))

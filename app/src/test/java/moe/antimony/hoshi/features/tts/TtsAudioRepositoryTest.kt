@@ -23,6 +23,28 @@ class TtsAudioRepositoryTest {
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 
+    @Test fun rubyPreferenceAppliesToPlaybackAndExportAndSeparatesCachedAudio() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { body ->
+            requests += Json.parseToJsonElement(body).jsonObject.getValue("input").jsonObject.getValue("text").jsonPrimitive.content
+        }
+        val repository = repository(client)
+        val sentence = TtsText.chapter(0, "<p><ruby>今日<rt>キヨウ</rt></ruby>です。</p>").single()
+        val disabled = preferences.copy(settings = preferences.settings.copy(useRubyReadings = false))
+        try {
+            val ruby = repository.audio(sentence, "book", preferences)
+            val original = repository.audio(sentence, "book", disabled)
+            assertNotEquals(ruby, original)
+            assertEquals(original, repository.audio(sentence, "book", disabled))
+            repository.export(sentence, "book", disabled).delete()
+            val custom = disabled.copy(words = listOf(TtsWord("reading", "今日", "きょう")))
+            repository.audio(sentence, "other", custom)
+            repository.export(sentence, "other", custom).delete()
+            assertEquals(listOf("キヨウです。", "今日です。", "今日です。", "きょうです。", "きょうです。"), requests)
+            assertEquals("今日です。", sentence.text)
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun playbackRateAndPrefetchCountReuseAudioButPitchChangesRequireNewSynthesis() = runBlocking {
         val syntheses = AtomicInteger()
         val client = client { syntheses.incrementAndGet() }

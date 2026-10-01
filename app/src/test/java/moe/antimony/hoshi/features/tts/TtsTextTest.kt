@@ -4,6 +4,25 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TtsTextTest {
+    @Test fun rubyCanBeDisabledWithoutChangingOriginalTextOrCustomReplacementPriority() {
+        val sentence = TtsText.chapter(0, "<p><ruby>今日<rt>キヨウ</rt></ruby>は<ruby>晴天<rt>せいてん</rt></ruby>。</p>").single()
+        assertEquals("キヨウはせいてん。", TtsText.spoken(sentence, "book", emptyList()))
+        assertEquals("今日は晴天。", TtsText.spoken(sentence, "book", emptyList(), useRubyReadings = false))
+        val words = listOf(TtsWord("global", "今日", "こんにち"), TtsWord("local", "今日", "きょう", "book"))
+        assertEquals("きょうはせいてん。", TtsText.spoken(sentence, "book", words))
+        assertEquals("きょうは晴天。", TtsText.spoken(sentence, "book", words, useRubyReadings = false))
+        assertEquals("こんにちは晴天。", TtsText.spoken(sentence, "other", words, useRubyReadings = false))
+        assertEquals("今日は晴天。", sentence.text)
+        assertEquals(0, sentence.start)
+        assertEquals(5, sentence.length)
+        assertEquals(2, sentence.ruby.size)
+    }
+
+    @Test fun disabledRubyAlsoSuppressesImageBackedInsertions() {
+        val sentence = TtsText.chapter(0, "<p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。</p>").single()
+        assertEquals("ねた。", TtsText.spoken(sentence, null, emptyList(), useRubyReadings = false))
+    }
+
     @Test fun imageBackedRubyIsSpokenOnceWithoutAddingSourceCharacters() {
         val sentence = TtsText.chapter(0, "<p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。<ruby><img src='glyph.png'/><rt>き</rt></ruby>く。</p>")
         assertEquals(listOf("ねた。", "く。"), sentence.map { it.text })

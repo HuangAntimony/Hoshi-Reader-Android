@@ -78,6 +78,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.features.reader.ReaderSheetCard
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
 import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
@@ -825,13 +826,13 @@ internal fun SharedReaderPlaybackSettings(
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
     )
-    SasayakiSettingsSwitchRow(
+    ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_show_bottom_playback_controls),
         checked = settings.showReaderBottomPlaybackControls,
         onCheckedChange = { onSettingsChange(settings.copy(showReaderBottomPlaybackControls = it)) },
     )
     if (settings.showReaderBottomPlaybackControls) {
-        SasayakiSettingsSwitchRow(
+        ReaderSheetSwitchRow(
             label = stringResource(R.string.sasayaki_reverse_vertical_skip_buttons),
             checked = settings.reverseVerticalReaderSkipButtons,
             onCheckedChange = { onSettingsChange(settings.copy(reverseVerticalReaderSkipButtons = it)) },
@@ -857,7 +858,7 @@ internal fun SharedReaderPlaybackSettings(
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
     )
-    SasayakiSettingsSwitchRow(
+    ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_auto_scroll),
         checked = settings.autoScroll,
         onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
@@ -872,7 +873,7 @@ internal fun SharedReaderPlaybackSettings(
             onSettingsChange(settings.copy(imageHoldSeconds = normalizeSasayakiImageHoldSeconds(it)))
         },
     )
-    SasayakiSettingsSwitchRow(
+    ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_auto_pause_on_lookup),
         checked = settings.autoPause,
         onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
@@ -985,28 +986,6 @@ private fun SasayakiSettingsActionRow(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SasayakiSettingsSwitchRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
     }
 }
 
