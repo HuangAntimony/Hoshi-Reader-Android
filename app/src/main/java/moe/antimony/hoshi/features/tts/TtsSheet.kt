@@ -278,11 +278,21 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
             }
             error?.let { Text(stringResource(when (it) { TtsWordError.Surface -> R.string.tts_invalid_surface; TtsWordError.Replacement -> R.string.tts_invalid_replacement; TtsWordError.Duplicate -> R.string.tts_duplicate; TtsWordError.Storage -> R.string.tts_storage_error }), color = MaterialTheme.colorScheme.error) }
             previewError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
-            if (words.words.any { it.id == initial.id }) TextButton(onClick = { viewModel.delete(initial.id); onDismiss() }) { Text(stringResource(R.string.action_delete)) }
         }
     }, confirmButton = {
-        TextButton(enabled = !saving, onClick = { scope.launch { saving = true; try { error = viewModel.save(value()); if (error == null) onDismiss() } finally { saving = false } } }) { Text(stringResource(R.string.action_save)) }
-    }, dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } })
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (words.words.any { it.id == initial.id }) {
+                TextButton(
+                    enabled = !saving,
+                    onClick = { viewModel.delete(initial.id); onDismiss() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.action_delete)) }
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            TextButton(enabled = !saving, onClick = { scope.launch { saving = true; try { error = viewModel.save(value()); if (error == null) onDismiss() } finally { saving = false } } }) { Text(stringResource(R.string.action_save)) }
+        }
+    })
 }
 
 internal fun TtsFailure.messageRes(): Int = when (this) {

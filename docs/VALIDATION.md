@@ -1133,7 +1133,9 @@ Validate relevant sync/update/Sasayaki changes with:
   scope selector, and full-width themed preview button (including its busy state),
   in both languages and light/dark/e-ink themes. Cancel without saving. With a multilingual IME, start in another input
   language and focus each original/replacement field: both should request Japanese.
-  Repeat from the TTS replacement editor. Check Dictionary search still requests the
+  Repeat from the TTS replacement editor: existing entries show a theme-danger-colored
+  Delete action on the same row as Cancel/Save; new entries show only Cancel/Save.
+  Check Dictionary search still requests the
   selected content language and retains its Search action; no system keyboard preference
   should be changed. IMEs without locale-hint support may retain their current language.
 
