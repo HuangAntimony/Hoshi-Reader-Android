@@ -20,7 +20,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 data class TtsEngineInfo(val id: String, val label: String)
-data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList())
+data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList(),
+    val displayName: String? = null, val locale: String? = null)
 data class TtsCatalog(val engines: List<TtsEngineInfo>, val selectedEngine: String, val voices: List<TtsVoiceInfo>)
 enum class TtsFailure {
     NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage,
@@ -87,7 +88,7 @@ class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val
             val engines = installed()
             val (tts, id) = resolve(settings)
             val voices = japaneseVoices(tts)
-            TtsCatalog(engines, id, voices.map { TtsVoiceInfo(it.name, it.isNetworkConnectionRequired) })
+            TtsCatalog(engines, id, voices.map { TtsVoiceInfo(it.name, it.isNetworkConnectionRequired, locale = it.locale.toLanguageTag()) })
         }
     }
 

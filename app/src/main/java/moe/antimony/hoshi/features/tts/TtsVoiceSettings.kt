@@ -1,0 +1,131 @@
+package moe.antimony.hoshi.features.tts
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.reader.ReaderSheetCard
+import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
+import moe.antimony.hoshi.ui.HoshiButton
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+
+@Composable
+internal fun TtsVoiceSettings(
+    settings: TtsSettings, catalog: TtsCatalog?, engines: List<TtsEngineInfo>, busy: Boolean,
+    preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettings) -> Unit,
+    onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
+    onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier,
+) {
+    var sourcePicker by remember { mutableStateOf(false) }
+    var voicePicker by remember { mutableStateOf(false) }
+    val source = TtsOnlineSource.from(settings.engine)
+    val automatic = stringResource(R.string.tts_system_default)
+    val choices = buildList {
+        add(TtsSourceChoice("", automatic, TtsSourceGroup.Device))
+        engines.forEach { add(TtsSourceChoice(it.id, it.label, TtsSourceGroup.Device)) }
+        TtsOnlineSource.entries.forEach { add(TtsSourceChoice(it.id, stringResource(it.labelRes), if (it.needsKey) TtsSourceGroup.Cloud else TtsSourceGroup.Online)) }
+        if (settings.engine.isNotBlank() && none { it.id == settings.engine }) add(TtsSourceChoice(settings.engine, settings.engine, TtsSourceGroup.Other))
+    }
+    val sourceTitle = if (settings.engine.isBlank()) engines.firstOrNull { it.id == catalog?.selectedEngine }?.label ?: automatic
+        else choices.first { it.id == settings.engine }.title
+    val voices = catalog?.voices.orEmpty()
+    val voice = if (settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == settings.voice }
+    val voiceTitle = if (settings.voice.isBlank()) automatic else (voice ?: TtsVoiceInfo(settings.voice, source != null)).display(source).title
+    val connection = when {
+        source != null || voice?.network == true -> stringResource(R.string.tts_online)
+        voice != null -> stringResource(R.string.tts_offline)
+        else -> null
+    }
+    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
+        ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
+            TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, connection) { sourcePicker = true }
+            HorizontalDivider(color = hoshiSurfaces.divider)
+            TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, null) { voicePicker = true }
+        }
+        if (busy && preview == TtsPreviewState.Idle) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
+        failure?.let {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (source?.needsKey == true) TextButton(onClick = { onConfigure(source) }) { Text(stringResource(R.string.tts_configure_source)) }
+                    TextButton(onClick = onRetry, enabled = !busy) { Text(stringResource(R.string.tts_retry)) }
+                }
+            }
+        }
+        var rate by remember(settings.engine, settings.rate) { mutableFloatStateOf(settings.rate) }
+        if (source == TtsOnlineSource.GoogleTranslate) ReaderSheetCard(verticalPadding = 4.dp) {
+            TtsChoice(stringResource(R.string.tts_rate_label), stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
+                if (rate < 1f) "slow" else "normal",
+                listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)), TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
+            ) { onSettings(settings.copy(rate = if (it == "slow") .5f else 1f)) }
+        } else {
+            val range = (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
+            ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
+                steps = when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
+                onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false,
+                rangeLabels = stringResource(R.string.tts_rate_value, range.start) to stringResource(R.string.tts_rate_value, range.endInclusive))
+        }
+        ttsPitchRange(source, voice?.id.orEmpty())?.let { range ->
+            var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
+            ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
+                steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
+                onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false,
+                rangeLabels = pitchLabel(source, range.start.toInt()) to pitchLabel(source, range.endInclusive.toInt()))
+        }
+        TtsSynthesisControls(settings, voice, onSettings)
+        HoshiButton(onClick = if (preview == TtsPreviewState.Idle) onPreview else onStopPreview,
+            enabled = preview != TtsPreviewState.Idle || !busy,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).height(48.dp)) {
+            if (preview == TtsPreviewState.Preparing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+            else Icon(if (preview == TtsPreviewState.Playing) Icons.Rounded.Stop else Icons.AutoMirrored.Rounded.VolumeUp, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(if (preview == TtsPreviewState.Idle) R.string.tts_preview_voice else R.string.tts_stop_preview))
+        }
+        source?.let {
+            Text(stringResource(if (it.needsKey) R.string.tts_cloud_source_hint else R.string.tts_unofficial_hint),
+                style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp))
+        }
+    }
+    if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = {
+        sourcePicker = false
+        val next = settings.copy(engine = it, voice = "", pitch = 0f)
+        onSettings(next.withOptions(next.options().copy(style = "", role = "")))
+    }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false })
+    if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, source, busy && preview == TtsPreviewState.Idle, failure,
+        onSelected = { voicePicker = false; onSettings(settings.copy(voice = it).withOptions(settings.options().copy(style = "", role = ""))) },
+        onRetry = onRetry, onDismiss = { voicePicker = false })
+}
+
+@Composable
+private fun TtsCurrentVoiceRow(label: String, value: String, status: String?, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(if (status == null) label else stringResource(R.string.tts_source_status, label, status),
+                style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
+            Text(value, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.Rounded.ChevronRight, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
+    }
+}
+
+@Composable
+private fun pitchLabel(source: TtsOnlineSource?, value: Int): String = stringResource(when {
+    source == TtsOnlineSource.Edge && value == 0 -> R.string.tts_pitch_zero_hz
+    source == TtsOnlineSource.Edge -> R.string.tts_pitch_hz
+    value == 0 -> R.string.tts_pitch_zero
+    else -> R.string.tts_pitch_short
+}, value)

@@ -34,8 +34,6 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiColorRow
 import moe.antimony.hoshi.features.sasayaki.SharedReaderPlaybackSettings
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
-import moe.antimony.hoshi.features.reader.ReaderSheetCard
-import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
@@ -66,7 +64,7 @@ fun TtsSettingsView(onClose: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> Unit)?, modifier: Modifier) {
+internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> Unit)?, modifier: Modifier) {
     val readingSettings by viewModel.readingSettings.collectAsStateWithLifecycle()
     var colorRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
@@ -74,31 +72,22 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
     val engines by viewModel.engines.collectAsStateWithLifecycle()
     val playback by viewModel.playback.state.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val preview by viewModel.previewState.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val readingError by viewModel.readingError.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editor by remember { mutableStateOf<TtsWord?>(null) }
     var configureSource by remember { mutableStateOf<TtsOnlineSource?>(null) }
-    val onlineSource = TtsOnlineSource.from(preferences.settings.engine)
-    val sourceOptions = listOf(TtsChoiceOption("", stringResource(R.string.tts_system_default))) +
-        engines.map { TtsChoiceOption(it.id, it.label) } +
-        TtsOnlineSource.entries.map { TtsChoiceOption(it.id, stringResource(it.labelRes), stringResource(R.string.tts_network)) }
     val context = LocalContext.current
     val sample = stringResource(R.string.tts_sample)
-    val automaticLabel = stringResource(R.string.tts_system_default)
-    val selectedVoice = catalog?.voices?.let { voices ->
-        if (preferences.settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == preferences.settings.voice }
-    }
-    val voiceLabel = preferences.settings.voice.ifBlank { automaticLabel }
-    val networkLabel = stringResource(R.string.tts_network)
-    val offlineLabel = stringResource(R.string.tts_offline)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     DisposableEffect(viewModel) { onDispose { viewModel.stopPreview() } }
     Column(modifier) {
         if (onStart != null) {
             TtsPlaybackControls(playback, busy,
-                onPrevious = viewModel.playback::previous, onNext = viewModel.playback::next,
-                onRepeat = viewModel.playback::repeat,
-                onToggle = { if (playback.playing) viewModel.playback.pause() else if (playback.started) viewModel.playback.play() else onStart() })
+                onPrevious = { viewModel.stopPreview(); viewModel.playback.previous() }, onNext = { viewModel.stopPreview(); viewModel.playback.next() },
+                onRepeat = { viewModel.stopPreview(); viewModel.playback.repeat() },
+                onToggle = { viewModel.stopPreview(); if (playback.playing) viewModel.playback.pause() else if (playback.started) viewModel.playback.play() else onStart() })
         }
         ReaderSheetTabs(
             labels = listOf(stringResource(R.string.tts_tab_voice), stringResource(R.string.tts_tab_dictionary), stringResource(R.string.settings_title)),
@@ -116,89 +105,21 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                 readingSettings?.let { settings ->
                     SharedReaderPlaybackSettings(settings, viewModel::readingSettings, { colorRow = it })
                 } ?: LinearProgressIndicator(Modifier.fillMaxWidth().padding(20.dp))
-                error?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) }
+                readingError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) }
             }
         } else {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-                ReaderSheetCard {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.weight(1f)) {
-                            TtsChoice(stringResource(R.string.tts_source),
-                                onlineSource?.let { stringResource(it.labelRes) }
-                                    ?: engines.firstOrNull { it.id == catalog?.selectedEngine }?.label
-                                    ?: engines.firstOrNull { it.id == preferences.settings.engine }?.label ?: automaticLabel,
-                                preferences.settings.engine,
-                                sourceOptions,
-                                singleLine = true,
-                            ) { val next = preferences.settings.copy(engine = it, voice = "", pitch = 0f)
-                                viewModel.settings(next.withOptions(next.options().copy(style = "", role = ""))) }
-                        }
-                        IconButton(onClick = {
-                            if (onlineSource != null) configureSource = onlineSource
-                            else try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
-                            catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                        }) { Icon(Icons.Rounded.Settings, null, tint = hoshiSurfaces.muted) }
-                    }
-                }
-                ReaderSheetCard {
-                    TtsChoice(stringResource(R.string.tts_voice), voiceLabel, preferences.settings.voice,
-                        listOf(TtsChoiceOption("", automaticLabel)) + catalog?.voices.orEmpty().map {
-                            TtsChoiceOption(it.id, it.id, if (it.network) networkLabel else offlineLabel)
-                        },
-                        supporting = selectedVoice?.let { if (it.network) networkLabel else offlineLabel },
-                    ) { viewModel.settings(preferences.settings.copy(voice = it).withOptions(preferences.settings.options().copy(style = "", role = ""))) }
-                }
-                if (onlineSource != null) Text(
-                    stringResource(if (onlineSource.needsKey) R.string.tts_cloud_source_hint else R.string.tts_unofficial_hint),
-                    style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                )
-                var rate by remember(preferences.settings.rate) { mutableFloatStateOf(preferences.settings.rate) }
-                if (onlineSource == TtsOnlineSource.GoogleTranslate) ReaderSheetCard {
-                    TtsChoice(stringResource(R.string.tts_rate_label),
-                        stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
-                        if (rate < 1f) "slow" else "normal",
-                        listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)),
-                            TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
-                    ) { viewModel.settings(preferences.settings.copy(rate = if (it == "slow") .5f else 1f)) }
-                } else ReaderSheetSliderRow(
-                    label = stringResource(R.string.tts_rate_label), valueText = stringResource(R.string.tts_rate_value, rate),
-                    value = rate, range = (if (onlineSource == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (onlineSource == TtsOnlineSource.GoogleCloud || onlineSource?.usesAzureRest == true) 2f else 3f),
-                    steps = when (onlineSource) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 }, onValueChange = { rate = it },
-                    onValueChangeFinished = { viewModel.settings(preferences.settings.copy(rate = rate)) },
-                )
-                ttsPitchRange(onlineSource, selectedVoice?.id.orEmpty())?.let { range ->
-                    var pitch by remember(preferences.settings.pitch) { mutableFloatStateOf(preferences.settings.pitch) }
-                    ReaderSheetSliderRow(
-                        label = stringResource(R.string.tts_pitch),
-                        valueText = stringResource(if (onlineSource == TtsOnlineSource.Edge) R.string.tts_pitch_hz else R.string.tts_pitch_semitones, pitch.toInt()),
-                        value = pitch, range = range, steps = (range.endInclusive - range.start).toInt() - 1,
-                        onValueChange = { pitch = it },
-                        onValueChangeFinished = { viewModel.settings(preferences.settings.copy(pitch = pitch)) },
-                    )
-                }
-                TtsSynthesisControls(preferences.settings, selectedVoice, viewModel::settings)
-                HoshiButton(
-                    onClick = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).heightIn(min = 48.dp),
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.tts_preview_voice))
-                }
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp))
-                (error ?: playback.error)?.let { failure ->
-                    ReaderSheetCard {
-                        Text(stringResource(failure.messageRes()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { viewModel.dismissError(); viewModel.refresh() }) { Text(stringResource(R.string.tts_retry)) }
-                    }
-                }
-            }
+            TtsVoiceSettings(preferences.settings, catalog, engines, busy, preview, error ?: playback.error,
+                onSettings = viewModel::settings,
+                onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, onStopPreview = viewModel::stopPreview,
+                onRetry = { viewModel.dismissError(); viewModel.refresh() }, onConfigure = { configureSource = it },
+                onSystemSettings = {
+                    try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                    catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                }, modifier = Modifier.weight(1f))
         }
     }
     configureSource?.let { source ->
-        TtsSourceConfigurationDialog(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }
+        TtsSourceConfigurationSheet(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }
     }
     colorRow?.let { row ->
         readingSettings?.let { settings ->

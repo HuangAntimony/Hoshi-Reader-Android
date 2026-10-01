@@ -10,10 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
@@ -55,6 +57,8 @@ internal fun ReaderSheetSliderRow(
     steps: Int,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: (() -> Unit)? = null,
+    showTicks: Boolean = true,
+    rangeLabels: Pair<String, String>? = null,
 ) {
     val metrics = readerSheetDensityMetrics()
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = metrics.sasayakiSliderVerticalPaddingDp.dp)) {
@@ -63,17 +67,25 @@ internal fun ReaderSheetSliderRow(
             Text(valueText, fontWeight = FontWeight.SemiBold)
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps,
-            onValueChangeFinished = onValueChangeFinished)
+            onValueChangeFinished = onValueChangeFinished,
+            colors = if (showTicks) SliderDefaults.colors() else SliderDefaults.colors(
+                activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent))
+        rangeLabels?.let { (start, end) ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(start, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
+                Text(end, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
+            }
+        }
     }
 }
 
 @Composable
-internal fun ReaderSheetCard(content: @Composable ColumnScope.() -> Unit) {
+internal fun ReaderSheetCard(verticalPadding: Dp = 14.dp, shape: Shape = RoundedCornerShape(8.dp), content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(8.dp), color = hoshiSurfaces.group,
+        shape = shape, color = hoshiSurfaces.group,
         border = hoshiContainerBorder(), tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), content = content)
+        Column(Modifier.padding(horizontal = 16.dp, vertical = verticalPadding), content = content)
     }
 }

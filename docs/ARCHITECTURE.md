@@ -868,13 +868,27 @@ QA matrices live in `docs/VALIDATION.md`.
   slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
   surface roles and e-ink outlines. TTS Settings uses the same tab content with its
   own settings scaffold; the replacement list is lazy and keeps playback controls
-  outside its scroll area. Voice-source and voice choices use anchored `HoshiDropdownMenu`
-  rows in shared cards; a separate settings icon beside the source selector opens system
-  TTS settings or a source-specific credential/test dialog. Additional synthesis controls
-  expand in the Voice tab and use source/voice capabilities. Connection tests synthesize
-  a public sample using the unsaved configuration without changing the active source.
-  Voice preview uses a full-width `HoshiButton` with the same default styling
-  as Theme's control preview. Source/voice labels use body typography.
+  outside its scroll area. Additional provider choices use anchored `HoshiDropdownMenu`
+  rows. Source and Voice share one compact card, with independent
+  48 dp touch rows opening lazy selection lists in `TtsSelectionSheet`, which reuses
+  `ReaderBottomPanel`. Sources group installed engines, online services and key-based
+  cloud services without guessing installed engine capabilities; an unavailable saved
+  source or voice remains visible under its original ID. The source picker exposes cloud
+  configuration actions only for key-based services and a system-settings action for
+  installed sources. Credential forms reuse the same sheet chrome, preserve encrypted
+  storage/blank-key retention, and test unsaved drafts with a public synthesis sample.
+  Canceling disposes the draft and its coroutine. Source errors appear beside the voice
+  card; shared behavior errors have a separate StateFlow and cannot show source failures
+  in the Settings tab. `TtsPreviewState` exposes idle/preparing/playing so the theme-colored
+  preview button can cancel preparation or stop playback; reading controls stop preview
+  before using the existing sentence controller. Additional synthesis controls expand
+  from a neutral row and use source/voice capabilities. TTS sliders hide tick marks
+  while retaining their discrete steps, with range labels for rate/pitch; shared slider
+  and card defaults remain unchanged for Sasayaki.
+  `TtsVoiceInfo` carries optional runtime display-name/locale metadata from catalogs;
+  `TtsVoiceDisplay` prefers provider names, formats only recognized Microsoft neural
+  IDs, and otherwise falls back to raw IDs. It never changes identifiers, capabilities,
+  persisted configuration or synthesized/exported text.
   `SharedReaderPlaybackSettings` edits the same Sasayaki settings
   repository from both panels; TTS merges only shared reading fields, preserving audiobook
   preferences and keeping its own synthesis settings. Extra sentence delay is owned by

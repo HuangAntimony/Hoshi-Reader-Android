@@ -948,8 +948,8 @@
     <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
     <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
     <string name="tts_key_saved_hint" comment="TTS online source configuration">此设备已保存密钥；留空可继续使用。</string>
-    <string name="tts_test_connection" comment="TTS online source configuration">测试合成</string>
-    <string name="tts_connection_success" comment="TTS online source configuration">示例合成成功。</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">测试连接</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">连接已验证</string>
     <string name="tts_rate_slow" comment="TTS online source configuration">慢速</string>
     <string name="tts_rate_normal" comment="TTS online source configuration">普通</string>
     <string name="tts_configuration_error" comment="TTS online source configuration">请先配置此来源，检查区域和 API 密钥；恢复的设置可能需要重新填写密钥。</string>
@@ -998,4 +998,25 @@
     <string name="tts_profile_home" comment="TTS synthesis parameter">家庭影音</string>
     <string name="tts_profile_car" comment="TTS synthesis parameter">车载音响</string>
     <string name="tts_profile_telephone" comment="TTS synthesis parameter">电话线路</string>
+    <string name="tts_system_settings" comment="TTS voice settings">系统 TTS 设置</string>
+    <string name="tts_choose_source" comment="TTS voice settings">选择来源</string>
+    <string name="tts_group_device" comment="TTS voice settings">设备引擎</string>
+    <string name="tts_group_online" comment="TTS voice settings">在线服务</string>
+    <string name="tts_group_cloud" comment="TTS voice settings">云服务</string>
+    <string name="tts_group_other" comment="TTS voice settings">其他来源</string>
+    <string name="tts_system_preferred" comment="TTS voice settings">使用系统首选引擎</string>
+    <string name="tts_installed_engine" comment="TTS voice settings">已安装到此设备</string>
+    <string name="tts_key_required" comment="TTS voice settings">需要 API 密钥</string>
+    <string name="tts_no_account" comment="TTS voice settings">无需账户</string>
+    <string name="tts_online" comment="TTS voice settings">在线</string>
+    <string name="tts_model_neural" comment="TTS voice settings">神经网络音色</string>
+    <string name="tts_model_multilingual_neural" comment="TTS voice settings">多语言神经网络音色</string>
+    <string name="tts_stop_preview" comment="TTS voice settings">停止试听</string>
+    <string name="tts_configure_source" comment="TTS voice settings">配置来源</string>
+    <string name="tts_key_device_hint" comment="TTS voice settings">凭据保存在此设备上。</string>
+    <string name="tts_pitch_short" comment="TTS voice settings">%1$+d 半音</string>
+    <string name="tts_pitch_zero" comment="TTS voice settings">0 半音</string>
+    <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
+    <string name="tts_source_status" comment="Source label with connection requirement, not a selectable network mode">%1$s · %2$s</string>
+    <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">已保存的来源</string>
 </resources>

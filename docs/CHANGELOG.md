@@ -11,9 +11,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
   Microsoft Translator, Google Cloud and Google Translate online sources, with a separate
   TTS panel styled like Sasayaki, with compact playback controls and Voice,
-  Replacements and Settings tabs. Choose sources and voices from dropdown rows with
-  readable labels and single-line source names, open system TTS settings beside the selected source, and preview
-  voices with a full-width theme-colored button matching Theme's control preview.
+  Replacements and Settings tabs. Source and Voice share a compact card with grouped,
+  scrolling bottom selection panels. Recognized voices show readable names while unknown
+  names remain selectable; installed third-party engines remain available. Source selection
+  includes cloud credential configuration and system TTS settings. Rate and pitch sliders
+  keep their steps without dense tick marks, and preview can be canceled or stopped from
+  its theme-colored button. Cloud credentials use a matching configuration sheet; source errors
+  stay beside the voice card instead of leaking into other tabs.
   Edit shared reading behavior directly in either panel,
   with independent Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.

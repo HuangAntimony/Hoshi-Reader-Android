@@ -1089,19 +1089,38 @@ Validate relevant sync/update/Sasayaki changes with:
   bounds, persistence, moving windows and cache reuse; keep export/source configuration
   behavior independent of prefetch depth.
 
+- Run `TtsVoiceDisplayTest` with the JVM suite and explicitly run `TtsVoiceSettingsTest`
+  and `TtsProviderConfigurationTest`, plus `TtsPanelStateTest`, using `am instrument`. Their isolated UI/callback
+  fixtures cover long lists, raw IDs, third-party engines, cloud actions, preview cancellation
+  and credential drafts without saved-device changes, real keys or network calls.
+  `TtsPanelStateTest` also verifies error isolation and installed-engine preview playback,
+  stop and natural completion with public Japanese text in test-owned cache. Pass
+  `-e ttsEngine <installed-offline-engine-package>` to isolate this test from a network-backed
+  system default; on the Samsung validation device use `com.samsung.SMT`. This must not
+  change system preferred-engine settings.
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
   Voice/Replacements/Settings, without a cover, book title or sentence preview.
-  Confirm source/voice dropdowns open next to their rows and dismiss on selection or
-  outside tap; voice items show their network requirement and selected checkmark.
-  Check source/voice label readability and the full-width preview button's styling against
-  Theme's control preview while enabled and loading, including sepia and e-ink themes.
-  Check rate save on release, dictionary add/edit/cancel,
-  and the source row's settings icon and return. Tapping this icon must not open the source
-  dropdown. Edit shared behavior and colors
+  Confirm Source and Voice have explicit labels in one compact card and open separate lazy bottom lists,
+  without search fields. Sources group all installed engines, online services and key-based
+  cloud services; unknown saved sources/voices remain visible and selectable under raw IDs.
+  Cloud rows alone offer credential actions; tapping an action must not select that source.
+  Only installed sources show the system TTS settings action. Check list scrolling, selected
+  checkmarks and dismissal/return. Connection status is supporting text with the Source label,
+  never the apparent editable value beside its arrow. Known Microsoft names display cleanly; provider metadata
+  takes priority and unknown formats retain raw IDs. Online voice rows must not repeat a
+  network label; installed voice rows still identify network requirements.
+  Check rate/pitch sliders have no dense ticks but keep existing steps/ranges and save on
+  release. Pitch zero uses `0 st`/`0 Hz`. The theme-colored Preview button must show preparing/stop
+  states and cancel or stop its own preview; reading controls still operate the book session.
+  Test credential draft/cancel/save with blank-key retention, loading, verified/error states,
+  and cancellation on dismiss. Source errors stay beside the voice card and cannot leak into
+  Replacements/Settings; failed shared behavior writes still report an error in Settings.
+  Compare light/dark, sepia and e-ink layouts, dictionary add/edit/cancel.
+  Edit shared behavior and colors
   in Settings and confirm Sasayaki reflects them, and vice versa; restore original values.
   TTS must not expose seconds-based navigation or change audiobook-only preferences.
-  Check long source names stay on one line with middle ellipsis and remain complete in
-  the dropdown; check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS
+  Check long source/voice names wrap without crowding the card and remain complete in
+  selection lists; check empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
   With Azure, Microsoft Translator or Google Cloud selected, expand synthesis parameters
   and check Audio format and Sample rate: short labels/values fit on one line at normal font size,

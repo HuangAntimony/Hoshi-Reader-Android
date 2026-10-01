@@ -950,8 +950,8 @@
     <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
     <string name="tts_api_key" comment="TTS online source configuration">Service API key</string>
     <string name="tts_key_saved_hint" comment="TTS online source configuration">A key is saved on this device. Leave this field empty to keep it.</string>
-    <string name="tts_test_connection" comment="TTS online source configuration">Test synthesis</string>
-    <string name="tts_connection_success" comment="TTS online source configuration">Sample synthesized successfully.</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">Test connection</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">Connection verified</string>
     <string name="tts_rate_slow" comment="TTS online source configuration">Slow</string>
     <string name="tts_rate_normal" comment="TTS online source configuration">Normal</string>
     <string name="tts_configuration_error" comment="TTS online source configuration">Configure this source first. Check its region and API key; restored settings may need a new key.</string>
@@ -1000,4 +1000,25 @@
     <string name="tts_profile_home" comment="TTS synthesis parameter">Home entertainment</string>
     <string name="tts_profile_car" comment="TTS synthesis parameter">Car audio</string>
     <string name="tts_profile_telephone" comment="TTS synthesis parameter">Telephone line</string>
+    <string name="tts_system_settings" comment="TTS voice settings">System TTS settings</string>
+    <string name="tts_choose_source" comment="TTS voice settings">Choose source</string>
+    <string name="tts_group_device" comment="TTS voice settings">Device engines</string>
+    <string name="tts_group_online" comment="TTS voice settings">Online services</string>
+    <string name="tts_group_cloud" comment="TTS voice settings">Cloud providers</string>
+    <string name="tts_group_other" comment="TTS voice settings">Other sources</string>
+    <string name="tts_system_preferred" comment="TTS voice settings">Use the system preferred engine</string>
+    <string name="tts_installed_engine" comment="TTS voice settings">Installed on this device</string>
+    <string name="tts_key_required" comment="TTS voice settings">API key required</string>
+    <string name="tts_no_account" comment="TTS voice settings">No account required</string>
+    <string name="tts_online" comment="TTS voice settings">Online</string>
+    <string name="tts_model_neural" comment="TTS voice settings">Neural</string>
+    <string name="tts_model_multilingual_neural" comment="TTS voice settings">Multilingual Neural</string>
+    <string name="tts_stop_preview" comment="TTS voice settings">Stop preview</string>
+    <string name="tts_configure_source" comment="TTS voice settings">Configure source</string>
+    <string name="tts_key_device_hint" comment="TTS voice settings">Credentials are stored on this device.</string>
+    <string name="tts_pitch_short" comment="TTS voice settings">%1$+d st</string>
+    <string name="tts_pitch_zero" comment="TTS voice settings">0 st</string>
+    <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
+    <string name="tts_source_status" comment="Source label with connection requirement, not a selectable network mode">%1$s · %2$s</string>
+    <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">Saved source</string>
 </resources>

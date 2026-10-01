@@ -16,6 +16,8 @@ import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
+enum class TtsPreviewState { Idle, Preparing, Playing }
+
 @OptIn(UnstableApi::class)
 @HiltViewModel
 class TtsViewModel @Inject constructor(
@@ -29,16 +31,18 @@ class TtsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val mutableError = MutableStateFlow<TtsFailure?>(null)
+    private val mutableReadingError = MutableStateFlow<TtsFailure?>(null)
+    val readingError = mutableReadingError.asStateFlow()
     val readingSettings = readingSettingsRepository.settings
         .map<SasayakiSettings, SasayakiSettings?> { it }
-        .catch { mutableError.value = TtsFailure.Storage; emit(null) }
+        .catch { mutableReadingError.value = TtsFailure.Storage; emit(null) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun readingSettings(value: SasayakiSettings) {
         viewModelScope.launch {
-            try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(value) } }
+            try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(value) }; mutableReadingError.value = null }
             catch (error: CancellationException) { throw error }
-            catch (_: Exception) { mutableError.value = TtsFailure.Storage }
+            catch (_: Exception) { mutableReadingError.value = TtsFailure.Storage }
         }
     }
 
@@ -49,8 +53,9 @@ class TtsViewModel @Inject constructor(
     val engines = mutableEngines.asStateFlow()
     val error = mutableError.asStateFlow()
     private val catalogBusy = MutableStateFlow(false)
-    private val previewBusy = MutableStateFlow(false)
-    val busy = combine(catalogBusy, previewBusy) { catalog, preview -> catalog || preview }
+    private val mutablePreviewState = MutableStateFlow(TtsPreviewState.Idle)
+    val previewState = mutablePreviewState.asStateFlow()
+    val busy = combine(catalogBusy, mutablePreviewState) { catalog, preview -> catalog || preview == TtsPreviewState.Preparing }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private var catalogGeneration = 0L
     private var previewGeneration = 0L
@@ -79,6 +84,7 @@ class TtsViewModel @Inject constructor(
     }
     fun settings(value: TtsSettings) {
         stopPreview()
+        dismissError()
         viewModelScope.launch { try {
             val previous = repository.preferences.first().settings
             repository.settings(value)
@@ -125,9 +131,10 @@ class TtsViewModel @Inject constructor(
     fun preview(sentence: TtsSentence, bookId: String?, word: TtsWord? = null) {
         stopPreview()
         playback.pause()
+        mutableError.value = null
         val generation = previewGeneration
         previewJob = viewModelScope.launch {
-            previewBusy.value = true
+            mutablePreviewState.value = TtsPreviewState.Preparing
             try {
                 val current = repository.preferences.first()
                 val config = if (word == null) current else current.copy(words = current.words.filterNot { it.id == word.id || it.surface == word.surface && it.bookId == word.bookId } + word)
@@ -136,20 +143,27 @@ class TtsViewModel @Inject constructor(
                 previewPlayer = ExoPlayer.Builder(context).build().apply {
                     setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
                     addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(playbackState: Int) { if (playbackState == Player.STATE_ENDED) stopPreview() }
-                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { mutableError.value = TtsFailure.AudioUnavailable; stopPreview() }
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            if (isPlaying && generation == previewGeneration) mutablePreviewState.value = TtsPreviewState.Playing
+                        }
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState == Player.STATE_ENDED && generation == previewGeneration) stopPreview()
+                        }
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            if (generation == previewGeneration) { mutableError.value = TtsFailure.AudioUnavailable; stopPreview() }
+                        }
                     })
                     setMediaItem(MediaItem.fromUri(file.toURI().toString())); prepare(); play()
                 }
-            } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
+            } catch (error: TimeoutCancellationException) { if (generation == previewGeneration) mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
-            finally { if (generation == previewGeneration) previewBusy.value = false }
+            catch (error: Exception) { if (generation == previewGeneration) mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
+            finally { if (generation == previewGeneration && previewPlayer == null) mutablePreviewState.value = TtsPreviewState.Idle }
         }
     }
     fun stopPreview() {
         previewGeneration++
-        previewBusy.value = false
+        mutablePreviewState.value = TtsPreviewState.Idle
         previewJob?.cancel(); previewJob = null
         previewPlayer?.release(); previewPlayer = null
         previewFile?.delete(); previewFile = null

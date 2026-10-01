@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -24,9 +25,11 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     val source = TtsOnlineSource.from(settings.engine)
     val options = settings.options()
     val update: (TtsSynthesisOptions) -> Unit = { onChange(settings.withOptions(it)) }
-    TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        Text(stringResource(R.string.tts_more_parameters), modifier = Modifier.weight(1f))
-        Icon(if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { expanded = !expanded }.heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.tts_more_parameters), style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Icon(if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = hoshiSurfaces.muted)
     }
     if (!expanded) return
     TtsParameterSlider(R.string.tts_prefetch_sentences, settings.prefetchSentences.coerceIn(ttsPrefetchRange).toFloat(),
@@ -126,5 +129,5 @@ private fun TtsParameterSlider(label: Int, value: Float, range: ClosedFloatingPo
 ) {
     var draft by remember(value) { mutableFloatStateOf(value) }
     ReaderSheetSliderRow(label = stringResource(label), valueText = display(draft), value = draft,
-        range = range, steps = steps, onValueChange = { draft = it }, onValueChangeFinished = { onChange(draft) })
+        range = range, steps = steps, onValueChange = { draft = it }, onValueChangeFinished = { onChange(draft) }, showTicks = false)
 }
