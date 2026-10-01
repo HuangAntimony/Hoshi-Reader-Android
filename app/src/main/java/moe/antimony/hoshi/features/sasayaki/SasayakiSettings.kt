@@ -58,13 +58,25 @@ data class SasayakiSettings(
     val lightBackgroundColor: Long = 0x6687CEEB,
     val darkTextColor: Long = 0xFFFFFFFF,
     val darkBackgroundColor: Long = 0x6687CEEB,
+    val sentenceAudioRate: Float? = null,
 ) {
+    fun effectiveSentenceAudioRate(playbackRate: Float): Float =
+        normalizeSasayakiSentenceAudioRate(sentenceAudioRate)
+            ?: normalizeSasayakiSentenceAudioRate(playbackRate)
+            ?: 1f
+
     fun textColor(dark: Boolean): Long =
         if (dark) darkTextColor else lightTextColor
 
     fun backgroundColor(dark: Boolean): Long =
         if (dark) darkBackgroundColor else lightBackgroundColor
 }
+
+internal val SasayakiSpeedSliderRange = 0.5f..3.0f
+internal const val SasayakiSpeedSliderSteps = 49
+
+private fun normalizeSasayakiSentenceAudioRate(value: Float?): Float? =
+    value?.takeIf { it.isFinite() }?.coerceIn(SasayakiSpeedSliderRange)
 
 const val SasayakiImageHoldDefaultSeconds = 1f
 const val SasayakiImageHoldMinSeconds = 0f
@@ -103,6 +115,9 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             imageHoldSeconds = normalizeSasayakiImageHoldSeconds(
                 preferences.getFloat(KEY_IMAGE_HOLD_SECONDS, SasayakiImageHoldDefaultSeconds),
             ),
+            sentenceAudioRate = normalizeSasayakiSentenceAudioRate(
+                if (preferences.contains(KEY_SENTENCE_AUDIO_RATE)) preferences.getFloat(KEY_SENTENCE_AUDIO_RATE, 1f) else null,
+            ),
             lightTextColor = preferences.getLong(KEY_LIGHT_TEXT_COLOR, 0xFF000000),
             lightBackgroundColor = preferences.getLong(KEY_LIGHT_BACKGROUND_COLOR, 0x6687CEEB),
             darkTextColor = preferences.getLong(KEY_DARK_TEXT_COLOR, 0xFFFFFFFF),
@@ -110,7 +125,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         )
 
     fun save(settings: SasayakiSettings) {
-        preferences.edit()
+        val editor = preferences.edit()
             .putBoolean(KEY_ENABLE, settings.enabled)
             .putBoolean(KEY_SYNC_ENABLED, settings.syncEnabled)
             .putBoolean(KEY_SHOW_READER_TOGGLE, settings.showReaderToggle)
@@ -125,7 +140,13 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             .putLong(KEY_LIGHT_BACKGROUND_COLOR, settings.lightBackgroundColor)
             .putLong(KEY_DARK_TEXT_COLOR, settings.darkTextColor)
             .putLong(KEY_DARK_BACKGROUND_COLOR, settings.darkBackgroundColor)
-            .apply()
+        val sentenceAudioRate = normalizeSasayakiSentenceAudioRate(settings.sentenceAudioRate)
+        if (sentenceAudioRate == null) {
+            editor.remove(KEY_SENTENCE_AUDIO_RATE)
+        } else {
+            editor.putFloat(KEY_SENTENCE_AUDIO_RATE, sentenceAudioRate)
+        }
+        editor.apply()
     }
 
     private companion object {
@@ -139,6 +160,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         const val KEY_AUTO_SCROLL = "sasayakiAutoScroll"
         const val KEY_AUTO_PAUSE = "sasayakiAutoPause"
         const val KEY_IMAGE_HOLD_SECONDS = "sasayakiImageHoldSeconds"
+        const val KEY_SENTENCE_AUDIO_RATE = "sasayakiSentenceAudioRate"
         const val KEY_LIGHT_TEXT_COLOR = "sasayakiTextColor"
         const val KEY_LIGHT_BACKGROUND_COLOR = "sasayakiBackgroundColor"
         const val KEY_DARK_TEXT_COLOR = "sasayakiDarkTextColor"
@@ -194,6 +216,7 @@ class SasayakiSettingsRepository(
             imageHoldSeconds = normalizeSasayakiImageHoldSeconds(
                 this[KEY_IMAGE_HOLD_SECONDS] ?: SasayakiImageHoldDefaultSeconds,
             ),
+            sentenceAudioRate = normalizeSasayakiSentenceAudioRate(this[KEY_SENTENCE_AUDIO_RATE]),
             lightTextColor = this[KEY_LIGHT_TEXT_COLOR] ?: 0xFF000000,
             lightBackgroundColor = this[KEY_LIGHT_BACKGROUND_COLOR] ?: 0x6687CEEB,
             darkTextColor = this[KEY_DARK_TEXT_COLOR] ?: 0xFFFFFFFF,
@@ -212,6 +235,12 @@ class SasayakiSettingsRepository(
         this[KEY_AUTO_PAUSE] = settings.autoPause
         this[KEY_TRANSCRIPTION_PRESET] = settings.transcriptionPreset.name
         this[KEY_IMAGE_HOLD_SECONDS] = normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds)
+        val sentenceAudioRate = normalizeSasayakiSentenceAudioRate(settings.sentenceAudioRate)
+        if (sentenceAudioRate == null) {
+            remove(KEY_SENTENCE_AUDIO_RATE)
+        } else {
+            this[KEY_SENTENCE_AUDIO_RATE] = sentenceAudioRate
+        }
         this[KEY_LIGHT_TEXT_COLOR] = settings.lightTextColor
         this[KEY_LIGHT_BACKGROUND_COLOR] = settings.lightBackgroundColor
         this[KEY_DARK_TEXT_COLOR] = settings.darkTextColor
@@ -237,6 +266,7 @@ class SasayakiSettingsRepository(
         private val KEY_AUTO_PAUSE = booleanPreferencesKey("sasayakiAutoPause")
         private val KEY_TRANSCRIPTION_PRESET = stringPreferencesKey("sasayakiTranscriptionPreset")
         private val KEY_IMAGE_HOLD_SECONDS = floatPreferencesKey("sasayakiImageHoldSeconds")
+        private val KEY_SENTENCE_AUDIO_RATE = floatPreferencesKey("sasayakiSentenceAudioRate")
         private val KEY_LIGHT_TEXT_COLOR = longPreferencesKey("sasayakiTextColor")
         private val KEY_LIGHT_BACKGROUND_COLOR = longPreferencesKey("sasayakiBackgroundColor")
         private val KEY_DARK_TEXT_COLOR = longPreferencesKey("sasayakiDarkTextColor")

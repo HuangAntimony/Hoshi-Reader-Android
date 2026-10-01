@@ -91,8 +91,6 @@ import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.rememberInitiallyCenteredLazyListState
 
-internal val SasayakiSpeedSliderRange = 0.5f..3.0f
-internal const val SasayakiSpeedSliderSteps = 49
 internal const val SasayakiAudiobookCoverWidthDp = 68
 internal const val SasayakiAudiobookCoverHeightDp = 68
 internal val SasayakiSheetTabRole = Role.Tab
@@ -826,6 +824,22 @@ private fun SasayakiSettingsTab(
             range = SasayakiSpeedSliderRange,
             steps = SasayakiSpeedSliderSteps,
             onValueChange = { player.setRate(it) },
+        )
+        val sentenceAudioRate = settings.effectiveSentenceAudioRate(player.rate)
+        SliderRow(
+            label = stringResource(R.string.sasayaki_sentence_audio_speed),
+            valueText = String.format(Locale.US, "%.2fx", sentenceAudioRate),
+            value = sentenceAudioRate,
+            range = SasayakiSpeedSliderRange,
+            steps = SasayakiSpeedSliderSteps,
+            onValueChange = { onSettingsChange(settings.copy(sentenceAudioRate = it)) },
+        )
+        SasayakiSettingsSwitchRow(
+            label = stringResource(R.string.sasayaki_sentence_audio_follow_audiobook_speed),
+            checked = settings.sentenceAudioRate == null,
+            onCheckedChange = { followAudiobook ->
+                onSettingsChange(settings.copy(sentenceAudioRate = if (followAudiobook) null else sentenceAudioRate))
+            },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
         Text(

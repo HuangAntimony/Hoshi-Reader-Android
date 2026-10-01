@@ -6,6 +6,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Export Anki sentence audio at the current audiobook speed by default. Set an independent
+  sentence audio speed from 0.5–3× in Reader's audiobook settings, or return to following
+  the audiobook speed. Speed changes preserve pitch.
+
 ## [v1.4.0] - 2026-09-24
 
 ### Added

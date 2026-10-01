@@ -815,7 +815,13 @@ fun ReaderWebView(
                 val messageId = message.messageId ?: return
                 val ankiContext = popup.sasayakiCue?.takeIf { ankiUiState.popupSettings.needsSasayakiAudio }?.let { cue ->
                     popup.state.ankiContext.copy(
-                        sasayakiAudioPath = sasayakiPlayer?.exportCueAudio(cue, popup.state.selection.sentence)?.absolutePath,
+                        sasayakiAudioPath = sasayakiPlayer?.let { player ->
+                            player.exportCueAudio(
+                                cue = cue,
+                                sentence = popup.state.selection.sentence,
+                                rate = sasayakiSettings.effectiveSentenceAudioRate(player.rate),
+                            )
+                        }?.absolutePath,
                     )
                 } ?: popup.state.ankiContext
                 ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, ankiContext) { mined ->

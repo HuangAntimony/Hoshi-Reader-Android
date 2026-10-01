@@ -132,8 +132,8 @@ class SasayakiPlayer private constructor(
         controller.playCue(cue = cue, stop = stop)
     }
 
-    fun exportCueAudio(cue: SasayakiMatch, sentence: String): File? =
-        controller.exportCueAudio(cue = cue, sentence = sentence)
+    fun exportCueAudio(cue: SasayakiMatch, sentence: String, rate: Float = this.rate): File? =
+        controller.exportCueAudio(cue = cue, sentence = sentence, rate = rate)
 
     fun release() {
         releaseController()
