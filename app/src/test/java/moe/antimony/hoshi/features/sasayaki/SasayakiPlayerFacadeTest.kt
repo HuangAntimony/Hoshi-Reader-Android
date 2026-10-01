@@ -16,6 +16,16 @@ class SasayakiPlayerFacadeTest {
     private val cue = SasayakiMatch("cue", 1.0, 2.0, "text", 0, 3, 4)
 
     @Test
+    fun cueAudioExportDefaultsToCurrentAudiobookSpeed() {
+        val controller = FakeSasayakiPlaybackController()
+        val player = playerFor(controller)
+
+        player.exportCueAudio(cue, "sentence")
+
+        assertEquals(listOf("exportCueAudio:cue:sentence:1.25"), controller.commands)
+    }
+
+    @Test
     fun exposesControllerStateForComposeCallers() {
         val controller = FakeSasayakiPlaybackController()
         val player = playerFor(controller)
@@ -80,7 +90,7 @@ class SasayakiPlayerFacadeTest {
                 "updateMatchData:1",
                 "findCue:2:10",
                 "playCue:cue:true",
-                "exportCueAudio:cue:sentence",
+                "exportCueAudio:cue:sentence:1.25",
             ),
             controller.commands,
         )
@@ -238,8 +248,8 @@ class SasayakiPlayerFacadeTest {
             commands += "playCue:${cue.id}:$stop"
         }
 
-        override fun exportCueAudio(cue: SasayakiMatch, sentence: String): File? {
-            commands += "exportCueAudio:${cue.id}:$sentence"
+        override fun exportCueAudio(cue: SasayakiMatch, sentence: String, rate: Float): File? {
+            commands += "exportCueAudio:${cue.id}:$sentence:$rate"
             return File("cue.m4a")
         }
 

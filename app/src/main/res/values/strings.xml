@@ -688,6 +688,8 @@
     <string name="sasayaki_copy_audiobook_to_storage_help">Keep a private copy instead of linking to the selected external media file</string>
     <string name="sasayaki_delay">Delay</string>
     <string name="sasayaki_speed" comment="Sasayaki setting label, intentionally matching the statistics speed metric noun.">Speed</string>
+    <string name="sasayaki_sentence_audio_speed">Anki sentence speed</string>
+    <string name="sasayaki_sentence_audio_follow_audiobook_speed">Follow audiobook speed</string>
     <string name="sasayaki_reader_controls">Reader Controls</string>
     <string name="sasayaki_show_bottom_playback_controls">Pin Playback Controls to Safe Area</string>
     <string name="sasayaki_show_bottom_playback_controls_help">Show rewind, play or pause, and fast-forward controls in the bottom safe area.</string>

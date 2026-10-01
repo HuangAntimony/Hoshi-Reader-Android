@@ -71,6 +71,19 @@ For reader web asset changes, run the focused JavaScript tests:
 node --test app/src/test/js/*.test.mjs
 ```
 
+## Anki Sentence Audio Speed
+
+- In Reader's audiobook Settings tab, change audiobook speed with "Follow audiobook speed"
+  enabled. Mine a sentence using `{sasayaki-audio}` into AnkiDroid and AnkiConnect; confirm
+  the imported audio plays at the selected speed without changing pitch.
+- Set sentence audio speed to 0.5×, 1×, 1.5×, and 3×. Confirm each exported clip includes the
+  full original sentence and its duration is approximately the source duration divided by
+  speed. Check both positive and negative subtitle delay; the source clipping times must
+  remain independent of speed. Existing cards retain their previously exported audio.
+- Reopen Reader or restart the app to confirm the independent setting persists. Enable
+  "Follow audiobook speed" again, then change audiobook speed and mine another sentence;
+  confirm it follows the new speed, including after reopening the app.
+
 ## Sasayaki Subtitle Export
 
 - From Resources, export the current match using both Subtitles and Transcription.

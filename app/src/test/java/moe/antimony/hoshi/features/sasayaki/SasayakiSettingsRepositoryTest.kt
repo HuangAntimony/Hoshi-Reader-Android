@@ -7,12 +7,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -55,6 +57,7 @@ class SasayakiSettingsRepositoryTest {
             copyAudiobookToPrivateStorage = true,
             autoScroll = false,
             autoPause = false,
+            sentenceAudioRate = 1.75f,
             imageHoldSeconds = 2.5f,
             lightTextColor = 0xFF111111,
             lightBackgroundColor = 0x22123456,
@@ -86,6 +89,7 @@ class SasayakiSettingsRepositoryTest {
             copyAudiobookToPrivateStorage = true,
             autoScroll = false,
             autoPause = false,
+            sentenceAudioRate = 2.25f,
             imageHoldSeconds = 4.5f,
             transcriptionPreset = SasayakiTranscriptionPreset.Fast,
             lightTextColor = 0xFF010203,
@@ -146,6 +150,107 @@ class SasayakiSettingsRepositoryTest {
             store.edit { it[stringPreferencesKey("sasayakiTranscriptionPreset")] = "unsupported" }
             assertEquals(SasayakiTranscriptionPreset.Balanced, repository.settings.first().transcriptionPreset)
         } finally { secondJob.cancelAndJoin() }
+    }
+
+    @Test
+    fun sentenceAudioFollowsCurrentAudiobookSpeedWhenPreferenceIsAbsent() = runBlocking {
+        repository().use { repository ->
+            val settings = repository.settings.first()
+
+            assertNull(settings.sentenceAudioRate)
+            assertEquals(1.25f, settings.effectiveSentenceAudioRate(1.25f), 0f)
+            assertEquals(2f, settings.effectiveSentenceAudioRate(2f), 0f)
+        }
+    }
+
+    @Test
+    fun independentSentenceAudioSpeedSurvivesReopening() = runBlocking {
+        val file = tempFolder.root.resolve("sentence-speed.preferences_pb")
+        val firstJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + firstJob), produceFile = { file })
+            val repository = SasayakiSettingsRepository(store)
+            repository.update { it.copy(sentenceAudioRate = 1.75f) }
+        } finally { firstJob.cancelAndJoin() }
+
+        val secondJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + secondJob), produceFile = { file })
+            val settings = SasayakiSettingsRepository(store).settings.first()
+
+            assertEquals(1.75f, settings.sentenceAudioRate ?: Float.NaN, 0f)
+            assertEquals(1.75f, settings.effectiveSentenceAudioRate(2.5f), 0f)
+        } finally { secondJob.cancelAndJoin() }
+    }
+
+    @Test
+    fun restoringFollowAudiobookSpeedRemovesOverrideAcrossReopening() = runBlocking {
+        val file = tempFolder.root.resolve("follow-speed.preferences_pb")
+        val firstJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + firstJob), produceFile = { file })
+            val repository = SasayakiSettingsRepository(store)
+            repository.update { it.copy(sentenceAudioRate = 2.25f) }
+            repository.update { it.copy(sentenceAudioRate = null) }
+
+            assertNull(store.data.first()[floatPreferencesKey("sasayakiSentenceAudioRate")])
+        } finally { firstJob.cancelAndJoin() }
+
+        val secondJob = Job()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + secondJob), produceFile = { file })
+            val settings = SasayakiSettingsRepository(store).settings.first()
+
+            assertNull(settings.sentenceAudioRate)
+            assertEquals(1.5f, settings.effectiveSentenceAudioRate(1.5f), 0f)
+        } finally { secondJob.cancelAndJoin() }
+    }
+
+    @Test
+    fun sentenceAudioSpeedUpdatesClampToAudiobookSliderRange() = runBlocking {
+        repository().use { repository ->
+            repository.update { it.copy(sentenceAudioRate = 0.1f) }
+            assertEquals(0.5f, repository.settings.first().sentenceAudioRate ?: Float.NaN, 0f)
+
+            repository.update { it.copy(sentenceAudioRate = 4f) }
+            assertEquals(3f, repository.settings.first().sentenceAudioRate ?: Float.NaN, 0f)
+        }
+    }
+
+    @Test
+    fun nonFiniteSentenceAudioSpeedUpdatesRestoreFollowingAudiobook() = runBlocking {
+        repository().use { repository ->
+            for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+                repository.update { it.copy(sentenceAudioRate = 1.75f) }
+                repository.update { it.copy(sentenceAudioRate = invalid) }
+
+                val settings = repository.settings.first()
+                assertNull(settings.sentenceAudioRate)
+                assertEquals(1.5f, settings.effectiveSentenceAudioRate(1.5f), 0f)
+            }
+        }
+    }
+
+    @Test
+    fun invalidStoredSentenceAudioSpeedUsesCurrentAudiobookSpeed() = runBlocking {
+        val job = Job()
+        try {
+            val file = tempFolder.root.resolve("invalid-speed.preferences_pb")
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO + job), produceFile = { file })
+            val repository = SasayakiSettingsRepository(store)
+            repository.settings.first()
+
+            for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+                store.edit { it[floatPreferencesKey("sasayakiSentenceAudioRate")] = invalid }
+
+                val settings = repository.settings.first()
+                assertNull(settings.sentenceAudioRate)
+                assertEquals(2f, settings.effectiveSentenceAudioRate(2f), 0f)
+            }
+
+            store.edit { it[floatPreferencesKey("sasayakiSentenceAudioRate")] = 5f }
+            assertEquals(3f, repository.settings.first().sentenceAudioRate ?: Float.NaN, 0f)
+        } finally { job.cancelAndJoin() }
     }
 
     private fun repository(

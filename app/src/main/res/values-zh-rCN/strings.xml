@@ -686,6 +686,8 @@
     <string name="sasayaki_copy_audiobook_to_storage_help">保留私有副本，而不是链接到所选外部媒体文件</string>
     <string name="sasayaki_delay">延迟</string>
     <string name="sasayaki_speed" comment="Sasayaki setting label, intentionally matching the statistics speed metric noun.">速度</string>
+    <string name="sasayaki_sentence_audio_speed">Anki 例句速度</string>
+    <string name="sasayaki_sentence_audio_follow_audiobook_speed">跟随有声书速度</string>
     <string name="sasayaki_reader_controls">阅读器控制</string>
     <string name="sasayaki_show_bottom_playback_controls">固定播放控制到底部安全区</string>
     <string name="sasayaki_show_bottom_playback_controls_help">在底部安全区显示后退、播放或暂停和快进控制。</string>

@@ -12,6 +12,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.FrameworkMuxer
@@ -34,6 +35,7 @@ internal class SasayakiCueAudioExporter(
         source: SasayakiPlaybackSource,
         cue: SasayakiMatch,
         range: SasayakiCueAudioRange,
+        rate: Float,
     ): File? = runCatching {
         outputRoot.mkdirs()
         val output = outputRoot.resolve(outputFileName(cue))
@@ -73,7 +75,7 @@ internal class SasayakiCueAudioExporter(
                         )
                         .build()
                     transformerRef.set(transformer)
-                    transformer.start(editedMediaItem(source = source, range = range), transformerOutput.absolutePath)
+                    transformer.start(editedMediaItem(source = source, range = range, rate = rate), transformerOutput.absolutePath)
                 }.onFailure {
                     failure.set(it)
                     done.countDown()
@@ -108,6 +110,7 @@ internal class SasayakiCueAudioExporter(
     private fun editedMediaItem(
         source: SasayakiPlaybackSource,
         range: SasayakiCueAudioRange,
+        rate: Float,
     ): EditedMediaItem {
         val mediaItem = MediaItem.Builder()
             .setUri(source.uri)
@@ -120,6 +123,10 @@ internal class SasayakiCueAudioExporter(
             .build()
         return EditedMediaItem.Builder(mediaItem)
             .setRemoveVideo(true)
+            .apply {
+                // Bake the speed into Anki's audio, preserving pitch and source clip times.
+                if (rate != 1f) setEffects(Effects(listOf(sasayakiCueAudioProcessor(rate)), emptyList()))
+            }
             .build()
     }
 

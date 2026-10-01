@@ -467,6 +467,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   offline, timeout and socket connection failures; manual operations still
   report errors, as do HTTP, TLS and non-network failures.
 - Audio playback uses Media3/ExoPlayer with controller/repository boundaries.
+- Anki sentence audio export follows the current audiobook rate unless Sasayaki settings
+  contain an independent sentence rate. Media3's Sonic audio processor changes the exported
+  PCM speed with pitch fixed at 1; clipping and subtitle delay use original source times.
+  At 1×, exports keep the existing path without an audio effect.
 - Sasayaki accepts MP3, M4B/M4A, and Ogg Opus audiobook sources. One repository
   inspection returns format, metadata, chapters, and static duration for
   seekable sources before playback starts. M4B inspection reads MP4 metadata, `moov/udta/chpl`, and
