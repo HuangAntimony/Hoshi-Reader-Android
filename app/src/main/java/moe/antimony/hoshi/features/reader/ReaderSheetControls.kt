@@ -58,7 +58,6 @@ internal fun ReaderSheetSliderRow(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: (() -> Unit)? = null,
     showTicks: Boolean = true,
-    rangeLabels: Pair<String, String>? = null,
 ) {
     val metrics = readerSheetDensityMetrics()
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = metrics.sasayakiSliderVerticalPaddingDp.dp)) {
@@ -70,12 +69,6 @@ internal fun ReaderSheetSliderRow(
             onValueChangeFinished = onValueChangeFinished,
             colors = if (showTicks) SliderDefaults.colors() else SliderDefaults.colors(
                 activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent))
-        rangeLabels?.let { (start, end) ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(start, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
-                Text(end, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
-            }
-        }
     }
 }
 

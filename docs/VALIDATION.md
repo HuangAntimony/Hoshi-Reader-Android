@@ -1141,7 +1141,8 @@ Validate relevant sync/update/Sasayaki changes with:
   voices within the same installed engine update that status; unknown saved voices have
   no inferred status. Voice names retain their original identifiers in the card and picker,
   and each catalog voice row identifies its network requirement.
-  Check rate/pitch sliders have no dense ticks but keep existing steps/ranges and save on
+  Check engine rate/playback speed/pitch sliders retain current-value labels without endpoint
+  labels or dense ticks, keep existing steps/ranges, and save on
   release. Pitch zero uses `0 st`/`0 Hz`. The theme-colored Preview button must show preparing/stop
   states and cancel or stop its own preview; reading controls still operate the book session.
   Test credential draft/cancel/save with blank-key retention, loading, verified/error states,

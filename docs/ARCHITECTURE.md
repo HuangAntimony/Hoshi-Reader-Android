@@ -906,7 +906,7 @@ QA matrices live in `docs/VALIDATION.md`.
   preview button can cancel preparation or stop playback; reading controls stop preview
   before using the existing sentence controller. Additional synthesis controls expand
   from a neutral row and use source/voice capabilities. TTS sliders hide tick marks
-  while retaining their discrete steps, with range labels for rate/pitch; shared slider
+  while retaining their discrete steps and current-value labels, without endpoint labels; shared slider
   and card defaults remain unchanged for Sasayaki.
   `TtsCatalogLoading` shares the catalog-loading presentation between the Voice tab and
   picker: e-ink uses localized status text, while other themes use the animated linear bar.

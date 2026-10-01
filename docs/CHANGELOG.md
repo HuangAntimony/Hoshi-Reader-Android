@@ -19,7 +19,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and omit subtitles for Sasayaki and Book Cover Lock Screen. Add independent Hoshi
   playback speed from 0.5× to 3.0× alongside engine speech rate; it applies to narration
   and preview without re-synthesizing audio, shifting pitch, or resuming paused playback. Rate and pitch sliders
-  keep their steps without dense tick marks, and preview can be canceled or stopped from
+  keep their steps without dense tick marks or endpoint labels, and preview can be canceled or stopped from
   its theme-colored button. Cloud credentials use a matching configuration sheet; source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;

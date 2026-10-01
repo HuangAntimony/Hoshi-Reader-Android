@@ -75,21 +75,17 @@ internal fun TtsVoiceSettings(
             val range = (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
             ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
                 steps = when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
-                onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false,
-                rangeLabels = stringResource(R.string.tts_rate_value, range.start) to stringResource(R.string.tts_rate_value, range.endInclusive))
+                onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false)
         }
         var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
         ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
             playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
-            onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false,
-            rangeLabels = stringResource(R.string.tts_rate_value, ttsPlaybackRateRange.start) to
-                stringResource(R.string.tts_rate_value, ttsPlaybackRateRange.endInclusive))
+            onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false)
         ttsPitchRange(source, voice?.id.orEmpty())?.let { range ->
             var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
             ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
                 steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
-                onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false,
-                rangeLabels = pitchLabel(source, range.start.toInt()) to pitchLabel(source, range.endInclusive.toInt()))
+                onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false)
         }
         TtsSynthesisControls(settings, voice, onSettings)
         HoshiButton(onClick = if (preview == TtsPreviewState.Idle) onPreview else onStopPreview,
