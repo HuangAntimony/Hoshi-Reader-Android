@@ -1078,7 +1078,7 @@ Validate relevant sync/update/Sasayaki changes with:
   this application delay must not be inserted into Anki exports.
 
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
-  Voice/Pronunciations/Settings, without a cover, book title or sentence preview.
+  Voice/Replacements/Settings, without a cover, book title or sentence preview.
   Confirm source/voice dropdowns open next to their rows and dismiss on selection or
   outside tap; voice items show their network requirement and selected checkmark.
   Check source/voice label readability and the full-width preview button's styling against
@@ -1095,18 +1095,27 @@ Validate relevant sync/update/Sasayaki changes with:
   format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
-- Long-press book text and create a pronunciation: prefill the selected text and an
-  empty reading, and preview the full source sentence including ruby and VN text outside
-  the screen. Cancel without saving. With a multilingual IME, start in another input
-  language and focus each written-form/reading field: both should request Japanese.
-  Repeat from the TTS dictionary editor. Check Dictionary search still requests the
+- Long-press book text and create a text replacement: prefill the selected original and
+  empty replacement text, and preview the full source sentence including ruby and VN
+  text outside the screen. Cancel without saving. With a multilingual IME, start in another input
+  language and focus each original/replacement field: both should request Japanese.
+  Repeat from the TTS replacement editor. Check Dictionary search still requests the
   selected content language and retains its Search action; no system keyboard preference
   should be changed. IMEs without locale-hint support may retain their current language.
 
-- Run `TtsTextTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
+- Create literal punctuation rules such as `――` → `、` and `……` → `。` in both
+  book/global scopes. Preview, playback and `{sentence-audio}` must use the same rules,
+  before Edge/Azure ellipsis handling; source text, sentence boundaries and highlighting
+  must stay unchanged. Check longest-match/book precedence, editing/deleting, exact
+  punctuation matching (different dash characters stay distinct), non-kana and multiline
+  replacements, blank validation and duplicate conflicts. Replacement text is plain text,
+  never executable SSML, and inserted replacements are not recursively matched.
+  Reopen the app with existing pronunciation entries: they must load unchanged; saving
+  a replacement or changing synthesis settings must preserve old rules and scopes.
+- Run `TtsTextTest`, `TtsRepositoryTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
   `TtsAudioRepositoryTest`, `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
   ruby/offsets, file-backed chapters, literal scope precedence, long input splitting,
-  pending/paused pronunciation edits, stale callbacks, audiobook exclusion, cancellation
+  pending/paused replacement edits, stale callbacks, audiobook exclusion, cancellation
   cleanup and the independent Anki handlebars. JS selection tests include full VN source
   context rather than screen-clone text.
   Hold a later synthesis pending while requesting already cached audio: it must return
@@ -1114,7 +1123,8 @@ Validate relevant sync/update/Sasayaki changes with:
   fresh file. Advancing playback must retain pending prefetch and extend its horizon.
 - With a Japanese engine installed, build `assembleDebugAndroidTest`, install both
   APKs using `adb install -r`, and run only the explicit classes
-  `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` and
+  `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` (including punctuation replacement
+  playback/export using isolated rules/cache) and
   `moe.antimony.hoshi.features.tts.TtsSessionPlayerTest`, plus
   `moe.antimony.hoshi.features.reader.ReaderTtsHighlightWebViewTest` via `am instrument`.
   These discover installed voices and synthesize into test-owned cache, without changing

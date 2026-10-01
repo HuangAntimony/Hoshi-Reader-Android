@@ -21,6 +21,32 @@ import org.junit.runner.RunWith
 /** Read-only engine discovery and synthesis into test-owned cache; never changes system voices or preferences. */
 @RunWith(AndroidJUnit4::class)
 class TtsEngineDeviceTest {
+    @Test fun punctuationReplacementsProducePlayablePlaybackAndExportFiles() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val directory = File(context.cacheDir, "tts-replacements-device-test")
+        val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO))
+        val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
+        val sentence = TtsText.chapter(0, "<p>待って――まだ……続きます。</p>").single()
+        val preferences = TtsPreferences(words = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "。")))
+        try {
+            assertEquals("待って、まだ。続きます。", TtsText.spoken(sentence, null, preferences.words))
+            val files = withContext(Dispatchers.Main) { audio.audio(sentence, null, preferences) } + audio.export(sentence, null, preferences)
+            files.forEach { file ->
+                val extractor = MediaExtractor()
+                try {
+                    extractor.setDataSource(file.absolutePath)
+                    assertTrue(extractor.trackCount > 0)
+                    val format = extractor.getTrackFormat(0)
+                    assertTrue(format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true)
+                    assertTrue(format.getLong(MediaFormat.KEY_DURATION) > 0)
+                } finally { extractor.release() }
+            }
+        } finally {
+            audio.clearPlaybackCache()
+            withContext(Dispatchers.IO) { directory.deleteRecursively() }
+        }
+    }
+
     @Test fun installedJapaneseEnginesExposePlayableOfflineVoices() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val engine = AndroidTtsEngine(context)

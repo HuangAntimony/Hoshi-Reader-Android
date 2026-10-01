@@ -94,11 +94,37 @@ class TtsTextTest {
         assertTrue(chunks.all { it.length <= 13 && !it.last().isHighSurrogate() && !it.first().isLowSurrogate() })
     }
 
-    @Test fun dictionaryRejectsConflictsAndNonKana() {
+    @Test fun dictionaryAcceptsAnyNonBlankReplacementAndStillRejectsConflicts() {
         val original = TtsWord("a", "東京", "とうきょう", "book")
         assertEquals(TtsWordError.Duplicate, validateTtsWord(original.copy(id = "b"), listOf(original)))
-        assertNull(validateTtsWord(original.copy(reading = "トーキョー"), listOf(original)))
+        listOf("トーキョー", "Tokyo", "、", "。", "漢字123😀", " \n text \n ", "<break/>").forEach {
+            assertNull(it, validateTtsWord(original.copy(replacement = it), listOf(original)))
+        }
         assertNull(validateTtsWord(original.copy(id = "b", bookId = null), listOf(original)))
-        assertEquals(TtsWordError.Reading, validateTtsWord(original.copy(reading = "Tokyo"), emptyList()))
+        assertEquals(TtsWordError.Surface, validateTtsWord(original.copy(surface = " "), emptyList()))
+        assertEquals(TtsWordError.Replacement, validateTtsWord(original.copy(replacement = " \n "), emptyList()))
+    }
+
+    @Test fun punctuationReplacementUsesLongestMatchAndBookScopeWithoutResegmentingSource() {
+        val sentences = TtsText.chapter(2, "<p>「待って――まだ……続く。」</p><p>次です。</p>")
+        val rules = listOf(
+            TtsWord("short", "―", "！", "book"),
+            TtsWord("global", "――", "。"),
+            TtsWord("book", "――", "、", "book"),
+            TtsWord("ellipsis", "……", "、"),
+        )
+        assertEquals("「待って、まだ、続く。」", TtsText.spoken(sentences.first(), "book", rules))
+        assertEquals("「待って。まだ、続く。」", TtsText.spoken(sentences.first(), "other", rules))
+        assertEquals(listOf("「待って――まだ……続く。」", "次です。"), sentences.map { it.text })
+        assertEquals(listOf(0, 7), sentences.map { it.start })
+        assertEquals(listOf(7, 3), sentences.map { it.length })
+    }
+
+    @Test fun replacementsAreLiteralSinglePassAndPreserveWhitespace() {
+        val sentence = TtsText.chapter(0, "<p>A—B―C。</p>").single()
+        val rules = listOf(TtsWord("dash", "—", "。"), TtsWord("period", "。", " \n！ "))
+        assertEquals("A。B―C \n！ ", TtsText.spoken(sentence, null, rules))
+        assertEquals("A—B―C。", sentence.text)
+        assertEquals(3, sentence.length)
     }
 }

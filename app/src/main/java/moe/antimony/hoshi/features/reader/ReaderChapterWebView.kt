@@ -847,7 +847,7 @@ private class ReaderHighlightActionModeCallback(
     }
 
     private fun addHighlightMenu(menu: Menu) {
-        if (menu.findItem(0x484920) == null) menu.add(ReaderHighlightSelectionMenu.groupId, 0x484920, 1, R.string.tts_set_reading).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+        if (menu.findItem(0x484920) == null) menu.add(ReaderHighlightSelectionMenu.groupId, 0x484920, 1, R.string.tts_set_replacement).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
         if (webView.ttsAvailable() && menu.findItem(0x484921) == null) menu.add(ReaderHighlightSelectionMenu.groupId, 0x484921, 2, R.string.tts_read_selection).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
         if (!webView.ttsAvailable()) menu.removeItem(0x484921)
         if (menu.findItem(ReaderHighlightSelectionMenu.parentItemId) != null) return

@@ -11,7 +11,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
   Google Cloud and Google Translate online sources, with a separate
   TTS panel styled like Sasayaki, with compact playback controls and Voice,
-  Pronunciations and Settings tabs. Choose sources and voices from dropdown rows with
+  Replacements and Settings tabs. Choose sources and voices from dropdown rows with
   readable labels and single-line source names, open system TTS settings beside the selected source, and preview
   voices with a full-width theme-colored button matching Theme's control preview.
   Edit shared reading behavior directly in either panel,
@@ -35,10 +35,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   reading position instead of jumping back to the narrated sentence. TTS shares
   Sasayaki's image holds and chapter presentation, keeping images visible for the
   configured duration before continuing; manual sentence jumps skip intervening images.
-- Customize word readings for one book or all books from text selection or the TTS
-  pronunciation dictionary in Settings. Text-selection creation previews the full original
-  sentence; both pronunciation fields request Japanese keyboard input. EPUB ruby remains
-  the fallback reading.
+- Customize TTS text replacements for one book or all books from text selection or
+  Settings. Replacement text accepts readings, other text and punctuation, including
+  dashes or ellipses replaced with commas/periods for engine-controlled pauses. Existing
+  pronunciation entries remain compatible. Replacements affect only synthesized speech;
+  original text, sentence navigation, highlighting and Anki sentence text stay unchanged.
+  Text-selection creation previews the full original sentence; both fields request
+  Japanese keyboard input. EPUB ruby remains the fallback reading.
   Image-backed characters with ruby are read without freezing or exhausting memory.
 - Add the opt-in Anki `{sentence-audio}` handlebar for audiobook or TTS sentence audio;
   `{sasayaki-audio}` and existing field mappings keep their audiobook-only behavior.

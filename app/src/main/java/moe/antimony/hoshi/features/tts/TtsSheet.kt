@@ -258,7 +258,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
                 horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(word.surface, style = MaterialTheme.typography.bodyLarge)
-                    Text(word.reading, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
+                    Text(word.replacement, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
                 }
                 Text(stringResource(if (word.bookId == null) R.string.tts_global else R.string.tts_book),
                     style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
@@ -310,7 +310,7 @@ internal data class TtsChoiceOption(val id: String, val label: String, val suppo
 @Composable
 fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, sentence: TtsSentence?, onDismiss: () -> Unit) {
     var surface by remember(initial.id) { mutableStateOf(initial.surface) }
-    var reading by remember(initial.id) { mutableStateOf(initial.reading) }
+    var replacement by remember(initial.id) { mutableStateOf(initial.replacement) }
     var global by remember(initial.id) { mutableStateOf(initial.bookId == null) }
     var error by remember { mutableStateOf<TtsWordError?>(null) }
     var saving by remember { mutableStateOf(false) }
@@ -318,14 +318,15 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
     val words by viewModel.preferences.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val previewError by viewModel.error.collectAsStateWithLifecycle()
-    fun value() = initial.copy(surface = surface.trim(), reading = reading.trim(), bookId = if (global) null else bookId)
+    fun value() = initial.copy(surface = surface.trim(), replacement = replacement, bookId = if (global) null else bookId)
     DisposableEffect(Unit) { onDispose { viewModel.stopPreview() } }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_set_reading)) }, text = {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_set_replacement)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(surface, { surface = it }, label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            OutlinedTextField(reading, { reading = it }, label = { Text(stringResource(R.string.tts_reading)) }, singleLine = true,
+            OutlinedTextField(replacement, { replacement = it }, label = { Text(stringResource(R.string.tts_replacement)) }, maxLines = 4,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
+            Text(stringResource(R.string.tts_replacement_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             Row {
                 FilterChip(global, { global = true }, label = { Text(stringResource(R.string.tts_global)) })
                 Spacer(Modifier.width(8.dp))
@@ -336,7 +337,7 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
                 error = validateTtsWord(value(), words.words.filterNot { it.id == initial.id })
                 if (error == null) viewModel.preview(sentence ?: TtsSentence(0, 0, 0, surface), bookId, value())
             }, enabled = !busy) { Text(stringResource(R.string.tts_preview)) }
-            error?.let { Text(stringResource(when (it) { TtsWordError.Surface -> R.string.tts_invalid_surface; TtsWordError.Reading -> R.string.tts_invalid_reading; TtsWordError.Duplicate -> R.string.tts_duplicate; TtsWordError.Storage -> R.string.tts_storage_error }), color = MaterialTheme.colorScheme.error) }
+            error?.let { Text(stringResource(when (it) { TtsWordError.Surface -> R.string.tts_invalid_surface; TtsWordError.Replacement -> R.string.tts_invalid_replacement; TtsWordError.Duplicate -> R.string.tts_duplicate; TtsWordError.Storage -> R.string.tts_storage_error }), color = MaterialTheme.colorScheme.error) }
             previewError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
             if (words.words.any { it.id == initial.id }) TextButton(onClick = { viewModel.delete(initial.id); onDismiss() }) { Text(stringResource(R.string.action_delete)) }
         }

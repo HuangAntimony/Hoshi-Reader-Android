@@ -119,7 +119,7 @@ class TtsViewModel @Inject constructor(
     catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
     suspend fun save(word: TtsWord): TtsWordError? = try {
-        repository.save(word.copy(surface = word.surface.trim(), reading = word.reading.trim()))
+        repository.save(word.copy(surface = word.surface.trim()))
     } catch (error: CancellationException) { throw error } catch (_: Exception) { TtsWordError.Storage }
     fun delete(id: String) { viewModelScope.launch { try { repository.delete(id) } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } } }
     fun preview(sentence: TtsSentence, bookId: String?, word: TtsWord? = null) {

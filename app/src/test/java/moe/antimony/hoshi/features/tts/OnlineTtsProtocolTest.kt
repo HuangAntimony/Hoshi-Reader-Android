@@ -5,6 +5,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OnlineTtsProtocolTest {
+    @Test fun literalReplacementsPrecedeProviderPunctuationHandlingAndCannotInjectSsml() {
+        val sentence = TtsText.chapter(0, "<p>待って――まだ……続く。</p>").single()
+        val rules = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "、<break/>"))
+        val spoken = TtsText.spoken(sentence, null, rules)
+        assertEquals("待って、まだ、<break/>続く。", OnlineTtsProtocol.edgeText(spoken, true))
+        val xml = OnlineTtsProtocol.azureSsml(spoken, TtsVoiceInfo("ja-JP-NanamiNeural", true), 1f, 0f,
+            TtsSynthesisOptions(ellipsisPauseMs = 700))
+        val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
+        assertEquals(spoken, document.documentElement.textContent)
+        assertEquals(0, document.getElementsByTagName("break").length)
+    }
+
     @Test fun japaneseEllipsisUsesOneExplicitPausePerRunWithoutInjectingMarkup() {
         val text = "「待って……まだ‥‥です...<x>」"
         val xml = OnlineTtsProtocol.azureSsml(text, TtsVoiceInfo("ja-JP-NanamiNeural", true), 1f, 0f,

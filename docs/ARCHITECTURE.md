@@ -775,8 +775,11 @@ QA matrices live in `docs/VALIDATION.md`.
 ## Japanese TTS
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
-  Japanese voice, rate, pitch, provider parameters, playback sentence delay and scoped pronunciation entries in the `japanese_tts`
-  Preferences DataStore. It does not extend Sasayaki sidecars or sync payloads.
+  Japanese voice, rate, pitch, provider parameters, playback sentence delay and scoped
+  text-replacement entries in the `japanese_tts`
+  Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
+  so existing pronunciation entries remain compatible. It does not extend Sasayaki
+  sidecars or sync payloads.
   Cloud API keys are AES-GCM ciphertext bound to the provider ID, using a non-exportable
   Android Keystore key through `TtsCredentialCipher`; restored ciphertext without its
   device key requires configuration again. UI fields never read keys back or put them
@@ -785,8 +788,12 @@ QA matrices live in `docs/VALIDATION.md`.
   cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
   Literal dictionary matching prefers longest surfaces, then book scope over global
-  scope; ruby is used where no custom reading overlaps. Replacements affect synthesis
-  only. Mining rebases ruby against the selected source occurrence, including full
+  scope; ruby is used where no custom replacement overlaps. Replacement values accept
+  any non-blank plain text, preserving whitespace. Matching is a single pass over the
+  original sentence; inserted text is never matched again. Replacements run before
+  provider punctuation handling and affect synthesis only, preserving original sentence
+  boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
+  the selected source occurrence, including full
   VN source sentences, rather than looking up the first matching text.
   Image-backed ruby uses zero-width insertions, emitted once at each source position;
   only positive, in-bounds ruby ranges may advance the source cursor. Playback text
@@ -848,11 +855,11 @@ QA matrices live in `docs/VALIDATION.md`.
   reveal a TTS sentence while synthesis or its image presentation is preparing;
   the playback callback completes image holds before sentence reveal and audio.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
-  Its fixed sentence controls and Voice/Pronunciations/Settings tabs use `ReaderBottomPanel`
+  Its fixed sentence controls and Voice/Replacements/Settings tabs use `ReaderBottomPanel`
   and `ReaderSheetControls`, without book metadata or sentence previews. The segmented tabs, group card and
   slider row in `ReaderSheetControls` are also used by Sasayaki, including shared
   surface roles and e-ink outlines. TTS Settings uses the same tab content with its
-  own settings scaffold; the pronunciation list is lazy and keeps playback controls
+  own settings scaffold; the replacement list is lazy and keeps playback controls
   outside its scroll area. Voice-source and voice choices use anchored `HoshiDropdownMenu`
   rows in shared cards; a separate settings icon beside the source selector opens system
   TTS settings or a source-specific credential/test dialog. Additional synthesis controls

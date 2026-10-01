@@ -899,15 +899,15 @@
     <string name="sasayaki_transcription_balanced_description">Balances transcription speed and everyday use.</string>
     <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">Voice</string>
-    <string name="tts_tab_dictionary">Pronunciations</string>
+    <string name="tts_tab_dictionary">Replacements</string>
     <string name="tts_rate_label">Speech rate</string>
     <string name="tts_rate_value">%1$.2f×</string>
     <string name="tts_title">TTS</string>
-    <string name="tts_dictionary">Pronunciation dictionary</string>
-    <string name="tts_add_word">Add pronunciation</string>
+    <string name="tts_dictionary">Text replacements</string>
+    <string name="tts_add_word">Add replacement</string>
     <string name="tts_global">All books</string>
     <string name="tts_book">This book</string>
-    <string name="tts_dictionary_empty">No custom pronunciations yet.</string>
+    <string name="tts_dictionary_empty">No text replacements yet.</string>
     <string name="tts_previous">Previous</string>
     <string name="tts_next">Next</string>
     <string name="tts_pause" comment="Pause synthesized book narration.">Pause</string>
@@ -922,12 +922,13 @@
     <string name="tts_preview">Preview</string>
     <string name="tts_preview_voice">Preview voice</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
-    <string name="tts_set_reading">Set pronunciation</string>
-    <string name="tts_surface">Written form</string>
-    <string name="tts_reading">Reading in kana</string>
-    <string name="tts_invalid_surface">Enter a written form.</string>
-    <string name="tts_invalid_reading">Enter the reading in hiragana or katakana.</string>
-    <string name="tts_duplicate">This form already has a pronunciation in this scope. Edit the existing entry.</string>
+    <string name="tts_set_replacement">Set text replacement</string>
+    <string name="tts_surface">Original text</string>
+    <string name="tts_replacement">Replacement text</string>
+    <string name="tts_replacement_hint">Changes only the text sent to TTS. Use a reading or any text, such as replacing ―― with 、 or 。 to adjust pauses.</string>
+    <string name="tts_invalid_surface">Enter the original text.</string>
+    <string name="tts_invalid_replacement">Enter non-blank replacement text.</string>
+    <string name="tts_duplicate">This text already has a replacement in this scope. Edit the existing entry.</string>
     <string name="tts_no_engine">No TTS engine is installed. Install an engine and Japanese voice data in system settings.</string>
     <string name="tts_missing_japanese">Japanese voice data is unavailable. Choose another voice or install Japanese data in system settings.</string>
     <string name="tts_engine_unavailable">The selected engine is unavailable. Choose another installed engine.</string>
@@ -936,7 +937,7 @@
     <string name="tts_failed">Unable to prepare or play the sentence audio. Please retry.</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
     <string name="tts_read_selection">Read from here</string>
-    <string name="tts_storage_error">Could not save the pronunciation. Please retry.</string>
+    <string name="tts_storage_error">Could not save TTS changes. Please retry.</string>
     <string name="anki_handlebar_sentence_audio">Sentence audio from the audiobook, or TTS when no audiobook is linked.</string>
     <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
     <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>

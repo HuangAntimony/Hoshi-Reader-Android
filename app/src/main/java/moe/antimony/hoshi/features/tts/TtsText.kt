@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.tts
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.epub.isReaderMatchableCodePoint
 import org.jsoup.Jsoup
@@ -8,13 +9,18 @@ import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 
 @Serializable
-data class TtsWord(val id: String, val surface: String, val reading: String, val bookId: String? = null)
+data class TtsWord(
+    val id: String,
+    val surface: String,
+    @SerialName("reading") val replacement: String,
+    val bookId: String? = null,
+)
 
-enum class TtsWordError { Surface, Reading, Duplicate, Storage }
+enum class TtsWordError { Surface, Replacement, Duplicate, Storage }
 
 fun validateTtsWord(word: TtsWord, words: List<TtsWord>): TtsWordError? = when {
     word.surface.isBlank() -> TtsWordError.Surface
-    word.reading.isBlank() || !word.reading.all { it in 'ぁ'..'ゖ' || it in 'ァ'..'ヺ' || it in "ーゝゞヽヾ ゙゚" } -> TtsWordError.Reading
+    word.replacement.isBlank() -> TtsWordError.Replacement
     words.any { it.id != word.id && it.surface == word.surface && it.bookId == word.bookId } -> TtsWordError.Duplicate
     else -> null
 }
@@ -138,7 +144,7 @@ object TtsText {
                 val word = applicable.firstOrNull { it.surface.isNotEmpty() && sentence.text.startsWith(it.surface, cursor) }
                 val ruby = sentence.ruby.firstOrNull { it.start == cursor && it.end > cursor && it.end <= sentence.text.length }
                 when {
-                    word != null -> { append(word.reading); cursor += word.surface.length }
+                    word != null -> { append(word.replacement); cursor += word.surface.length }
                     ruby != null && (cursor until ruby.end).none { start -> applicable.any { sentence.text.startsWith(it.surface, start) } } -> {
                         append(ruby.reading); cursor = ruby.end
                     }

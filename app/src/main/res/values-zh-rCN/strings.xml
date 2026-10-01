@@ -897,15 +897,15 @@
     <string name="sasayaki_transcription_balanced_description">兼顾转录速度与日常使用。</string>
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">音源</string>
-    <string name="tts_tab_dictionary">读音辞典</string>
+    <string name="tts_tab_dictionary">文本替换</string>
     <string name="tts_rate_label">朗读语速</string>
     <string name="tts_rate_value">%1$.2f×</string>
     <string name="tts_title">TTS</string>
-    <string name="tts_dictionary">读音辞典</string>
-    <string name="tts_add_word">添加读音</string>
+    <string name="tts_dictionary">文本替换规则</string>
+    <string name="tts_add_word">添加替换</string>
     <string name="tts_global">全局</string>
     <string name="tts_book">本书</string>
-    <string name="tts_dictionary_empty">尚未添加自定义读音。</string>
+    <string name="tts_dictionary_empty">尚未添加文本替换规则。</string>
     <string name="tts_previous">上一句</string>
     <string name="tts_next">下一句</string>
     <string name="tts_pause" comment="Pause synthesized book narration.">暂停</string>
@@ -920,12 +920,13 @@
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
-    <string name="tts_set_reading">设置读音</string>
-    <string name="tts_surface">表记</string>
-    <string name="tts_reading">假名读音</string>
-    <string name="tts_invalid_surface">请输入表记。</string>
-    <string name="tts_invalid_reading">请使用平假名或片假名填写读音。</string>
-    <string name="tts_duplicate">此作用范围内已存在相同表记，请编辑已有词条。</string>
+    <string name="tts_set_replacement">设置文本替换</string>
+    <string name="tts_surface">原文本</string>
+    <string name="tts_replacement">替换文本</string>
+    <string name="tts_replacement_hint">仅替换送入 TTS 的文本，正文保持不变。可填写读音或任意文本，例如将「――」替换为「、」或「。」以调整停顿。</string>
+    <string name="tts_invalid_surface">请输入原文本。</string>
+    <string name="tts_invalid_replacement">请输入非空白的替换文本。</string>
+    <string name="tts_duplicate">此作用范围内已存在相同原文本，请编辑已有规则。</string>
     <string name="tts_no_engine">设备未安装 TTS 引擎，请在系统设置中安装引擎及日语语音数据。</string>
     <string name="tts_missing_japanese">日语音色不可用，请选择其他音色或在系统设置中安装日语语音数据。</string>
     <string name="tts_engine_unavailable">所选引擎不可用，请选择其他已安装的引擎。</string>
@@ -934,7 +935,7 @@
     <string name="tts_failed">无法生成或播放句子音频，请重试。</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
     <string name="tts_read_selection">从此处朗读</string>
-    <string name="tts_storage_error">无法保存读音，请重试。</string>
+    <string name="tts_storage_error">无法保存 TTS 更改，请重试。</string>
     <string name="anki_handlebar_sentence_audio">句子音频：使用有声书；未关联有声书时使用 TTS。</string>
     <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
     <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>

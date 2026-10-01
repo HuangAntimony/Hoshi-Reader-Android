@@ -8,6 +8,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
@@ -21,6 +22,28 @@ class TtsAudioRepositoryTest {
         online = mapOf(TtsOnlineSource.GoogleCloud.id to TtsOnlineConfig(encryptedKey = "fixture"))))
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
+
+    @Test fun playbackAndExportUseTheSameLiteralReplacementsAndEditsInvalidateCachedAudio() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { body ->
+            requests += Json.parseToJsonElement(body).jsonObject.getValue("input").jsonObject.getValue("text").jsonPrimitive.content
+        }
+        val repository = repository(client)
+        val sentence = TtsText.chapter(0, "<p>待って――まだ……続く。</p>").single()
+        val rules = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "。"))
+        val configured = preferences.copy(words = rules)
+        try {
+            val first = repository.audio(sentence, "book", configured)
+            assertEquals(first, repository.audio(sentence, "book", configured))
+            repository.export(sentence, "book", configured).also { assertTrue(it.isFile); it.delete() }
+            val changed = repository.audio(sentence, "book", configured.copy(words = rules.map {
+                if (it.id == "dash") it.copy(replacement = "。") else it
+            }))
+            assertNotEquals(first, changed)
+            assertEquals(listOf("待って、まだ。続く。", "待って、まだ。続く。", "待って。まだ。続く。"), requests)
+            assertEquals("待って――まだ……続く。", sentence.text)
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
 
     @Test fun cachedNextSentenceReturnsWhileLaterSynthesisIsStillPending() = runBlocking {
         val pending = CompletableDeferred<Unit>()
