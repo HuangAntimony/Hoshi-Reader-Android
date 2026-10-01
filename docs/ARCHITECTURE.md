@@ -801,9 +801,9 @@ QA matrices live in `docs/VALIDATION.md`.
 - `AndroidTtsEngine` serializes installed-engine discovery and `synthesizeToFile`,
   filters Japanese voices, bounds initialization/utterance waits, splits oversized
   inputs, and accepts files only after completion. `TtsEngineRouter` dispatches installed
-  engines to this adapter and the four explicit online sources to `OnlineTtsEngine`:
-  Edge Read Aloud WebSocket, Azure Speech REST, Google Cloud Text-to-Speech REST and
-  Google Translate's unofficial speech RPC. Network-required voices and unofficial
+  engines to this adapter and the five explicit online sources to `OnlineTtsEngine`:
+  Edge Read Aloud WebSocket, Azure Speech REST, Microsoft Translator, Google Cloud
+  Text-to-Speech REST and Google Translate's unofficial speech RPC. Network-required voices and unofficial
   sources are labeled in the UI. No voice model is bundled and failures never select
   another provider automatically.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
@@ -813,12 +813,19 @@ QA matrices live in `docs/VALIDATION.md`.
   limits and Edge framing. `OnlineTtsTransport` owns bounded HTTPS/WebSocket requests;
   cancellation closes the active call/socket, and only a completed Edge turn may return
   audio. Source adapters synthesize chunks serially and remove partial files on failure
-  or cancellation. Azure exposes advertised styles/roles, intensity and exact silence
-  controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
-  supports prosody rate/pitch/volume; Translate exposes only normal/slow speech.
+  or cancellation. Azure and Microsoft Translator share Speech REST synthesis and expose
+  advertised styles/roles, intensity and exact silence controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
+  supports prosody rate/pitch/volume; Google Translate exposes only normal/slow speech.
   Pitch controls use provider units and omit unsupported Google voice families.
   `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
   removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
+- `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial
+  Translator endpoint using its public client signing protocol. Tokens and their returned
+  Speech region stay in memory, never in settings or exported media. A mutex shares token
+  acquisition; expiry refresh has a 60-second margin, and a rejected Speech token gets
+  one refresh/retry. The source never reads Azure subscription keys. Catalogs use the
+  returned regional Speech endpoint, so offered voices/styles reflect that service
+  rather than a hardcoded promise of Azure-wide availability.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
   configuration invalidation and two-sentence prefetch, and rejects stale operations
   after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by

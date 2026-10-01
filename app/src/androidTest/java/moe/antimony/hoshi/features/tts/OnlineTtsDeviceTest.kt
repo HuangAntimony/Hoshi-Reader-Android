@@ -16,7 +16,38 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class OnlineTtsDeviceTest {
     @Test fun edgeCatalogSynthesisAndExport() = checkSource(TtsOnlineSource.Edge)
+    @Test fun microsoftTranslatorCatalogSynthesisAndExport() = checkSource(TtsOnlineSource.MicrosoftTranslator)
     @Test fun translateLongSentenceExportsEveryMp3Chunk() = checkSource(TtsOnlineSource.GoogleTranslate)
+
+    @Test fun microsoftTranslatorAdvertisedStyleAndPcmExport() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val directory = File(context.cacheDir, "translator-style-device-test")
+        val engine = OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO)
+        val router = TtsEngineRouter(AndroidTtsEngine(context), engine)
+        val repository = TtsAudioRepository(router, directory, Dispatchers.IO)
+        val initial = TtsSettings(engine = TtsOnlineSource.MicrosoftTranslator.id)
+        val voice = router.catalog(initial).voices.first { "cheerful" in it.styles }
+        try {
+            for (format in listOf(TtsAudioFormat.Wav, TtsAudioFormat.Mp3)) {
+                val sampleRate = if (format == TtsAudioFormat.Wav) 16000 else 48000
+                val settings = initial.copy(voice = voice.id, rate = 1.25f, pitch = 2f).withOptions(
+                    TtsSynthesisOptions(style = "cheerful", styleDegree = 1.5f, commaMs = 300,
+                        format = format, sampleRate = sampleRate))
+                val sentence = TtsSentence(0, 0, 0, "こんにちは、日本語の音声です。")
+                val exported = repository.export(sentence, null, TtsPreferences(settings))
+                val extractor = MediaExtractor()
+                try {
+                    assertEquals(settings.audioExtension(), exported.extension)
+                    extractor.setDataSource(exported.absolutePath)
+                    assertTrue(extractor.trackCount > 0)
+                    val track = extractor.getTrackFormat(0)
+                    assertEquals(if (format == TtsAudioFormat.Wav) "audio/raw" else "audio/mpeg", track.getString(MediaFormat.KEY_MIME))
+                    assertEquals(sampleRate, track.getInteger(MediaFormat.KEY_SAMPLE_RATE))
+                    assertTrue(track.getLong(MediaFormat.KEY_DURATION) > 0)
+                } finally { extractor.release(); exported.delete() }
+            }
+        } finally { repository.clearPlaybackCache(); directory.deleteRecursively() }
+    }
 
     @Test fun credentialsStayEncryptedAndAreBoundToTheirSource() = runBlocking {
         val cipher = TtsCredentialCipher(Dispatchers.IO)
@@ -34,7 +65,7 @@ class OnlineTtsDeviceTest {
         val router = TtsEngineRouter(AndroidTtsEngine(context), online)
         val repository = TtsAudioRepository(router, directory, Dispatchers.IO)
         val settings = TtsSettings(engine = source.id, pitch = if (source == TtsOnlineSource.Edge) 10f else 0f,
-            parameters = mapOf(source.id to TtsSynthesisOptions(volume = -10f)))
+            parameters = mapOf(source.id to TtsSynthesisOptions(volume = -10f, format = TtsAudioFormat.Mp3)))
         val voices = router.catalog(settings).voices
         assertTrue(voices.isNotEmpty())
         val sentence = TtsSentence(0, 0, 0, "今日は日本語の音声をテストしています。長い文章も最後まで正しく読み上げます。")

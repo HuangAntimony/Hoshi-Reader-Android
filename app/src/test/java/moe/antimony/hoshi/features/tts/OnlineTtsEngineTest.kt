@@ -30,6 +30,67 @@ class OnlineTtsEngineTest {
         return OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "test-key" }, Dispatchers.IO)
     }
 
+    @Test fun microsoftTranslatorUsesAutomaticAuthorizationAndAzureSpeechParameters() = runBlocking {
+        var authentications = 0
+        val token = translatorToken("first")
+        val text = "東京……へ行く。"
+        val engine = engine { request ->
+            if (request.url.host == "dev.microsofttranslator.com") {
+                authentications++
+                assertEquals("POST", request.method)
+                assertTrue(request.header("X-MT-Signature")!!.startsWith("MSTranslatorAndroidApp::"))
+                200 to """{"r":"eastasia","t":"$token"}""".toByteArray()
+            } else {
+                assertEquals("eastasia.tts.speech.microsoft.com", request.url.host)
+                assertEquals("Bearer $token", request.header("Authorization"))
+                assertNull(request.header("Ocp-Apim-Subscription-Key"))
+                if (request.url.encodedPath.endsWith("list")) {
+                    200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural","StyleList":["cheerful"]}]""".toByteArray()
+                } else {
+                    assertEquals("riff-24khz-16bit-mono-pcm", request.header("X-Microsoft-OutputFormat"))
+                    val buffer = okio.Buffer(); request.body!!.writeTo(buffer)
+                    val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(buffer.readByteArray().inputStream())
+                    assertEquals(text, document.documentElement.textContent)
+                    assertEquals("cheerful", document.getElementsByTagName("mstts:express-as").item(0).attributes.getNamedItem("style").nodeValue)
+                    assertEquals("+2st", document.getElementsByTagName("prosody").item(0).attributes.getNamedItem("pitch").nodeValue)
+                    assertEquals("300ms", document.getElementsByTagName("mstts:silence").item(0).attributes.getNamedItem("value").nodeValue)
+                    200 to wav
+                }
+            }
+        }
+        val settings = TtsSettings(engine = "online:microsoft-translator", rate = 1.5f, pitch = 2f,
+            parameters = mapOf("online:microsoft-translator" to TtsSynthesisOptions(style = "cheerful", commaMs = 300)))
+        assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
+        assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
+        assertEquals(1, authentications)
+    }
+
+    @Test fun microsoftTranslatorRefreshesRejectedTokenOnceWithoutChangingSource() = runBlocking {
+        var authentications = 0
+        var syntheses = 0
+        val tokens = listOf(translatorToken("first"), translatorToken("second"))
+        val engine = engine { request ->
+            when {
+                request.url.host == "dev.microsofttranslator.com" -> {
+                    val token = tokens[authentications++]
+                    200 to """{"r":"eastasia","t":"$token"}""".toByteArray()
+                }
+                request.url.encodedPath.endsWith("list") -> 200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray()
+                ++syntheses == 1 -> 401 to "expired".toByteArray()
+                else -> {
+                    assertEquals("Bearer ${tokens[1]}", request.header("Authorization"))
+                    200 to wav
+                }
+            }
+        }
+        assertArrayEquals(wav, engine.synthesize("日本語。", TtsSettings(engine = "online:microsoft-translator"), folder.root).single().readBytes())
+        assertEquals(2, authentications)
+        assertEquals(2, syntheses)
+    }
+
+    private fun translatorToken(signature: String): String = "fixture." + Base64.getUrlEncoder().withoutPadding()
+        .encodeToString("""{"exp":${System.currentTimeMillis() / 1000 + 3600}}""".toByteArray()) + ".$signature"
+
     @Test fun azureSendsCredentialsRegionVoiceRateAndPitchAndReturnsWav() = runBlocking {
         val requests = mutableListOf<Request>()
         val engine = engine { request ->

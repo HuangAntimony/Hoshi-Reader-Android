@@ -40,7 +40,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         { stringResource(if (source == TtsOnlineSource.GoogleCloud) R.string.tts_decibels else R.string.tts_relative_percent, it.roundToInt()) },
     ) { update(options.copy(volume = it)) }
 
-    if (source == TtsOnlineSource.Azure) {
+    if (source.usesAzureRest) {
         if (!voice?.styles.isNullOrEmpty()) {
             ReaderSheetCard {
                 TtsParameterChoice(R.string.tts_speaking_style, options.style, voice.styles) {
@@ -62,7 +62,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         TtsPauseControl(R.string.tts_enumeration_pause, options.enumerationCommaMs) { update(options.copy(enumerationCommaMs = it)) }
         TtsPauseControl(R.string.tts_boundary_pause, options.sentenceBoundaryMs) { update(options.copy(sentenceBoundaryMs = it)) }
     }
-    if (source == TtsOnlineSource.Azure || source == TtsOnlineSource.GoogleCloud) {
+    if (source.usesAzureRest || source == TtsOnlineSource.GoogleCloud) {
         ReaderSheetCard {
             val formats = listOf(TtsChoiceOption(TtsAudioFormat.Wav.name, stringResource(R.string.tts_format_wav)),
                 TtsChoiceOption(TtsAudioFormat.Mp3.name, stringResource(R.string.tts_format_mp3)))

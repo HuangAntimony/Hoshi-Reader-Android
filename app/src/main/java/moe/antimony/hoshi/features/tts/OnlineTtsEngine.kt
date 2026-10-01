@@ -19,9 +19,10 @@ class OnlineTtsEngine internal constructor(
     private val transport: OnlineTtsTransport,
     private val decryptKey: suspend (String, String) -> String,
     private val io: CoroutineDispatcher,
+    private val translator: MicrosoftTranslatorSession = MicrosoftTranslatorSession(transport),
 ) {
-    @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher) :
-        this(transport, cipher::decrypt, io)
+    @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher, translator: MicrosoftTranslatorSession = MicrosoftTranslatorSession(transport)) :
+        this(transport, cipher::decrypt, io, translator)
     private val synthesis = Mutex()
     private val catalogs = Mutex()
     private val voiceCache = linkedMapOf<Pair<String, TtsOnlineConfig>, List<TtsVoiceInfo>>()
@@ -41,9 +42,8 @@ class OnlineTtsEngine internal constructor(
         val voices = when (source) {
             TtsOnlineSource.GoogleTranslate -> listOf(TtsVoiceInfo("ja", true))
             TtsOnlineSource.Edge -> OnlineTtsProtocol.microsoftVoices(transport.request(edgeRequest(false)).toString(Charsets.UTF_8))
-            TtsOnlineSource.Azure -> OnlineTtsProtocol.microsoftVoices(transport.request(Request.Builder()
-                .url(OnlineTtsProtocol.azureBase(config.region) + "/cognitiveservices/voices/list")
-                .header("Ocp-Apim-Subscription-Key", key(source, config)).build()).toString(Charsets.UTF_8))
+            TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> OnlineTtsProtocol.microsoftVoices(
+                azureSpeechRequest(source, config, "/cognitiveservices/voices/list").toString(Charsets.UTF_8))
             TtsOnlineSource.GoogleCloud -> OnlineTtsProtocol.googleVoices(transport.request(Request.Builder()
                 .url("https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP")
                 .header("X-Goog-Api-Key", key(source, config)).build()).toString(Charsets.UTF_8))
@@ -67,7 +67,7 @@ class OnlineTtsEngine internal constructor(
                 val rate = source.normalizeRate(settings.rate)
                 val pitch = ttsPitchRange(source, voice)?.let { settings.pitch.coerceIn(it) } ?: 0f
                 val pitchText = (if (pitch >= 0) "+" else "") + pitch.toInt() + if (source == TtsOnlineSource.Edge) "Hz" else "st"
-                val credential = if (source.needsKey) key(source, config) else ""
+                val credential = if (source == TtsOnlineSource.GoogleCloud) key(source, config) else ""
                 val mp3 = settings.audioExtension() == "mp3"
                 directory.mkdirs()
                 // Conservative UTF-8 budgets also leave room for SSML escaping on Edge.
@@ -77,12 +77,8 @@ class OnlineTtsEngine internal constructor(
                     val bytes = when (source) {
                         TtsOnlineSource.Edge -> transport.edgeAudio(edgeRequest(true), OnlineTtsProtocol.ssml(
                             part, voice, rate, pitchText, options.volume))
-                        TtsOnlineSource.Azure -> transport.request(Request.Builder()
-                            .url(OnlineTtsProtocol.azureBase(config.region) + "/cognitiveservices/v1")
-                            .header("Ocp-Apim-Subscription-Key", credential)
-                            .header("X-Microsoft-OutputFormat", azureFormat(options))
-                            .header("User-Agent", "Hoshi")
-                            .post(OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options).toRequestBody("application/ssml+xml".toMediaType())).build())
+                        TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> azureSpeechRequest(source, config,
+                            "/cognitiveservices/v1", OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options), options)
                         TtsOnlineSource.GoogleCloud -> OnlineTtsProtocol.googleAudio(transport.request(Request.Builder()
                             .url("https://texttospeech.googleapis.com/v1/text:synthesize")
                             .header("X-Goog-Api-Key", credential)
@@ -109,6 +105,21 @@ class OnlineTtsEngine internal constructor(
     }
 
     private fun source(settings: TtsSettings) = TtsOnlineSource.from(settings.engine) ?: throw TtsException(TtsFailure.Configuration)
+    private suspend fun azureSpeechRequest(source: TtsOnlineSource, config: TtsOnlineConfig, path: String,
+        ssml: String? = null, options: TtsSynthesisOptions = TtsSynthesisOptions(),
+    ): ByteArray {
+        suspend fun request(region: String, header: String, credential: String): ByteArray = transport.request(Request.Builder()
+            .url(OnlineTtsProtocol.azureBase(region) + path).header(header, credential).header("User-Agent", "Hoshi")
+            .apply { if (ssml != null) {
+                header("X-Microsoft-OutputFormat", azureFormat(options))
+                post(ssml.toRequestBody("application/ssml+xml".toMediaType()))
+            } }.build())
+        return when (source) {
+            TtsOnlineSource.Azure -> request(config.region, "Ocp-Apim-Subscription-Key", key(source, config))
+            TtsOnlineSource.MicrosoftTranslator -> translator.authorized { request(it.region, "Authorization", "Bearer ${it.bearer}") }
+            else -> throw TtsException(TtsFailure.Configuration)
+        }
+    }
     private fun azureFormat(options: TtsSynthesisOptions): String {
         val khz = options.sampleRate / 1000
         return if (options.format == TtsAudioFormat.Wav) "riff-${khz}khz-16bit-mono-pcm"

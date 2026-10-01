@@ -1042,16 +1042,22 @@ Validate relevant sync/update/Sasayaki changes with:
 ## Japanese TTS
 
 - Online-source regressions: run `OnlineTtsProtocolTest`, `OnlineTtsTransportTest`,
-  `OnlineTtsEngineTest` and `TtsMp3Test` with the JVM suite. Cover literal SSML/JSON,
+  `OnlineTtsEngineTest`, `MicrosoftTranslatorSessionTest` and `TtsMp3Test` with the JVM
+  suite. Cover literal SSML/JSON,
   UTF-8/surrogate-safe chunking, credential headers, provider errors, cancellation,
   complete WebSocket turns, partial-file cleanup, MP3 frame concatenation, supported
-  styles/roles and synthesis parameters. Keep live network calls out of JVM tests.
+  styles/roles and synthesis parameters. Translator coverage includes signing vectors,
+  concurrent/expiry token refresh, bounded authentication retry, malformed responses
+  and canceled authorization. Keep live network calls out of JVM tests.
 - With a connected non-disposable device, build the test APK with
   `:app:assembleDebugAndroidTest`, install APKs via `adb install -r`, and explicitly run
   `OnlineTtsDeviceTest` through `am instrument`. It uses public Japanese samples,
   test-owned cache and encrypted test values, without changing saved settings. Require
-  the final `OK` summary. Verify Edge and Translate MP3 exports with MediaExtractor,
+  the final `OK` summary. Verify Edge, Google Translate and Microsoft Translator MP3
+  exports with MediaExtractor,
   including multi-part sentences; verify source-bound Keystore credential round trips.
+  Translator tests also verify an advertised speaking style with pitch/rate/punctuation
+  controls, 16 kHz PCM and 48 kHz MP3 exports, without reading saved Azure credentials.
   Run `TtsContinuousPlaybackDeviceTest` for high-rate Edge playback through the real
   controller, audio repository and Media3 decoder. It uses public sentences, an isolated
   player/cache and in-memory preferences, and must complete every sentence without
@@ -1062,10 +1068,10 @@ Validate relevant sync/update/Sasayaki changes with:
   response coverage as a successful live account test. Reopening configuration must
   keep the saved key masked; leaving it empty preserves it. Restored settings without
   the Keystore key must request reconfiguration.
-- Compare default/modified pitch and volume in preview and Anki. Azure style/role choices
+- Compare default/modified pitch and volume in preview and Anki. Azure/Translator style/role choices
   must come from the selected voice, reset when changing voices, and include only valid
   styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
-  Translate offers normal/slow only. Unsupported pitch controls must be hidden.
+  Google Translate offers normal/slow only. Unsupported pitch controls must be hidden.
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
   this application delay must not be inserted into Anki exports.
@@ -1084,8 +1090,8 @@ Validate relevant sync/update/Sasayaki changes with:
   Check long source names stay on one line with middle ellipsis and remain complete in
   the dropdown; check long voice names, empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
-  With Azure or Google Cloud selected, expand synthesis parameters and check Audio
-  format and Sample rate: short labels/values fit on one line at normal font size,
+  With Azure, Microsoft Translator or Google Cloud selected, expand synthesis parameters
+  and check Audio format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
 - Long-press book text and choose Replace beside Highlight: prefill the selected original and

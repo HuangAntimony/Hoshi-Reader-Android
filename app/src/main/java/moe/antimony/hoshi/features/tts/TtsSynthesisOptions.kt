@@ -41,6 +41,6 @@ internal fun TtsSettings.options() = parameters[engine]?.normalized(TtsOnlineSou
 internal fun TtsSettings.withOptions(options: TtsSynthesisOptions) = copy(parameters = parameters + (engine to options))
 internal fun TtsSettings.audioExtension() = when (TtsOnlineSource.from(engine)) {
     TtsOnlineSource.Edge, TtsOnlineSource.GoogleTranslate -> "mp3"
-    TtsOnlineSource.Azure, TtsOnlineSource.GoogleCloud -> if (options().format == TtsAudioFormat.Mp3) "mp3" else "wav"
+    TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator, TtsOnlineSource.GoogleCloud -> if (options().format == TtsAudioFormat.Mp3) "mp3" else "wav"
     null -> "wav"
 }

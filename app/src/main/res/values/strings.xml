@@ -940,6 +940,7 @@
     <string name="anki_handlebar_sentence_audio">Sentence audio from the audiobook, or TTS when no audiobook is linked.</string>
     <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
     <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>
+    <string name="tts_source_microsoft_translator" comment="TTS online source configuration">Microsoft Translator</string>
     <string name="tts_source_google_cloud" comment="TTS online source configuration">Google Cloud TTS</string>
     <string name="tts_source_google_translate" comment="TTS online source configuration">Google Translate</string>
     <string name="tts_cloud_credentials_hint" comment="TTS online source configuration">Enter your own service credentials. Connection tests synthesize a short sample and may use your service quota.</string>

@@ -164,8 +164,8 @@ private fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> U
                     ) { viewModel.settings(preferences.settings.copy(rate = if (it == "slow") .5f else 1f)) }
                 } else ReaderSheetSliderRow(
                     label = stringResource(R.string.tts_rate_label), valueText = stringResource(R.string.tts_rate_value, rate),
-                    value = rate, range = (if (onlineSource == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (onlineSource == TtsOnlineSource.GoogleCloud || onlineSource == TtsOnlineSource.Azure) 2f else 3f),
-                    steps = when (onlineSource) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure -> 29; else -> 49 }, onValueChange = { rate = it },
+                    value = rate, range = (if (onlineSource == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (onlineSource == TtsOnlineSource.GoogleCloud || onlineSource?.usesAzureRest == true) 2f else 3f),
+                    steps = when (onlineSource) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 }, onValueChange = { rate = it },
                     onValueChangeFinished = { viewModel.settings(preferences.settings.copy(rate = rate)) },
                 )
                 ttsPitchRange(onlineSource, selectedVoice?.id.orEmpty())?.let { range ->
