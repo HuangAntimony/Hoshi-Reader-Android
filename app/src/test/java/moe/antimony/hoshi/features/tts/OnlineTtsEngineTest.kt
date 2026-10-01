@@ -21,13 +21,111 @@ class OnlineTtsEngineTest {
         put("data".toByteArray()); putInt(4); putInt(0)
     }.array()
 
-    private fun engine(handler: (Request) -> Pair<Int, ByteArray>): OnlineTtsEngine {
+    private fun engine(store: TtsVoiceCatalogStore? = null, handler: (Request) -> Pair<Int, ByteArray>): OnlineTtsEngine {
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val (code, body) = handler(chain.request())
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(code).message("test")
                 .body(body.toResponseBody()).build()
         }.build()
-        return OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "test-key" }, Dispatchers.IO)
+        return OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "test-key" }, Dispatchers.IO, voiceStore = store)
+    }
+
+    @Test fun repeatedCatalogLoadsReuseVoicesForEveryOnlineSourceDespitePlaybackChanges() = runBlocking {
+        for (source in TtsOnlineSource.entries) {
+            var authorizations = 0
+            var catalogs = 0
+            val engine = engine { request ->
+                if (request.url.host == "dev.microsofttranslator.com") {
+                    authorizations++
+                    200 to """{"r":"eastasia","t":"${translatorToken("cache")}"}""".toByteArray()
+                } else {
+                    catalogs++
+                    200 to (if (source == TtsOnlineSource.GoogleCloud)
+                        """{"voices":[{"name":"ja-JP-Neural2-B","languageCodes":["ja-JP"]}]}"""
+                    else """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""").toByteArray()
+                }
+            }
+            val settings = TtsSettings(engine = source.id, online = mapOf(source.id to TtsOnlineConfig("eastasia", "fixture")))
+            val first = engine.catalog(settings)
+            assertEquals(first, engine.catalog(settings.copy(rate = 1.5f, voice = first.voices.first().id, playbackRate = 2f)))
+            assertEquals(first, engine.catalog(settings))
+            assertEquals(if (source == TtsOnlineSource.GoogleTranslate) 0 else 1, catalogs)
+            assertEquals(if (source == TtsOnlineSource.MicrosoftTranslator) 1 else 0, authorizations)
+        }
+    }
+
+    @Test fun concurrentCatalogRequestsShareOneSuccessfulLoad() = runBlocking {
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val engine = engine { calls.incrementAndGet(); 200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray() }
+        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        val results = (1..12).map { async { engine.catalog(settings) } }.awaitAll()
+        assertTrue(results.all { it == results.first() })
+        assertEquals(1, calls.get())
+    }
+
+    @Test fun failedCatalogLoadsAreNotCachedAndCanBeRetried() = runBlocking {
+        var calls = 0
+        val engine = engine { if (++calls == 1) 503 to "temporary".toByteArray()
+            else 200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray() }
+        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        try { engine.catalog(settings); fail("Expected failure") } catch (_: TtsException) { }
+        val recovered = engine.catalog(settings)
+        assertEquals(recovered, engine.catalog(settings))
+        assertEquals(2, calls)
+    }
+
+    @Test fun storedCatalogSurvivesEngineRecreationAndOnlyExplicitRefreshFetchesAgain() = runBlocking {
+        var calls = 0
+        val directory = folder.newFolder("voice-catalogs")
+        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        val firstEngine = engine(TtsVoiceCatalogStore(directory)) {
+            calls++
+            200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray()
+        }
+        val first = firstEngine.catalog(settings)
+        assertEquals(1, calls)
+        val recreated = engine(TtsVoiceCatalogStore(directory)) {
+            calls++
+            200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-KeitaNeural"}]""".toByteArray()
+        }
+        assertEquals(first, recreated.cachedCatalog(settings))
+        assertEquals(first, recreated.catalog(settings))
+        assertEquals(1, calls)
+        val refreshed = recreated.catalog(settings, force = true)
+        assertEquals("ja-JP-KeitaNeural", refreshed.voices.single().id)
+        assertEquals(refreshed, recreated.catalog(settings))
+        assertEquals(2, calls)
+    }
+
+    @Test fun changingCloudConfigurationRequiresANewCatalogButOtherSourcesRemainCached() = runBlocking {
+        val calls = mutableListOf<String>()
+        val directory = folder.newFolder("configuration-catalogs")
+        val engine = engine(TtsVoiceCatalogStore(directory)) {
+            calls += it.url.host
+            200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray()
+        }
+        val edge = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        val azure = TtsSettings(engine = TtsOnlineSource.Azure.id,
+            online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastasia", "first")))
+        engine.catalog(edge); engine.catalog(azure)
+        val changed = azure.copy(online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastus", "second")))
+        assertNull(engine.cachedCatalog(changed))
+        engine.catalog(changed); engine.catalog(edge)
+        assertEquals(listOf("speech.platform.bing.com", "eastasia.tts.speech.microsoft.com", "eastus.tts.speech.microsoft.com"), calls)
+        val files = directory.listFiles()!!.map { it.readText() }
+        assertTrue(files.none { it.contains("test-key") || it.contains("first") || it.contains("second") })
+    }
+
+    @Test fun corruptDiskCatalogIsRefetchedWithoutLosingOtherSources() = runBlocking {
+        val directory = folder.newFolder("corrupt-catalog")
+        File(directory, "Edge.json").writeText("incomplete")
+        var calls = 0
+        val engine = engine(TtsVoiceCatalogStore(directory)) { calls++; 200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray() }
+        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        assertNull(engine.cachedCatalog(settings))
+        val voices = engine.catalog(settings)
+        assertEquals(1, calls)
+        assertEquals(voices, engine.catalog(settings))
     }
 
     @Test fun microsoftTranslatorUsesAutomaticAuthorizationAndAzureSpeechParameters() = runBlocking {

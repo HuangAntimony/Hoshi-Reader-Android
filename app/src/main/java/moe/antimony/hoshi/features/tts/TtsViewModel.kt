@@ -64,17 +64,18 @@ class TtsViewModel @Inject constructor(
     private var previewPlayer: ExoPlayer? = null
     private var previewFile: java.io.File? = null
 
-    fun refresh() {
+    fun refresh(force: Boolean = false) {
         val generation = ++catalogGeneration
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            catalogBusy.value = true
-            mutableError.value = null
-            mutableCatalog.value = null
             try {
                 val settings = repository.preferences.first().settings
+                val cached = engine.cachedCatalog(settings)
+                mutableError.value = null
+                mutableCatalog.value = cached
+                catalogBusy.value = force || cached == null
                 mutableEngines.value = engine.installedEngines()
-                mutableCatalog.value = engine.catalog(settings)
+                mutableCatalog.value = if (!force && cached != null) cached else engine.catalog(settings, force)
                 if (mutableCatalog.value?.voices.isNullOrEmpty()) mutableError.value = TtsFailure.MissingJapanese
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
@@ -109,7 +110,7 @@ class TtsViewModel @Inject constructor(
         val config = configuration(source, region, key)
         stopPreview()
         repository.configure(source, config)
-        refresh()
+        refresh(force = true)
         null
     } catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }

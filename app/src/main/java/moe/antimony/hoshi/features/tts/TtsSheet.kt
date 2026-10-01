@@ -111,7 +111,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
             TtsVoiceSettings(preferences.settings, catalog, engines, busy, preview, error ?: playback.error,
                 onSettings = viewModel::settings,
                 onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, onStopPreview = viewModel::stopPreview,
-                onRetry = { viewModel.dismissError(); viewModel.refresh() }, onConfigure = { configureSource = it },
+                onRetry = { viewModel.dismissError(); viewModel.refresh(force = true) }, onConfigure = { configureSource = it },
                 onSystemSettings = {
                     try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                     catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }

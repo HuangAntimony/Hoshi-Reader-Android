@@ -24,6 +24,7 @@ import moe.antimony.hoshi.features.reader.readerHardwareKeyEventForKeyEvent
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.*
 import org.junit.runner.RunWith
 
@@ -44,14 +45,21 @@ class TtsPanelStateTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val models = ViewModelStore()
     private var playCount = 0
+    private val panelVisible = androidx.compose.runtime.mutableStateOf(true)
+    private var onlineRequests = 0
     private lateinit var model: TtsViewModel
     private val configMessage get() = context.getString(R.string.tts_configuration_error)
 
-    private fun panel(system: Boolean = false, reader: Boolean = false) {
-        val source = if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else TtsOnlineSource.GoogleCloud.id
+    private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false) {
+        val source = if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
         val repository = TtsRepository(MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"}}""")))
         val cipher = TtsCredentialCipher(Dispatchers.IO)
-        val transport = OnlineTtsTransport(OkHttpClient.Builder().addInterceptor { throw IOException("UI fixture prohibits network") }.build())
+        val transport = OnlineTtsTransport(OkHttpClient.Builder().addInterceptor {
+            if (!online) throw IOException("UI fixture prohibits network")
+            onlineRequests++
+            okhttp3.Response.Builder().request(it.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("Fixture")
+                .body("""[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toResponseBody()).build()
+        }.build())
         val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO))
         val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO)
         val books = TtsBookRepository(Dispatchers.IO)
@@ -68,12 +76,30 @@ class TtsPanelStateTest {
                 TtsPlaybackController(books, repository, audio, output, scope), context)
             models.put("fixture", model)
         }
-        compose.setContent { HoshiReaderTheme(darkTheme = false, dynamicColor = false) { TtsPanel(model, null, if (reader) ({ model.playback.play() }) else null, Modifier) } }
+        compose.setContent { HoshiReaderTheme(darkTheme = false, dynamicColor = false) { if (panelVisible.value) TtsPanel(model, null, if (reader) ({ model.playback.play() }) else null, Modifier) } }
         compose.waitUntil(15_000) { !model.busy.value && model.readingSettings.value != null &&
-            if (system) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value == TtsFailure.Configuration }
+            if (system || online) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value == TtsFailure.Configuration }
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
+
+    @Test fun reopeningOnlinePanelKeepsCatalogWithoutLoadingOrNetworkRequests() {
+        panel(online = true)
+        val loading = mutableListOf<Boolean>()
+        val catalogs = mutableListOf<TtsCatalog?>()
+        compose.runOnIdle {
+            scope.launch { model.busy.collect { loading += it } }
+            scope.launch { model.catalog.collect { catalogs += it } }
+            panelVisible.value = false
+        }
+        compose.runOnIdle { panelVisible.value = true }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            Assert.assertEquals(1, onlineRequests)
+            Assert.assertFalse(loading.any { it })
+            Assert.assertTrue(catalogs.all { it?.voices?.isNotEmpty() == true })
+        }
+    }
 
     @Test fun sourceFailureStaysNearVoiceCardAndDoesNotLeakIntoOtherTabs() {
         panel()

@@ -11,8 +11,10 @@ class TtsEngineRouter @Inject constructor(
     private val online: OnlineTtsEngine,
 ) {
     suspend fun installedEngines() = android.installedEngines()
-    suspend fun catalog(settings: TtsSettings): TtsCatalog =
-        if (TtsOnlineSource.from(settings.engine) == null) android.catalog(settings) else online.catalog(settings)
+    suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? =
+        if (TtsOnlineSource.from(settings.engine) == null) null else online.cachedCatalog(settings)
+    suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog =
+        if (TtsOnlineSource.from(settings.engine) == null) android.catalog(settings) else online.catalog(settings, force)
 
     suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> =
         if (TtsOnlineSource.from(settings.engine) == null) android.synthesize(text, settings, directory)

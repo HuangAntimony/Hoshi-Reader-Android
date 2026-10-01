@@ -20,22 +20,42 @@ class OnlineTtsEngine internal constructor(
     private val decryptKey: suspend (String, String) -> String,
     private val io: CoroutineDispatcher,
     private val translator: MicrosoftTranslatorSession = MicrosoftTranslatorSession(transport),
+    private val voiceStore: TtsVoiceCatalogStore? = null,
 ) {
-    @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher, translator: MicrosoftTranslatorSession = MicrosoftTranslatorSession(transport)) :
-        this(transport, cipher::decrypt, io, translator)
+    @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher,
+        translator: MicrosoftTranslatorSession, voiceStore: TtsVoiceCatalogStore) : this(transport, cipher::decrypt, io, translator, voiceStore)
+    internal constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, io: CoroutineDispatcher) : this(transport, cipher::decrypt, io)
     private val synthesis = Mutex()
     private val catalogs = Mutex()
+    private val catalogRequests = Mutex()
     private val voiceCache = linkedMapOf<Pair<String, TtsOnlineConfig>, List<TtsVoiceInfo>>()
 
-    suspend fun catalog(settings: TtsSettings): TtsCatalog = withContext(io) {
+    suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
-        val voices = fetchVoices(source, config)
-        catalogs.withLock {
-            voiceCache[source.id to config] = voices
-            if (voiceCache.size > 8) voiceCache.remove(voiceCache.keys.first())
+        val voices = catalogs.withLock {
+            voiceCache[source.id to config] ?: voiceStore?.read(source, config)?.also { rememberVoices(source, config, it) }
         }
-        TtsCatalog(emptyList(), source.id, voices)
+        voices?.let { TtsCatalog(emptyList(), source.id, it) }
+    }
+
+    suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
+        if (!force) cachedCatalog(settings)?.let { return@withContext it }
+        catalogRequests.withLock {
+            // Recheck after waiting: concurrent panels/synthesis share the same successful load.
+            if (!force) cachedCatalog(settings)?.let { return@withLock it }
+            val source = source(settings)
+            val config = settings.online[source.id] ?: TtsOnlineConfig()
+            val voices = fetchVoices(source, config)
+            catalogs.withLock { rememberVoices(source, config, voices) }
+            voiceStore?.write(source, config, voices)
+            TtsCatalog(emptyList(), source.id, voices)
+        }
+    }
+
+    private fun rememberVoices(source: TtsOnlineSource, config: TtsOnlineConfig, voices: List<TtsVoiceInfo>) {
+        voiceCache[source.id to config] = voices
+        if (voiceCache.size > 8) voiceCache.remove(voiceCache.keys.first())
     }
 
     private suspend fun fetchVoices(source: TtsOnlineSource, config: TtsOnlineConfig): List<TtsVoiceInfo> {

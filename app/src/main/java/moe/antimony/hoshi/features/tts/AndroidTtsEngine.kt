@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 data class TtsEngineInfo(val id: String, val label: String)
+@kotlinx.serialization.Serializable
 data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList())
 data class TtsCatalog(val engines: List<TtsEngineInfo>, val selectedEngine: String, val voices: List<TtsVoiceInfo>)
 enum class TtsFailure {

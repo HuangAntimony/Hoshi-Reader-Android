@@ -20,6 +20,7 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
 internal enum class TtsSourceGroup(val labelRes: Int) {
     Device(R.string.tts_group_device), Online(R.string.tts_group_online), Cloud(R.string.tts_group_cloud), Other(R.string.tts_group_other)
@@ -92,7 +93,7 @@ internal fun TtsVoicePicker(
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp))
+        if (busy) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp))
         failure?.let {
             Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
             TextButton(onClick = onRetry, modifier = Modifier.padding(horizontal = 12.dp)) { Text(stringResource(R.string.tts_retry)) }
@@ -123,4 +124,11 @@ private fun TtsVoiceRow(title: String, subtitle: String?, selected: Boolean, onC
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted) }
         }
     }
+}
+
+@Composable
+internal fun TtsCatalogLoading(modifier: Modifier = Modifier) {
+    if (LocalHoshiEInkMode.current) Text(stringResource(R.string.tts_loading_voices), modifier,
+        style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+    else LinearProgressIndicator(modifier)
 }

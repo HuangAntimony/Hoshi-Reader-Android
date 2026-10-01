@@ -16,6 +16,22 @@ import org.junit.runner.RunWith
 class TtsVoiceSettingsTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun einkCatalogLoadingUsesReadableStatusInThePanelAndVoicePicker() {
+        val picker = mutableStateOf(false)
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                if (picker.value) TtsVoicePicker("Fixture", emptyList(), "", true, null, {}, {}, {})
+                else TtsVoiceSettings(TtsSettings(engine = TtsOnlineSource.Edge.id), null, emptyList(), true,
+                    TtsPreviewState.Idle, null, {}, {}, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Loading voices…").assertIsDisplayed()
+        compose.runOnIdle { picker.value = true }
+        compose.onNodeWithText("Loading voices…").assertIsDisplayed()
+        compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+            androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate)).assertCountEquals(0)
+    }
+
     @Test fun playbackSpeedRemainsIndependentOfTwoStateEngineRate() {
         val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.GoogleTranslate.id, rate = .5f))
         compose.setContent {

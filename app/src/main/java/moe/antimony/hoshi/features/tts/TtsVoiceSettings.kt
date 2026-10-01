@@ -55,7 +55,7 @@ internal fun TtsVoiceSettings(
             HorizontalDivider(color = hoshiSurfaces.divider)
             TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, connection) { voicePicker = true }
         }
-        if (busy && preview == TtsPreviewState.Idle) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
+        if (busy && preview == TtsPreviewState.Idle) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
         failure?.let {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

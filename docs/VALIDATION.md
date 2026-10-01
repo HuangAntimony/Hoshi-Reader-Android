@@ -1119,6 +1119,16 @@ Validate relevant sync/update/Sasayaki changes with:
   `-e ttsEngine <installed-offline-engine-package>` to isolate this test from a network-backed
   system default; on the Samsung validation device use `com.samsung.SMT`. This must not
   change system preferred-engine settings.
+- Online catalog reuse: open/close the panel, switch away/back to a source, and restart
+  the app after its first successful list load. It must reuse the saved voice list without
+  network requests, clearing the list, or flashing loading state; there is no expiry refresh.
+  Region/key changes must use the new configuration, failed/corrupt loads must be retryable,
+  and explicit error retry must fetch again. Catalog files must contain no API key or bearer
+  token. `OnlineTtsEngineTest` covers every source, concurrent requests, engine recreation,
+  config changes and force retry with fixture responses; `TtsPanelStateTest` checks warm
+  panel lifecycle/state without network. Keep installed-engine resume refresh so new
+  Japanese data remains discoverable. In e-ink, check the Voice tab and voice picker show
+  Loading voices text while loading; other themes retain the animated progress bar.
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
   Voice/Replacements/Settings, without a cover, book title or sentence preview.
   Confirm Source and Voice have explicit labels in one compact card and open separate lazy bottom lists,

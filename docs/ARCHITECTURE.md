@@ -807,8 +807,16 @@ QA matrices live in `docs/VALIDATION.md`.
   sources are labeled in the UI. No voice model is bundled and failures never select
   another provider automatically.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
-  Samsung's ISO 639-2 locales). TTS panels refresh the engine catalog on resume so
+  Samsung's ISO 639-2 locales). TTS panels refresh installed-engine catalogs on resume so
   returning from system voice installation updates their available voices.
+- Online voice lists are shared by panel, preview and synthesis. `OnlineTtsEngine` coalesces
+  concurrent catalog loads and reuses successful catalogs; `TtsVoiceCatalogStore` persists
+  one atomic JSON file per source under app files storage on the engine's IO dispatcher.
+  Catalogs have no age-based refresh. Source configuration fingerprints prevent reuse after
+  region/key changes without storing credentials in catalog files. Missing/corrupt catalogs
+  are fetched again, failures are not cached, and explicit error retry/configuration save
+  forces a fetch. Warm panel openings retain the catalog and do not enter loading state;
+  installed-engine discovery still refreshes so newly installed engines remain selectable.
 - `OnlineTtsProtocol` owns service JSON/SSML, Japanese catalog filtering, UTF-8 length
   limits and Edge framing. `OnlineTtsTransport` owns bounded HTTPS/WebSocket requests;
   cancellation closes the active call/socket, and only a completed Edge turn may return
@@ -896,6 +904,8 @@ QA matrices live in `docs/VALIDATION.md`.
   from a neutral row and use source/voice capabilities. TTS sliders hide tick marks
   while retaining their discrete steps, with range labels for rate/pitch; shared slider
   and card defaults remain unchanged for Sasayaki.
+  `TtsCatalogLoading` shares the catalog-loading presentation between the Voice tab and
+  picker: e-ink uses localized status text, while other themes use the animated linear bar.
   Voice names use catalog identifiers unchanged. Online/offline status belongs to the
   selected voice and its catalog network requirement, not the source. Unknown saved
   voices keep their raw identifiers without an inferred connection status.
