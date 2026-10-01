@@ -28,7 +28,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   panel. Adjust supported pitch, volume, Azure/Microsoft Translator speaking styles/roles/intensity and
   punctuation silence, cloud audio format/sample rate with compact dropdown rows
   anchored at the right-side control, Google device profiles, and
-  extra playback pauses between sentences.
+  extra playback pauses between sentences. Pause sliders use 10 ms increments, with
+  a normal range of 0–1000 ms for provider silence and 0–2000 ms for extra sentence
+  pauses; previously saved longer pauses remain intact until edited.
   MP3 sources retain MP3 for playback and Anki.
   Ready sentence audio plays without waiting for later network synthesis, and continuous
   playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20

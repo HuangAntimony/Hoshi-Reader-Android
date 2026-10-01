@@ -1071,6 +1071,11 @@ Validate relevant sync/update/Sasayaki changes with:
 - Compare default/modified pitch and volume in preview and Anki. Azure/Translator style/role choices
   must come from the selected voice, reset when changing voices, and include only valid
   styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
+  Verify normal provider pause sliders span 0–1000 ms and extra sentence delay spans
+  0–2000 ms, both allowing 300 → 310 ms. Restored longer values must survive edits
+  to unrelated parameters and return to the usual slider range once reduced. Run
+  `TtsPauseControlsTest` explicitly with `am instrument`; it uses isolated Compose
+  controls and in-memory preferences without network requests or saved-device changes.
   Google Translate offers normal/slow only. Unsupported pitch controls must be hidden.
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;

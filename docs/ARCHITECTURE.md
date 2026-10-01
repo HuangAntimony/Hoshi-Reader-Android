@@ -817,6 +817,10 @@ QA matrices live in `docs/VALIDATION.md`.
   advertised styles/roles, intensity and exact silence controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
   supports prosody rate/pitch/volume; Google Translate exposes only normal/slow speech.
   Pitch controls use provider units and omit unsupported Google voice families.
+  `TtsPauseSlider` separates the usual UI ranges (provider silence 0–1000 ms, playback
+  sentence delay 0–2000 ms, both in 10 ms increments) from service/storage limits.
+  Existing larger values expand only their own slider until explicitly edited,
+  preserving old preferences and exact synthesis durations.
   `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
   removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
 - `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial

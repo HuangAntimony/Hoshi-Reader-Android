@@ -34,8 +34,9 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         { pluralStringResource(R.plurals.tts_sentence_count, it.roundToInt(), it.roundToInt()) }) {
         onChange(settings.copy(prefetchSentences = it.roundToInt()))
     }
-    TtsParameterSlider(R.string.tts_sentence_pause, settings.sentencePauseMs.toFloat(), 0f..5000f, 49,
-        { stringResource(R.string.tts_milliseconds, it.roundToInt()) }) { onChange(settings.copy(sentencePauseMs = it.toLong())) }
+    TtsPauseSlider(R.string.tts_sentence_pause, settings.sentencePauseMs.coerceIn(0, 5000).toInt(), usualMaximum = 2000) {
+        onChange(settings.copy(sentencePauseMs = it.toLong()))
+    }
     Text(stringResource(R.string.tts_sentence_pause_hint), style = MaterialTheme.typography.bodySmall,
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     if (source == null || source == TtsOnlineSource.GoogleTranslate) return
@@ -108,7 +109,14 @@ private fun TtsPauseControl(label: Int, value: Int, onChange: (Int) -> Unit) {
             Switch(value >= 0, { onChange(if (it) 300 else -1) })
         }
     }
-    if (value >= 0) TtsParameterSlider(label, value.toFloat(), 0f..20000f, 199,
+    if (value >= 0) TtsPauseSlider(label, value, onChange = onChange)
+}
+
+@Composable
+private fun TtsPauseSlider(label: Int, value: Int, usualMaximum: Int = 1000, onChange: (Int) -> Unit) {
+    // Preserve a previously saved longer pause until the user explicitly changes it.
+    val maximum = ((maxOf(usualMaximum, value) + 9) / 10) * 10
+    TtsParameterSlider(label, value.toFloat(), 0f..maximum.toFloat(), maximum / 10 - 1,
         { stringResource(R.string.tts_milliseconds, it.roundToInt()) }) { onChange(it.roundToInt()) }
 }
 
