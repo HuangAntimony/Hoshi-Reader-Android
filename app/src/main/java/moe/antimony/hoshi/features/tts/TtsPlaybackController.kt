@@ -104,13 +104,13 @@ class TtsPlaybackController internal constructor(
     fun startAt(chapter: Int, offset: Int, singleSentence: Boolean = false) {
         val values = state.value.sentences
         val selected = values.indexOfFirst { it.chapter > chapter || it.chapter == chapter && it.start + it.length > offset }
-        if (selected >= 0) seek(selected, singleSentence)
-        else if (values.isNotEmpty()) seek(values.lastIndex, singleSentence)
+        if (selected >= 0) seek(selected, singleSentence, startPlayback = true)
+        else if (values.isNotEmpty()) seek(values.lastIndex, singleSentence, startPlayback = true)
     }
     fun toggle() { if (state.value.playing) pause() else play() }
     fun previous() = seek((state.value.index - 1).coerceAtLeast(0))
     fun next() = seek((state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
-    fun repeat() = seek(state.value.index)
+    fun repeat() = seek(state.value.index, startPlayback = true)
     private fun advance() {
         if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) { pause(); preparedIndex = null; return }
         val waitMillis = preferences.settings.sentencePauseMs
@@ -123,7 +123,7 @@ class TtsPlaybackController internal constructor(
             if (token == generation && state.value.playing) seek(state.value.index + 1, natural = true)
         }
     }
-    private fun seek(index: Int, singleSentence: Boolean = false, natural: Boolean = false) {
+    private fun seek(index: Int, singleSentence: Boolean = false, natural: Boolean = false, startPlayback: Boolean = state.value.playing) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
         waitingForNextSentence = false
@@ -132,7 +132,16 @@ class TtsPlaybackController internal constructor(
         naturalAdvance = natural
         preparedIndex = null
         mutableState.value = state.value.copy(index = index)
-        play()
+        if (startPlayback) play()
+        else if (state.value.started) {
+            val sentence = requireNotNull(state.value.sentence)
+            val token = generation
+            job = scope.launch(Dispatchers.Main.immediate) {
+                try { presentSentence?.invoke(sentence, false) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { if (generation == token) fail(TtsFailure.AudioUnavailable) }
+            }
+        }
     }
     fun play() {
         if (associated || state.value.sentence == null || state.value.playing) return

@@ -353,12 +353,22 @@ Manual reader validation should cover:
   absence of invisible touch blockers after dismissal.
 - volume-key popup term navigation in paginated, continuous, and VN modes:
   verify the root or topmost recursive popup takes priority over enabled page
-  turns and Sasayaki seeking, default and reversed directions reach adjacent
+  turns and Sasayaki/TTS seeking, default and reversed directions reach adjacent
   term headers aligned exactly to the popup top without wrapping; repeat at
   popup scales 0.8, 1.0, 1.5, and 2.0. Verify long-press repeats work while
   asynchronously rendered terms appear, manual scrolling resumes from the
   visible term, and closing the popup restores the previously configured
   volume-key behavior.
+- TTS volume-key behavior defaults off. Enable it with page turns and popup-term navigation:
+  before starting book narration (including after preview-only playback), volume keys retain
+  their existing page/system behavior. After explicit TTS playback, they navigate previous/next
+  sentences while playing or paused, below topmost popup terms and above page turns. Check
+  both directions, reversal, long-press repeat and key-up consumption. Closing/reopening or
+  switching books resets eligibility; rotation retains the current session. Audiobook association
+  leaves its existing Sasayaki priority intact. Pause, jump across a chapter boundary, and verify
+  the sentence is revealed without audio; explicit resume starts the selected sentence. Passive
+  paused chapter navigation must still stay where the user browses. Check sheet, reader toolbar
+  and headset/notification previous/next preserve pause, while explicit replay/start-at can play.
 - E-ink selection marks, horizontal and vertical lookup underlines, reduced
   motion popup scrolling, and slow-device first-visible-content behavior.
 - reader chrome behavior: focus mode, transient system bars, Android Back

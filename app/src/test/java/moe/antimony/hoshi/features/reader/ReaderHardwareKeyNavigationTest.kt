@@ -8,6 +8,44 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderHardwareKeyNavigationTest {
+    @Test fun ttsNavigationRequiresBothThePreferenceAndAStartedBookSession() {
+        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekTts = true)
+        assertEquals(ReaderHardwareKeyAction.ReaderNavigation(ReaderNavigationDirection.Forward),
+            ttsKey(settings, started = false).action)
+        assertEquals(ReaderHardwareKeyAction.ReaderNavigation(ReaderNavigationDirection.Forward),
+            ttsKey(settings.copy(volumeKeysSeekTts = false)).action)
+        assertFalse(ttsKey(ReaderSettings(volumeKeysSeekTts = true), started = false).consumed)
+        assertFalse(ttsKey(ReaderSettings()).consumed)
+        assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Forward),
+            ttsKey(settings).action)
+    }
+
+    @Test fun ttsVolumeNavigationUsesSharedPriorityDirectionsRepeatAndKeyUpRules() {
+        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekTts = true,
+            volumeKeysSeekSasayaki = true, volumeKeysNavigatePopupTerms = true)
+        assertEquals(ReaderHardwareKeyAction.PopupTermNavigation(PopupTermNavigationDirection.Next),
+            ttsKey(settings, popup = true).action)
+        assertEquals(ReaderHardwareKeyAction.SasayakiSeekForward,
+            ttsKey(settings, audiobook = true).action)
+        assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Backward),
+            ttsKey(settings, code = KeyEvent.KEYCODE_VOLUME_UP).action)
+        assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Forward),
+            ttsKey(settings.copy(reverseVolumeKeyDirection = true), code = KeyEvent.KEYCODE_VOLUME_UP).action)
+        assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Backward),
+            ttsKey(settings.copy(reverseVolumeKeyDirection = true)).action)
+        assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Forward),
+            ttsKey(settings, repeat = 4).action)
+        val released = ttsKey(settings, action = KeyEvent.ACTION_UP)
+        assertTrue(released.consumed)
+        assertNull(released.action)
+    }
+
+    private fun ttsKey(settings: ReaderSettings, started: Boolean = true, popup: Boolean = false,
+        audiobook: Boolean = false, code: Int = KeyEvent.KEYCODE_VOLUME_DOWN,
+        action: Int = KeyEvent.ACTION_DOWN, repeat: Int = 0) = readerHardwareKeyEventForKeyEvent(
+        code, action, repeat, settings, sasayakiEnabled = audiobook, hasSasayakiAudio = audiobook,
+        hasLookupPopup = popup, hasStartedTts = started)
+
     @Test
     fun pageDownAndPageUpAlwaysMapToReaderNavigation() {
         val settings = ReaderSettings(volumeKeysTurnPages = false, reverseVolumeKeyDirection = true)

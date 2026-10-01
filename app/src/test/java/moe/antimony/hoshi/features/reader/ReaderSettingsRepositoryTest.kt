@@ -252,6 +252,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.volumeKeysTurnPages)
             assertFalse(settings.volumeKeysNavigatePopupTerms)
             assertFalse(settings.volumeKeysSeekSasayaki)
+            assertFalse(settings.volumeKeysSeekTts)
             assertFalse(settings.reverseVolumeKeyDirection)
             assertFalse(settings.keepScreenOnWhileReading)
             assertFalse(settings.lockCurrentOrientation)
@@ -356,6 +357,7 @@ class ReaderSettingsRepositoryTest {
                 volumeKeysTurnPages = true,
                 volumeKeysNavigatePopupTerms = true,
                 volumeKeysSeekSasayaki = true,
+                volumeKeysSeekTts = true,
                 keepScreenOnWhileReading = true,
                 lockCurrentOrientation = true,
                 openLastReadBookOnLaunch = true,
@@ -385,6 +387,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(migrated.volumeKeysTurnPages)
             assertTrue(migrated.volumeKeysNavigatePopupTerms)
             assertTrue(migrated.volumeKeysSeekSasayaki)
+            assertTrue(migrated.volumeKeysSeekTts)
             assertTrue(migrated.keepScreenOnWhileReading)
             assertTrue(migrated.lockCurrentOrientation)
             assertTrue(migrated.openLastReadBookOnLaunch)
@@ -460,6 +463,7 @@ class ReaderSettingsRepositoryTest {
                     volumeKeysTurnPages = true,
                     volumeKeysNavigatePopupTerms = true,
                     volumeKeysSeekSasayaki = true,
+                    volumeKeysSeekTts = true,
                     reverseVolumeKeyDirection = true,
                     keepScreenOnWhileReading = true,
                     lockCurrentOrientation = true,
@@ -527,6 +531,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.volumeKeysTurnPages)
             assertTrue(saved.volumeKeysNavigatePopupTerms)
             assertTrue(saved.volumeKeysSeekSasayaki)
+            assertTrue(saved.volumeKeysSeekTts)
             assertTrue(saved.reverseVolumeKeyDirection)
             assertTrue(saved.keepScreenOnWhileReading)
             assertTrue(saved.lockCurrentOrientation)
@@ -570,6 +575,7 @@ class ReaderSettingsRepositoryTest {
                     visualNovelMergeCrossScreenSasayakiCues = true,
                     volumeKeysTurnPages = true,
                     volumeKeysNavigatePopupTerms = true,
+                    volumeKeysSeekTts = true,
                     lockCurrentOrientation = true,
                     openLastReadBookOnLaunch = true,
                 )
@@ -588,6 +594,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
             assertTrue(inherited.volumeKeysTurnPages)
             assertTrue(inherited.volumeKeysNavigatePopupTerms)
+            assertTrue(inherited.volumeKeysSeekTts)
             assertTrue(inherited.lockCurrentOrientation)
             assertTrue(inherited.openLastReadBookOnLaunch)
 
@@ -603,6 +610,7 @@ class ReaderSettingsRepositoryTest {
                     visualNovelMergeCrossScreenSasayakiCues = false,
                     volumeKeysTurnPages = false,
                     volumeKeysNavigatePopupTerms = false,
+                    volumeKeysSeekTts = false,
                     lockCurrentOrientation = false,
                     openLastReadBookOnLaunch = false,
                 )
@@ -620,6 +628,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)
             assertFalse(japanese.volumeKeysTurnPages)
             assertFalse(japanese.volumeKeysNavigatePopupTerms)
+            assertFalse(japanese.volumeKeysSeekTts)
             assertFalse(japanese.lockCurrentOrientation)
             assertFalse(japanese.openLastReadBookOnLaunch)
         }

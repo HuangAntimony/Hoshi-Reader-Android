@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
 import android.content.Context
+import android.view.KeyEvent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -14,6 +15,12 @@ import java.io.IOException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.features.reader.ReaderHardwareKeyAction
+import moe.antimony.hoshi.features.reader.ReaderNavigationDirection
+import moe.antimony.hoshi.features.reader.readerHardwareKeyEventForKeyEvent
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import okhttp3.OkHttpClient
@@ -36,10 +43,11 @@ class TtsPanelStateTest {
     private val reading = MemoryStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val models = ViewModelStore()
+    private var playCount = 0
     private lateinit var model: TtsViewModel
     private val configMessage get() = context.getString(R.string.tts_configuration_error)
 
-    private fun panel(system: Boolean = false) {
+    private fun panel(system: Boolean = false, reader: Boolean = false) {
         val source = if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else TtsOnlineSource.GoogleCloud.id
         val repository = TtsRepository(MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"}}""")))
         val cipher = TtsCredentialCipher(Dispatchers.IO)
@@ -51,7 +59,7 @@ class TtsPanelStateTest {
             override var onEnded: () -> Unit = {}; override var onPaused: () -> Unit = {}; override var onError: () -> Unit = {}
             override suspend fun connect() = Unit
             override fun prepare(files: List<File>, title: String, sentence: String) = Unit
-            override fun play() = Unit; override fun pause() = Unit; override fun clear() = Unit; override fun disconnect() = Unit
+            override fun play() { playCount++ }; override fun pause() = Unit; override fun clear() = Unit; override fun disconnect() = Unit
         }
         compose.runOnUiThread {
             model = TtsViewModel(repository, SasayakiSettingsRepository(reading),
@@ -59,7 +67,7 @@ class TtsPanelStateTest {
                 TtsPlaybackController(books, repository, audio, output, scope), context)
             models.put("fixture", model)
         }
-        compose.setContent { HoshiReaderTheme(darkTheme = false, dynamicColor = false) { TtsPanel(model, null, null, Modifier) } }
+        compose.setContent { HoshiReaderTheme(darkTheme = false, dynamicColor = false) { TtsPanel(model, null, if (reader) ({ model.playback.play() }) else null, Modifier) } }
         compose.waitUntil(15_000) { !model.busy.value && model.readingSettings.value != null &&
             if (system) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value == TtsFailure.Configuration }
     }
@@ -89,6 +97,41 @@ class TtsPanelStateTest {
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "はい。"), null) }
         compose.waitUntil(15_000) { model.previewState.value == TtsPreviewState.Idle }
         compose.runOnIdle { Assert.assertNull(model.error.value) }
+    }
+
+    @Test fun readerSentenceControlsAndVolumeKeysPreservePausedInstalledEnginePlayback() {
+        panel(system = true, reader = true)
+        val controller = model.playback
+        val settings = ReaderSettings(volumeKeysSeekTts = true)
+        fun key() = readerHardwareKeyEventForKeyEvent(KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.ACTION_DOWN, 0, settings, false, false, hasStartedTts = controller.state.value.started)
+        val book = EpubBook("Device fixture", chapters = listOf(
+            EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>今日は晴れです。次の文章です。最後の文章です。</p>")))
+        compose.runOnIdle { controller.load("tts-key-fixture", book, false) }
+        compose.waitUntil(5_000) { controller.state.value.sentences.size == 3 }
+        compose.runOnIdle { Assert.assertFalse(key().consumed); controller.play() }
+        compose.waitUntil(15_000) { !controller.state.value.preparing }
+        compose.runOnIdle {
+            Assert.assertNull(controller.state.value.error)
+            Assert.assertTrue(controller.state.value.playing)
+            Assert.assertEquals(1, playCount)
+            controller.pause()
+            Assert.assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Forward), key().action)
+        }
+        // The four unlabeled icon buttons above the tab row are replay/previous/play/next.
+        fun controls() = compose.onAllNodes(hasClickAction() and SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Button)).fetchSemanticsNodes().filter {
+            it.boundsInRoot.bottom < compose.onNodeWithText("Replacements").fetchSemanticsNode().boundsInRoot.top
+        }.sortedBy { it.boundsInRoot.left }
+        Assert.assertEquals(4, controls().size)
+        val nextId = controls().last().id
+        compose.onNode(SemanticsMatcher("next sentence control") { it.id == nextId }).performClick()
+        compose.runOnIdle { Assert.assertEquals(1, controller.state.value.index); Assert.assertFalse(controller.state.value.playing); Assert.assertEquals(1, playCount) }
+        val previousId = controls()[1].id
+        compose.onNode(SemanticsMatcher("previous sentence control") { it.id == previousId }).performClick()
+        compose.runOnIdle { Assert.assertEquals(0, controller.state.value.index); Assert.assertFalse(controller.state.value.playing); Assert.assertEquals(1, playCount) }
+        compose.runOnIdle { controller.stop(); controller.load("tts-key-fixture", book, false); Assert.assertFalse(key().consumed) }
     }
 
     @Test fun readingWriteFailureAndPreviewFailureRemainIndependent() {

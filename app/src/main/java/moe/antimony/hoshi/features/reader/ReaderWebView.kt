@@ -1494,9 +1494,10 @@ fun ReaderWebView(
         dispatchSasayakiCueToReader(pending.cue, pending.reveal, pending.source)
     }
     val ttsPresenter: suspend (TtsSentence, Boolean, Boolean) -> Unit = present@{ sentence, allowImages, restoring ->
+        val directJump = !restoring && !ttsViewModel.playback.state.value.playing
         fun presentation() = readerTtsPresentation(
             ttsViewModel.playback.state.value, sentence,
-            stateHolder.readerPosition.displayedPosition.index, sasayakiSettings.autoScroll, restoring,
+            stateHolder.readerPosition.displayedPosition.index, sasayakiSettings.autoScroll, restoring, directJump,
         )
         val foreground = view.findViewTreeLifecycleOwner()?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.STARTED) == true
         if (foreground && ttsAvailable) {
@@ -1585,6 +1586,7 @@ fun ReaderWebView(
             sasayakiEnabled = sasayakiSettings.enabled,
             hasSasayakiAudio = sasayakiPlayer?.hasAudio == true,
             hasLookupPopup = stateHolder.lookupPopups.isNotEmpty(),
+            hasStartedTts = ttsAvailable && ttsViewModel.playback.state.value.let { it.bookId == ttsBookId && it.started },
         )
         if (!keyEvent.consumed) return@rememberUpdatedState false
         when (val action = keyEvent.action) {
@@ -1598,6 +1600,11 @@ fun ReaderWebView(
                     "window.hoshiReaderPopupHost && window.hoshiReaderPopupHost.navigateTopTerm('$direction')",
                     null,
                 )
+            }
+            is ReaderHardwareKeyAction.TtsSentenceNavigation -> {
+                ttsViewModel.stopPreview()
+                if (action.direction == ReaderNavigationDirection.Forward) ttsViewModel.playback.next()
+                else ttsViewModel.playback.previous()
             }
             ReaderHardwareKeyAction.SasayakiSeekBackward -> {
                 sasayakiPlayer?.previousCue()

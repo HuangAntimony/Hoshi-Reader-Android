@@ -26,6 +26,13 @@ class ReaderTtsPresentationTest {
         assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(playing, sentence, 2, autoScroll = false))
     }
 
+    @Test fun explicitPausedNavigationRevealsTheSelectedSentenceAcrossChapters() {
+        assertEquals(ReaderTtsPresentation.Follow,
+            readerTtsPresentation(paused, sentence, 2, autoScroll = true, restoring = false, directJump = true))
+        assertEquals(ReaderTtsPresentation.Follow,
+            readerTtsPresentation(paused, sentence, 1, autoScroll = false, restoring = false, directJump = true))
+    }
+
     @Test fun oldPresentationCannotFollowAfterStopOrSentenceChange() {
         assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(TtsPlaybackState(), sentence, 1, autoScroll = true))
         val changed = paused.copy(sentences = listOf(sentence.copy(start = 40)), playing = true)

@@ -832,7 +832,15 @@ QA matrices live in `docs/VALIDATION.md`.
   rather than a hardcoded promise of Azure-wide availability.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
   configuration invalidation and configurable sentence prefetch, and rejects stale operations
-  after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by
+  after stop/book/source changes. Previous/next preserves the playing state; explicit
+  start-at/replay still starts audio. Paused navigation invalidates preparation and lookup
+  resume callbacks, presents the selected sentence directly, and synthesizes nothing until
+  playback resumes. `started` remains scoped to the Reader route/book session, so the
+  default-off global Behavior setting `volumeKeysSeekTts` activates sentence navigation
+  only after that session has explicitly started narration. Reader's existing hardware-key
+  resolver gives enabled popup term navigation priority, then audiobook/TTS navigation,
+  then page turning; direction reversal and repeat/key-up handling stay shared.
+  `TtsAudioRepository` keys temporary playback audio by
   configuration (excluding prefetch depth) and resolved spoken text; independent export
   files are owned by their caller and cleaned on cancellation, including cancelled dispatcher return delivery.
   Cache lookups use a short metadata lock independently of the serial synthesis queue,
@@ -856,8 +864,9 @@ QA matrices live in `docs/VALIDATION.md`.
   Only natural forward playback inspects intervening media; manual jumps and zero
   image-hold duration restore directly. `ReaderTtsPresentation` separates active
   playback following from passive highlight restoration. Paused narration may only
-  restore its highlight in the displayed chapter,
-  without revealing text or moving the page. Chapter loads, image holds and post-restore
+  passively restore its highlight in the displayed chapter,
+  without revealing text or moving the page. An explicit paused sentence jump instead
+  reveals its target (including another chapter) through the shared direct-jump path. Chapter loads, image holds and post-restore
   reveal decisions read current playback/sentence state, rejecting stopped or obsolete
   presentations; returning to foreground uses the same policy. Restoration cannot
   reveal a TTS sentence while synthesis or its image presentation is preparing;

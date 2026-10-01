@@ -29,6 +29,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and refreshes its temporary authorization automatically.
   Linking an audiobook hides TTS and preserves Sasayaki's audiobook controls.
   Reopening or switching books after narration keeps playback idle until explicitly started.
+  Optionally navigate TTS sentences with volume keys after starting narration in the current
+  book session; popup term navigation takes priority over narration, then page turns.
+  Previous/next sentence navigation preserves paused playback instead of starting audio.
   Recognizes Samsung's Japanese voices and refreshes available voices when returning
   from system settings. Configure cloud credentials and test synthesis in the current
   panel. Adjust supported pitch, volume, Azure/Microsoft Translator speaking styles/roles/intensity and

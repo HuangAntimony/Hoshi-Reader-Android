@@ -131,6 +131,63 @@ class TtsPlaybackControllerTest {
             assertEquals(0, controller.state.value.index)
         }
     }
+    @Test fun pausedSentenceNavigationChangesPositionWithoutResumingOrSynthesizing() = runTest {
+        fixture { controller, output, audio, _ ->
+            controller.play(); runCurrent()
+            controller.pause()
+            val requests = audio.requests.size
+            val presented = mutableListOf<TtsSentence>()
+            controller.presentSentence = { sentence, images -> assertFalse(images); presented += sentence }
+            controller.next(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            assertFalse(controller.state.value.preparing)
+            assertEquals(1, output.playCount)
+            assertEquals(requests, audio.requests.size)
+            controller.previous(); runCurrent()
+            assertEquals(0, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            assertEquals(listOf(1, 0), presented.map { controller.state.value.sentences.indexOf(it) })
+            controller.play(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(2, output.playCount)
+        }
+    }
+
+    @Test fun navigationBeforeFirstPlayDoesNotStartTheBookSession() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.next(); runCurrent()
+            assertFalse(controller.state.value.started)
+            assertFalse(controller.state.value.playing)
+            assertEquals(0, output.playCount)
+            controller.play(); runCurrent()
+            controller.pause()
+            assertTrue(controller.state.value.started)
+            controller.stop()
+            controller.load("book", book, false); runCurrent()
+            assertFalse(controller.state.value.started)
+            controller.play(); runCurrent()
+            controller.load("other-book", book, false); runCurrent()
+            assertFalse(controller.state.value.started)
+        }
+    }
+
+    @Test fun pausedJumpCancelsPendingSynthesisAndInvalidatesLookupResume() = runTest {
+        fixture { controller, output, audio, _ ->
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { withContext(NonCancellable) { release.await() } }
+            controller.play(); runCurrent()
+            val resume = controller.pauseForLookup()
+            controller.next(); runCurrent()
+            release.complete(Unit); runCurrent()
+            resume(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            assertEquals(0, output.playCount)
+        }
+    }
+
     @Test fun onlyNaturalSentenceAdvancesRequestImageHolds() = runTest {
         fixture { controller, output, _, _ ->
             val holds = mutableListOf<Boolean>()

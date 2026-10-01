@@ -11,9 +11,11 @@ internal fun readerTtsPresentation(
     currentChapter: Int,
     autoScroll: Boolean,
     restoring: Boolean = true,
+    directJump: Boolean = false,
 ): ReaderTtsPresentation = when {
     !playback.started || playback.sentence != sentence -> ReaderTtsPresentation.None
     restoring && playback.playing && playback.preparing -> ReaderTtsPresentation.None
+    directJump -> ReaderTtsPresentation.Follow
     playback.playing && autoScroll -> ReaderTtsPresentation.Follow
     currentChapter == sentence.chapter -> ReaderTtsPresentation.Highlight
     else -> ReaderTtsPresentation.None
