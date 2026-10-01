@@ -59,6 +59,7 @@ class TtsPanelStateTest {
             override var onEnded: () -> Unit = {}; override var onPaused: () -> Unit = {}; override var onError: () -> Unit = {}
             override suspend fun connect() = Unit
             override fun prepare(files: List<File>, title: String, sentence: String) = Unit
+            override fun setPlaybackRate(rate: Float) = Unit
             override fun play() { playCount++ }; override fun pause() = Unit; override fun clear() = Unit; override fun disconnect() = Unit
         }
         compose.runOnUiThread {
@@ -77,7 +78,7 @@ class TtsPanelStateTest {
     @Test fun sourceFailureStaysNearVoiceCardAndDoesNotLeakIntoOtherTabs() {
         panel()
         val error = compose.onNodeWithText(configMessage).fetchSemanticsNode().boundsInRoot
-        val rate = compose.onNodeWithText("Speech rate").fetchSemanticsNode().boundsInRoot
+        val rate = compose.onNodeWithText("Engine speech rate").fetchSemanticsNode().boundsInRoot
         Assert.assertTrue(error.bottom < rate.top)
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText(configMessage).assertDoesNotExist()
@@ -92,6 +93,9 @@ class TtsPanelStateTest {
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "こんにちは。日本語の読み上げです。こんにちは。日本語の読み上げです。"), null) }
         compose.waitUntil(15_000) { model.previewState.value == TtsPreviewState.Playing || model.error.value != null }
         compose.runOnIdle { Assert.assertNull(model.error.value); Assert.assertEquals(TtsPreviewState.Playing, model.previewState.value) }
+        compose.runOnIdle { model.settings(model.preferences.value.settings.copy(playbackRate = 1.5f)) }
+        compose.waitUntil(5_000) { model.preferences.value.settings.playbackRate == 1.5f }
+        compose.runOnIdle { Assert.assertEquals(TtsPreviewState.Playing, model.previewState.value) }
         compose.onNodeWithText("Stop preview").performScrollTo().performClick()
         compose.runOnIdle { Assert.assertEquals(TtsPreviewState.Idle, model.previewState.value) }
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "はい。"), null) }

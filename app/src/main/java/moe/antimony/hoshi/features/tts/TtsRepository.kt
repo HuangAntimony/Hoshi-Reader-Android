@@ -20,8 +20,10 @@ data class TtsSettings(
     val engine: String = "", val voice: String = "", val rate: Float = 1f,
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
-    val prefetchSentences: Int = 2,
+    val prefetchSentences: Int = 2, val playbackRate: Float = 1f,
 )
+internal val ttsPlaybackRateRange = .5f..3f
+internal fun normalizeTtsPlaybackRate(rate: Float): Float = if (rate.isFinite()) rate.coerceIn(ttsPlaybackRateRange) else 1f
 internal val ttsPrefetchRange = 1..20
 @Serializable
 data class TtsPreferences(val settings: TtsSettings = TtsSettings(), val words: List<TtsWord> = emptyList())
@@ -33,7 +35,10 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     private val key = stringPreferencesKey("preferences")
     private val json = Json { ignoreUnknownKeys = true }
     val preferences = store.data.map { decode(it[key]) }
-    private fun decode(value: String?) = value?.let { json.decodeFromString<TtsPreferences>(it) } ?: TtsPreferences()
+    private fun decode(value: String?): TtsPreferences {
+        val preferences = value?.let { json.decodeFromString<TtsPreferences>(it) } ?: TtsPreferences()
+        return preferences.copy(settings = preferences.settings.copy(playbackRate = normalizeTtsPlaybackRate(preferences.settings.playbackRate)))
+    }
 
     suspend fun settings(settings: TtsSettings) {
         val rate = TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
@@ -42,6 +47,7 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
         val normalized = settings.copy(rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
             prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
+            playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
         store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = normalized)) }
     }

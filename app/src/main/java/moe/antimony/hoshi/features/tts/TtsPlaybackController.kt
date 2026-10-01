@@ -65,9 +65,11 @@ class TtsPlaybackController internal constructor(
         scope.launch(Dispatchers.Main.immediate) {
             repository.preferences.catch { fail(TtsFailure.Storage) }.collect { next ->
                 val prefetchChanged = next.settings.prefetchSentences != preferences.settings.prefetchSentences
-                val settingsChanged = next.settings.copy(prefetchSentences = preferences.settings.prefetchSentences) != preferences.settings
+                val settingsChanged = next.settings.copy(prefetchSentences = preferences.settings.prefetchSentences,
+                    playbackRate = preferences.settings.playbackRate) != preferences.settings
                 val wordsChanged = next.words != preferences.words
                 preferences = next
+                output.setPlaybackRate(next.settings.playbackRate)
                 if (settingsChanged || wordsChanged || prefetchChanged) { prefetch?.cancel(); prefetch = null }
                 val restartPending = wordsChanged && state.value.playing && state.value.preparing && !settingsChanged
                 if (settingsChanged || restartPending || wordsChanged && !state.value.playing) {

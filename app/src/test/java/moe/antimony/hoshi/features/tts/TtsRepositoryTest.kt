@@ -21,6 +21,35 @@ class TtsRepositoryTest {
             transform(data.value).also { data.value = it }
     }
 
+    @Test fun legacyPlaybackDefaultsToNormalAndPersistsIndependentlyOfEngineRate() = runTest {
+        val key = stringPreferencesKey("preferences")
+        val store = MemoryStore(preferencesOf(key to """{"settings":{"engine":"online:google-translate","rate":0.5}}"""))
+        val repository = TtsRepository(store)
+        val original = repository.preferences.first().settings
+        assertEquals(1f, original.playbackRate)
+        repository.settings(original.copy(playbackRate = 2.5f))
+        val restored = TtsRepository(store).preferences.first().settings
+        assertEquals(2.5f, restored.playbackRate)
+        assertEquals(.5f, restored.rate)
+    }
+
+    @Test fun invalidRestoredPlaybackRateIsClampedBeforeReachingPlayersOrUi() = runTest {
+        val key = stringPreferencesKey("preferences")
+        for ((value, expected) in listOf(-10 to .5f, 10 to 3f)) {
+            val repository = TtsRepository(MemoryStore(preferencesOf(key to """{"settings":{"playbackRate":$value}}""")))
+            assertEquals(expected, repository.preferences.first().settings.playbackRate)
+        }
+    }
+
+    @Test fun playbackRateIsBoundedAndNonFiniteValuesResetToNormal() = runTest {
+        val repository = TtsRepository(MemoryStore(preferencesOf()))
+        for ((rate, expected) in listOf(-1f to .5f, .5f to .5f, 1.75f to 1.75f, 3f to 3f, 10f to 3f,
+            Float.NaN to 1f, Float.POSITIVE_INFINITY to 1f)) {
+            repository.settings(TtsSettings(playbackRate = rate))
+            assertEquals(expected, repository.preferences.first().settings.playbackRate)
+        }
+    }
+
     @Test fun legacySettingsDefaultToTwoPrefetchedSentencesAndConfiguredCountSurvivesReload() = runTest {
         val key = stringPreferencesKey("preferences")
         val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))

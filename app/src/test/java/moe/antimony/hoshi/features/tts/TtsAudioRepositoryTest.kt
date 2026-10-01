@@ -23,7 +23,7 @@ class TtsAudioRepositoryTest {
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 
-    @Test fun prefetchCountChangesReuseAudioButPitchChangesRequireNewSynthesis() = runBlocking {
+    @Test fun playbackRateAndPrefetchCountReuseAudioButPitchChangesRequireNewSynthesis() = runBlocking {
         val syntheses = AtomicInteger()
         val client = client { syntheses.incrementAndGet() }
         val repository = repository(client)
@@ -31,10 +31,26 @@ class TtsAudioRepositoryTest {
             val first = repository.audio(next, "book", preferences)
             val deeper = preferences.copy(settings = preferences.settings.copy(prefetchSentences = 6))
             assertEquals(first, repository.audio(next, "book", deeper))
+            assertEquals(first, repository.audio(next, "book", deeper.copy(settings = deeper.settings.copy(playbackRate = 3f))))
             assertEquals(1, syntheses.get())
             val newPitch = repository.audio(next, "book", deeper.copy(settings = deeper.settings.copy(pitch = 2f)))
             assertNotEquals(first, newPitch)
             assertEquals(2, syntheses.get())
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
+    @Test fun appPlaybackRateDoesNotChangeExportSynthesisParametersOrAudio() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { requests += it }
+        val repository = repository(client)
+        try {
+            val normal = repository.export(next, "book", preferences)
+            val fast = repository.export(next, "book", preferences.copy(settings = preferences.settings.copy(playbackRate = 3f)))
+            try {
+                assertEquals(2, requests.size)
+                assertEquals(requests.first(), requests.last())
+                assertArrayEquals(normal.readBytes(), fast.readBytes())
+            } finally { normal.delete(); fast.delete() }
         } finally { repository.clearPlaybackCache(); close(client) }
     }
 

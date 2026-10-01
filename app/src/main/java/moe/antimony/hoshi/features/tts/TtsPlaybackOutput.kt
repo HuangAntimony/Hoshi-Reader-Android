@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -23,6 +24,7 @@ internal interface TtsPlaybackOutput {
     var onError: () -> Unit
     suspend fun connect()
     fun prepare(files: List<File>, title: String, sentence: String)
+    fun setPlaybackRate(rate: Float)
     fun play()
     fun pause()
     fun clear()
@@ -36,9 +38,11 @@ internal class AndroidTtsPlaybackOutput(private val context: Context) : TtsPlayb
     override var onError: () -> Unit = {}
     private var player: ExoPlayer? = null
     private var connection: MediaController? = null
+    private var desiredRate = 1f
 
     fun attach(next: ExoPlayer) {
         player = next
+        next.playbackParameters = PlaybackParameters(desiredRate, 1f)
         next.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) { if (playbackState == Player.STATE_ENDED) onEnded() }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -65,6 +69,10 @@ internal class AndroidTtsPlaybackOutput(private val context: Context) : TtsPlayb
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(sentence).build()).build() })
             prepare()
         }
+    }
+    override fun setPlaybackRate(rate: Float) {
+        desiredRate = normalizeTtsPlaybackRate(rate)
+        player?.playbackParameters = PlaybackParameters(desiredRate, 1f)
     }
     override fun play() { requireNotNull(player).play() }
     override fun pause() { player?.pause() }

@@ -83,12 +83,13 @@ class TtsViewModel @Inject constructor(
         }
     }
     fun settings(value: TtsSettings) {
-        stopPreview()
-        dismissError()
         viewModelScope.launch { try {
             val previous = repository.preferences.first().settings
+            val playbackOnly = previous.copy(playbackRate = value.playbackRate) == value
+            if (!playbackOnly) { stopPreview(); dismissError() }
             repository.settings(value)
-            if (previous.engine != value.engine || previous.online != value.online || catalog.value == null) refresh()
+            previewPlayer?.setPlaybackSpeed(normalizeTtsPlaybackRate(value.playbackRate))
+            if (!playbackOnly && (previous.engine != value.engine || previous.online != value.online || catalog.value == null)) refresh()
         } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
     }
     private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
@@ -140,7 +141,9 @@ class TtsViewModel @Inject constructor(
                 val config = if (word == null) current else current.copy(words = current.words.filterNot { it.id == word.id || it.surface == word.surface && it.bookId == word.bookId } + word)
                 val file = audio.export(sentence, bookId, config)
                 previewFile = file
+                val playbackRate = repository.preferences.first().settings.playbackRate
                 previewPlayer = ExoPlayer.Builder(context).build().apply {
+                    setPlaybackSpeed(playbackRate)
                     setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_SPEECH).build(), true)
                     addListener(object : Player.Listener {
                         override fun onIsPlayingChanged(isPlaying: Boolean) {

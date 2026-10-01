@@ -897,7 +897,8 @@
     <string name="sasayaki_transcription_fast_description">优先转录速度，发热可能增加。</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">音源</string>
     <string name="tts_tab_dictionary">文本替换</string>
-    <string name="tts_rate_label">朗读语速</string>
+    <string name="tts_rate_label">引擎语速</string>
+    <string name="tts_playback_rate">Hoshi 播放速度</string>
     <string name="tts_rate_value">%1$.2f×</string>
     <string name="tts_title">TTS</string>
     <string name="tts_dictionary">文本替换规则</string>

@@ -92,6 +92,7 @@ class TtsContinuousPlaybackDeviceTest {
             player.setMediaItems(files.map { MediaItem.fromUri(it.toURI().toString()) })
             player.prepare()
         }
+        override fun setPlaybackRate(rate: Float) = player.setPlaybackSpeed(rate)
         override fun play() = player.play()
         override fun pause() = player.pause()
         override fun clear() { player.stop(); player.clearMediaItems() }

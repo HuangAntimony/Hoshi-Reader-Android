@@ -899,7 +899,8 @@
     <string name="sasayaki_transcription_fast_description">Faster transcription; may generate more heat.</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">Voice</string>
     <string name="tts_tab_dictionary">Replacements</string>
-    <string name="tts_rate_label">Speech rate</string>
+    <string name="tts_rate_label">Engine speech rate</string>
+    <string name="tts_playback_rate">Hoshi playback speed</string>
     <string name="tts_rate_value">%1$.2f×</string>
     <string name="tts_title">TTS</string>
     <string name="tts_dictionary">Text replacements</string>

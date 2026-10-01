@@ -78,6 +78,12 @@ internal fun TtsVoiceSettings(
                 onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false,
                 rangeLabels = stringResource(R.string.tts_rate_value, range.start) to stringResource(R.string.tts_rate_value, range.endInclusive))
         }
+        var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
+        ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
+            playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
+            onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false,
+            rangeLabels = stringResource(R.string.tts_rate_value, ttsPlaybackRateRange.start) to
+                stringResource(R.string.tts_rate_value, ttsPlaybackRateRange.endInclusive))
         ttsPitchRange(source, voice?.id.orEmpty())?.let { range ->
             var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
             ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,

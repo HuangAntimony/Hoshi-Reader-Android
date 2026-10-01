@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -14,6 +15,25 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TtsVoiceSettingsTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun playbackSpeedRemainsIndependentOfTwoStateEngineRate() {
+        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.GoogleTranslate.id, rate = .5f))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
+                    { settings.value = it }, {}, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Engine speech rate").assertExists()
+        compose.onNodeWithText("Hoshi playback speed").assertExists()
+        val slider = compose.onNode(SemanticsMatcher("Hoshi playback speed range") {
+            it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo)?.range == ttsPlaybackRateRange
+        })
+        slider.performScrollTo().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(3f) }
+        compose.runOnIdle { assertEquals(3f, settings.value.playbackRate); assertEquals(.5f, settings.value.rate) }
+        slider.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(.5f) }
+        compose.runOnIdle { assertEquals(.5f, settings.value.playbackRate); assertEquals(.5f, settings.value.rate) }
+    }
 
     @Test fun providerPickerGroupsInstalledThirdPartyAndOnlineSourcesAndPreservesSelectionIds() {
         val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural"))

@@ -24,10 +24,12 @@ class TtsPlaybackControllerTest {
         override var onEnded: () -> Unit = {}
         override var onPaused: () -> Unit = {}
         override var onError: () -> Unit = {}
+        var appliedRate = 1f
         var playCount = 0
         var prepared = emptyList<File>()
         override suspend fun connect() = Unit
         override fun prepare(files: List<File>, title: String, sentence: String) { prepared = files }
+        override fun setPlaybackRate(rate: Float) { appliedRate = rate }
         override fun play() { playCount++ }
         override fun pause() = Unit
         override fun clear() { prepared = emptyList() }
@@ -62,6 +64,61 @@ class TtsPlaybackControllerTest {
     private fun prefetchPreferences(count: Int) = preferencesOf(preferencesKey to """{"settings":{"prefetchSentences":$count}}""")
     private val shortSentencesBook = EpubBook("Short sentences", chapters = listOf(EpubChapter("one", "one.xhtml",
         "application/xhtml+xml", "<p>一。二。三。四。五。六。七。八。九。十。</p>")))
+
+    @Test fun playbackRateChangesDoNotInterruptCurrentAudioOrPrefetchAndPreservePause() = runTest {
+        fixture { controller, output, audio, repository ->
+            val release = CompletableDeferred<Unit>()
+            var cancelled = false
+            audio.synthesize = { sentence ->
+                if (sentence.text == "次です。") {
+                    try { release.await() } catch (error: CancellationException) { cancelled = true; throw error }
+                }
+            }
+            controller.play(); runCurrent()
+            val prepared = output.prepared
+            repository.settings(repository.preferences.first().settings.copy(playbackRate = 3f)); runCurrent()
+            assertEquals(3f, output.appliedRate)
+            assertTrue(controller.state.value.playing)
+            assertFalse(controller.state.value.preparing)
+            assertEquals(prepared, output.prepared)
+            assertEquals(1, output.playCount)
+            assertFalse(cancelled)
+            release.complete(Unit); runCurrent()
+            assertEquals(listOf("東京です。", "次です。", "三つです。"), audio.requests)
+            controller.pause()
+            repository.settings(repository.preferences.first().settings.copy(playbackRate = .5f)); runCurrent()
+            assertEquals(.5f, output.appliedRate)
+            assertFalse(controller.state.value.playing)
+            assertEquals(prepared, output.prepared)
+            controller.play(); runCurrent()
+            assertEquals(2, output.playCount)
+            assertEquals(.5f, output.appliedRate)
+        }
+    }
+
+    @Test fun playbackRateDuringSynthesisKeepsThePendingSentenceAndUsesLatestRate() = runTest {
+        fixture { controller, output, audio, repository ->
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { if (it.text == "東京です。") release.await() }
+            controller.play(); runCurrent()
+            repository.settings(repository.preferences.first().settings.copy(playbackRate = 2f)); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertTrue(controller.state.value.preparing)
+            assertEquals(0, output.playCount)
+            release.complete(Unit); runCurrent()
+            assertEquals(1, output.playCount)
+            assertEquals(2f, output.appliedRate)
+            assertEquals(1, audio.requests.count { it == "東京です。" })
+        }
+    }
+
+    @Test fun restoredPlaybackRateAppliesBeforePlaybackStarts() = runTest {
+        fixture(store = MemoryStore(preferencesOf(preferencesKey to """{"settings":{"playbackRate":2.5}}"""))) { controller, output, _, _ ->
+            assertEquals(2.5f, output.appliedRate)
+            controller.play(); runCurrent()
+            assertEquals(2.5f, output.appliedRate)
+        }
+    }
 
     @Test fun configuredPrefetchPreparesSixFollowingSentences() = runTest {
         fixture(store = MemoryStore(prefetchPreferences(6)), fixtureBook = shortSentencesBook) { controller, output, audio, _ ->

@@ -1086,7 +1086,18 @@ Validate relevant sync/update/Sasayaki changes with:
   to unrelated parameters and return to the usual slider range once reduced. Run
   `TtsPauseControlsTest` explicitly with `am instrument`; it uses isolated Compose
   controls and in-memory preferences without network requests or saved-device changes.
-  Google Translate offers normal/slow only. Unsupported pitch controls must be hidden.
+  Google Translate's engine rate offers normal/slow only. Unsupported pitch controls must be hidden.
+- Hoshi playback speed is independent of engine rate, spans 0.5–3.0× in 0.05 steps,
+  and defaults to 1× for existing preferences. Change it during narration, preview,
+  preparation and pause: ready audio and pending prefetch remain reusable, preview
+  keeps playing, and paused audio does not resume. Reopen settings/recreate the service
+  player to verify persistence; test Google Translate's two engine rates independently.
+  Verify pitch and Anki audio remain unchanged. `TtsPlaybackRateDeviceTest` checks real
+  local PCM duration at both endpoints, chunked sentences, attachment and paused state
+  without network or saved-device changes; run it explicitly through `am instrument`.
+  `TtsRepositoryTest`, `TtsPlaybackControllerTest` and `TtsAudioRepositoryTest` cover
+  normalization, persistence, pending work, cache reuse and unchanged export synthesis.
+- Extra sentence delay remains independent of playback speed.
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
   this application delay must not be inserted into Anki exports.
@@ -1099,7 +1110,7 @@ Validate relevant sync/update/Sasayaki changes with:
   bounds, persistence, moving windows and cache reuse; keep export/source configuration
   behavior independent of prefetch depth.
 
-- Run `TtsVoiceDisplayTest` with the JVM suite and explicitly run `TtsVoiceSettingsTest`
+- Explicitly run `TtsVoiceSettingsTest`
   and `TtsProviderConfigurationTest`, plus `TtsPanelStateTest`, using `am instrument`. Their isolated UI/callback
   fixtures cover long lists, raw IDs, third-party engines, cloud actions, preview cancellation
   and credential drafts without saved-device changes, real keys or network calls.

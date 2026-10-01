@@ -775,7 +775,7 @@ QA matrices live in `docs/VALIDATION.md`.
 ## Japanese TTS
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
-  Japanese voice, rate, pitch, provider parameters, playback sentence delay, prefetch
+  Japanese voice, engine speech rate, independent Hoshi playback speed, pitch, provider parameters, playback sentence delay, prefetch
   depth and scoped text-replacement entries in the `japanese_tts`
   Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
   so existing pronunciation entries remain compatible. It does not extend Sasayaki
@@ -841,13 +841,15 @@ QA matrices live in `docs/VALIDATION.md`.
   resolver gives enabled popup term navigation priority, then audiobook/TTS navigation,
   then page turning; direction reversal and repeat/key-up handling stay shared.
   `TtsAudioRepository` keys temporary playback audio by
-  configuration (excluding prefetch depth) and resolved spoken text; independent export
+  configuration (excluding prefetch depth and Hoshi playback speed) and resolved spoken text; independent export
   files are owned by their caller and cleaned on cancellation, including cancelled dispatcher return delivery.
   Cache lookups use a short metadata lock independently of the serial synthesis queue,
   so ready audio never waits for another sentence's network request. Continuous playback
   keeps valid in-flight prefetch and rolls its horizon forward by the saved 1–20 sentence
   depth (default 2). Depth changes cancel/rebuild prefetch without pausing the current
-  sentence or invalidating completed audio; other settings/dictionary changes and stop
+  sentence or invalidating completed audio. Hoshi playback speed (0.5–3.0×, default 1×)
+  updates the attached player live with unchanged pitch; it preserves pause, preparation and
+  prefetch, and is reapplied when the service player is recreated. Synthesis settings/dictionary changes and stop
   still cancel it. Cache clearing serializes with
   synthesis so late completions cannot repopulate a cleared cache.
 - `TtsPlaybackService` owns the Media3 ExoPlayer/session. `TtsSessionPlayer` exposes a
@@ -901,7 +903,9 @@ QA matrices live in `docs/VALIDATION.md`.
   repository from both panels; TTS merges only shared reading fields, preserving audiobook
   preferences and keeping its own synthesis settings. Extra sentence delay is owned by
   playback, is cancellable and is excluded from preview/Anki audio; provider silence
-  controls are part of synthesized audio. TTS navigation remains sentence-based
+  controls are part of synthesized audio. Preview uses the Hoshi playback speed and applies
+  changes without stopping or re-synthesizing; Anki exports retain the engine-produced audio
+  without applying this player speed. TTS navigation remains sentence-based
   without a timeline or the audiobook skip-action setting.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.
