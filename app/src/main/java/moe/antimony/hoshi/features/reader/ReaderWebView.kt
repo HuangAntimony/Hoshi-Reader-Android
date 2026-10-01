@@ -1969,13 +1969,7 @@ fun ReaderWebView(
                             onReaderInteraction = ::handleReaderInteraction,
                             onImageTapped = ::openFullscreenImage,
                             onHighlightChanged = ::changeHighlight,
-                            ttsAvailable = ttsAvailable,
-                            onTtsSelection = { selection, read ->
-                                if (read && ttsAvailable) {
-                                    ttsViewModel.playback.startAt(readerPosition.displayedPosition.index, selection.normalizedOffset ?: 0)
-                                    showTts = true
-                                } else if (!read) ttsSelection = selection
-                            },
+                            onTtsReplacementSelected = { selection -> ttsSelection = selection },
                             readerPopupBridgeHolder = readerPopupBridgeHolder,
                             readerPopupResourceHandler = readerPopupResourceHandler,
                             readerPopupFrames = readerLookupPopupPayloads,

@@ -1088,9 +1088,11 @@ Validate relevant sync/update/Sasayaki changes with:
   format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
-- Long-press book text and create a text replacement: prefill the selected original and
+- Long-press book text and choose Replace beside Highlight: prefill the selected original and
   empty replacement text, and preview the full source sentence including ruby and VN
-  text outside the screen. Cancel without saving. With a multilingual IME, start in another input
+  text outside the screen. Check the dialog title identifies TTS, the equal-width
+  scope selector, and full-width themed preview button (including its busy state),
+  in both languages and light/dark/e-ink themes. Cancel without saving. With a multilingual IME, start in another input
   language and focus each original/replacement field: both should request Japanese.
   Repeat from the TTS replacement editor. Check Dictionary search still requests the
   selected content language and retains its Search action; no system keyboard preference

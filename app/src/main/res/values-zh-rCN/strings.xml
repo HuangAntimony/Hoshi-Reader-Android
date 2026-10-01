@@ -356,7 +356,7 @@
     <string name="reader_statistics_sync_behaviour">同步行为</string>
     <string name="reader_statistics_sync_behaviour_hint">决定同步时统计数据是逐条合并，还是完全替换。</string>
     <string name="reader_statistics_sync_mode_merge">合并</string>
-    <string name="reader_statistics_sync_mode_replace">替换</string>
+    <string name="reader_statistics_sync_mode_replace" comment="Reader statistics synchronization mode that replaces local statistics.">替换</string>
     <string name="reader_statistics_settings_hint">可从阅读器菜单访问统计。</string>
     <string name="reader_appearance_text">文本</string>
     <string name="reader_appearance_layout">布局</string>
@@ -920,10 +920,10 @@
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
-    <string name="tts_set_replacement">设置文本替换</string>
+    <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">替换</string>
+    <string name="tts_replacement_title">TTS 文本替换</string>
     <string name="tts_surface">原文本</string>
     <string name="tts_replacement">替换文本</string>
-    <string name="tts_replacement_hint">仅替换送入 TTS 的文本，正文保持不变。可填写读音或任意文本，例如将「――」替换为「、」或「。」以调整停顿。</string>
     <string name="tts_invalid_surface">请输入原文本。</string>
     <string name="tts_invalid_replacement">请输入非空白的替换文本。</string>
     <string name="tts_duplicate">此作用范围内已存在相同原文本，请编辑已有规则。</string>
@@ -934,7 +934,6 @@
     <string name="tts_empty_text">未找到可朗读的句子。</string>
     <string name="tts_failed">无法生成或播放句子音频，请重试。</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
-    <string name="tts_read_selection">从此处朗读</string>
     <string name="tts_storage_error">无法保存 TTS 更改，请重试。</string>
     <string name="anki_handlebar_sentence_audio">句子音频：使用有声书；未关联有声书时使用 TTS。</string>
     <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>

@@ -320,23 +320,41 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
     val previewError by viewModel.error.collectAsStateWithLifecycle()
     fun value() = initial.copy(surface = surface.trim(), replacement = replacement, bookId = if (global) null else bookId)
     DisposableEffect(Unit) { onDispose { viewModel.stopPreview() } }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_set_replacement)) }, text = {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(surface, { surface = it }, label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true,
+            OutlinedTextField(surface, { surface = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            OutlinedTextField(replacement, { replacement = it }, label = { Text(stringResource(R.string.tts_replacement)) }, maxLines = 4,
+            OutlinedTextField(replacement, { replacement = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.tts_replacement)) }, maxLines = 4,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            Text(stringResource(R.string.tts_replacement_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            Row {
-                FilterChip(global, { global = true }, label = { Text(stringResource(R.string.tts_global)) })
-                Spacer(Modifier.width(8.dp))
-                FilterChip(!global, { global = false }, enabled = bookId != null, label = { Text(stringResource(R.string.tts_book)) })
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf(true, false).forEachIndexed { index, allBooks ->
+                    SegmentedButton(
+                        selected = global == allBooks,
+                        onClick = { global = allBooks },
+                        enabled = allBooks || bookId != null,
+                        shape = SegmentedButtonDefaults.itemShape(index, 2),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = hoshiSurfaces.selected,
+                            activeContentColor = hoshiSurfaces.onSelected,
+                            inactiveContainerColor = hoshiSurfaces.nested,
+                            inactiveContentColor = hoshiSurfaces.muted,
+                        ),
+                        icon = {},
+                    ) {
+                        Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book))
+                    }
+                }
             }
             sentence?.let { Text(it.text) }
-            TextButton(onClick = {
+            HoshiButton(onClick = {
                 error = validateTtsWord(value(), words.words.filterNot { it.id == initial.id })
                 if (error == null) viewModel.preview(sentence ?: TtsSentence(0, 0, 0, surface), bookId, value())
-            }, enabled = !busy) { Text(stringResource(R.string.tts_preview)) }
+            }, enabled = !busy && !saving, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.tts_preview))
+            }
             error?.let { Text(stringResource(when (it) { TtsWordError.Surface -> R.string.tts_invalid_surface; TtsWordError.Replacement -> R.string.tts_invalid_replacement; TtsWordError.Duplicate -> R.string.tts_duplicate; TtsWordError.Storage -> R.string.tts_storage_error }), color = MaterialTheme.colorScheme.error) }
             previewError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
             if (words.words.any { it.id == initial.id }) TextButton(onClick = { viewModel.delete(initial.id); onDismiss() }) { Text(stringResource(R.string.action_delete)) }

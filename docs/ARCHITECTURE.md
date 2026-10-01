@@ -870,6 +870,9 @@ QA matrices live in `docs/VALIDATION.md`.
   without a timeline or the audiobook skip-action setting.
   Missing associated files remain Sasayaki recovery cases. The standalone Nav3 TTS
   Settings route and dictionary remain available regardless of that association.
+  Native text selection exposes Replace, which captures the existing full source
+  sentence into the same TTS replacement editor used by Settings. Its title identifies
+  TTS, scope uses a Material segmented control, and preview uses `HoshiButton`.
 - Root Reader lookup popups retain their source chapter and expose independent TTS
   visibility/playback state and typed bridge commands. The shared three-button toolbar
   routes to the active source: TTS replay stops after one sentence, toggle can cancel
