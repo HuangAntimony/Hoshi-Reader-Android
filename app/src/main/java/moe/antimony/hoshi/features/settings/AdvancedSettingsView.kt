@@ -117,7 +117,6 @@ fun AdvancedSettingsView(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
                                 headlineContent = { Text(stringResource(row.titleRes)) },
-                                supportingContent = row.subtitleRes?.let { subtitleRes -> { Text(stringResource(subtitleRes)) } },
                                 modifier = Modifier.clickable { if (row.destination == AdvancedDestination.Tts) onOpenTts() else destination = row.destination },
                             )
                             if (index != section.rows.lastIndex) {
@@ -165,7 +164,6 @@ internal data class AdvancedSettingsRow(
     @param:StringRes val titleRes: Int,
     val destination: AdvancedDestination,
     val icon: AdvancedSettingsIcon,
-    @param:StringRes val subtitleRes: Int? = null,
 )
 
 internal data class AdvancedSettingsSection(
@@ -186,7 +184,6 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     titleRes = R.string.advanced_sasayaki_audiobooks,
                     destination = AdvancedDestination.Sasayaki,
                     icon = AdvancedSettingsIcon.Waveform,
-                    subtitleRes = R.string.advanced_sasayaki_subtitle,
                 ),
             ),
         ),
@@ -210,7 +207,6 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     titleRes = R.string.settings_book_cover_wallpaper,
                     destination = AdvancedDestination.BookCoverWallpaper,
                     icon = AdvancedSettingsIcon.Wallpaper,
-                    subtitleRes = R.string.settings_book_cover_wallpaper_subtitle,
                 ),
             ),
         ),

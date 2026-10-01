@@ -531,9 +531,8 @@
     <string name="backup_restoring">Restoring...</string>
     <string name="backup_exporting">Exporting...</string>
     <string name="backup_importing" comment="ッツ backup import progress label, intentionally matching the generic importing progress text.">Importing...</string>
-    <string name="advanced_audio">Audio</string>
+    <string name="advanced_audio">Word audio</string>
     <string name="advanced_sasayaki_audiobooks">Sasayaki (Audiobooks)</string>
-    <string name="advanced_sasayaki_subtitle">Read along with matched audiobook subtitles</string>
     <string name="audio_sources">Sources</string>
     <string name="audio_add_source">Add Source</string>
     <string name="audio_name">Name</string>
@@ -732,7 +731,6 @@
     <string name="sasayaki_no_file_selected">No file selected</string>
     <string name="sasayaki_matching">Matching...</string>
     <string name="settings_book_cover_wallpaper">Book Cover Lock Screen</string>
-    <string name="settings_book_cover_wallpaper_subtitle">Show the current book cover when the device is locked or sleeping</string>
     <string name="book_cover_wallpaper_lock_screen">Update lock screen wallpaper</string>
     <string name="book_cover_wallpaper_lock_screen_summary">Set the current book cover as the Android lock screen wallpaper whenever a book opens. This may not work on some e-ink devices.</string>
     <string name="book_cover_wallpaper_not_supported">Lock screen wallpapers are not supported on this device.</string>
