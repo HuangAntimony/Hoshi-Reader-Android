@@ -64,10 +64,11 @@ class TtsPlaybackController internal constructor(
         output.onError = { fail(TtsFailure.AudioUnavailable) }
         scope.launch(Dispatchers.Main.immediate) {
             repository.preferences.catch { fail(TtsFailure.Storage) }.collect { next ->
-                val settingsChanged = next.settings != preferences.settings
+                val prefetchChanged = next.settings.prefetchSentences != preferences.settings.prefetchSentences
+                val settingsChanged = next.settings.copy(prefetchSentences = preferences.settings.prefetchSentences) != preferences.settings
                 val wordsChanged = next.words != preferences.words
                 preferences = next
-                if (settingsChanged || wordsChanged) { prefetch?.cancel(); prefetch = null }
+                if (settingsChanged || wordsChanged || prefetchChanged) { prefetch?.cancel(); prefetch = null }
                 val restartPending = wordsChanged && state.value.playing && state.value.preparing && !settingsChanged
                 if (settingsChanged || restartPending || wordsChanged && !state.value.playing) {
                     pause()
@@ -75,6 +76,7 @@ class TtsPlaybackController internal constructor(
                     output.clear()
                     if (restartPending) play()
                 }
+                if (prefetchChanged && !settingsChanged && !wordsChanged && state.value.playing) prefetchAhead()
             }
         }
     }
@@ -179,7 +181,7 @@ class TtsPlaybackController internal constructor(
                 while (true) {
                     val current = state.value
                     index = maxOf(index, current.index + 1)
-                    if (index > current.index + 2) break
+                    if (index > current.index + preferences.settings.prefetchSentences.coerceIn(ttsPrefetchRange)) break
                     val sentence = current.sentences.getOrNull(index) ?: break
                     audio.audio(sentence, current.bookId, preferences)
                     index++

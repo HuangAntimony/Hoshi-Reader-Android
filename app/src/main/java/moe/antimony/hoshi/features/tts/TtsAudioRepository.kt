@@ -30,7 +30,8 @@ class TtsAudioRepository @Inject constructor(
     override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
         withContext(ioDispatcher) {
             val spoken = TtsText.spoken(sentence, bookId, preferences.words)
-            val identity = "${preferences.settings}\u0000$spoken"
+            // Prefetch depth changes scheduling, not the synthesized audio.
+            val identity = "${preferences.settings.copy(prefetchSentences = 0)}\u0000$spoken"
             val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
             cached(key)?.let { return@withContext it }
             synthesis.withLock {

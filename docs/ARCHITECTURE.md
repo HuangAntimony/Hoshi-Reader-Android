@@ -775,8 +775,8 @@ QA matrices live in `docs/VALIDATION.md`.
 ## Japanese TTS
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
-  Japanese voice, rate, pitch, provider parameters, playback sentence delay and scoped
-  text-replacement entries in the `japanese_tts`
+  Japanese voice, rate, pitch, provider parameters, playback sentence delay, prefetch
+  depth and scoped text-replacement entries in the `japanese_tts`
   Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
   so existing pronunciation entries remain compatible. It does not extend Sasayaki
   sidecars or sync payloads.
@@ -827,14 +827,16 @@ QA matrices live in `docs/VALIDATION.md`.
   returned regional Speech endpoint, so offered voices/styles reflect that service
   rather than a hardcoded promise of Azure-wide availability.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,
-  configuration invalidation and two-sentence prefetch, and rejects stale operations
+  configuration invalidation and configurable sentence prefetch, and rejects stale operations
   after stop/book/source changes. `TtsAudioRepository` keys temporary playback audio by
-  configuration and resolved spoken text; independent export files are owned by their
-  caller and cleaned on cancellation, including cancelled dispatcher return delivery.
+  configuration (excluding prefetch depth) and resolved spoken text; independent export
+  files are owned by their caller and cleaned on cancellation, including cancelled dispatcher return delivery.
   Cache lookups use a short metadata lock independently of the serial synthesis queue,
   so ready audio never waits for another sentence's network request. Continuous playback
-  keeps valid in-flight prefetch and rolls its horizon forward to two sentences ahead;
-  settings/dictionary changes and stop still cancel it. Cache clearing serializes with
+  keeps valid in-flight prefetch and rolls its horizon forward by the saved 1–20 sentence
+  depth (default 2). Depth changes cancel/rebuild prefetch without pausing the current
+  sentence or invalidating completed audio; other settings/dictionary changes and stop
+  still cancel it. Cache clearing serializes with
   synthesis so late completions cannot repopulate a cleared cache.
 - `TtsPlaybackService` owns the Media3 ExoPlayer/session. `TtsSessionPlayer` exposes a
   nonseekable sentence transport without seconds or a fabricated duration, and represents

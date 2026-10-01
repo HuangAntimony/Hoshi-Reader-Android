@@ -25,32 +25,38 @@ import org.junit.runner.RunWith
 @OptIn(UnstableApi::class)
 @RunWith(AndroidJUnit4::class)
 class TtsContinuousPlaybackDeviceTest {
-    @Test fun fastEdgePlaybackCompletesEverySentenceWithPrefetch() = runBlocking {
+    @Test fun fastEdgePlaybackCompletesEverySentenceWithPrefetch() = checkPlayback(2)
+    @Test fun fastEdgePlaybackCompletesShortSentencesWithSixPrefetchedSentences() = checkPlayback(6)
+
+    private fun checkPlayback(prefetchSentences: Int) = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "tts-continuous-device-test")
         val router = TtsEngineRouter(AndroidTtsEngine(context),
             OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO))
         val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
         val repository = TtsRepository(MemoryStore())
-        repository.settings(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural", rate = 2f))
+        repository.settings(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural", rate = 2f,
+            prefetchSentences = prefetchSentences))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         try {
             withContext(Dispatchers.Main) {
                 val player = ExoPlayer.Builder(context).build()
                 val output = DirectOutput(player)
                 val controller = TtsPlaybackController(TtsBookRepository(Dispatchers.IO), repository, audio, output, scope)
+                val text = if (prefetchSentences == 6) "一。二。三。四。五。六。七。八。"
+                    else "今日は晴れです。次の文章です。日本語を読んでいます。これが最後の文章です。"
                 val book = EpubBook("Public sample", chapters = listOf(EpubChapter("one", "one.xhtml",
-                    "application/xhtml+xml", "<p>今日は晴れです。次の文章です。日本語を読んでいます。これが最後の文章です。</p>")))
+                    "application/xhtml+xml", "<p>$text</p>")))
                 try {
                     controller.load("continuous-fixture", book, false)
                     val loaded = withTimeout(5000) { controller.state.first { it.sentences.isNotEmpty() } }
-                    assertEquals(4, loaded.sentences.size)
+                    assertEquals(if (prefetchSentences == 6) 8 else 4, loaded.sentences.size)
                     controller.play()
                     val finished = withTimeout(60_000) {
-                        controller.state.first { it.error != null || it.started && it.index == 3 && !it.playing }
+                        controller.state.first { it.error != null || it.started && it.index == loaded.sentences.lastIndex && !it.playing }
                     }
                     assertNull(finished.error)
-                    assertEquals(3, finished.index)
+                    assertEquals(loaded.sentences.lastIndex, finished.index)
                     assertEquals(loaded.sentences.map { it.text }, output.sentences)
                 } finally { controller.stop(); player.release() }
             }

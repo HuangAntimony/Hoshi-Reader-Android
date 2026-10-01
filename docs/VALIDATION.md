@@ -1075,6 +1075,14 @@ Validate relevant sync/update/Sasayaki changes with:
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
   this application delay must not be inserted into Anki exports.
+- In Synthesis parameters, verify Preload sentences supports 1–20 and defaults to 2
+  for existing settings. During playback, increase the count to fill the larger window
+  and decrease it to cancel excess pending synthesis. The current sentence must keep
+  playing and completed audio must remain reusable. Repeat while paused, at book end,
+  after reopening settings and with short sentences. Restore the original count.
+  `TtsPlaybackControllerTest`, `TtsRepositoryTest` and `TtsAudioRepositoryTest` cover
+  bounds, persistence, moving windows and cache reuse; keep export/source configuration
+  behavior independent of prefetch depth.
 
 - Check Reader TTS in the shared 70% bottom panel: only sentence controls remain above
   Voice/Replacements/Settings, without a cover, book title or sentence preview.
@@ -1138,7 +1146,7 @@ Validate relevant sync/update/Sasayaki changes with:
   from Main. `TtsTextTest` covers zero-width insertions (including shared/end positions),
   invalid ranges and sentence export: every source cursor step must advance or finish,
   and glyph readings must not alter Reader offsets. Include a chapter with image-backed
-  ruby in continuous playback checks so the two-sentence prefetch path is exercised.
+  ruby in continuous playback checks so the configured prefetch path is exercised.
   The Reader fixture verifies actual sentence highlight pixels across all six
   mode/writing-direction combinations using an explicit saturated highlight color;
   do not apply opaque-color thresholds to the default translucent highlight.

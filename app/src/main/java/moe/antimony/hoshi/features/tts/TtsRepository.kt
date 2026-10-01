@@ -20,7 +20,9 @@ data class TtsSettings(
     val engine: String = "", val voice: String = "", val rate: Float = 1f,
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
+    val prefetchSentences: Int = 2,
 )
+internal val ttsPrefetchRange = 1..20
 @Serializable
 data class TtsPreferences(val settings: TtsSettings = TtsSettings(), val words: List<TtsWord> = emptyList())
 private val Context.ttsStore by preferencesDataStore("japanese_tts")
@@ -39,6 +41,7 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         val pitchRange = ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
         val normalized = settings.copy(rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
+            prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
         store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = normalized)) }
     }

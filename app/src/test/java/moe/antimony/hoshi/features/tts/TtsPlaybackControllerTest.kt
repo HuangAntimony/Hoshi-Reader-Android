@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.tts
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 import java.io.File
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -14,8 +16,8 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
-    private class MemoryStore : DataStore<Preferences> {
-        override val data = MutableStateFlow(emptyPreferences())
+    private class MemoryStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
+        override val data = MutableStateFlow(initial)
         override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = transform(data.value).also { data.value = it }
     }
     private class Output : TtsPlaybackOutput {
@@ -42,18 +44,80 @@ class TtsPlaybackControllerTest {
         override suspend fun clearPlaybackCache() = Unit
     }
     private val book = EpubBook("Fixture", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>東京です。次です。三つです。四つです。</p>")))
-    private suspend fun TestScope.fixture(body: suspend (TtsPlaybackController, Output, Audio, TtsRepository) -> Unit) {
+    private suspend fun TestScope.fixture(store: MemoryStore = MemoryStore(), fixtureBook: EpubBook = book, body: suspend (TtsPlaybackController, Output, Audio, TtsRepository) -> Unit) {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val fixtureScope = CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job]))
         try {
-            val repository = TtsRepository(MemoryStore())
+            val repository = TtsRepository(store)
             val output = Output()
             val audio = Audio()
-            val controller = TtsPlaybackController(TtsBookRepository(UnconfinedTestDispatcher(testScheduler)), repository, audio, output, backgroundScope)
-            controller.load("book", book, false)
+            val controller = TtsPlaybackController(TtsBookRepository(UnconfinedTestDispatcher(testScheduler)), repository, audio, output, fixtureScope)
+            controller.load("book", fixtureBook, false)
             withTimeout(5_000) { controller.state.first { it.sentences.isNotEmpty() } }
             body(controller, output, audio, repository)
             controller.stop()
-        } finally { backgroundScope.cancel(); runCurrent(); Dispatchers.resetMain() }
+        } finally { fixtureScope.cancel(); runCurrent(); Dispatchers.resetMain() }
+    }
+    private val preferencesKey = stringPreferencesKey("preferences")
+    private fun prefetchPreferences(count: Int) = preferencesOf(preferencesKey to """{"settings":{"prefetchSentences":$count}}""")
+    private val shortSentencesBook = EpubBook("Short sentences", chapters = listOf(EpubChapter("one", "one.xhtml",
+        "application/xhtml+xml", "<p>一。二。三。四。五。六。七。八。九。十。</p>")))
+
+    @Test fun configuredPrefetchPreparesSixFollowingSentences() = runTest {
+        fixture(store = MemoryStore(prefetchPreferences(6)), fixtureBook = shortSentencesBook) { controller, output, audio, _ ->
+            controller.play(); runCurrent()
+            assertEquals(1, output.playCount)
+            assertEquals(listOf("一。", "二。", "三。", "四。", "五。", "六。", "七。"), audio.requests)
+        }
+    }
+
+    @Test fun increasingPrefetchRefillsWithoutInterruptingCurrentPlayback() = runTest {
+        val store = MemoryStore(prefetchPreferences(1))
+        fixture(store = store, fixtureBook = shortSentencesBook) { controller, output, audio, _ ->
+            controller.play(); runCurrent()
+            assertEquals(listOf("一。", "二。"), audio.requests)
+            store.updateData { prefetchPreferences(6) }; runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            assertEquals(listOf("二。", "三。", "四。", "五。", "六。", "七。"), audio.requests.drop(2))
+        }
+    }
+
+    @Test fun reducingPrefetchCancelsExcessPendingWorkWithoutPausingPlayback() = runTest {
+        val store = MemoryStore(prefetchPreferences(6))
+        fixture(store = store, fixtureBook = shortSentencesBook) { controller, output, audio, _ ->
+            val pending = CompletableDeferred<Unit>()
+            var cancelled = false
+            audio.synthesize = { sentence ->
+                if (sentence.text == "三。") {
+                    pending.complete(Unit)
+                    try { awaitCancellation() }
+                    finally { cancelled = true }
+                }
+            }
+            controller.play(); runCurrent(); pending.await()
+            store.updateData { prefetchPreferences(1) }; runCurrent()
+            assertTrue(cancelled)
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            assertEquals(listOf("一。", "二。", "三。", "二。"), audio.requests)
+        }
+    }
+
+    @Test fun prefetchClampsRestoredCountsAndStopsAtBookEnd() = runTest {
+        val longBook = EpubBook("Long book", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml",
+            "<p>" + (1..25).joinToString("") { "第${it}文。" } + "</p>")))
+        for ((count, requests) in listOf(-5 to 2, 1 to 2, 1000 to 21)) {
+            fixture(store = MemoryStore(prefetchPreferences(count)), fixtureBook = longBook) { controller, _, audio, _ ->
+                controller.play(); runCurrent()
+                assertEquals(requests, audio.requests.size)
+            }
+        }
+        fixture(store = MemoryStore(prefetchPreferences(20))) { controller, output, audio, _ ->
+            controller.play(); runCurrent()
+            assertEquals(4, audio.requests.size)
+            assertEquals(1, output.playCount)
+        }
     }
     @Test fun prefetchIsBoundedAndNavigationUsesSentences() = runTest {
         fixture { controller, output, audio, _ ->

@@ -21,6 +21,26 @@ class TtsRepositoryTest {
             transform(data.value).also { data.value = it }
     }
 
+    @Test fun legacySettingsDefaultToTwoPrefetchedSentencesAndConfiguredCountSurvivesReload() = runTest {
+        val key = stringPreferencesKey("preferences")
+        val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))
+        val repository = TtsRepository(store)
+        val legacy = repository.preferences.first().settings
+        assertEquals(2, legacy.prefetchSentences)
+        repository.settings(legacy.copy(prefetchSentences = 6))
+        val restored = TtsRepository(store).preferences.first().settings
+        assertEquals(6, restored.prefetchSentences)
+        assertEquals(1.5f, restored.rate)
+    }
+
+    @Test fun savingPrefetchCountClampsToSupportedBounds() = runTest {
+        val repository = TtsRepository(MemoryStore(preferencesOf()))
+        for ((count, expected) in listOf(-5 to 1, 1 to 1, 6 to 6, 20 to 20, 1000 to 20)) {
+            repository.settings(TtsSettings(prefetchSentences = count))
+            assertEquals(expected, repository.preferences.first().settings.prefetchSentences)
+        }
+    }
+
     @Test fun legacyReadingsAndArbitraryReplacementsSurviveSettingsChangesAndReload() = runTest {
         val key = stringPreferencesKey("preferences")
         val store = MemoryStore(preferencesOf(key to """{"words":[{"id":"legacy","surface":"東京","reading":"とうきょう","bookId":"book"}]}"""))

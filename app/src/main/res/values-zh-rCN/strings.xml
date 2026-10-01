@@ -961,6 +961,11 @@
     <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
     <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d 半音</string>
     <string name="tts_more_parameters" comment="TTS synthesis parameter">合成参数</string>
+    <string name="tts_prefetch_sentences" comment="TTS playback buffering">预加载句数</string>
+    <plurals name="tts_sentence_count">
+        <item quantity="one">%1$d 句</item>
+        <item quantity="other">%1$d 句</item>
+    </plurals>
     <string name="tts_sentence_pause" comment="TTS synthesis parameter">句间额外停顿</string>
     <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">连续朗读时由 Hoshi 在两句间等待，此时长不会加入导出的音频。</string>
     <string name="tts_synthesis_volume" comment="TTS synthesis parameter">合成音量</string>
