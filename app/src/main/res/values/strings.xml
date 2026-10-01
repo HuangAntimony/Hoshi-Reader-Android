@@ -1011,14 +1011,12 @@
     <string name="tts_key_required" comment="TTS voice settings">API key required</string>
     <string name="tts_no_account" comment="TTS voice settings">No account required</string>
     <string name="tts_online" comment="TTS voice settings">Online</string>
-    <string name="tts_model_neural" comment="TTS voice settings">Neural</string>
-    <string name="tts_model_multilingual_neural" comment="TTS voice settings">Multilingual Neural</string>
     <string name="tts_stop_preview" comment="TTS voice settings">Stop preview</string>
     <string name="tts_configure_source" comment="TTS voice settings">Configure source</string>
     <string name="tts_key_device_hint" comment="TTS voice settings">Credentials are stored on this device.</string>
     <string name="tts_pitch_short" comment="TTS voice settings">%1$+d st</string>
     <string name="tts_pitch_zero" comment="TTS voice settings">0 st</string>
     <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
-    <string name="tts_source_status" comment="Source label with connection requirement, not a selectable network mode">%1$s · %2$s</string>
+    <string name="tts_voice_status" comment="Voice label with its network requirement">%1$s · %2$s</string>
     <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">Saved source</string>
 </resources>

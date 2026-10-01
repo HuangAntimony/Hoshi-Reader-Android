@@ -24,9 +24,9 @@ class TtsVoiceSettingsTest {
                     { settings.value = it }, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Source · Online").assertExists()
-        compose.onNodeWithText("Voice").assertExists()
-        compose.onNodeWithText("Nanami").assertExists()
+        compose.onNodeWithText("Source").assertExists()
+        compose.onNodeWithText("Voice · Online").assertExists()
+        compose.onNodeWithText("ja-JP-NanamiNeural").assertExists()
         compose.onNodeWithText("Edge TTS").performClick()
         compose.onNodeWithText("Choose source").assertExists()
         compose.onNodeWithText("Device engines").assertExists()
@@ -40,7 +40,7 @@ class TtsVoiceSettingsTest {
         val voices = (1..400).map { TtsVoiceInfo("custom-voice-$it", true) }
         compose.setContent {
             HoshiReaderTheme(darkTheme = true, dynamicColor = false) {
-                TtsVoicePicker("Fixture source", voices, "saved-voice-not-in-catalog", TtsOnlineSource.Azure, false, null,
+                TtsVoicePicker("Fixture source", voices, "saved-voice-not-in-catalog", false, null,
                     onSelected = { selected = it }, onRetry = {}, onDismiss = {})
             }
         }
@@ -49,6 +49,30 @@ class TtsVoiceSettingsTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("custom-voice-400"))
         compose.onNodeWithText("custom-voice-400").performClick()
         compose.runOnIdle { assertEquals("custom-voice-400", selected) }
+    }
+
+    @Test fun installedVoiceSelectionUpdatesItsNetworkRequirement() {
+        val settings = mutableStateOf(TtsSettings(engine = "fixture.engine", voice = "offline-voice"))
+        val voices = listOf(TtsVoiceInfo("offline-voice", false), TtsVoiceInfo("online-voice", true))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), "fixture.engine", voices),
+                    listOf(TtsEngineInfo("fixture.engine", "Fixture engine")), false, TtsPreviewState.Idle, null,
+                    { settings.value = it }, {}, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Source").assertExists()
+        compose.onNodeWithText("Voice · Offline").assertExists()
+        compose.onNodeWithText("offline-voice").performClick()
+        compose.onNodeWithText("online-voice").performClick()
+        compose.onNodeWithText("Voice · Online").assertExists()
+        compose.runOnIdle { assertEquals("online-voice", settings.value.voice) }
+        compose.onNodeWithText("online-voice").performClick()
+        compose.onNodeWithText("Automatic").performClick()
+        compose.onNodeWithText("Voice · Offline").assertExists()
+        compose.runOnIdle { settings.value = settings.value.copy(voice = "unknown-saved-voice") }
+        compose.onNodeWithText("Voice").assertExists()
+        compose.onNodeWithText("unknown-saved-voice").assertExists()
     }
 
     @Test fun previewButtonCanCancelPreparationAndStopPlayback() {

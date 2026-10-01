@@ -87,7 +87,7 @@ internal fun TtsProviderPicker(
 
 @Composable
 internal fun TtsVoicePicker(
-    title: String, voices: List<TtsVoiceInfo>, selected: String, source: TtsOnlineSource?, busy: Boolean,
+    title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
     failure: TtsFailure?, onSelected: (String) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit,
 ) {
     val choices = voices.withSelectedVoice(selected)
@@ -102,8 +102,9 @@ internal fun TtsVoicePicker(
                 TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank()) { onSelected("") }
             }
             items(choices, key = { it.id }) { voice ->
-                val display = voice.display(source)
-                TtsVoiceRow(display.title, display.subtitle(source, voice.network.takeIf { voices.any { item -> item.id == voice.id } }), voice.id == selected) { onSelected(voice.id) }
+                val connection = if (voices.any { it.id == voice.id })
+                    stringResource(if (voice.network) R.string.tts_online else R.string.tts_offline) else null
+                TtsVoiceRow(voice.id, connection, voice.id == selected) { onSelected(voice.id) }
             }
         }
     }
@@ -122,15 +123,4 @@ private fun TtsVoiceRow(title: String, subtitle: String?, selected: Boolean, onC
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted) }
         }
     }
-}
-
-@Composable
-internal fun TtsVoiceDisplay.subtitle(source: TtsOnlineSource?, network: Boolean?): String? {
-    val localeLabel = locale?.let { tag ->
-        val value = java.util.Locale.forLanguageTag(tag)
-        if (value.language.isBlank() || value.language == "und") tag else value.getDisplayName(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).ifBlank { tag }
-    }
-    val modelLabel = model?.let { stringResource(if (it == TtsVoiceModel.MultilingualNeural) R.string.tts_model_multilingual_neural else R.string.tts_model_neural) }
-    val connection = if (source == null && network != null) stringResource(if (network) R.string.tts_online else R.string.tts_offline) else null
-    return listOfNotNull(localeLabel, modelLabel, connection).joinToString(" · ").ifBlank { null }
 }

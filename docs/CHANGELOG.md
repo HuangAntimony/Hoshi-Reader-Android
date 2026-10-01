@@ -12,8 +12,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Microsoft Translator, Google Cloud and Google Translate online sources, with a separate
   TTS panel styled like Sasayaki, with compact playback controls and Voice,
   Replacements and Settings tabs. Source and Voice share a compact card with grouped,
-  scrolling bottom selection panels. Recognized voices show readable names while unknown
-  names remain selectable; installed third-party engines remain available. Source selection
+  scrolling bottom selection panels. Voices retain their original names and show their
+  online/offline requirement; installed third-party engines remain available. Source selection
   includes cloud credential configuration and system TTS settings. Rate and pitch sliders
   keep their steps without dense tick marks, and preview can be canceled or stopped from
   its theme-colored button. Cloud credentials use a matching configuration sheet; source errors

@@ -885,10 +885,9 @@ QA matrices live in `docs/VALIDATION.md`.
   from a neutral row and use source/voice capabilities. TTS sliders hide tick marks
   while retaining their discrete steps, with range labels for rate/pitch; shared slider
   and card defaults remain unchanged for Sasayaki.
-  `TtsVoiceInfo` carries optional runtime display-name/locale metadata from catalogs;
-  `TtsVoiceDisplay` prefers provider names, formats only recognized Microsoft neural
-  IDs, and otherwise falls back to raw IDs. It never changes identifiers, capabilities,
-  persisted configuration or synthesized/exported text.
+  Voice names use catalog identifiers unchanged. Online/offline status belongs to the
+  selected voice and its catalog network requirement, not the source. Unknown saved
+  voices keep their raw identifiers without an inferred connection status.
   `SharedReaderPlaybackSettings` edits the same Sasayaki settings
   repository from both panels; TTS merges only shared reading fields, preserving audiobook
   preferences and keeping its own synthesis settings. Extra sentence delay is owned by

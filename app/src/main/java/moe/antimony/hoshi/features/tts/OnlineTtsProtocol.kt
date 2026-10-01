@@ -15,9 +15,7 @@ internal object OnlineTtsProtocol {
             .filter { it["Locale"]?.jsonPrimitive?.content.equals("ja-JP", true) }
             .map { TtsVoiceInfo(it.getValue("ShortName").jsonPrimitive.content, true,
                 it["StyleList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
-                it["RolePlayList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
-                displayName = (it["DisplayName"] as? JsonPrimitive)?.takeIf { name -> name.isString }?.contentOrNull?.takeIf { name -> name.isNotBlank() },
-                locale = it["Locale"]?.jsonPrimitive?.contentOrNull) }
+                it["RolePlayList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content }) }
             .distinctBy { it.id }.sortedBy { it.id }
     }
 
@@ -25,7 +23,7 @@ internal object OnlineTtsProtocol {
         Json.parseToJsonElement(body).jsonObject["voices"]?.jsonArray.orEmpty()
             .map { it.jsonObject }
             .filter { voice -> voice["languageCodes"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "ja-JP" } }
-            .map { TtsVoiceInfo(it.getValue("name").jsonPrimitive.content, true, locale = "ja-JP") }
+            .map { TtsVoiceInfo(it.getValue("name").jsonPrimitive.content, true) }
             .distinctBy { it.id }.sortedBy { it.id }
     }
 

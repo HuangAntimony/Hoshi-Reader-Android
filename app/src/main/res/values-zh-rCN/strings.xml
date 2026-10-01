@@ -1009,14 +1009,12 @@
     <string name="tts_key_required" comment="TTS voice settings">需要 API 密钥</string>
     <string name="tts_no_account" comment="TTS voice settings">无需账户</string>
     <string name="tts_online" comment="TTS voice settings">在线</string>
-    <string name="tts_model_neural" comment="TTS voice settings">神经网络音色</string>
-    <string name="tts_model_multilingual_neural" comment="TTS voice settings">多语言神经网络音色</string>
     <string name="tts_stop_preview" comment="TTS voice settings">停止试听</string>
     <string name="tts_configure_source" comment="TTS voice settings">配置来源</string>
     <string name="tts_key_device_hint" comment="TTS voice settings">凭据保存在此设备上。</string>
     <string name="tts_pitch_short" comment="TTS voice settings">%1$+d 半音</string>
     <string name="tts_pitch_zero" comment="TTS voice settings">0 半音</string>
     <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
-    <string name="tts_source_status" comment="Source label with connection requirement, not a selectable network mode">%1$s · %2$s</string>
+    <string name="tts_voice_status" comment="Voice label with its network requirement">%1$s · %2$s</string>
     <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">已保存的来源</string>
 </resources>

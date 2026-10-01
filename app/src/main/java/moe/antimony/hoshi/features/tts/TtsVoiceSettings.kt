@@ -43,17 +43,17 @@ internal fun TtsVoiceSettings(
         else choices.first { it.id == settings.engine }.title
     val voices = catalog?.voices.orEmpty()
     val voice = if (settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == settings.voice }
-    val voiceTitle = if (settings.voice.isBlank()) automatic else (voice ?: TtsVoiceInfo(settings.voice, source != null)).display(source).title
+    val voiceTitle = if (settings.voice.isBlank()) automatic else settings.voice
     val connection = when {
-        source != null || voice?.network == true -> stringResource(R.string.tts_online)
+        voice?.network == true -> stringResource(R.string.tts_online)
         voice != null -> stringResource(R.string.tts_offline)
         else -> null
     }
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
         ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
-            TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, connection) { sourcePicker = true }
+            TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, null) { sourcePicker = true }
             HorizontalDivider(color = hoshiSurfaces.divider)
-            TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, null) { voicePicker = true }
+            TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, connection) { voicePicker = true }
         }
         if (busy && preview == TtsPreviewState.Idle) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
         failure?.let {
@@ -104,7 +104,7 @@ internal fun TtsVoiceSettings(
         val next = settings.copy(engine = it, voice = "", pitch = 0f)
         onSettings(next.withOptions(next.options().copy(style = "", role = "")))
     }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false })
-    if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, source, busy && preview == TtsPreviewState.Idle, failure,
+    if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, busy && preview == TtsPreviewState.Idle, failure,
         onSelected = { voicePicker = false; onSettings(settings.copy(voice = it).withOptions(settings.options().copy(style = "", role = ""))) },
         onRetry = onRetry, onDismiss = { voicePicker = false })
 }
@@ -114,7 +114,7 @@ private fun TtsCurrentVoiceRow(label: String, value: String, status: String?, on
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(if (status == null) label else stringResource(R.string.tts_source_status, label, status),
+            Text(if (status == null) label else stringResource(R.string.tts_voice_status, label, status),
                 style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
             Text(value, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }

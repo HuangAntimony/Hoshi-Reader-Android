@@ -1105,10 +1105,11 @@ Validate relevant sync/update/Sasayaki changes with:
   cloud services; unknown saved sources/voices remain visible and selectable under raw IDs.
   Cloud rows alone offer credential actions; tapping an action must not select that source.
   Only installed sources show the system TTS settings action. Check list scrolling, selected
-  checkmarks and dismissal/return. Connection status is supporting text with the Source label,
-  never the apparent editable value beside its arrow. Known Microsoft names display cleanly; provider metadata
-  takes priority and unknown formats retain raw IDs. Online voice rows must not repeat a
-  network label; installed voice rows still identify network requirements.
+  checkmarks and dismissal/return. Connection status is supporting text with the Voice label,
+  determined by the selected voice’s catalog network requirement. Verify online and offline
+  voices within the same installed engine update that status; unknown saved voices have
+  no inferred status. Voice names retain their original identifiers in the card and picker,
+  and each catalog voice row identifies its network requirement.
   Check rate/pitch sliders have no dense ticks but keep existing steps/ranges and save on
   release. Pitch zero uses `0 st`/`0 Hz`. The theme-colored Preview button must show preparing/stop
   states and cancel or stop its own preview; reading controls still operate the book session.
