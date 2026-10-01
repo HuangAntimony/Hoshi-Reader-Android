@@ -18,8 +18,6 @@ data class TtsSynthesisOptions(
     val semicolonMs: Int = -1,
     val enumerationCommaMs: Int = -1,
     val sentenceBoundaryMs: Int = -1,
-    val ellipsisPauseMs: Int = 600,
-    val edgeEllipsisPause: Boolean = true,
     val format: TtsAudioFormat = TtsAudioFormat.Wav,
     val sampleRate: Int = 24000,
     val effectsProfile: String = "",
@@ -30,7 +28,6 @@ data class TtsSynthesisOptions(
         leadingMs = leadingMs.coerceIn(-1, 20000), trailingMs = trailingMs.coerceIn(-1, 20000),
         commaMs = commaMs.coerceIn(-1, 20000), semicolonMs = semicolonMs.coerceIn(-1, 20000),
         enumerationCommaMs = enumerationCommaMs.coerceIn(-1, 20000), sentenceBoundaryMs = sentenceBoundaryMs.coerceIn(-1, 20000),
-        ellipsisPauseMs = ellipsisPauseMs.coerceIn(-1, 20000),
         sampleRate = sampleRate.takeIf { it in listOf(16000, 24000, 48000) } ?: 24000,
         effectsProfile = effectsProfile.takeIf { it in googleAudioProfiles } ?: "",
     )

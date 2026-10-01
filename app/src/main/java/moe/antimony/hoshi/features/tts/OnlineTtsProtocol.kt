@@ -10,25 +10,6 @@ internal object OnlineTtsProtocol {
     const val edgeToken = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
     const val edgeVersion = "143.0.3650.75"
     const val edgeBase = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud"
-    private val ellipsis = Regex("[\u2026\u2025]+|\\.{3,}")
-
-    /** Edge rejects break elements. Its sentence punctuation creates a voice-defined pause. */
-    fun edgeText(text: String, pause: Boolean): String = if (!pause) text else ellipsis.replace(text) { match ->
-        if (text.getOrNull(match.range.last + 1) in listOf('。', '！', '？', '!', '?')) "" else "。"
-    }
-
-    private fun azureText(text: String, pauseMillis: Int): String {
-        if (pauseMillis < 0) return xml(text)
-        val result = StringBuilder()
-        var start = 0
-        ellipsis.findAll(text).forEach { match ->
-            result.append(xml(text.substring(start, match.range.first)))
-            result.append("<break time=\"${pauseMillis}ms\"/>")
-            start = match.range.last + 1
-        }
-        return result.append(xml(text.substring(start))).toString()
-    }
-
     fun microsoftVoices(body: String): List<TtsVoiceInfo> = parse {
         Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }
             .filter { it["Locale"]?.jsonPrimitive?.content.equals("ja-JP", true) }
@@ -62,7 +43,7 @@ internal object OnlineTtsProtocol {
         val controls = options.normalized(TtsOnlineSource.Azure)
         if (controls.style.isNotBlank() && controls.style !in voice.styles || controls.role.isNotBlank() &&
             (controls.role !in voice.roles || controls.style.isBlank())) throw TtsException(TtsFailure.Configuration)
-        val content = "<prosody rate=\"${signed(((rate - 1) * 100).roundToInt())}%\" pitch=\"${signed(pitch.toInt())}st\" volume=\"${signed(controls.volume.toInt())}%\">${azureText(text, controls.ellipsisPauseMs)}</prosody>"
+        val content = "<prosody rate=\"${signed(((rate - 1) * 100).roundToInt())}%\" pitch=\"${signed(pitch.toInt())}st\" volume=\"${signed(controls.volume.toInt())}%\">${xml(text)}</prosody>"
         val styled = if (controls.style.isBlank()) content else
             "<mstts:express-as style=\"${xml(controls.style)}\" styledegree=\"${controls.styleDegree}\"" +
                 (if (controls.role.isNotBlank()) " role=\"${xml(controls.role)}\"" else "") + ">$content</mstts:express-as>"

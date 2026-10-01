@@ -39,7 +39,8 @@ class OnlineTtsEngineTest {
         }
         val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, rate = 1.5f, pitch = 2f,
             online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastus", "encrypted")))
-        val files = engine.synthesize("東京へ行く。", settings, folder.root)
+        val text = "東京……へ‥‥行く...。<x>"
+        val files = engine.synthesize(text, settings, folder.root)
         assertArrayEquals(wav, files.single().readBytes())
         val request = requests.last()
         assertEquals("eastus.tts.speech.microsoft.com", request.url.host)
@@ -47,6 +48,7 @@ class OnlineTtsEngineTest {
         assertEquals("riff-24khz-16bit-mono-pcm", request.header("X-Microsoft-OutputFormat"))
         val buffer = okio.Buffer(); request.body!!.writeTo(buffer)
         val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(buffer.readByteArray().inputStream())
+        assertEquals(text, document.documentElement.textContent)
         val prosody = document.getElementsByTagName("prosody").item(0)
         assertEquals("+2st", prosody.attributes.getNamedItem("pitch").nodeValue)
         assertEquals("+50%", prosody.attributes.getNamedItem("rate").nodeValue)

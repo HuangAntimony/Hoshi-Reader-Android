@@ -26,8 +26,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   panel. Adjust supported pitch, volume, Azure speaking styles/roles/intensity and
   punctuation silence, cloud audio format/sample rate with compact dropdown rows
   anchored at the right-side control, Google device profiles, and
-  extra playback pauses between sentences. Japanese ellipses use adjustable explicit
-  pauses on Azure and optional sentence-pause normalization on Edge.
+  extra playback pauses between sentences.
   MP3 sources retain MP3 for playback and Anki.
   Ready sentence audio plays without waiting for later network synthesis, and continuous
   playback keeps ongoing prefetch when moving to the next sentence.

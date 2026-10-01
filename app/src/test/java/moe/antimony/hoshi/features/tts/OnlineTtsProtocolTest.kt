@@ -5,38 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OnlineTtsProtocolTest {
-    @Test fun literalReplacementsPrecedeProviderPunctuationHandlingAndCannotInjectSsml() {
+    @Test fun literalReplacementsAreEscapedForMicrosoftSpeech() {
         val sentence = TtsText.chapter(0, "<p>待って――まだ……続く。</p>").single()
         val rules = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "、<break/>"))
         val spoken = TtsText.spoken(sentence, null, rules)
-        assertEquals("待って、まだ、<break/>続く。", OnlineTtsProtocol.edgeText(spoken, true))
+        assertEquals("待って、まだ、<break/>続く。", spoken)
+        val edgeXml = OnlineTtsProtocol.ssml(spoken, "ja-JP-NanamiNeural", 1f)
+        val edgeDocument = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(edgeXml.byteInputStream())
+        assertEquals(spoken, edgeDocument.documentElement.textContent)
+        assertEquals(0, edgeDocument.getElementsByTagName("break").length)
         val xml = OnlineTtsProtocol.azureSsml(spoken, TtsVoiceInfo("ja-JP-NanamiNeural", true), 1f, 0f,
-            TtsSynthesisOptions(ellipsisPauseMs = 700))
+            TtsSynthesisOptions())
         val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
         assertEquals(spoken, document.documentElement.textContent)
         assertEquals(0, document.getElementsByTagName("break").length)
     }
 
-    @Test fun japaneseEllipsisUsesOneExplicitPausePerRunWithoutInjectingMarkup() {
-        val text = "「待って……まだ‥‥です...<x>」"
-        val xml = OnlineTtsProtocol.azureSsml(text, TtsVoiceInfo("ja-JP-NanamiNeural", true), 1f, 0f,
-            TtsSynthesisOptions(ellipsisPauseMs = 700))
-        val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xml.byteInputStream())
-        val pauses = document.getElementsByTagName("break")
-        assertEquals(3, pauses.length)
-        repeat(pauses.length) { assertEquals("700ms", pauses.item(it).attributes.getNamedItem("time").nodeValue) }
-        assertEquals(0, document.getElementsByTagName("x").length)
-        val natural = OnlineTtsProtocol.azureSsml(text, TtsVoiceInfo("ja-JP-NanamiNeural", true), 1f, 0f,
-            TtsSynthesisOptions(ellipsisPauseMs = -1))
-        assertEquals(text, javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
-            .parse(natural.byteInputStream()).documentElement.textContent)
-    }
-
-    @Test fun edgeEllipsisUsesSupportedPunctuationAndCanBeDisabled() {
-        assertEquals("待って。まだです。", OnlineTtsProtocol.edgeText("待って……まだです…。", true))
-        assertEquals("待って……まだです。", OnlineTtsProtocol.edgeText("待って……まだです。", false))
-        assertEquals("3.14", OnlineTtsProtocol.edgeText("3.14", true))
-    }
     @Test fun azureCarriesOnlyAdvertisedStylesAndPrecisePauseSettings() {
         val voices = OnlineTtsProtocol.microsoftVoices("""[{"ShortName":"ja-JP-NanamiNeural","Locale":"ja-JP","StyleList":["cheerful","sad"],"RolePlayList":["YoungAdultFemale"]}]""")
         assertEquals(listOf("cheerful", "sad"), voices.single().styles)

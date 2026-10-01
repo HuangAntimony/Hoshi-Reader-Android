@@ -76,7 +76,7 @@ class OnlineTtsEngine internal constructor(
                     currentCoroutineContext().ensureActive()
                     val bytes = when (source) {
                         TtsOnlineSource.Edge -> transport.edgeAudio(edgeRequest(true), OnlineTtsProtocol.ssml(
-                            OnlineTtsProtocol.edgeText(part, options.edgeEllipsisPause), voice, rate, pitchText, options.volume))
+                            part, voice, rate, pitchText, options.volume))
                         TtsOnlineSource.Azure -> transport.request(Request.Builder()
                             .url(OnlineTtsProtocol.azureBase(config.region) + "/cognitiveservices/v1")
                             .header("Ocp-Apim-Subscription-Key", credential)

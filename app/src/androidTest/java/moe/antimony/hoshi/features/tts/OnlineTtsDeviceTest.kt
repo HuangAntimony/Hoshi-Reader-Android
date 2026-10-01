@@ -18,22 +18,6 @@ class OnlineTtsDeviceTest {
     @Test fun edgeCatalogSynthesisAndExport() = checkSource(TtsOnlineSource.Edge)
     @Test fun translateLongSentenceExportsEveryMp3Chunk() = checkSource(TtsOnlineSource.GoogleTranslate)
 
-    @Test fun edgeEllipsisPauseProducesLongerPlayableMp3() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val engine = OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO)
-        val directory = File(context.cacheDir, "edge-ellipsis-device-test")
-        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural")
-        try {
-            suspend fun synthesize(pause: Boolean) = engine.synthesize("こんにちは……お元気ですか。",
-                settings.withOptions(TtsSynthesisOptions(edgeEllipsisPause = pause)), directory).single()
-            val natural = synthesize(false)
-            val paused = synthesize(true)
-            // Edge's output is 48 kbit/s CBR; this public sample has an internal sentence pause.
-            assertTrue("The normalized ellipsis should add an audible pause", paused.length() - natural.length() > 2000)
-            assertEquals("mp3", paused.extension)
-        } finally { directory.deleteRecursively() }
-    }
-
     @Test fun credentialsStayEncryptedAndAreBoundToTheirSource() = runBlocking {
         val cipher = TtsCredentialCipher(Dispatchers.IO)
         val encrypted = cipher.encrypt("device-test-value", TtsOnlineSource.Azure.id)

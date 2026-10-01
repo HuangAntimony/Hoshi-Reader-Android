@@ -790,9 +790,8 @@ QA matrices live in `docs/VALIDATION.md`.
   Literal dictionary matching prefers longest surfaces, then book scope over global
   scope; ruby is used where no custom replacement overlaps. Replacement values accept
   any non-blank plain text, preserving whitespace. Matching is a single pass over the
-  original sentence; inserted text is never matched again. Replacements run before
-  provider punctuation handling and affect synthesis only, preserving original sentence
-  boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
+  original sentence; inserted text is never matched again. Replacements affect synthesis
+  only, preserving original sentence boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
   the selected source occurrence, including full
   VN source sentences, rather than looking up the first matching text.
   Image-backed ruby uses zero-width insertions, emitted once at each source position;
@@ -818,10 +817,6 @@ QA matrices live in `docs/VALIDATION.md`.
   controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
   supports prosody rate/pitch/volume; Translate exposes only normal/slow speech.
   Pitch controls use provider units and omit unsupported Google voice families.
-  Azure ellipsis runs become an escaped SSML break (600 ms by default); Edge can
-  normalize them to sentence punctuation because its consumer endpoint rejects break
-  elements. Edge pause duration remains voice-defined. These transformations affect
-  synthesis only, preserving Reader offsets, dictionary lookup and Anki sentence text.
   `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
   removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
 - `TtsPlaybackController` exposes immutable StateFlow, owns sentence navigation,

@@ -993,6 +993,4 @@
     <string name="tts_profile_home" comment="TTS synthesis parameter">家庭影音</string>
     <string name="tts_profile_car" comment="TTS synthesis parameter">车载音响</string>
     <string name="tts_profile_telephone" comment="TTS synthesis parameter">电话线路</string>
-    <string name="tts_ellipsis_pause" comment="TTS ellipsis handling">省略号停顿</string>
-    <string name="tts_edge_ellipsis_hint" comment="TTS ellipsis handling">将省略号作为句末停顿朗读，时长由音色决定。</string>
 </resources>

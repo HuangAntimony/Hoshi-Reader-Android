@@ -1062,13 +1062,6 @@ Validate relevant sync/update/Sasayaki changes with:
   response coverage as a successful live account test. Reopening configuration must
   keep the saved key masked; leaving it empty preserves it. Restored settings without
   the Keystore key must request reconfiguration.
-- For explicitly authorized live Azure checks, run `ConfiguredAzureTtsDeviceTest` with
-  `am instrument -e hoshiAzureTtsLive true`; it consumes the already saved key entirely
-  inside the app, does not print credentials or change preferences, and compares two
-  public samples with different explicit ellipsis durations. Without that argument or
-  a saved key, it is skipped. `OnlineTtsDeviceTest` compares Edge ellipsis normalization
-  against natural punctuation. Cover `…`, `……`, `‥‥`, ASCII `...`, XML-special text and
-  disabling the override; the displayed/source sentence must remain unchanged.
 - Compare default/modified pitch and volume in preview and Anki. Azure style/role choices
   must come from the selected voice, reset when changing voices, and include only valid
   styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
@@ -1104,9 +1097,9 @@ Validate relevant sync/update/Sasayaki changes with:
   should be changed. IMEs without locale-hint support may retain their current language.
 
 - Create literal punctuation rules such as `――` → `、` and `……` → `。` in both
-  book/global scopes. Preview, playback and `{sentence-audio}` must use the same rules,
-  before Edge/Azure ellipsis handling; source text, sentence boundaries and highlighting
-  must stay unchanged. Check longest-match/book precedence, editing/deleting, exact
+  book/global scopes. Preview, playback and `{sentence-audio}` must use the same rules;
+  source text, sentence boundaries and highlighting must stay unchanged. Check
+  longest-match/book precedence, editing/deleting, exact
   punctuation matching (different dash characters stay distinct), non-kana and multiline
   replacements, blank validation and duplicate conflicts. Replacement text is plain text,
   never executable SSML, and inserted replacements are not recursively matched.

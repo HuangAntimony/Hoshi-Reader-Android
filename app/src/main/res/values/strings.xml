@@ -995,6 +995,4 @@
     <string name="tts_profile_home" comment="TTS synthesis parameter">Home entertainment</string>
     <string name="tts_profile_car" comment="TTS synthesis parameter">Car audio</string>
     <string name="tts_profile_telephone" comment="TTS synthesis parameter">Telephone line</string>
-    <string name="tts_ellipsis_pause" comment="TTS ellipsis handling">Ellipsis pause</string>
-    <string name="tts_edge_ellipsis_hint" comment="TTS ellipsis handling">Read ellipses as sentence pauses. The voice determines the duration.</string>
 </resources>

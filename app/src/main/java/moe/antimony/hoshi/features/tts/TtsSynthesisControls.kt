@@ -34,16 +34,6 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     if (source == null || source == TtsOnlineSource.GoogleTranslate) return
 
-    if (source == TtsOnlineSource.Edge) ReaderSheetCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.tts_ellipsis_pause), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(R.string.tts_edge_ellipsis_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            }
-            Switch(options.edgeEllipsisPause, { update(options.copy(edgeEllipsisPause = it)) })
-        }
-    }
-
     TtsParameterSlider(R.string.tts_synthesis_volume, options.volume,
         if (source == TtsOnlineSource.GoogleCloud) -96f..16f else -100f..100f,
         if (source == TtsOnlineSource.GoogleCloud) 111 else 199,
@@ -51,7 +41,6 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     ) { update(options.copy(volume = it)) }
 
     if (source == TtsOnlineSource.Azure) {
-        TtsPauseControl(R.string.tts_ellipsis_pause, options.ellipsisPauseMs) { update(options.copy(ellipsisPauseMs = it)) }
         if (!voice?.styles.isNullOrEmpty()) {
             ReaderSheetCard {
                 TtsParameterChoice(R.string.tts_speaking_style, options.style, voice.styles) {
