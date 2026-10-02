@@ -151,7 +151,7 @@ private fun readerVolumeKeyAction(
             reverseDirection = settings.reverseVolumeKeyDirection,
         )
     }
-    if (settings.volumeKeysSeekTts && hasStartedTts) {
+    if (settings.volumeKeysSeekSasayaki && hasStartedTts) {
         return ReaderHardwareKeyAction.TtsSentenceNavigation(
             volumePageTurnDirectionForKey(keyCode, settings.reverseVolumeKeyDirection),
         )

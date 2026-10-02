@@ -8,21 +8,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderHardwareKeyNavigationTest {
-    @Test fun ttsNavigationRequiresBothThePreferenceAndAStartedBookSession() {
-        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekTts = true)
+    @Test fun ttsNavigationRequiresTheSharedAudioPreferenceAndAStartedBookSession() {
+        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekSasayaki = true)
         assertEquals(ReaderHardwareKeyAction.ReaderNavigation(ReaderNavigationDirection.Forward),
             ttsKey(settings, started = false).action)
         assertEquals(ReaderHardwareKeyAction.ReaderNavigation(ReaderNavigationDirection.Forward),
-            ttsKey(settings.copy(volumeKeysSeekTts = false)).action)
-        assertFalse(ttsKey(ReaderSettings(volumeKeysSeekTts = true), started = false).consumed)
+            ttsKey(settings.copy(volumeKeysSeekSasayaki = false)).action)
+        assertFalse(ttsKey(ReaderSettings(volumeKeysSeekSasayaki = true), started = false).consumed)
         assertFalse(ttsKey(ReaderSettings()).consumed)
         assertEquals(ReaderHardwareKeyAction.TtsSentenceNavigation(ReaderNavigationDirection.Forward),
             ttsKey(settings).action)
     }
 
     @Test fun ttsVolumeNavigationUsesSharedPriorityDirectionsRepeatAndKeyUpRules() {
-        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekTts = true,
-            volumeKeysSeekSasayaki = true, volumeKeysNavigatePopupTerms = true)
+        val settings = ReaderSettings(volumeKeysTurnPages = true, volumeKeysSeekSasayaki = true,
+            volumeKeysNavigatePopupTerms = true)
         assertEquals(ReaderHardwareKeyAction.PopupTermNavigation(PopupTermNavigationDirection.Next),
             ttsKey(settings, popup = true).action)
         assertEquals(ReaderHardwareKeyAction.SasayakiSeekForward,

@@ -167,7 +167,7 @@ class TtsPanelStateTest {
     @Test fun readerSentenceControlsAndVolumeKeysPreservePausedInstalledEnginePlayback() {
         panel(system = true, reader = true)
         val controller = model.playback
-        val settings = ReaderSettings(volumeKeysSeekTts = true)
+        val settings = ReaderSettings(volumeKeysSeekSasayaki = true)
         fun key() = readerHardwareKeyEventForKeyEvent(KeyEvent.KEYCODE_VOLUME_DOWN,
             KeyEvent.ACTION_DOWN, 0, settings, false, false, hasStartedTts = controller.state.value.started)
         val book = EpubBook("Device fixture", chapters = listOf(

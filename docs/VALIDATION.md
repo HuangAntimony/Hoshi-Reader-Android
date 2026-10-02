@@ -359,7 +359,8 @@ Manual reader validation should cover:
   asynchronously rendered terms appear, manual scrolling resumes from the
   visible term, and closing the popup restores the previously configured
   volume-key behavior.
-- TTS volume-key behavior defaults off. Enable it with page turns and popup-term navigation:
+- The shared Volume Keys Control Audiobook / TTS switch defaults off and retains the
+  existing Sasayaki preference. Enable it with page turns and popup-term navigation:
   before starting book narration (including after preview-only playback), volume keys retain
   their existing page/system behavior. After explicit TTS playback, they navigate previous/next
   sentences while playing or paused, below topmost popup terms and above page turns. Check

@@ -848,10 +848,12 @@ QA matrices live in `docs/VALIDATION.md`.
   start-at/replay still starts audio. Paused navigation invalidates preparation and lookup
   resume callbacks, presents the selected sentence directly, and synthesizes nothing until
   playback resumes. `started` remains scoped to the Reader route/book session, so the
-  default-off global Behavior setting `volumeKeysSeekTts` activates sentence navigation
-  only after that session has explicitly started narration. Reader's existing hardware-key
-  resolver gives enabled popup term navigation priority, then audiobook/TTS navigation,
-  then page turning; direction reversal and repeat/key-up handling stay shared.
+  default-off global Behavior setting `volumeKeysSeekSasayaki` controls both audiobook
+  seeking and TTS sentence navigation. TTS becomes eligible only after that session has
+  explicitly started narration; the existing preference key/value remains unchanged.
+  Reader's existing hardware-key resolver gives enabled popup term navigation priority,
+  then audiobook/TTS navigation, then page turning; direction reversal and repeat/key-up
+  handling stay shared.
   `TtsAudioRepository` keys temporary playback audio by
   configuration (excluding prefetch depth and Hoshi playback speed) and resolved spoken text; independent export
   files are owned by their caller and cleaned on cancellation, including cancelled dispatcher return delivery.
