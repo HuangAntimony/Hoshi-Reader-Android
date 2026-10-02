@@ -50,6 +50,14 @@ internal fun TtsProviderPicker(
 ) {
     TtsSelectionSheet(stringResource(R.string.tts_choose_source), onDismiss) {
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
+            item(key = "system-settings") {
+                TextButton(onClick = onSystemSettings, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
+                    Icon(Icons.Rounded.Settings, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.tts_system_settings))
+                }
+                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = hoshiSurfaces.divider)
+            }
             for (group in TtsSourceGroup.entries) {
                 val entries = choices.filter { it.group == group }
                 if (entries.isEmpty() && group != TtsSourceGroup.Custom) continue
@@ -81,14 +89,6 @@ internal fun TtsProviderPicker(
             item(key = "add-service") {
                 TextButton(onClick = { onCustom(null) }, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
                     Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.tts_add_service))
-                }
-            }
-            if (TtsOnlineSource.from(selected) == null && !selected.startsWith("custom:")) item(key = "system-settings") {
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = hoshiSurfaces.divider)
-                TextButton(onClick = onSystemSettings, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
-                    Icon(Icons.Rounded.Settings, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.tts_system_settings))
                 }
             }
         }

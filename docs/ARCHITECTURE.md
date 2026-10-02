@@ -928,8 +928,9 @@ QA matrices live in `docs/VALIDATION.md`.
   `ReaderBottomPanel`. Sources group installed engines, online services and key-based
   cloud services without guessing installed engine capabilities; an unavailable saved
   source or voice remains visible under its original ID. The source picker exposes cloud
-  configuration actions for key-based services and editable self-hosted profiles and a system-settings action for
-  installed sources. Credential forms reuse the same sheet chrome, preserve encrypted
+  configuration actions for key-based services and editable self-hosted profiles. Its
+  system-settings action always appears above the Device engines group as a separate row,
+  independent of the selected source. Credential forms reuse the same sheet chrome, preserve encrypted
   storage/blank-key retention, and test unsaved drafts with a public synthesis sample.
   Canceling disposes the draft and its coroutine. Source errors appear beside the voice
   card; shared behavior errors have a separate StateFlow and cannot show source failures
