@@ -1172,6 +1172,11 @@ Validate relevant sync/update/Sasayaki changes with:
   Check long source/voice names wrap without crowding the card and remain complete in
   selection lists; check empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
+  In each source's Voice picker, use the fixed top Refresh voices action: it must bypass
+  the catalog cache, keep the picker open and the selected ID unchanged, disable repeated
+  refresh taps during loading, and retain old choices after failure. Confirm a successful
+  refresh includes newly advertised voices and survives reopening without another request.
+  Check manual OpenAI IDs remain available during refresh and e-ink uses loading text.
   Parameters appear directly without a separate heading or toggle. With Azure, Microsoft Translator or
   Google Cloud selected, check Audio format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
@@ -1302,6 +1307,9 @@ Validate relevant sync/update/Sasayaki changes with:
   synthesizes public samples as WAV/MP3, exercises isolated Media3 playback and sentence
   export, and uses only test-owned cache and settings. No model/configuration mutation,
   private book text, application preferences, cloud keys or application data clearing.
+  `selfHostedOpenAiCatalogRefreshPlaybackCacheAndAnkiExport` accepts `openAiUrl` and
+  `openAiModel` for the equivalent OpenAI flow. Both explicitly refresh the catalog and
+  verify cached choices before exercising WAV/MP3 playback, reuse and sentence export.
 - VITS requests must send `Content-Type: application/json` without an appended charset.
   `CustomTtsEngineTest` exercises the server's strict JSON/form distinction, optional
   OpenAI discovery, prefix/auth/rate mapping, invalid audio and cancellation cleanup.

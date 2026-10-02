@@ -50,6 +50,9 @@ class TtsPanelStateTest {
     private var playCount = 0
     private val panelVisible = androidx.compose.runtime.mutableStateOf(true)
     private var onlineRequests = 0
+    @Volatile private var onlineVoice = "ja-JP-NanamiNeural"
+    @Volatile private var onlineFailure = false
+    @Volatile private var refreshGate: CountDownLatch? = null
     private val discoveryStarted = AtomicBoolean(false)
     private lateinit var model: TtsViewModel
     private lateinit var speech: MemoryStore
@@ -70,8 +73,10 @@ class TtsPanelStateTest {
             }
             if (!online) throw IOException("UI fixture prohibits network")
             onlineRequests++
+            refreshGate?.await(10, TimeUnit.SECONDS)
+            if (onlineFailure) throw IOException("Fixture catalog unavailable")
             okhttp3.Response.Builder().request(it.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("Fixture")
-                .body("""[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toResponseBody()).build()
+                .body("""[{"Locale":"ja-JP","ShortName":"$onlineVoice"}]""".toResponseBody()).build()
         }.build())
         val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), CustomTtsEngine(transport, cipher::decrypt, Dispatchers.IO))
         val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO)
@@ -107,6 +112,7 @@ class TtsPanelStateTest {
             compose.runOnIdle { Assert.assertFalse(model.busy.value) }
             compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).assertIsEnabled()
             compose.onNodeWithText("sample").performScrollTo().performClick()
+            compose.onNodeWithText("Refresh voices").assertIsNotEnabled()
             compose.onNodeWithText("neutral").assertIsDisplayed().performClick()
             compose.waitUntil(5_000) { model.preferences.value.settings.voice == "neutral" }
             compose.runOnIdle { Assert.assertEquals("neutral", model.preferences.value.settings.customSource()?.voice) }
@@ -162,6 +168,39 @@ class TtsPanelStateTest {
             Assert.assertFalse(loading.any { it })
             Assert.assertTrue(catalogs.all { it?.voices?.isNotEmpty() == true })
         }
+    }
+
+    @Test fun manualVoiceRefreshUpdatesCachedVoicesAndRetainsThemAfterFailure() {
+        panel(online = true)
+        compose.onNodeWithText("Automatic").performClick()
+        val refresh = compose.onNodeWithText("Refresh voices")
+        refresh.assertIsDisplayed()
+        val gate = CountDownLatch(1)
+        try {
+            onlineVoice = "ja-JP-KeitaNeural"
+            refreshGate = gate
+            refresh.performClick()
+            compose.waitUntil(5_000) { model.busy.value }
+            refresh.assertIsNotEnabled()
+            compose.onNodeWithText("ja-JP-NanamiNeural").assertIsDisplayed()
+            gate.countDown()
+            compose.waitUntil(5_000) { model.catalog.value?.voices?.singleOrNull()?.id == "ja-JP-KeitaNeural" && !model.busy.value }
+            refresh.assertIsEnabled()
+            compose.onNodeWithText("ja-JP-KeitaNeural").assertIsDisplayed()
+            compose.runOnIdle { Assert.assertEquals(2, onlineRequests); Assert.assertEquals("", model.preferences.value.settings.voice) }
+            onlineFailure = true
+            refresh.performClick()
+            compose.waitUntil(5_000) { model.error.value != null && !model.busy.value }
+            compose.onNodeWithText("ja-JP-KeitaNeural").assertIsDisplayed()
+            refresh.assertIsEnabled()
+            onlineFailure = false
+            refresh.performClick()
+            compose.waitUntil(5_000) { model.error.value == null && !model.busy.value }
+            compose.onNodeWithText("ja-JP-KeitaNeural").performClick()
+            compose.runOnIdle { model.refresh() }
+            compose.waitUntil(5_000) { model.preferences.value.settings.voice == "ja-JP-KeitaNeural" }
+            compose.runOnIdle { Assert.assertEquals(4, onlineRequests) }
+        } finally { gate.countDown(); refreshGate = null }
     }
 
     @Test fun sourceFailureStaysNearVoiceCardAndDoesNotLeakIntoOtherTabs() {

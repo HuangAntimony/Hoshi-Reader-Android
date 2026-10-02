@@ -62,9 +62,12 @@ class TtsViewModel @Inject constructor(
     val engines = mutableEngines.asStateFlow()
     val error = mutableError.asStateFlow()
     private val catalogBusy = MutableStateFlow(false)
+    val catalogLoading = catalogBusy.asStateFlow()
     private val mutablePreviewState = MutableStateFlow(TtsPreviewState.Idle)
     val previewState = mutablePreviewState.asStateFlow()
-    val busy = combine(catalogBusy, mutablePreviewState) { catalog, preview -> catalog || preview == TtsPreviewState.Preparing }
+    val busy = combine(catalogBusy, mutablePreviewState, preferences) { catalog, preview, current ->
+        (catalog && current.settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) || preview == TtsPreviewState.Preparing
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private var catalogGeneration = 0L
     private var previewGeneration = 0L
@@ -83,9 +86,10 @@ class TtsViewModel @Inject constructor(
                 val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
                 fallback = optional?.let { TtsCatalog(emptyList(), it.id, it.voiceChoices(emptyList())) }
                 val cached = engine.cachedCatalog(settings)
+                fallback = cached ?: fallback
                 mutableError.value = null
                 mutableCatalog.value = cached ?: fallback
-                catalogBusy.value = optional == null && (force || cached == null)
+                catalogBusy.value = force || cached == null
                 mutableEngines.value = engine.installedEngines()
                 mutableCatalog.value = if (!force && cached != null) cached else engine.catalog(settings, force)
                 if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese

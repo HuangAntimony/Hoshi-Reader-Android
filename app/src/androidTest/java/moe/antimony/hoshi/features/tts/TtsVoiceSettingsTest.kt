@@ -117,12 +117,13 @@ class TtsVoiceSettingsTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = true, dynamicColor = false) {
                 TtsVoicePicker("Fixture source", voices, "saved-voice-not-in-catalog", false, null,
-                    onSelected = { selected = it }, onRetry = {}, onDismiss = {})
+                    onSelected = { selected = it }, onRefresh = {}, onDismiss = {})
             }
         }
         compose.onNodeWithText("saved-voice-not-in-catalog").assertExists()
         compose.onNodeWithText("Automatic").assertExists()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("custom-voice-400"))
+        compose.onNodeWithText("Refresh voices").assertIsDisplayed()
         compose.onNodeWithText("custom-voice-400").performClick()
         compose.runOnIdle { assertEquals("custom-voice-400", selected) }
     }

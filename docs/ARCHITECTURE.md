@@ -857,7 +857,12 @@ QA matrices live in `docs/VALIDATION.md`.
   Catalogs have no age-based refresh. Source configuration fingerprints prevent reuse after
   region/key changes without storing credentials in catalog files. Missing/corrupt catalogs
   are fetched again, failures are not cached, and explicit error retry/configuration save
-  forces a fetch. Warm panel openings retain the catalog and do not enter loading state;
+  forces a fetch. Every Voice picker exposes a fixed manual refresh action above the list;
+  it bypasses the catalog cache without changing voice preferences or audio caches.
+  Refresh failures retain a valid previous catalog and show the localized error in the picker.
+  `TtsViewModel.catalogLoading` disables repeated refresh requests independently of preview
+  readiness, keeping manually configured OpenAI voices usable during optional discovery.
+  Warm panel openings retain the catalog and do not enter loading state;
   installed-engine discovery still refreshes so newly installed engines remain selectable.
 - `OnlineTtsProtocol` owns service JSON/SSML, Japanese catalog filtering, UTF-8 length
   limits and Edge framing. `OnlineTtsTransport` owns bounded HTTPS/WebSocket requests;
@@ -955,8 +960,8 @@ QA matrices live in `docs/VALIDATION.md`.
   card; shared behavior errors have a separate StateFlow and cannot show source failures
   in the Settings tab. `TtsPreviewState` exposes idle/preparing/playing so the theme-colored
   preview button can cancel preparation or stop playback; reading controls stop preview
-  before using the existing sentence controller. Additional synthesis controls expand
-  from a neutral row and use source/voice capabilities. TTS sliders hide tick marks
+  before using the existing sentence controller. Additional synthesis controls use
+  source/voice capabilities. TTS sliders hide tick marks
   while retaining their discrete steps and current-value labels, without endpoint labels; shared slider
   and card defaults remain unchanged for Sasayaki.
   `TtsCatalogLoading` shares the catalog-loading presentation between the Voice tab and

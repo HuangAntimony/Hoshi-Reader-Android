@@ -914,6 +914,7 @@
     <string name="tts_repeat">Repeat sentence</string>
     <string name="tts_use_ruby">Use Ruby readings</string>
     <string name="tts_loading_voices">Loading voices…</string>
+    <string name="tts_refresh_voices">Refresh voices</string>
     <string name="tts_source">Source</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">Voice</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">Automatic</string>

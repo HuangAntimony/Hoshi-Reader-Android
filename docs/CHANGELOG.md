@@ -31,7 +31,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Cloud credentials use a matching configuration sheet; source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
-  e-ink shows readable loading text instead of a solid black progress line.
+  the Voice picker provides a manual refresh action at the top for every source,
+  retaining known voices during loading or refresh failure.
+  E-ink shows readable loading text instead of a solid black progress line.
   Add, edit and delete self-hosted servers from Source; each retains its model, voice,
   engine rate and WAV/MP3 format, with optional encrypted credentials and draft connection
   testing. Choose voices separately under Voice: VITS shows server-provided character names,

@@ -59,6 +59,31 @@ class CustomTtsEngineTest {
         }
     }
 
+    @Test fun forcedCatalogRefreshFetchesNewVoicesAndFailedRefreshKeepsPersistentCache() = runBlocking {
+        for (protocol in TtsCustomProtocol.entries) MockWebServer().use { server ->
+            fun response(id: Int) = when (protocol) {
+                TtsCustomProtocol.OpenAi -> """{"voices":[{"id":"voice-$id"}]}"""
+                TtsCustomProtocol.Vits -> """{"VITS":[{"id":$id,"name":"Voice $id","lang":["ja"]}]}"""
+            }
+            server.enqueue(MockResponse().setBody(response(0)))
+            server.enqueue(MockResponse().setBody(response(1)))
+            server.enqueue(MockResponse().setResponseCode(401))
+            val source = profile(server, protocol).copy(voice = "")
+            val store = TtsVoiceCatalogStore(folder.newFolder(protocol.name))
+            val adapter = engine(store = store)
+            val first = adapter.catalog(settings(source))
+            assertEquals(first, adapter.catalog(settings(source)))
+            assertEquals(1, server.requestCount)
+            val refreshed = adapter.catalog(settings(source), force = true)
+            assertEquals(if (protocol == TtsCustomProtocol.OpenAi) "voice-1" else "VITS:1", refreshed.voices.single().id)
+            assertEquals(2, server.requestCount)
+            try { adapter.catalog(settings(source), force = true); fail("Expected authentication failure") }
+            catch (error: TtsException) { assertEquals(TtsFailure.Authentication, error.failure) }
+            assertEquals(refreshed, engine(store = store).catalog(settings(source)))
+            assertEquals(3, server.requestCount)
+        }
+    }
+
     @Test fun vitsUsesInverseLengthAndJapaneseWithoutSendingUnsupportedPitch() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody(Buffer().write(wav)))

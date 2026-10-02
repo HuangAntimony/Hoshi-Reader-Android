@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -98,14 +99,19 @@ internal fun TtsProviderPicker(
 @Composable
 internal fun TtsVoicePicker(
     title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
-    failure: TtsFailure?, onSelected: (String) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit,
+    failure: TtsFailure?, onSelected: (String) -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit,
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
+        TextButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
+            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.tts_refresh_voices))
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = hoshiSurfaces.divider)
         if (busy) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp))
         failure?.let {
             Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
-            TextButton(onClick = onRetry, modifier = Modifier.padding(horizontal = 12.dp)) { Text(stringResource(R.string.tts_retry)) }
         }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
             item(key = "automatic") {

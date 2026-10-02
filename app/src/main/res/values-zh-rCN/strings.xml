@@ -912,6 +912,7 @@
     <string name="tts_repeat">重播本句</string>
     <string name="tts_use_ruby">使用 Ruby 读音</string>
     <string name="tts_loading_voices">正在加载音色…</string>
+    <string name="tts_refresh_voices">刷新音色列表</string>
     <string name="tts_source">来源</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>

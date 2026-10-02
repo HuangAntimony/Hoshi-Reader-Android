@@ -28,6 +28,7 @@ internal fun TtsVoiceSettings(
     preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettings) -> Unit,
     onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
     onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier, onCustom: (String?) -> Unit = {},
+    catalogLoading: Boolean = busy && preview == TtsPreviewState.Idle,
 ) {
     var sourcePicker by remember { mutableStateOf(false) }
     var voicePicker by remember { mutableStateOf(false) }
@@ -114,9 +115,9 @@ internal fun TtsVoiceSettings(
         val next = settings.selectSource(it)
         onSettings(next.withOptions(next.options().copy(style = "", role = "")))
     }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false }, onCustom = { sourcePicker = false; onCustom(it) })
-    if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, busy && preview == TtsPreviewState.Idle, failure,
+    if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, catalogLoading, failure,
         onSelected = { voicePicker = false; onSettings(settings.copy(voice = it).withOptions(settings.options().copy(style = "", role = ""))) },
-        onRetry = onRetry, onDismiss = { voicePicker = false })
+        onRefresh = onRetry, onDismiss = { voicePicker = false })
 }
 
 @Composable

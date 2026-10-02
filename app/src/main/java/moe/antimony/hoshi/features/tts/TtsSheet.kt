@@ -73,6 +73,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
     val engines by viewModel.engines.collectAsStateWithLifecycle()
     val playback by viewModel.playback.state.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val catalogLoading by viewModel.catalogLoading.collectAsStateWithLifecycle()
     val preview by viewModel.previewState.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val readingError by viewModel.readingError.collectAsStateWithLifecycle()
@@ -122,7 +123,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
                 }, modifier = Modifier.weight(1f), onCustom = { id ->
                     customEditor = preferences.settings.customSources.firstOrNull { it.id == id }
                         ?: TtsCustomSource("custom:${UUID.randomUUID()}")
-                })
+                }, catalogLoading = catalogLoading)
         }
     }
     customEditor?.let { source ->
