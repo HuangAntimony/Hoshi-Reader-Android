@@ -12,7 +12,7 @@ import moe.antimony.hoshi.di.IoDispatcher
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import moe.antimony.hoshi.epub.EpubBook
 
 @Serializable
@@ -37,8 +37,22 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     private val json = Json { ignoreUnknownKeys = true }
     val preferences = store.data.map { decode(it[key]) }
     private fun decode(value: String?): TtsPreferences {
-        val preferences = value?.let { json.decodeFromString<TtsPreferences>(it) } ?: TtsPreferences()
+        val preferences = value?.let {
+            val stored = json.parseToJsonElement(it).jsonObject
+            val settings = stored["settings"] as? JsonObject
+            // Older saved options/profiles omitted the WAV default. New saves always encode format.
+            val restored = settings?.let { fields -> JsonObject(fields.mapValues { (field, entry) -> when (field) {
+                "parameters" -> JsonObject(entry.jsonObject.mapValues { (_, options) -> storedFormat(options) })
+                "customSources" -> JsonArray(entry.jsonArray.map(::storedFormat))
+                else -> entry
+            } }) }
+            json.decodeFromJsonElement<TtsPreferences>(if (restored == null) stored else JsonObject(stored + ("settings" to restored)))
+        } ?: TtsPreferences()
         return preferences.copy(settings = preferences.settings.copy(playbackRate = normalizeTtsPlaybackRate(preferences.settings.playbackRate)))
+    }
+
+    private fun storedFormat(value: JsonElement): JsonObject = value.jsonObject.let {
+        if ("format" in it) it else JsonObject(it + ("format" to JsonPrimitive(TtsAudioFormat.Wav.name)))
     }
 
     suspend fun settings(settings: TtsSettings) {

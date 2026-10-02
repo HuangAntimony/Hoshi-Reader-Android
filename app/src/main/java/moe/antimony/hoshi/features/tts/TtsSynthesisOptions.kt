@@ -1,12 +1,15 @@
 package moe.antimony.hoshi.features.tts
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable
 enum class TtsAudioFormat { Wav, Mp3 }
 
 /** Provider parameters; unsupported controls are neither shown nor added to requests. */
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class TtsSynthesisOptions(
     val volume: Float = 0f,
     val style: String = "",
@@ -18,7 +21,7 @@ data class TtsSynthesisOptions(
     val semicolonMs: Int = -1,
     val enumerationCommaMs: Int = -1,
     val sentenceBoundaryMs: Int = -1,
-    val format: TtsAudioFormat = TtsAudioFormat.Wav,
+    @EncodeDefault val format: TtsAudioFormat = TtsAudioFormat.Mp3,
     val sampleRate: Int = 24000,
     val effectsProfile: String = "",
 ) {

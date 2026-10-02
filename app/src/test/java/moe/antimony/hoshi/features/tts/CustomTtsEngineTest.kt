@@ -24,7 +24,7 @@ class CustomTtsEngineTest {
         CustomTtsEngine(OnlineTtsTransport(client, client), { _, _ -> "test-key" }, Dispatchers.IO, store)
     private fun profile(server: MockWebServer, protocol: TtsCustomProtocol = TtsCustomProtocol.OpenAi) =
         TtsCustomSource(id = "custom:fixture", name = "Fixture", protocol = protocol, baseUrl = server.url("/proxy/v1/").toString(),
-            model = "irodori-tts", voice = "sample", encryptedKey = "ciphertext")
+            model = "irodori-tts", voice = "sample", encryptedKey = "ciphertext", format = TtsAudioFormat.Wav)
     private fun settings(source: TtsCustomSource) = TtsSettings(engine = source.id, customSources = listOf(source))
 
     @Test fun openAiSynthesisDoesNotRequireCatalogAndPreservesPrefixAndFullJapaneseText() = runBlocking {

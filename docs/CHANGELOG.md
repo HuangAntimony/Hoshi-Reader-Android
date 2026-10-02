@@ -25,8 +25,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   its theme-colored button fixed above the bottom system inset. Synthesis parameters appear
   directly in Voice without a separate heading or toggle; audio format is selected there
   rather than duplicated in Source configuration.
-  Provider pause switches use plain settings rows, while remaining parameter cards have
-  tighter vertical padding; slider row heights stay unchanged.
+  Provider pause switches, audio format and sample rate use plain settings rows, while
+  remaining parameter cards have tighter vertical padding; slider row heights stay unchanged.
+  Configurable sources default to MP3, retaining saved WAV/MP3 selections.
   Cloud credentials use a matching configuration sheet; source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;

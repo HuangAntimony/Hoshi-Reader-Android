@@ -95,10 +95,10 @@ class OnlineTtsProtocolTest {
         assertTrue(chunks.none { it.first().isLowSurrogate() || it.last().isHighSurrogate() })
     }
 
-    @Test fun googleSynthesisUsesLiteralTextAndPcmForExport() {
+    @Test fun googleSynthesisUsesLiteralTextAndDefaultsToMp3() {
         val body = Json.parseToJsonElement(OnlineTtsProtocol.googleBody("日本<&", "ja-JP-Neural2-B", 1.25f)).jsonObject
         assertEquals("日本<&", body.getValue("input").jsonObject.getValue("text").jsonPrimitive.content)
-        assertEquals("LINEAR16", body.getValue("audioConfig").jsonObject.getValue("audioEncoding").jsonPrimitive.content)
+        assertEquals("MP3", body.getValue("audioConfig").jsonObject.getValue("audioEncoding").jsonPrimitive.content)
         assertEquals(1.25f, body.getValue("audioConfig").jsonObject.getValue("speakingRate").jsonPrimitive.float)
     }
 

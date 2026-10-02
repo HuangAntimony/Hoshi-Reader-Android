@@ -19,7 +19,8 @@ import org.junit.rules.TemporaryFolder
 class TtsAudioRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
     private val preferences = TtsPreferences(TtsSettings(engine = TtsOnlineSource.GoogleCloud.id,
-        online = mapOf(TtsOnlineSource.GoogleCloud.id to TtsOnlineConfig(encryptedKey = "fixture"))))
+        online = mapOf(TtsOnlineSource.GoogleCloud.id to TtsOnlineConfig(encryptedKey = "fixture")))
+        .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav)))
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 

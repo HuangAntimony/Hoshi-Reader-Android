@@ -15,7 +15,7 @@ class TtsCustomSourceTest {
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(data.value).also { data.value = it }
     }
     private val first = TtsCustomSource("custom:one", "Irodori", baseUrl = "http://192.168.50.147:8088/v1", model = "irodori-tts", voice = "alice", rate = 3.5f, format = TtsAudioFormat.Mp3)
-    private val second = TtsCustomSource("custom:two", "VITS", TtsCustomProtocol.Vits, "http://192.168.50.147:23456", voice = "VITS:0", rate = 2f)
+    private val second = TtsCustomSource("custom:two", "VITS", TtsCustomProtocol.Vits, "http://192.168.50.147:23456", voice = "VITS:0", rate = 2f, format = TtsAudioFormat.Wav)
 
     @Test fun profilesRestoreIndependentVoiceRateAndFormatWithoutChangingPlayerSpeed() = runTest {
         val store = Store()

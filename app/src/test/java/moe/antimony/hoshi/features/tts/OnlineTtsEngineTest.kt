@@ -157,7 +157,7 @@ class OnlineTtsEngineTest {
             }
         }
         val settings = TtsSettings(engine = "online:microsoft-translator", rate = 1.5f, pitch = 2f,
-            parameters = mapOf("online:microsoft-translator" to TtsSynthesisOptions(style = "cheerful", commaMs = 300)))
+            parameters = mapOf("online:microsoft-translator" to TtsSynthesisOptions(style = "cheerful", commaMs = 300, format = TtsAudioFormat.Wav)))
         assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
         assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
         assertEquals(1, authentications)
@@ -181,7 +181,7 @@ class OnlineTtsEngineTest {
                 }
             }
         }
-        assertArrayEquals(wav, engine.synthesize("日本語。", TtsSettings(engine = "online:microsoft-translator"), folder.root).single().readBytes())
+        assertArrayEquals(wav, engine.synthesize("日本語。", TtsSettings(engine = "online:microsoft-translator").withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav)), folder.root).single().readBytes())
         assertEquals(2, authentications)
         assertEquals(2, syntheses)
     }
@@ -198,6 +198,7 @@ class OnlineTtsEngineTest {
         }
         val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, rate = 1.5f, pitch = 2f,
             online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastus", "encrypted")))
+            .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav))
         val text = "東京……へ‥‥行く...。<x>"
         val files = engine.synthesize(text, settings, folder.root)
         assertArrayEquals(wav, files.single().readBytes())
@@ -222,6 +223,7 @@ class OnlineTtsEngineTest {
         }
         val settings = TtsSettings(engine = TtsOnlineSource.GoogleCloud.id,
             online = mapOf(TtsOnlineSource.GoogleCloud.id to TtsOnlineConfig(encryptedKey = "encrypted")))
+            .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav))
         assertArrayEquals(wav, engine.synthesize("日本", settings, folder.root).single().readBytes())
     }
 
@@ -234,6 +236,7 @@ class OnlineTtsEngineTest {
         }
         val settings = TtsSettings(engine = TtsOnlineSource.GoogleCloud.id,
             online = mapOf(TtsOnlineSource.GoogleCloud.id to TtsOnlineConfig(encryptedKey = "encrypted")))
+            .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav))
         try { engine.synthesize("日本語。".repeat(400), settings, folder.root); fail("Expected quota error") }
         catch (error: TtsException) { assertEquals(TtsFailure.RateLimited, error.failure) }
         assertEquals(2, calls)

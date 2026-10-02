@@ -38,7 +38,7 @@ class TtsVoiceSettingsTest {
     }
 
     @Test fun customFormatSelectionPreservesOtherServersAndVoice() {
-        val first = TtsCustomSource("custom:first", "Local", TtsCustomProtocol.Vits, "http://127.0.0.1:8080", voice = "VITS:3")
+        val first = TtsCustomSource("custom:first", "Local", TtsCustomProtocol.Vits, "http://127.0.0.1:8080", voice = "VITS:3", format = TtsAudioFormat.Wav)
         val other = first.copy(id = "custom:other", name = "Other")
         val settings = mutableStateOf(TtsSettings(engine = first.id, voice = first.voice, customSources = listOf(first, other)))
         compose.setContent {

@@ -21,6 +21,41 @@ class TtsRepositoryTest {
             transform(data.value).also { data.value = it }
     }
 
+    @Test fun newSourcesDefaultToMp3AndPersistEitherFormatAcrossReload() = runTest {
+        val store = MemoryStore(preferencesOf())
+        val repository = TtsRepository(store)
+        for (source in listOf(TtsOnlineSource.Azure, TtsOnlineSource.GoogleCloud, TtsOnlineSource.MicrosoftTranslator)) {
+            assertEquals(TtsAudioFormat.Mp3, TtsSettings(engine = source.id).options().format)
+        }
+        val custom = TtsCustomSource("custom:format", "Local", baseUrl = "http://127.0.0.1/v1", model = "tts")
+        assertEquals(TtsAudioFormat.Mp3, custom.format)
+        repository.saveSource(custom)
+        for (format in listOf(TtsAudioFormat.Wav, TtsAudioFormat.Mp3)) {
+            repository.settings(TtsSettings(engine = TtsOnlineSource.Azure.id, customSources = listOf(custom.copy(format = format)))
+                .withOptions(TtsSynthesisOptions(format = format)))
+            val restored = TtsRepository(store).preferences.first().settings
+            assertEquals(format, restored.options().format)
+            assertEquals(format, restored.customSources.single().format)
+        }
+    }
+
+    @Test fun legacyOmittedFormatsStayWavWhileUnconfiguredSourcesUseMp3() = runTest {
+        val store = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{
+          "engine":"online:azure","parameters":{"online:azure":{},"online:google-cloud":{"format":"Mp3"}},
+          "customSources":[{"id":"custom:legacy","name":"Legacy","baseUrl":"http://127.0.0.1/v1","model":"tts"}]}}
+        """))
+        val repository = TtsRepository(store)
+        val settings = repository.preferences.first().settings
+        assertEquals(TtsAudioFormat.Wav, settings.options().format)
+        assertEquals(TtsAudioFormat.Wav, settings.customSources.single().format)
+        assertEquals(TtsAudioFormat.Mp3, settings.copy(engine = TtsOnlineSource.GoogleCloud.id).options().format)
+        assertEquals(TtsAudioFormat.Mp3, settings.copy(engine = TtsOnlineSource.MicrosoftTranslator.id).options().format)
+        repository.settings(settings.copy(playbackRate = 2f))
+        val restored = TtsRepository(store).preferences.first().settings
+        assertEquals(TtsAudioFormat.Wav, restored.options().format)
+        assertEquals(TtsAudioFormat.Wav, restored.customSources.single().format)
+    }
+
     @Test fun rubyDefaultsOnForLegacyPreferencesAndIsPersistedGloballyAcrossSourceChanges() = runTest {
         val key = stringPreferencesKey("preferences")
         val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))

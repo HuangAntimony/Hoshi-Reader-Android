@@ -30,7 +30,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     Text(stringResource(R.string.tts_sentence_pause_hint), style = MaterialTheme.typography.bodySmall,
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     settings.customSource()?.let { custom ->
-        ReaderSheetCard(verticalPadding = 4.dp) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
             TtsAudioFormatChoice(custom.format) { format ->
                 onChange(settings.copy(customSources = settings.customSources.map { profile ->
                     if (profile.id == custom.id) profile.copy(format = format) else profile
@@ -69,7 +69,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         TtsPauseControl(R.string.tts_boundary_pause, options.sentenceBoundaryMs) { update(options.copy(sentenceBoundaryMs = it)) }
     }
     if (source.usesAzureRest || source == TtsOnlineSource.GoogleCloud) {
-        ReaderSheetCard(verticalPadding = 4.dp) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
             TtsAudioFormatChoice(options.format) { update(options.copy(format = it)) }
             val rates = listOf(16000, 24000, 48000).map { TtsChoiceOption(it.toString(), stringResource(R.string.tts_sample_rate_hz, it)) }
             TtsChoice(stringResource(R.string.tts_sample_rate), stringResource(R.string.tts_sample_rate_hz, options.sampleRate),

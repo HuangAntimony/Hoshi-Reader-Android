@@ -833,8 +833,13 @@ QA matrices live in `docs/VALIDATION.md`.
   expansion toggle; standalone settings consume scaffold
   padding before applying this footer inset.
   Provider pause switches reuse `ReaderSheetSwitchRow` with optional supporting text rather
-  than individual cards; remaining parameter cards use compact vertical padding. Shared
+  than individual cards; output format/sample rate also use plain rows, and remaining
+  parameter cards use compact vertical padding. Shared
   slider heights and existing behavior-setting rows retain their defaults.
+  New cloud/self-hosted synthesis configurations default to MP3. Serialized format fields
+  are always written, including defaults; omitted fields in older stored parameter entries
+  and custom profiles retain their legacy WAV value on decode. Unconfigured sources use
+  the new default; installed Android engines still generate WAV.
   Voice owns speaker selection. VITS speaker names come from `/voice/speakers`, with
   model-type/ID retained as secondary labels;
   configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding

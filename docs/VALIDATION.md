@@ -1178,7 +1178,7 @@ Validate relevant sync/update/Sasayaki changes with:
   width to the label; long values must stay bounded without pushing the arrow out.
   Provider pause switches use plain rows matching Settings, retaining default/custom
   supporting text and showing their unchanged sliders when enabled. Remaining parameter
-  cards have compact padding. Check long labels and wrapped supporting text without
+  cards have compact padding; Audio format/Sample rate appear as plain rows. Check long labels and wrapped supporting text without
   overlap, and confirm Sasayaki/shared behavior rows retain their layout.
 - In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
   Toggle it off with a ruby sample such as 今日 annotated キヨウ: playback, full-sentence
@@ -1315,3 +1315,7 @@ Validate relevant sync/update/Sasayaki changes with:
 - Select self-hosted WAV/MP3 only under Voice; Source configuration contains
   no duplicate format control. Changing format preserves the selected voice and other
   server profiles, and switching sources restores each server's format.
+- New configurable cloud/self-hosted sources default to MP3. Restore saved WAV and MP3
+  choices, including legacy JSON that omitted default WAV fields, and verify both choices
+  survive an unrelated settings edit and repository recreation. Installed system synthesis
+  continues to use WAV. `TtsRepositoryTest` covers these persistence boundaries.

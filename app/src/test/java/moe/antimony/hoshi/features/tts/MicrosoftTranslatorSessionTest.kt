@@ -130,7 +130,7 @@ class MicrosoftTranslatorSessionTest {
         assertEquals(.5f, source.normalizeRate(.1f))
         assertEquals(2f, source.normalizeRate(3f))
         assertEquals(ttsPitchRange(TtsOnlineSource.Azure, "ja-JP-NanamiNeural"), ttsPitchRange(source, "ja-JP-NanamiNeural"))
-        assertEquals("wav", TtsSettings(engine = source.id).audioExtension())
-        assertEquals("mp3", TtsSettings(engine = source.id).withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Mp3)).audioExtension())
+        assertEquals("mp3", TtsSettings(engine = source.id).audioExtension())
+        assertEquals("wav", TtsSettings(engine = source.id).withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav)).audioExtension())
     }
 }
