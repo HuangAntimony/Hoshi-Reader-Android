@@ -70,4 +70,17 @@ class TtsCustomSourceTest {
             try { first.copy(baseUrl = url).validate(); fail("Expected rejected URL") } catch (_: TtsException) { }
         }
     }
+
+    @Test fun configuredVoiceIdsPersistWithoutChangingTheChosenVoiceOrSynthesisIdentity() = runTest {
+        val store = Store()
+        val repository = TtsRepository(store)
+        repository.saveSource(first)
+        repository.settings(repository.preferences.first().settings.selectSource(first.id))
+        val before = repository.preferences.first().settings.synthesisSettings()
+        repository.saveSource(first.copy(voiceIds = listOf(" alice ", "bob", "bob", "")))
+        val restored = TtsRepository(store).preferences.first().settings
+        assertEquals(listOf("alice", "bob"), restored.customSource()!!.voiceIds)
+        assertEquals("alice", restored.voice)
+        assertEquals(before, restored.synthesisSettings())
+    }
 }

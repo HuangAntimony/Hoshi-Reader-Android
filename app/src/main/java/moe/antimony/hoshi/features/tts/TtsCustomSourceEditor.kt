@@ -31,6 +31,7 @@ internal fun TtsCustomSourceEditor(
     onDismiss: () -> Unit,
 ) {
     var source by remember(initial.id) { mutableStateOf(initial) }
+    var voiceIds by remember(initial.id) { mutableStateOf(initial.voiceIds.joinToString("\n")) }
     var key by remember(initial.id) { mutableStateOf("") }
     var removeKey by remember(initial.id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -50,8 +51,8 @@ internal fun TtsCustomSourceEditor(
                 if (!busy) {
                     val protocol = TtsCustomProtocol.valueOf(it)
                     if (protocol != source.protocol) {
-                        update(source.copy(protocol = protocol, model = "", voice = if (protocol == TtsCustomProtocol.Vits) "VITS:0" else "", rate = 1f, preset = "", encryptedKey = ""))
-                        key = ""; removeKey = false; models = emptyList(); modelsLoaded = false
+                        update(source.copy(protocol = protocol, model = "", voice = "", rate = 1f, preset = "", encryptedKey = "", voiceIds = emptyList()))
+                        key = ""; removeKey = false; models = emptyList(); modelsLoaded = false; voiceIds = ""
                     }
                 }
             }
@@ -77,18 +78,15 @@ internal fun TtsCustomSourceEditor(
                 if (models.isNotEmpty()) TtsChoice(stringResource(R.string.tts_service_model), source.model, source.model,
                     models.map { TtsChoiceOption(it, it) }, enabled = !busy) { update(source.copy(model = it)) }
                 else if (modelsLoaded) Text(stringResource(R.string.tts_service_no_models), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-                TtsServiceField(R.string.tts_service_voice, source.voice, !busy) { update(source.copy(voice = it)) }
-            } else {
-                val speaker = vitsSpeaker(source.voice) ?: ("VITS" to 0)
-                TtsChoice(stringResource(R.string.tts_service_vits_model), speaker.first, speaker.first,
-                    vitsModels.keys.map { TtsChoiceOption(it, it) }, enabled = !busy) { if (!busy) update(source.copy(voice = "$it:${speaker.second}", rate = 1f)) }
-                TtsServiceField(R.string.tts_service_speaker, source.voice.substringAfter(':', ""), !busy, KeyboardType.Number) {
-                    update(source.copy(voice = "${speaker.first}:$it"))
-                }
-                if (speaker.first == "GPT-SOVITS") {
-                    TtsServiceField(R.string.tts_service_preset, source.preset, !busy) { update(source.copy(preset = it)) }
-                    Text(stringResource(R.string.tts_service_preset_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-                }
+                OutlinedTextField(voiceIds, {
+                    voiceIds = it
+                    update(source.copy(voiceIds = it.lineSequence().map { id -> id.trim() }.filter { id -> id.isNotEmpty() }.distinct().toList()))
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6,
+                    label = { Text(stringResource(R.string.tts_service_voice_ids)) }, colors = hoshiOutlinedTextFieldColors())
+                Text(stringResource(R.string.tts_service_voice_ids_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+            } else if (vitsSpeaker(source.voice)?.first == "GPT-SOVITS") {
+                TtsServiceField(R.string.tts_service_preset, source.preset, !busy) { update(source.copy(preset = it)) }
+                Text(stringResource(R.string.tts_service_preset_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             }
             TtsChoice(stringResource(R.string.tts_output_format), stringResource(if (source.format == TtsAudioFormat.Wav) R.string.tts_format_wav else R.string.tts_format_mp3),
                 source.format.name, listOf(TtsChoiceOption("Wav", stringResource(R.string.tts_format_wav)), TtsChoiceOption("Mp3", stringResource(R.string.tts_format_mp3))), enabled = !busy) {

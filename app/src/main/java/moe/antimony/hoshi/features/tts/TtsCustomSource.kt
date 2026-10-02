@@ -23,9 +23,11 @@ data class TtsCustomSource(
     val rate: Float = 1f,
     val format: TtsAudioFormat = TtsAudioFormat.Wav,
     val preset: String = "",
+    val voiceIds: List<String> = emptyList(),
 ) {
     fun normalized(): TtsCustomSource = copy(name = name.trim(), baseUrl = customTtsBaseUrl(baseUrl).toString(),
-        model = model.trim(), voice = voice.trim(), preset = preset.trim(), rate = normalizeRate(rate))
+        model = model.trim(), voice = voice.trim(), preset = preset.trim(), rate = normalizeRate(rate),
+        voiceIds = voiceIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct())
     fun validate(): TtsCustomSource {
         val value = normalized()
         if (!id.startsWith("custom:") || id.length <= 7 || value.name.isBlank() ||
@@ -57,12 +59,18 @@ internal fun customTtsBaseUrl(value: String): HttpUrl {
 internal fun TtsSettings.customSource(): TtsCustomSource? = customSources.firstOrNull { it.id == engine }
 internal fun TtsSettings.isCustomSource(): Boolean = engine.startsWith("custom:")
 
+internal fun TtsCustomSource.voiceChoices(discovered: List<TtsVoiceInfo>): List<TtsVoiceInfo> {
+    val configured = if (protocol == TtsCustomProtocol.OpenAi) voiceIds.map { TtsVoiceInfo(it, true) } else emptyList()
+    val choices = (discovered + configured).distinctBy { it.id }
+    return if (voice.isNotBlank() && choices.none { it.id == voice }) choices + TtsVoiceInfo(voice, true) else choices
+}
+
 /** Only the selected source influences synthesis; display names and unrelated profiles do not. */
 internal fun TtsSettings.synthesisSettings(): TtsSettings {
     val custom = customSource()
     return copy(voice = custom?.voice ?: voice, rate = custom?.rate ?: rate, pitch = if (isCustomSource()) 0f else pitch,
         online = online.filterKeys { it == engine }, parameters = parameters.filterKeys { it == engine },
-        customSources = listOfNotNull(custom?.copy(name = "")), prefetchSentences = 0, playbackRate = 1f)
+        customSources = listOfNotNull(custom?.copy(name = "", voiceIds = emptyList())), prefetchSentences = 0, playbackRate = 1f)
 }
 
 internal fun TtsSettings.selectSource(id: String): TtsSettings {

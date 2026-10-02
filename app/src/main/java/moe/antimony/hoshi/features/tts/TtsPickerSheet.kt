@@ -99,7 +99,6 @@ internal fun TtsProviderPicker(
 internal fun TtsVoicePicker(
     title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
     failure: TtsFailure?, onSelected: (String) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit,
-    onManual: (() -> Unit)? = null,
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
@@ -111,9 +110,6 @@ internal fun TtsVoicePicker(
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
             item(key = "automatic") {
                 TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank()) { onSelected("") }
-            }
-            if (onManual != null) item(key = "manual-voice") {
-                TextButton(onClick = onManual, modifier = Modifier.padding(horizontal = 12.dp)) { Text(stringResource(R.string.tts_service_manual_voice)) }
             }
             items(choices, key = { it.id }) { voice ->
                 val connection = if (voices.any { it.id == voice.id })

@@ -31,8 +31,7 @@ class CustomTtsEngine internal constructor(
     private fun fingerprint(source: TtsCustomSource): String = MessageDigest.getInstance("SHA-256")
         .digest("${source.id}\u0000${source.protocol}\u0000${source.baseUrl}\u0000${source.encryptedKey}".toByteArray())
         .joinToString("") { "%02x".format(it) }
-    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>) = TtsCatalog(emptyList(), source.id,
-        if (source.voice.isNotBlank() && voices.none { it.id == source.voice }) voices + TtsVoiceInfo(source.voice, true) else voices)
+    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>) = TtsCatalog(emptyList(), source.id, source.voiceChoices(voices))
 
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)

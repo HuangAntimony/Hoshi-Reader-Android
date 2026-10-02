@@ -117,8 +117,7 @@ internal fun TtsVoiceSettings(
     }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false }, onCustom = { sourcePicker = false; onCustom(it) })
     if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, busy && preview == TtsPreviewState.Idle, failure,
         onSelected = { voicePicker = false; onSettings(settings.copy(voice = it).withOptions(settings.options().copy(style = "", role = ""))) },
-        onRetry = onRetry, onDismiss = { voicePicker = false },
-        onManual = if (custom?.protocol == TtsCustomProtocol.OpenAi) ({ voicePicker = false; onCustom(custom.id) }) else null)
+        onRetry = onRetry, onDismiss = { voicePicker = false })
 }
 
 @Composable

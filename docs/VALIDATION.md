@@ -1301,3 +1301,7 @@ Validate relevant sync/update/Sasayaki changes with:
 - Keep OpenAI manual Preview/Play usable while optional voice discovery is pending. A
   temporary network/catalog error must not persist an empty voice list; test successful
   recovery, while unsupported discovery endpoints remain usable without repeated loading.
+- Configure available OpenAI voice IDs in Source, one per line, then choose under Voice.
+  Check persistence and de-duplication with discovered IDs, including a pending/failed
+  optional list request. Editing available IDs keeps the chosen voice and ongoing audio;
+  VITS voices use server-provided character names and compound model/speaker identifiers.

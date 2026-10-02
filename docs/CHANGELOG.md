@@ -28,7 +28,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   e-ink shows readable loading text instead of a solid black progress line.
   Add, edit and delete self-hosted servers from Source; each retains its model, voice,
   engine rate and WAV/MP3 format, with optional encrypted credentials and draft connection
-  testing. Editing another server or renaming the current one leaves playback running.
+  testing. Choose voices separately under Voice: VITS shows server-provided character names,
+  while OpenAI Compatible can list manually configured voice IDs alongside voices discovered
+  from the server. Changing available IDs keeps the chosen voice and playback intact.
+  Editing another server or renaming the current one leaves playback running.
   TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
   sends original base text to the engine while preserving custom replacements for reading,
   preview and Anki sentence audio.

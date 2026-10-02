@@ -57,7 +57,7 @@ class TtsPanelStateTest {
 
     private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false, discovery: CountDownLatch? = null) {
         val source = if (discovery != null) "custom:manual" else if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
-        val profiles = if (discovery == null) "" else """, "voice":"sample", "customSources":[{"id":"custom:manual","name":"Local","baseUrl":"http://127.0.0.1:8088/v1","model":"irodori-tts","voice":"sample"}]"""
+        val profiles = if (discovery == null) "" else """, "voice":"sample", "customSources":[{"id":"custom:manual","name":"Local","baseUrl":"http://127.0.0.1:8088/v1","model":"irodori-tts","voice":"sample","voiceIds":["neutral","bright"]}]"""
         speech = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"$profiles}}"""))
         val repository = TtsRepository(speech)
         val cipher = TtsCredentialCipher(Dispatchers.IO)
@@ -106,6 +106,10 @@ class TtsPanelStateTest {
             panel(discovery = discovery)
             compose.runOnIdle { Assert.assertFalse(model.busy.value) }
             compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).performScrollTo().assertIsEnabled()
+            compose.onNodeWithText("sample").performScrollTo().performClick()
+            compose.onNodeWithText("neutral").assertIsDisplayed().performClick()
+            compose.waitUntil(5_000) { model.preferences.value.settings.voice == "neutral" }
+            compose.runOnIdle { Assert.assertEquals("neutral", model.preferences.value.settings.customSource()?.voice) }
         } finally { discovery.countDown() }
     }
 

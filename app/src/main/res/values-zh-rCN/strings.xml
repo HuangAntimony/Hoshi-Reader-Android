@@ -1030,14 +1030,12 @@
     <string name="tts_service_url_openai">包含 API 前缀，例如 http://192.168.1.10:8088/v1</string>
     <string name="tts_service_url_vits">服务根地址，例如 http://192.168.1.10:23456</string>
     <string name="tts_service_model">模型 ID</string>
-    <string name="tts_service_voice">音色 ID</string>
-    <string name="tts_service_vits_model">模型类型</string>
-    <string name="tts_service_speaker">说话人 ID</string>
+    <string name="tts_service_voice_ids">可用音色 ID</string>
+    <string name="tts_service_voice_ids_hint">选填，每行一个 ID。将在音色列表中与服务器提供的音色一起显示。</string>
     <string name="tts_service_preset">参考音频预设</string>
     <string name="tts_service_preset_hint">填写服务器中已有的预设，留空使用服务器默认配置。</string>
     <string name="tts_service_key_hint">可选。留空保留已保存的密钥。</string>
     <string name="tts_service_clear_key">移除已保存的密钥</string>
-    <string name="tts_service_manual_voice">输入音色 ID</string>
     <string name="tts_service_load_models">获取模型列表</string>
     <string name="tts_service_no_models">模型列表不可用，请手动填写模型 ID。</string>
     <string name="tts_service_delete_title">删除服务？</string>

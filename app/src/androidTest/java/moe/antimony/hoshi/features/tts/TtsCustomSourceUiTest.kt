@@ -68,4 +68,22 @@ class TtsCustomSourceUiTest {
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertTrue(cancelled); assertFalse(saved) }
     }
+
+    @Test fun editingAvailableVoiceIdsKeepsTheSelectedVoice() {
+        var saved: TtsCustomSource? = null
+        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1",
+            model = "irodori-tts", voice = "selected", voiceIds = listOf("selected"))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsCustomSourceEditor(source, true, { _, _, _ -> null },
+                    { draft, _, _ -> saved = draft; null }, { null }, { _, _, _ -> emptyList() }, {})
+            }
+        }
+        compose.onNodeWithText("Available voice IDs").performScrollTo().performTextReplacement("neutral\nbright")
+        compose.onNodeWithText("Save").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf("neutral", "bright"), saved?.voiceIds)
+            assertEquals("selected", saved?.voice)
+        }
+    }
 }

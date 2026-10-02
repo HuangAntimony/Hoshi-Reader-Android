@@ -77,21 +77,21 @@ class TtsViewModel @Inject constructor(
         val generation = ++catalogGeneration
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
+            var fallback: TtsCatalog? = null
             try {
                 val settings = repository.preferences.first().settings
-                val cached = engine.cachedCatalog(settings)
                 val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
+                fallback = optional?.let { TtsCatalog(emptyList(), it.id, it.voiceChoices(emptyList())) }
+                val cached = engine.cachedCatalog(settings)
                 mutableError.value = null
-                mutableCatalog.value = cached ?: optional?.let {
-                    TtsCatalog(emptyList(), it.id, if (it.voice.isBlank()) emptyList() else listOf(TtsVoiceInfo(it.voice, true)))
-                }
+                mutableCatalog.value = cached ?: fallback
                 catalogBusy.value = optional == null && (force || cached == null)
                 mutableEngines.value = engine.installedEngines()
                 mutableCatalog.value = if (!force && cached != null) cached else engine.catalog(settings, force)
                 if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableCatalog.value = null; mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.EngineUnavailable }
+            catch (error: Exception) { mutableCatalog.value = fallback; mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.EngineUnavailable }
             finally { if (generation == catalogGeneration) catalogBusy.value = false }
         }
     }
@@ -152,10 +152,11 @@ class TtsViewModel @Inject constructor(
     suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsFailure? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first().settings
-        val changed = current.customSource()?.copy(name = "") != draft.copy(name = "")
+        val previous = current.customSource()
+        val changed = previous?.copy(name = "", voiceIds = emptyList()) != draft.copy(name = "", voiceIds = emptyList())
         if (current.engine == draft.id && changed) stopPreview()
         repository.saveSource(draft)
-        if (current.engine == draft.id && changed) refresh()
+        if (current.engine == draft.id && (changed || previous?.voiceIds != draft.voiceIds)) refresh()
         null
     } catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }

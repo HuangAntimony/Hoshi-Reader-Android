@@ -1032,14 +1032,12 @@
     <string name="tts_service_url_openai">Include the API prefix, for example http://192.168.1.10:8088/v1</string>
     <string name="tts_service_url_vits">Server root, for example http://192.168.1.10:23456</string>
     <string name="tts_service_model">Model ID</string>
-    <string name="tts_service_voice">Voice ID</string>
-    <string name="tts_service_vits_model">Model type</string>
-    <string name="tts_service_speaker">Speaker ID</string>
+    <string name="tts_service_voice_ids">Available voice IDs</string>
+    <string name="tts_service_voice_ids_hint">Optional, one ID per line. These appear in Voice alongside any server-provided voices.</string>
     <string name="tts_service_preset">Reference preset</string>
     <string name="tts_service_preset_hint">Use a preset already configured on the server, or leave blank for its default.</string>
     <string name="tts_service_key_hint">Optional. Leave blank to keep the saved key.</string>
     <string name="tts_service_clear_key">Remove saved key</string>
-    <string name="tts_service_manual_voice">Enter voice ID</string>
     <string name="tts_service_load_models">Load models</string>
     <string name="tts_service_no_models">No model list available. Enter the model ID manually.</string>
     <string name="tts_service_delete_title">Delete service?</string>

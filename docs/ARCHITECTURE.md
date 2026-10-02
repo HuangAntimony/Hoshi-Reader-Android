@@ -825,8 +825,14 @@ QA matrices live in `docs/VALIDATION.md`.
   proxy path prefixes, disable redirects, use normal TLS validation, and share private HTTP
   host rules with AnkiConnect through `network/PrivateHttpHost`. Credentials are encrypted
   against each profile ID; protocol changes clear the draft's old credential. Named profiles
-  independently persist model, voice, rate and format. The active synthesis snapshot excludes
-  display names and other sources; both playback invalidation and audio caching use it.
+  independently persist model, voice, rate and format.
+  Source configuration edits connection/model options and an optional OpenAI voice-ID list;
+  Voice owns speaker selection. VITS speaker names come from `/voice/speakers`, with
+  model-type/ID retained as secondary labels;
+  configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding
+  server-provided labels. They are available during optional discovery and after failure.
+  The active synthesis snapshot excludes display names, available voice-ID lists and other
+  sources; both playback invalidation and audio caching use it.
   Catalogs are stored by profile ID and connection fingerprint without timed refresh.
   Missing `custom:` profiles fail configuration rather than falling through to Android.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including

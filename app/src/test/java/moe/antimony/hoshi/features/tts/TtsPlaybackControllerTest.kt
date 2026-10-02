@@ -86,6 +86,7 @@ class TtsPlaybackControllerTest {
             val prepared = output.prepared
             repository.saveSource(second.copy(baseUrl = "http://192.168.1.2/v1")); runCurrent()
             repository.saveSource(first.copy(name = "Renamed")); runCurrent()
+            repository.saveSource(first.copy(voiceIds = listOf("bob", "carol"))); runCurrent()
             repository.deleteSource(second.id); runCurrent()
             assertTrue(controller.state.value.playing); assertEquals(prepared, output.prepared)
             repository.deleteSource(first.id); runCurrent()

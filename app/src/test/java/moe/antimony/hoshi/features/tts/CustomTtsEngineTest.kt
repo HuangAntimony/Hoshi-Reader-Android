@@ -114,6 +114,20 @@ class CustomTtsEngineTest {
         }
     }
 
+    @Test fun configuredVoiceIdsCombineWithDiscoveryAndRefreshFromCachedCatalog() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"voices":[{"id":"alice","name":"Server Alice"}]}"""))
+            val source = profile(server).copy(voiceIds = listOf("alice", "bob"))
+            val adapter = engine(store = TtsVoiceCatalogStore(folder.newFolder("manual-voices")))
+            val catalog = adapter.catalog(settings(source))
+            assertEquals(listOf("alice", "bob", "sample"), catalog.voices.map { it.id })
+            assertEquals("Server Alice", catalog.voices.first().label)
+            val changed = source.copy(voiceIds = listOf("alice", "carol"))
+            assertEquals(listOf("alice", "carol", "sample"), adapter.cachedCatalog(settings(changed))!!.voices.map { it.id })
+            assertEquals(1, server.requestCount)
+        }
+    }
+
     @Test fun catalogsSurviveRecreationAndAreSeparatedByServerConfiguration() = runBlocking {
         MockWebServer().use { server ->
             val store = TtsVoiceCatalogStore(folder.newFolder("voices"))
