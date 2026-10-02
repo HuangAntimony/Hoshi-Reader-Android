@@ -32,7 +32,7 @@ class TtsContinuousPlaybackDeviceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "tts-continuous-device-test")
         val router = TtsEngineRouter(AndroidTtsEngine(context),
-            OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO))
+            OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO), CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO))
         val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
         val repository = TtsRepository(MemoryStore())
         repository.settings(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural", rate = 2f,

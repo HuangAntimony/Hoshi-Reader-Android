@@ -23,7 +23,7 @@ class OnlineTtsDeviceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "translator-style-device-test")
         val engine = OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO)
-        val router = TtsEngineRouter(AndroidTtsEngine(context), engine)
+        val router = TtsEngineRouter(AndroidTtsEngine(context), engine, CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO))
         val repository = TtsAudioRepository(router, directory, Dispatchers.IO)
         val initial = TtsSettings(engine = TtsOnlineSource.MicrosoftTranslator.id)
         val voice = router.catalog(initial).voices.first { "cheerful" in it.styles }
@@ -62,7 +62,7 @@ class OnlineTtsDeviceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "online-tts-device-test-${source.name}")
         val online = OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO)
-        val router = TtsEngineRouter(AndroidTtsEngine(context), online)
+        val router = TtsEngineRouter(AndroidTtsEngine(context), online, CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO))
         val repository = TtsAudioRepository(router, directory, Dispatchers.IO)
         val settings = TtsSettings(engine = source.id, pitch = if (source == TtsOnlineSource.Edge) 10f else 0f,
             parameters = mapOf(source.id to TtsSynthesisOptions(volume = -10f, format = TtsAudioFormat.Mp3)))

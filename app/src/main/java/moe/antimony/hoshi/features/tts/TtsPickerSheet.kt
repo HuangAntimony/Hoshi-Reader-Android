@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
@@ -23,9 +25,9 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
 internal enum class TtsSourceGroup(val labelRes: Int) {
-    Device(R.string.tts_group_device), Online(R.string.tts_group_online), Cloud(R.string.tts_group_cloud), Other(R.string.tts_group_other)
+    Device(R.string.tts_group_device), Online(R.string.tts_group_online), Cloud(R.string.tts_group_cloud), Custom(R.string.tts_group_custom), Other(R.string.tts_group_other)
 }
-internal data class TtsSourceChoice(val id: String, val title: String, val group: TtsSourceGroup)
+internal data class TtsSourceChoice(val id: String, val title: String, val group: TtsSourceGroup, val protocol: TtsCustomProtocol? = null)
 
 @Composable
 internal fun TtsSelectionSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
@@ -44,12 +46,13 @@ internal fun TtsSelectionSheet(title: String, onDismiss: () -> Unit, content: @C
 internal fun TtsProviderPicker(
     choices: List<TtsSourceChoice>, selected: String, onSelected: (String) -> Unit,
     onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, onDismiss: () -> Unit,
+    onCustom: (String?) -> Unit = {},
 ) {
     TtsSelectionSheet(stringResource(R.string.tts_choose_source), onDismiss) {
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
             for (group in TtsSourceGroup.entries) {
                 val entries = choices.filter { it.group == group }
-                if (entries.isEmpty()) continue
+                if (entries.isEmpty() && group != TtsSourceGroup.Custom) continue
                 item(key = "group:$group") {
                     Text(stringResource(group.labelRes), style = MaterialTheme.typography.labelLarge,
                         color = hoshiSurfaces.muted, modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 8.dp))
@@ -68,13 +71,19 @@ internal fun TtsProviderPicker(
                         Box(Modifier.size(24.dp)) { if (choice.id == selected) Icon(Icons.Rounded.Check, null) }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(choice.title, style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(supporting), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+                            Text(stringResource(choice.protocol?.labelRes ?: supporting), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
                         }
+                        if (choice.protocol != null) IconButton(onClick = { onCustom(choice.id) }) { Icon(Icons.Rounded.Edit, null, tint = hoshiSurfaces.muted) }
                         if (source?.needsKey == true) IconButton(onClick = { onConfigure(source) }) { Icon(Icons.Rounded.Settings, null, tint = hoshiSurfaces.muted) }
                     }
                 }
             }
-            if (TtsOnlineSource.from(selected) == null) item(key = "system-settings") {
+            item(key = "add-service") {
+                TextButton(onClick = { onCustom(null) }, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
+                    Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.tts_add_service))
+                }
+            }
+            if (TtsOnlineSource.from(selected) == null && !selected.startsWith("custom:")) item(key = "system-settings") {
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = hoshiSurfaces.divider)
                 TextButton(onClick = onSystemSettings, modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp)) {
                     Icon(Icons.Rounded.Settings, null, Modifier.size(18.dp))
@@ -90,6 +99,7 @@ internal fun TtsProviderPicker(
 internal fun TtsVoicePicker(
     title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
     failure: TtsFailure?, onSelected: (String) -> Unit, onRetry: () -> Unit, onDismiss: () -> Unit,
+    onManual: (() -> Unit)? = null,
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
@@ -102,10 +112,13 @@ internal fun TtsVoicePicker(
             item(key = "automatic") {
                 TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank()) { onSelected("") }
             }
+            if (onManual != null) item(key = "manual-voice") {
+                TextButton(onClick = onManual, modifier = Modifier.padding(horizontal = 12.dp)) { Text(stringResource(R.string.tts_service_manual_voice)) }
+            }
             items(choices, key = { it.id }) { voice ->
                 val connection = if (voices.any { it.id == voice.id })
                     stringResource(if (voice.network) R.string.tts_online else R.string.tts_offline) else null
-                TtsVoiceRow(voice.id, connection, voice.id == selected) { onSelected(voice.id) }
+                TtsVoiceRow(voice.label, if (voice.label != voice.id) voice.id else connection, voice.id == selected) { onSelected(voice.id) }
             }
         }
     }

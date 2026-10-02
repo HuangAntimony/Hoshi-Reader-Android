@@ -21,13 +21,13 @@ import kotlinx.coroutines.sync.withLock
 
 data class TtsEngineInfo(val id: String, val label: String)
 @kotlinx.serialization.Serializable
-data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList())
+data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList(), val label: String = id)
 data class TtsCatalog(val engines: List<TtsEngineInfo>, val selectedEngine: String, val voices: List<TtsVoiceInfo>)
 enum class TtsFailure {
     NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage,
-    Configuration, Authentication, RateLimited, Network, InvalidResponse,
+    PrivateHttp, Configuration, Authentication, RateLimited, Network, InvalidResponse,
 }
-class TtsException(val failure: TtsFailure) : Exception(failure.name)
+class TtsException(val failure: TtsFailure, internal val statusCode: Int? = null) : Exception(failure.name)
 
 // Engines may expose ISO 639-1 (Google) or ISO 639-2 (Samsung) locale language codes.
 internal fun isJapaneseTtsLocale(locale: Locale): Boolean = locale.language == "ja" || locale.language == "jpn"

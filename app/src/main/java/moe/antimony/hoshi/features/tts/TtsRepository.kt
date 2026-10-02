@@ -18,6 +18,7 @@ import moe.antimony.hoshi.epub.EpubBook
 @Serializable
 data class TtsSettings(
     val engine: String = "", val voice: String = "", val rate: Float = 1f,
+    val customSources: List<TtsCustomSource> = emptyList(),
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
     val prefetchSentences: Int = 2, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
@@ -41,11 +42,13 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     }
 
     suspend fun settings(settings: TtsSettings) {
-        val rate = TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
+        val custom = settings.customSource()
+        val rate = custom?.normalizeRate(settings.rate) ?: TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
             ?: settings.rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
-        val pitchRange = ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
+        val pitchRange = if (settings.isCustomSource()) null else ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
-        val normalized = settings.copy(rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
+        val sources = settings.customSources.map { if (it.id == settings.engine) it.copy(voice = settings.voice, rate = rate) else it }
+        val normalized = settings.copy(customSources = sources, rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
             prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
             playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
@@ -61,6 +64,23 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         store.edit {
             val old = decode(it[key])
             it[key] = json.encodeToString(old.copy(settings = old.settings.copy(online = old.settings.online + (source.id to config))))
+        }
+    }
+    suspend fun saveSource(source: TtsCustomSource) {
+        val value = source.validate()
+        store.edit {
+            val current = decode(it[key])
+            val settings = current.settings
+            val sources = settings.customSources.filterNot { profile -> profile.id == value.id } + value
+            val next = settings.copy(customSources = sources).let { if (it.engine == value.id) it.selectSource(value.id) else it }
+            it[key] = json.encodeToString(current.copy(settings = next))
+        }
+    }
+    suspend fun deleteSource(id: String) {
+        store.edit {
+            val current = decode(it[key])
+            val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { source -> source.id == id })
+            it[key] = json.encodeToString(current.copy(settings = if (settings.engine == id) settings.selectSource("") else settings))
         }
     }
     suspend fun save(word: TtsWord): TtsWordError? {

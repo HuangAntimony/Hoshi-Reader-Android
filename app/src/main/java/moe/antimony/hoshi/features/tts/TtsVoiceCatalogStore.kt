@@ -25,6 +25,14 @@ class TtsVoiceCatalogStore internal constructor(private val directory: File) {
     private fun fingerprint(config: TtsOnlineConfig): String = MessageDigest.getInstance("SHA-256")
         .digest("${config.region}\u0000${config.encryptedKey}".toByteArray()).joinToString("") { "%02x".format(it) }
 
+    private fun customFile(id: String): File = File(directory, "custom-" + MessageDigest.getInstance("SHA-256")
+        .digest(id.toByteArray()).joinToString("") { "%02x".format(it) } + ".json")
+    internal fun readCustom(id: String, configuration: String): List<TtsVoiceInfo>? = try {
+        json.decodeFromString<Entry>(customFile(id).readText()).takeIf { it.configuration == configuration }?.voices
+    } catch (_: IOException) { null } catch (_: SerializationException) { null } catch (_: IllegalArgumentException) { null }
+    internal fun writeCustom(id: String, configuration: String, voices: List<TtsVoiceInfo>) {
+        writeEntry(customFile(id), Entry(configuration, voices))
+    }
     internal fun read(source: TtsOnlineSource, config: TtsOnlineConfig): List<TtsVoiceInfo>? = try {
         json.decodeFromString<Entry>(file(source).readText()).takeIf {
             it.configuration == fingerprint(config) && it.voices.isNotEmpty()
@@ -32,14 +40,17 @@ class TtsVoiceCatalogStore internal constructor(private val directory: File) {
     } catch (_: IOException) { null } catch (_: SerializationException) { null } catch (_: IllegalArgumentException) { null }
 
     internal fun write(source: TtsOnlineSource, config: TtsOnlineConfig, voices: List<TtsVoiceInfo>) {
+        writeEntry(file(source), Entry(fingerprint(config), voices))
+    }
+    private fun writeEntry(target: File, entry: Entry) {
         val temporary = File(directory, "${UUID.randomUUID()}.tmp")
         try {
             directory.mkdirs()
-            temporary.writeText(json.encodeToString(Entry(fingerprint(config), voices)))
+            temporary.writeText(json.encodeToString(entry))
             try {
-                Files.move(temporary.toPath(), file(source).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(temporary.toPath(), file(source).toPath(), StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
         } catch (_: IOException) {
             // A cache write failure must not discard successfully fetched voices.

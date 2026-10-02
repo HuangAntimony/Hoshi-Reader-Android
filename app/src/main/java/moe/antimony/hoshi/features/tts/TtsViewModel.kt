@@ -80,26 +80,32 @@ class TtsViewModel @Inject constructor(
             try {
                 val settings = repository.preferences.first().settings
                 val cached = engine.cachedCatalog(settings)
+                val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
                 mutableError.value = null
-                mutableCatalog.value = cached
-                catalogBusy.value = force || cached == null
+                mutableCatalog.value = cached ?: optional?.let {
+                    TtsCatalog(emptyList(), it.id, if (it.voice.isBlank()) emptyList() else listOf(TtsVoiceInfo(it.voice, true)))
+                }
+                catalogBusy.value = optional == null && (force || cached == null)
                 mutableEngines.value = engine.installedEngines()
                 mutableCatalog.value = if (!force && cached != null) cached else engine.catalog(settings, force)
-                if (mutableCatalog.value?.voices.isNullOrEmpty()) mutableError.value = TtsFailure.MissingJapanese
+                if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { mutableCatalog.value = null; mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.EngineUnavailable }
             finally { if (generation == catalogGeneration) catalogBusy.value = false }
         }
     }
-    fun settings(value: TtsSettings) {
+    fun settings(proposed: TtsSettings) {
+        val value = proposed.copy(customSources = proposed.customSources.map { if (it.id == proposed.engine) it.copy(voice = proposed.voice, rate = proposed.rate) else it })
         viewModelScope.launch { try {
             val previous = repository.preferences.first().settings
-            val playbackOnly = previous.copy(playbackRate = value.playbackRate) == value
+            val playbackOnly = previous.synthesisSettings() == value.synthesisSettings()
             if (!playbackOnly) { stopPreview(); dismissError() }
             repository.settings(value)
             previewPlayer?.setPlaybackSpeed(normalizeTtsPlaybackRate(value.playbackRate))
-            if (!playbackOnly && (previous.engine != value.engine || previous.online != value.online || catalog.value == null)) refresh()
+            if (!playbackOnly && (previous.engine != value.engine || previous.online[previous.engine] != value.online[value.engine] ||
+                previous.customSource()?.let { it.copy(name = "", rate = 1f, voice = "", format = TtsAudioFormat.Wav, preset = "") } !=
+                value.customSource()?.let { it.copy(name = "", rate = 1f, voice = "", format = TtsAudioFormat.Wav, preset = "") } || catalog.value == null)) refresh()
         } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
     }
     private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
@@ -135,6 +141,45 @@ class TtsViewModel @Inject constructor(
     } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
     catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
+    private suspend fun customDraft(source: TtsCustomSource, key: String, removeKey: Boolean): TtsCustomSource {
+        val encrypted = if (removeKey) "" else if (key.isBlank()) source.encryptedKey else {
+            val value = key.trim()
+            if (value.any { it <= ' ' || it >= '\u007f' }) throw TtsException(TtsFailure.Configuration)
+            cipher.encrypt(value, source.id)
+        }
+        return source.copy(encryptedKey = encrypted).validate()
+    }
+    suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsFailure? = try {
+        val draft = customDraft(source, key, removeKey)
+        val current = repository.preferences.first().settings
+        val changed = current.customSource()?.copy(name = "") != draft.copy(name = "")
+        if (current.engine == draft.id && changed) stopPreview()
+        repository.saveSource(draft)
+        if (current.engine == draft.id && changed) refresh()
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
+    suspend fun testSource(source: TtsCustomSource, key: String, removeKey: Boolean, sample: String): TtsFailure? = try {
+        val draft = customDraft(source, key, removeKey)
+        val current = repository.preferences.first()
+        val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id)
+        audio.export(TtsSentence(0, 0, 0, sample), null, current.copy(settings = settings)).delete()
+        null
+    } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
+    catch (error: CancellationException) { throw error }
+    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
+    suspend fun deleteSource(id: String): TtsFailure? = try {
+        val current = repository.preferences.first().settings
+        if (current.engine == id) { stopPreview(); playback.pause() }
+        repository.deleteSource(id)
+        if (current.engine == id) refresh()
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (_: Exception) { TtsFailure.Storage }
+    suspend fun sourceModels(source: TtsCustomSource, key: String, removeKey: Boolean): List<String> {
+        val encrypted = if (removeKey) "" else if (key.isBlank()) source.encryptedKey else cipher.encrypt(key.trim(), source.id)
+        return engine.models(source.copy(encryptedKey = encrypted))
+    }
     suspend fun save(word: TtsWord): TtsWordError? = try {
         repository.save(word.copy(surface = word.surface.trim()))
     } catch (error: CancellationException) { throw error } catch (_: Exception) { TtsWordError.Storage }

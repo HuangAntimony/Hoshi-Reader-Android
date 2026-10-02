@@ -12,6 +12,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import moe.antimony.hoshi.R
@@ -47,22 +50,30 @@ class TtsPanelStateTest {
     private var playCount = 0
     private val panelVisible = androidx.compose.runtime.mutableStateOf(true)
     private var onlineRequests = 0
+    private val discoveryStarted = AtomicBoolean(false)
     private lateinit var model: TtsViewModel
     private lateinit var speech: MemoryStore
     private val configMessage get() = context.getString(R.string.tts_configuration_error)
 
-    private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false) {
-        val source = if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
-        speech = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"}}"""))
+    private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false, discovery: CountDownLatch? = null) {
+        val source = if (discovery != null) "custom:manual" else if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
+        val profiles = if (discovery == null) "" else """, "voice":"sample", "customSources":[{"id":"custom:manual","name":"Local","baseUrl":"http://127.0.0.1:8088/v1","model":"irodori-tts","voice":"sample"}]"""
+        speech = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"engine":"$source"$profiles}}"""))
         val repository = TtsRepository(speech)
         val cipher = TtsCredentialCipher(Dispatchers.IO)
         val transport = OnlineTtsTransport(OkHttpClient.Builder().addInterceptor {
+            if (discovery != null) {
+                discoveryStarted.set(true)
+                discovery.await(10, TimeUnit.SECONDS)
+                return@addInterceptor okhttp3.Response.Builder().request(it.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("Fixture")
+                    .body("[]".toResponseBody()).build()
+            }
             if (!online) throw IOException("UI fixture prohibits network")
             onlineRequests++
             okhttp3.Response.Builder().request(it.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("Fixture")
                 .body("""[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toResponseBody()).build()
         }.build())
-        val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO))
+        val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), CustomTtsEngine(transport, cipher::decrypt, Dispatchers.IO))
         val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO)
         val books = TtsBookRepository(Dispatchers.IO)
         val output = object : TtsPlaybackOutput {
@@ -79,11 +90,24 @@ class TtsPanelStateTest {
             models.put("fixture", model)
         }
         compose.setContent { HoshiReaderTheme(darkTheme = false, dynamicColor = false) { if (panelVisible.value) TtsPanel(model, null, if (reader) ({ model.playback.play() }) else null, Modifier) } }
+        if (discovery != null) {
+            compose.waitUntil(5_000) { discoveryStarted.get() }
+            return
+        }
         compose.waitUntil(15_000) { !model.busy.value && model.readingSettings.value != null &&
             if (system || online) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value == TtsFailure.Configuration }
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
+
+    @Test fun optionalOpenAiDiscoveryDoesNotDisableManualPreview() {
+        val discovery = CountDownLatch(1)
+        try {
+            panel(discovery = discovery)
+            compose.runOnIdle { Assert.assertFalse(model.busy.value) }
+            compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).performScrollTo().assertIsEnabled()
+        } finally { discovery.countDown() }
+    }
 
     @Test fun rubyWriteFailureIsShownInSettingsAndDoesNotOverwriteSourceFailure() {
         panel()

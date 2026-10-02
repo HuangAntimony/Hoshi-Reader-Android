@@ -39,7 +39,7 @@ internal val googleAudioProfiles = listOf("", "wearable-class-device", "handset-
 
 internal fun TtsSettings.options() = parameters[engine]?.normalized(TtsOnlineSource.from(engine)) ?: TtsSynthesisOptions()
 internal fun TtsSettings.withOptions(options: TtsSynthesisOptions) = copy(parameters = parameters + (engine to options))
-internal fun TtsSettings.audioExtension() = when (TtsOnlineSource.from(engine)) {
+internal fun TtsSettings.audioExtension(): String = customSource()?.let { if (it.format == TtsAudioFormat.Mp3) "mp3" else "wav" } ?: when (TtsOnlineSource.from(engine)) {
     TtsOnlineSource.Edge, TtsOnlineSource.GoogleTranslate -> "mp3"
     TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator, TtsOnlineSource.GoogleCloud -> if (options().format == TtsAudioFormat.Mp3) "mp3" else "wav"
     null -> "wav"

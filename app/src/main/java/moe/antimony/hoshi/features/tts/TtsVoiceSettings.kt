@@ -27,23 +27,25 @@ internal fun TtsVoiceSettings(
     settings: TtsSettings, catalog: TtsCatalog?, engines: List<TtsEngineInfo>, busy: Boolean,
     preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettings) -> Unit,
     onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
-    onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier,
+    onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier, onCustom: (String?) -> Unit = {},
 ) {
     var sourcePicker by remember { mutableStateOf(false) }
     var voicePicker by remember { mutableStateOf(false) }
     val source = TtsOnlineSource.from(settings.engine)
+    val custom = settings.customSource()
     val automatic = stringResource(R.string.tts_system_default)
     val choices = buildList {
         add(TtsSourceChoice("", automatic, TtsSourceGroup.Device))
         engines.forEach { add(TtsSourceChoice(it.id, it.label, TtsSourceGroup.Device)) }
         TtsOnlineSource.entries.forEach { add(TtsSourceChoice(it.id, stringResource(it.labelRes), if (it.needsKey) TtsSourceGroup.Cloud else TtsSourceGroup.Online)) }
+        settings.customSources.forEach { add(TtsSourceChoice(it.id, it.name, TtsSourceGroup.Custom, it.protocol)) }
         if (settings.engine.isNotBlank() && none { it.id == settings.engine }) add(TtsSourceChoice(settings.engine, settings.engine, TtsSourceGroup.Other))
     }
     val sourceTitle = if (settings.engine.isBlank()) engines.firstOrNull { it.id == catalog?.selectedEngine }?.label ?: automatic
         else choices.first { it.id == settings.engine }.title
     val voices = catalog?.voices.orEmpty()
     val voice = if (settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == settings.voice }
-    val voiceTitle = if (settings.voice.isBlank()) automatic else settings.voice
+    val voiceTitle = if (settings.voice.isBlank()) automatic else voice?.label ?: settings.voice
     val connection = when {
         voice?.network == true -> stringResource(R.string.tts_online)
         voice != null -> stringResource(R.string.tts_offline)
@@ -60,6 +62,7 @@ internal fun TtsVoiceSettings(
             Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (custom != null) TextButton(onClick = { onCustom(custom.id) }) { Text(stringResource(R.string.tts_configure_source)) }
                     if (source?.needsKey == true) TextButton(onClick = { onConfigure(source) }) { Text(stringResource(R.string.tts_configure_source)) }
                     TextButton(onClick = onRetry, enabled = !busy) { Text(stringResource(R.string.tts_retry)) }
                 }
@@ -71,21 +74,27 @@ internal fun TtsVoiceSettings(
                 if (rate < 1f) "slow" else "normal",
                 listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)), TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
             ) { onSettings(settings.copy(rate = if (it == "slow") .5f else 1f)) }
-        } else {
-            val range = (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
+        } else if (custom?.supportsRate != false) {
+            val range = custom?.rateRange ?: (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
             ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
-                steps = when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
+                steps = if (custom != null) ((range.endInclusive - range.start) * 20).toInt() - 1 else when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
                 onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false)
         }
         var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
         ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
             playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
             onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false)
-        ttsPitchRange(source, voice?.id.orEmpty())?.let { range ->
+        (if (settings.isCustomSource()) null else ttsPitchRange(source, voice?.id.orEmpty()))?.let { range ->
             var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
             ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
                 steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
                 onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false)
+        }
+        if (custom != null) moe.antimony.hoshi.features.reader.ReaderSheetCard(verticalPadding = 4.dp) {
+            TtsChoice(stringResource(R.string.tts_output_format), stringResource(if (custom.format == TtsAudioFormat.Wav) R.string.tts_format_wav else R.string.tts_format_mp3),
+                custom.format.name, listOf(TtsChoiceOption("Wav", stringResource(R.string.tts_format_wav)), TtsChoiceOption("Mp3", stringResource(R.string.tts_format_mp3)))) {
+                onSettings(settings.copy(customSources = settings.customSources.map { profile -> if (profile.id == custom.id) profile.copy(format = TtsAudioFormat.valueOf(it)) else profile }))
+            }
         }
         TtsSynthesisControls(settings, voice, onSettings)
         HoshiButton(onClick = if (preview == TtsPreviewState.Idle) onPreview else onStopPreview,
@@ -103,12 +112,13 @@ internal fun TtsVoiceSettings(
     }
     if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = {
         sourcePicker = false
-        val next = settings.copy(engine = it, voice = "", pitch = 0f)
+        val next = settings.selectSource(it)
         onSettings(next.withOptions(next.options().copy(style = "", role = "")))
-    }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false })
+    }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false }, onCustom = { sourcePicker = false; onCustom(it) })
     if (voicePicker) TtsVoicePicker(sourceTitle, voices, settings.voice, busy && preview == TtsPreviewState.Idle, failure,
         onSelected = { voicePicker = false; onSettings(settings.copy(voice = it).withOptions(settings.options().copy(style = "", role = ""))) },
-        onRetry = onRetry, onDismiss = { voicePicker = false })
+        onRetry = onRetry, onDismiss = { voicePicker = false },
+        onManual = if (custom?.protocol == TtsCustomProtocol.OpenAi) ({ voicePicker = false; onCustom(custom.id) }) else null)
 }
 
 @Composable

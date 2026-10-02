@@ -31,7 +31,7 @@ class TtsAudioRepository @Inject constructor(
         withContext(ioDispatcher) {
             val spoken = TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings)
             // Prefetch depth and player speed do not change the synthesized audio.
-            val identity = "${preferences.settings.copy(prefetchSentences = 0, playbackRate = 1f)}\u0000$spoken"
+            val identity = "${preferences.settings.synthesisSettings()}\u0000$spoken"
             val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
             cached(key)?.let { return@withContext it }
             synthesis.withLock {

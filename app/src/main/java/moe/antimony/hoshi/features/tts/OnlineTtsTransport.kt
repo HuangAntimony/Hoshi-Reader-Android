@@ -20,13 +20,17 @@ import okhttp3.*
 import okio.ByteString
 
 @Singleton
-class OnlineTtsTransport internal constructor(private val client: OkHttpClient) {
+class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
+    private val customClient: OkHttpClient = client.newBuilder().connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS).callTimeout(180, TimeUnit.SECONDS)
+        .followRedirects(false).followSslRedirects(false).build(),
+) {
     @Inject constructor() : this(OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build())
 
-    internal suspend fun request(request: Request): ByteArray = suspendCancellableCoroutine { continuation ->
-        val call = client.newCall(request)
+    internal suspend fun request(request: Request, selfHosted: Boolean = false): ByteArray = suspendCancellableCoroutine { continuation ->
+        val call = (if (selfHosted) customClient else client).newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -35,7 +39,7 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient) 
             override fun onResponse(call: Call, response: Response) {
                 try {
                     val bytes = response.use {
-                        if (!it.isSuccessful) throw TtsException(httpFailure(it.code))
+                        if (!it.isSuccessful) throw TtsException(httpFailure(it.code), statusCode = it.code)
                         val body = it.body ?: throw TtsException(TtsFailure.InvalidResponse)
                         if (body.contentLength() > maxResponseBytes) throw TtsException(TtsFailure.InvalidResponse)
                         body.byteStream().use { input ->

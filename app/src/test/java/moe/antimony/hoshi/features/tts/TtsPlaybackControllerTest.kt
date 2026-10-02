@@ -65,6 +65,47 @@ class TtsPlaybackControllerTest {
     private val shortSentencesBook = EpubBook("Short sentences", chapters = listOf(EpubChapter("one", "one.xhtml",
         "application/xhtml+xml", "<p>一。二。三。四。五。六。七。八。九。十。</p>")))
 
+    @Test fun editingUnusedSourceDoesNotInterruptPlayback() = runTest {
+        fixture { controller, output, _, repository ->
+            controller.play(); runCurrent()
+            val prepared = output.prepared
+            repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "fixture")); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(prepared, output.prepared)
+            assertEquals(1, output.playCount)
+        }
+    }
+
+    @Test fun editingOrDeletingUnusedCustomServerPreservesCurrentPlaybackAndDeletingActiveStopsIt() = runTest {
+        fixture { controller, output, _, repository ->
+            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts", voice = "alice")
+            val second = first.copy(id = "custom:two", name = "Two")
+            repository.saveSource(first); repository.saveSource(second)
+            repository.settings(repository.preferences.first().settings.selectSource(first.id)); runCurrent()
+            controller.play(); runCurrent()
+            val prepared = output.prepared
+            repository.saveSource(second.copy(baseUrl = "http://192.168.1.2/v1")); runCurrent()
+            repository.saveSource(first.copy(name = "Renamed")); runCurrent()
+            repository.deleteSource(second.id); runCurrent()
+            assertTrue(controller.state.value.playing); assertEquals(prepared, output.prepared)
+            repository.deleteSource(first.id); runCurrent()
+            assertFalse(controller.state.value.playing); assertTrue(output.prepared.isEmpty())
+        }
+    }
+
+    @Test fun customServerChangeCancelsPendingSynthesisAndLateAudioCannotResumePlayback() = runTest {
+        fixture { controller, output, audio, repository ->
+            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts", voice = "alice")
+            repository.saveSource(first); repository.settings(repository.preferences.first().settings.selectSource(first.id)); runCurrent()
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { if (it.text == "東京です。") withContext(NonCancellable) { release.await() } }
+            controller.play(); runCurrent()
+            repository.saveSource(first.copy(baseUrl = "http://192.168.1.2:8088/v1")); runCurrent()
+            release.complete(Unit); runCurrent()
+            assertFalse(controller.state.value.playing); assertEquals(0, output.playCount)
+        }
+    }
+
     @Test fun changingRubyPreferenceInvalidatesPendingAudioWithoutResumingOldSynthesis() = runTest {
         val rubyBook = EpubBook("Ruby fixture", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml",
             "<p><ruby>今日<rt>キヨウ</rt></ruby>です。次です。</p>")))

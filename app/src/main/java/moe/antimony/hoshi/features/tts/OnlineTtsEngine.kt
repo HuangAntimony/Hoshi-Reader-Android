@@ -109,9 +109,7 @@ class OnlineTtsEngine internal constructor(
                             .post(FormBody.Builder().add("f.req", OnlineTtsProtocol.translateBody(part, rate < 1f)).build()).build()).toString(Charsets.UTF_8))
                     }
                     currentCoroutineContext().ensureActive()
-                    if (mp3) TtsMp3.validate(bytes)
-                    else if (bytes.size <= 44 || bytes.copyOfRange(0, 4).toString(Charsets.US_ASCII) != "RIFF")
-                        throw TtsException(TtsFailure.InvalidResponse)
+                    validateTtsAudio(bytes, if (mp3) TtsAudioFormat.Mp3 else TtsAudioFormat.Wav)
                     val file = File(directory, "${UUID.randomUUID()}.${if (mp3) "mp3" else "wav"}")
                     files += file
                     file.writeBytes(bytes)

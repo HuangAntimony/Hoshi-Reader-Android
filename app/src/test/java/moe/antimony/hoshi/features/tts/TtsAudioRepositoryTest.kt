@@ -146,7 +146,7 @@ class TtsAudioRepositoryTest {
 
     private fun repository(client: OkHttpClient): TtsAudioRepository {
         val online = OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "fixture-key" }, Dispatchers.IO)
-        return TtsAudioRepository(TtsEngineRouter(AndroidTtsEngine(ContextWrapper(null)), online), folder.root, Dispatchers.IO)
+        return TtsAudioRepository(TtsEngineRouter(AndroidTtsEngine(ContextWrapper(null)), online, CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO)), folder.root, Dispatchers.IO)
     }
 
     private fun client(onSynthesis: (String) -> Unit): OkHttpClient {

@@ -1018,4 +1018,28 @@
     <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
     <string name="tts_voice_status" comment="Voice label with its network requirement">%1$s · %2$s</string>
     <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">已保存的来源</string>
+    <string name="tts_protocol_openai">OpenAI 兼容</string>
+    <string name="tts_protocol_vits">VITS Simple API</string>
+    <string name="tts_private_http_error">HTTP 请使用局域网地址；远程服务器请使用 HTTPS。</string>
+    <string name="tts_group_custom">自建服务</string>
+    <string name="tts_add_service">添加服务</string>
+    <string name="tts_edit_service">编辑服务</string>
+    <string name="tts_service_name">服务名称</string>
+    <string name="tts_service_protocol">协议</string>
+    <string name="tts_service_url">API 基础地址</string>
+    <string name="tts_service_url_openai">包含 API 前缀，例如 http://192.168.1.10:8088/v1</string>
+    <string name="tts_service_url_vits">服务根地址，例如 http://192.168.1.10:23456</string>
+    <string name="tts_service_model">模型 ID</string>
+    <string name="tts_service_voice">音色 ID</string>
+    <string name="tts_service_vits_model">模型类型</string>
+    <string name="tts_service_speaker">说话人 ID</string>
+    <string name="tts_service_preset">参考音频预设</string>
+    <string name="tts_service_preset_hint">填写服务器中已有的预设，留空使用服务器默认配置。</string>
+    <string name="tts_service_key_hint">可选。留空保留已保存的密钥。</string>
+    <string name="tts_service_clear_key">移除已保存的密钥</string>
+    <string name="tts_service_manual_voice">输入音色 ID</string>
+    <string name="tts_service_load_models">获取模型列表</string>
+    <string name="tts_service_no_models">模型列表不可用，请手动填写模型 ID。</string>
+    <string name="tts_service_delete_title">删除服务？</string>
+    <string name="tts_service_delete_message">删除 %1$s？使用此服务的播放将停止。</string>
 </resources>

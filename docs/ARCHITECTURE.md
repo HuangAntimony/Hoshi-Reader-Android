@@ -776,7 +776,7 @@ QA matrices live in `docs/VALIDATION.md`.
 
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
   Japanese voice, engine speech rate, independent Hoshi playback speed, pitch, provider parameters, playback sentence delay, prefetch
-  depth, the global `useRubyReadings` flag (default true), and scoped text-replacement entries in the `japanese_tts`
+  depth, named self-hosted server profiles, the global `useRubyReadings` flag (default true), and scoped text-replacement entries in the `japanese_tts`
   Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
   so existing pronunciation entries remain compatible. It does not extend Sasayaki
   sidecars or sync payloads.
@@ -810,6 +810,25 @@ QA matrices live in `docs/VALIDATION.md`.
   Text-to-Speech REST and Google Translate's unofficial speech RPC. Network-required voices and unofficial
   sources are labeled in the UI. No voice model is bundled and failures never select
   another provider automatically.
+  `CustomTtsEngine` is the third router backend for `custom:` IDs. OpenAI-compatible
+  profiles use a base URL including the API prefix and `/audio/speech`; VITS Simple API
+  uses the server root, `/voice/speakers`, and model-specific synthesis routes for VITS,
+  W2V2-VITS, Bert-VITS2 and GPT-SoVITS. Voices retain model-type/speaker-ID identity and
+  exclude advertised non-Japanese and audio-conversion models. JSON requests use exactly
+  `application/json`: VITS Simple API compares this header literally and otherwise parses
+  an empty form. VITS length is inverse engine rate; GPT-SoVITS uses server rate and an
+  optional existing reference preset. OpenAI model/voice IDs can be entered manually;
+  voice discovery is optional and never disables manual synthesis/preview controls. Unsupported
+  discovery (404/405) may cache an empty list; transient failures remain retryable and are not
+  persisted as empty catalogs. Only WAV/MP3 complete
+  responses enter the existing audio pipeline. Self-hosted calls allow 180 seconds, preserve
+  proxy path prefixes, disable redirects, use normal TLS validation, and share private HTTP
+  host rules with AnkiConnect through `network/PrivateHttpHost`. Credentials are encrypted
+  against each profile ID; protocol changes clear the draft's old credential. Named profiles
+  independently persist model, voice, rate and format. The active synthesis snapshot excludes
+  display names and other sources; both playback invalidation and audio caching use it.
+  Catalogs are stored by profile ID and connection fingerprint without timed refresh.
+  Missing `custom:` profiles fail configuration rather than falling through to Android.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
   Samsung's ISO 639-2 locales). TTS panels refresh installed-engine catalogs on resume so
   returning from system voice installation updates their available voices.
@@ -909,7 +928,7 @@ QA matrices live in `docs/VALIDATION.md`.
   `ReaderBottomPanel`. Sources group installed engines, online services and key-based
   cloud services without guessing installed engine capabilities; an unavailable saved
   source or voice remains visible under its original ID. The source picker exposes cloud
-  configuration actions only for key-based services and a system-settings action for
+  configuration actions for key-based services and editable self-hosted profiles and a system-settings action for
   installed sources. Credential forms reuse the same sheet chrome, preserve encrypted
   storage/blank-key retention, and test unsaved drafts with a public synthesis sample.
   Canceling disposes the draft and its coroutine. Source errors appear beside the voice

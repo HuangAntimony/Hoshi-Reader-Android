@@ -1278,3 +1278,26 @@ Validate relevant sync/update/Sasayaki changes with:
   reports failure without TTS fallback. Referencing both audio handles for the same cue
   uploads once. Cancel a popup during synthesis, retry errors, and check no temporary
   export survives cancellation. Create test cards only with explicit user authorization.
+
+## Self-hosted TTS
+
+- Add multiple named OpenAI Compatible and VITS Simple API sources from Source. Save
+  without requiring a network connection; test an unsaved draft, then cancel. Saved keys
+  stay blank, and Cancel/close cancels requests. Test ordinary and e-ink presentation.
+- OpenAI bases include `/v1` (or the server's API prefix); VITS bases are server roots.
+  Verify reverse-proxy prefixes, optional keys, manual OpenAI model/voice IDs when lists
+  are absent, VITS Japanese speaker names and compound model/speaker identifiers.
+- Switch servers and restore each model/voice/rate/format. Rename the selected server or
+  edit/delete another while narrating without interruption. Editing active synthesis
+  configuration pauses; deleting the active server selects system default without playing.
+- `CustomTtsDeviceTest#selfHostedVitsCatalogPlaybackCacheAndAnkiExport` accepts explicit
+  instrumentation argument `vitsUrl` to opt into a caller-provided service. It reads speakers,
+  synthesizes public samples as WAV/MP3, exercises isolated Media3 playback and sentence
+  export, and uses only test-owned cache and settings. No model/configuration mutation,
+  private book text, application preferences, cloud keys or application data clearing.
+- VITS requests must send `Content-Type: application/json` without an appended charset.
+  `CustomTtsEngineTest` exercises the server's strict JSON/form distinction, optional
+  OpenAI discovery, prefix/auth/rate mapping, invalid audio and cancellation cleanup.
+- Keep OpenAI manual Preview/Play usable while optional voice discovery is pending. A
+  temporary network/catalog error must not persist an empty voice list; test successful
+  recovery, while unsupported discovery endpoints remain usable without repeated loading.

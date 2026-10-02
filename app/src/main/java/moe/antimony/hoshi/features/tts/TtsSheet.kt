@@ -78,6 +78,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
     val readingError by viewModel.readingError.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var editor by remember { mutableStateOf<TtsWord?>(null) }
+    var customEditor by remember { mutableStateOf<TtsCustomSource?>(null) }
     var configureSource by remember { mutableStateOf<TtsOnlineSource?>(null) }
     val context = LocalContext.current
     val sample = stringResource(R.string.tts_sample)
@@ -118,8 +119,17 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
                 onSystemSettings = {
                     try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                     catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                }, modifier = Modifier.weight(1f))
+                }, modifier = Modifier.weight(1f), onCustom = { id ->
+                    customEditor = preferences.settings.customSources.firstOrNull { it.id == id }
+                        ?: TtsCustomSource("custom:${UUID.randomUUID()}")
+                })
         }
+    }
+    customEditor?.let { source ->
+        TtsCustomSourceEditor(source, preferences.settings.customSources.any { it.id == source.id },
+            onTest = { draft, key, remove -> viewModel.testSource(draft, key, remove, sample) },
+            onSave = viewModel::saveSource, onDelete = { viewModel.deleteSource(source.id) }, onModels = viewModel::sourceModels,
+            onDismiss = { customEditor = null })
     }
     configureSource?.let { source ->
         TtsSourceConfigurationSheet(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }
@@ -196,12 +206,12 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
 @Composable
 internal fun TtsChoice(
     label: String, value: String, selected: String, choices: List<TtsChoiceOption>,
-    supporting: String? = null, singleLine: Boolean = false, onSelected: (String) -> Unit,
+    supporting: String? = null, singleLine: Boolean = false, enabled: Boolean = true, onSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val valueMaxWidth = (maxWidth * .65f - 32.dp).coerceAtLeast(0.dp)
-        Row(Modifier.fillMaxWidth().clickable { expanded = true }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
+        Row(Modifier.fillMaxWidth().clickable(enabled = enabled) { expanded = true }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Column(Modifier.widthIn(max = valueMaxWidth), verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
@@ -299,6 +309,7 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
 }
 
 internal fun TtsFailure.messageRes(): Int = when (this) {
+    TtsFailure.PrivateHttp -> R.string.tts_private_http_error
     TtsFailure.Configuration -> R.string.tts_configuration_error
     TtsFailure.Authentication -> R.string.tts_authentication_error
     TtsFailure.RateLimited -> R.string.tts_rate_limit_error

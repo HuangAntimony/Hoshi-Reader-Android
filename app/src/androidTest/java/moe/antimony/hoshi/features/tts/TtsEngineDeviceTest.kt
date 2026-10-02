@@ -24,7 +24,7 @@ class TtsEngineDeviceTest {
     @Test fun punctuationReplacementsProducePlayablePlaybackAndExportFiles() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "tts-replacements-device-test")
-        val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO))
+        val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO), CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO))
         val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
         val sentence = TtsText.chapter(0, "<p>待って――まだ……続きます。</p>").single()
         val preferences = TtsPreferences(words = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "。")))
@@ -77,7 +77,7 @@ class TtsEngineDeviceTest {
     @Test fun imageGlyphRubySynthesizesThroughPlaybackRepositoryFromMain() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val directory = File(context.cacheDir, "tts-image-ruby-device-test")
-        val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO))
+        val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(OnlineTtsTransport(), TtsCredentialCipher(Dispatchers.IO), Dispatchers.IO), CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO))
         val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
         val sentences = TtsText.chapter(0, "<p><ruby><img src='glyph.png'/><rt>たず</rt></ruby>ねた。次を<ruby><img src='glyph.png'/><rt>き</rt></ruby>く。</p>")
         try {

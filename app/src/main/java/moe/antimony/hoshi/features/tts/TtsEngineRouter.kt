@@ -9,16 +9,23 @@ import javax.inject.Singleton
 class TtsEngineRouter @Inject constructor(
     private val android: AndroidTtsEngine,
     private val online: OnlineTtsEngine,
+    private val custom: CustomTtsEngine,
 ) {
     suspend fun installedEngines() = android.installedEngines()
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? =
-        if (TtsOnlineSource.from(settings.engine) == null) null else online.cachedCatalog(settings)
+        when { settings.isCustomSource() -> custom.cachedCatalog(settings)
+            TtsOnlineSource.from(settings.engine) != null -> online.cachedCatalog(settings)
+            else -> null }
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog =
-        if (TtsOnlineSource.from(settings.engine) == null) android.catalog(settings) else online.catalog(settings, force)
+        when { settings.isCustomSource() -> custom.catalog(settings, force)
+            TtsOnlineSource.from(settings.engine) != null -> online.catalog(settings, force)
+            else -> android.catalog(settings) }
 
     suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> =
-        if (TtsOnlineSource.from(settings.engine) == null) android.synthesize(text, settings, directory)
-        else online.synthesize(text, settings, directory)
+        when { settings.isCustomSource() -> custom.synthesize(text, settings, directory)
+            TtsOnlineSource.from(settings.engine) != null -> online.synthesize(text, settings, directory)
+            else -> android.synthesize(text, settings, directory) }
 
+    suspend fun models(source: TtsCustomSource) = custom.models(source)
     fun extension(settings: TtsSettings): String = settings.audioExtension()
 }

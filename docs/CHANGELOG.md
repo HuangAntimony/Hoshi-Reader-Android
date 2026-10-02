@@ -9,7 +9,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 ### Added
 
 - Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
-  Microsoft Translator, Google Cloud and Google Translate online sources, with a separate
+  Microsoft Translator, Google Cloud and Google Translate online sources, plus multiple named
+  self-hosted OpenAI Compatible and VITS Simple API servers, with a separate
   TTS panel styled like Sasayaki, with compact playback controls and Voice,
   Replacements and Settings tabs. Source and Voice share a compact card with grouped,
   scrolling bottom selection panels. Voices retain their original names and show their
@@ -24,6 +25,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   e-ink shows readable loading text instead of a solid black progress line.
+  Add, edit and delete self-hosted servers from Source; each retains its model, voice,
+  engine rate and WAV/MP3 format, with optional encrypted credentials and draft connection
+  testing. Editing another server or renaming the current one leaves playback running.
   TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
   sends original base text to the engine while preserving custom replacements for reading,
   preview and Anki sentence audio.
