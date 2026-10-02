@@ -88,10 +88,6 @@ internal fun TtsCustomSourceEditor(
                 TtsServiceField(R.string.tts_service_preset, source.preset, !busy) { update(source.copy(preset = it)) }
                 Text(stringResource(R.string.tts_service_preset_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             }
-            TtsChoice(stringResource(R.string.tts_output_format), stringResource(if (source.format == TtsAudioFormat.Wav) R.string.tts_format_wav else R.string.tts_format_mp3),
-                source.format.name, listOf(TtsChoiceOption("Wav", stringResource(R.string.tts_format_wav)), TtsChoiceOption("Mp3", stringResource(R.string.tts_format_mp3))), enabled = !busy) {
-                if (!busy) update(source.copy(format = TtsAudioFormat.valueOf(it)))
-            }
             HoshiButton(enabled = !busy, modifier = Modifier.fillMaxWidth().height(48.dp), onClick = { scope.launch {
                 busy = true; failure = null; verified = false
                 try { failure = onTest(source, key, removeKey); verified = failure == null } finally { busy = false }

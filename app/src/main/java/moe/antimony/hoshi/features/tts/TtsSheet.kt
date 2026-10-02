@@ -60,7 +60,7 @@ fun TtsSheet(
 fun TtsSettingsView(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val viewModel: TtsViewModel = hiltViewModel()
     SettingsDetailScaffold(title = stringResource(R.string.tts_title), onClose = onClose, modifier = modifier) { padding ->
-        TtsPanel(viewModel, null, null, Modifier.fillMaxSize().padding(padding))
+        TtsPanel(viewModel, null, null, Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding))
     }
 }
 

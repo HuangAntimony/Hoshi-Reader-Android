@@ -1157,8 +1157,11 @@ Validate relevant sync/update/Sasayaki changes with:
   and each catalog voice row identifies its network requirement.
   Check engine rate/playback speed/pitch sliders retain current-value labels without endpoint
   labels or dense ticks, keep existing steps/ranges, and save on
-  release. Pitch zero uses `0 st`/`0 Hz`. The theme-colored Preview button must show preparing/stop
-  states and cancel or stop its own preview; reading controls still operate the book session.
+  release. Pitch zero uses `0 st`/`0 Hz`. The theme-colored Preview button stays visible outside
+  the scroll area, above system navigation, in both the reader sheet and standalone Settings,
+  including compact panels and e-ink. Scroll between Source and the last synthesis parameter
+  and confirm its position and tap target remain fixed. It must show preparing/stop states
+  and cancel or stop its own preview; reading controls still operate the book session.
   Test credential draft/cancel/save with blank-key retention, loading, verified/error states,
   and cancellation on dismiss. Source errors stay beside the voice card and cannot leak into
   Replacements/Settings; failed shared behavior writes still report an error in Settings.
@@ -1169,8 +1172,8 @@ Validate relevant sync/update/Sasayaki changes with:
   Check long source/voice names wrap without crowding the card and remain complete in
   selection lists; check empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
-  With Azure, Microsoft Translator or Google Cloud selected, expand synthesis parameters
-  and check Audio format and Sample rate: short labels/values fit on one line at normal font size,
+  Synthesis parameters are expanded without a toggle. With Azure, Microsoft Translator or
+  Google Cloud selected, check Audio format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
 - In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
@@ -1305,3 +1308,6 @@ Validate relevant sync/update/Sasayaki changes with:
   Check persistence and de-duplication with discovered IDs, including a pending/failed
   optional list request. Editing available IDs keeps the chosen voice and ongoing audio;
   VITS voices use server-provided character names and compound model/speaker identifiers.
+- Select self-hosted WAV/MP3 only under Synthesis parameters; Source configuration contains
+  no duplicate format control. Changing format preserves the selected voice and other
+  server profiles, and switching sources restores each server's format.

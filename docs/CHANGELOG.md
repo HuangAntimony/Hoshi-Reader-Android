@@ -22,7 +22,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   playback speed from 0.5× to 3.0× alongside engine speech rate; it applies to narration
   and preview without re-synthesizing audio, shifting pitch, or resuming paused playback. Rate and pitch sliders
   keep their steps without dense tick marks or endpoint labels, and preview can be canceled or stopped from
-  its theme-colored button. Cloud credentials use a matching configuration sheet; source errors
+  its theme-colored button fixed above the bottom system inset. Synthesis parameters remain
+  expanded; audio format is selected there rather than duplicated in Source configuration.
+  Cloud credentials use a matching configuration sheet; source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   e-ink shows readable loading text instead of a solid black progress line.

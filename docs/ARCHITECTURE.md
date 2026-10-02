@@ -826,7 +826,11 @@ QA matrices live in `docs/VALIDATION.md`.
   host rules with AnkiConnect through `network/PrivateHttpHost`. Credentials are encrypted
   against each profile ID; protocol changes clear the draft's old credential. Named profiles
   independently persist model, voice, rate and format.
-  Source configuration edits connection/model options and an optional OpenAI voice-ID list;
+  Source configuration edits connection/model options and an optional OpenAI voice-ID list.
+  Output format is edited only under the expanded synthesis parameters alongside other
+  supported providers. The Voice tab separates its scrolling controls from a fixed Preview
+  footer that consumes the bottom navigation inset; standalone settings consume scaffold
+  padding before applying this footer inset.
   Voice owns speaker selection. VITS speaker names come from `/voice/speakers`, with
   model-type/ID retained as secondary labels;
   configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding

@@ -1,10 +1,13 @@
 package moe.antimony.hoshi.features.tts
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import org.junit.Assert.*
 import org.junit.Rule
@@ -15,6 +18,43 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TtsVoiceSettingsTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun previewRemainsVisibleWhileExpandedParametersScroll() {
+        var starts = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsVoiceSettings(TtsSettings(engine = TtsOnlineSource.Azure.id), null, emptyList(), false,
+                    TtsPreviewState.Idle, null, {}, { starts++ }, {}, {}, {}, {}, Modifier.height(360.dp))
+            }
+        }
+        val preview = compose.onNodeWithText("Preview voice").assertIsDisplayed()
+        val position = preview.fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText("Audio format").performScrollTo().assertIsDisplayed()
+        preview.assertIsDisplayed().performClick()
+        assertEquals(position, preview.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Source").performScrollTo().assertIsDisplayed()
+        preview.assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(2, starts) }
+    }
+
+    @Test fun customFormatSelectionPreservesOtherServersAndVoice() {
+        val first = TtsCustomSource("custom:first", "Local", TtsCustomProtocol.Vits, "http://127.0.0.1:8080", voice = "VITS:3")
+        val other = first.copy(id = "custom:other", name = "Other")
+        val settings = mutableStateOf(TtsSettings(engine = first.id, voice = first.voice, customSources = listOf(first, other)))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
+                    { settings.value = it }, {}, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Audio format").performScrollTo().performClick()
+        compose.onNodeWithText("MP3").performClick()
+        compose.runOnIdle {
+            assertEquals(TtsAudioFormat.Mp3, settings.value.customSource()?.format)
+            assertEquals(other, settings.value.customSources.last())
+            assertEquals("VITS:3", settings.value.voice)
+        }
+    }
 
     @Test fun einkCatalogLoadingUsesReadableStatusInThePanelAndVoicePicker() {
         val picker = mutableStateOf(false)
@@ -121,7 +161,7 @@ class TtsVoiceSettingsTest {
                     {}, { starts++ }, { stops++ }, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Stop preview").performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText("Stop preview").assertIsEnabled().performClick()
         compose.runOnIdle { preview.value = TtsPreviewState.Playing }
         compose.onNodeWithText("Stop preview").performClick()
         compose.runOnIdle { preview.value = TtsPreviewState.Idle }

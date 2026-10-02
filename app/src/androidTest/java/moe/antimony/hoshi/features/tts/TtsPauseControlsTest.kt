@@ -31,7 +31,6 @@ class TtsPauseControlsTest {
                 }
             }
         }
-        compose.onNodeWithText("Synthesis parameters").performClick()
         return state
     }
 

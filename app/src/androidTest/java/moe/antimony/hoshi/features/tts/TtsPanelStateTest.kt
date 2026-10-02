@@ -105,7 +105,7 @@ class TtsPanelStateTest {
         try {
             panel(discovery = discovery)
             compose.runOnIdle { Assert.assertFalse(model.busy.value) }
-            compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).performScrollTo().assertIsEnabled()
+            compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).assertIsEnabled()
             compose.onNodeWithText("sample").performScrollTo().performClick()
             compose.onNodeWithText("neutral").assertIsDisplayed().performClick()
             compose.waitUntil(5_000) { model.preferences.value.settings.voice == "neutral" }
@@ -185,7 +185,7 @@ class TtsPanelStateTest {
         compose.runOnIdle { model.settings(model.preferences.value.settings.copy(playbackRate = 1.5f)) }
         compose.waitUntil(5_000) { model.preferences.value.settings.playbackRate == 1.5f }
         compose.runOnIdle { Assert.assertEquals(TtsPreviewState.Playing, model.previewState.value) }
-        compose.onNodeWithText("Stop preview").performScrollTo().performClick()
+        compose.onNodeWithText("Stop preview").performClick()
         compose.runOnIdle { Assert.assertEquals(TtsPreviewState.Idle, model.previewState.value) }
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "はい。"), null) }
         compose.waitUntil(15_000) { model.previewState.value == TtsPreviewState.Idle }

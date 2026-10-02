@@ -1,13 +1,8 @@
 package moe.antimony.hoshi.features.tts
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -21,17 +16,11 @@ import kotlin.math.roundToInt
 
 @Composable
 internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, onChange: (TtsSettings) -> Unit) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
     val source = TtsOnlineSource.from(settings.engine)
     val options = settings.options()
     val update: (TtsSynthesisOptions) -> Unit = { onChange(settings.withOptions(it)) }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).clickable { expanded = !expanded }.heightIn(min = 48.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.tts_more_parameters), style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        Icon(if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = hoshiSurfaces.muted)
-    }
-    if (!expanded) return
+    Text(stringResource(R.string.tts_more_parameters), style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
     TtsParameterSlider(R.string.tts_prefetch_sentences, settings.prefetchSentences.coerceIn(ttsPrefetchRange).toFloat(),
         ttsPrefetchRange.first.toFloat()..ttsPrefetchRange.last.toFloat(), ttsPrefetchRange.last - ttsPrefetchRange.first - 1,
         { pluralStringResource(R.plurals.tts_sentence_count, it.roundToInt(), it.roundToInt()) }) {
@@ -42,6 +31,15 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     }
     Text(stringResource(R.string.tts_sentence_pause_hint), style = MaterialTheme.typography.bodySmall,
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+    settings.customSource()?.let { custom ->
+        ReaderSheetCard {
+            TtsAudioFormatChoice(custom.format) { format ->
+                onChange(settings.copy(customSources = settings.customSources.map { profile ->
+                    if (profile.id == custom.id) profile.copy(format = format) else profile
+                }))
+            }
+        }
+    }
     if (source == null || source == TtsOnlineSource.GoogleTranslate) return
 
     TtsParameterSlider(R.string.tts_synthesis_volume, options.volume,
@@ -74,10 +72,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     }
     if (source.usesAzureRest || source == TtsOnlineSource.GoogleCloud) {
         ReaderSheetCard {
-            val formats = listOf(TtsChoiceOption(TtsAudioFormat.Wav.name, stringResource(R.string.tts_format_wav)),
-                TtsChoiceOption(TtsAudioFormat.Mp3.name, stringResource(R.string.tts_format_mp3)))
-            TtsChoice(stringResource(R.string.tts_output_format), formats.first { it.id == options.format.name }.label,
-                options.format.name, formats) { update(options.copy(format = TtsAudioFormat.valueOf(it))) }
+            TtsAudioFormatChoice(options.format) { update(options.copy(format = it)) }
             val rates = listOf(16000, 24000, 48000).map { TtsChoiceOption(it.toString(), stringResource(R.string.tts_sample_rate_hz, it)) }
             TtsChoice(stringResource(R.string.tts_sample_rate), stringResource(R.string.tts_sample_rate_hz, options.sampleRate),
                 options.sampleRate.toString(), rates) { update(options.copy(sampleRate = it.toInt())) }
@@ -91,6 +86,14 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         TtsChoice(stringResource(R.string.tts_audio_profile), choices.first { it.id == options.effectsProfile }.label,
             options.effectsProfile, choices) { update(options.copy(effectsProfile = it)) }
     }
+}
+
+@Composable
+private fun TtsAudioFormatChoice(format: TtsAudioFormat, onChange: (TtsAudioFormat) -> Unit) {
+    val formats = listOf(TtsChoiceOption(TtsAudioFormat.Wav.name, stringResource(R.string.tts_format_wav)),
+        TtsChoiceOption(TtsAudioFormat.Mp3.name, stringResource(R.string.tts_format_mp3)))
+    TtsChoice(stringResource(R.string.tts_output_format), formats.first { it.id == format.name }.label,
+        format.name, formats) { onChange(TtsAudioFormat.valueOf(it)) }
 }
 
 @Composable

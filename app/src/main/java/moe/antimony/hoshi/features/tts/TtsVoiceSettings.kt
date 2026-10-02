@@ -51,63 +51,62 @@ internal fun TtsVoiceSettings(
         voice != null -> stringResource(R.string.tts_offline)
         else -> null
     }
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-        ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
-            TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, null) { sourcePicker = true }
-            HorizontalDivider(color = hoshiSurfaces.divider)
-            TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, connection) { voicePicker = true }
-        }
-        if (busy && preview == TtsPreviewState.Idle) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
-        failure?.let {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (custom != null) TextButton(onClick = { onCustom(custom.id) }) { Text(stringResource(R.string.tts_configure_source)) }
-                    if (source?.needsKey == true) TextButton(onClick = { onConfigure(source) }) { Text(stringResource(R.string.tts_configure_source)) }
-                    TextButton(onClick = onRetry, enabled = !busy) { Text(stringResource(R.string.tts_retry)) }
+    Column(modifier.fillMaxWidth()) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
+            ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
+                TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, null) { sourcePicker = true }
+                HorizontalDivider(color = hoshiSurfaces.divider)
+                TtsCurrentVoiceRow(stringResource(R.string.tts_voice), voiceTitle, connection) { voicePicker = true }
+            }
+            if (busy && preview == TtsPreviewState.Idle) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
+            failure?.let {
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (custom != null) TextButton(onClick = { onCustom(custom.id) }) { Text(stringResource(R.string.tts_configure_source)) }
+                        if (source?.needsKey == true) TextButton(onClick = { onConfigure(source) }) { Text(stringResource(R.string.tts_configure_source)) }
+                        TextButton(onClick = onRetry, enabled = !busy) { Text(stringResource(R.string.tts_retry)) }
+                    }
                 }
             }
-        }
-        var rate by remember(settings.engine, settings.rate) { mutableFloatStateOf(settings.rate) }
-        if (source == TtsOnlineSource.GoogleTranslate) ReaderSheetCard(verticalPadding = 4.dp) {
-            TtsChoice(stringResource(R.string.tts_rate_label), stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
-                if (rate < 1f) "slow" else "normal",
-                listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)), TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
-            ) { onSettings(settings.copy(rate = if (it == "slow") .5f else 1f)) }
-        } else if (custom?.supportsRate != false) {
-            val range = custom?.rateRange ?: (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
-            ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
-                steps = if (custom != null) ((range.endInclusive - range.start) * 20).toInt() - 1 else when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
-                onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false)
-        }
-        var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
-        ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
-            playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
-            onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false)
-        (if (settings.isCustomSource()) null else ttsPitchRange(source, voice?.id.orEmpty()))?.let { range ->
-            var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
-            ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
-                steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
-                onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false)
-        }
-        if (custom != null) moe.antimony.hoshi.features.reader.ReaderSheetCard(verticalPadding = 4.dp) {
-            TtsChoice(stringResource(R.string.tts_output_format), stringResource(if (custom.format == TtsAudioFormat.Wav) R.string.tts_format_wav else R.string.tts_format_mp3),
-                custom.format.name, listOf(TtsChoiceOption("Wav", stringResource(R.string.tts_format_wav)), TtsChoiceOption("Mp3", stringResource(R.string.tts_format_mp3)))) {
-                onSettings(settings.copy(customSources = settings.customSources.map { profile -> if (profile.id == custom.id) profile.copy(format = TtsAudioFormat.valueOf(it)) else profile }))
+            var rate by remember(settings.engine, settings.rate) { mutableFloatStateOf(settings.rate) }
+            if (source == TtsOnlineSource.GoogleTranslate) ReaderSheetCard(verticalPadding = 4.dp) {
+                TtsChoice(stringResource(R.string.tts_rate_label), stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
+                    if (rate < 1f) "slow" else "normal",
+                    listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)), TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
+                ) { onSettings(settings.copy(rate = if (it == "slow") .5f else 1f)) }
+            } else if (custom?.supportsRate != false) {
+                val range = custom?.rateRange ?: (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
+                ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
+                    steps = if (custom != null) ((range.endInclusive - range.start) * 20).toInt() - 1 else when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
+                    onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false)
+            }
+            var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
+            ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
+                playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
+                onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false)
+            (if (settings.isCustomSource()) null else ttsPitchRange(source, voice?.id.orEmpty()))?.let { range ->
+                var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
+                ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
+                    steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
+                    onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false)
+            }
+            TtsSynthesisControls(settings, voice, onSettings)
+            source?.let {
+                Text(stringResource(if (it.needsKey) R.string.tts_cloud_source_hint else R.string.tts_unofficial_hint),
+                    style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp))
             }
         }
-        TtsSynthesisControls(settings, voice, onSettings)
-        HoshiButton(onClick = if (preview == TtsPreviewState.Idle) onPreview else onStopPreview,
-            enabled = preview != TtsPreviewState.Idle || !busy,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).height(48.dp)) {
-            if (preview == TtsPreviewState.Preparing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
-            else Icon(if (preview == TtsPreviewState.Playing) Icons.Rounded.Stop else Icons.AutoMirrored.Rounded.VolumeUp, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(if (preview == TtsPreviewState.Idle) R.string.tts_preview_voice else R.string.tts_stop_preview))
-        }
-        source?.let {
-            Text(stringResource(if (it.needsKey) R.string.tts_cloud_source_hint else R.string.tts_unofficial_hint),
-                style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp))
+        HorizontalDivider(color = hoshiSurfaces.divider)
+        Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+            HoshiButton(onClick = if (preview == TtsPreviewState.Idle) onPreview else onStopPreview,
+                enabled = preview != TtsPreviewState.Idle || !busy,
+                modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                if (preview == TtsPreviewState.Preparing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+                else Icon(if (preview == TtsPreviewState.Playing) Icons.Rounded.Stop else Icons.AutoMirrored.Rounded.VolumeUp, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (preview == TtsPreviewState.Idle) R.string.tts_preview_voice else R.string.tts_stop_preview))
+            }
         }
     }
     if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = {
