@@ -889,11 +889,13 @@ QA matrices live in `docs/VALIDATION.md`.
   the playback callback completes image holds before sentence reveal and audio.
 - Reader’s existing top-right playback button routes its playing state and callback
   together through `ReaderTopPlaybackControl`: loaded audiobooks use Sasayaki, while
-  books without an audiobook use TTS after source sentences are ready. The shared
-  `showReaderToggle` preference controls visibility; Sasayaki’s enable switch only gates
-  audiobooks. First TTS playback starts at the displayed reading position; subsequent
-  toggles resume/pause the current sentence. During lookup auto-pause, the button retains
-  its pause icon and cancels pending auto-resume when pressed. Reader-initiated playback
+  books without an audiobook use TTS only after explicit playback in the current Reader
+  session, using the same eligibility as the bottom playback controls. Pausing keeps both
+  controls available; preview alone does not enable them, and closing/switching books
+  resets eligibility. The shared `showReaderToggle` preference controls visibility;
+  Sasayaki’s enable switch only gates audiobooks. TTS toggles resume/pause the current
+  sentence. During lookup auto-pause, the button retains its pause icon and cancels
+  pending auto-resume when pressed. Reader-initiated playback
   errors open the TTS panel so its existing error/recovery controls remain accessible.
 - Reader only offers the independent TTS sheet when no audiobook is associated.
   Its fixed sentence controls and Voice/Replacements/Settings tabs use `ReaderBottomPanel`

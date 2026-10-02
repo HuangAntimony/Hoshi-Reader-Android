@@ -1131,9 +1131,12 @@ Validate relevant sync/update/Sasayaki changes with:
   Japanese data remains discoverable. In e-ink, check the Voice tab and voice picker show
   Loading voices text while loading; other themes retain the animated progress bar.
 - In focus mode, the existing top-right playback button controls Sasayaki for a loaded
-  audiobook and TTS for books without an associated audiobook. Start TTS from the middle
-  of a chapter; first playback must begin at the displayed position. Pause, browse elsewhere,
-  and resume: the existing narrated sentence resumes. Check play/pause icon updates,
+  audiobook and TTS for books without an associated audiobook. On a fresh Reader session,
+  the TTS button and bottom playback controls must remain hidden, including after preview
+  alone. Start TTS manually from its panel or a lookup popup: both controls become available
+  and remain visible when paused. Closing/reopening or switching books hides them again.
+  Start TTS from the middle of a chapter; first playback must begin at the displayed position.
+  Pause, browse elsewhere, and resume: the existing narrated sentence resumes. Check play/pause icon updates,
   cancellation while preparing, and lookup auto-pause: pressing the pause icon cancels
   auto-resume when the popup closes. Toggle Show Audiobook / TTS Toggle in Appearance:
   it hides either source’s button. This preference remains editable with Sasayaki disabled,

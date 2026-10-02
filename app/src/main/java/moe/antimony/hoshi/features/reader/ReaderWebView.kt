@@ -186,6 +186,7 @@ fun ReaderWebView(
     ttsLifetime.bookId = ttsBookId
     val ttsAssociated = (sasayakiPlayer?.playback ?: sasayakiPlaybackData).hasStoredAudioSource() || sasayakiPlayer?.hasAudio == true
     val ttsAvailable = isSasayakiPlaybackLoaded && !ttsAssociated
+    val hasStartedTtsSession = ttsAvailable && ttsState.bookId == ttsBookId && ttsState.started
     var showTts by remember(bookRoot) { mutableStateOf(false) }
     var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
     var ttsLookupResume by remember(bookRoot) { mutableStateOf<(() -> Unit)?>(null) }
@@ -1774,16 +1775,14 @@ fun ReaderWebView(
     }
     val topPlaybackControl = readerTopPlaybackControl(
         settings = sasayakiSettings,
-        tts = if (ttsAvailable && ttsState.bookId == ttsBookId && ttsState.sentences.isNotEmpty()) {
+        tts = if (hasStartedTtsSession) {
             ReaderTopPlaybackControl(ttsState.playing || ttsLookupResume != null) {
                 ttsViewModel.stopPreview()
                 if (ttsLookupResume != null) {
                     ttsLookupResume = null
                     ttsViewModel.playback.pause()
-                } else if (ttsViewModel.playback.state.value.started) {
-                    ttsViewModel.playback.toggle()
                 } else {
-                    startTtsAtReadingPosition()
+                    ttsViewModel.playback.toggle()
                 }
             }
         } else null,
@@ -2073,7 +2072,7 @@ fun ReaderWebView(
             colors = readerChromeColors(effectiveSettings, systemDarkTheme),
             metrics = bottomChromeMetrics,
             focusMode = focusMode,
-            sasayakiPlaybackControls = if (ttsAvailable && ttsState.started) sasayakiBottomPlaybackControls.copy(visible = sasayakiSettings.showReaderBottomPlaybackControls) else sasayakiBottomPlaybackControls,
+            sasayakiPlaybackControls = if (hasStartedTtsSession) sasayakiBottomPlaybackControls.copy(visible = sasayakiSettings.showReaderBottomPlaybackControls) else sasayakiBottomPlaybackControls,
             sasayakiPlaying = if (ttsAvailable) ttsState.playing else sasayakiPlayer?.isPlaying == true,
             onTapSafeArea = ::handleReaderTapOutside,
             onSasayakiSkipBackward = { if (ttsAvailable) { if (sasayakiBottomSkipButtonActions.left == ReaderSasayakiBottomSkipButtonAction.Backward) ttsViewModel.playback.previous() else ttsViewModel.playback.next() } else performSasayakiBottomSkipAction(sasayakiBottomSkipButtonActions.left) },

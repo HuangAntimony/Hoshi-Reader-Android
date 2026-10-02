@@ -40,8 +40,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   TTS sentence navigation after starting narration in the current book session; popup term
   navigation takes priority over narration, then page turns.
   Previous/next sentence navigation preserves paused playback instead of starting audio.
-  The Reader’s top-right playback button also controls TTS, starts at the current reading
-  position, and shares the Show Audiobook / TTS Toggle preference with Sasayaki.
+  The Reader’s top-right playback button also controls TTS after manually starting narration
+  in the current book session, like the bottom controls. It remains available while paused
+  and shares the Show Audiobook / TTS Toggle preference with Sasayaki.
   Recognizes Samsung's Japanese voices and refreshes available voices when returning
   from system settings. Configure cloud credentials and test synthesis in the current
   panel. Adjust supported pitch, volume, Azure/Microsoft Translator speaking styles/roles/intensity and
