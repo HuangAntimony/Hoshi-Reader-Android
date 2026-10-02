@@ -827,10 +827,14 @@ QA matrices live in `docs/VALIDATION.md`.
   against each profile ID; protocol changes clear the draft's old credential. Named profiles
   independently persist model, voice, rate and format.
   Source configuration edits connection/model options and an optional OpenAI voice-ID list.
-  Output format is edited only under the expanded synthesis parameters alongside other
+  Output format is edited only among the Voice tab's parameters alongside other
   supported providers. The Voice tab separates its scrolling controls from a fixed Preview
-  footer that consumes the bottom navigation inset; standalone settings consume scaffold
+  footer that consumes the bottom navigation inset. Parameters have no separate heading or
+  expansion toggle; standalone settings consume scaffold
   padding before applying this footer inset.
+  Provider pause switches reuse `ReaderSheetSwitchRow` with optional supporting text rather
+  than individual cards; remaining parameter cards use compact vertical padding. Shared
+  slider heights and existing behavior-setting rows retain their defaults.
   Voice owns speaker selection. VITS speaker names come from `/voice/speakers`, with
   model-type/ID retained as secondary labels;
   configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding

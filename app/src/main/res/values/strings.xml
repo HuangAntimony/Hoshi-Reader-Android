@@ -963,7 +963,6 @@
     <string name="tts_pitch" comment="TTS synthesis pitch">Pitch</string>
     <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
     <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d semitones</string>
-    <string name="tts_more_parameters" comment="TTS synthesis parameter">Synthesis parameters</string>
     <string name="tts_prefetch_sentences" comment="TTS playback buffering">Preload sentences</string>
     <plurals name="tts_sentence_count">
         <item quantity="one">%1$d sentence</item>

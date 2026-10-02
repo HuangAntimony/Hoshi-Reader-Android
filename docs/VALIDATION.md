@@ -1102,7 +1102,7 @@ Validate relevant sync/update/Sasayaki changes with:
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
   this application delay must not be inserted into Anki exports.
-- In Synthesis parameters, verify Preload sentences supports 1–20 and defaults to 2
+- In Voice, verify Preload sentences supports 1–20 and defaults to 2
   for existing settings. During playback, increase the count to fill the larger window
   and decrease it to cancel excess pending synthesis. The current sentence must keep
   playing and completed audio must remain reusable. Repeat while paused, at book end,
@@ -1172,10 +1172,14 @@ Validate relevant sync/update/Sasayaki changes with:
   Check long source/voice names wrap without crowding the card and remain complete in
   selection lists; check empty/long dictionaries, e-ink outlines, and standalone TTS
   Settings. Compare Sasayaki's tabs, resource cards and sliders after shared UI changes.
-  Synthesis parameters are expanded without a toggle. With Azure, Microsoft Translator or
+  Parameters appear directly without a separate heading or toggle. With Azure, Microsoft Translator or
   Google Cloud selected, check Audio format and Sample rate: short labels/values fit on one line at normal font size,
   while dropdowns open from the right-side arrow. Short values must leave remaining
   width to the label; long values must stay bounded without pushing the arrow out.
+  Provider pause switches use plain rows matching Settings, retaining default/custom
+  supporting text and showing their unchanged sliders when enabled. Remaining parameter
+  cards have compact padding. Check long labels and wrapped supporting text without
+  overlap, and confirm Sasayaki/shared behavior rows retain their layout.
 - In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
   Toggle it off with a ruby sample such as 今日 annotated キヨウ: playback, full-sentence
   preview and Anki sentence audio must send 今日 to the engine. Re-enable to use キヨウ;
@@ -1308,6 +1312,6 @@ Validate relevant sync/update/Sasayaki changes with:
   Check persistence and de-duplication with discovered IDs, including a pending/failed
   optional list request. Editing available IDs keeps the chosen voice and ongoing audio;
   VITS voices use server-provided character names and compound model/speaker identifiers.
-- Select self-hosted WAV/MP3 only under Synthesis parameters; Source configuration contains
+- Select self-hosted WAV/MP3 only under Voice; Source configuration contains
   no duplicate format control. Changing format preserves the selected voice and other
   server profiles, and switching sources restores each server's format.

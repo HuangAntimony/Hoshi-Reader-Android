@@ -22,8 +22,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   playback speed from 0.5× to 3.0× alongside engine speech rate; it applies to narration
   and preview without re-synthesizing audio, shifting pitch, or resuming paused playback. Rate and pitch sliders
   keep their steps without dense tick marks or endpoint labels, and preview can be canceled or stopped from
-  its theme-colored button fixed above the bottom system inset. Synthesis parameters remain
-  expanded; audio format is selected there rather than duplicated in Source configuration.
+  its theme-colored button fixed above the bottom system inset. Synthesis parameters appear
+  directly in Voice without a separate heading or toggle; audio format is selected there
+  rather than duplicated in Source configuration.
+  Provider pause switches use plain settings rows, while remaining parameter cards have
+  tighter vertical padding; slider row heights stay unchanged.
   Cloud credentials use a matching configuration sheet; source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
@@ -64,7 +67,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   MP3 sources retain MP3 for playback and Anki.
   Ready sentence audio plays without waiting for later network synthesis, and continuous
   playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20
-  upcoming sentences to preload in Synthesis parameters (default 2); changes adjust
+  upcoming sentences to preload in Voice (default 2); changes adjust
   buffering without interrupting narration or regenerating cached audio.
   While narration is paused, chapter navigation and returning to Reader keep the selected
   reading position instead of jumping back to the narrated sentence. TTS shares

@@ -3,7 +3,6 @@ package moe.antimony.hoshi.features.tts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
@@ -11,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.reader.ReaderSheetCard
 import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
+import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import kotlin.math.roundToInt
 
@@ -19,8 +19,6 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     val source = TtsOnlineSource.from(settings.engine)
     val options = settings.options()
     val update: (TtsSynthesisOptions) -> Unit = { onChange(settings.withOptions(it)) }
-    Text(stringResource(R.string.tts_more_parameters), style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
     TtsParameterSlider(R.string.tts_prefetch_sentences, settings.prefetchSentences.coerceIn(ttsPrefetchRange).toFloat(),
         ttsPrefetchRange.first.toFloat()..ttsPrefetchRange.last.toFloat(), ttsPrefetchRange.last - ttsPrefetchRange.first - 1,
         { pluralStringResource(R.plurals.tts_sentence_count, it.roundToInt(), it.roundToInt()) }) {
@@ -32,7 +30,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     Text(stringResource(R.string.tts_sentence_pause_hint), style = MaterialTheme.typography.bodySmall,
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     settings.customSource()?.let { custom ->
-        ReaderSheetCard {
+        ReaderSheetCard(verticalPadding = 4.dp) {
             TtsAudioFormatChoice(custom.format) { format ->
                 onChange(settings.copy(customSources = settings.customSources.map { profile ->
                     if (profile.id == custom.id) profile.copy(format = format) else profile
@@ -50,7 +48,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
 
     if (source.usesAzureRest) {
         if (!voice?.styles.isNullOrEmpty()) {
-            ReaderSheetCard {
+            ReaderSheetCard(verticalPadding = 4.dp) {
                 TtsParameterChoice(R.string.tts_speaking_style, options.style, voice.styles) {
                     update(options.copy(style = it, role = if (it.isBlank()) "" else options.role))
                 }
@@ -58,7 +56,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
             if (options.style.isNotBlank()) {
                 TtsParameterSlider(R.string.tts_style_degree, options.styleDegree, .01f..2f, 198,
                     { stringResource(R.string.tts_rate_value, it) }) { update(options.copy(styleDegree = it)) }
-                if (voice.roles.isNotEmpty()) ReaderSheetCard {
+                if (voice.roles.isNotEmpty()) ReaderSheetCard(verticalPadding = 4.dp) {
                     TtsParameterChoice(R.string.tts_speaking_role, options.role, voice.roles) { update(options.copy(role = it)) }
                 }
             }
@@ -71,14 +69,14 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         TtsPauseControl(R.string.tts_boundary_pause, options.sentenceBoundaryMs) { update(options.copy(sentenceBoundaryMs = it)) }
     }
     if (source.usesAzureRest || source == TtsOnlineSource.GoogleCloud) {
-        ReaderSheetCard {
+        ReaderSheetCard(verticalPadding = 4.dp) {
             TtsAudioFormatChoice(options.format) { update(options.copy(format = it)) }
             val rates = listOf(16000, 24000, 48000).map { TtsChoiceOption(it.toString(), stringResource(R.string.tts_sample_rate_hz, it)) }
             TtsChoice(stringResource(R.string.tts_sample_rate), stringResource(R.string.tts_sample_rate_hz, options.sampleRate),
                 options.sampleRate.toString(), rates) { update(options.copy(sampleRate = it.toInt())) }
         }
     }
-    if (source == TtsOnlineSource.GoogleCloud) ReaderSheetCard {
+    if (source == TtsOnlineSource.GoogleCloud) ReaderSheetCard(verticalPadding = 4.dp) {
         val labels = listOf(R.string.tts_profile_none, R.string.tts_profile_wearable, R.string.tts_profile_handset,
             R.string.tts_profile_headphones, R.string.tts_profile_small_speaker, R.string.tts_profile_medium_speaker,
             R.string.tts_profile_home, R.string.tts_profile_car, R.string.tts_profile_telephone)
@@ -105,16 +103,11 @@ private fun TtsParameterChoice(label: Int, value: String, choices: List<String>,
 
 @Composable
 private fun TtsPauseControl(label: Int, value: Int, onChange: (Int) -> Unit) {
-    ReaderSheetCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(if (value < 0) R.string.tts_provider_default else R.string.tts_pause_override),
-                    style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            }
-            Switch(value >= 0, { onChange(if (it) 300 else -1) })
-        }
-    }
+    ReaderSheetSwitchRow(
+        label = stringResource(label), checked = value >= 0,
+        onCheckedChange = { onChange(if (it) 300 else -1) },
+        supportingText = stringResource(if (value < 0) R.string.tts_provider_default else R.string.tts_pause_override),
+    )
     if (value >= 0) TtsPauseSlider(label, value, onChange = onChange)
 }
 

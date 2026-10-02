@@ -88,6 +88,7 @@ internal fun ReaderSheetSwitchRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    supportingText: String? = null,
 ) {
     val metrics = readerSheetDensityMetrics()
     Row(
@@ -97,7 +98,11 @@ internal fun ReaderSheetSwitchRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        if (supportingText == null) Text(label, style = MaterialTheme.typography.bodyLarge)
+        else Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(supportingText, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+        }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
