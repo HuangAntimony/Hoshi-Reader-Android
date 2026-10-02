@@ -445,7 +445,7 @@
     <string name="reader_appearance_show_statistics_toggle">显示统计开关</string>
     <string name="reader_appearance_show_reading_speed">显示阅读速度</string>
     <string name="reader_appearance_show_reading_time">显示阅读时间</string>
-    <string name="reader_appearance_show_sasayaki_toggle">显示有声书开关</string>
+    <string name="reader_appearance_show_sasayaki_toggle">显示有声书 / TTS 开关</string>
     <string name="reader_appearance_width">宽度</string>
     <string name="reader_appearance_height">高度</string>
     <string name="reader_appearance_scale">缩放</string>

@@ -6,7 +6,20 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.ui.graphics.vector.ImageVector
 import moe.antimony.hoshi.features.display.DisplayPalettePreset
 import moe.antimony.hoshi.features.display.resolveDisplaySettings
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import java.util.Locale
+
+internal data class ReaderTopPlaybackControl(
+    val isPlaying: Boolean,
+    val onToggle: () -> Unit,
+)
+
+internal fun readerTopPlaybackControl(
+    settings: SasayakiSettings,
+    tts: ReaderTopPlaybackControl?,
+    sasayaki: ReaderTopPlaybackControl?,
+): ReaderTopPlaybackControl? =
+    if (!settings.showReaderToggle) null else tts ?: sasayaki.takeIf { settings.enabled }
 
 data class ReaderChromeState(
     val title: String,

@@ -447,7 +447,7 @@
     <string name="reader_appearance_show_statistics_toggle">Show Statistics Toggle</string>
     <string name="reader_appearance_show_reading_speed">Show Reading Speed</string>
     <string name="reader_appearance_show_reading_time">Show Reading Time</string>
-    <string name="reader_appearance_show_sasayaki_toggle">Show Sasayaki Toggle</string>
+    <string name="reader_appearance_show_sasayaki_toggle">Show Audiobook / TTS Toggle</string>
     <string name="reader_appearance_width">Width</string>
     <string name="reader_appearance_height">Height</string>
     <string name="reader_appearance_scale">Scale</string>

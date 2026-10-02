@@ -369,7 +369,9 @@ fun ReaderWebView(
     val showStatistics = stateHolder.showStatistics
     val focusMode = stateHolder.focusMode
     LaunchedEffect(ttsState.error) {
-        if (ttsAvailable && ttsState.error != null && stateHolder.lookupPopups.isNotEmpty()) showTts = true
+        if (ttsAvailable && ttsState.error != null &&
+            (ttsState.started || stateHolder.lookupPopups.isNotEmpty())
+        ) showTts = true
     }
     val sasayakiWasPausedByLookup = stateHolder.sasayakiWasPausedByLookup
     var persistedStatistics by remember(bookRoot) {
@@ -1765,16 +1767,43 @@ fun ReaderWebView(
             ReaderSasayakiBottomSkipButtonAction.Forward -> sasayakiPlayer?.nextCue()
         }
     }
-    val showSasayakiTopToggle = sasayakiSettings.enabled &&
-        sasayakiSettings.showReaderToggle &&
-        (sasayakiPlayer?.hasAudio == true || sasayakiPlaybackData.hasStoredAudioSource())
+    fun startTtsAtReadingPosition() {
+        val position = readerPosition.displayedPosition
+        val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
+        ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())
+    }
+    val topPlaybackControl = readerTopPlaybackControl(
+        settings = sasayakiSettings,
+        tts = if (ttsAvailable && ttsState.bookId == ttsBookId && ttsState.sentences.isNotEmpty()) {
+            ReaderTopPlaybackControl(ttsState.playing || ttsLookupResume != null) {
+                ttsViewModel.stopPreview()
+                if (ttsLookupResume != null) {
+                    ttsLookupResume = null
+                    ttsViewModel.playback.pause()
+                } else if (ttsViewModel.playback.state.value.started) {
+                    ttsViewModel.playback.toggle()
+                } else {
+                    startTtsAtReadingPosition()
+                }
+            }
+        } else null,
+        sasayaki = sasayakiPlayer?.takeIf { it.hasAudio }?.let { player ->
+            ReaderTopPlaybackControl(player.isPlaying || sasayakiWasPausedByLookup) {
+                if (sasayakiWasPausedByLookup) {
+                    stateHolder.clearSasayakiPauseState()
+                } else {
+                    player.togglePlayback()
+                }
+            }
+        },
+    )
     val reserveSasayakiTopToggle = remember(bookRoot, sasayakiSettings) {
         readerShouldReserveSasayakiTopToggle(bookRoot, sasayakiSettings)
     }
     val contentChromeInsets = readerContentChromeInsets(
         state = chromeState,
         settings = effectiveSettings,
-        showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
+        showSasayakiToggle = reserveSasayakiTopToggle || topPlaybackControl != null,
         showStatisticsToggle = effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
         topSystemInsetDp = stableStatusBarPadding.value.roundToInt().coerceAtLeast(0),
@@ -1784,29 +1813,18 @@ fun ReaderWebView(
         focusMode = focusMode,
         settings = effectiveSettings,
     ).dp
-    val onSasayakiTopToggle = sasayakiPlayer
-        ?.takeIf { showSasayakiTopToggle && it.hasAudio }
-        ?.let { player ->
-            ({
-                if (sasayakiWasPausedByLookup) {
-                    stateHolder.clearSasayakiPauseState()
-                } else {
-                    player.togglePlayback()
-                }
-            })
-        }
     val chromeLayout = readerChromeLayout(
         chromeState,
         effectiveSettings,
         progressDisplay = progressDisplay,
-        showSasayakiToggle = reserveSasayakiTopToggle || showSasayakiTopToggle,
+        showSasayakiToggle = reserveSasayakiTopToggle || topPlaybackControl != null,
         showStatisticsToggle = effectiveSettings.showStatisticsToggle,
         focusMode = focusMode,
     )
     val chromeVisibility = readerChromeVisibility(
         focusMode = focusMode,
         hasStatisticsToggle = effectiveSettings.showStatisticsToggle,
-        hasSasayakiToggle = onSasayakiTopToggle != null,
+        hasSasayakiToggle = topPlaybackControl != null,
         hasBackJump = stateHolder.backTargetPosition != null,
         hasForwardJump = stateHolder.forwardTargetPosition != null,
     )
@@ -2033,8 +2051,8 @@ fun ReaderWebView(
                     navigateJumpForward()
                 }
             },
-            onSasayakiToggle = onSasayakiTopToggle,
-            sasayakiPlaying = sasayakiPlayer?.isPlaying == true || sasayakiWasPausedByLookup,
+            onSasayakiToggle = topPlaybackControl?.onToggle,
+            sasayakiPlaying = topPlaybackControl?.isPlaying == true,
             visibility = topInfoVisibility,
             metrics = topChromeMetrics,
             modifier = Modifier
@@ -2162,11 +2180,7 @@ fun ReaderWebView(
             )
         }
         if (showTts && ttsAvailable) {
-            TtsSheet(ttsViewModel, ttsBookId, onStart = {
-                val position = readerPosition.displayedPosition
-                val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
-                ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())
-            }, onDismiss = { showTts = false })
+            TtsSheet(ttsViewModel, ttsBookId, onStart = ::startTtsAtReadingPosition, onDismiss = { showTts = false })
         }
         ttsSelection?.let { selection ->
             val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "", ttsBookId) }

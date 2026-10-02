@@ -739,7 +739,7 @@ private fun ReaderAppearanceContent(
                             },
                         )
                     }
-                    readerAppearanceSasayakiRows(sasayakiSettings).forEach { labelRes ->
+                    readerAppearancePlaybackRows().forEach { labelRes ->
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(labelRes),
@@ -951,8 +951,8 @@ private fun ReaderAppearanceContent(
     }
 }
 
-internal fun readerAppearanceSasayakiRows(settings: SasayakiSettings): List<Int> =
-    if (settings.enabled) listOf(R.string.reader_appearance_show_sasayaki_toggle) else emptyList()
+internal fun readerAppearancePlaybackRows(): List<Int> =
+    listOf(R.string.reader_appearance_show_sasayaki_toggle)
 
 internal fun readerAppearanceFontOptions(importedFontNames: List<String>, selectedFont: String): List<String> =
     (listOf(ReaderFontManager.publisherFont) + ReaderFontManager.defaultFonts + importedFontNames + selectedFont)
