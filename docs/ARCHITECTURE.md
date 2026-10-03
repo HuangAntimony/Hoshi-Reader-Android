@@ -826,6 +826,9 @@ QA matrices live in `docs/VALIDATION.md`.
   host rules with AnkiConnect through `network/PrivateHttpHost`. Credentials are encrypted
   against each profile ID; protocol changes clear the draft's old credential. Named profiles
   independently persist model, voice, rate and format.
+  Saving a newly created profile atomically selects it through `TtsRepository`;
+  `TtsViewModel` stops preview and refreshes its catalog after successful persistence.
+  Editing an existing unselected profile does not switch sources.
   Source configuration edits connection/model options and an optional OpenAI voice-ID list.
   OpenAI model discovery is anchored to the editable Model ID field: its trailing action
   loads `/models` and offers its IDs in the shared themed dropdown, even for a sole

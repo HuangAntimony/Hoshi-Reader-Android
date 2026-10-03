@@ -156,11 +156,13 @@ class TtsViewModel @Inject constructor(
     suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsFailure? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first().settings
+        val created = current.customSources.none { it.id == draft.id }
         val previous = current.customSource()
         val changed = previous?.copy(name = "", voiceIds = emptyList()) != draft.copy(name = "", voiceIds = emptyList())
         if (current.engine == draft.id && changed) stopPreview()
         repository.saveSource(draft)
-        if (current.engine == draft.id && (changed || previous?.voiceIds != draft.voiceIds)) refresh()
+        if (created) stopPreview()
+        if (created || current.engine == draft.id && (changed || previous?.voiceIds != draft.voiceIds)) refresh()
         null
     } catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }

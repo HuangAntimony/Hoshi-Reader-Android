@@ -34,7 +34,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   the Voice picker provides a manual refresh action at the top for every source,
   retaining known voices during loading or refresh failure.
   E-ink shows readable loading text instead of a solid black progress line.
-  Add, edit and delete self-hosted servers from Source; each retains its model, voice,
+  Add, edit and delete self-hosted servers from Source; saving a new server selects it
+  immediately without starting playback, and each retains its model, voice,
   engine rate and WAV/MP3 format, with optional encrypted credentials and draft connection
   testing. Choose voices separately under Voice: VITS shows server-provided character names,
   while OpenAI Compatible can list manually configured voice IDs alongside voices discovered

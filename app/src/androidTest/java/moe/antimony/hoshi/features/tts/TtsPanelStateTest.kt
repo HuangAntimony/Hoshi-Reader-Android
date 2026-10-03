@@ -170,6 +170,21 @@ class TtsPanelStateTest {
         }
     }
 
+    @Test fun savingNewSourceSelectsItAndLoadsItsVoicesWithoutStartingPlayback() {
+        panel(online = true)
+        compose.onNodeWithText("Edge TTS").performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Add service"))
+        compose.onNodeWithText("Add service").performClick()
+        compose.onNodeWithText("Service name").performTextReplacement("New local server")
+        compose.onNodeWithText("API base URL").performTextReplacement("http://127.0.0.1:8088/v1")
+        compose.onNodeWithText("Model ID").performScrollTo().performTextReplacement("tts")
+        compose.onNodeWithText("Available voice IDs").performScrollTo().performTextReplacement("neutral\nbright")
+        compose.onNodeWithText("Save").performClick()
+        compose.waitUntil(5_000) { model.preferences.value.settings.engine.startsWith("custom:") && model.catalog.value?.voices?.any { it.id == "neutral" } == true }
+        compose.onNodeWithText("New local server").assertIsDisplayed()
+        compose.runOnIdle { Assert.assertEquals(0, playCount); Assert.assertEquals(TtsPreviewState.Idle, model.previewState.value) }
+    }
+
     @Test fun manualVoiceRefreshUpdatesCachedVoicesAndRetainsThemAfterFailure() {
         panel(online = true)
         compose.onNodeWithText("Automatic").performClick()

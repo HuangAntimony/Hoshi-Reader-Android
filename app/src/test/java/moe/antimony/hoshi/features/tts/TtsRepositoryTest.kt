@@ -21,6 +21,27 @@ class TtsRepositoryTest {
             transform(data.value).also { data.value = it }
     }
 
+    @Test fun creatingSourceSelectsItAtomicallyAndEditingAnotherKeepsSelection() = runTest {
+        val store = MemoryStore(preferencesOf())
+        val repository = TtsRepository(store)
+        repository.settings(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "old-voice", playbackRate = 2f))
+        val first = TtsCustomSource("custom:first", "First", baseUrl = "http://127.0.0.1/v1", model = "tts", voice = "first-voice", rate = 1.5f)
+        repository.saveSource(first)
+        val selected = TtsRepository(store).preferences.first().settings
+        assertEquals(first.id, selected.engine)
+        assertEquals("first-voice", selected.voice)
+        assertEquals(1.5f, selected.rate)
+        assertEquals(2f, selected.playbackRate)
+        val second = first.copy(id = "custom:second", name = "Second", voice = "second-voice", rate = .75f)
+        repository.saveSource(second)
+        repository.saveSource(first.copy(name = "Renamed", model = "different"))
+        val restored = TtsRepository(store).preferences.first().settings
+        assertEquals(second.id, restored.engine)
+        assertEquals("second-voice", restored.voice)
+        assertEquals(.75f, restored.rate)
+        assertEquals("Renamed", restored.customSources.first { it.id == first.id }.name)
+    }
+
     @Test fun newSourcesDefaultToMp3AndPersistEitherFormatAcrossReload() = runTest {
         val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)

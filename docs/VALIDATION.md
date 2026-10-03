@@ -1294,7 +1294,10 @@ Validate relevant sync/update/Sasayaki changes with:
 ## Self-hosted TTS
 
 - Add multiple named OpenAI Compatible and VITS Simple API sources from Source. Save
-  without requiring a network connection; test an unsaved draft, then cancel. Saved keys
+  without requiring a network connection; saving a new source must select it immediately
+  and prepare its voice choices without starting playback. Editing an unselected source
+  must retain the current selection; failed saves/cancel must not switch sources.
+  Test an unsaved draft, then cancel. Saved keys
   stay blank, and Cancel/close cancels requests. Test ordinary and e-ink presentation.
 - OpenAI bases include `/v1` (or the server's API prefix); VITS bases are server roots.
   In the Model ID field, the trailing list action opens a nearby menu for one or more

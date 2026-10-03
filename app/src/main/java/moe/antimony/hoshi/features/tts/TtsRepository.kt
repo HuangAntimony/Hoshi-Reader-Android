@@ -85,8 +85,9 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         store.edit {
             val current = decode(it[key])
             val settings = current.settings
+            val created = settings.customSources.none { profile -> profile.id == value.id }
             val sources = settings.customSources.filterNot { profile -> profile.id == value.id } + value
-            val next = settings.copy(customSources = sources).let { if (it.engine == value.id) it.selectSource(value.id) else it }
+            val next = settings.copy(customSources = sources).let { if (created || it.engine == value.id) it.selectSource(value.id) else it }
             it[key] = json.encodeToString(current.copy(settings = next))
         }
     }
