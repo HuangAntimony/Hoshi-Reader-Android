@@ -24,6 +24,47 @@ class TtsAudioRepositoryTest {
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 
+    @Test fun dialogueRequestsUseOrderedVoicesAndExportTheWholeSentence() = runBlocking {
+        val requests = mutableListOf<Pair<String, String>>()
+        val client = client { body ->
+            val json = Json.parseToJsonElement(body).jsonObject
+            requests += json.getValue("voice").jsonObject.getValue("name").jsonPrimitive.content to
+                json.getValue("input").jsonObject.getValue("text").jsonPrimitive.content
+        }
+        val repository = repository(client)
+        val sentence = TtsText.chapter(0, "<p>彼は「こんにちは」と言った。</p>").single()
+        val configured = preferences.copy(settings = preferences.settings.withRouting(TtsVoiceRouting(true, "ja-JP-Neural2-B", "ja-JP-Neural2-C")))
+        try {
+            val files = repository.audio(sentence, "book", configured)
+            assertEquals(3, files.size)
+            assertEquals(listOf("ja-JP-Neural2-B" to "彼は", "ja-JP-Neural2-C" to "「こんにちは」", "ja-JP-Neural2-B" to "と言った。"), requests)
+            assertEquals(files, repository.audio(sentence, "book", configured))
+            repository.export(sentence, "book", configured).also { output ->
+                assertEquals("wav", output.extension)
+                assertEquals(56, output.length().toInt())
+                output.delete()
+            }
+            assertEquals(requests.take(3), requests.drop(3))
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
+    @Test fun identicalEffectiveVoicesKeepWholeSentenceAndInvalidDialogueNeverFallsBack() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { requests += it }
+        val repository = repository(client)
+        val sentence = TtsText.chapter(0, "<p>「こんにちは」と言った。</p>").single()
+        try {
+            val same = preferences.copy(settings = preferences.settings.withRouting(TtsVoiceRouting(true, "", "ja-JP-Neural2-B")))
+            assertEquals(1, repository.audio(sentence, "book", same).size)
+            assertEquals(1, requests.size)
+            assertTrue(requests.single().contains(sentence.text))
+            val invalid = same.copy(settings = same.settings.withRouting(TtsVoiceRouting(true, "ja-JP-Neural2-B", "missing")))
+            try { repository.audio(sentence, "book", invalid); fail("Invalid voice must not fall back") }
+            catch (error: TtsException) { assertEquals(TtsFailure.MissingJapanese, error.failure) }
+            assertEquals(1, requests.size)
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun rubyPreferenceAppliesToPlaybackAndExportAndSeparatesCachedAudio() = runBlocking {
         val requests = mutableListOf<String>()
         val client = client { body ->
@@ -147,7 +188,7 @@ class TtsAudioRepositoryTest {
 
     private fun repository(client: OkHttpClient): TtsAudioRepository {
         val online = OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "fixture-key" }, Dispatchers.IO)
-        return TtsAudioRepository(TtsEngineRouter(AndroidTtsEngine(ContextWrapper(null)), online, CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO)), folder.root, Dispatchers.IO)
+        return TtsAudioRepository(TtsEngineRouter(AndroidTtsEngine(ContextWrapper(null)), online, CustomTtsEngine(OnlineTtsTransport(), { _, _ -> throw TtsException(TtsFailure.Configuration) }, kotlinx.coroutines.Dispatchers.IO)), folder.root, Dispatchers.IO, TtsExportFallback { _, _ -> throw AssertionError("Unexpected format normalization") })
     }
 
     private fun client(onSynthesis: (String) -> Unit): OkHttpClient {
@@ -159,7 +200,7 @@ class TtsAudioRepositoryTest {
         return OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             val body = if (request.url.encodedPath.endsWith("voices")) {
-                """{"voices":[{"name":"ja-JP-Neural2-B","languageCodes":["ja-JP"]}]}"""
+                """{"voices":[{"name":"ja-JP-Neural2-B","languageCodes":["ja-JP"]},{"name":"ja-JP-Neural2-C","languageCodes":["ja-JP"]}]}"""
             } else {
                 val buffer = okio.Buffer()
                 request.body!!.writeTo(buffer)

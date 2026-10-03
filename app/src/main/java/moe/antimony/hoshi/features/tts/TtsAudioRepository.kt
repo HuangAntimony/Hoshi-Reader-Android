@@ -19,24 +19,27 @@ internal interface TtsAudioSource {
 }
 
 @Singleton
-class TtsAudioRepository @Inject constructor(
+class TtsAudioRepository internal constructor(
     private val engine: TtsEngineRouter,
     @param:CacheDir private val cache: File,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val fallback: TtsExportFallback,
 ) : TtsAudioSource {
+    @Inject constructor(engine: TtsEngineRouter, @CacheDir cache: File, @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        fallback: AndroidTtsExportFallback) : this(engine, cache, ioDispatcher, fallback as TtsExportFallback)
     private val synthesis = Mutex()
     private val cacheLock = Mutex()
     private val files = linkedMapOf<String, List<File>>()
     override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
         withContext(ioDispatcher) {
-            val spoken = TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings)
+            val plan = plan(sentence, bookId, preferences)
             // Prefetch depth and player speed do not change the synthesized audio.
-            val identity = "${preferences.settings.synthesisSettings()}\u0000$spoken"
+            val identity = plan.joinToString("\u0000") { "${it.settings.synthesisSettings()}\u0000${it.text}" }
             val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
             cached(key)?.let { return@withContext it }
             synthesis.withLock {
                 cached(key)?.let { return@withLock it }
-                engine.synthesize(spoken, preferences.settings, File(cache, "tts/playback")).also { generated ->
+                synthesize(plan, File(cache, "tts/playback")).also { generated ->
                     // Once returned by the engine, the cache owns these files even if the caller is cancelled.
                     withContext(NonCancellable) {
                         cacheLock.withLock {
@@ -48,6 +51,24 @@ class TtsAudioRepository @Inject constructor(
                 }
             }
         }
+
+    private suspend fun plan(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<TtsSynthesisPart> {
+        val settings = preferences.settings
+        val catalog = if (settings.routing().enabled && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi)
+            engine.cachedCatalog(settings) ?: engine.catalog(settings) else null
+        return ttsSynthesisPlan(sentence, bookId, preferences, catalog)
+    }
+
+    private suspend fun synthesize(plan: List<TtsSynthesisPart>, directory: File): List<File> {
+        val files = mutableListOf<File>()
+        try {
+            plan.forEach { files += engine.synthesize(it.text, it.settings, directory) }
+            return files
+        } catch (error: Throwable) {
+            withContext(NonCancellable + ioDispatcher) { files.forEach { it.delete() } }
+            throw error
+        }
+    }
 
     private suspend fun cached(key: String): List<File>? = cacheLock.withLock {
         files[key]?.takeIf { list -> list.all { it.isFile } }
@@ -64,13 +85,22 @@ class TtsAudioRepository @Inject constructor(
     }
 
     /** Export has its own lifetime so changing books cannot delete Anki's pending upload. */
-    suspend fun export(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): File =
-        withTtsExportFile(File(cache, "tts/export/${java.util.UUID.randomUUID()}.${engine.extension(preferences.settings)}"), ioDispatcher) { target ->
-            val parts = engine.synthesize(TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings), preferences.settings, File(cache, "tts/export"))
-            try {
-                if (target.extension == "mp3") TtsMp3.concatenate(parts, target) else TtsWav.concatenate(parts, target)
-            } finally { parts.forEach { it.delete() } }
+    suspend fun export(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): File {
+        val target = File(cache, "tts/export/${java.util.UUID.randomUUID()}.${engine.extension(preferences.settings)}")
+        var parts: List<File> = emptyList()
+        var output: File? = null
+        try {
+            return withContext(ioDispatcher) {
+                parts = synthesize(plan(sentence, bookId, preferences), File(cache, "tts/export"))
+                joinTtsAudio(parts, target, fallback, ioDispatcher).also { output = it }
+            }
+        } catch (error: Throwable) {
+            withContext(NonCancellable + ioDispatcher) { output?.delete() }
+            throw error
+        } finally {
+            withContext(NonCancellable + ioDispatcher) { parts.forEach { it.delete() } }
         }
+    }
 }
 
 /** Own the final file outside the dispatcher boundary, including cancelled return delivery. */
@@ -103,7 +133,7 @@ internal object TtsWav {
                 require(size >= 0 && cursor.toLong() + 8 + size <= bytes.size)
                 val body = bytes.copyOfRange(cursor + 8, cursor + 8 + size)
                 if (id == "fmt ") {
-                    require(format == null || format.contentEquals(body))
+                    if (format != null && !format.contentEquals(body)) throw TtsAudioFormatMismatch()
                     format = body
                 } else if (id == "data") data.write(body)
                 cursor += 8 + size + size % 2

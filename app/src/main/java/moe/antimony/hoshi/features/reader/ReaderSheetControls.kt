@@ -98,7 +98,7 @@ internal fun ReaderSheetSwitchRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (supportingText == null) Text(label, style = MaterialTheme.typography.bodyLarge)
+        if (supportingText == null) Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         else Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(supportingText, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)

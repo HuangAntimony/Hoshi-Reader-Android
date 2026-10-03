@@ -34,12 +34,15 @@ data class TtsSentence(
     val text: String,
     val ruby: List<TtsRuby> = emptyList(),
     val imageBefore: Boolean = false,
+    val roles: List<TtsTextRange> = emptyList(),
 )
 
 /** Written offsets use the Reader's matchable code points; ruby offsets use UTF-16 within text. */
 object TtsText {
     fun chapter(chapter: Int, html: String): List<TtsSentence> {
         val result = mutableListOf<TtsSentence>()
+        val source = StringBuilder()
+        val sourceStarts = mutableListOf<Int>()
         val text = StringBuilder()
         val rubies = mutableListOf<TtsRuby>()
         var offset = 0
@@ -49,10 +52,12 @@ object TtsText {
             val value = text.toString()
             val length = value.codePoints().filter { it.isReaderMatchableCodePoint() }.count().toInt()
             if (length > 0) {
+                sourceStarts += source.length
                 result += TtsSentence(chapter, offset, length, value, rubies.toList(), imageBefore)
                 imageBefore = false
             }
             offset += length
+            source.append(value).append('\n')
             text.clear()
             rubies.clear()
             sentenceEnded = false
@@ -99,7 +104,8 @@ object TtsText {
         }
         visit(Jsoup.parse(html).body())
         flush()
-        return result
+        val roles = TtsDialogue.ranges(source.toString())
+        return result.mapIndexed { index, sentence -> sentence.copy(roles = TtsDialogue.slice(roles, sourceStarts[index], sourceStarts[index] + sentence.text.length)) }
     }
 
     fun selection(sentences: List<TtsSentence>, text: String, normalizedOffset: Int?, sentenceOffset: Int?): TtsSentence {
@@ -128,31 +134,75 @@ object TtsText {
             }
         }
         val chapter = sentences.firstOrNull()?.chapter ?: 0
-        return TtsSentence(chapter, start, starts.size, text, rubies)
+        if (normalizedOffset != null) TtsDialogue.selectionRanges(sentences, text, start, starts.size)?.let {
+            return TtsSentence(chapter, start, starts.size, text, rubies, roles = it)
+        }
+        val roleByOffset = mutableMapOf<Int, TtsTextRole>()
+        sentences.forEach { source ->
+            val sourceRoles = source.roles.ifEmpty { TtsDialogue.ranges(source.text) }
+            var position = source.start
+            var sourceUtf16 = 0
+            source.text.codePoints().forEach { point ->
+                if (point.isReaderMatchableCodePoint()) {
+                    roleByOffset[position++] = sourceRoles.firstOrNull { sourceUtf16 >= it.start && sourceUtf16 < it.end }?.role ?: TtsTextRole.Narration
+                }
+                sourceUtf16 += Character.charCount(point)
+            }
+        }
+        val selectedRoles = mutableListOf<TtsTextRange>()
+        var position = start
+        var selectedUtf16 = 0
+        text.codePoints().forEach { point ->
+            val role = if (!point.isReaderMatchableCodePoint() && point != '「'.code && point != '『'.code)
+                selectedRoles.lastOrNull()?.role ?: roleByOffset[position] ?: TtsTextRole.Narration
+            else roleByOffset[position] ?: selectedRoles.lastOrNull()?.role ?: TtsTextRole.Narration
+            val end = selectedUtf16 + Character.charCount(point)
+            val previous = selectedRoles.lastOrNull()
+            if (previous?.role == role) selectedRoles[selectedRoles.lastIndex] = previous.copy(end = end)
+            else selectedRoles += TtsTextRange(selectedUtf16, end, role)
+            if (point.isReaderMatchableCodePoint()) position++
+            selectedUtf16 = end
+        }
+        return TtsSentence(chapter, start, starts.size, text, rubies, roles = if (normalizedOffset == null) TtsDialogue.ranges(text) else selectedRoles)
     }
 
     fun spoken(sentence: TtsSentence, bookId: String?, words: List<TtsWord>, useRubyReadings: Boolean = true): String {
+        return spokenParts(sentence, bookId, words, useRubyReadings).joinToString("") { it.text }
+    }
+
+    fun spokenParts(sentence: TtsSentence, bookId: String?, words: List<TtsWord>, useRubyReadings: Boolean = true): List<TtsSpokenPart> {
         val applicable = words.filter { it.bookId == null || it.bookId == bookId }
             .sortedWith(compareByDescending<TtsWord> { it.surface.length }.thenByDescending { it.bookId != null })
         val rubies = if (useRubyReadings) sentence.ruby else emptyList()
-        return buildString {
+        val roles = sentence.roles.ifEmpty { TtsDialogue.ranges(sentence.text) }
+        val result = mutableListOf<Pair<TtsTextRole, StringBuilder>>()
+        fun emit(value: String, start: Int, end: Int) {
+            if (value.isEmpty()) return
+            val position = (start until end).firstOrNull { sentence.text[it] !in "「」『』" } ?: start
+            val role = TtsDialogue.roleAt(roles, if (start == end && position == sentence.text.length) (position - 1).coerceAtLeast(0) else position)
+            val previous = result.lastOrNull()
+            if (previous?.first == role) previous.second.append(value)
+            else result += role to StringBuilder(value)
+        }
+        run {
             var cursor = 0
             while (cursor <= sentence.text.length) {
                 // Image-backed glyphs have no matchable source text. Emit each insertion once,
                 // then consume source text; never use an empty/backward range to advance cursor.
-                rubies.filter { it.start == cursor && it.end == cursor }.forEach { append(it.reading) }
+                rubies.filter { it.start == cursor && it.end == cursor }.forEach { emit(it.reading, cursor, cursor) }
                 if (cursor == sentence.text.length) break
                 val word = applicable.firstOrNull { it.surface.isNotEmpty() && sentence.text.startsWith(it.surface, cursor) }
                 val ruby = rubies.firstOrNull { it.start == cursor && it.end > cursor && it.end <= sentence.text.length }
                 when {
-                    word != null -> { append(word.replacement); cursor += word.surface.length }
+                    word != null -> { emit(word.replacement, cursor, cursor + word.surface.length); cursor += word.surface.length }
                     ruby != null && (cursor until ruby.end).none { start -> applicable.any { sentence.text.startsWith(it.surface, start) } } -> {
-                        append(ruby.reading); cursor = ruby.end
+                        emit(ruby.reading, cursor, ruby.end); cursor = ruby.end
                     }
-                    else -> append(sentence.text[cursor++])
+                    else -> { emit(sentence.text[cursor].toString(), cursor, cursor + 1); cursor++ }
                 }
             }
         }
+        return result.map { TtsSpokenPart(it.first, it.second.toString()) }
     }
 
     fun chunks(text: String, limit: Int): List<String> {

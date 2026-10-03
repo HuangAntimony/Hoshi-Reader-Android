@@ -44,7 +44,7 @@ class CustomTtsDeviceTest {
         val transport = OnlineTtsTransport()
         val custom = CustomTtsEngine(transport, cipher, Dispatchers.IO, TtsVoiceCatalogStore(File(directory, "voices")))
         val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), custom)
-        val audio = TtsAudioRepository(router, directory, Dispatchers.IO)
+        val audio = TtsAudioRepository(router, directory, Dispatchers.IO, AndroidTtsExportFallback(context))
         val settings = TtsSettings(engine = initial.id, customSources = listOf(initial))
         val sentence = TtsText.chapter(0, "<p><ruby>今日<rt>きょう</rt></ruby>は晴れです。</p>").single()
         try {

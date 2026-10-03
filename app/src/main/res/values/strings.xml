@@ -938,6 +938,10 @@
     <string name="tts_empty_text">No readable sentences were found.</string>
     <string name="tts_failed">Unable to prepare or play the sentence audio. Please retry.</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
+    <string name="tts_dialogue_routing">Separate narration and dialogue</string>
+    <string name="tts_narration_voice">Narration voice</string>
+    <string name="tts_dialogue_voice">Dialogue voice</string>
+    <string name="tts_dialogue_sample">彼女は窓を開けた。「今日はいい天気ですね」と言って、微笑んだ。</string>
     <string name="tts_storage_error">Could not save TTS changes. Please retry.</string>
     <string name="anki_handlebar_sentence_audio">Sentence audio from the audiobook, or TTS when no audiobook is linked.</string>
     <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>

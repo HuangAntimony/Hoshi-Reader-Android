@@ -1052,6 +1052,25 @@ Validate relevant sync/update/Sasayaki changes with:
 
 ## Japanese TTS
 
+- Narration/dialogue routing: run `TtsDialogueTest`, `TtsCustomDialogueTest`,
+  `TtsRepositoryTest`, `TtsAudioRepositoryTest`, `TtsPlaybackControllerTest` and
+  `TtsExportTest` in the JVM suite. Cover paired/nested/unmatched Japanese quotes,
+  cross-sentence/paragraph dialogue and chapter reset; ruby and sentence-end image
+  glyphs, symbols/emoji and replacements across role boundaries; source-anchored lookup
+  with repeated text; first activation after choosing a voice while disabled, retained
+  dialogue after reactivation and per-Source restart restoration; ordered request-local
+  voices, identical-voice coalescing, invalid voices, partial synthesis cleanup/retry,
+  cache separation and inactive-source edits/late callbacks. Compatible exports keep
+  MP3/WAV; incompatible formats use M4A, while corrupt input still fails and cancellation
+  deletes partial exports. Prefetch/cache counts remain sentences, not voice fragments.
+  On a connected device, explicitly run `TtsDialogueUiTest` and
+  `TtsDialogueExportDeviceTest` using the APK-preserving installation procedure below.
+  The UI fixture covers ordinary/e-ink selection, refresh, initial/re-enabled routing
+  and the fixed Preview footer. Local PCM fixtures verify the real AAC codec with
+  different sample rates/channel counts and full sentence duration, without credentials.
+  Also check installed-engine dual voices and reading/replacement preview/Anki in
+  paginated, continuous and VN modes, paused navigation, images and background controls.
+  Build success alone does not establish device UI or codec validation.
 - Online-source regressions: run `OnlineTtsProtocolTest`, `OnlineTtsTransportTest`,
   `OnlineTtsEngineTest`, `MicrosoftTranslatorSessionTest` and `TtsMp3Test` with the JVM
   suite. Cover literal SSML/JSON,

@@ -15,6 +15,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TtsRepositoryTest {
+    @Test fun firstEnableInheritsTheVoiceChosenWhileDisabledButReenableKeepsDialogue() {
+        var settings = TtsSettings(engine = TtsOnlineSource.Edge.id)
+        settings = settings.withRouting(settings.routing().copy(narration = "chosen"))
+        settings = settings.withRouting(settings.routing().copy(enabled = true))
+        assertEquals("chosen", settings.routing().dialogue)
+        settings = settings.withRouting(settings.routing().copy(dialogue = "other"))
+        settings = settings.withRouting(settings.routing().copy(enabled = false))
+        settings = settings.withRouting(settings.routing().copy(narration = "new-narration"))
+        settings = settings.withRouting(settings.routing().copy(enabled = true))
+        assertEquals("other", settings.routing().dialogue)
+    }
+
+    @Test fun dialogueRoutingDefaultsOffAndRestoresEachSourceIndependently() = runTest {
+        val store = MemoryStore(preferencesOf())
+        val repository = TtsRepository(store)
+        assertFalse(repository.preferences.first().settings.routing().enabled)
+        val first = TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "narrator")
+            .withRouting(TtsVoiceRouting(true, "narrator", "dialogue"))
+        repository.settings(first)
+        repository.settings(repository.preferences.first().settings.selectSource(TtsOnlineSource.Azure.id).copy(voice = "azure")
+            .withRouting(TtsVoiceRouting(true, "azure", "other")))
+        val restored = TtsRepository(store).preferences.first().settings.selectSource(TtsOnlineSource.Edge.id)
+        assertEquals("narrator", restored.voice)
+        assertEquals(TtsVoiceRouting(true, "narrator", "dialogue"), restored.routing())
+        repository.settings(restored.withRouting(restored.routing().copy(enabled = false)))
+        val disabled = repository.preferences.first().settings
+        assertEquals("dialogue", disabled.routing().dialogue)
+        assertEquals(TtsVoiceRouting(true, "azure", "other"), disabled.selectSource(TtsOnlineSource.Azure.id).routing())
+        assertEquals(first.synthesisSettings(), first.copy(routingBySource = first.routingBySource + ("unselected" to TtsVoiceRouting(true, "a", "b"))).synthesisSettings())
+    }
+
     private class MemoryStore(initial: Preferences) : DataStore<Preferences> {
         override val data = MutableStateFlow(initial)
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =

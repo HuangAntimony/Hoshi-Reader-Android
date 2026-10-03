@@ -16,6 +16,27 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun changingUnselectedRoutingKeepsPlaybackButActiveRoutingCancelsLateAudio() = runTest {
+        fixture { controller, output, audio, repository ->
+            controller.play(); runCurrent()
+            val original = repository.preferences.first().settings
+            repository.settings(original.copy(routingBySource = mapOf("unselected" to TtsVoiceRouting(true, "a", "b")))); runCurrent()
+            assertTrue(controller.state.value.playing)
+            controller.pause()
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { withContext(NonCancellable) { release.await() } }
+            controller.next()
+            controller.play(); runCurrent()
+            val count = output.playCount
+            val current = repository.preferences.first().settings
+            repository.settings(current.withRouting(TtsVoiceRouting(true, current.voice, "different"))); runCurrent()
+            release.complete(Unit); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals(count, output.playCount)
+            assertTrue(output.prepared.isEmpty())
+        }
+    }
+
     private class MemoryStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
         override val data = MutableStateFlow(initial)
         override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = transform(data.value).also { data.value = it }

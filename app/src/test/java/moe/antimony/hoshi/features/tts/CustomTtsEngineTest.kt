@@ -241,7 +241,7 @@ class CustomTtsEngineTest {
             val transport = OnlineTtsTransport(OkHttpClient())
             val router = TtsEngineRouter(AndroidTtsEngine(android.content.ContextWrapper(null)),
                 OnlineTtsEngine(transport, { _, _ -> "unused" }, Dispatchers.IO), engine())
-            val audio = TtsAudioRepository(router, folder.root, Dispatchers.IO)
+            val audio = TtsAudioRepository(router, folder.root, Dispatchers.IO, TtsExportFallback { _, _ -> throw AssertionError("Unexpected format normalization") })
             val source = profile(server)
             val other = source.copy(id = "custom:other", name = "Other")
             val preferences = TtsPreferences(TtsSettings(engine = source.id, customSources = listOf(source, other)),

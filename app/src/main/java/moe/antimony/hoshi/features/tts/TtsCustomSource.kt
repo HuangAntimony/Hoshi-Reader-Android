@@ -73,12 +73,14 @@ internal fun TtsSettings.synthesisSettings(): TtsSettings {
     val custom = customSource()
     return copy(voice = custom?.voice ?: voice, rate = custom?.rate ?: rate, pitch = if (isCustomSource()) 0f else pitch,
         online = online.filterKeys { it == engine }, parameters = parameters.filterKeys { it == engine },
-        customSources = listOfNotNull(custom?.copy(name = "", voiceIds = emptyList())), prefetchSentences = 0, playbackRate = 1f)
+        customSources = listOfNotNull(custom?.copy(name = "", voiceIds = emptyList())), prefetchSentences = 0, playbackRate = 1f,
+        routingBySource = if (routing().enabled) mapOf(engine to routing()) else emptyMap())
 }
 
 internal fun TtsSettings.selectSource(id: String): TtsSettings {
     val custom = customSources.firstOrNull { it.id == id }
     val selectedRate = custom?.rate ?: TtsOnlineSource.from(id)?.normalizeRate(rate)
         ?: rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
-    return copy(engine = id, voice = custom?.voice ?: "", rate = selectedRate, pitch = 0f)
+    return copy(engine = id, voice = routingBySource[id]?.narration ?: custom?.voice ?: "", rate = selectedRate, pitch = 0f,
+        routingBySource = routingBySource + (engine to routing().copy(narration = voice)))
 }

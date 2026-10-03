@@ -14,6 +14,50 @@ import org.junit.rules.TemporaryFolder
 class TtsExportTest {
     @get:Rule val folder = TemporaryFolder()
 
+    private fun wav(name: String, rate: Int) = File(folder.root, name).apply {
+        writeBytes(ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put("RIFF".toByteArray()).putInt(40).put("WAVEfmt ".toByteArray()).putInt(16)
+            putShort(1).putShort(1).putInt(rate).putInt(rate * 2).putShort(2).putShort(16)
+            put("data".toByteArray()).putInt(4).putInt(0)
+        }.array())
+    }
+
+    @Test fun incompatibleVoicesUseM4aFallbackAndDeleteTheFailedDirectExport() = runTest {
+        val parts = listOf(wav("first.wav", 24000), wav("second.wav", 48000))
+        val target = File(folder.root, "sentence.wav")
+        val output = joinTtsAudio(parts, target, TtsExportFallback { inputs, result ->
+            assertEquals(parts, inputs)
+            assertTrue(inputs.all { it.isFile })
+            result.writeText("normalized")
+        }, UnconfinedTestDispatcher(testScheduler))
+        assertEquals("m4a", output.extension)
+        assertEquals("normalized", output.readText())
+        assertFalse(target.exists())
+    }
+
+    @Test fun cancelledFallbackDeletesPartialOutputAndKeepsItsInputFiles() = runTest {
+        val target = File(folder.root, "cancel.wav")
+        val parts = listOf(wav("first.wav", 24000), wav("second.wav", 48000))
+        val pending = CompletableDeferred<Unit>()
+        val task = launch {
+            joinTtsAudio(parts, target, TtsExportFallback { _, output -> output.writeText("partial"); pending.await() }, UnconfinedTestDispatcher(testScheduler))
+        }
+        runCurrent()
+        task.cancelAndJoin()
+        assertFalse(target.exists())
+        assertFalse(File(folder.root, "cancel.m4a").exists())
+        assertTrue(parts.all { it.isFile })
+    }
+
+    @Test fun corruptAudioIsNotTreatedAsAFormatMismatch() = runTest {
+        val parts = listOf(wav("first.wav", 24000), File(folder.root, "bad.wav").apply { writeText("bad") })
+        val target = File(folder.root, "bad-export.wav")
+        try {
+            joinTtsAudio(parts, target, TtsExportFallback { _, _ -> fail("Must not transcode corrupt input") }, UnconfinedTestDispatcher(testScheduler))
+            fail("Corrupt audio must fail")
+        } catch (_: IllegalArgumentException) { assertFalse(target.exists()) }
+    }
+
     @Test fun cancellationAtReturnBoundaryDeletesCompletedExport() = runTest {
         val target = File(folder.root, "cancelled.wav")
         val owner = Job()

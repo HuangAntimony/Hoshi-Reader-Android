@@ -784,6 +784,34 @@ QA matrices live in `docs/VALIDATION.md`.
   Android Keystore key through `TtsCredentialCipher`; restored ciphertext without its
   device key requires configuration again. UI fields never read keys back or put them
   in saveable state, URLs, logs or visible errors.
+- Optional narration/dialogue routing is stored per Source in `routingBySource`, default
+  off. `TtsVoiceRouting.initialized` distinguishes first activation (both voices inherit
+  the current voice) from reactivation (the dialogue choice is retained). The selected
+  narration voice remains the existing `voice` field. Both routes share credentials,
+  provider parameters and Hoshi speed; Voice presents shared style/role and pitch/rate
+  capabilities. Connection tests omit routing and test only the draft source.
+  `TtsDialogue` finds complete paired Japanese quotes before chapter sentence slicing,
+  retains nested/cross-paragraph dialogue, resets at each chapter and treats unmatched
+  markers as ordinary text. Sentence-local UTF-16 role ranges retain the original
+  matchable Reader offsets. Lookup selection matches source text at its normalized
+  anchor, preserving punctuation/symbol roles and distinguishing repeated occurrences;
+  chapter parsing and selection projection stay on the book repository's IO dispatcher.
+  Text replacement/ruby emission keeps original roles, including sentence-end zero-width
+  glyph readings. A replacement spanning role boundaries belongs to its first non-quote
+  source character. Original text, highlighter and Anki sentence text stay unchanged.
+  `ttsSynthesisPlan` resolves two voices within one Source, coalesces adjacent identical
+  effective voices and attaches punctuation-only ranges to spoken content. Custom voice
+  overrides are request-local and update the effective profile as well as `voice`.
+  OpenAI's omitted voice remains the server default; its first catalog entry is not
+  assumed to be that default. Optional discovery is not a synthesis prerequisite.
+  Ordered effective configurations/text key one sentence cache entry, preserving the
+  32-sentence bound; all sentence parts must finish before playback. Role changes do not
+  alter sentence navigation, image holds or add an app-level intra-sentence pause.
+  Export first uses lossless MP3/WAV concatenation. Only incompatible sample formats
+  trigger the Hilt-injected `AndroidTtsExportFallback`: Media3 Transformer normalizes
+  each part to 24 kHz mono and writes one AAC/M4A file. Transformer cancellation completes
+  on its looper before temporary inputs/output are removed; no additional output option
+  or Hoshi-speed processing is introduced.
 - `TtsBookRepository` reads complete linear chapter source, including file-backed
   cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.

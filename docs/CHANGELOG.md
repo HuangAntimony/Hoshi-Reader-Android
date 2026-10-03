@@ -28,6 +28,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Provider pause switches, audio format and sample rate use plain settings rows, while
   remaining parameter cards have tighter vertical padding; slider row heights stay unchanged.
   Configurable sources default to MP3, retaining saved WAV/MP3 selections.
+  Each Source can optionally use separate narration and dialogue voices, remembered
+  independently and selected from the existing voice picker. Paired Japanese quotes
+  route dialogue across sentences and paragraphs; reading, replacement preview and
+  Anki sentence audio share this behavior while keeping sentence navigation unchanged.
   Cloud credentials use a matching configuration sheet; connection testing and its
   success/error feedback stay visible in a fixed footer for cloud and self-hosted sources,
   without requiring another scroll after testing. Source errors

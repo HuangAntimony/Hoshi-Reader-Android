@@ -17,7 +17,7 @@ internal object TtsMp3 {
                 val bytes = file.readBytes()
                 frames(bytes).filterNot { it.metadata }.forEach { frame ->
                     val current = frame.rate to frame.channels
-                    if (format != null && format != current) invalid()
+                    if (format != null && format != current) throw TtsAudioFormatMismatch()
                     format = current
                     output.write(bytes, frame.offset, frame.size)
                 }

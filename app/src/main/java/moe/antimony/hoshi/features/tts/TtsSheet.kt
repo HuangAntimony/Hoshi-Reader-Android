@@ -82,7 +82,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
     var customEditor by remember { mutableStateOf<TtsCustomSource?>(null) }
     var configureSource by remember { mutableStateOf<TtsOnlineSource?>(null) }
     val context = LocalContext.current
-    val sample = stringResource(R.string.tts_sample)
+    val sample = stringResource(if (preferences.settings.routing().enabled) R.string.tts_dialogue_sample else R.string.tts_sample)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     DisposableEffect(viewModel) { onDispose { viewModel.stopPreview() } }
     Column(modifier) {

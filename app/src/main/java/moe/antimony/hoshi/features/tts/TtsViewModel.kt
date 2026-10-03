@@ -139,7 +139,7 @@ class TtsViewModel @Inject constructor(
         val config = configuration(source, region, key)
         val current = repository.preferences.first()
         val draft = current.copy(settings = current.settings.copy(engine = source.id, voice = "", rate = 1f, pitch = 0f,
-            online = current.settings.online + (source.id to config), parameters = emptyMap()))
+            online = current.settings.online + (source.id to config), parameters = emptyMap(), routingBySource = emptyMap()))
         audio.export(TtsSentence(0, 0, 0, sample), null, draft).delete()
         null
     } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
@@ -169,7 +169,7 @@ class TtsViewModel @Inject constructor(
     suspend fun testSource(source: TtsCustomSource, key: String, removeKey: Boolean, sample: String): TtsFailure? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first()
-        val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id)
+        val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id).copy(routingBySource = emptyMap())
         audio.export(TtsSentence(0, 0, 0, sample), null, current.copy(settings = settings)).delete()
         null
     } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
@@ -234,7 +234,7 @@ class TtsViewModel @Inject constructor(
         previewFile?.delete(); previewFile = null
     }
     suspend fun sourceSentence(book: moe.antimony.hoshi.epub.EpubBook, chapter: Int, selection: moe.antimony.hoshi.features.reader.ReaderSelectionData): TtsSentence =
-        TtsText.selection(books.chapter(book, chapter), selection.sentence, selection.normalizedOffset, selection.sentenceOffset)
+        books.selection(book, chapter, selection.sentence, selection.normalizedOffset, selection.sentenceOffset)
 
     suspend fun sentenceAudio(sentence: TtsSentence, bookId: String?): java.io.File = audio.export(sentence, bookId, repository.preferences.first())
     fun dismissError() { mutableError.value = null; playback.clearError() }

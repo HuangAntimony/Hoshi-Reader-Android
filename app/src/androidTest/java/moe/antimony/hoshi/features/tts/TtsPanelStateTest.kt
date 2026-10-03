@@ -79,7 +79,7 @@ class TtsPanelStateTest {
                 .body("""[{"Locale":"ja-JP","ShortName":"$onlineVoice"}]""".toResponseBody()).build()
         }.build())
         val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), CustomTtsEngine(transport, cipher::decrypt, Dispatchers.IO))
-        val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO)
+        val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO, AndroidTtsExportFallback(context))
         val books = TtsBookRepository(Dispatchers.IO)
         val output = object : TtsPlaybackOutput {
             override var onEnded: () -> Unit = {}; override var onPaused: () -> Unit = {}; override var onError: () -> Unit = {}

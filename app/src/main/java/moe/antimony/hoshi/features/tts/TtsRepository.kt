@@ -22,6 +22,7 @@ data class TtsSettings(
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
     val prefetchSentences: Int = 2, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
+    val routingBySource: Map<String, TtsVoiceRouting> = emptyMap(),
 )
 internal val ttsPlaybackRateRange = .5f..3f
 internal fun normalizeTtsPlaybackRate(rate: Float): Float = if (rate.isFinite()) rate.coerceIn(ttsPlaybackRateRange) else 1f
@@ -63,6 +64,7 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
         val sources = settings.customSources.map { if (it.id == settings.engine) it.copy(voice = settings.voice, rate = rate) else it }
         val normalized = settings.copy(customSources = sources, rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
+            routingBySource = settings.routingBySource.mapValues { (id, routing) -> if (id == settings.engine) routing.copy(narration = settings.voice) else routing },
             prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
             playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
@@ -94,8 +96,10 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     suspend fun deleteSource(id: String) {
         store.edit {
             val current = decode(it[key])
-            val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { source -> source.id == id })
-            it[key] = json.encodeToString(current.copy(settings = if (settings.engine == id) settings.selectSource("") else settings))
+            val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { source -> source.id == id },
+                routingBySource = current.settings.routingBySource - id)
+            val next = if (settings.engine == id) settings.selectSource("").copy(routingBySource = settings.routingBySource - id) else settings
+            it[key] = json.encodeToString(current.copy(settings = next))
         }
     }
     suspend fun save(word: TtsWord): TtsWordError? {
@@ -124,5 +128,8 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
         val html = chapter.html.ifBlank { book.readResource(chapter.href)?.toString(Charsets.UTF_8).orEmpty() }
         TtsText.chapter(index, html)
     }
+
+    suspend fun selection(book: EpubBook, index: Int, text: String, normalizedOffset: Int?, sentenceOffset: Int?): TtsSentence =
+        withContext(dispatcher) { TtsText.selection(chapter(book, index), text, normalizedOffset, sentenceOffset) }
 
 }
