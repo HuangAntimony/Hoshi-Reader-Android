@@ -14,6 +14,72 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TtsCustomSourceUiTest {
     @get:Rule val compose = createComposeRule()
+
+    private fun loadModels() {
+        compose.onNodeWithText("Model ID").performScrollTo()
+        compose.onNode(hasClickAction() and hasAnyAncestor(hasText("Model ID"))).performClick()
+    }
+
+    @Test fun singleModelFillsTheEditableFieldAndSavesWithoutAnotherSelection() {
+        var saved: TtsCustomSource? = null
+        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1")
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsCustomSourceEditor(source, false, { _, _, _ -> null }, { draft, _, _ -> saved = draft; null },
+                    { null }, { _, _, _ -> listOf("irodori-tts") }, {})
+            }
+        }
+        loadModels()
+        compose.onNode(hasSetTextAction() and hasText("irodori-tts")).assertIsDisplayed()
+        compose.onNodeWithText("Save").performClick()
+        compose.runOnIdle { assertEquals("irodori-tts", saved?.model) }
+    }
+
+    @Test fun choosingFromSeveralModelsAndTypingBothUpdateTheSameField() {
+        var saved: TtsCustomSource? = null
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsCustomSourceEditor(TtsCustomSource("custom:fixture"), false, { _, _, _ -> null },
+                    { draft, _, _ -> saved = draft; null }, { null }, { _, _, _ -> listOf("first", "second") }, {})
+            }
+        }
+        loadModels()
+        compose.onNodeWithText("second").performClick()
+        compose.onNode(hasSetTextAction() and hasText("second")).performTextReplacement("manual-model")
+        compose.onNodeWithText("Save").performClick()
+        compose.runOnIdle { assertEquals("manual-model", saved?.model) }
+    }
+
+    @Test fun failedModelDiscoveryKeepsManualInputAvailable() {
+        var saved: TtsCustomSource? = null
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsCustomSourceEditor(TtsCustomSource("custom:fixture", model = "existing"), false,
+                    { _, _, _ -> null }, { draft, _, _ -> saved = draft; null }, { null },
+                    { _, _, _ -> throw java.io.IOException("Fixture unavailable") }, {})
+            }
+        }
+        loadModels()
+        compose.onNode(hasSetTextAction() and hasText("existing")).assertIsEnabled().performTextReplacement("manual")
+        compose.onNodeWithText("Save").performClick()
+        compose.runOnIdle { assertEquals("manual", saved?.model) }
+    }
+
+    @Test fun cancelingEditorCancelsModelDiscovery() {
+        val open = mutableStateOf(true)
+        var cancelled = false
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                if (open.value) TtsCustomSourceEditor(TtsCustomSource("custom:fixture"), false,
+                    { _, _, _ -> null }, { _, _, _ -> null }, { null },
+                    { _, _, _ -> try { awaitCancellation() } finally { cancelled = true } }, { open.value = false })
+            }
+        }
+        loadModels()
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.runOnIdle { assertTrue(cancelled) }
+    }
     @Test fun savedCredentialsStayBlankAndTestingDraftDoesNotSave() {
         var tested: TtsCustomSource? = null
         var saved: TtsCustomSource? = null

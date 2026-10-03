@@ -827,6 +827,10 @@ QA matrices live in `docs/VALIDATION.md`.
   against each profile ID; protocol changes clear the draft's old credential. Named profiles
   independently persist model, voice, rate and format.
   Source configuration edits connection/model options and an optional OpenAI voice-ID list.
+  OpenAI model discovery is anchored to the editable Model ID field: its trailing action
+  loads `/models`, fills a sole result automatically, or offers multiple IDs in the shared
+  themed dropdown. Missing lists leave manual entry available; model loading stays local
+  to the field instead of using the voice-loading status.
   Output format is edited only among the Voice tab's parameters alongside other
   supported providers. The Voice tab separates its scrolling controls from a fixed Preview
   footer that consumes the bottom navigation inset. Parameters have no separate heading or

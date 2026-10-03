@@ -1038,7 +1038,6 @@
     <string name="tts_service_preset_hint">Use a preset already configured on the server, or leave blank for its default.</string>
     <string name="tts_service_key_hint">Optional. Leave blank to keep the saved key.</string>
     <string name="tts_service_clear_key">Remove saved key</string>
-    <string name="tts_service_load_models">Load models</string>
     <string name="tts_service_no_models">No model list available. Enter the model ID manually.</string>
     <string name="tts_service_delete_title">Delete service?</string>
     <string name="tts_service_delete_message">Delete %1$s? Playback using this service will stop.</string>

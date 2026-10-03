@@ -6,6 +6,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,11 +18,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.HoshiButton
+import moe.antimony.hoshi.ui.HoshiDropdownMenu
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
 @Composable
 internal fun TtsCustomSourceEditor(
@@ -39,6 +45,8 @@ internal fun TtsCustomSourceEditor(
     var verified by remember { mutableStateOf(false) }
     var models by remember { mutableStateOf<List<String>>(emptyList()) }
     var modelsLoaded by remember { mutableStateOf(false) }
+    var modelsExpanded by remember { mutableStateOf(false) }
+    var modelsLoading by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val update: (TtsCustomSource) -> Unit = { source = it; verified = false; failure = null }
@@ -69,15 +77,36 @@ internal fun TtsCustomSourceEditor(
                 Text(stringResource(R.string.tts_service_clear_key), style = MaterialTheme.typography.bodyMedium)
             }
             if (source.protocol == TtsCustomProtocol.OpenAi) {
-                TtsServiceField(R.string.tts_service_model, source.model, !busy) { update(source.copy(model = it)) }
-                TextButton(enabled = !busy, onClick = { scope.launch {
-                    busy = true
-                    try { models = onModels(source, key, removeKey); modelsLoaded = true }
-                    finally { busy = false }
-                } }) { Text(stringResource(R.string.tts_service_load_models)) }
-                if (models.isNotEmpty()) TtsChoice(stringResource(R.string.tts_service_model), source.model, source.model,
-                    models.map { TtsChoiceOption(it, it) }, enabled = !busy) { update(source.copy(model = it)) }
-                else if (modelsLoaded) Text(stringResource(R.string.tts_service_no_models), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+                OutlinedTextField(source.model, { update(source.copy(model = it)) }, enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(stringResource(R.string.tts_service_model)) }, colors = hoshiOutlinedTextFieldColors(),
+                    trailingIcon = {
+                        Box {
+                            IconButton(enabled = !busy, onClick = { scope.launch {
+                                busy = true; modelsLoading = true; modelsLoaded = false
+                                try {
+                                    models = onModels(source, key, removeKey).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+                                    modelsLoaded = true
+                                    if (models.size == 1) update(source.copy(model = models.single()))
+                                    else modelsExpanded = models.isNotEmpty()
+                                } catch (error: CancellationException) { throw error }
+                                catch (_: Exception) { models = emptyList(); modelsLoaded = true }
+                                finally { busy = false; modelsLoading = false }
+                            } }) {
+                                if (modelsLoading && !LocalHoshiEInkMode.current)
+                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                else Icon(if (modelsLoading) Icons.Rounded.HourglassTop else Icons.Rounded.ExpandMore, null)
+                            }
+                            HoshiDropdownMenu(modelsExpanded, onDismissRequest = { modelsExpanded = false }, modifier = Modifier.widthIn(max = 320.dp)) {
+                                models.forEach { model ->
+                                    DropdownMenuItem(text = { Text(model) }, onClick = {
+                                        modelsExpanded = false; update(source.copy(model = model))
+                                    }, trailingIcon = { if (model == source.model) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) })
+                                }
+                            }
+                        }
+                    })
+                if (modelsLoaded && models.isEmpty()) Text(stringResource(R.string.tts_service_no_models), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
                 OutlinedTextField(voiceIds, {
                     voiceIds = it
                     update(source.copy(voiceIds = it.lineSequence().map { id -> id.trim() }.filter { id -> id.isNotEmpty() }.distinct().toList()))
@@ -92,7 +121,7 @@ internal fun TtsCustomSourceEditor(
                 busy = true; failure = null; verified = false
                 try { failure = onTest(source, key, removeKey); verified = failure == null } finally { busy = false }
             } }) { Text(stringResource(R.string.tts_test_connection)) }
-            if (busy) TtsCatalogLoading(Modifier.fillMaxWidth())
+            if (busy && !modelsLoading) TtsCatalogLoading(Modifier.fillMaxWidth())
             if (verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Rounded.CheckCircle, null, Modifier.size(20.dp))
                 Text(stringResource(R.string.tts_connection_success), style = MaterialTheme.typography.bodyMedium)

@@ -1297,6 +1297,10 @@ Validate relevant sync/update/Sasayaki changes with:
   without requiring a network connection; test an unsaved draft, then cancel. Saved keys
   stay blank, and Cancel/close cancels requests. Test ordinary and e-ink presentation.
 - OpenAI bases include `/v1` (or the server's API prefix); VITS bases are server roots.
+  In the Model ID field, the trailing list action must fill a sole model automatically
+  or open a nearby menu for multiple models; selecting updates that same editable field.
+  Empty/failed lists retain manual input and the entered ID. Verify loading disables
+  repeated requests, canceling the editor cancels discovery, and e-ink uses a static icon.
   Verify reverse-proxy prefixes, optional keys, manual OpenAI model/voice IDs when lists
   are absent, VITS Japanese speaker names and compound model/speaker identifiers.
 - Switch servers and restore each model/voice/rate/format. Rename the selected server or

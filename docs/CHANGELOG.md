@@ -40,6 +40,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   while OpenAI Compatible can list manually configured voice IDs alongside voices discovered
   from the server. Changing available IDs keeps the chosen voice and playback intact.
   Editing another server or renaming the current one leaves playback running.
+  OpenAI model IDs use one editable field with an integrated list button; a single
+  returned model is filled automatically, while multiple models open a nearby menu.
   TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
   sends original base text to the engine while preserving custom replacements for reading,
   preview and Anki sentence audio.
