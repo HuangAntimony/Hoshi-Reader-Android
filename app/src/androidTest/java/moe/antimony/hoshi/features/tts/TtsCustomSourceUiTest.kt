@@ -20,9 +20,9 @@ class TtsCustomSourceUiTest {
         compose.onNode(hasClickAction() and hasAnyAncestor(hasText("Model ID"))).performClick()
     }
 
-    @Test fun singleModelFillsTheEditableFieldAndSavesWithoutAnotherSelection() {
+    @Test fun singleModelOpensASelectableListBeforeUpdatingTheField() {
         var saved: TtsCustomSource? = null
-        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1")
+        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1", model = "saved-model")
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsCustomSourceEditor(source, false, { _, _, _ -> null }, { draft, _, _ -> saved = draft; null },
@@ -30,6 +30,8 @@ class TtsCustomSourceUiTest {
             }
         }
         loadModels()
+        compose.onNode(hasSetTextAction() and hasText("saved-model")).assertIsDisplayed()
+        compose.onNodeWithText("irodori-tts").performClick()
         compose.onNode(hasSetTextAction() and hasText("irodori-tts")).assertIsDisplayed()
         compose.onNodeWithText("Save").performClick()
         compose.runOnIdle { assertEquals("irodori-tts", saved?.model) }

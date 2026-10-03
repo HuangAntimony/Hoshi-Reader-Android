@@ -87,8 +87,7 @@ internal fun TtsCustomSourceEditor(
                                 try {
                                     models = onModels(source, key, removeKey).map { it.trim() }.filter { it.isNotBlank() }.distinct()
                                     modelsLoaded = true
-                                    if (models.size == 1) update(source.copy(model = models.single()))
-                                    else modelsExpanded = models.isNotEmpty()
+                                    modelsExpanded = models.isNotEmpty()
                                 } catch (error: CancellationException) { throw error }
                                 catch (_: Exception) { models = emptyList(); modelsLoaded = true }
                                 finally { busy = false; modelsLoading = false }
