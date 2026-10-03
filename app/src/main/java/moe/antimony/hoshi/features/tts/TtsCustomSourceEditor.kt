@@ -5,7 +5,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.HourglassTop
@@ -41,6 +40,7 @@ internal fun TtsCustomSourceEditor(
     var key by remember(initial.id) { mutableStateOf("") }
     var removeKey by remember(initial.id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var testing by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<TtsFailure?>(null) }
     var verified by remember { mutableStateOf(false) }
     var models by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -116,25 +116,22 @@ internal fun TtsCustomSourceEditor(
                 TtsServiceField(R.string.tts_service_preset, source.preset, !busy) { update(source.copy(preset = it)) }
                 Text(stringResource(R.string.tts_service_preset_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             }
-            HoshiButton(enabled = !busy, modifier = Modifier.fillMaxWidth().height(48.dp), onClick = { scope.launch {
-                busy = true; failure = null; verified = false
-                try { failure = onTest(source, key, removeKey); verified = failure == null } finally { busy = false }
-            } }) { Text(stringResource(R.string.tts_test_connection)) }
-            if (busy && !modelsLoading) TtsCatalogLoading(Modifier.fillMaxWidth())
-            if (verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Rounded.CheckCircle, null, Modifier.size(20.dp))
-                Text(stringResource(R.string.tts_connection_success), style = MaterialTheme.typography.bodyMedium)
-            }
-            failure?.let { Text(stringResource(it.messageRes()), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
         }
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (editing) TextButton(enabled = !busy, onClick = { confirmDelete = true }, modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.action_delete)) }
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(stringResource(R.string.action_cancel)) }
-            HoshiButton(enabled = !busy, modifier = Modifier.weight(1f).height(48.dp), onClick = { scope.launch {
-                busy = true; failure = null
-                try { failure = onSave(source, key, removeKey); if (failure == null) { key = ""; onDismiss() } } finally { busy = false }
-            } }) { Text(stringResource(R.string.action_save)) }
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TtsConnectionTestControls(!busy, testing, verified, failure, onTest = { scope.launch {
+                busy = true; testing = true; failure = null; verified = false
+                try { failure = onTest(source, key, removeKey); verified = failure == null }
+                finally { busy = false; testing = false }
+            } })
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (editing) TextButton(enabled = !busy, onClick = { confirmDelete = true }, modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.action_delete)) }
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(stringResource(R.string.action_cancel)) }
+                HoshiButton(enabled = !busy, modifier = Modifier.weight(1f).height(48.dp), onClick = { scope.launch {
+                    busy = true; failure = null
+                    try { failure = onSave(source, key, removeKey); if (failure == null) { key = ""; onDismiss() } } finally { busy = false }
+                } }) { Text(stringResource(R.string.action_save)) }
+            }
         }
     }
     if (confirmDelete) HoshiAlertDialog(onDismissRequest = { confirmDelete = false },

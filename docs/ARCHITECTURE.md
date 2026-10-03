@@ -829,6 +829,11 @@ QA matrices live in `docs/VALIDATION.md`.
   Saving a newly created profile atomically selects it through `TtsRepository`;
   `TtsViewModel` stops preview and refreshes its catalog after successful persistence.
   Editing an existing unselected profile does not switch sources.
+  Cloud and custom configuration sheets share `TtsConnectionTestControls` in a fixed
+  footer above their Save/Cancel actions. A reserved status area above the test button
+  displays localized success or failure without extending the scrolling form; failures
+  take precedence over previous verification. Only an active connection test animates
+  the button indicator; e-ink uses a static Material hourglass.
   Source configuration edits connection/model options and an optional OpenAI voice-ID list.
   OpenAI model discovery is anchored to the editable Model ID field: its trailing action
   loads `/models` and offers its IDs in the shared themed dropdown, even for a sole

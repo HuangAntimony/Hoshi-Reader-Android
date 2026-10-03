@@ -1299,6 +1299,11 @@ Validate relevant sync/update/Sasayaki changes with:
   must retain the current selection; failed saves/cancel must not switch sources.
   Test an unsaved draft, then cancel. Saved keys
   stay blank, and Cancel/close cancels requests. Test ordinary and e-ink presentation.
+  In both custom and cloud configuration sheets, connection testing, its success/error
+  result and Save/Cancel must remain visible outside the scrolling form. Complete a
+  delayed success/failure after scrolling and verify no second scroll is needed, the
+  test button stays in place, and editing connection fields clears stale feedback.
+  E-ink uses a static test indicator; canceling still terminates the pending test.
 - OpenAI bases include `/v1` (or the server's API prefix); VITS bases are server roots.
   In the Model ID field, the trailing list action opens a nearby menu for one or more
   models without changing the entered ID; selecting updates that same editable field.

@@ -15,6 +15,27 @@ import org.junit.runner.RunWith
 class TtsProviderConfigurationTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun failedConnectionRemainsVisibleAboveTheFixedButtonInEink() {
+        val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig(),
+                    { _, _ -> result.await() }, { _, _ -> null }, {})
+            }
+        }
+        val button = compose.onNodeWithText("Test connection").assertIsDisplayed()
+        val position = button.fetchSemanticsNode().boundsInRoot
+        button.performClick()
+        button.assertIsNotEnabled()
+        compose.runOnIdle { result.complete(TtsFailure.Authentication) }
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        compose.onNodeWithText(context.getString(TtsFailure.Authentication.messageRes())).assertIsDisplayed()
+        assertEquals(position, button.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Save").assertIsDisplayed()
+        compose.onNodeWithText("Service API key").performTextReplacement("changed")
+        compose.onNodeWithText(context.getString(TtsFailure.Authentication.messageRes())).assertDoesNotExist()
+    }
+
     @Test fun savedKeyStaysBlankAndTestDoesNotSaveDraft() {
         var tested: Pair<String, String>? = null
         var saved: Pair<String, String>? = null
@@ -26,7 +47,7 @@ class TtsProviderConfigurationTest {
         }
         compose.onNodeWithText("encrypted-fixture").assertDoesNotExist()
         compose.onNodeWithText("Service API key").performTextInput("draft-key")
-        compose.onNodeWithText("Test connection").performScrollTo().performClick()
+        compose.onNodeWithText("Test connection").performClick()
         compose.runOnIdle { assertEquals("eastasia" to "draft-key", tested); assertNull(saved) }
         compose.onNodeWithText("Connection verified").assertExists()
         compose.onNodeWithText("Save").performClick()

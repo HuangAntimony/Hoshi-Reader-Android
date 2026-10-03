@@ -20,6 +20,25 @@ class TtsCustomSourceUiTest {
         compose.onNode(hasClickAction() and hasAnyAncestor(hasText("Model ID"))).performClick()
     }
 
+    @Test fun connectionResultIsVisibleWithoutScrollingAndKeepsTheTestButtonInPlace() {
+        val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsCustomSourceEditor(TtsCustomSource("custom:fixture"), false,
+                    { _, _, _ -> result.await() }, { _, _, _ -> null }, { null }, { _, _, _ -> emptyList() }, {})
+            }
+        }
+        val button = compose.onNodeWithText("Test connection").assertIsDisplayed()
+        val position = button.fetchSemanticsNode().boundsInRoot
+        button.performClick()
+        compose.runOnIdle { result.complete(null) }
+        compose.onNodeWithText("Connection verified").assertIsDisplayed()
+        assertEquals(position, button.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Service name").performScrollTo()
+        button.assertIsDisplayed()
+        compose.onNodeWithText("Connection verified").assertIsDisplayed()
+    }
+
     @Test fun singleModelOpensASelectableListBeforeUpdatingTheField() {
         var saved: TtsCustomSource? = null
         val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1", model = "saved-model")
@@ -95,7 +114,7 @@ class TtsCustomSourceUiTest {
         compose.onNodeWithText("fixture-ciphertext").assertDoesNotExist()
         compose.onNodeWithText("Service name").performTextReplacement("Changed")
         compose.onNodeWithText("Service API key").performScrollTo().performTextInput("draft-key")
-        compose.onNodeWithText("Test connection").performScrollTo().performClick()
+        compose.onNodeWithText("Test connection").performClick()
         compose.runOnIdle { assertEquals("Changed", tested?.name); assertNull(saved) }
         compose.onNodeWithText("Save").performClick()
         compose.runOnIdle { assertEquals("Changed", saved?.name) }
@@ -131,7 +150,7 @@ class TtsCustomSourceUiTest {
                     { _, _, _ -> saved = true; null }, { null }, { _, _, _ -> emptyList() }, { open.value = false })
             }
         }
-        compose.onNodeWithText("Test connection").performScrollTo().performClick()
+        compose.onNodeWithText("Test connection").performClick()
         compose.onNodeWithText("Save").assertIsNotEnabled()
         compose.onNodeWithText("Cancel").performClick()
         compose.runOnIdle { assertTrue(cancelled); assertFalse(saved) }
