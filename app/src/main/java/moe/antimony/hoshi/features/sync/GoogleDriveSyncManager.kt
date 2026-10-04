@@ -638,10 +638,7 @@ class GoogleDriveSyncManager internal constructor(
             Triple(record, source, url)
         } ?: return
         val name = if (fileType == SyncFileType.sasayaki) "$source-${url.name.syncKey()}" else url.name.syncKey()
-        val data = withContext(ioDispatcher) { url.readBytes() }
-        currentCoroutineContext().ensureActive()
-        if (!canPublish(key, fileType, source, record.generation)) return
-        upload(listing, key, record.generation, name, data)
+        upload(listing, key, record.generation, name, url)
         currentCoroutineContext().ensureActive()
         store.transaction {
             if (!canPublish(key, fileType, source, record.generation)) return@transaction
@@ -686,7 +683,7 @@ class GoogleDriveSyncManager internal constructor(
         cache = cache.copy(bookFolders = cache.bookFolders - "$key/$generation")
     }
 
-    private suspend fun upload(listing: Listing, key: String, generation: Int, name: String, data: ByteArray) {
+    private suspend fun upload(listing: Listing, key: String, generation: Int, name: String, file: File) {
         var (book, folder) = resolveFolder(listing, key, generation)
         if (folder == null) {
             if (book == null) {
@@ -699,7 +696,7 @@ class GoogleDriveSyncManager internal constructor(
             folder = created
         }
         if ((folder to name) in listing.files) return
-        if (listing.listed || folder in listing.created) client.write(data, name, folder) else drive.upload(data, name, folder)
+        if (listing.listed || folder in listing.created) client.write(file, name, folder) else drive.upload(file, name, folder)
     }
 
     private suspend fun findFile(listing: Listing, key: String, generation: Int, name: String): GoogleDriveFile? {
