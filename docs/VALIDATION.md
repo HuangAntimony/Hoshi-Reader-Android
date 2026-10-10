@@ -891,6 +891,16 @@ Validate relevant sync/update/Sasayaki changes with:
   network restoration. Unsupported `formatVersion` must block file transfers and
   cursor advancement until a successful full pass; restart must retain cursor
   and version skips. Preserve both devices' app data.
+- Sync regressions: edit a session, delete it on another device, let the editor
+  refresh, and verify its draft closes without restoring the deleted record;
+  unrelated refreshes must retain unsaved input. Rename a non-last shelf, reopen
+  the app, and verify order and memberships with sync both off and on. Read
+  offline, background the app, allow process reclamation (do not force-stop),
+  then restore connectivity and verify pending changes upload without reopening.
+  `StatisticsBookViewModelTest`, `SyncSidecarConversionTest`,
+  `GoogleDriveSyncManagerTest`, and `GoogleDriveSyncWorkerTest` cover draft
+  invalidation, persisted shelf order, transient failure/recovery and worker
+  outcomes; authorization/format failures must not loop on automatic retries.
 - TTU Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
   remote-only bookshelf list, pull-to-refresh, import, long-press delete,
   transient network behavior, manual import/export result dialogs,

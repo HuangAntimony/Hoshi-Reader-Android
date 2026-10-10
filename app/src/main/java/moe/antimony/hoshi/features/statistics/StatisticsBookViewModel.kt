@@ -74,7 +74,10 @@ internal class StatisticsBookViewModel internal constructor(
         loadJob = scope.launch {
             try {
                 val book = repository.loadBookStatistics(folder)
-                if (request == generation) _uiState.update { it.copy(book = book, isLoading = false) }
+                if (request == generation) _uiState.update {
+                    it.copy(book = book, isLoading = false,
+                        draft = it.draft?.takeIf { draft -> book?.sessions?.get(draft.id)?.value != null })
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -99,7 +102,7 @@ internal class StatisticsBookViewModel internal constructor(
 
     fun saveSession() {
         val draft = _uiState.value.draft?.takeIf { it.canSave } ?: return
-        val original = _uiState.value.book!!.sessions.getValue(draft.id).value!!
+        val original = _uiState.value.book?.sessions?.get(draft.id)?.value ?: return cancelEdit()
         val previous = StatisticsSessionDraft.from(draft.id, original)
         val characters = draft.characters.toInt().takeIf { draft.characters != previous.characters }
         val seconds = (requireNotNull(draft.totalMinutes) * 60.0).takeIf { draft.hours != previous.hours || draft.minutes != previous.minutes }

@@ -66,7 +66,7 @@ data class SyncProgress(val done: Int, val total: Int, val current: String?)
 
 private enum class SyncPhase { State, File }
 
-private data class BookError(val title: String, val message: UiText)
+private data class BookError(val title: String, val message: UiText, val cause: Throwable)
 
 private class RemoteChanges(val listed: Map<String, List<GoogleDriveFile>>?, val changed: Map<String, List<GoogleDriveFile>>, val cursor: String) {
     operator fun contains(key: String) = key in changed || listed?.containsKey(key) == true
@@ -143,6 +143,7 @@ class GoogleDriveSyncManager internal constructor(
     private var transfers = listOf<SyncQueueItem>()
     private var progress: SyncProgress? = null
     private var bookErrors = mapOf<Pair<String, SyncPhase>, BookError>()
+    private var runError: Exception? = null
     var flushReader: (suspend (String) -> Unit)? = null
     var stopReader: (suspend (String) -> Unit)? = null
     var reloadSyncedMatch: (suspend (String) -> Unit)? = null
@@ -191,8 +192,11 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     suspend fun syncInBackground(): Unit = withContext(mainDispatcher) {
+        if (!enabled()) return@withContext
         sync()
         fileTransferTask?.join()
+        runError?.let { throw it }
+        bookErrors.values.firstOrNull()?.let { throw it.cause }
     }
 
     suspend fun stop(): Unit = withContext(mainDispatcher) {
@@ -282,6 +286,7 @@ class GoogleDriveSyncManager internal constructor(
             try {
                 currentCoroutineContext().ensureActive()
                 mutableState.value = state.value.copy(errorMessage = null)
+                runError = null
                 try {
                     syncState(book)
                 } finally {
@@ -420,13 +425,14 @@ class GoogleDriveSyncManager internal constructor(
         currentCoroutineContext().ensureActive()
         if (error.stopsRun) throw error
         val title = bookTitle(key, store.state.books[key]?.deleted == true)
-        bookErrors = bookErrors + ((key to phase) to BookError(title, error.message?.let(UiText::Literal) ?: error.syncMessage()))
+        bookErrors = bookErrors + ((key to phase) to BookError(title, error.message?.let(UiText::Literal) ?: error.syncMessage(), error))
     }
 
     private suspend fun bookTitle(key: String, deleted: Boolean): String =
         store.transaction { books.loadMetadata(store.bookDirectory(key, deleted))?.displayTitle?.ifBlank { null } } ?: key
 
     private fun failRun(error: Exception) {
+        runError = error
         mutableState.value = state.value.copy(errorMessage = error.syncMessage())
         if (error is SyncFormatError) unsupportedFormat = true
     }

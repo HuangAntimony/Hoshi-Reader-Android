@@ -499,7 +499,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   foreground polling and 30-second local-edit debounce in release builds; debug
   builds use 5-second polling and 2-second debounce for testing. It also performs
   network-restored passes, immutable upload/download and stale-file cleanup. Process lifecycle callbacks
-  start/pause polling; a Hilt WorkManager job performs the final background pass.
+  start/pause polling; a Hilt WorkManager job performs the final background pass
+  with a connected-network constraint. State and file failures propagate to the
+  worker: temporary network/server failures retry, while authorization and format
+  failures wait for user action.
   Hoshi cloud books are local metadata placeholders: tapping downloads the EPUB,
   Delete Local retains their cloud state, and Delete Everywhere archives sessions
   and publishes deletion. Covers and Sasayaki match data download automatically.

@@ -26,11 +26,14 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   per-book errors.
   Books sync eight at a time using far fewer Google Drive requests, and
   rate-limited or failed requests are retried.
+  Background sync waits for a network connection and retries temporary failures.
+  Renaming a shelf preserves its order and book memberships.
 
 ### Changed
 
 - Edit individual reading sessions in Statistics. Session deletions persist across
-  sync, and daily totals follow the selected reset time.
+  sync, and daily totals follow the selected reset time. If another device deletes
+  the session being edited, its editor closes without restoring the deleted session.
 
 ## [v1.4.0] - 2026-09-24
 

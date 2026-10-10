@@ -10,7 +10,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.CoroutineWorker
+import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker.Result
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -21,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -48,7 +52,9 @@ class GoogleDriveSyncLifecycle @Inject constructor(
                     val config = settings.settings.first()
                     if (config.enabled && config.provider == SyncProvider.Gdrive) {
                         workManager.get().enqueueUniqueWork(BackgroundWork, ExistingWorkPolicy.KEEP,
-                            OneTimeWorkRequestBuilder<GoogleDriveSyncWorker>().build())
+                            OneTimeWorkRequestBuilder<GoogleDriveSyncWorker>()
+                                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                                .build())
                     }
                 }
             }
@@ -85,8 +91,20 @@ class GoogleDriveSyncWorker @AssistedInject constructor(
     @Assisted parameters: WorkerParameters,
     private val manager: GoogleDriveSyncManager,
 ) : CoroutineWorker(context, parameters) {
-    override suspend fun doWork(): Result {
-        manager.syncInBackground()
-        return Result.success()
-    }
+    override suspend fun doWork(): Result = backgroundSyncResult(manager::syncInBackground)
+}
+
+internal suspend fun backgroundSyncResult(sync: suspend () -> Unit): Result = try {
+    sync()
+    Result.success()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (error: Exception) {
+    if (error.isRetryableBackgroundSyncFailure()) Result.retry() else Result.failure()
+}
+
+private fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = when (this) {
+    is GoogleDriveUnavailableException -> cause is java.io.IOException || cause.isRetryableBackgroundSyncFailure()
+    is GoogleDriveApiException -> statusCode == 429 || (statusCode ?: 0) >= 500 || isTransientDriveNetworkFailure()
+    else -> false
 }

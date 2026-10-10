@@ -209,12 +209,10 @@ class BookRepository private constructor(
         val normalized = shelves.map { it.copy(name = it.name.syncKey()) }
         val names = normalized.map { it.name }.toSet()
         val oldNames = old.entries.filter { it.value.value != null }.sortedWith(compareBy({ it.value.value }, { it.key })).map { it.key }
-        val reordered = oldNames.toSet() == names && oldNames != normalized.map { it.name }
+        val orderChanged = oldNames != normalized.map { it.name }
         old.filterValues { it.value != null }.keys.filterNot { it in names }.forEach { list[it] = Timestamped(now, null) }
-        var position = old.values.mapNotNull { it.value }.maxOrNull() ?: -1
         normalized.forEachIndexed { index, shelf ->
-            if (reordered) list[shelf.name] = Timestamped(now, index)
-            else if (old[shelf.name]?.value == null) list[shelf.name] = Timestamped(now, ++position)
+            if (orderChanged && old[shelf.name]?.value != index) list[shelf.name] = Timestamped(now, index)
         }
         for (root in loadAllBooks()) {
             val metadata = loadMetadata(root) ?: continue

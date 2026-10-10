@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sync
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.work.ListenableWorker
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -369,6 +370,35 @@ class GoogleDriveSyncManagerTest {
         assertEquals(0, f.remote.reads["b"] ?: 0)
         assertTrue(f.manager.state.value.queue.isEmpty())
         assertNull(f.manager.cache.cursor)
+    }
+
+    @Test fun backgroundSyncReportsOfflineFailureAndRecoversOnNextAttempt() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.remote.failRead = { IOException("offline") }
+        val error = runCatching { f.manager.syncInBackground() }.exceptionOrNull()
+        assertTrue(error is GoogleDriveUnavailableException)
+        assertNull(f.manager.cache.cursor)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        f.remote.failRead = { null }
+        assertEquals(ListenableWorker.Result.success(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals("Remote", f.store.loadBook("book-a")!!.metadata.value.title)
+        assertEquals("next", f.manager.cache.cursor)
+        assertNull(f.manager.state.value.errorMessage)
+    }
+
+    @Test fun backgroundSyncReportsPerBookServerFailureUntilRetrySucceeds() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.remote.failRead = { HttpStatus(500) }
+        val error = runCatching { f.manager.syncInBackground() }.exceptionOrNull()
+        assertTrue(error is GoogleDriveApiException)
+        assertEquals(500, (error as GoogleDriveApiException).statusCode)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        f.remote.failRead = { null }
+        assertEquals(ListenableWorker.Result.success(), backgroundSyncResult(f.manager::syncInBackground))
+        assertTrue(f.manager.state.value.queue.isEmpty())
+        assertEquals("next", f.manager.cache.cursor)
     }
 
     @Test fun listedStateFilesSkipPerBookLookup() = runTest {

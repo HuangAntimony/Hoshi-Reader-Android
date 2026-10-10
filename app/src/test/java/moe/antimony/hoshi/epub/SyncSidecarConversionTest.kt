@@ -11,6 +11,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SyncSidecarConversionTest {
+    @Test fun renamingFirstShelfKeepsOrderMembershipAndDeletionAcrossReload() = runBlocking {
+        val files = Files.createTempDirectory("shelf-rename").toFile()
+        try {
+            val repository = BookRepository(files)
+            val root = repository.createBookDirectory("book")
+            val id = "80CC1266-83A1-4A41-89E5-76EF980BDB66"
+            repository.saveMetadata(root, BookMetadata(id, "Book", folder = "book", lastAccess = 0.0))
+            repository.saveShelves(listOf(BookShelf("Manga", listOf(id)), BookShelf("Novels", emptyList())))
+            val renamed = moe.antimony.hoshi.features.bookshelf.renameShelfList(repository.loadShelves(), "Manga", "Mystery")
+            repository.saveShelves(renamed)
+            val reloaded = BookRepository(files)
+            assertEquals(listOf(BookShelf("Mystery", listOf(id)), BookShelf("Novels", emptyList())), reloaded.loadShelves())
+            assertNull(reloaded.loadShelfList().getValue("Manga").value)
+            assertEquals(false, reloaded.loadMetadata(root)!!.shelves!!.getValue("Manga").value)
+            val stamps = reloaded.loadShelfList()
+            reloaded.saveShelves(reloaded.loadShelves())
+            assertEquals(stamps, reloaded.loadShelfList())
+            reloaded.saveShelves(reloaded.loadShelves().reversed())
+            assertEquals(listOf("Novels", "Mystery"), reloaded.loadShelves().map { it.name })
+        } finally {
+            files.deleteRecursively()
+        }
+    }
+
     @Test fun savedSasayakiMatchesIncludeTheImagesArrayRequiredByIos() = runBlocking {
         val root = Files.createTempDirectory("sasayaki-images").toFile()
         val source = BookSidecarDataSource()
