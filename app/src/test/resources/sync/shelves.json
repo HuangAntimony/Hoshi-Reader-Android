@@ -1,0 +1,23 @@
+{
+  "formatVersion": 1,
+  "shelves": {
+    "Reading": {
+      "modified": 1789430400000,
+      "value": 0
+    },
+    "Old": {
+      "modified": 1789430500000,
+      "value": null
+    }
+  },
+  "orders": {
+    "Reading": {
+      "modified": 1789430600000,
+      "value": [
+        "book-a",
+        "book-c",
+        "book-b"
+      ]
+    }
+  }
+}

@@ -33,6 +33,8 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.reader.ReaderLoadingPage
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderWebView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
@@ -40,6 +42,7 @@ import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.sync.SyncProvider
 import moe.antimony.hoshi.features.sync.SyncDirection
 import moe.antimony.hoshi.features.sync.SyncResult
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperViewModel
@@ -47,6 +50,7 @@ import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperViewModel
 @Composable
 internal fun ReaderRouteDestination(
     bookId: String,
+    skipSyncOnOpen: Boolean = false,
     stateHolder: ReaderRouteStateHolder,
     readerSettings: ReaderSettings,
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
@@ -85,7 +89,13 @@ internal fun ReaderRouteDestination(
                 syncSettings = syncSettings ?: appContainer.syncSettingsRepository.settings.first(),
                 sasayakiSettings = sasayakiSettings ?: appContainer.sasayakiSettingsRepository.settings.first(),
             )
-            if (initialAutoSyncState.shouldSyncOnOpen) {
+            if (initialAutoSyncState.syncSettings?.let { it.enabled && it.provider == SyncProvider.Gdrive } == true) {
+                if (!skipSyncOnOpen) appContainer.googleDriveSyncManager.sync(entry.metadata)
+                if (appContainer.bookRepository.loadMetadata(entry.root)?.epub == null) {
+                    withContext(Dispatchers.Main.immediate) { onClose() }
+                    error("Book was deleted.")
+                }
+            } else if (initialAutoSyncState.shouldSyncOnOpen) {
                 runCatching {
                     appContainer.syncManager.syncBook(
                         entry = entry,
@@ -163,10 +173,19 @@ internal fun ReaderRouteDestination(
     }
 
     fun flushExport() {
-        autoSyncExportController.flushExport(autoSyncState.isReaderAutoSyncEnabled)
+        if (syncSettings?.provider == SyncProvider.Gdrive) {
+            appContainer.appScope.launch {
+                autoSyncExportController.flushSaves()
+                appContainer.googleDriveSyncManager.sync()
+            }
+        } else autoSyncExportController.flushExport(autoSyncState.isReaderAutoSyncEnabled)
     }
 
     fun importOnForeground(entry: BookEntry) {
+        if (syncSettings?.provider == SyncProvider.Gdrive) {
+            bookmarkScope.launch { appContainer.googleDriveSyncManager.sync(entry.metadata) }
+            return
+        }
         if (!autoSyncState.isReaderAutoSyncEnabled) return
         bookmarkScope.launch {
             val result = runCatching {
@@ -237,6 +256,20 @@ internal fun ReaderRouteDestination(
                         }
                         scheduleExport(readyState.entry)
                     },
+                    onSaveStatistics = { statistics ->
+                        autoSyncExportController.launchSave {
+                            try {
+                                appContainer.bookRepository.saveTrackedSessions(readyState.bookRoot, statistics)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                bookmarkScope.launch { bookCoverSnackbarHostState.showSnackbar(statisticsSaveFailedMessage) }
+                            }
+                        }
+                        if (readerSettings.statisticsSyncEnabled) scheduleExport(readyState.entry)
+                    },
+                    onFlushBookmarkSaves = autoSyncExportController::flushSaves,
+                    syncProvider = syncSettings?.provider ?: SyncProvider.Gdrive,
                     onFlushAutoSyncExport = ::flushExport,
                     onForegroundAutoSyncImport = { importOnForeground(readyState.entry) },
                     contentLanguageProfile = state.contentLanguageProfile,

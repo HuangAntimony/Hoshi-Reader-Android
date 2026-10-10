@@ -2,6 +2,7 @@ package moe.antimony.hoshi.epub
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 enum class SasayakiMatchSource {
@@ -25,6 +26,7 @@ data class SasayakiMatchData(
     val matches: List<SasayakiMatch>,
     val unmatched: Int,
     val source: SasayakiMatchSource = legacyMatchSource(matches),
+    val images: List<JsonObject> = emptyList(),
 )
 
 private fun legacyMatchSource(matches: List<SasayakiMatch>): SasayakiMatchSource =
@@ -42,4 +44,5 @@ data class SasayakiPlaybackData(
     val rate: Float = 1f,
     val audioUri: String? = null,
     val audioFileName: String? = null,
+    val modified: Long? = null,
 )

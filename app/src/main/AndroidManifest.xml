@@ -90,6 +90,23 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".features.sync.GoogleDriveBrowserAuthActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".features.sync.GoogleDriveOAuthRedirectActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${googleOAuthRedirectScheme}" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".features.dictionary.ProcessTextLookupActivity"
             android:configChanges="uiMode"
             android:excludeFromRecents="true"

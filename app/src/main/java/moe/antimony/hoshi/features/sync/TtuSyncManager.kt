@@ -14,7 +14,7 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import java.io.File
 
 @Singleton
-class SyncManager private constructor(
+class TtuSyncManager private constructor(
     private val bookRepository: BookRepository,
     private val drive: DriveSyncDataSource,
     private val ioDispatcher: CoroutineDispatcher,
@@ -188,9 +188,7 @@ class SyncManager private constructor(
 
         importProgress(entry, progress)
         if (syncStats) {
-            bookRepository.updateStatistics(entry.root) { localStats ->
-                TtuSyncRules.mergeStatistics(localStats, remoteStats, statsSyncMode).ifEmpty { localStats }
-            }
+            bookRepository.statisticsStore.importHistory(entry.root, remoteStats, statsSyncMode)
         }
         if (remoteAudioBook != null) {
             importAudioBook(entry, remoteAudioBook)

@@ -36,6 +36,11 @@ class SasayakiPlaybackStateCoordinator(initialPosition: Double) {
     val hasPendingSeek: Boolean
         get() = pendingSeek != null
 
+    fun applySyncedPosition(seconds: Double) {
+        currentTime = seconds
+        lastSavedSecond = seconds.toInt()
+    }
+
     fun markPlaying() {
         isPlaying = true
     }

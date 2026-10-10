@@ -43,6 +43,9 @@ data class BookMetadata(
     val profileId: String? = null,
     val bookLanguage: String? = null,
     val author: String? = null,
+    val modified: Long? = null,
+    val characterCount: Int? = null,
+    val shelves: Map<String, moe.antimony.hoshi.features.sync.Timestamped<Boolean>>? = null,
 ) {
     val displayTitle: String
         get() = renamedTitle?.takeIf { it.isNotBlank() } ?: title.orEmpty()

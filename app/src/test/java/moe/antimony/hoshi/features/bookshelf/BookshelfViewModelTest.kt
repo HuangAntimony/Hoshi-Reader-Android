@@ -544,8 +544,35 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun tappingAnotherCloudBookCancelsPreviousDownloadAndSkipsSecondOpenSync() {
+        val first = bookEntry("first")
+        val second = bookEntry("second")
+        val gate = CompletableDeferred<Unit>()
+        var firstCancelled = false
+        val repository = FakeBookshelfRepository(entries = listOf(first, second), openBookOperation = { entry, progress ->
+            progress(0.5)
+            if (entry.metadata.id == first.metadata.id) {
+                try { gate.await() } finally { firstCancelled = true }
+            }
+            entry.metadata.id
+        })
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.openBook(first)
+        assertEquals(0.5, viewModel.uiState.value.remoteImportProgressById[first.metadata.id])
+        viewModel.openBook(first)
+        assertFalse(firstCancelled)
+        viewModel.openBook(second)
+        assertTrue(firstCancelled)
+        assertEquals(second.metadata.id, viewModel.uiState.value.openReaderBookId)
+        assertTrue(viewModel.uiState.value.openReaderSkipSync)
+        assertTrue(viewModel.uiState.value.remoteImportProgressById.isEmpty())
+        assertEquals(listOf(BookSortOption.Recent), repository.loadRequests)
+    }
+
+    @Test
     fun openingBookEmitsOpenReaderEventWithoutRefreshingShelf() {
-        val entry = bookEntry("book-a")
+        val initial = bookEntry("book-a")
+        val entry = initial.copy(metadata = initial.metadata.copy(epub = "book-a.epub"))
         val repository = FakeBookshelfRepository(entries = listOf(entry), openBookId = "book-a")
         val viewModel = BookshelfViewModel(repository, testScope())
 
@@ -1305,6 +1332,7 @@ class BookshelfViewModelTest {
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
         var openBookId: String = "book-a",
+        var openBookOperation: (suspend (BookEntry, (Double) -> Unit) -> String)? = null,
         var importBookId: String = "imported-book",
         var shelves: List<BookShelf> = emptyList(),
         var coverSourcesById: Map<String, BookCoverSource> = emptyMap(),
@@ -1377,6 +1405,8 @@ class BookshelfViewModelTest {
             return entries.associate { it.metadata.id to progressById.getValue(it.metadata.id) }
         }
 
+        override suspend fun syncLibrary() = Unit
+
         override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult {
             remoteLoadRequests += localEntries.map { it.metadata.id }
             remoteLoadGate?.await()
@@ -1388,7 +1418,7 @@ class BookshelfViewModelTest {
             )
         }
 
-        override suspend fun openBook(entry: BookEntry): String = openBookId
+        override suspend fun openBook(entry: BookEntry, onProgress: (Double) -> Unit): String = openBookOperation?.invoke(entry, onProgress) ?: openBookId
 
         override suspend fun importBook(uri: android.net.Uri): String = importBookId
 
@@ -1408,6 +1438,8 @@ class BookshelfViewModelTest {
             remoteImportError?.let { throw it }
             return importBookId
         }
+
+        override suspend fun deleteLocalBook(entry: BookEntry) = Unit
 
         override suspend fun deleteBook(entry: BookEntry) {
             localDeleteError?.let { throw it }

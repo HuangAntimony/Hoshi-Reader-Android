@@ -1,11 +1,19 @@
 package moe.antimony.hoshi.features.reader
 
+import moe.antimony.hoshi.features.sync.SyncProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderAutoSyncTimingTest {
+    @Test
+    fun hoshiResyncsAfterEveryForegroundReturnButNotInitialReaderAttachment() {
+        assertTrue(readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Resume, 1, SyncProvider.Gdrive).importOnForeground)
+        assertFalse(readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Resume, null, SyncProvider.Gdrive).importOnForeground)
+        assertFalse(readerLifecycleAutoSyncPlan(ReaderLifecycleAutoSyncEvent.Resume, 1, SyncProvider.Ttu).importOnForeground)
+    }
+
     @Test
     fun paginatedPageTurnPersistsBookmarkImmediatelyLikeIos() {
         assertEquals(

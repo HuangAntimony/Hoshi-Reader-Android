@@ -5,6 +5,7 @@ import moe.antimony.hoshi.features.sync.DriveAuthStatus
 import moe.antimony.hoshi.features.sync.DriveFile
 import moe.antimony.hoshi.features.sync.DriveSyncDataSource
 import moe.antimony.hoshi.features.sync.DriveSyncFiles
+import moe.antimony.hoshi.features.sync.SyncProvider
 import moe.antimony.hoshi.features.sync.SyncSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,11 +15,12 @@ import org.junit.Test
 class RemoteBookshelfLoaderTest {
     @Test
     fun automaticRemoteBooksLoadOnlyWhenSyncIsEnabledAndDriveIsAuthenticated() {
-        assertTrue(shouldLoadRemoteBooks(SyncSettings(enabled = true), DriveAuthStatus.Connected))
-        assertFalse(shouldLoadRemoteBooks(SyncSettings(enabled = false), DriveAuthStatus.Connected))
-        assertFalse(shouldLoadRemoteBooks(SyncSettings(enabled = true), DriveAuthStatus.NotConnected))
-        assertFalse(shouldLoadRemoteBooks(SyncSettings(enabled = true), DriveAuthStatus.MissingConfiguration))
-        assertFalse(shouldLoadRemoteBooks(SyncSettings(enabled = true), DriveAuthStatus.Failed("failed")))
+        assertFalse(shouldLoadRemoteBooks(SyncSettings(enabled = true, provider = SyncProvider.Gdrive), DriveAuthStatus.Connected))
+        assertTrue(shouldLoadRemoteBooks(SyncSettings(provider = SyncProvider.Ttu, enabled = true), DriveAuthStatus.Connected))
+        assertFalse(shouldLoadRemoteBooks(SyncSettings(provider = SyncProvider.Ttu, enabled = false), DriveAuthStatus.Connected))
+        assertFalse(shouldLoadRemoteBooks(SyncSettings(provider = SyncProvider.Ttu, enabled = true), DriveAuthStatus.NotConnected))
+        assertFalse(shouldLoadRemoteBooks(SyncSettings(provider = SyncProvider.Ttu, enabled = true), DriveAuthStatus.MissingConfiguration))
+        assertFalse(shouldLoadRemoteBooks(SyncSettings(provider = SyncProvider.Ttu, enabled = true), DriveAuthStatus.Failed("failed")))
     }
 
     @Test

@@ -124,7 +124,7 @@ If the request is Android-specific, or cannot be implemented on iOS because of s
 
 Hoshi Reader Android stores imported books, dictionaries, fonts, audiobook data, reading progress, highlights, statistics, and settings locally in app storage.
 
-Google Drive sync uses a user-configured Google Cloud OAuth device-code flow. Anki card mining talks to AnkiDroid or the configured AnkiConnect endpoint. Update checks read GitHub release metadata.
+Hoshi Google Drive sync uses Google Play Services sign-in, with browser OAuth when Play Services is unavailable. TTU sync uses a user-configured Google Cloud OAuth device-code flow. Both request access only to files used with the app. Anki card mining talks to AnkiDroid or the configured AnkiConnect endpoint. Update checks read GitHub release metadata.
 
 ## Attribution
 

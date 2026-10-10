@@ -58,7 +58,6 @@ fun SasayakiSettingsView(
     val appContainer = LocalHoshiUiDependencies.current
     val scope = rememberCoroutineScope()
     val repository = appContainer.sasayakiSettingsRepository
-    val syncSettings = appContainer.syncSettingsRepository.settings.collectAsLoadedSettings()
     val settings = repository.settings.collectAsLoadedSettings()
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
     var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
@@ -98,7 +97,6 @@ fun SasayakiSettingsView(
         ) {
             item {
                 val loadedSettings = settings ?: return@item
-                val loadedSyncSettings = syncSettings ?: return@item
                 SettingsCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -123,19 +121,6 @@ fun SasayakiSettingsView(
                                 )
                             },
                         )
-                        if (loadedSettings.enabled && loadedSyncSettings.enabled) {
-                            SettingsDivider()
-                            ListItem(
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                headlineContent = { Text(stringResource(R.string.sync_ttu_sync)) },
-                                trailingContent = {
-                                    Switch(
-                                        checked = loadedSettings.syncEnabled,
-                                        onCheckedChange = { save(loadedSettings.copy(syncEnabled = it)) },
-                                    )
-                                },
-                            )
-                        }
                         SettingsDivider()
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),

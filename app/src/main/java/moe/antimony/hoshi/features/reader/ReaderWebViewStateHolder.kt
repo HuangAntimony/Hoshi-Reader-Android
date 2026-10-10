@@ -266,6 +266,12 @@ internal class ReaderWebViewStateHolder(
         return pending
     }
 
+    fun applySyncedBookmark(position: ReaderChapterPosition) {
+        pendingSearchHighlight = null
+        readerPosition = readerPosition.jumpTo(position)
+        markWebViewRestoring()
+    }
+
     fun jumpTo(position: ReaderChapterPosition, fragment: String? = null): ReaderChapterPosition {
         pendingSearchHighlight = null
         if (isCurrentDisplayedTarget(position, fragment)) {

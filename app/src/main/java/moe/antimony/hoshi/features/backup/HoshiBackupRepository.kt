@@ -37,6 +37,7 @@ import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.MAX_PATH_COMPONENT_UTF8_BYTES
 import moe.antimony.hoshi.epub.fitUtf8PathComponent
 import moe.antimony.hoshi.features.sync.TtuBookDataConverter
+import moe.antimony.hoshi.features.sync.SyncStorage
 import moe.antimony.hoshi.features.sync.TtuProgress
 import moe.antimony.hoshi.features.sync.TtuSyncRules
 import moe.antimony.hoshi.features.sync.resolveTtuCharacterPosition
@@ -49,21 +50,15 @@ class HoshiBackupRepository @Inject constructor(
     private val bookRepository: BookRepository,
     private val ttuConverter: TtuBookDataConverter,
     private val profileRepository: ProfileRepository,
+    private val syncStorage: SyncStorage,
 ) {
-    constructor(filesDir: File) : this(
-        filesDir = filesDir,
-        ioDispatcher = Dispatchers.IO,
-        bookRepository = BookRepository(filesDir),
-        ttuConverter = createStandaloneTtuConverter(filesDir, Dispatchers.IO),
-        profileRepository = ProfileRepository(filesDir),
-    )
+    constructor(filesDir: File) : this(filesDir, Dispatchers.IO)
 
-    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(
-        filesDir = filesDir,
-        ioDispatcher = ioDispatcher,
-        bookRepository = BookRepository(filesDir),
-        ttuConverter = createStandaloneTtuConverter(filesDir, ioDispatcher),
-        profileRepository = ProfileRepository(filesDir),
+    constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(filesDir, ioDispatcher, BookRepository(filesDir, ioDispatcher))
+
+    private constructor(filesDir: File, ioDispatcher: CoroutineDispatcher, books: BookRepository) : this(
+        filesDir, ioDispatcher, books, createStandaloneTtuConverter(filesDir, ioDispatcher), ProfileRepository(filesDir),
+        SyncStorage(filesDir, books, ioDispatcher),
     )
 
     suspend fun exportBooks(contentResolver: ContentResolver, uri: Uri) {
@@ -182,10 +177,11 @@ class HoshiBackupRepository @Inject constructor(
                     val bookData = files.firstOrNull { it.isFile && it.name.startsWith("bookdata_") && it.extension == "zip" }
                         ?: return@forEach
                     val entry = ttuConverter.importBookData(bookData)
+                    syncStorage.handleBookImport(entry.metadata, entry.root)
                     restoredCount += 1
                     files.firstOrNull { it.name.startsWith("statistics_") }?.let { statsFile ->
                         val stats = backupJson.decodeFromString(ListSerializer(ReadingStatistics.serializer()), statsFile.readText())
-                        bookRepository.saveStatistics(entry.root, stats)
+                        bookRepository.statisticsStore.importHistory(entry.root, stats)
                     }
                     files.firstOrNull { it.name.startsWith("progress_") }?.let { progressFile ->
                         val progress = backupJson.decodeFromString(TtuProgress.serializer(), progressFile.readText())
@@ -201,7 +197,6 @@ class HoshiBackupRepository @Inject constructor(
                             ),
                         )
                     }
-                    bookRepository.restoreArchivedStatistics(entry.root.name)
                 }
                 restoredCount
             } finally {

@@ -170,6 +170,9 @@ class SasayakiPlayerFacadeTest {
         override val rate = 1.25f
         override val audioStorageSummary = "content URI"
         val commands = mutableListOf<String>()
+        override suspend fun flushSaves() = Unit
+        override fun applySyncedPlayback(value: SasayakiPlaybackData) = Unit
+
         override fun setDelay(value: Double) {
             commands += "setDelay:$value"
         }

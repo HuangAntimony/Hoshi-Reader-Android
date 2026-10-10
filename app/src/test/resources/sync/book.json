@@ -1,0 +1,71 @@
+{
+  "formatVersion": 1,
+  "generation": 1,
+  "deleted": false,
+  "metadata": {
+    "modified": 1789430400000,
+    "value": {
+      "title": "義妹生活４【電子特典付き】",
+      "author": "三河ごーすと"
+    }
+  },
+  "characterCount": 90928,
+  "files": {
+    "epub": {
+      "modified": 1789430400000,
+      "value": "義妹生活４【電子特典付き】.epub"
+    },
+    "cover": {
+      "modified": 1789430400000,
+      "value": "cover.jpg"
+    },
+    "sasayaki": {
+      "modified": 1789430400000,
+      "value": "1789430400000-sasayaki_match.json"
+    }
+  },
+  "bookmark": {
+    "modified": 1789430400000,
+    "value": {
+      "characterCount": 40917
+    }
+  },
+  "audiobook": {
+    "modified": 1789430400000,
+    "value": {
+      "lastPosition": 12.5,
+      "delay": -0.2,
+      "rate": 1.25
+    }
+  },
+  "highlights": {
+    "80CC1266-83A1-4A41-89E5-76EF980BDB66": {
+      "modified": 1789430400000,
+      "value": {
+        "character": 42,
+        "offset": 3,
+        "text": "漢字",
+        "textFurigana": "漢字(かんじ)",
+        "color": "pink",
+        "createdAt": 1789430400000
+      }
+    }
+  },
+  "sessions": {
+    "6DBECBE8-83AC-43D8-9C89-2B947EBDF5F8": {
+      "modified": 1789516860000,
+      "value": {
+        "startedAt": 1789516800000,
+        "endedAt": 1789516860000,
+        "charactersRead": 100,
+        "readingTime": 60.0
+      }
+    }
+  },
+  "shelves": {
+    "お気に入り": {
+      "modified": 1789430400000,
+      "value": true
+    }
+  }
+}

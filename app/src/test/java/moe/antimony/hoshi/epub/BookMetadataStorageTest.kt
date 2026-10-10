@@ -323,6 +323,7 @@ class BookMetadataStorageTest {
     fun loadBookEntryMigratesLegacyFolderLookupToUuidMetadata() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-fallback-id").toFile())
         val root = storage.createBookDirectory("folder-only")
+        storage.saveMetadata(root, BookMetadata("folder-only", folder = "folder-only", lastAccess = 0.0))
         storage.saveShelves(listOf(BookShelf(name = "Legacy", bookIds = listOf("folder-only"))))
 
         val entry = storage.loadBookEntry("folder-only")
@@ -339,7 +340,7 @@ class BookMetadataStorageTest {
     fun deleteBookRemovesBookDirectory() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-metadata-delete").toFile())
         val root = storage.createBookDirectory("delete-me")
-        root.resolve("metadata.json").writeText("{}")
+        storage.saveMetadata(root, BookMetadata(id = UUID.randomUUID().toString(), title = "Delete me", folder = root.name, lastAccess = 0.0))
 
         storage.deleteBook(root)
 
@@ -358,15 +359,17 @@ class BookMetadataStorageTest {
             BookShelf(name = "Novels", bookIds = emptyList()),
         )
 
+        for ((folder, id) in listOf("a" to bookA, "b" to bookB)) {
+            val root = storage.createBookDirectory(folder)
+            storage.saveMetadata(root, BookMetadata(id, folder = folder, lastAccess = 0.0))
+        }
         storage.saveShelves(shelves)
 
         val shelvesFile = filesDir.resolve("Books/shelves.json")
-        val saved = Json.parseToJsonElement(shelvesFile.readText()).jsonArray
-        assertEquals("Manga", saved[0].jsonObject.getValue("name").jsonPrimitive.content)
-        assertEquals(bookA, saved[0].jsonObject.getValue("bookIds").jsonArray[0].jsonPrimitive.content)
-        assertEquals(bookB, saved[0].jsonObject.getValue("bookIds").jsonArray[1].jsonPrimitive.content)
-        assertEquals("Novels", saved[1].jsonObject.getValue("name").jsonPrimitive.content)
-        assertEquals(shelves, storage.loadShelves())
+        val saved = Json.parseToJsonElement(shelvesFile.readText()).jsonObject
+        assertEquals("0", saved.getValue("Manga").jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals("1", saved.getValue("Novels").jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals(shelves.map { it.name to it.bookIds.toSet() }, storage.loadShelves().map { it.name to it.bookIds.toSet() })
     }
 
     @Test
@@ -579,20 +582,20 @@ class BookMetadataStorageTest {
         storage.saveSasayakiPlayback(root, playback)
 
         assertEquals(match, storage.loadSasayakiMatch(root))
-        assertEquals(playback, storage.loadSasayakiPlayback(root))
+        assertEquals(playback, storage.loadSasayakiPlayback(root)?.copy(modified = null))
         assertEquals(true, root.resolve("sasayaki_match.json").isFile)
         assertEquals(true, root.resolve("sasayaki_playback.json").isFile)
 
         storage.saveSasayakiPlayback(root, copiedPlayback)
 
-        assertEquals(copiedPlayback, storage.loadSasayakiPlayback(root))
+        assertEquals(copiedPlayback, storage.loadSasayakiPlayback(root)?.copy(modified = null))
     }
 
     @Test
     fun savesAndLoadsIosCompatibleHighlightSidecar() = runBlocking {
         val storage = BookStorage(Files.createTempDirectory("hoshi-highlight-sidecars").toFile())
         val root = storage.createBookDirectory("book")
-        val highlightId = UUID.randomUUID().toString()
+        val highlightId = UUID.randomUUID().toString().uppercase()
         val highlights = listOf(
             ReaderHighlight(
                 id = highlightId,
@@ -607,7 +610,7 @@ class BookMetadataStorageTest {
 
         storage.saveHighlights(root, highlights)
 
-        val saved = Json.parseToJsonElement(root.resolve("highlights.json").readText()).jsonArray.single().jsonObject
+        val saved = Json.parseToJsonElement(root.resolve("highlights.json").readText()).jsonObject.getValue(highlightId).jsonObject.getValue("value").jsonObject
         assertEquals(highlightId, saved.getValue("id").jsonPrimitive.content)
         assertEquals(42, saved.getValue("character").jsonPrimitive.content.toInt())
         assertEquals(7, saved.getValue("offset").jsonPrimitive.content.toInt())

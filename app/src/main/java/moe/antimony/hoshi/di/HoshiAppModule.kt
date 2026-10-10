@@ -170,8 +170,9 @@ internal object HoshiAppModule {
     fun provideSyncSettingsRepository(
         @ApplicationContext context: Context,
         drive: DriveSyncDataSource,
+        ttu: moe.antimony.hoshi.features.sync.DeviceCodeDriveAuthorizer,
     ): SyncSettingsRepository =
-        context.syncSettingsRepository(drive)
+        context.syncSettingsRepository(drive) { ttu.status() == moe.antimony.hoshi.features.sync.DriveAuthStatus.Connected }
 
     @Provides
     @Singleton

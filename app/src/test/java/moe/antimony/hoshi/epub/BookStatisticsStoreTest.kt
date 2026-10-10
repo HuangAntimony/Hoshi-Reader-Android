@@ -1,6 +1,9 @@
 package moe.antimony.hoshi.epub
 
 import kotlinx.coroutines.Dispatchers
+import moe.antimony.hoshi.features.sync.Timestamped
+import moe.antimony.hoshi.features.sync.TtuStatistics
+import moe.antimony.hoshi.features.sync.SyncFormat
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -10,21 +13,22 @@ import org.junit.rules.TemporaryFolder
 class BookStatisticsStoreTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun archiveAndRestoreUseOppositeFirstOnTieOrder() = runBlocking {
+    @Test fun archiveAndRestoreKeepLiveSessionsFirstOnEqualStampsLikeIos() = runBlocking {
         val files = temporary.newFolder()
         val repository = BookRepository(files)
         val store = repository.statisticsStore
         val active = repository.createBookDirectory("book")
-        repository.saveStatistics(active, listOf(day(20)))
+        repository.saveMetadata(active, BookMetadata("active", "Book", folder = "book", lastAccess = 0.0))
         val archive = files.resolve("Books/statistics_archive/book").apply { mkdirs() }
-        repository.saveMetadata(archive, BookMetadata("archived", "Book", null, "book", 0.0))
-        repository.saveStatistics(archive, listOf(day(10)))
+        repository.saveMetadata(archive, BookMetadata("archived", "Book", folder = "book", lastAccess = 0.0))
+        store.applySessions(active, mapOf("same" to Timestamped(10, ReadingSession(0, 1, 20))))
+        store.applySessions(archive, mapOf("same" to Timestamped(10, ReadingSession(0, 1, 10))))
         repository.deleteBook(active)
-        assertEquals(10, repository.loadStatistics(archive).single().charactersRead)
+        assertEquals(20, store.loadSessions(archive).getValue("same").value!!.charactersRead)
         val restored = repository.createBookDirectory("book")
-        repository.saveStatistics(restored, listOf(day(30)))
+        store.applySessions(restored, mapOf("same" to Timestamped(10, ReadingSession(0, 1, 30))))
         store.restore("book")
-        assertEquals(30, repository.loadStatistics(restored).single().charactersRead)
+        assertEquals(30, store.loadSessions(restored).getValue("same").value!!.charactersRead)
         assertFalse(archive.exists())
     }
 
@@ -40,37 +44,34 @@ class BookStatisticsStoreTest {
         assertEquals("broken", root.resolve("statistics.json").readText())
     }
 
-    @Test fun editsLatestDiskSelectedDayAndMaintainsSpeedExtrema() = runBlocking {
+    @Test fun sessionEditsChangeOnlyRequestedFieldsAndDeletionPersists() = runBlocking {
         val repository = BookRepository(temporary.newFolder())
         val root = repository.createBookDirectory("book")
-        repository.saveStatistics(root, listOf(day(10).copy(minReadingSpeed = 300, altMinReadingSpeed = 700, maxReadingSpeed = 500), day(70).copy(dateKey = "2026-09-02")))
-        repository.statisticsStore.updateDay("book", "2026-09-01", 100, 1)
-        val days = repository.loadStatistics(root)
-        val updated = days.first()
-        assertEquals(6000, updated.lastReadingSpeed)
-        assertEquals(6000, updated.maxReadingSpeed)
-        assertEquals(300, updated.minReadingSpeed)
-        assertEquals(700, updated.altMinReadingSpeed)
-        assertEquals(70, days.last().charactersRead)
-        assertTrue(updated.lastStatisticModified > 10)
-        repository.statisticsStore.deleteDay("book", "2026-09-01")
-        assertTrue(runCatching { repository.statisticsStore.updateDay("book", "2026-09-01", 42, 1) }.isFailure)
-        assertEquals(listOf("2026-09-02"), repository.loadStatistics(root).map { it.dateKey })
+        val store = repository.statisticsStore
+        val original = ReadingSession(1000, 2000, 10, 1.5)
+        store.applySessions(root, mapOf("A" to Timestamped(10, original), "B" to Timestamped(20, original)))
+        store.edit("A", "book", 100, null)
+        assertEquals(original.copy(charactersRead = 100), store.loadSessions(root).getValue("A").value)
+        assertEquals(Timestamped(20, original), store.loadSessions(root).getValue("B"))
+        store.delete(listOf("A"), "book")
+        store.edit("A", "book", 42, 60.0)
+        assertNull(store.loadSessions(root).getValue("A").value)
+        assertNull(BookRepository(root.parentFile!!.parentFile!!).loadSessions(root).getValue("A").value)
     }
 
-    @Test fun emptyArchiveIsRemovedButEmptyActiveStatisticsFileIsRetained() = runBlocking {
+    @Test fun emptyArchiveRetainsMetadataAndTombstonesAndLosesCover() = runBlocking {
         val files = temporary.newFolder()
         val repository = BookRepository(files)
         val root = repository.createBookDirectory("book")
         repository.saveStatistics(root, listOf(day(10)))
-        repository.statisticsStore.updateDay("book", "2026-09-01", -1, -1)
-        assertTrue(root.resolve("statistics.json").isFile)
-        assertTrue(repository.loadStatistics(root).isEmpty())
-        repository.saveStatistics(root, listOf(day(10)))
         repository.deleteBook(root)
-        repository.statisticsStore.deleteDay("book", "2026-09-01")
-        assertFalse(files.resolve("Books/statistics_archive/book").exists())
-        assertTrue(runCatching { repository.statisticsStore.deleteAll("unknown") }.isFailure)
+        val archive = files.resolve("Books/statistics_archive/book")
+        archive.resolve("cover.jpg").writeText("cover")
+        repository.statisticsStore.clearArchive()
+        assertTrue(archive.resolve("metadata.json").isFile)
+        assertFalse(archive.resolve("cover.jpg").exists())
+        assertTrue(repository.loadSessions(archive).values.all { it.value == null })
+        assertEquals(0, repository.statisticsStore.loadArchiveSummary())
     }
 
     @Test fun requiredArchiveWriteFailurePreservesBook() = runBlocking {
@@ -109,7 +110,7 @@ class BookStatisticsStoreTest {
         val stored = BookRepository(files).statisticsStore.loadBook("book")!!
         assertEquals("iOS title", stored.metadata.title)
         assertNull(stored.coverPath)
-        assertEquals(42, stored.statistics.single().charactersRead)
+        assertEquals(42, stored.days.single().total.charactersRead)
     }
 
     @Test fun duplicateDaysSortByDateAndKeepFirstOnEqualTimestamp() {
@@ -151,47 +152,45 @@ class BookStatisticsStoreTest {
         repository.saveStatistics(active, listOf(day(20)))
         val snapshot = repository.statisticsStore.loadSnapshot()
         assertEquals(1, snapshot.books.size)
-        assertEquals(20, snapshot.books.single().statistics.single().charactersRead)
+        assertEquals(20, snapshot.books.single().days.single().total.charactersRead)
         repository.restoreArchivedStatistics(composed)
         assertFalse(archive.exists())
         assertEquals(20, repository.loadStatistics(active).single().charactersRead)
         assertEquals(composed.repeat(100).toImportedBookStorageName(), decomposed.repeat(100).toImportedBookStorageName())
     }
 
-    @Test fun queuedReaderSavesCannotUndoLaterEditsOrDeletes() = runBlocking {
+    @Test fun readerSaveOverwritesAnEditButCannotUndoDeletion() = runBlocking {
         val repository = BookRepository(temporary.newFolder())
         val root = repository.createBookDirectory("book")
-        val queued = day(10)
-        val unaffected = day(20).copy(dateKey = "2026-09-02")
-        repository.saveStatistics(root, listOf(queued, unaffected))
-        repository.statisticsStore.updateDay("book", queued.dateKey, 100, 10)
-        repository.saveTrackedStatistics(root, listOf(queued.copy(charactersRead = 15)))
-        assertEquals(100, repository.loadStatistics(root).first().charactersRead)
-        repository.statisticsStore.deleteDay("book", queued.dateKey)
-        repository.saveTrackedStatistics(root, listOf(queued))
-        assertEquals(listOf(unaffected), repository.loadStatistics(root))
-        repository.statisticsStore.deleteAll("book")
-        repository.saveTrackedStatistics(root, listOf(queued.copy(dateKey = "2026-09-03")))
-        assertTrue(repository.loadStatistics(root).isEmpty())
-        repository.saveTrackedStatistics(root, listOf(queued.copy(lastStatisticModified = System.currentTimeMillis() + 1000)))
-        assertEquals(10, repository.loadStatistics(root).single().charactersRead)
+        val original = ReadingSession(0, 1000, 10, 1.0)
+        val store = repository.statisticsStore
+        store.saveTrackedSession(root, "A", original)
+        store.edit("A", "book", 100, null)
+        store.saveTrackedSession(root, "A", original.copy(charactersRead = 15))
+        assertEquals(15, store.loadSessions(root).getValue("A").value!!.charactersRead)
+        store.delete(listOf("A"), "book")
+        store.saveTrackedSession(root, "A", original)
+        assertNull(store.loadSessions(root).getValue("A").value)
     }
 
-    @Test fun deletingLastHistoricalDayDoesNotDiscardAQueuedDifferentReadingDay() = runBlocking {
+    @Test fun deletingKnownSessionsPreservesAnUnseenOfflineSession() = runBlocking {
         val repository = BookRepository(temporary.newFolder())
         val root = repository.createBookDirectory("book")
-        repository.saveStatistics(root, listOf(day(10)))
-        repository.statisticsStore.deleteDay("book", "2026-09-01")
-        val queued = day(30).copy(dateKey = "2026-09-02")
-        repository.saveTrackedStatistics(root, listOf(queued))
-        assertEquals(listOf(queued), repository.loadStatistics(root))
+        val store = repository.statisticsStore
+        val session = ReadingSession(0, 1000, 10, 1.0)
+        store.saveTrackedSession(root, "A", session)
+        val known = store.loadSessions(root).keys
+        store.saveTrackedSession(root, "B", session)
+        store.delete(known, "book")
+        assertNull(store.loadSessions(root).getValue("A").value)
+        assertEquals(session, store.loadSessions(root).getValue("B").value)
     }
 
     @Test fun transactionalUpdateUsesLatestPersistedDay() = runBlocking {
         val repository = BookRepository(temporary.newFolder())
         val root = repository.createBookDirectory("book")
         repository.saveStatistics(root, listOf(day(10)))
-        repository.statisticsStore.updateDay("book", "2026-09-01", 100, 10)
+        repository.statisticsStore.edit(repository.loadSessions(root).keys.single(), "book", 100, 600.0)
         repository.updateStatistics(root) { latest ->
             assertEquals(100, latest.single().charactersRead)
             latest + day(30).copy(dateKey = "2026-09-02")

@@ -6,6 +6,35 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ## [Unreleased]
 
+### Added
+
+- Add Hoshi Google Drive sync alongside TTU, sharing books, reading position,
+  highlights, shelves, reading sessions and Sasayaki playback with iOS. Cloud
+  books download when opened; choose Delete Local to keep the cloud copy or
+  Delete Everywhere to remove it across devices while retaining reading history.
+  Book deletion actions stack vertically, and cloud icons sit inline on the first
+  title line.
+  Failed Google Drive sign-ins show an error dialog.
+  Connecting through the Google account picker resets pending sync operations so
+  books deleted before sign-in do not delete existing cloud copies.
+  Devices without Google Play Services can connect through their browser.
+  Android-generated Sasayaki matches include the image-list field required by iOS.
+  Debug builds sync edits after 2 seconds and poll for cloud changes every 5 seconds.
+  Bookshelf and Statistics refreshes are batched during sync and skipped while reading.
+  Full syncs of large libraries are faster, a failed book no longer stops the
+  rest of the sync, and Sync settings show a transfer queue with progress and
+  per-book errors.
+  Books sync eight at a time using far fewer Google Drive requests, and
+  rate-limited or failed requests are retried.
+  Background sync waits for a network connection and retries temporary failures.
+  Renaming a shelf preserves its order and book memberships.
+
+### Changed
+
+- Edit individual reading sessions in Statistics. Session deletions persist across
+  sync, and daily totals follow the selected reset time. If another device deletes
+  the session being edited, its editor closes without restoring the deleted session.
+
 ## [v1.4.0] - 2026-09-24
 
 ### Added

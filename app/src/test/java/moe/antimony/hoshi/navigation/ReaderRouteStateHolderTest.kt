@@ -8,6 +8,7 @@ import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
 import moe.antimony.hoshi.epub.ReadingStatistics
+import moe.antimony.hoshi.epub.ReadingSessions
 import moe.antimony.hoshi.epub.ReaderRouteBookRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -43,13 +44,13 @@ class ReaderRouteStateHolderTest {
         assertTrue(state is ReaderRouteLoadState.Ready)
         state as ReaderRouteLoadState.Ready
         assertEquals(root, state.bookRoot)
-        assertEquals(parsedBook, state.book)
+        assertEquals(parsedBook.copy(title = "Old Title"), state.book)
         assertEquals(root.resolve("cover.jpg"), state.bookCoverFile)
-        assertEquals(bookmark, state.bookmark)
+        assertEquals(bookmark.copy(progress = 0.4), state.bookmark)
         assertEquals(
             BookMetadata(
                 id = "book-a",
-                title = "Parsed Title",
+                title = "Old Title",
                 cover = "Books/${root.name}/cover.jpg",
                 folder = root.name,
                 lastAccess = 42.0,
@@ -151,7 +152,7 @@ class ReaderRouteStateHolderTest {
     fun saveBookmarkPersistsStatisticsThroughSameRepositoryPath() = runBlocking {
         val root = File("book-a")
         val book = readerBook(html = "1234567890")
-        val statistics = listOf(ReadingStatistics(title = "Book", dateKey = "2026-05-13", charactersRead = 5))
+        val statistics = mapOf("session" to moe.antimony.hoshi.features.sync.Timestamped<moe.antimony.hoshi.epub.ReadingSession?>(1, moe.antimony.hoshi.epub.ReadingSession(0, 1, 5)))
         val repository = FakeReaderRouteBookRepository(entry = null, now = 99.0)
         val stateHolder = ReaderRouteStateHolder(repository, FakeReaderRouteEpubParser(book))
 
@@ -184,10 +185,10 @@ class ReaderRouteStateHolderTest {
             private set
         var savedBookmark: Bookmark? = null
             private set
-        var savedStatistics: List<ReadingStatistics>? = null
+        var savedStatistics: ReadingSessions? = null
             private set
 
-        override suspend fun loadBookEntry(bookId: String): BookEntry? = entry
+        override suspend fun loadBookEntry(bookId: String): BookEntry? = entry?.let { it.copy(metadata = savedMetadata ?: it.metadata) }
 
         override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
             coverHref?.let { "Books/${bookRoot.name}/${File(it).name}" }
@@ -196,15 +197,15 @@ class ReaderRouteStateHolderTest {
             savedMetadata = metadata
         }
 
-        override suspend fun loadBookmark(bookRoot: File): Bookmark? = bookmark
+        override suspend fun loadBookmark(bookRoot: File): Bookmark? = savedBookmark ?: bookmark
 
         override suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark) {
             savedBookmark = bookmark
         }
 
-        override suspend fun loadStatistics(bookRoot: File): List<ReadingStatistics> = emptyList()
+        override suspend fun loadSessions(bookRoot: File): ReadingSessions = emptyMap()
 
-        override suspend fun saveTrackedStatistics(bookRoot: File, statistics: List<ReadingStatistics>) {
+        override suspend fun saveTrackedSessions(bookRoot: File, statistics: ReadingSessions) {
             savedStatistics = statistics
         }
 

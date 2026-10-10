@@ -24,8 +24,37 @@ class BookRepositoryDataSourceTest {
         }
 
         assertTrue(root.name.toByteArray(Charsets.UTF_8).size <= 250)
-        assertTrue(root.resolve("${root.name}.epub").isFile)
+        assertTrue(root.resolve("A.epub").isFile)
         assertTrue(filesDir.resolve("ImportTemp").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun importingPlaceholderKeepsSidecarsAndExistingLocalBookIsNotImportedAgain() = runBlocking {
+        val filesDir = Files.createTempDirectory("hoshi-placeholder-import").toFile()
+        val source = filesDir.resolve("source.epub")
+        writeMinimalEpubArchive(source, title = "Book")
+        val sidecars = BookSidecarDataSource()
+        val files = BookFileDataSource(filesDir)
+        val root = files.createBookDirectoryForImportedTitle("Book")
+        val metadata = BookMetadata("id", "Book", folder = root.name, lastAccess = 0.0)
+        sidecars.saveMetadata(root, metadata)
+        val bookmark = Bookmark(0, 0.0, 10, 123.0)
+        sidecars.saveBookmark(root, bookmark)
+        var imported = 0
+        val dataSource = BookImportDataSource(filesDir, files, sidecarDataSource = sidecars)
+        source.inputStream().use { input ->
+            dataSource.importBook("Original Name.epub", input) { target, epub ->
+                imported++
+                sidecars.saveMetadata(target, metadata.copy(epub = epub.name))
+            }
+        }
+        assertEquals(bookmark, sidecars.loadBookmark(root))
+        assertTrue(root.resolve("Original Name.epub").isFile)
+        source.inputStream().use { input ->
+            dataSource.importBook("Another Name.epub", input) { _, _ -> imported++ }
+        }
+        assertEquals(1, imported)
+        assertFalse(root.resolve("Another Name.epub").exists())
     }
 
     @Test

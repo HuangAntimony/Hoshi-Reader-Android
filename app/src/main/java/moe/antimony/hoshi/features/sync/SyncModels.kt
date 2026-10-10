@@ -34,6 +34,7 @@ enum class StatisticsSyncMode(val rawValue: String) {
 
 data class SyncSettings(
     val enabled: Boolean = false,
+    val provider: SyncProvider = SyncProvider.Gdrive,
     val mode: SyncMode = SyncMode.Auto,
     val autoSyncEnabled: Boolean = false,
     val authProvider: SyncAuthProvider = SyncAuthProvider.DeviceCode,
@@ -118,6 +119,8 @@ class GoogleDriveApiException(
     }
 }
 
+class GoogleDriveUnavailableException(override val cause: Throwable) : Exception(cause.message, cause)
+
 internal fun shouldAttemptDriveRequest(
     hasActiveNetwork: Boolean,
     hasInternetCapability: Boolean,
@@ -129,6 +132,7 @@ internal fun shouldAttemptDriveRequest(
 internal fun Throwable.isTransientDriveNetworkFailure(): Boolean = when (this) {
     is GoogleDriveApiException -> statusCode == null &&
         message == GoogleDriveApiException.NoInternetConnectionMessage
+    is GoogleDriveUnavailableException -> cause.isTransientDriveNetworkFailure()
     is java.net.SocketTimeoutException,
     is java.net.SocketException,
     is java.net.UnknownHostException -> true

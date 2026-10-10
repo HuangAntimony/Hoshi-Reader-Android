@@ -24,6 +24,10 @@ internal class ReaderAutoSyncExportController(
         return job
     }
 
+    suspend fun flushSaves() {
+        latestSaveJob?.join()
+    }
+
     fun scheduleExport(enabled: Boolean, export: suspend () -> Unit) {
         if (!enabled) return
         pendingExport = export
