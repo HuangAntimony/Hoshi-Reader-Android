@@ -44,7 +44,12 @@ internal class AndroidTtsPlaybackOutput(private val context: Context) : TtsPlayb
         player = next
         next.playbackParameters = PlaybackParameters(desiredRate, 1f)
         next.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) { if (playbackState == Player.STATE_ENDED) onEnded() }
+            override fun onEvents(player: Player, events: Player.Events) {
+                // Inspect the current playlist after batched events, not an old state callback
+                // queued before a seek/clear. Paused completion still belongs to the controller.
+                if (this@AndroidTtsPlaybackOutput.player === player &&
+                    events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_ENDED) onEnded()
+            }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && reason != Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) onPaused()
             }

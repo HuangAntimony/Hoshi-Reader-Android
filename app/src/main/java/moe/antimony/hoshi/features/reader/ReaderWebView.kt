@@ -189,13 +189,8 @@ fun ReaderWebView(
     val hasStartedTtsSession = ttsAvailable && ttsState.bookId == ttsBookId && ttsState.started
     var showTts by remember(bookRoot) { mutableStateOf(false) }
     var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
-    var ttsLookupResume by remember(bookRoot) { mutableStateOf<(() -> Unit)?>(null) }
     var ttsMiningError by remember { mutableStateOf(false) }
     val ttsMiningJobs = remember { mutableMapOf<String, Job>() }
-    LaunchedEffect(book, ttsBookId, isSasayakiPlaybackLoaded, ttsAssociated) {
-        if (isSasayakiPlaybackLoaded) ttsViewModel.playback.load(ttsBookId, book, ttsAssociated)
-        if (ttsAssociated) { showTts = false; ttsLookupResume = null }
-    }
     var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
     var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
     val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
@@ -235,6 +230,11 @@ fun ReaderWebView(
                 progress = initialProgress.coerceIn(0.0, 1.0),
             ),
         )
+    }
+    val ttsLookupPause = stateHolder.ttsLookupPause
+    LaunchedEffect(book, ttsBookId, isSasayakiPlaybackLoaded, ttsAssociated) {
+        if (isSasayakiPlaybackLoaded) ttsViewModel.playback.load(ttsBookId, book, ttsAssociated)
+        if (ttsAssociated) { showTts = false; ttsLookupPause.clear() }
     }
     LaunchedEffect(readerSettings) {
         stateHolder.syncSettings(readerSettings)
@@ -374,7 +374,7 @@ fun ReaderWebView(
             (ttsState.started || stateHolder.lookupPopups.isNotEmpty())
         ) showTts = true
     }
-    val sasayakiWasPausedByLookup = stateHolder.sasayakiWasPausedByLookup
+    val sasayakiWasPausedByLookup = stateHolder.sasayakiLookupPause.pending
     var persistedStatistics by remember(bookRoot) {
         mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
     }
@@ -657,18 +657,7 @@ fun ReaderWebView(
             }
         }
     }
-    fun resumeSasayakiAfterLookupIfNeeded() {
-        val player = sasayakiPlayer
-        if (player != null && !player.isPlaying) {
-            player.togglePlayback()
-        }
-    }
     fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
-        if (nextPopups.isEmpty()) {
-            val resume = ttsLookupResume
-            ttsLookupResume = null
-            if (ttsAvailable) resume?.invoke()
-        }
         val activeIds = nextPopups.mapTo(mutableSetOf()) { it.id }
         ttsMiningJobs.filterKeys { it !in activeIds }.values.forEach { it.cancel() }
         ttsMiningJobs.keys.retainAll(activeIds)
@@ -676,7 +665,7 @@ fun ReaderWebView(
         rootSelectionHighlight = rootSelectionHighlight?.takeIf { highlight ->
             highlight.popupId == null || highlight.popupId in activeIds
         }
-        stateHolder.setLookupPopups(nextPopups, ::resumeSasayakiAfterLookupIfNeeded)
+        stateHolder.updateLookupPopups(nextPopups)
     }
     fun dismissRootLookupPopup() {
         rootSelectionHighlight = null
@@ -776,18 +765,22 @@ fun ReaderWebView(
         currentWebView.navigatePage(direction, onLimit, ::displayPagedTurnProgress, ::saveDisplayedProgress)
         return true
     }
-    fun pauseSasayakiForLookupIfNeeded() {
-        if (sasayakiSettings.autoPause && ttsState.playing) {
-            ttsLookupResume = ttsViewModel.playback.pauseForLookup()
-        }
+    fun pauseNarrationForLookupIfNeeded() {
+        ttsLookupPause.pauseIfPlaying(
+            enabled = sasayakiSettings.autoPause && ttsAvailable,
+            isPlaying = ttsViewModel.playback.state.value.playing,
+            pause = ttsViewModel.playback::pauseForLookup,
+        )
         val player = sasayakiPlayer
-        if (stateHolder.shouldPauseSasayakiForLookup(
-                enabled = sasayakiSettings.enabled,
-                autoPause = sasayakiSettings.autoPause,
-                isPlaying = player?.isPlaying == true,
-            )
+        stateHolder.sasayakiLookupPause.pauseIfPlaying(
+            enabled = sasayakiSettings.enabled && sasayakiSettings.autoPause,
+            isPlaying = player?.isPlaying == true,
         ) {
-            player?.pausePlayback()
+            requireNotNull(player).pausePlayback()
+            val resume = {
+                if (sasayakiPlayer === player && !player.isPlaying) player.togglePlayback()
+            }
+            resume
         }
     }
     fun handleReaderInteraction() {
@@ -980,8 +973,8 @@ fun ReaderWebView(
                 val offset = popup.state.selection.normalizedOffset ?: return
                 if (!ttsAvailable) return
                 WordAudioPlayer.get(context).stop()
-                val wasPaused = ttsLookupResume != null
-                ttsLookupResume = null
+                val wasPaused = ttsLookupPause.pending
+                ttsLookupPause.clear()
                 when (message) {
                     is ReaderLookupPopupBridgeMessage.TtsReplaySentence ->
                         ttsViewModel.playback.startAt(chapter, offset, singleSentence = true)
@@ -1005,7 +998,7 @@ fun ReaderWebView(
             is ReaderLookupPopupBridgeMessage.SasayakiTogglePlayback -> {
                 WordAudioPlayer.get(context).stop()
                 if (sasayakiWasPausedByLookup) {
-                    stateHolder.clearSasayakiPauseState()
+                    stateHolder.sasayakiLookupPause.clear()
                 } else {
                     sasayakiPlayer?.togglePlayback()
                 }
@@ -1024,11 +1017,10 @@ fun ReaderWebView(
         cancelSasayakiAutoPage()
         stateHolder.enterFocusModeForReaderInteraction()
         rootSelectionHighlight = null
-        setLookupPopups(emptyList())
         val lookup = lookupRootPopup(selection)
         if (lookup != null) {
             val (popup, highlightCount) = lookup
-            pauseSasayakiForLookupIfNeeded()
+            pauseNarrationForLookupIfNeeded()
             val selectionCount = onTextSelected(selection) ?: highlightCount
             rootSelectionHighlight = ReaderRootSelectionHighlight(
                 popupId = popup.id,
@@ -1060,6 +1052,7 @@ fun ReaderWebView(
                 )
             }
         } else {
+            setLookupPopups(emptyList())
             onTextSelected(selection)?.let { count ->
                 selectionRects(count) { rects ->
                     rootSelectionHighlight = ReaderRootSelectionHighlight(
@@ -1776,10 +1769,10 @@ fun ReaderWebView(
     val topPlaybackControl = readerTopPlaybackControl(
         settings = sasayakiSettings,
         tts = if (hasStartedTtsSession) {
-            ReaderTopPlaybackControl(ttsState.playing || ttsLookupResume != null) {
+            ReaderTopPlaybackControl(ttsState.playing || ttsLookupPause.pending) {
                 ttsViewModel.stopPreview()
-                if (ttsLookupResume != null) {
-                    ttsLookupResume = null
+                if (ttsLookupPause.pending) {
+                    ttsLookupPause.clear()
                     ttsViewModel.playback.pause()
                 } else {
                     ttsViewModel.playback.toggle()
@@ -1789,7 +1782,7 @@ fun ReaderWebView(
         sasayaki = sasayakiPlayer?.takeIf { it.hasAudio }?.let { player ->
             ReaderTopPlaybackControl(player.isPlaying || sasayakiWasPausedByLookup) {
                 if (sasayakiWasPausedByLookup) {
-                    stateHolder.clearSasayakiPauseState()
+                    stateHolder.sasayakiLookupPause.clear()
                 } else {
                     player.togglePlayback()
                 }
@@ -1878,7 +1871,7 @@ fun ReaderWebView(
                     readerLookupPopupViewport,
                     sasayakiWasPausedByLookup,
                     sasayakiPlayer?.isPlaying == true,
-                    ttsAvailable, ttsState.playing, ttsState.sentences.isNotEmpty(), ttsLookupResume,
+                    ttsAvailable, ttsState.playing, ttsState.sentences.isNotEmpty(), ttsLookupPause.resumeAction,
                     readerPopupIframeUrl,
                     rootSelectionHighlight,
                 ) {
@@ -1890,7 +1883,7 @@ fun ReaderWebView(
                         sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
                         ttsAvailable = ttsAvailable && ttsState.sentences.isNotEmpty(),
                         ttsIsPlaying = ttsState.playing,
-                        ttsWasPaused = ttsLookupResume != null,
+                        ttsWasPaused = ttsLookupPause.pending,
                         iframeUrl = readerPopupIframeUrl,
                         rootSelectionHighlight = rootSelectionHighlight,
                     )
@@ -1912,13 +1905,8 @@ fun ReaderWebView(
                             chapterFragment = readerPosition.loadFragment,
                             webViewViewportSize = stateHolder.webViewViewportSize,
                             onReaderViewportSizeChanged = { size ->
-                                val shouldResumeLookupAudio = stateHolder.lookupPopups.isNotEmpty() &&
-                                    stateHolder.sasayakiWasPausedByLookup
                                 if (stateHolder.updateViewportSize(size)) {
                                     rootSelectionHighlight = null
-                                    if (shouldResumeLookupAudio) {
-                                        resumeSasayakiAfterLookupIfNeeded()
-                                    }
                                 }
                             },
                             onWebViewReady = { webView = it },

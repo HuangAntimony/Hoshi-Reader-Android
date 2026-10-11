@@ -430,6 +430,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   instead of mixing unscaled layout offsets with scaled scroll coordinates.
 - Lookup opens from a single tap on reader text. Long press is reserved for
   native selection/highlight flows.
+  `ReaderLookupPauseState` owns the shared Sasayaki/TTS lookup interruption policy:
+  pause once, preserve the resume action across root/child popup replacement, consume
+  it once when the stack becomes empty, and clear it when manual pause cancels recovery.
+  Root lookup resolves before replacing the stack; it never transiently empties the
+  stack between two successful selections. A lookup miss or final dismissal resumes
+  the original source. TTS supplies its generation-checked resume action; Sasayaki
+  resumes only the same player instance if it is still paused.
 
 ## Integrations
 
@@ -932,8 +939,12 @@ QA matrices live in `docs/VALIDATION.md`.
   configuration invalidation and configurable sentence prefetch, and rejects stale operations
   after stop/book/source changes. Previous/next preserves the playing state; explicit
   start-at/replay still starts audio. Paused navigation invalidates preparation and lookup
-  resume callbacks, presents the selected sentence directly, and synthesizes nothing until
-  playback resumes. `started` remains scoped to the Reader route/book session, so the
+  resume actions, presents the selected sentence directly, and synthesizes nothing until
+  playback resumes. Decoder completion is recorded for the prepared sentence even while
+  paused, so resuming after a late end event advances rather than replaying an exhausted
+  buffer. Final/single-sentence completion remains stopped. The output inspects current
+  playback state in Media3's batched `onEvents` and ignores detached players.
+  `started` remains scoped to the Reader route/book session, so the
   default-off global Behavior setting `volumeKeysSeekSasayaki` controls both audiobook
   seeking and TTS sentence navigation. TTS becomes eligible only after that session has
   explicitly started narration; the existing preference key/value remains unchanged.

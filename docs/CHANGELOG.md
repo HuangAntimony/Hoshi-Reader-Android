@@ -67,6 +67,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   TTS sentence navigation after starting narration in the current book session; popup term
   navigation takes priority over narration, then page turns.
   Previous/next sentence navigation preserves paused playback instead of starting audio.
+  Lookup pauses survive switching directly to another word without a brief playback
+  restart, and closing the popup resumes correctly when the sentence ended during the pause.
   The Reader’s top-right playback button also controls TTS after manually starting narration
   in the current book session, like the bottom controls. It remains available while paused
   and shares the Show Audiobook / TTS Toggle preference with Sasayaki.
@@ -185,6 +187,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Keep Sasayaki paused when replacing a lookup popup by tapping another word, avoiding
+  brief audio playback or automatic page turns between lookups.
 - Preserve Dictionary results and Back/Forward history when switching tabs, including
   after following a definition link and swiping back.
 - Recognize existing AnkiDroid cards with equivalent Unicode spellings to prevent

@@ -72,8 +72,8 @@ internal class ReaderWebViewStateHolder(
     var webViewRestoreEpoch by mutableStateOf(0)
         private set
 
-    var sasayakiWasPausedByLookup by mutableStateOf(false)
-        private set
+    val sasayakiLookupPause = ReaderLookupPauseState()
+    val ttsLookupPause = ReaderLookupPauseState()
 
     fun syncSettings(settings: ReaderSettings) {
         val shouldReloadContent = effectiveSettings.readerContentReloadKey() != settings.readerContentReloadKey()
@@ -186,38 +186,12 @@ internal class ReaderWebViewStateHolder(
         showStatistics = false
     }
 
-    fun setLookupPopups(
-        popups: List<LookupPopupItem>,
-        resumeSasayakiAfterLookup: () -> Unit = {},
-    ) {
+    fun updateLookupPopups(popups: List<LookupPopupItem>) {
         lookupPopups = popups
-        if (popups.isEmpty() && sasayakiWasPausedByLookup) {
-            sasayakiWasPausedByLookup = false
-            resumeSasayakiAfterLookup()
+        if (popups.isEmpty()) {
+            sasayakiLookupPause.resume()
+            ttsLookupPause.resume()
         }
-    }
-
-    fun markSasayakiPausedByLookup() {
-        sasayakiWasPausedByLookup = true
-    }
-
-    fun clearSasayakiPauseState() {
-        sasayakiWasPausedByLookup = false
-    }
-
-    fun shouldPauseSasayakiForLookup(
-        enabled: Boolean,
-        autoPause: Boolean,
-        isPlaying: Boolean,
-    ): Boolean {
-        if (enabled && autoPause && isPlaying) {
-            markSasayakiPausedByLookup()
-            return true
-        }
-        if (!autoPause) {
-            clearSasayakiPauseState()
-        }
-        return false
     }
 
     fun recordDisplayedProgress(progress: Double): ReaderChapterPosition {
@@ -338,10 +312,10 @@ internal class ReaderWebViewStateHolder(
         if (size == webViewViewportSize) return false
         val resizedExistingViewport = webViewViewportSize != IntSize.Zero
         if (resizedExistingViewport) {
-            setLookupPopups(emptyList())
             prepareReloadAtDisplayedPosition()
         }
         webViewViewportSize = size
+        if (resizedExistingViewport) updateLookupPopups(emptyList())
         return resizedExistingViewport
     }
 

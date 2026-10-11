@@ -16,6 +16,86 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun lookupDuringSentenceDelayResumesNextSentence() = runTest {
+        fixture { controller, output, _, repository ->
+            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            advanceTimeBy(100); runCurrent()
+            val resume = controller.pauseForLookup()
+            advanceTimeBy(2000); runCurrent()
+            assertFalse(controller.state.value.playing)
+            resume(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+        }
+    }
+
+    @Test fun lookupDuringNextSentencePreparationResumes() = runTest {
+        fixture { controller, output, audio, _ ->
+            val ready = CompletableDeferred<Unit>()
+            audio.synthesize = { if (it.start > 0) ready.await() }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertTrue(controller.state.value.preparing)
+            val resume = controller.pauseForLookup()
+            ready.complete(Unit); runCurrent()
+            assertFalse(controller.state.value.playing)
+            resume(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertFalse(controller.state.value.preparing)
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+        }
+    }
+
+    @Test fun sentenceEndArrivingAfterLookupPauseStillResumesForward() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            val resume = controller.pauseForLookup()
+            // The audio has finished, but its completion event arrives after lookup paused playback.
+            output.onEnded(); runCurrent()
+            resume(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals("Must advance beyond the audio that already ended", 1, controller.state.value.index)
+        }
+    }
+
+    @Test fun lookupAtFinalSentenceEndDoesNotReplayFinishedAudio() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.startAt(0, 999); runCurrent()
+            val resume = controller.pauseForLookup()
+            output.onEnded(); runCurrent()
+            resume(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+        }
+    }
+    @Test fun lookupAtSingleSentenceEndDoesNotContinueOrReplay() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.startAt(0, 0, singleSentence = true); runCurrent()
+            val resume = controller.pauseForLookup()
+            output.onEnded(); runCurrent()
+            resume(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals(0, controller.state.value.index)
+            assertEquals(1, output.playCount)
+        }
+    }
+    @Test fun lateEndAfterPausedNavigationCannotSkipTheNewSentence() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            val resume = controller.pauseForLookup()
+            controller.next(); runCurrent()
+            output.onEnded(); resume(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            controller.play(); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
+        }
+    }
+
     @Test fun changingUnselectedRoutingKeepsPlaybackButActiveRoutingCancelsLateAudio() = runTest {
         fixture { controller, output, audio, repository ->
             controller.play(); runCurrent()

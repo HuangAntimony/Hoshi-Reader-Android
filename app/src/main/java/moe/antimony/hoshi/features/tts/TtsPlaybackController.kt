@@ -56,10 +56,16 @@ class TtsPlaybackController internal constructor(
     var presentSentence: (suspend (TtsSentence, Boolean) -> Unit)? = null
     private var heldImageIndex: Int? = null
     private var naturalAdvance = false
-    private var waitingForNextSentence = false
+    private var sentenceFinished = false
 
     init {
-        output.onEnded = { if (state.value.playing) advance() }
+        output.onEnded = {
+            // Completion can arrive after lookup has paused us. Remember it without resuming.
+            if (preparedIndex == state.value.index) {
+                sentenceFinished = true
+                if (state.value.playing) advance()
+            }
+        }
         output.onPaused = { if (state.value.playing && !state.value.preparing) pause() }
         output.onError = { fail(TtsFailure.AudioUnavailable) }
         scope.launch(Dispatchers.Main.immediate) {
@@ -113,11 +119,14 @@ class TtsPlaybackController internal constructor(
     fun next() = seek((state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
     fun repeat() = seek(state.value.index, startPlayback = true)
     private fun advance() {
-        if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) { pause(); preparedIndex = null; return }
+        if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) {
+            sentenceFinished = false
+            pause(); preparedIndex = null; return
+        }
         val waitMillis = preferences.settings.sentencePauseMs
         if (waitMillis == 0L) { seek(state.value.index + 1, natural = true); return }
         val token = generation
-        waitingForNextSentence = true
+        sentenceFinished = true
         mutableState.value = state.value.copy(preparing = true)
         job = scope.launch(Dispatchers.Main.immediate) {
             delay(waitMillis)
@@ -127,7 +136,7 @@ class TtsPlaybackController internal constructor(
     private fun seek(index: Int, singleSentence: Boolean = false, natural: Boolean = false, startPlayback: Boolean = state.value.playing) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
-        waitingForNextSentence = false
+        sentenceFinished = false
         output.clear()
         stopAfterSentence = singleSentence
         naturalAdvance = natural
@@ -146,10 +155,11 @@ class TtsPlaybackController internal constructor(
     }
     fun play() {
         if (associated || state.value.sentence == null || state.value.playing) return
-        if (waitingForNextSentence) {
-            waitingForNextSentence = false
+        if (sentenceFinished) {
+            sentenceFinished = false
             preparedIndex = null
             output.clear()
+            if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) return
             mutableState.value = state.value.copy(index = (state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
             naturalAdvance = true
         }
@@ -214,7 +224,7 @@ class TtsPlaybackController internal constructor(
     }
     private fun fail(failure: TtsFailure) { pause(); mutableState.value = state.value.copy(error = failure) }
     fun stop() {
-        waitingForNextSentence = false
+        sentenceFinished = false
         stopAfterSentence = false
         loadGeneration++
         pause()

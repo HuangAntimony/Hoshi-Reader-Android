@@ -1295,6 +1295,16 @@ Validate relevant sync/update/Sasayaki changes with:
   Nested dictionary popups must not acquire a book playback anchor; linked audiobooks
   keep their original controls. `ReaderTtsPopupTest` and the reader popup JS tests cover
   source visibility and command routing; controller tests cover replay/forward boundaries.
+  For both Sasayaki and TTS, tap another book word while lookup auto-pause is active:
+  the old popup must be replaced without any intervening audio or auto-page. Dismissing
+  the final popup or tapping a lookup miss resumes once; nested popup dismissal and
+  selecting a replacement word retain the pending resume. Explicit pause cancels it.
+  For TTS, also pause at sentence completion, during the configured sentence delay and
+  during next-sentence synthesis. Closing lookup advances from finished audio; the last
+  sentence and single-sentence replay stay stopped. `TtsPlaybackControllerTest` and
+  `ReaderWebViewStateHolderTest` cover these states. `TtsLookupPauseDeviceTest` forces
+  lookup pause before the real Media3 completion batch using local PCM and isolated
+  preferences, without network requests or changing the user's sources/library.
 - Test Home/lock screen, notification/headset previous/next sentence and pause/resume,
   interruptions, task removal while preparing, and explicit Reader exit. After TTS has
   created a media session, leave and reopen a book and switch to another book before

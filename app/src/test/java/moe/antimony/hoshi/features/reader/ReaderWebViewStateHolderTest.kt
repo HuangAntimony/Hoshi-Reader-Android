@@ -459,13 +459,13 @@ class ReaderWebViewStateHolderTest {
         val holder = stateHolder(initialIndex = 1)
         holder.updateViewportSize(IntSize(800, 1200))
         holder.markWebViewRestored()
-        holder.markSasayakiPausedByLookup()
-        holder.setLookupPopups(listOf(lookupPopup()))
+        holder.sasayakiLookupPause.pauseIfPlaying(true, true) { {} }
+        holder.updateLookupPopups(listOf(lookupPopup()))
 
         holder.updateViewportSize(IntSize(900, 1200))
 
         assertTrue(holder.lookupPopups.isEmpty())
-        assertFalse(holder.sasayakiWasPausedByLookup)
+        assertFalse(holder.sasayakiLookupPause.pending)
     }
 
     @Test
@@ -915,28 +915,45 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun emptyLookupStackConsumesSasayakiResumeRequest() {
-        val holder = stateHolder()
-        holder.markSasayakiPausedByLookup()
-        var resumed = 0
-
-        holder.setLookupPopups(emptyList()) { resumed += 1 }
-        holder.setLookupPopups(emptyList()) { resumed += 1 }
-
-        assertEquals(1, resumed)
-        assertFalse(holder.sasayakiWasPausedByLookup)
+    fun replacingLookupStackKeepsBothNarrationSourcesPausedUntilFinalDismissal() {
+        for (tts in listOf(false, true)) {
+            val holder = stateHolder()
+            val pauseState = if (tts) holder.ttsLookupPause else holder.sasayakiLookupPause
+            var pauses = 0
+            var resumes = 0
+            pauseState.pauseIfPlaying(true, true) { pauses++; { resumes++ } }
+            holder.updateLookupPopups(listOf(lookupPopup()))
+            holder.updateLookupPopups(listOf(lookupPopup().copy(id = "replacement")))
+            // A second selection must not replace the original resume even with a stale playing snapshot.
+            pauseState.pauseIfPlaying(true, true) { pauses++; { resumes++ } }
+            assertEquals(1, pauses)
+            assertEquals(0, resumes)
+            assertTrue(pauseState.pending)
+            holder.updateLookupPopups(emptyList())
+            holder.updateLookupPopups(emptyList())
+            assertEquals(1, resumes)
+            assertFalse(pauseState.pending)
+        }
     }
 
     @Test
-    fun lookupAutoPauseOnlyMarksWhenEnabledAutoPauseAndPlaying() {
+    fun lookupPauseClearingOrDisabledAutoPauseNeverResumesPlayback() {
         val holder = stateHolder()
-
-        assertFalse(holder.shouldPauseSasayakiForLookup(enabled = true, autoPause = true, isPlaying = false))
-        assertFalse(holder.sasayakiWasPausedByLookup)
-        assertTrue(holder.shouldPauseSasayakiForLookup(enabled = true, autoPause = true, isPlaying = true))
-        assertTrue(holder.sasayakiWasPausedByLookup)
-        assertFalse(holder.shouldPauseSasayakiForLookup(enabled = true, autoPause = false, isPlaying = true))
-        assertFalse(holder.sasayakiWasPausedByLookup)
+        for (pauseState in listOf(holder.sasayakiLookupPause, holder.ttsLookupPause)) {
+            var resumes = 0
+            pauseState.pauseIfPlaying(true, false) { error("Already paused") }
+            assertFalse(pauseState.pending)
+            pauseState.pauseIfPlaying(false, true) { error("Auto-pause disabled") }
+            assertFalse(pauseState.pending)
+            pauseState.pauseIfPlaying(true, true) { { resumes++ } }
+            pauseState.clear()
+            holder.updateLookupPopups(emptyList())
+            assertEquals(0, resumes)
+            pauseState.pauseIfPlaying(true, true) { { resumes++ } }
+            pauseState.pauseIfPlaying(false, true) { error("Auto-pause disabled") }
+            holder.updateLookupPopups(emptyList())
+            assertEquals(0, resumes)
+        }
     }
 
     @Test
