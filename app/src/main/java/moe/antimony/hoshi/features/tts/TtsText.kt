@@ -7,6 +7,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
+import org.jsoup.parser.Parser
 
 @Serializable
 data class TtsWord(
@@ -39,7 +40,7 @@ data class TtsSentence(
 
 /** Written offsets use the Reader's matchable code points; ruby offsets use UTF-16 within text. */
 object TtsText {
-    fun chapter(chapter: Int, html: String): List<TtsSentence> {
+    fun chapter(chapter: Int, html: String, mediaType: String = "text/html"): List<TtsSentence> {
         val result = mutableListOf<TtsSentence>()
         val source = StringBuilder()
         val sourceStarts = mutableListOf<Int>()
@@ -85,7 +86,7 @@ object TtsText {
             when (node) {
                 is TextNode -> append(node.wholeText)
                 is Element -> when (node.normalName()) {
-                    "rt", "rp", "script", "style" -> Unit
+                    "head", "rt", "rp", "script", "style" -> Unit
                     "img", "svg" -> { flush(); imageBefore = true }
                     "br" -> flush()
                     "ruby" -> {
@@ -102,7 +103,12 @@ object TtsText {
                 }
             }
         }
-        visit(Jsoup.parse(html).body())
+        // EPUB XHTML permits self-closing script/style tags; HTML parsing would swallow the body.
+        val body = if (mediaType == "application/xhtml+xml") {
+            val document = Jsoup.parse(html, "", Parser.xmlParser())
+            document.selectFirst("body") ?: document
+        } else Jsoup.parse(html).body()
+        visit(body)
         flush()
         val roles = TtsDialogue.ranges(source.toString())
         return result.mapIndexed { index, sentence -> sentence.copy(roles = TtsDialogue.slice(roles, sourceStarts[index], sourceStarts[index] + sentence.text.length)) }

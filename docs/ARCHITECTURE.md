@@ -815,6 +815,8 @@ QA matrices live in `docs/VALIDATION.md`.
 - `TtsBookRepository` reads complete linear chapter source, including file-backed
   cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
+  Chapter extraction uses the declared MIME type: XML parsing for XHTML preserves
+  self-closing script/style boundaries; ordinary HTML retains HTML error recovery.
   Literal dictionary matching prefers longest surfaces, then book scope over global
   scope; ruby is used where no custom replacement overlaps and the global Use Ruby readings
   preference is enabled. Disabling it leaves original base text for the engine and suppresses

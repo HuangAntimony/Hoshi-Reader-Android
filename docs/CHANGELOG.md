@@ -52,6 +52,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
   sends original base text to the engine while preserving custom replacements for reading,
   preview and Anki sentence audio.
+  Read XHTML books containing self-closing script/style tags without losing their
+  body text during TTS preparation.
   Edit shared reading behavior directly in either panel,
   with independent Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.

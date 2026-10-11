@@ -126,7 +126,7 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
     suspend fun chapter(book: EpubBook, index: Int): List<TtsSentence> = withContext(dispatcher) {
         val chapter = book.chapters[index]
         val html = chapter.html.ifBlank { book.readResource(chapter.href)?.toString(Charsets.UTF_8).orEmpty() }
-        TtsText.chapter(index, html)
+        TtsText.chapter(index, html, chapter.mediaType)
     }
 
     suspend fun selection(book: EpubBook, index: Int, text: String, normalizedOffset: Int?, sentenceOffset: Int?): TtsSentence =

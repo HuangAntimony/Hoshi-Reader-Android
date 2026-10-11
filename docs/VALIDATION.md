@@ -1204,6 +1204,9 @@ Validate relevant sync/update/Sasayaki changes with:
   supporting text and showing their unchanged sliders when enabled. Remaining parameter
   cards have compact padding; Audio format/Sample rate appear as plain rows. Check long labels and wrapped supporting text without
   overlap, and confirm Sasayaki/shared behavior rows retain their layout.
+- `TtsBookRepositoryTest` covers XHTML self-closing script/style tags in both
+  inline and cached chapter sources: body text, ruby, image boundaries and sentence
+  offsets must survive, while ordinary HTML retains malformed-markup recovery.
 - In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
   Toggle it off with a ruby sample such as 今日 annotated キヨウ: playback, full-sentence
   preview and Anki sentence audio must send 今日 to the engine. Re-enable to use キヨウ;
