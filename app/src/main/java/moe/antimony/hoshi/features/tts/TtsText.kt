@@ -18,11 +18,10 @@ data class TtsWord(
     val regex: Boolean = false,
 )
 
-enum class TtsWordError { Surface, Replacement, Duplicate, RegexPattern, RegexReplacement, Storage }
+enum class TtsWordError { Surface, Duplicate, RegexPattern, RegexReplacement, Storage }
 
 fun validateTtsWord(word: TtsWord, words: List<TtsWord>): TtsWordError? = when {
     word.surface.isBlank() -> TtsWordError.Surface
-    word.replacement.isBlank() -> TtsWordError.Replacement
     word.regex && TtsRegexRule.patternError(word) -> TtsWordError.RegexPattern
     word.regex && TtsRegexRule.compile(word) == null -> TtsWordError.RegexReplacement
     words.any { it.id != word.id && it.surface == word.surface && it.bookId == word.bookId && it.regex == word.regex } -> TtsWordError.Duplicate

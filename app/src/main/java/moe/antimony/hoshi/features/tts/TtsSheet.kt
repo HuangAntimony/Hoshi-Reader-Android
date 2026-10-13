@@ -187,7 +187,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
                 horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(word.surface, style = MaterialTheme.typography.bodyLarge)
-                    Text(word.replacement, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
+                    Text(word.replacement.ifBlank { stringResource(R.string.tts_replacement_deleted) }, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
                     if (word.regex) Text(stringResource(R.string.tts_regex_pattern), style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
                 }
                 Text(stringResource(if (word.bookId == null) R.string.tts_global else R.string.tts_book),

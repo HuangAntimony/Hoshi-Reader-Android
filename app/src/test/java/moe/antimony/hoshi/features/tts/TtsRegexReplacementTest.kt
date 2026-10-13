@@ -6,6 +6,17 @@ import org.junit.Test
 
 class TtsRegexReplacementTest {
     private val json = Json { ignoreUnknownKeys = true }
+    @Test fun emptyLiteralAndRegexReplacementsDeleteWithoutChangingSource() {
+        val sentence = TtsSentence(3, 8, 6, "前（注）後々。")
+        val words = listOf(TtsWord("literal", "（注）", ""), TtsWord("regex", "々", "", regex = true))
+        words.forEach { assertNull(validateTtsWord(it, words)) }
+        val preview = prepareTtsWordPreview(words.last(), sentence, "book", TtsPreferences(words = words))
+        assertNull(preview.error)
+        assertEquals("前後。", preview.text)
+        assertEquals("前（注）後々。", preview.sentence.text)
+        assertEquals(8, preview.sentence.start)
+    }
+
     private fun rule(pattern: String, replacement: String, id: String = "regex", book: String? = null): TtsWord =
         json.decodeFromJsonElement(buildJsonObject {
             put("id", id); put("surface", pattern); put("reading", replacement); put("regex", true)

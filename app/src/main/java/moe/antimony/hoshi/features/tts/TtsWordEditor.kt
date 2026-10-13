@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.tts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -19,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
-import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.hoshiContentKeyboardOptions
@@ -37,6 +38,7 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
         onSave = viewModel::save, onDelete = viewModel::delete, onDismiss = onDismiss)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TtsWordEditorDialog(
     initial: TtsWord, bookId: String?, sentence: TtsSentence?, preferences: TtsPreferences,
@@ -45,12 +47,14 @@ internal fun TtsWordEditorDialog(
     previewDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     var surface by remember(initial.id) { mutableStateOf(initial.surface) }
-    var replacement by remember(initial.id) { mutableStateOf(initial.replacement) }
+    val replacementState = remember(initial.id) { TextFieldState(initial.replacement) }
+    val replacement = replacementState.text.toString()
     var regex by remember(initial.id) { mutableStateOf(initial.regex) }
     var global by remember(initial.id) { mutableStateOf(initial.bookId == null) }
     var sample by remember(initial.id) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<TtsWordError?>(null) }
     var saving by remember { mutableStateOf(false) }
+    var surfaceEdited by remember(initial.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val draft = initial.copy(surface = if (regex) surface else surface.trim(), replacement = replacement,
         bookId = if (global) null else bookId, regex = regex)
@@ -64,26 +68,44 @@ internal fun TtsWordEditorDialog(
     // Open with a complete initial layout. Later computations retain the last
     // result for display, while only the current snapshot can enable playback.
     val displayedPreview = prepared ?: return
+    val validation = error ?: displayedPreview.error?.takeUnless { it == TtsWordError.Surface && !surfaceEdited }
     HoshiAlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReaderSheetSwitchRow(stringResource(R.string.tts_regex_enabled), regex, { regex = it })
-            OutlinedTextField(surface, { surface = it }, modifier = Modifier.fillMaxWidth(),
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.tts_replacement_rule), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.tts_regex_enabled), style = MaterialTheme.typography.bodySmall)
+                Switch(checked = regex, onCheckedChange = { regex = it })
+            }
+            OutlinedTextField(surface, { surface = it; surfaceEdited = true }, modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(if (regex) R.string.tts_regex_pattern else R.string.tts_surface)) }, singleLine = true,
+                isError = validation == TtsWordError.Surface || validation == TtsWordError.RegexPattern,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            OutlinedTextField(replacement, { replacement = it }, modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.tts_replacement)) }, maxLines = 4,
+            OutlinedTextField(state = replacementState, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.tts_replacement)) },
+                labelPosition = TextFieldLabelPosition.Attached(alwaysMinimize = true),
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 4),
+                placeholder = { Text(stringResource(R.string.tts_replacement_delete_hint)) },
+                isError = validation == TtsWordError.RegexReplacement,
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
             if (regex) Text(stringResource(R.string.tts_regex_help), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf(true, false).forEachIndexed { index, allBooks ->
-                    SegmentedButton(selected = global == allBooks, onClick = { global = allBooks }, enabled = allBooks || bookId != null,
-                        shape = SegmentedButtonDefaults.itemShape(index, 2),
-                        colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primary,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimary, inactiveContainerColor = hoshiSurfaces.nested,
-                            inactiveContentColor = hoshiSurfaces.muted), icon = {},
-                    ) { Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book)) }
+            validation?.let { Text(stringResource(it.messageRes()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.tts_replacement_scope), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                SingleChoiceSegmentedButtonRow {
+                    listOf(true, false).forEachIndexed { index, allBooks ->
+                        SegmentedButton(selected = global == allBooks, onClick = { global = allBooks }, enabled = allBooks || bookId != null,
+                            shape = SegmentedButtonDefaults.itemShape(index, 2),
+                            colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primary,
+                                activeContentColor = MaterialTheme.colorScheme.onPrimary, inactiveContainerColor = hoshiSurfaces.nested,
+                                inactiveContentColor = hoshiSurfaces.muted), icon = {},
+                        ) { Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book)) }
+                    }
                 }
             }
+            HorizontalDivider(color = hoshiSurfaces.outline)
+            Text(stringResource(R.string.tts_replacement_preview), style = MaterialTheme.typography.titleSmall)
             Text(stringResource(R.string.tts_replacement_before), style = MaterialTheme.typography.labelLarge, color = hoshiSurfaces.muted)
             if (sentence != null) SelectionContainer { Text(sentence.text) }
             else OutlinedTextField(original.text, { sample = it }, modifier = Modifier.fillMaxWidth(),
@@ -91,10 +113,14 @@ internal fun TtsWordEditorDialog(
                 placeholder = { Text(if (regex) stringResource(R.string.tts_replacement_sample_hint) else surface) },
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
             Text(stringResource(R.string.tts_replacement_after), style = MaterialTheme.typography.labelLarge, color = hoshiSurfaces.muted)
-            displayedPreview.text?.let { SelectionContainer { Text(it) } }
-            (error ?: displayedPreview.error)?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
+            SelectionContainer {
+                Text(displayedPreview.text?.takeIf { it.isNotBlank() }
+                    ?: stringResource(if (displayedPreview.error == null) R.string.tts_replacement_empty_preview else R.string.tts_replacement_pending_preview),
+                    style = MaterialTheme.typography.bodyMedium, color = if (displayedPreview.text.isNullOrBlank()) hoshiSurfaces.muted else LocalContentColor.current)
+            }
             HoshiButton(onClick = { preview?.let(onPreview) }, enabled = !busy && !saving && preview?.text?.isNotBlank() == true,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.filledTonalButtonColors()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -109,7 +135,7 @@ internal fun TtsWordEditorDialog(
             ) { Text(stringResource(R.string.action_delete)) }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            TextButton(enabled = !saving, onClick = { scope.launch {
+            HoshiButton(enabled = !saving && preview?.error == null && preview != null, onClick = { scope.launch {
                 saving = true
                 try { error = onSave(draft); if (error == null) onDismiss() } finally { saving = false }
             } }) { Text(stringResource(R.string.action_save)) }
@@ -119,7 +145,6 @@ internal fun TtsWordEditorDialog(
 
 internal fun TtsWordError.messageRes(): Int = when (this) {
     TtsWordError.Surface -> R.string.tts_invalid_surface
-    TtsWordError.Replacement -> R.string.tts_invalid_replacement
     TtsWordError.Duplicate -> R.string.tts_duplicate
     TtsWordError.RegexPattern -> R.string.tts_invalid_regex
     TtsWordError.RegexReplacement -> R.string.tts_invalid_regex_replacement

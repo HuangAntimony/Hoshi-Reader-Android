@@ -925,7 +925,7 @@
     <string name="tts_preview_voice">Preview voice</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">Replace</string>
-    <string name="tts_regex_enabled">Use regular expression</string>
+    <string name="tts_regex_enabled">Regex</string>
     <string name="tts_regex_pattern">Pattern</string>
     <string name="tts_regex_help">RE2 syntax; use $1, $2… for captured text. Escape a literal dollar sign with a backslash. Empty matches are ignored.</string>
     <string name="tts_invalid_regex">Invalid or unsupported regular expression.</string>
@@ -934,11 +934,17 @@
     <string name="tts_replacement_after">Text sent to TTS</string>
     <string name="tts_replacement_sample">Preview text</string>
     <string name="tts_replacement_sample_hint">Enter text to try this rule.</string>
+    <string name="tts_replacement_rule">Replacement rule</string>
+    <string name="tts_replacement_scope">Applies to</string>
+    <string name="tts_replacement_preview">Sentence preview</string>
+    <string name="tts_replacement_delete_hint">Leave empty to delete matching text</string>
+    <string name="tts_replacement_empty_preview">No text to read after replacement</string>
+    <string name="tts_replacement_pending_preview">Complete the rule to see the result</string>
+    <string name="tts_replacement_deleted">Remove matching text</string>
     <string name="tts_replacement_title">TTS replacement</string>
-    <string name="tts_surface">Original text</string>
-    <string name="tts_replacement">Replacement text</string>
+    <string name="tts_surface">Matching text</string>
+    <string name="tts_replacement">Replace with</string>
     <string name="tts_invalid_surface">Enter the original text.</string>
-    <string name="tts_invalid_replacement">Enter non-blank replacement text.</string>
     <string name="tts_duplicate">This text already has a replacement in this scope. Edit the existing entry.</string>
     <string name="tts_no_engine">No TTS engine is installed. Install an engine and Japanese voice data in system settings.</string>
     <string name="tts_missing_japanese">Japanese voice data is unavailable. Choose another voice or install Japanese data in system settings.</string>

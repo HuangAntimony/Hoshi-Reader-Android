@@ -830,7 +830,11 @@ QA matrices live in `docs/VALIDATION.md`.
   zero-width image-glyph readings; custom replacements still apply. Playback, preview and Anki
   exports all read this flag through `TtsAudioRepository`, retaining source ruby/ranges for
   later re-enabling. It participates in synthesis invalidation and audio cache identity. Replacement values accept
-  any non-blank plain text, preserving whitespace. Matching is a single pass over the
+  any plain text, preserving whitespace; empty replacements delete their matched source ranges.
+  Empty synthesis plans return no playback files without discovering voices or calling engines.
+  The controller traverses these sentences in its cancellable preparation loop, retaining image
+  presentation and single-sentence boundaries without adding sentence delays; empty exports
+  report `EmptyText` and produce no media file. Matching is a single pass over the
   original sentence; inserted text is never matched again. `TtsWord.regex` defaults false for
   legacy entries. `TtsRegexReplacement` uses RE2/J with a bounded compiled-rule cache,
   numeric `$0`/`$1` capture templates and backslash escaping. Invalid patterns/templates

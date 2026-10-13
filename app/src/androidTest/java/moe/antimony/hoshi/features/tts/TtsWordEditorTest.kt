@@ -40,7 +40,8 @@ class TtsWordEditorTest {
         compose.onNode(isDialog()).assertDoesNotExist()
         dispatcher.completeNext()
         compose.onNode(isDialog()).assertExists()
-        compose.onNodeWithText(text(R.string.tts_invalid_replacement)).assertExists()
+        compose.onNodeWithText("瑞しい。").assertExists()
+        compose.onNodeWithText(text(R.string.tts_replacement_delete_hint)).assertIsDisplayed()
         val bounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot
         compose.mainClock.advanceTimeBy(100)
         assertEquals(bounds, compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot)
@@ -69,6 +70,26 @@ class TtsWordEditorTest {
         compose.onNodeWithText("とうきょうへ。").assertDoesNotExist()
         compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals("トーキョーへ。", played?.text) }
+    }
+
+    @Test fun deletingWholeSentenceCanBeSavedButCannotBePreviewed() {
+        var saved: TtsWord? = null
+        val draft = TtsWord("existing", "東京。", "とうきょう。")
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(draft, "book", TtsSentence(0, 0, 2, "東京。"),
+                    TtsPreferences(words = listOf(draft)), false, null, { fail("Empty preview must not play") },
+                    { saved = it; validateTtsWord(it, listOf(draft)) }, {}, {})
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextClearance()
+        compose.waitUntil(5000) { compose.onAllNodesWithText(text(R.string.tts_replacement_empty_preview)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
+        val delete = compose.onNodeWithText(text(R.string.action_delete)).fetchSemanticsNode().boundsInRoot
+        val save = compose.onNodeWithText(text(R.string.action_save)).fetchSemanticsNode().boundsInRoot
+        assertEquals(delete.center.y, save.center.y, 1f)
+        compose.onNodeWithText(text(R.string.action_save)).assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals("", saved?.replacement) }
     }
 
     private fun verify(eink: Boolean) {

@@ -90,7 +90,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Sasayaki's image holds and chapter presentation, keeping images visible for the
   configured duration before continuing; manual sentence jumps skip intervening images.
 - Customize TTS text replacements for one book or all books from text selection or
-  Settings. Replacement text accepts readings, other text and punctuation, including
+  Settings. Replacement text accepts readings, other text and punctuation; leaving it empty
+  deletes the matching text from speech. Fully deleted sentences are skipped during continuous
+  playback without sending empty synthesis requests. Supported substitutions include
   dashes or ellipses replaced with commas/periods for engine-controlled pauses. Existing
   pronunciation entries remain compatible and default to literal matching. Add an opt-in
   regular-expression switch to replacement creation/editing, with capture-group substitution,
@@ -98,7 +100,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   over regex rules. Both modes show the original and actual TTS input before preview; rules
   created from Settings can be tested with editable sample text. The editor opens with
   its initial preview/validation content ready, avoiding an opening
-  size jump, and retains the preview area while edits are recalculated.
+  size jump, and retains the preview area while edits are recalculated. The compact editor
+  groups the rule, scope and sentence preview, with a secondary Preview button and a primary Save
+  action. Empty results are clearly identified, remain saveable and disable Preview.
   Replacements affect only synthesized speech; original text, sentence navigation,
   highlighting and Anki sentence text stay unchanged.
   The selection menu offers a compact Replace action; its TTS replacement dialog

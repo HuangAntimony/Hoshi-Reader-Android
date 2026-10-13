@@ -171,6 +171,14 @@ class TtsRepositoryTest {
         }
     }
 
+    @Test fun emptyReplacementRulesSurviveReload() = runTest {
+        val store = MemoryStore(preferencesOf())
+        val repository = TtsRepository(store)
+        val rules = listOf(TtsWord("literal", "注", ""), TtsWord("regex", "[0-9]+", "", "book", regex = true))
+        rules.forEach { assertNull(repository.save(it)) }
+        assertEquals(rules, TtsRepository(store).preferences.first().words)
+    }
+
     @Test fun legacyReadingsAndArbitraryReplacementsSurviveSettingsChangesAndReload() = runTest {
         val key = stringPreferencesKey("preferences")
         val store = MemoryStore(preferencesOf(key to """{"words":[{"id":"legacy","surface":"東京","reading":"とうきょう","bookId":"book"}]}"""))
@@ -182,7 +190,6 @@ class TtsRepositoryTest {
         assertNull(repository.save(global))
         assertNull(repository.save(local))
         assertEquals(TtsWordError.Duplicate, repository.save(local.copy(id = "duplicate")))
-        assertEquals(TtsWordError.Replacement, repository.save(local.copy(replacement = "\n ")))
         repository.settings(TtsSettings(rate = 1.5f))
 
         val reloaded = TtsRepository(store).preferences.first()

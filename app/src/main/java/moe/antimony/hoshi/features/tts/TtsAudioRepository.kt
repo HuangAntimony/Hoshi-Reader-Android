@@ -54,9 +54,12 @@ class TtsAudioRepository internal constructor(
 
     private suspend fun plan(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<TtsSynthesisPart> {
         val settings = preferences.settings
+        // Deleted sentences need neither a voice catalog nor an engine request.
+        val spoken = TtsText.spokenParts(sentence, bookId, preferences.words, settings.useRubyReadings)
+        if (spoken.all { it.text.isBlank() }) return emptyList()
         val catalog = if (settings.routing().enabled && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi)
             engine.cachedCatalog(settings) ?: engine.catalog(settings) else null
-        return ttsSynthesisPlan(sentence, bookId, preferences, catalog)
+        return ttsSynthesisPlan(sentence, bookId, preferences, catalog, spoken)
     }
 
     private suspend fun synthesize(plan: List<TtsSynthesisPart>, directory: File): List<File> {
@@ -92,6 +95,7 @@ class TtsAudioRepository internal constructor(
         try {
             return withContext(ioDispatcher) {
                 parts = synthesize(plan(sentence, bookId, preferences), File(cache, "tts/export"))
+                if (parts.isEmpty()) throw TtsException(TtsFailure.EmptyText)
                 joinTtsAudio(parts, target, fallback, ioDispatcher).also { output = it }
             }
         } catch (error: Throwable) {

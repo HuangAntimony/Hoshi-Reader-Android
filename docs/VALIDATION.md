@@ -1220,7 +1220,8 @@ Validate relevant sync/update/Sasayaki changes with:
 - Long-press book text and choose Replace beside Highlight: prefill the selected original and
   empty replacement text, and preview the full source sentence including ruby and VN
   text outside the screen. Check the dialog title identifies TTS, the equal-width
-  scope selector, and full-width themed preview button (including its busy state),
+  scope selector beside its label, compact rule/regex row, and full-width themed secondary
+  preview button (including its busy state),
   in both languages and light/dark/e-ink themes. Cancel without saving. With a multilingual IME, start in another input
   language and focus each original/replacement field: both should request Japanese.
   Repeat from the TTS replacement editor: existing entries show a theme-danger-colored
@@ -1234,7 +1235,13 @@ Validate relevant sync/update/Sasayaki changes with:
   source text, sentence boundaries and highlighting must stay unchanged. Check
   longest-match/book precedence, editing/deleting, exact
   punctuation matching (different dash characters stay distinct), non-kana and multiline
-  replacements, blank validation and duplicate conflicts. Replacement text is plain text,
+  replacements, empty-match validation and duplicate conflicts. Leave replacement text empty
+  in literal and regex modes: save/reopen the deletion rule, verify the list identifies deletion
+  and the preview shows the actual result. If the whole sentence disappears, Save remains
+  enabled and Preview is disabled with an empty-result message. Continuous playback skips
+  consecutive deleted sentences, preserving image holds and lookup pause/cancellation; single
+  sentence playback and the end of a fully deleted book stop without errors. Anki exports
+  of an empty result report no readable text and never create empty audio files. Replacement text is plain text,
   never executable SSML, and inserted replacements are not recursively matched.
   Reopen the app with existing pronunciation entries: they must load unchanged; saving
   a replacement or changing synthesis settings must preserve old rules and scopes.

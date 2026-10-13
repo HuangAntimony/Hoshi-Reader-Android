@@ -118,6 +118,25 @@ class TtsAudioRepositoryTest {
         } finally { repository.clearPlaybackCache(); close(client) }
     }
 
+    @Test fun deletingEntireSentenceSkipsSynthesisAndRejectsEmptyExport() = runBlocking {
+        var requests = 0
+        val client = client { requests++ }
+        val repository = repository(client)
+        val sentence = TtsSentence(0, 0, 2, "削除。")
+        val configured = preferences.copy(words = listOf(TtsWord("delete", "削除。", "")))
+        try {
+            assertTrue(repository.audio(sentence, "book", configured).isEmpty())
+            val routed = configured.copy(settings = configured.settings.withRouting(TtsVoiceRouting(true)))
+            assertTrue(repository.audio(sentence, "book", routed).isEmpty())
+            try { repository.export(sentence, "book", configured); fail("Empty audio must not be exported") }
+            catch (error: TtsException) { assertEquals(TtsFailure.EmptyText, error.failure) }
+            assertEquals(0, requests)
+            assertFalse(folder.root.walkTopDown().any { it.isFile })
+            assertTrue(repository.audio(sentence, "book", preferences).isNotEmpty())
+            assertEquals(1, requests)
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun playbackAndExportUseTheSameLiteralReplacementsAndEditsInvalidateCachedAudio() = runBlocking {
         val requests = mutableListOf<String>()
         val client = client { body ->

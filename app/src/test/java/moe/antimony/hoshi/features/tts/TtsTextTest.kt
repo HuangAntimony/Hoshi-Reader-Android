@@ -113,15 +113,14 @@ class TtsTextTest {
         assertTrue(chunks.all { it.length <= 13 && !it.last().isHighSurrogate() && !it.first().isLowSurrogate() })
     }
 
-    @Test fun dictionaryAcceptsAnyNonBlankReplacementAndStillRejectsConflicts() {
+    @Test fun dictionaryAcceptsEmptyReplacementAndStillRejectsConflicts() {
         val original = TtsWord("a", "東京", "とうきょう", "book")
         assertEquals(TtsWordError.Duplicate, validateTtsWord(original.copy(id = "b"), listOf(original)))
-        listOf("トーキョー", "Tokyo", "、", "。", "漢字123😀", " \n text \n ", "<break/>").forEach {
+        listOf("", " \n ", "トーキョー", "Tokyo", "、", "。", "漢字123😀", " \n text \n ", "<break/>").forEach {
             assertNull(it, validateTtsWord(original.copy(replacement = it), listOf(original)))
         }
         assertNull(validateTtsWord(original.copy(id = "b", bookId = null), listOf(original)))
         assertEquals(TtsWordError.Surface, validateTtsWord(original.copy(surface = " "), emptyList()))
-        assertEquals(TtsWordError.Replacement, validateTtsWord(original.copy(replacement = " \n "), emptyList()))
     }
 
     @Test fun punctuationReplacementUsesLongestMatchAndBookScopeWithoutResegmentingSource() {

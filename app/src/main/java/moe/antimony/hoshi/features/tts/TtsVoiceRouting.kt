@@ -51,10 +51,13 @@ internal fun TtsSettings.withCompatibleVoiceOptions(voices: List<TtsVoiceInfo>):
         .copy(pitch = sharedPitchRange(voices)?.let { pitch.coerceIn(it) } ?: 0f)
 }
 
-internal fun ttsSynthesisPlan(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences, catalog: TtsCatalog?): List<TtsSynthesisPart> {
+internal fun ttsSynthesisPlan(
+    sentence: TtsSentence, bookId: String?, preferences: TtsPreferences, catalog: TtsCatalog?,
+    spoken: List<TtsSpokenPart> = TtsText.spokenParts(sentence, bookId, preferences.words, preferences.settings.useRubyReadings),
+): List<TtsSynthesisPart> {
     val settings = preferences.settings
     val routing = settings.routing()
-    val spoken = TtsText.spokenParts(sentence, bookId, preferences.words, settings.useRubyReadings)
+    if (spoken.all { it.text.isBlank() }) return emptyList()
     if (!routing.enabled) return listOf(TtsSynthesisPart(spoken.joinToString("") { it.text }, settings))
     fun effective(id: String): String {
         // An OpenAI server's omitted voice means its own default, not necessarily the first listed voice.
@@ -84,6 +87,5 @@ internal fun ttsSynthesisPlan(sentence: TtsSentence, bookId: String?, preference
             else parts += TtsSynthesisPart(text, config)
         }
     }
-    if (parts.isEmpty()) throw TtsException(TtsFailure.EmptyText)
     return parts
 }

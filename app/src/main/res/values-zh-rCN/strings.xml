@@ -923,7 +923,7 @@
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">替换</string>
-    <string name="tts_regex_enabled">启用正则表达式</string>
+    <string name="tts_regex_enabled">正则表达式</string>
     <string name="tts_regex_pattern">匹配表达式</string>
     <string name="tts_regex_help">使用 RE2 语法；$1、$2… 表示捕获的文本。字面美元符号需用反斜杠转义。忽略空匹配。</string>
     <string name="tts_invalid_regex">正则表达式无效或使用了不支持的语法。</string>
@@ -932,11 +932,17 @@
     <string name="tts_replacement_after">送入 TTS 的文本</string>
     <string name="tts_replacement_sample">预览文本</string>
     <string name="tts_replacement_sample_hint">输入文本以测试这条规则。</string>
+    <string name="tts_replacement_rule">替换规则</string>
+    <string name="tts_replacement_scope">应用范围</string>
+    <string name="tts_replacement_preview">句子预览</string>
+    <string name="tts_replacement_delete_hint">留空则删除匹配内容</string>
+    <string name="tts_replacement_empty_preview">替换后无可朗读文本</string>
+    <string name="tts_replacement_pending_preview">填写规则后查看结果</string>
+    <string name="tts_replacement_deleted">删除匹配内容</string>
     <string name="tts_replacement_title">TTS 文本替换</string>
-    <string name="tts_surface">原文本</string>
-    <string name="tts_replacement">替换文本</string>
+    <string name="tts_surface">匹配文本</string>
+    <string name="tts_replacement">替换为</string>
     <string name="tts_invalid_surface">请输入原文本。</string>
-    <string name="tts_invalid_replacement">请输入非空白的替换文本。</string>
     <string name="tts_duplicate">此作用范围内已存在相同原文本，请编辑已有规则。</string>
     <string name="tts_no_engine">设备未安装 TTS 引擎，请在系统设置中安装引擎及日语语音数据。</string>
     <string name="tts_missing_japanese">日语音色不可用，请选择其他音色或在系统设置中安装日语语音数据。</string>

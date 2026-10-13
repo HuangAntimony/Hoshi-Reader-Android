@@ -16,6 +16,56 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun silentSentencesAdvanceWithoutPlayingEmptyAudioOrAddingPauses() = runTest {
+        fixture { controller, output, audio, repository ->
+            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            val sentences = controller.state.value.sentences
+            audio.silent = { it != sentences.last() }
+            val presented = mutableListOf<Pair<TtsSentence, Boolean>>()
+            controller.presentSentence = { sentence, hold -> presented += sentence to hold }
+            controller.play(); runCurrent()
+            assertEquals(3, controller.state.value.index)
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            assertEquals(sentences, presented.map { it.first })
+            assertEquals(listOf(false, true, true, true), presented.map { it.second })
+            assertEquals(0L, testScheduler.currentTime)
+        }
+    }
+
+    @Test fun allSilentSentencesAndSingleSentenceReplayStopWithoutErrors() = runTest {
+        fixture { controller, output, audio, _ ->
+            audio.silent = { true }
+            controller.startAt(0, 0, singleSentence = true); runCurrent()
+            assertEquals(0, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            controller.startAt(0, 0); runCurrent()
+            assertEquals(3, controller.state.value.index)
+            assertFalse(controller.state.value.playing)
+            assertFalse(controller.state.value.preparing)
+            assertNull(controller.state.value.error)
+            assertEquals(0, output.playCount)
+            assertTrue(output.prepared.isEmpty())
+        }
+    }
+
+    @Test fun lookupPauseDuringSilentSentenceImageHoldCannotAdvanceUntilResumed() = runTest {
+        fixture { controller, output, audio, _ ->
+            audio.silent = { it == controller.state.value.sentences[1] }
+            controller.presentSentence = { sentence, hold -> if (hold && sentence == controller.state.value.sentences[1]) delay(1000) }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            val resume = controller.pauseForLookup()
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(1, output.playCount)
+            resume(); runCurrent(); advanceTimeBy(1000); runCurrent()
+            assertEquals(2, controller.state.value.index)
+            assertEquals(2, output.playCount)
+            assertTrue(controller.state.value.playing)
+        }
+    }
+
     @Test fun lookupDuringSentenceDelayResumesNextSentence() = runTest {
         fixture { controller, output, _, repository ->
             repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
@@ -139,10 +189,11 @@ class TtsPlaybackControllerTest {
     private class Audio : TtsAudioSource {
         val requests = mutableListOf<String>()
         var synthesize: suspend (TtsSentence) -> Unit = {}
+        var silent: (TtsSentence) -> Boolean = { false }
         override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> {
             requests += TtsText.spoken(sentence, bookId, preferences.words, preferences.settings.useRubyReadings)
             synthesize(sentence)
-            return listOf(File("${sentence.start}.wav"))
+            return if (silent(sentence)) emptyList() else listOf(File("${sentence.start}.wav"))
         }
         override suspend fun clearPlaybackCache() = Unit
     }

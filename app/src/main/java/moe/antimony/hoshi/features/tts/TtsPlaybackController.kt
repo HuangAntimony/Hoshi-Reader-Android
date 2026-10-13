@@ -170,23 +170,43 @@ class TtsPlaybackController internal constructor(
         job = scope.launch(Dispatchers.Main.immediate) {
             try {
                 withTimeout(15_000) { output.connect() }
-                if (preparedIndex != snapshot.index) {
-                    val files = audio.audio(requireNotNull(snapshot.sentence), snapshot.bookId, config)
+                var current = snapshot
+                while (generation == token && !associated) {
+                    val sentence = requireNotNull(current.sentence)
+                    val files = if (preparedIndex != current.index) audio.audio(sentence, current.bookId, config) else null
                     if (generation != token || associated) return@launch
-                    output.prepare(files, snapshot.title, snapshot.sentence?.text.orEmpty())
-                    preparedIndex = snapshot.index
+                    if (files?.isNotEmpty() == true) {
+                        output.prepare(files, current.title, sentence.text)
+                        preparedIndex = current.index
+                    }
+                    val holdImages = naturalAdvance && heldImageIndex != current.index
+                    presentSentence?.invoke(sentence, holdImages)
+                    if (sentence.imageBefore && holdImages && presentSentence == null) {
+                        delay(imageHoldMillis)
+                    }
+                    if (generation != token || associated) return@launch
+                    heldImageIndex = current.index
+                    if (files?.isEmpty() == true) {
+                        // A deleted sentence has no player completion event. Traverse it here,
+                        // retaining image presentation and cancellation, without a sentence pause.
+                        if (stopAfterSentence || current.index == current.sentences.lastIndex) {
+                            preparedIndex = null
+                            output.clear()
+                            pause()
+                            return@launch
+                        }
+                        preparedIndex = null
+                        naturalAdvance = true
+                        current = state.value.copy(index = current.index + 1)
+                        mutableState.value = current
+                        yield()
+                        continue
+                    }
+                    mutableState.value = state.value.copy(preparing = false)
+                    output.play()
+                    prefetchAhead()
+                    return@launch
                 }
-                val holdImages = naturalAdvance && heldImageIndex != snapshot.index
-                presentSentence?.invoke(requireNotNull(snapshot.sentence), holdImages)
-                if (snapshot.sentence?.imageBefore == true && holdImages && presentSentence == null) {
-                    heldImageIndex = snapshot.index
-                    delay(imageHoldMillis)
-                }
-                heldImageIndex = snapshot.index
-                if (generation != token || associated) return@launch
-                mutableState.value = state.value.copy(preparing = false)
-                output.play()
-                prefetchAhead()
             } catch (error: TimeoutCancellationException) {
                 if (generation == token) fail(TtsFailure.Timeout)
             } catch (error: CancellationException) { throw error }
