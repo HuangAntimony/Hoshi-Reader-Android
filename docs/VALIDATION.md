@@ -1252,11 +1252,16 @@ Validate relevant sync/update/Sasayaki changes with:
   Test invalid patterns/group references, zero-width matches, supplementary kanji, overlapping
   patterns, book/global scope, existing entry editing and mode persistence after reopening.
   The Preview button must not play an obsolete draft while text updates; its configuration
-  snapshot must match the displayed result. Check normal/e-ink dialog scrolling and footer.
+  snapshot must match the displayed result. During scope changes, Preview and Save stay
+  visually enabled when the previous result was valid. Click Preview before calculation
+  completes: it must play the new result once ready; another edit cancels the queued click.
+  Save during calculation must validate/persist the current scope and text. Check unselected
+  scope options blend with the dialog surface in light/dark/e-ink themes, and section title,
+  small before/after labels, subdued original and larger output remain visually distinct. Check normal/e-ink dialog scrolling and footer.
   Open new and existing replacements from Reader and Settings: the first visible dialog
   must include its initial validation/preview content, without an empty intermediate
   layout that changes window size. Hold preview computation pending while editing:
-  keep the dialog/result area visible and disable Preview until the current result arrives.
+  keep the dialog/result area visible and never play the old result while the current result is pending.
   `TtsWordEditorTest` controls the preview dispatcher to check both transitions.
   `TtsRegexReplacementTest`, `TtsRepositoryTest`, `TtsAudioRepositoryTest` and the non-destructive
   `TtsWordEditorTest` cover matching, persistence, preview/export/cache and Compose controls.

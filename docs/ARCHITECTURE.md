@@ -843,7 +843,10 @@ QA matrices live in `docs/VALIDATION.md`.
   non-overlapping matches, then rules at the same start prefer the longest match and book
   scope on ties (remaining ties retain saved order). Matches across dialogue boundaries
   retain first-non-quote ownership. Preview computes on Default using the same `TtsText`
-  transform and passes its immutable preferences snapshot to synthesis. Both literal/regex
+  transform and passes its immutable preferences snapshot to synthesis. The editor retains the
+  last result and action availability during recomputation; Preview clicks wait for the current
+  result, and further edits cancel the queued click. Save validates the current draft through
+  the repository without waiting for preview computation. Both literal/regex
   editors display before/after text; settings entry adds editable preview text. Replacements affect synthesis
   only, preserving original sentence boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
   the selected source occurrence, including full

@@ -63,13 +63,51 @@ class TtsWordEditorTest {
         compose.onNode(isDialog()).assertExists()
         compose.onNodeWithText("とうきょうへ。").assertExists()
         assertEquals(bounds, compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsEnabled().performClick()
         assertNull(played)
         dispatcher.completeNext()
         compose.onNodeWithText("トーキョーへ。").assertExists()
         compose.onNodeWithText("とうきょうへ。").assertDoesNotExist()
-        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals("トーキョーへ。", played?.text) }
+    }
+
+    @Test fun scopeChangeKeepsActionsAvailableAndUsesOnlyTheCurrentDraft() {
+        val dispatcher = QueuedPreviewDispatcher()
+        var played: TtsWordPreview? = null
+        var saved: TtsWord? = null
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
+                    TtsPreferences(), false, null, { played = it }, { saved = it; null }, {}, {}, previewDispatcher = dispatcher)
+            }
+        }
+        dispatcher.completeNext()
+        compose.onNodeWithText(text(R.string.tts_book)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsEnabled().performClick()
+        compose.runOnIdle { assertNull(played); assertEquals("book", saved?.bookId) }
+        dispatcher.completeNext()
+        compose.runOnIdle { assertEquals("book", played?.word?.bookId) }
+    }
+
+    @Test fun editingAgainCancelsAQueuedPreview() {
+        val dispatcher = QueuedPreviewDispatcher()
+        var plays = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
+                    TtsPreferences(), false, null, { plays++ }, { null }, {}, {}, previewDispatcher = dispatcher)
+            }
+        }
+        dispatcher.completeNext()
+        compose.onNodeWithText(text(R.string.tts_book)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextReplacement("トーキョー")
+        dispatcher.completeNext()
+        compose.waitForIdle()
+        dispatcher.completeNext()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("トーキョーへ。").fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle { assertEquals(0, plays) }
     }
 
     @Test fun deletingWholeSentenceCanBeSavedButCannotBePreviewed() {

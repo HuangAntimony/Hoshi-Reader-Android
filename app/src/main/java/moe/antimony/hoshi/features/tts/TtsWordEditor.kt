@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,11 +64,18 @@ internal fun TtsWordEditorDialog(
     val prepared by produceState<TtsWordPreview?>(null, draft, original, preferences, bookId) {
         value = withContext(previewDispatcher) { prepareTtsWordPreview(draft, original, bookId, preferences) }
     }
-    // Never enable playback of an old draft while the new text is still being computed.
+    // Playback can only use the current snapshot; a click during computation waits for it.
     val preview = prepared?.takeIf { it.word == draft && it.sentence == original && it.sourcePreferences == preferences }
+    var previewRequested by remember(draft, original, preferences) { mutableStateOf(false) }
+    LaunchedEffect(preview, previewRequested, busy, saving) {
+        if (previewRequested && preview != null) {
+            previewRequested = false
+            if (!busy && !saving && !preview.text.isNullOrBlank()) onPreview(preview)
+        }
+    }
     LaunchedEffect(draft) { error = null }
     // Open with a complete initial layout. Later computations retain the last
-    // result for display, while only the current snapshot can enable playback.
+    // result for display; playback still waits for the current snapshot.
     val displayedPreview = prepared ?: return
     val validation = error ?: displayedPreview.error?.takeUnless { it == TtsWordError.Surface && !surfaceEdited }
     HoshiAlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
@@ -98,27 +107,35 @@ internal fun TtsWordEditorDialog(
                         SegmentedButton(selected = global == allBooks, onClick = { global = allBooks }, enabled = allBooks || bookId != null,
                             shape = SegmentedButtonDefaults.itemShape(index, 2),
                             colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.primary,
-                                activeContentColor = MaterialTheme.colorScheme.onPrimary, inactiveContainerColor = hoshiSurfaces.nested,
-                                inactiveContentColor = hoshiSurfaces.muted), icon = {},
+                                activeContentColor = MaterialTheme.colorScheme.onPrimary, inactiveContainerColor = Color.Transparent,
+                                inactiveContentColor = hoshiSurfaces.content), icon = {},
                         ) { Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book)) }
                     }
                 }
             }
             HorizontalDivider(color = hoshiSurfaces.outline)
-            Text(stringResource(R.string.tts_replacement_preview), style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(R.string.tts_replacement_before), style = MaterialTheme.typography.labelLarge, color = hoshiSurfaces.muted)
-            if (sentence != null) SelectionContainer { Text(sentence.text) }
-            else OutlinedTextField(original.text, { sample = it }, modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.tts_replacement_sample)) },
-                placeholder = { Text(if (regex) stringResource(R.string.tts_replacement_sample_hint) else surface) },
-                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            Text(stringResource(R.string.tts_replacement_after), style = MaterialTheme.typography.labelLarge, color = hoshiSurfaces.muted)
-            SelectionContainer {
-                Text(displayedPreview.text?.takeIf { it.isNotBlank() }
-                    ?: stringResource(if (displayedPreview.error == null) R.string.tts_replacement_empty_preview else R.string.tts_replacement_pending_preview),
-                    style = MaterialTheme.typography.bodyMedium, color = if (displayedPreview.text.isNullOrBlank()) hoshiSurfaces.muted else LocalContentColor.current)
+            Text(stringResource(R.string.tts_replacement_preview), style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold, color = hoshiSurfaces.content)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.tts_replacement_before), style = MaterialTheme.typography.labelMedium, color = hoshiSurfaces.muted)
+                if (sentence != null) SelectionContainer {
+                    Text(sentence.text, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
+                }
+                else OutlinedTextField(original.text, { sample = it }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.tts_replacement_sample)) },
+                    placeholder = { Text(if (regex) stringResource(R.string.tts_replacement_sample_hint) else surface) },
+                    keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
             }
-            HoshiButton(onClick = { preview?.let(onPreview) }, enabled = !busy && !saving && preview?.text?.isNotBlank() == true,
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.tts_replacement_after), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                SelectionContainer {
+                    Text(displayedPreview.text?.takeIf { it.isNotBlank() }
+                        ?: stringResource(if (displayedPreview.error == null) R.string.tts_replacement_empty_preview else R.string.tts_replacement_pending_preview),
+                        style = MaterialTheme.typography.bodyLarge, color = if (displayedPreview.text.isNullOrBlank()) hoshiSurfaces.muted else hoshiSurfaces.content)
+                }
+            }
+            HoshiButton(onClick = { if (preview != null) onPreview(preview) else previewRequested = true },
+                enabled = !busy && !saving && !displayedPreview.text.isNullOrBlank(),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.filledTonalButtonColors()) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -135,7 +152,7 @@ internal fun TtsWordEditorDialog(
             ) { Text(stringResource(R.string.action_delete)) }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            HoshiButton(enabled = !saving && preview?.error == null && preview != null, onClick = { scope.launch {
+            HoshiButton(enabled = !saving && displayedPreview.error == null, onClick = { scope.launch {
                 saving = true
                 try { error = onSave(draft); if (error == null) onDismiss() } finally { saving = false }
             } }) { Text(stringResource(R.string.action_save)) }

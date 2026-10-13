@@ -101,8 +101,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   created from Settings can be tested with editable sample text. The editor opens with
   its initial preview/validation content ready, avoiding an opening
   size jump, and retains the preview area while edits are recalculated. The compact editor
-  groups the rule, scope and sentence preview, with a secondary Preview button and a primary Save
-  action. Empty results are clearly identified, remain saveable and disable Preview.
+  groups the rule, scope and sentence preview, with distinct original/output typography,
+  a secondary Preview button and a primary Save action. Scope choices share the dialog
+  background when unselected; preview recalculation keeps actions stable and queues Preview
+  for the current draft instead of briefly disabling it. Empty results are clearly identified, remain saveable and disable Preview.
   Replacements affect only synthesized speech; original text, sentence navigation,
   highlighting and Anki sentence text stay unchanged.
   The selection menu offers a compact Replace action; its TTS replacement dialog
