@@ -1257,7 +1257,8 @@ Validate relevant sync/update/Sasayaki changes with:
   completes: it must play the new result once ready; another edit cancels the queued click.
   Save during calculation must validate/persist the current scope and text. Check unselected
   scope options blend with the dialog surface in light/dark/e-ink themes, and section title,
-  small before/after labels, subdued original and larger output remain visually distinct. Check normal/e-ink dialog scrolling and footer.
+  small before/after labels, subdued original and stronger output color remain visually distinct;
+  original and output body text use the same size, including editable sample text. Check normal/e-ink dialog scrolling and footer.
   Open new and existing replacements from Reader and Settings: the first visible dialog
   must include its initial validation/preview content, without an empty intermediate
   layout that changes window size. Hold preview computation pending while editing:

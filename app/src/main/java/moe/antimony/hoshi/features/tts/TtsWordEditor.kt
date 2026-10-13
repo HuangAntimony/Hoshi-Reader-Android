@@ -122,6 +122,7 @@ internal fun TtsWordEditorDialog(
                     Text(sentence.text, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
                 }
                 else OutlinedTextField(original.text, { sample = it }, modifier = Modifier.fillMaxWidth(),
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     label = { Text(stringResource(R.string.tts_replacement_sample)) },
                     placeholder = { Text(if (regex) stringResource(R.string.tts_replacement_sample_hint) else surface) },
                     keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
@@ -131,7 +132,7 @@ internal fun TtsWordEditorDialog(
                 SelectionContainer {
                     Text(displayedPreview.text?.takeIf { it.isNotBlank() }
                         ?: stringResource(if (displayedPreview.error == null) R.string.tts_replacement_empty_preview else R.string.tts_replacement_pending_preview),
-                        style = MaterialTheme.typography.bodyLarge, color = if (displayedPreview.text.isNullOrBlank()) hoshiSurfaces.muted else hoshiSurfaces.content)
+                        style = MaterialTheme.typography.bodyMedium, color = if (displayedPreview.text.isNullOrBlank()) hoshiSurfaces.muted else hoshiSurfaces.content)
                 }
             }
             HoshiButton(onClick = { if (preview != null) onPreview(preview) else previewRequested = true },
