@@ -1048,6 +1048,10 @@ QA matrices live in `docs/VALIDATION.md`.
   Native text selection exposes Replace, which captures the existing full source
   sentence into the same TTS replacement editor used by Settings. Its title identifies
   TTS, scope uses a Material segmented control, and preview uses `HoshiButton`.
+  Reader resolves the full source sentence before mounting the editor, falling back
+  to the captured sentence on failure. The editor waits for its initial background
+  text/validation result before opening the dialog. Recomputations retain the last
+  displayed result, while playback requires a snapshot matching the current draft.
   Both creation entry points default to global scope; editing retains the saved scope.
 - Root Reader lookup popups retain their source chapter and expose independent TTS
   visibility/playback state and typed bridge commands. The shared three-button toolbar

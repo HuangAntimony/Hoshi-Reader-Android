@@ -2172,12 +2172,16 @@ fun ReaderWebView(
         ttsSelection?.let { selection ->
             val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "") }
             val chapter = readerPosition.displayedPosition.index
-            val previewSentence by produceState(TtsSentence(chapter, selection.normalizedOffset ?: 0, 0, selection.sentence), selection) {
+            val previewSentence by produceState<TtsSentence?>(null, selection) {
                 try { value = ttsViewModel.sourceSentence(book, chapter, selection) }
                 catch (error: CancellationException) { throw error }
-                catch (_: Exception) { /* Plain source remains available for the editor's preview. */ }
+                catch (_: Exception) {
+                    value = TtsSentence(chapter, selection.normalizedOffset ?: 0, 0, selection.sentence)
+                }
             }
-            TtsWordEditor(ttsViewModel, draft, ttsBookId, previewSentence, onDismiss = { ttsSelection = null })
+            previewSentence?.let { sentence ->
+                TtsWordEditor(ttsViewModel, draft, ttsBookId, sentence, onDismiss = { ttsSelection = null })
+            }
         }
         if (ttsMiningError) AlertDialog(onDismissRequest = { ttsMiningError = false },
             title = { Text(stringResource(R.string.tts_title)) }, text = { Text(stringResource(R.string.tts_failed)) },

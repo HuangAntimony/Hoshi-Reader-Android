@@ -1246,6 +1246,11 @@ Validate relevant sync/update/Sasayaki changes with:
   patterns, book/global scope, existing entry editing and mode persistence after reopening.
   The Preview button must not play an obsolete draft while text updates; its configuration
   snapshot must match the displayed result. Check normal/e-ink dialog scrolling and footer.
+  Open new and existing replacements from Reader and Settings: the first visible dialog
+  must include its initial validation/preview content, without an empty intermediate
+  layout that changes window size. Hold preview computation pending while editing:
+  keep the dialog/result area visible and disable Preview until the current result arrives.
+  `TtsWordEditorTest` controls the preview dispatcher to check both transitions.
   `TtsRegexReplacementTest`, `TtsRepositoryTest`, `TtsAudioRepositoryTest` and the non-destructive
   `TtsWordEditorTest` cover matching, persistence, preview/export/cache and Compose controls.
 - Run `TtsTextTest`, `TtsRepositoryTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,

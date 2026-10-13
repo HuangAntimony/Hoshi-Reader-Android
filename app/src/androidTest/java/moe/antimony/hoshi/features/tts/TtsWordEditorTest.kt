@@ -5,6 +5,10 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlin.coroutines.CoroutineContext
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import org.junit.Assert.*
@@ -18,6 +22,54 @@ class TtsWordEditorTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private fun text(id: Int) = context.getString(id)
+
+    private class QueuedPreviewDispatcher : CoroutineDispatcher() {
+        private val tasks = LinkedBlockingQueue<Runnable>()
+        override fun dispatch(context: CoroutineContext, block: Runnable) { tasks.add(block) }
+        fun completeNext() { requireNotNull(tasks.poll(5, TimeUnit.SECONDS)).run() }
+    }
+
+    @Test fun openingWaitsForInitialValidationInsteadOfResizingAnEmptyPreview() {
+        val dispatcher = QueuedPreviewDispatcher()
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(TtsWord("draft", "々", ""), "book", TtsSentence(0, 0, 1, "瑞々しい。"),
+                    TtsPreferences(), false, null, {}, { null }, {}, {}, previewDispatcher = dispatcher)
+            }
+        }
+        compose.onNode(isDialog()).assertDoesNotExist()
+        dispatcher.completeNext()
+        compose.onNode(isDialog()).assertExists()
+        compose.onNodeWithText(text(R.string.tts_invalid_replacement)).assertExists()
+        val bounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot
+        compose.mainClock.advanceTimeBy(100)
+        assertEquals(bounds, compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test fun editingKeepsPreviewLayoutButCannotPlayTheObsoleteDraft() {
+        val dispatcher = QueuedPreviewDispatcher()
+        var played: TtsWordPreview? = null
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
+                    TtsPreferences(), false, null, { played = it }, { null }, {}, {}, previewDispatcher = dispatcher)
+            }
+        }
+        dispatcher.completeNext()
+        compose.onNodeWithText("とうきょうへ。").assertExists()
+        val bounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextReplacement("トーキョー")
+        compose.onNode(isDialog()).assertExists()
+        compose.onNodeWithText("とうきょうへ。").assertExists()
+        assertEquals(bounds, compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
+        assertNull(played)
+        dispatcher.completeNext()
+        compose.onNodeWithText("トーキョーへ。").assertExists()
+        compose.onNodeWithText("とうきょうへ。").assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("トーキョーへ。", played?.text) }
+    }
 
     private fun verify(eink: Boolean) {
         var played: TtsWordPreview? = null

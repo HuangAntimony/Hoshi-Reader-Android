@@ -96,8 +96,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   regular-expression switch to replacement creation/editing, with capture-group substitution,
   book/global scope and validation. Explicit literal entries and available ruby take priority
   over regex rules. Both modes show the original and actual TTS input before preview; rules
-  created from Settings can be tested with editable sample text. Replacements affect only synthesized speech;
-  original text, sentence navigation, highlighting and Anki sentence text stay unchanged.
+  created from Settings can be tested with editable sample text. The editor opens with
+  its initial preview/validation content ready, avoiding an opening
+  size jump, and retains the preview area while edits are recalculated.
+  Replacements affect only synthesized speech; original text, sentence navigation,
+  highlighting and Anki sentence text stay unchanged.
   The selection menu offers a compact Replace action; its TTS replacement dialog
   defaults new entries to all books, with a theme-colored selected scope and stable centered labels,
   and a full-width theme-colored preview button, with

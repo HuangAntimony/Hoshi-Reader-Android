@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
@@ -41,6 +42,7 @@ internal fun TtsWordEditorDialog(
     initial: TtsWord, bookId: String?, sentence: TtsSentence?, preferences: TtsPreferences,
     busy: Boolean, previewError: TtsFailure?, onPreview: (TtsWordPreview) -> Unit,
     onSave: suspend (TtsWord) -> TtsWordError?, onDelete: (String) -> Unit, onDismiss: () -> Unit,
+    previewDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     var surface by remember(initial.id) { mutableStateOf(initial.surface) }
     var replacement by remember(initial.id) { mutableStateOf(initial.replacement) }
@@ -54,12 +56,14 @@ internal fun TtsWordEditorDialog(
         bookId = if (global) null else bookId, regex = regex)
     val original = sentence ?: TtsSentence(0, 0, 0, sample ?: if (regex) "" else surface)
     val prepared by produceState<TtsWordPreview?>(null, draft, original, preferences, bookId) {
-        value = null
-        value = withContext(Dispatchers.Default) { prepareTtsWordPreview(draft, original, bookId, preferences) }
+        value = withContext(previewDispatcher) { prepareTtsWordPreview(draft, original, bookId, preferences) }
     }
     // Never enable playback of an old draft while the new text is still being computed.
     val preview = prepared?.takeIf { it.word == draft && it.sentence == original && it.sourcePreferences == preferences }
     LaunchedEffect(draft) { error = null }
+    // Open with a complete initial layout. Later computations retain the last
+    // result for display, while only the current snapshot can enable playback.
+    val displayedPreview = prepared ?: return
     HoshiAlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ReaderSheetSwitchRow(stringResource(R.string.tts_regex_enabled), regex, { regex = it })
@@ -87,8 +91,8 @@ internal fun TtsWordEditorDialog(
                 placeholder = { Text(if (regex) stringResource(R.string.tts_replacement_sample_hint) else surface) },
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
             Text(stringResource(R.string.tts_replacement_after), style = MaterialTheme.typography.labelLarge, color = hoshiSurfaces.muted)
-            preview?.text?.let { SelectionContainer { Text(it) } }
-            (error ?: preview?.error)?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
+            displayedPreview.text?.let { SelectionContainer { Text(it) } }
+            (error ?: displayedPreview.error)?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
             HoshiButton(onClick = { preview?.let(onPreview) }, enabled = !busy && !saving && preview?.text?.isNotBlank() == true,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
