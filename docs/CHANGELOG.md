@@ -95,7 +95,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   pronunciation entries remain compatible. Replacements affect only synthesized speech;
   original text, sentence navigation, highlighting and Anki sentence text stay unchanged.
   The selection menu offers a compact Replace action; its TTS replacement dialog
-  has a single scope selector and full-width theme-colored preview button, with
+  defaults new entries to all books, with a theme-colored selected scope and checkmark,
+  and a full-width theme-colored preview button, with
   a destructive Delete action aligned beside Cancel and Save when editing an entry.
   Text-selection creation previews the full original sentence; both fields request
   Japanese keyboard input. EPUB ruby remains the fallback reading.

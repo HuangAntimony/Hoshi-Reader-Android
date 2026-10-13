@@ -100,7 +100,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
         if (selectedTab == 1) {
             TtsDictionaryList(
                 words = preferences.words.filter { bookId == null || it.bookId == null || it.bookId == bookId },
-                onAdd = { editor = TtsWord(UUID.randomUUID().toString(), "", "", bookId) },
+                onAdd = { editor = TtsWord(UUID.randomUUID().toString(), "", "") },
                 onEdit = { editor = it }, modifier = Modifier.weight(1f),
             )
         } else if (selectedTab == 2) {
@@ -269,12 +269,11 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
                         enabled = allBooks || bookId != null,
                         shape = SegmentedButtonDefaults.itemShape(index, 2),
                         colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = hoshiSurfaces.selected,
-                            activeContentColor = hoshiSurfaces.onSelected,
+                            activeContainerColor = MaterialTheme.colorScheme.primary,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
                             inactiveContainerColor = hoshiSurfaces.nested,
                             inactiveContentColor = hoshiSurfaces.muted,
                         ),
-                        icon = {},
                     ) {
                         Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book))
                     }
