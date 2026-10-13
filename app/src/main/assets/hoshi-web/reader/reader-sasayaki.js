@@ -1,6 +1,3 @@
-  usesSasayakiRangeHighlight: function() {
-    return !!(window.CSS && window.CSS.highlights && typeof window.Highlight === 'function');
-  },
   collectSasayakiCueRanges: function(cues) {
     if (!cues.length) return [];
     var entries = [];
@@ -10,8 +7,7 @@
     var domText = window.hoshiReaderDomText;
     var index = domText.createSasayakiTextIndex(document.body, entries);
     return cues.map(function(cue) {
-      return { id: cue.id, start: cue.start, length: cue.length,
-        ranges: domText.sasayakiSegments(index, index.range(cue.start, cue.length)) };
+      return { id: cue.id, ranges: domText.sasayakiSegments(index, index.range(cue.start, cue.length)) };
     });
   },
    applySasayakiCues: function(cues) {
@@ -19,7 +15,7 @@
      this.resetSasayakiCues();
      var cueRanges = this.collectSasayakiCueRanges(cues);
      this.rememberSasayakiCueSources(cueRanges);
-     if (this.isEInkMode() || this.usesSasayakiRangeHighlight()) {
+     if (this.isEInkMode()) {
        this.cueGeometryRanges = this.buildSasayakiGeometryRanges(cueRanges);
      }
      this.prepareSasayakiInlineTargets(cueRanges);
@@ -30,7 +26,7 @@
      }
    },
   wrapSasayakiCue: function(cue) {
-    if (this.isEInkMode() || this.usesSasayakiRangeHighlight()) {
+    if (this.isEInkMode()) {
       this.ensureSasayakiCueGeometry(cue);
       return this.cueGeometryRanges.get(cue.id) || [];
     }
@@ -74,7 +70,6 @@
      }
    },
            sasayakiInlineTargetsForCue: function(cueId) {
-             if (this.usesSasayakiRangeHighlight()) return this.cueGeometryRanges.get(cueId) || [];
              return this.cueWrappers.get(cueId) || [];
            },
            hasSasayakiCueTarget: function(cueId) {
@@ -90,7 +85,7 @@
              }
            },
            prepareSasayakiInlineTargets: function(cueRanges) {
-            if (!this.isEInkMode() && !this.usesSasayakiRangeHighlight()) {
+            if (!this.isEInkMode()) {
               this.wrapSasayakiCueRanges(cueRanges);
             }
           },
@@ -111,15 +106,6 @@
       if (cueGeometryRanges.length) geometryRanges.set(id, cueGeometryRanges);
     }
     return geometryRanges;
-  },
-  refreshSasayakiRangeTargets: function() {
-    if (!this.usesSasayakiRangeHighlight() || !this.cueSourceRanges.size) return;
-    // Saved highlight edits move/split text nodes. Reproject from semantic cue
-    // offsets instead of retaining live Ranges whose contents were extracted.
-    var cueRanges = this.collectSasayakiCueRanges(Array.from(this.cueSourceRanges.values()));
-    this.rememberSasayakiCueSources(cueRanges);
-    this.cueGeometryRanges = this.buildSasayakiGeometryRanges(cueRanges);
-    this.refreshSasayakiCuePresentation();
   },
   ensureSasayakiCueGeometry: function(cue) {
     if (!cue) return;
@@ -172,22 +158,10 @@
     window.hoshiReaderPopupHost?.clearSasayakiHighlight?.();
   },
   clearInlineSasayakiCue: function(cueId) {
-    if (this.usesSasayakiRangeHighlight()) window.CSS.highlights.delete('hoshi-sasayaki');
     var wrappers = this.cueWrappers.get(cueId) || [];
     wrappers.forEach(function(wrapper) { wrapper.classList.remove('hoshi-sasayaki-active'); });
   },
   applyInlineSasayakiCue: function(cueId) {
-    if (this.usesSasayakiRangeHighlight()) {
-      var ranges = this.cueGeometryRanges.get(cueId) || [];
-      if (!ranges.length) return false;
-      // Paint without wrapping text: fragmented inline boxes can misroute
-      // WebView's native selection handles to an earlier page.
-      var highlight = new window.Highlight();
-      ranges.forEach(function(range) { highlight.add(range); });
-      highlight.priority = -1;
-      window.CSS.highlights.set('hoshi-sasayaki', highlight);
-      return true;
-    }
     var wrappers = this.cueWrappers.get(cueId) || [];
     wrappers.forEach(function(wrapper) { wrapper.classList.add('hoshi-sasayaki-active'); });
     return wrappers.length > 0;
@@ -253,7 +227,6 @@
     this.clearSasayakiOverlay();
   },
   resetSasayakiCues: function() {
-    if (this.usesSasayakiRangeHighlight()) window.CSS.highlights.delete('hoshi-sasayaki');
      this.cueSourceRanges.clear();
     this.cueGeometryRanges.clear();
     var self = this;

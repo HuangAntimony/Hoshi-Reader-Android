@@ -103,7 +103,6 @@ window.hoshiReader = {
     this.nodeStartRawOffsets = rawOffsets;
     // Wrapping/unwrapping moves text nodes and invalidates live CSS Ranges.
     if (window.hoshiHighlights?.searchRange) window.hoshiHighlights.refreshSearchHighlight();
-    this.refreshSasayakiRangeTargets();
     this.paginationMetrics = null;
   },
   countCharsBeforeViewport: function(node, context) {

@@ -176,7 +176,7 @@ node --test app/src/test/js/*.test.mjs
   and stale document notification rejection. Run it with the data-preserving
   explicit instrumentation procedure above.
   `ReaderSelectionViewportWebViewTest` also checks native handle drags with
-  narration cues prepared, selection preservation during cue updates, and
+  narration cues prepared, and
   immediate scroll prevention, visible/logical position retention, and resumed
   paging in both writing directions. Repeat real-book ruby handle drags and
   inspect recordings frame by frame for unrelated columns becoming selected;

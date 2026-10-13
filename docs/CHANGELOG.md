@@ -141,8 +141,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Keep text selection from unexpectedly turning pages or chapters when the
   native selection menu disappears or is recreated.
 - Reduce text-selection flicker in paginated reading by preventing selection
-  autoscroll and avoiding narration highlight wrappers that can make handles
-  jump to text on an earlier page on current WebViews.
+  autoscroll while dragging selection handles.
 
 ## [v1.4.0] - 2026-09-24
 

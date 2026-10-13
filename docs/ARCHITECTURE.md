@@ -320,14 +320,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   three modes. VN captures CSS boundaries before detaching the chapter DOM,
   builds and caches this index from the complete source stream
   and projects expanded raw ranges through its existing screen range map.
-- Paginated/continuous narration uses CSS Custom Highlights when supported,
-  painting Sasayaki/TTS cue ranges without inserting inline text wrappers that
-  interfere with native selection hit testing across page fragments. Range
-  targets also drive cue navigation and image stops; node-offset rebuilds
-  reproject them from saved semantic cue offsets after persistent-highlight
-  edits. Narration has lower highlight priority than lookup/search. E-ink keeps
-  its existing geometry overlay; WebViews without Custom Highlights keep the
-  inline-wrapper fallback. VN keeps its screen-projection implementation.
+- Paginated/continuous narration keeps inline cue wrappers in normal mode and
+  geometry overlays in E-ink mode. Do not replace narration painting with CSS
+  Custom Highlights based on API support alone: WebView can clip the left edges
+  of vertical Japanese glyphs, including ruby-adjacent text. Any replacement
+  must first pass the real-WebView glyph-edge checks in `docs/VALIDATION.md`.
 - Reader image setup semantics live in `reader-media-semantics.js` and are
   consumed by paginated, continuous, and VN assets for shared gaiji class
   recognition, transparent monochrome inline-image tinting, SVG image

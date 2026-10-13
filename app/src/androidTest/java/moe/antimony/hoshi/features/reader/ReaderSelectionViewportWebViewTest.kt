@@ -27,33 +27,6 @@ class ReaderSelectionViewportWebViewTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test
-    fun narrationCueUpdatesPreserveNativeSelection() {
-        val webView = createWebView()
-        try {
-            loadFixture(webView, vertical = true)
-            evaluate(webView, """
-                (()=>{const node=document.getElementById('tail').firstChild;
-                  getSelection().setBaseAndExtent(node,0,node,node.length);
-                  window.selectedNode=node;return true;})()
-            """.trimIndent())
-            composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
-            val result = JSONObject(evaluate(webView, """
-                (()=>{const start=hoshiReader.nodeStartOffsets.get(selectedNode);
-                  hoshiReader.applySasayakiCues([{id:'selected',start:start,length:1}]);
-                  hoshiReader.highlightSasayakiCue('selected',false);
-                  const selection=getSelection();
-                  return {text:selection.toString(),sameAnchor:selection.anchorNode===selectedNode,
-                    highlighted:[...CSS.highlights.get('hoshi-sasayaki')].map(r=>r.toString()).join('')};})()
-            """.trimIndent()))
-            assertEquals("Cue preparation preserves the selected word", "派", result.getString("text"))
-            assertTrue("Native handle keeps its original anchor", result.getBoolean("sameAnchor"))
-            assertEquals("Narration still paints the cue", "派", result.getString("highlighted"))
-        } finally {
-            instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
-        }
-    }
-
-    @Test
     fun draggingRubyHandleKeepsSelectionWithinDraggedText() {
         val webView = createWebView()
         try {
