@@ -173,8 +173,13 @@ node --test app/src/test/js/*.test.mjs
   navigation must resume. `ReaderNativeSelectionStateWebViewTest` uses generated
   vertical paginated content and a real ActionMode to check surviving selection,
   logical page retention, blocked navigation versus chapter boundaries,
-  and stale document notification rejection. Run it with the data-preserving
-  explicit instrumentation procedure above.
+  and stale document notification rejection. It also checks empty/offscreen
+  native menu bounds against the visible DOM selection, preserves valid native
+  bounds, and discards fallback coordinates after selection movement or scroll
+  within the same ActionMode. On device, long-press ruby-adjacent base text and
+  confirm the menu stays beside the selected text; in continuous mode, scroll
+  the selection out of view and verify no stale toolbar remains pinned. Run it
+  with the data-preserving explicit instrumentation procedure above.
   `ReaderSelectionViewportWebViewTest` also checks native handle drags with
   narration cues prepared, and
   immediate scroll prevention, visible/logical position retention, and resumed

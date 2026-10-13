@@ -625,6 +625,9 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     val nativeSelectionState: StateFlow<Boolean> get() = nativeSelectionActivity
     private var nativeSelectionActionMode: ActionMode? = null
     private var nativeSelectionContentRect: Rect? = null
+    private var nativeSelectionFallbackRect: Rect? = null
+    private var nativeSelectionAnchorRequested = false
+    private var nativeSelectionAnchorGeneration = 0
     private var highlightColorPopup: PopupWindow? = null
     private var selectionHighlightPending = false
 
@@ -636,6 +639,18 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
                     if (!isReleased && tag == restoreToken) {
                         documentHasSelection = active
                         updateNativeSelectionActivity()
+                    }
+                }
+            }
+            @JavascriptInterface
+            fun invalidateMenuAnchor(request: Int, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken && request == nativeSelectionAnchorGeneration) {
+                        nativeSelectionFallbackRect = null
+                        nativeSelectionAnchorGeneration++
+                        // Do not remeasure while handles are moving. A new native
+                        // ActionMode may request a fresh anchor after the gesture.
+                        nativeSelectionActionMode?.invalidateContentRect()
                     }
                 }
             }
@@ -661,6 +676,9 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     }
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
+        nativeSelectionFallbackRect = null
+        nativeSelectionAnchorRequested = false
+        nativeSelectionAnchorGeneration++
         if (mode == null) {
             nativeSelectionContentRect = null
             dismissHighlightColorPopup()
@@ -675,6 +693,30 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
 
     fun setNativeSelectionContentRect(rect: Rect) {
         nativeSelectionContentRect = Rect(rect)
+    }
+
+    fun resolveNativeSelectionContentRect(mode: ActionMode, rect: Rect) {
+        if (!rect.isEmpty && Rect.intersects(rect, Rect(0, 0, width, height))) return
+        nativeSelectionFallbackRect?.let { rect.set(it); return }
+        if (nativeSelectionAnchorRequested || nativeSelectionActionMode !== mode) return
+        nativeSelectionAnchorRequested = true
+        val documentToken = tag
+        val generation = nativeSelectionAnchorGeneration
+        // A fresh delegate read cannot repair Chromium's empty/offscreen bounds.
+        // Query the visible DOM selection once for this ActionMode instead.
+        evaluateJavascript(ReaderSelectionCommand.NativeMenuRect(generation).source) { result ->
+            if (tag != documentToken || nativeSelectionActionMode !== mode ||
+                generation != nativeSelectionAnchorGeneration) return@evaluateJavascript
+            val anchor = ReaderNativeSelectionMenuRect.fromJavascriptResult(result) ?: return@evaluateJavascript
+            val scale = width / anchor.viewportWidth
+            val fallback = Rect(
+                (anchor.left * scale).roundToInt(), (anchor.top * scale).roundToInt(),
+                (anchor.right * scale).roundToInt(), (anchor.bottom * scale).roundToInt(),
+            )
+            if (!fallback.intersect(0, 0, width, height)) return@evaluateJavascript
+            nativeSelectionFallbackRect = fallback
+            mode.invalidateContentRect()
+        }
     }
 
     fun prepareHighlightColorPicker(mode: ActionMode) {
@@ -864,6 +906,7 @@ private class ReaderHighlightActionModeCallback(
         } else {
             super.onGetContentRect(mode, view, outRect)
         }
+        webView.resolveNativeSelectionContentRect(mode, outRect)
         webView.setNativeSelectionContentRect(outRect)
     }
 

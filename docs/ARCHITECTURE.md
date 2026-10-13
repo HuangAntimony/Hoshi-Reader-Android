@@ -380,8 +380,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Logical page offsets stay unchanged; deselection restores the normal body
   scroll position. This prevents Blink autoscroll and the reader's rollback from
   moving selection endpoints back and forth. WebViews without overflow-clip
-  support retain the scroll-lock fallback. Native menu placement remains owned
-  by WebView's ActionMode callback.
+  support retain the scroll-lock fallback. Native menus keep WebView's valid
+  ActionMode content bounds. If those bounds are empty or wholly offscreen,
+  Android may measure the visible DOM selection once per ActionMode and use its
+  clipped fragment bounds. Selection changes, scroll, and resize discard this
+  fallback without rereading layout during the gesture; document, mode, and
+  request-generation guards reject stale replies. This only corrects placement
+  of an existing menu and does not create or unhide native menus.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for

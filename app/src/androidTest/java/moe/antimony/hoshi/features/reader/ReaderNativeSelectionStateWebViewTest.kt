@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import android.graphics.Rect
+import android.view.View
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
@@ -13,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -116,6 +119,108 @@ class ReaderNativeSelectionStateWebViewTest {
             instrumentation.runOnMainSync { webView.prepareForDocument("third-chapter") }
             assertFalse("Changing chapters clears the old selection", webView.nativeSelectionState.value)
 
+        } finally {
+            instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
+        }
+    }
+
+    @Test
+    fun invalidNativeMenuBoundsUseVisibleSelectionButValidBoundsRemainNative() {
+        val assets = ReaderWebAssets.load(instrumentation.targetContext)
+        lateinit var webView: HoshiReaderWebView
+        composeRule.setContent {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+                HoshiReaderWebView(context).also {
+                    webView = it
+                    it.settings.javaScriptEnabled = true
+                    it.tag = "menu-anchor-fixture"
+                }
+            })
+        }
+        composeRule.waitForIdle()
+        try {
+            val loaded = CountDownLatch(1)
+            instrumentation.runOnMainSync {
+                webView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                }
+                webView.loadDataWithBaseURL(null,
+                    "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>" +
+                        "<script>${assets.selectionJs};hoshiSelection.configure({bridge:'android-reader',nativeSelectionToken:'menu-anchor-fixture'});</script>" +
+                        "</head><body style='margin:0;height:4000px'>" +
+                        "<p style='position:absolute;margin:0;left:40%;top:55%;writing-mode:vertical-rl;font-size:27px'>" +
+                        "<ruby><span id='selected'>読</span><rt>どく</rt></ruby><span id='other'>書</span></p></body></html>",
+                    "text/html", "utf-8", null)
+            }
+            assertTrue(loaded.await(15, TimeUnit.SECONDS))
+            val expected = JSONObject(evaluate(webView, """
+                (()=>{const r=document.createRange();r.selectNodeContents(document.getElementById('selected'));
+                  getSelection().removeAllRanges();getSelection().addRange(r);
+                  return {rect:r.getBoundingClientRect().toJSON(),width:innerWidth};})()
+            """.trimIndent()))
+            val scale = webView.width / expected.getDouble("width")
+            val selected = expected.getJSONObject("rect")
+            val storedRect = HoshiReaderWebView::class.java.getDeclaredField("nativeSelectionContentRect")
+                .apply { isAccessible = true }
+            fun currentRect(): Rect? {
+                var rect: Rect? = null
+                instrumentation.runOnMainSync { rect = (storedRect.get(webView) as? Rect)?.let(::Rect) }
+                return rect
+            }
+            for (nativeRect in listOf(Rect(), Rect(-100, -100, -50, -50), Rect(50, 80, 120, 160))) {
+                lateinit var mode: ActionMode
+                instrumentation.runOnMainSync {
+                    mode = webView.startActionMode(object : ActionMode.Callback2() {
+                        override fun onCreateActionMode(mode: ActionMode, menu: Menu) = true
+                        override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
+                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem) = false
+                        override fun onDestroyActionMode(mode: ActionMode) = Unit
+                        override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
+                            outRect.set(nativeRect)
+                        }
+                    }, ActionMode.TYPE_FLOATING)!!
+                }
+                if (nativeRect.isEmpty || nativeRect.bottom < 0) {
+                    composeRule.waitUntil("Menu is anchored beside the selected text", 3000) {
+                        val rect = currentRect()
+                        rect != null && !rect.isEmpty &&
+                            kotlin.math.abs(rect.top - selected.getDouble("top") * scale) < 2 &&
+                            kotlin.math.abs(rect.left - selected.getDouble("left") * scale) < 2
+                    }
+                    val actual = currentRect()!!
+                    assertEquals(selected.getDouble("left") * scale, actual.left.toDouble(), 2.0)
+                    assertEquals(selected.getDouble("bottom") * scale, actual.bottom.toDouble(), 2.0)
+                    val fallbackField = HoshiReaderWebView::class.java.getDeclaredField("nativeSelectionFallbackRect")
+                        .apply { isAccessible = true }
+                    if (nativeRect.isEmpty) {
+                        evaluate(webView, """
+                            (()=>{const r=document.createRange();r.selectNodeContents(document.getElementById('other'));
+                              getSelection().removeAllRanges();getSelection().addRange(r);return true;})()
+                        """.trimIndent())
+                    } else {
+                        evaluate(webView, "scrollTo(0,innerHeight);true")
+                        assertTrue("Fixture scrolls the selection out of view",
+                            evaluate(webView, "scrollY").toDouble() > 0)
+                    }
+                    composeRule.waitUntil("Moving selection or scrolling expires the anchor: $nativeRect", 3000) {
+                        var cleared = false
+                        instrumentation.runOnMainSync { cleared = fallbackField.get(webView) == null }
+                        cleared
+                    }
+                    composeRule.waitUntil("The menu itself stops using the old visible anchor", 3000) {
+                        currentRect() == nativeRect
+                    }
+                } else {
+                    assertEquals("Valid platform coordinates stay authoritative", nativeRect, currentRect())
+                }
+                instrumentation.runOnMainSync { mode.finish() }
+                evaluate(webView, """
+                    (()=>{scrollTo(0,0);const r=document.createRange();
+                      r.selectNodeContents(document.getElementById('selected'));
+                      getSelection().removeAllRanges();getSelection().addRange(r);return true;})()
+                """.trimIndent())
+                instrumentation.waitForIdleSync()
+            }
         } finally {
             instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
         }

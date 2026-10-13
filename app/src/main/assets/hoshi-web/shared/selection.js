@@ -877,6 +877,37 @@ window.hoshiSelection = {
         return count;
     },
 
+    nativeMenuAnchorRequest: null,
+
+    invalidateNativeMenuAnchor() {
+        const request = this.nativeMenuAnchorRequest;
+        if (request == null) return;
+        this.nativeMenuAnchorRequest = null;
+        window.HoshiNativeSelection?.invalidateMenuAnchor(request, this.options.nativeSelectionToken);
+    },
+
+    nativeSelectionMenuRect(request) {
+        this.nativeMenuAnchorRequest = request ?? null;
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || !selection.rangeCount || !selection.toString()) return null;
+        // Read only when Android receives an unusable native menu anchor, never
+        // while tracking selection handles. Clip each fragment before unioning.
+        let bounds = null;
+        for (const rect of selection.getRangeAt(0).getClientRects()) {
+            const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
+            const right = Math.min(innerWidth, rect.right), bottom = Math.min(innerHeight, rect.bottom);
+            if (right <= left || bottom <= top) continue;
+            if (!bounds) bounds = { left, top, right, bottom, viewportWidth: innerWidth };
+            else {
+                bounds.left = Math.min(bounds.left, left);
+                bounds.top = Math.min(bounds.top, top);
+                bounds.right = Math.max(bounds.right, right);
+                bounds.bottom = Math.max(bounds.bottom, bottom);
+            }
+        }
+        return bounds;
+    },
+
     nativeSelectionContext() {
         const selection = window.getSelection();
         if (!selection || !selection.rangeCount) return null;
@@ -914,7 +945,10 @@ window.hoshiSelection = {
 };
 
 let lastHasSelection = false;
+document.addEventListener('scroll', () => window.hoshiSelection.invalidateNativeMenuAnchor(), true);
+window.addEventListener?.('resize', () => window.hoshiSelection.invalidateNativeMenuAnchor());
 document.addEventListener('selectionchange', () => {
+    window.hoshiSelection.invalidateNativeMenuAnchor();
     const s = getSelection();
     const hasSelection = !!s && !s.isCollapsed;
     if (hasSelection === lastHasSelection) return;

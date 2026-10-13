@@ -83,6 +83,8 @@ function loadSelection(text) {
 
     vm.runInNewContext(selectionSource(), {
         CSS: {},
+        innerWidth: 400,
+        innerHeight: 800,
         document,
         getSelection() {
             return nativeSelection;
@@ -94,6 +96,7 @@ function loadSelection(text) {
 
     return {
         document,
+        dispatchDocumentEvent(name) { listeners[name]?.(); },
         changeNativeSelection(value) {
             nativeSelection = value;
             listeners.selectionchange();
@@ -837,4 +840,61 @@ test('selection notifications preserve the WebKit bridge outside the Android rea
     changeNativeSelection({ isCollapsed: false });
     changeNativeSelection(null);
     assert.deepEqual(events, [true, false]);
+});
+
+
+test('native menu anchor includes only visible selection fragments without changing selection', () => {
+    const { selection, window } = loadSelection('読書');
+    let rects = [
+        { left: 30, top: -200, right: 80, bottom: -100 },
+        { left: 420, top: 50, right: 450, bottom: 60 },
+        { left: 280, top: 590, right: 320, bottom: 640 },
+        { left: 280, top: 640, right: 320, bottom: 830 },
+    ];
+    const native = {
+        isCollapsed: false, rangeCount: 1, toString: () => '読書',
+        getRangeAt: () => ({ getClientRects: () => rects }),
+    };
+    window.getSelection = () => native;
+    assert.deepEqual(JSON.parse(JSON.stringify(selection.nativeSelectionMenuRect())),
+        { left: 280, top: 590, right: 320, bottom: 800, viewportWidth: 400 });
+    rects = rects.slice(0, 2);
+    assert.equal(selection.nativeSelectionMenuRect(), null);
+    native.isCollapsed = true;
+    native.getRangeAt = () => assert.fail('Collapsed selection needs no geometry read');
+    assert.equal(selection.nativeSelectionMenuRect(), null);
+    native.isCollapsed = false;
+    native.toString = () => '';
+    assert.equal(selection.nativeSelectionMenuRect(), null);
+});
+
+
+test('native menu measurement is invalidated once by selection or scroll without reading layout', () => {
+    const { selection, window, changeNativeSelection, dispatchDocumentEvent } = loadSelection('読書');
+    const events = [];
+    let reads = 0;
+    const native = {
+        isCollapsed: false, rangeCount: 1, toString: () => '読書',
+        getRangeAt: () => ({ getClientRects: () => {
+            reads++;
+            return [{ left: 20, top: 50, right: 40, bottom: 90 }];
+        }}),
+    };
+    window.getSelection = () => native;
+    selection.configure({ bridge: 'android-reader', nativeSelectionToken: 'chapter-a' });
+    window.HoshiNativeSelection = {
+        postMessage() {},
+        invalidateMenuAnchor: (id, token) => events.push([id, token]),
+    };
+    selection.nativeSelectionMenuRect(1);
+    changeNativeSelection(native);
+    changeNativeSelection(native);
+    dispatchDocumentEvent('scroll');
+    assert.deepEqual(events, [[1, 'chapter-a']]);
+    assert.equal(reads, 1, 'Invalidation never reads layout');
+    selection.nativeSelectionMenuRect(2);
+    dispatchDocumentEvent('scroll');
+    dispatchDocumentEvent('scroll');
+    assert.deepEqual(events, [[1, 'chapter-a'], [2, 'chapter-a']]);
+    assert.equal(reads, 2);
 });
