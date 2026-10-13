@@ -328,7 +328,7 @@ internal fun ChapterWebView(
                 }
             }
             fun shouldIgnoreReaderGestureEvent(event: MotionEvent): Boolean {
-                if (currentIsWebViewRestoring.value || webView.isNativeSelectionActionModeActive()) {
+                if (currentIsWebViewRestoring.value || webView.isNativeSelectionActive()) {
                     return true
                 }
                 val density = webView.resources.displayMetrics.density
@@ -480,7 +480,7 @@ internal fun ChapterWebView(
                     currentOnRestoreStarted.value()
                     return@AndroidView
                 }
-                webView.tag = restoreToken
+                webView.prepareForDocument(restoreToken)
                 webView.hideForReaderRestore()
                 webView.webViewClient = EpubWebViewClient(
                     book = book,
@@ -600,7 +600,7 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
 internal fun WebView.readerNativeSelectionState(): StateFlow<Boolean>? =
     (this as? HoshiReaderWebView)?.nativeSelectionState
 
-private class HoshiReaderWebView(context: Context) : WebView(context) {
+internal class HoshiReaderWebView(context: Context) : WebView(context) {
     var isReleased = false
         private set
 
@@ -620,7 +620,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
             onTtsReplacementSelected(selection)
         }
     }
-    private var nativeSelectionActionModeActive = false
+    private var documentHasSelection = false
     private val nativeSelectionActivity = MutableStateFlow(false)
     val nativeSelectionState: StateFlow<Boolean> get() = nativeSelectionActivity
     private var nativeSelectionActionMode: ActionMode? = null
@@ -628,11 +628,39 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     private var highlightColorPopup: PopupWindow? = null
     private var selectionHighlightPending = false
 
-    fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
+    init {
+        addJavascriptInterface(object {
+            @JavascriptInterface
+            fun postMessage(active: Boolean, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken) {
+                        documentHasSelection = active
+                        updateNativeSelectionActivity()
+                    }
+                }
+            }
+        }, "HoshiNativeSelection")
+    }
+
+    fun isNativeSelectionActive(): Boolean = nativeSelectionActivity.value
+
+    fun prepareForDocument(restoreToken: String) {
+        tag = restoreToken
+        clearNativeSelectionState()
+    }
+
+    private fun clearNativeSelectionState() {
+        documentHasSelection = false
+        selectionHighlightPending = false
+        nativeSelectionActionMode?.finish()
+        setNativeSelectionActionMode(null)
+    }
+
+    fun clearNativeSelectionActionMode(mode: ActionMode) {
+        if (nativeSelectionActionMode === mode) setNativeSelectionActionMode(null)
+    }
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
-        nativeSelectionActionModeActive = mode != null
-        evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
         if (mode == null) {
             nativeSelectionContentRect = null
             dismissHighlightColorPopup()
@@ -642,7 +670,7 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     private fun updateNativeSelectionActivity() {
         nativeSelectionActivity.value =
-            nativeSelectionActionModeActive || selectionHighlightPending || highlightColorPopup != null
+            documentHasSelection || nativeSelectionActionMode != null || selectionHighlightPending || highlightColorPopup != null
     }
 
     fun setNativeSelectionContentRect(rect: Rect) {
@@ -782,10 +810,8 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     fun releaseForDestroy() {
         isReleased = true
-        selectionHighlightPending = false
-        nativeSelectionActionMode?.finish()
-        dismissHighlightColorPopup()
-        setNativeSelectionActionMode(null)
+        removeJavascriptInterface("HoshiNativeSelection")
+        clearNativeSelectionState()
         onTtsReplacementSelected = {}
         onHighlightChanged = { _, _, _ -> }
     }
@@ -828,7 +854,7 @@ private class ReaderHighlightActionModeCallback(
     }
 
     override fun onDestroyActionMode(mode: ActionMode) {
-        webView.setNativeSelectionActionMode(null)
+        webView.clearNativeSelectionActionMode(mode)
         delegate.onDestroyActionMode(mode)
     }
 
@@ -953,6 +979,7 @@ private fun readerSetupScript(
           $selectionScript
           window.hoshiSelection.configure({
             bridge: 'android-reader',
+            nativeSelectionToken: ${readerJavaScriptStringLiteral(restoreToken)},
             language: $selectionLanguageId,
             linkTapResult: 'link',
             imageTapResult: 'image',
@@ -1104,7 +1131,7 @@ internal fun WebView.navigatePage(
                     },
                 )
             }
-            ReaderNavigationResult.Revealed -> {
+            ReaderNavigationResult.Revealed, ReaderNavigationResult.Blocked -> {
                 readerPageTurnProgressRequestIds.remove(this)
             }
             ReaderNavigationResult.Limit -> {

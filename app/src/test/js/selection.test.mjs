@@ -18,6 +18,8 @@ function selectionSource() {
 }
 
 function loadSelection(text) {
+    let nativeSelection = null;
+    const listeners = {};
     const textNode = {
         nodeType: 3,
         textContent: text,
@@ -71,7 +73,7 @@ function loadSelection(text) {
         elementFromPoint() {
             return this.pointElement;
         },
-        addEventListener() {},
+        addEventListener(name, listener) { listeners[name] = listener; },
     };
     const window = {
         getComputedStyle() {
@@ -83,7 +85,7 @@ function loadSelection(text) {
         CSS: {},
         document,
         getSelection() {
-            return null;
+            return nativeSelection;
         },
         Node: { TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
@@ -92,6 +94,10 @@ function loadSelection(text) {
 
     return {
         document,
+        changeNativeSelection(value) {
+            nativeSelection = value;
+            listeners.selectionchange();
+        },
         selection: window.hoshiSelection,
         textNode,
         window,
@@ -805,4 +811,30 @@ test('native pronunciation selection uses full source sentence and excludes ruby
     assert.equal(result.text, '東京');
     assert.equal(result.sentence, '東京へ行きました。');
     assert.equal(result.normalizedOffset, 42);
+});
+
+
+test('native selection locks the reader before notifying Android, independent of menu visibility', () => {
+    const { selection, window, changeNativeSelection } = loadSelection('本文');
+    const events = [];
+    selection.configure({ bridge: 'android-reader', nativeSelectionToken: 'chapter-a' });
+    window.hoshiReader = { setNativeSelectionActive: active => events.push(['lock', active]) };
+    window.HoshiNativeSelection = { postMessage: (active, token) => events.push(['android', active, token]) };
+    changeNativeSelection({ isCollapsed: false });
+    changeNativeSelection({ isCollapsed: false });
+    changeNativeSelection({ isCollapsed: true });
+    assert.deepEqual(events, [
+        ['lock', true], ['android', true, 'chapter-a'],
+        ['lock', false], ['android', false, 'chapter-a'],
+    ]);
+});
+
+test('selection notifications preserve the WebKit bridge outside the Android reader', () => {
+    const { window, changeNativeSelection } = loadSelection('本文');
+    const events = [];
+    window.webkit = { messageHandlers: { selectionState: { postMessage: active => events.push(active) } } };
+    window.HoshiNativeSelection = { postMessage: () => assert.fail('Popup selection must not lock the reader') };
+    changeNativeSelection({ isCollapsed: false });
+    changeNativeSelection(null);
+    assert.deepEqual(events, [true, false]);
 });

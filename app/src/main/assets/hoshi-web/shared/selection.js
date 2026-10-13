@@ -919,5 +919,11 @@ document.addEventListener('selectionchange', () => {
     const hasSelection = !!s && !s.isCollapsed;
     if (hasSelection === lastHasSelection) return;
     lastHasSelection = hasSelection;
+    if (window.hoshiSelection.options.bridge === 'android-reader') {
+        // Selection survives native menu dismissal/recreation. Lock locally before
+        // notifying Android so handle autoscroll cannot race the bridge callback.
+        window.hoshiReader?.setNativeSelectionActive?.(hasSelection);
+        window.HoshiNativeSelection?.postMessage(hasSelection, window.hoshiSelection.options.nativeSelectionToken);
+    }
     try { window.webkit?.messageHandlers?.selectionState?.postMessage(hasSelection); } catch {}
 });

@@ -363,6 +363,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   accepts an optional semantic projection; paginated, continuous, and popup use
   the identity live-DOM path, while VN supplies its source/clone projection and
   fails closed when a clone hit cannot be mapped.
+- Reader DOM `selectionchange` owns the selected-text state. It synchronously
+  locks paginated/VN navigation and reports through `HoshiNativeSelection` with
+  the document restore token; Android ignores stale document notifications.
+  Native gesture/narration guards combine this state with the ActionMode and
+  highlight color workflow. Dismissing a menu alone does not clear a surviving
+  selection. Navigation blocked by selection returns `blocked`, never the
+  chapter-boundary `limit` result.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for

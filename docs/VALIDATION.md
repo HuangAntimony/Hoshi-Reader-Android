@@ -166,6 +166,16 @@ node --test app/src/test/js/*.test.mjs
   Selecting only a visible part of a cross-screen highlight creates a separate
   range rather than editing the complete stored range. Preserve device data.
 
+- While selecting text, dismiss/recreate the native menu and drag selection
+  handles near ruby and page edges. Paginated/VN navigation must remain blocked
+  until the selection clears, without crossing a chapter boundary; continuous
+  mode must not treat handle drags as reader gestures. After deselection, normal
+  navigation must resume. `ReaderNativeSelectionStateWebViewTest` uses generated
+  vertical paginated content and a real ActionMode to check surviving selection,
+  browser autoscroll rollback, blocked navigation versus chapter boundaries,
+  and stale document notification rejection. Run it with the data-preserving
+  explicit instrumentation procedure above.
+
 ### Theme
 
 Preserve app data and cover all four tabs, every settings category, native Reader

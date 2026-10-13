@@ -599,7 +599,7 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   },
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
-    if (this.nativeSelectionActive) return "limit";
+    if (this.nativeSelectionActive) return "blocked";
     var context = this.getScrollContext();
     if (context.pageSize <= 0) return "limit";
     var currentScroll = this.getPagePosition(context);

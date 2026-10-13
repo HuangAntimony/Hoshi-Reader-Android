@@ -1947,7 +1947,7 @@ window.hoshiReader = {
   },
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
-    if (this.nativeSelectionActive) return "limit";
+    if (this.nativeSelectionActive) return "blocked";
     if (!this.screens.length) return "limit";
     if (direction === "forward") {
       if (!this.revealComplete) {

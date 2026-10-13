@@ -136,6 +136,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Replace BIZ UDPGothic with BIZ UDGothic in the recommended reader fonts.
 
+### Fixed
+
+- Keep text selection from unexpectedly turning pages or chapters when the
+  native selection menu disappears or is recreated.
+
 ## [v1.4.0] - 2026-09-24
 
 ### Added

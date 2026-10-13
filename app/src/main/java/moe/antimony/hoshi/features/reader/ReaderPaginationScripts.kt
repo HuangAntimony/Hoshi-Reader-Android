@@ -18,6 +18,7 @@ internal enum class ReaderNavigationDirection(val jsValue: String) {
 internal enum class ReaderNavigationResult {
     Advanced,
     Revealed,
+    Blocked,
     Limit,
 }
 
@@ -30,9 +31,6 @@ internal object ReaderPaginationScripts {
 
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
         "window.hoshiReader.paginate('${direction.jsValue}')"
-
-    fun nativeSelectionActiveInvocation(active: Boolean): String =
-        "if (window.hoshiReader && typeof window.hoshiReader.setNativeSelectionActive === 'function') { window.hoshiReader.setNativeSelectionActive($active); }"
 
     fun progressInvocation(): String =
         "window.hoshiReader.calculateProgress()"
@@ -62,6 +60,7 @@ internal object ReaderPaginationScripts {
         when (result?.trim()?.trim('"')) {
             "scrolled" -> ReaderNavigationResult.Advanced
             "revealed" -> ReaderNavigationResult.Revealed
+            "blocked" -> ReaderNavigationResult.Blocked
             else -> ReaderNavigationResult.Limit
         }
 

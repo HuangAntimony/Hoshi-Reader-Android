@@ -43,6 +43,7 @@ class ReaderPaginationScriptsTest {
 
         assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("\"scrolled\""))
         assertEquals(ReaderNavigationResult.Revealed, ReaderPaginationScripts.navigationResult("\"revealed\""))
+        assertEquals(ReaderNavigationResult.Blocked, ReaderPaginationScripts.navigationResult("\"blocked\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult("\"limit\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult(null))
     }
