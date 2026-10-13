@@ -19,15 +19,22 @@ window.hoshiHighlights = {
       this.pendingRange = null;
       return null;
     }
-    var startBase = window.hoshiReader.nodeStartOffsets.get(range.startContainer);
-    var rawStartBase = window.hoshiReader.nodeStartRawOffsets.get(range.startContainer);
-    var rawEndBase = window.hoshiReader.nodeStartRawOffsets.get(range.endContainer);
+    var segments = window.hoshiReaderDomText.selectedTextSegments(range);
+    if (!segments.length) {
+      this.pendingRange = null;
+      return null;
+    }
+    var first = segments[0];
+    var last = segments[segments.length - 1];
+    var startBase = window.hoshiReader.nodeStartOffsets.get(first.node);
+    var rawStartBase = window.hoshiReader.nodeStartRawOffsets.get(first.node);
+    var rawEndBase = window.hoshiReader.nodeStartRawOffsets.get(last.node);
     if (startBase === undefined || rawStartBase === undefined || rawEndBase === undefined) {
       this.pendingRange = null;
       return null;
     }
-    var startPrefix = range.startContainer.textContent.substring(0, range.startOffset);
-    var endPrefix = range.endContainer.textContent.substring(0, range.endOffset);
+    var startPrefix = first.node.textContent.substring(0, first.start);
+    var endPrefix = last.node.textContent.substring(0, last.end);
     var start = startBase + window.hoshiReader.countChars(startPrefix);
     var rawStart = rawStartBase + window.hoshiReader.countRawChars(startPrefix);
     var rawEnd = rawEndBase + window.hoshiReader.countRawChars(endPrefix);

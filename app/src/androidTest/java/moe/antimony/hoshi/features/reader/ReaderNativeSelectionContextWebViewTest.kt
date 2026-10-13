@@ -44,6 +44,7 @@ class ReaderNativeSelectionContextWebViewTest {
                     ${assets.selectionJapaneseJs}
                     ${assets.selectionJs}
                     ${assets.readerTextSemanticsJs}
+                    ${assets.readerDomTextJs}
                     ${assets.readerVnContentStreamJs}
                     ${assets.readerVnRangeMapJs}
                     ${assets.readerVnSelectionProjectionJs}</script></head><body>

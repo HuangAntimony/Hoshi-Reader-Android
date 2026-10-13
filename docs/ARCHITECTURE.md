@@ -293,6 +293,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Reader highlights keep plain text/raw offsets for positioning and optional
   iOS-compatible `textFurigana` for Contents display. The shared highlight asset
   owns exact-range identity and returns explicit create/recolor/remove results;
+  it reads the first/last selected body slices through
+  `reader-dom-text.js`'s `selectedTextSegments`, shared with native replacement
+  context. Annotation and element endpoints never become highlight offsets;
+  picker snapshots preserve the original native range until a color is chosen.
   Kotlin preserves record identity and creation time on edits through the
   existing sidecar repository. VN extracts highlight text/readings from its
   content stream and uses the range map only for screen projection. Batch
@@ -369,7 +373,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   the identity live-DOM path, while VN supplies its source/clone projection and
   fails closed when a clone hit cannot be mapped.
   Native selection context reads only selected body-text slices using the shared
-  ruby-filtered walker. Its first nonempty slice supplies the semantic source hit,
+  DOM text range extractor. Its first nonempty slice supplies the semantic source hit,
   even when the native range begins inside `rt/rp` or at a text/element end.
   Annotation-only ranges return no context; reading never changes native endpoints.
 - Reader DOM `selectionchange` owns the selected-text state. It synchronously

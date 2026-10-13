@@ -13,6 +13,7 @@ function selectionSource() {
         japaneseLanguageUrl,
         japaneseSelectionUrl,
         englishSelectionUrl,
+        new URL('../../main/assets/hoshi-web/reader/reader-dom-text.js', import.meta.url),
         sharedSelectionUrl,
     ].map((url) => fs.readFileSync(url, 'utf8')).join('\n');
 }

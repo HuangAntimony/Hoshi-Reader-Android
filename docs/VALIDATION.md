@@ -167,6 +167,14 @@ node --test app/src/test/js/*.test.mjs
   range rather than editing the complete stored range. Preserve device data.
 
 - While selecting text, dismiss/recreate the native menu and drag selection
+  handles into ruby annotations, then choose Highlight and a color. The body text
+  must be marked without annotations; selecting the same range must recolor/remove
+  the original mark. `ReaderNativeHighlightWebViewTest` covers picker range retention,
+  annotation/element endpoints and forward/backward selections in all six reader
+  mode/writing-direction combinations, using isolated HTML with no sidecar writes.
+  Run it using the data-preserving explicit instrumentation procedure above.
+
+- While selecting text, dismiss/recreate the native menu and drag selection
   handles near ruby and page edges. Paginated/VN navigation must remain blocked
   until the selection clears, without crossing a chapter boundary; continuous
   mode must not treat handle drags as reader gestures. After deselection, normal

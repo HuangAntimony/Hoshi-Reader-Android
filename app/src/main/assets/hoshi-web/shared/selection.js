@@ -955,34 +955,16 @@ window.hoshiSelection = {
         if (!selection || !selection.rangeCount) return null;
         const range = selection.getRangeAt(0);
         if (range.collapsed) return null;
-        // Native handles can start inside rt/rp. Read selected body text without
-        // moving the native range, and derive source context from its first character.
-        const walker = this.createWalker(range.commonAncestorContainer);
-        walker.currentNode = range.startContainer;
-        let node = range.startContainer.nodeType === Node.TEXT_NODE
-            ? range.startContainer : walker.nextNode();
-        let first = null;
-        const parts = [];
-        while (node) {
-            if (range.comparePoint(node, 0) > 0) break;
-            if (!this.isFurigana(node) && range.intersectsNode(node)) {
-                const start = node === range.startContainer ? range.startOffset : 0;
-                const end = node === range.endContainer ? range.endOffset : node.textContent.length;
-                if (end > start) {
-                    first ??= { node, offset: start };
-                    parts.push(node.textContent.slice(start, end));
-                }
-            }
-            node = walker.nextNode();
-        }
-        if (!first) return null;
+        const segments = window.hoshiReaderDomText.selectedTextSegments(range);
+        if (!segments.length) return null;
+        const first = { node: segments[0].node, offset: segments[0].start };
         const projection = this.options.textProjection;
         const hit = projection ? projection.toSemanticHit?.(first) : first;
         if (!hit) return null;
         const context = this.getSentenceContext(hit.node, hit.offset);
         const rect = range.getBoundingClientRect();
         return {
-            text: parts.join(''),
+            text: segments.map(({ node, start, end }) => node.textContent.slice(start, end)).join(''),
             sentence: context.sentence,
             sentenceOffset: context.sentenceOffset,
             normalizedOffset: projection ? projection.normalizedOffsetForHit?.(hit) : this.getNormalizedOffset(hit.node, hit.offset),

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { TextRangeFixture } from './dom-range-fixture.mjs';
 
 const readerPaginatedUrl = new URL('../../main/assets/hoshi-web/reader/reader-paginated.js', import.meta.url);
 const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-continuous.js', import.meta.url);
@@ -266,8 +267,9 @@ class TestFragment extends TestNode {
     }
 }
 
-class TestRange {
+class TestRange extends TextRangeFixture {
     constructor() {
+        super();
         this.node = null;
         this.startNode = null;
         this.startOffset = 0;
@@ -447,11 +449,11 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
                 node.childNodes?.forEach(visit);
             };
             visit(root);
-            let index = 0;
+            let index = -1;
             return {
-                nextNode() {
-                    return nodes[index++] ?? null;
-                },
+                get currentNode() { return nodes[index] ?? root; },
+                set currentNode(node) { index = nodes.indexOf(node); },
+                nextNode() { return nodes[++index] ?? null; },
             };
         },
         querySelector(selector) {
@@ -1483,6 +1485,39 @@ test('Sasayaki includes ruby base punctuation without reading annotation text or
 
 
 for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${sourceUrl.pathname.split('/').pop()} highlights body text when a saved selection starts or ends inside ruby`, () => {
+        for (const annotationAtStart of [true, false]) {
+            const body = new TestElement('body');
+            body.appendChild(new TestText('前'));
+            const ruby = new TestElement('ruby');
+            const first = new TestText('瑞');
+            const rt = new TestElement('rt');
+            const reading = new TestText('みず');
+            rt.appendChild(reading);
+            const second = new TestText('々');
+            ruby.appendChild(first); ruby.appendChild(rt); ruby.appendChild(second);
+            body.appendChild(ruby);
+            const { reader, window, document } = loadReader(body, sourceUrl, {
+                highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+            });
+            reader.buildNodeOffsets();
+            const range = document.createRange();
+            range.setStart(annotationAtStart ? reading : first, 0);
+            range.setEnd(annotationAtStart ? second : reading, annotationAtStart ? 1 : 2);
+            window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => range });
+            const highlights = window.hoshiHighlights;
+            assert.equal(highlights.prepareHighlightSelection(), true);
+            window.getSelection = () => null;
+            const result = highlights.createHighlight('yellow', 'ruby-boundary');
+            assert.equal(result?.action, 'created');
+            assert.equal(result.text, annotationAtStart ? '々' : '瑞');
+            assert.equal(result.offset, annotationAtStart ? 2 : 1);
+            assert.equal(result.start, annotationAtStart ? 2 : 1);
+            assert.equal(highlights.highlights.get('ruby-boundary').wrappers.map(node => node.textContent).join(''), result.text);
+            assert.equal(reading.textContent, 'みず');
+        }
+    });
+
     test(`${sourceUrl.pathname.split('/').pop()} persists ruby and edits exact raw ranges through pending selection`, () => {
         const body = new TestElement('body');
         body.appendChild(new TestText('あ 、𠮟'));
