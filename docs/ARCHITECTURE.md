@@ -368,6 +368,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   accepts an optional semantic projection; paginated, continuous, and popup use
   the identity live-DOM path, while VN supplies its source/clone projection and
   fails closed when a clone hit cannot be mapped.
+  Native selection context reads only selected body-text slices using the shared
+  ruby-filtered walker. Its first nonempty slice supplies the semantic source hit,
+  even when the native range begins inside `rt/rp` or at a text/element end.
+  Annotation-only ranges return no context; reading never changes native endpoints.
 - Reader DOM `selectionchange` owns the selected-text state. It synchronously
   locks paginated/VN navigation and reports through `HoshiNativeSelection` with
   the document restore token; Android ignores stale document notifications.

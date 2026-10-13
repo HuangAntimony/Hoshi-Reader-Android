@@ -121,6 +121,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   defaults new entries to all books, with a theme-colored selected scope and stable centered labels,
   and a full-width theme-colored preview button, with
   a destructive Delete action aligned beside Cancel and Save when editing an entry.
+  Replace also opens when a ruby-adjacent selection begins inside an annotation,
+  using only selected body text and preserving native selection handles.
   Text-selection creation previews the full original sentence; both fields request
   Japanese keyboard input; the replacement field offers Done to dismiss the keyboard
   before saving.

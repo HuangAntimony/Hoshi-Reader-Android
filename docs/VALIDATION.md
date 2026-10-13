@@ -1292,7 +1292,13 @@ Validate relevant sync/update/Sasayaki changes with:
   cover these boundaries; `TtsPanelStateTest` covers the actual Settings switch and reopening.
 - Long-press book text and choose Replace beside Highlight: prefill the selected original and
   empty replacement text, and preview the full source sentence including ruby and VN
-  text outside the screen. Check the dialog title identifies TTS, the equal-width
+  text outside the screen. Include a selection starting inside ruby annotation and ending
+  in the following base text (for example, only `々` in `瑞々`): Replace must open and
+  exclude annotations. `ReaderNativeSelectionContextWebViewTest` exercises real DOM
+  ranges and VN source projection in both writing directions, forward/backward selections,
+  text/element end boundaries, annotation-only ranges and emoji, checking unchanged native
+  endpoints. Run it with the data-preserving explicit instrumentation procedure above.
+  Check the dialog title identifies TTS, the equal-width
   scope selector beside its label, compact rule/regex row, and full-width themed secondary
   preview button (including its busy state),
   in both languages and light/dark/e-ink themes. Cancel without saving. With a multilingual IME, start in another input

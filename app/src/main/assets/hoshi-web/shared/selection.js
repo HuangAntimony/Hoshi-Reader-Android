@@ -955,23 +955,34 @@ window.hoshiSelection = {
         if (!selection || !selection.rangeCount) return null;
         const range = selection.getRangeAt(0);
         if (range.collapsed) return null;
-        let node = range.startContainer;
-        let offset = range.startOffset;
-        if (node.nodeType !== Node.TEXT_NODE) {
-            node = node.childNodes[offset];
-            while (node && node.nodeType !== Node.TEXT_NODE) node = node.firstChild;
-            offset = 0;
+        // Native handles can start inside rt/rp. Read selected body text without
+        // moving the native range, and derive source context from its first character.
+        const walker = this.createWalker(range.commonAncestorContainer);
+        walker.currentNode = range.startContainer;
+        let node = range.startContainer.nodeType === Node.TEXT_NODE
+            ? range.startContainer : walker.nextNode();
+        let first = null;
+        const parts = [];
+        while (node) {
+            if (range.comparePoint(node, 0) > 0) break;
+            if (!this.isFurigana(node) && range.intersectsNode(node)) {
+                const start = node === range.startContainer ? range.startOffset : 0;
+                const end = node === range.endContainer ? range.endOffset : node.textContent.length;
+                if (end > start) {
+                    first ??= { node, offset: start };
+                    parts.push(node.textContent.slice(start, end));
+                }
+            }
+            node = walker.nextNode();
         }
-        if (!node) return null;
+        if (!first) return null;
         const projection = this.options.textProjection;
-        const hit = projection ? projection.toSemanticHit?.({ node, offset }) : { node, offset };
+        const hit = projection ? projection.toSemanticHit?.(first) : first;
         if (!hit) return null;
-        const fragment = range.cloneContents();
-        fragment.querySelectorAll('rt, rp').forEach(element => element.remove());
         const context = this.getSentenceContext(hit.node, hit.offset);
         const rect = range.getBoundingClientRect();
         return {
-            text: fragment.textContent,
+            text: parts.join(''),
             sentence: context.sentence,
             sentenceOffset: context.sentenceOffset,
             normalizedOffset: projection ? projection.normalizedOffsetForHit?.(hit) : this.getNormalizedOffset(hit.node, hit.offset),

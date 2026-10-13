@@ -804,10 +804,10 @@ test('native pronunciation selection uses full source sentence and excludes ruby
         toSemanticHit: () => source,
         normalizedOffsetForHit: () => 42,
     }});
-    const fragment = { textContent: '東京', querySelectorAll: () => [] };
     window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => ({
         collapsed: false, startContainer: textNode, startOffset: 0,
-        cloneContents: () => fragment,
+        endContainer: textNode, endOffset: 2, commonAncestorContainer: textNode,
+        comparePoint: () => 0, intersectsNode: node => node === textNode,
         getBoundingClientRect: () => ({ x: 0, y: 0, width: 10, height: 20 }),
     }) });
     const result = selection.nativeSelectionContext();
