@@ -878,8 +878,50 @@ window.hoshiSelection = {
     },
 
     nativeMenuAnchorRequest: null,
+    nativeMenuRecovery: null,
+    nativeMenuRecoverySequence: 0,
+
+    recoverNativeSelectionMenu(event) {
+        const bridge = window.HoshiNativeSelection;
+        if (this.options.bridge !== 'android-reader' || !bridge?.recoverMenu ||
+            !event.isTrusted || event.button === 2) return;
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed || !selection.rangeCount || !selection.toString()) return;
+        const range = selection.getRangeAt(0);
+        const selectedCaretAt = (x, y) => {
+            const caret = document.caretRangeFromPoint(x, y);
+            return caret && !caret.startContainer.parentElement?.closest('rt, rp') &&
+                range.comparePoint(caret.startContainer, caret.startOffset) === 0;
+        };
+        if (event.clientX >= 0 && event.clientX < innerWidth &&
+            event.clientY >= 0 && event.clientY < innerHeight &&
+            selectedCaretAt(event.clientX, event.clientY)) return;
+        // Chromium can use a previous column's caret coordinates after a handle
+        // drag. Recover only at a visible point verified to belong to this range.
+        for (const rect of range.getClientRects()) {
+            const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
+            const right = Math.min(innerWidth, rect.right), bottom = Math.min(innerHeight, rect.bottom);
+            if (right <= left || bottom <= top) continue;
+            const x = (left + right) / 2, y = (top + bottom) / 2;
+            if (!selectedCaretAt(x, y)) continue;
+            const id = ++this.nativeMenuRecoverySequence;
+            this.nativeMenuRecovery = { id, point: { x, y, viewportWidth: innerWidth } };
+            event.preventDefault();
+            bridge.recoverMenu(id, this.options.nativeSelectionToken);
+            return;
+        }
+    },
+
+    takeNativeMenuRecovery(id, anchorRequest) {
+        if (this.nativeMenuRecovery?.id !== id) return null;
+        this.nativeMenuAnchorRequest = anchorRequest;
+        const point = this.nativeMenuRecovery.point;
+        this.nativeMenuRecovery = null;
+        return point;
+    },
 
     invalidateNativeMenuAnchor() {
+        this.nativeMenuRecovery = null;
         const request = this.nativeMenuAnchorRequest;
         if (request == null) return;
         this.nativeMenuAnchorRequest = null;
@@ -945,6 +987,7 @@ window.hoshiSelection = {
 };
 
 let lastHasSelection = false;
+document.addEventListener('contextmenu', event => window.hoshiSelection.recoverNativeSelectionMenu(event));
 document.addEventListener('scroll', () => window.hoshiSelection.invalidateNativeMenuAnchor(), true);
 window.addEventListener?.('resize', () => window.hoshiSelection.invalidateNativeMenuAnchor());
 document.addEventListener('selectionchange', () => {

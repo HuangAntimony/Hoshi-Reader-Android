@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import android.os.SystemClock
+import android.view.ActionMode
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.webkit.WebView
@@ -15,6 +16,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -59,6 +62,47 @@ class ReaderSelectionViewportWebViewTest {
             assertEquals("No transient expansion into distant text", "", result.getString("escaped"))
             assertEquals("Visible page stays in place", tail.getDouble("top"), result.getDouble("top"), 1.0)
             assertEquals("Logical position stays in place", position, result.getDouble("position"), 1.0)
+        } finally {
+            instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
+        }
+    }
+
+    @Test
+    fun draggingPlainTextInFragmentedParagraphRestoresNativeMenu() {
+        val webView = createWebView()
+        try {
+            loadFixture(webView, vertical = true, plain = true)
+            val tail = JSONObject(evaluate(webView, "document.getElementById('tail').getBoundingClientRect().toJSON()"))
+            val location = IntArray(2)
+            var density = 1f
+            instrumentation.runOnMainSync {
+                webView.getLocationOnScreen(location)
+                density = webView.resources.displayMetrics.density
+            }
+            fun x(value: Double) = location[0] + (value * density).toFloat()
+            fun y(value: Double) = location[1] + (value * density).toFloat()
+            gesture(x(tail.getDouble("x") + tail.getDouble("width") / 2),
+                y(tail.getDouble("y") + tail.getDouble("height") / 2), duration = 900)
+            val modeField = HoshiReaderWebView::class.java.getDeclaredField("nativeSelectionActionMode")
+                .apply { isAccessible = true }
+            fun currentMode(): ActionMode? {
+                var mode: ActionMode? = null
+                instrumentation.runOnMainSync { mode = modeField.get(webView) as? ActionMode }
+                return mode
+            }
+            composeRule.waitUntil(3000) { currentMode() != null }
+            val before = currentMode()
+            val selectedRect = JSONObject(evaluate(webView, "getSelection().getRangeAt(0).getBoundingClientRect().toJSON()"))
+            val handleX = x(selectedRect.getDouble("right") - 6)
+            val startY = y(selectedRect.getDouble("top") + 10)
+            gesture(handleX, startY, handleX, startY - density * 120, 1200)
+            assertTrue("Dragging changes the selection",
+                evaluate(webView, "selectionChanges").toInt() > 3)
+            composeRule.waitUntil("Dragging restores the native menu for the new selection", 3000) {
+                currentMode() != null && currentMode() !== before
+            }
+            assertNotNull(currentMode())
+            assertNotSame(before, currentMode())
         } finally {
             instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
         }
@@ -118,7 +162,7 @@ class ReaderSelectionViewportWebViewTest {
         return webView
     }
 
-    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean) {
+    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val loaded = CountDownLatch(1)
         instrumentation.runOnMainSync {
@@ -142,10 +186,12 @@ class ReaderSelectionViewportWebViewTest {
                     "const s=getSelection();if(s.isCollapsed||!s.rangeCount)return;selectionChanges++;" +
                     "const range=s.getRangeAt(0),text=range.toString();" +
                     "if(range.intersectsNode(document.getElementById('before'))||text.length>24)selectionEscapedPage=text;" +
-                    "});</script></head><body><p id='before'>${"前のページの文章。".repeat(60)}</p>" +
+                    "});</script></head><body>" + (if (plain)
+                        "<p id='before'></p><p>${"あいうえおかきくけこさしすせそ".repeat(45)}<span id='tail'>時間</span>のようだった。</p>"
+                    else "<p id='before'>${"前のページの文章。".repeat(60)}</p>" +
                     "<p style='break-before:column'>${"あいうえおかきくけこさしすせそ".repeat(3)}<ruby>濫<rt>らん</rt></ruby>" +
                     "<ruby><span><span>読</span></span><rt>どく</rt></ruby><span id='tail'>派</span>のようだった。</p>" +
-                    "<p style='break-before:column'>次のページです。</p></body></html>", "text/html", "utf-8", null)
+                    "<p style='break-before:column'>次のページです。</p>") + "</body></html>", "text/html", "utf-8", null)
         }
         assertTrue(loaded.await(15, TimeUnit.SECONDS))
         composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }

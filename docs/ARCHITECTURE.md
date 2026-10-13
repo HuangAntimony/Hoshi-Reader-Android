@@ -385,8 +385,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Android may measure the visible DOM selection once per ActionMode and use its
   clipped fragment bounds. Selection changes, scroll, and resize discard this
   fallback without rereading layout during the gesture; document, mode, and
-  request-generation guards reject stale replies. This only corrects placement
-  of an existing menu and does not create or unhide native menus.
+  request-generation guards reject stale replies. If Chromium sends a trusted
+  touch context-menu request outside the viewport or selected text after a handle drag, shared
+  selection validates a visible point inside the current range. Android consumes
+  that point once and sends secondary-button events through WebView's generic
+  motion path to recreate the native menu without changing the selection.
+  Recovery shares the anchor generation guard; normal/mouse requests are never
+  replayed. Geometry is read only at the menu request, not during handle movement.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for

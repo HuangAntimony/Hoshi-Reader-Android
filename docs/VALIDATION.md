@@ -181,9 +181,15 @@ node --test app/src/test/js/*.test.mjs
   the selection out of view and verify no stale toolbar remains pinned. Run it
   with the data-preserving explicit instrumentation procedure above.
   `ReaderSelectionViewportWebViewTest` also checks native handle drags with
-  narration cues prepared, and
+  narration cues prepared, menu recreation after dragging plain text in a single
+  paragraph spanning pages, and
   immediate scroll prevention, visible/logical position retention, and resumed
-  paging in both writing directions. Repeat real-book ruby handle drags and
+  paging in both writing directions. Verify the visible menu reappears after
+  repeated drags in both plain and ruby-adjacent text, preserves the dragged
+  range, and copies/highlights that range. Existing ActionMode or selected-text
+  state alone does not prove menu visibility. Record the tested WebView version:
+  recovery uses generic secondary-button events, whose zero-actionButton handling
+  differs across Chromium versions. Repeat real-book ruby handle drags and
   inspect recordings frame by frame for unrelated columns becoming selected;
   final scroll position alone cannot validate this. During gesture acceptance,
   do not poll DOM geometry or suspend threads with JDWP method tracing: both

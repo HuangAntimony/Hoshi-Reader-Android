@@ -32,6 +32,10 @@ internal sealed interface ReaderSelectionCommand {
         override val source = "window.hoshiSelection.nativeSelectionMenuRect($request)"
     }
 
+    data class TakeMenuRecovery(val request: Int, val generation: Int) : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.takeNativeMenuRecovery($request, $generation)"
+    }
+
     data object NativeContext : ReaderSelectionCommand {
         override val source = "window.hoshiSelection.nativeSelectionContext()"
     }

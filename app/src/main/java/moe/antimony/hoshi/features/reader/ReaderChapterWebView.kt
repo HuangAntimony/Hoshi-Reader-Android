@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.SystemClock
 import android.view.ActionMode
 import android.view.Gravity
+import android.view.InputDevice
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -643,6 +644,13 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
                 }
             }
             @JavascriptInterface
+            fun recoverMenu(request: Int, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken) recoverNativeSelectionMenu(request, restoreToken)
+                }
+            }
+
+            @JavascriptInterface
             fun invalidateMenuAnchor(request: Int, restoreToken: String) {
                 post {
                     if (!isReleased && tag == restoreToken && request == nativeSelectionAnchorGeneration) {
@@ -716,6 +724,32 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
             if (!fallback.intersect(0, 0, width, height)) return@evaluateJavascript
             nativeSelectionFallbackRect = fallback
             mode.invalidateContentRect()
+        }
+    }
+
+    private fun recoverNativeSelectionMenu(request: Int, documentToken: String) {
+        val mode = nativeSelectionActionMode
+        val generation = nativeSelectionAnchorGeneration
+        evaluateJavascript(ReaderSelectionCommand.TakeMenuRecovery(request, generation).source) { result ->
+            if (tag != documentToken || nativeSelectionActionMode !== mode ||
+                generation != nativeSelectionAnchorGeneration ||
+                !isAttachedToWindow || !hasWindowFocus()) return@evaluateJavascript
+            val point = ReaderNativeSelectionMenuPoint.fromJavascriptResult(result) ?: return@evaluateJavascript
+            val scale = width / point.viewportWidth
+            val x = (point.x * scale).toFloat()
+            val y = (point.y * scale).toFloat()
+            if (x !in 0f..<width.toFloat() || y !in 0f..<height.toFloat()) return@evaluateJavascript
+            // Re-enter WebView's normal context-menu path at the selected text.
+            // Button events bypass reader touch gestures and preserve the range.
+            val now = SystemClock.uptimeMillis()
+            for (action in listOf(MotionEvent.ACTION_BUTTON_PRESS, MotionEvent.ACTION_BUTTON_RELEASE)) {
+                val event = MotionEvent.obtain(now, now, action, 1,
+                    arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_MOUSE }),
+                    arrayOf(MotionEvent.PointerCoords().apply { this.x = x; this.y = y }),
+                    0, if (action == MotionEvent.ACTION_BUTTON_PRESS) MotionEvent.BUTTON_SECONDARY else 0,
+                    1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
+                try { super.onGenericMotionEvent(event) } finally { event.recycle() }
+            }
         }
     }
 

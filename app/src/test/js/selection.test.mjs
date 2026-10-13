@@ -96,7 +96,7 @@ function loadSelection(text) {
 
     return {
         document,
-        dispatchDocumentEvent(name) { listeners[name]?.(); },
+        dispatchDocumentEvent(name, event) { listeners[name]?.(event); },
         changeNativeSelection(value) {
             nativeSelection = value;
             listeners.selectionchange();
@@ -897,4 +897,62 @@ test('native menu measurement is invalidated once by selection or scroll without
     dispatchDocumentEvent('scroll');
     assert.deepEqual(events, [[1, 'chapter-a'], [2, 'chapter-a']]);
     assert.equal(reads, 2);
+});
+
+
+test('invalid touch menu requests recover once at a visible selected character', () => {
+    const { selection, window, document, dispatchDocumentEvent, changeNativeSelection } = loadSelection('読書');
+    const calls = [];
+    const invalidations = [];
+    const textNode = { nodeType: 3 };
+    const range = {
+        getClientRects: () => [{left:20,top:40,right:40,bottom:80}],
+        comparePoint: (node) => node === textNode ? 0 : 1,
+    };
+    const native = { isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range };
+    window.getSelection = () => native;
+    document.caretRangeFromPoint = () => ({startContainer:textNode,startOffset:0});
+    selection.configure({bridge:'android-reader',nativeSelectionToken:'chapter'});
+    window.HoshiNativeSelection = {
+        postMessage(){}, recoverMenu:(id,token)=>calls.push([id,token]),
+        invalidateMenuAnchor:(id,token)=>invalidations.push([id,token]),
+    };
+    const event = (overrides={}) => ({isTrusted:true,button:0,clientX:30,clientY:-400,preventDefault(){this.prevented=true;},...overrides});
+    dispatchDocumentEvent('contextmenu', event({clientY:50}));
+    dispatchDocumentEvent('contextmenu', event({isTrusted:false}));
+    dispatchDocumentEvent('contextmenu', event({button:2}));
+    assert.equal(calls.length,0,'Normal, script, and mouse menus are not replayed');
+    const broken = event();
+    dispatchDocumentEvent('contextmenu',broken);
+    assert.equal(broken.prevented,true);
+    assert.equal(calls.length,1);
+    assert.equal(calls[0][1],'chapter');
+    assert.equal(selection.takeNativeMenuRecovery(calls[0][0]+1),null);
+    assert.deepEqual(JSON.parse(JSON.stringify(selection.takeNativeMenuRecovery(calls[0][0], 42))),
+        {x:30,y:60,viewportWidth:400});
+    assert.equal(selection.takeNativeMenuRecovery(calls[0][0]),null,'A request can be consumed only once');
+    changeNativeSelection(native);
+    assert.deepEqual(invalidations, [[42, 'chapter']], 'Moving after consumption invalidates the pending native reply');
+    dispatchDocumentEvent('contextmenu',event());
+    changeNativeSelection(native);
+    assert.equal(selection.takeNativeMenuRecovery(calls.at(-1)[0]),null,'Moving the selection cancels recovery');
+    dispatchDocumentEvent('contextmenu',event());
+    dispatchDocumentEvent('scroll');
+    assert.equal(selection.takeNativeMenuRecovery(calls.at(-1)[0]),null,'Scrolling cancels recovery');
+    const precedingText = {nodeType:3};
+    range.comparePoint = (node) => node === precedingText ? -1 : node === textNode ? 0 : 1;
+    document.caretRangeFromPoint = (x) => ({startContainer:x === 100 ? precedingText : textNode,startOffset:0});
+    const misplaced = event({clientX:100,clientY:50});
+    dispatchDocumentEvent('contextmenu', misplaced);
+    assert.equal(misplaced.prevented,true,'Visible coordinates outside the selected text also need recovery');
+    assert.deepEqual(JSON.parse(JSON.stringify(selection.takeNativeMenuRecovery(calls.at(-1)[0], 43))),
+        {x:30,y:60,viewportWidth:400});
+    document.caretRangeFromPoint = () => ({startContainer:{},startOffset:0});
+    const count=calls.length;
+    dispatchDocumentEvent('contextmenu',event());
+    assert.equal(calls.length,count,'Do not replay over unselected text inside a block rectangle');
+    document.caretRangeFromPoint = () => ({startContainer:{parentElement:{closest:()=>({})}},startOffset:0});
+    range.comparePoint = () => 0;
+    dispatchDocumentEvent('contextmenu',event());
+    assert.equal(calls.length,count,'Ruby annotations are not a menu recovery target');
 });

@@ -96,3 +96,15 @@ internal data class ReaderNativeSelectionMenuRect(
                 }
     }
 }
+
+@Serializable
+internal data class ReaderNativeSelectionMenuPoint(val x: Double, val y: Double, val viewportWidth: Double) {
+    companion object {
+        fun fromJavascriptResult(result: String?): ReaderNativeSelectionMenuPoint? =
+            runCatching { Json.decodeFromString<ReaderNativeSelectionMenuPoint>(result.orEmpty()) }
+                .getOrNull()?.takeIf {
+                    it.x.isFinite() && it.y.isFinite() && it.viewportWidth.isFinite() &&
+                        it.viewportWidth > 0 && it.x >= 0 && it.x < it.viewportWidth && it.y >= 0
+                }
+    }
+}
