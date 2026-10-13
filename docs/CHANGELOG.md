@@ -92,7 +92,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Customize TTS text replacements for one book or all books from text selection or
   Settings. Replacement text accepts readings, other text and punctuation, including
   dashes or ellipses replaced with commas/periods for engine-controlled pauses. Existing
-  pronunciation entries remain compatible. Replacements affect only synthesized speech;
+  pronunciation entries remain compatible and default to literal matching. Add an opt-in
+  regular-expression switch to replacement creation/editing, with capture-group substitution,
+  book/global scope and validation. Explicit literal entries and available ruby take priority
+  over regex rules. Both modes show the original and actual TTS input before preview; rules
+  created from Settings can be tested with editable sample text. Replacements affect only synthesized speech;
   original text, sentence navigation, highlighting and Anki sentence text stay unchanged.
   The selection menu offers a compact Replace action; its TTS replacement dialog
   defaults new entries to all books, with a theme-colored selected scope and stable centered labels,

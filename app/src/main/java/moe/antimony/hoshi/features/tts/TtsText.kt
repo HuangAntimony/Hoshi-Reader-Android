@@ -15,14 +15,17 @@ data class TtsWord(
     val surface: String,
     @SerialName("reading") val replacement: String,
     val bookId: String? = null,
+    val regex: Boolean = false,
 )
 
-enum class TtsWordError { Surface, Replacement, Duplicate, Storage }
+enum class TtsWordError { Surface, Replacement, Duplicate, RegexPattern, RegexReplacement, Storage }
 
 fun validateTtsWord(word: TtsWord, words: List<TtsWord>): TtsWordError? = when {
     word.surface.isBlank() -> TtsWordError.Surface
     word.replacement.isBlank() -> TtsWordError.Replacement
-    words.any { it.id != word.id && it.surface == word.surface && it.bookId == word.bookId } -> TtsWordError.Duplicate
+    word.regex && TtsRegexRule.patternError(word) -> TtsWordError.RegexPattern
+    word.regex && TtsRegexRule.compile(word) == null -> TtsWordError.RegexReplacement
+    words.any { it.id != word.id && it.surface == word.surface && it.bookId == word.bookId && it.regex == word.regex } -> TtsWordError.Duplicate
     else -> null
 }
 
@@ -177,9 +180,10 @@ object TtsText {
     }
 
     fun spokenParts(sentence: TtsSentence, bookId: String?, words: List<TtsWord>, useRubyReadings: Boolean = true): List<TtsSpokenPart> {
-        val applicable = words.filter { it.bookId == null || it.bookId == bookId }
+        val applicable = words.filter { !it.regex && (it.bookId == null || it.bookId == bookId) }
             .sortedWith(compareByDescending<TtsWord> { it.surface.length }.thenByDescending { it.bookId != null })
         val rubies = if (useRubyReadings) sentence.ruby else emptyList()
+        val regexMatches = ttsRegexMatches(sentence.text, words.filter { it.regex && (it.bookId == null || it.bookId == bookId) }, applicable, rubies)
         val roles = sentence.roles.ifEmpty { TtsDialogue.ranges(sentence.text) }
         val result = mutableListOf<Pair<TtsTextRole, StringBuilder>>()
         fun emit(value: String, start: Int, end: Int) {
@@ -203,6 +207,10 @@ object TtsText {
                     word != null -> { emit(word.replacement, cursor, cursor + word.surface.length); cursor += word.surface.length }
                     ruby != null && (cursor until ruby.end).none { start -> applicable.any { sentence.text.startsWith(it.surface, start) } } -> {
                         emit(ruby.reading, cursor, ruby.end); cursor = ruby.end
+                    }
+                    regexMatches[cursor] != null -> {
+                        val match = regexMatches.getValue(cursor)
+                        emit(match.text, cursor, match.end); cursor = match.end
                     }
                     else -> { emit(sentence.text[cursor].toString(), cursor, cursor + 1); cursor++ }
                 }

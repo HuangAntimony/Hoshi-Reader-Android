@@ -1,7 +1,5 @@
 package moe.antimony.hoshi.features.tts
 
-import moe.antimony.hoshi.content.ContentLanguageProfile
-import moe.antimony.hoshi.ui.hoshiContentKeyboardOptions
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,7 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -38,10 +35,7 @@ import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
 import moe.antimony.hoshi.features.reader.readerSheetStyle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
-import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
-import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
-import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 
 @Composable
@@ -194,6 +188,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(word.surface, style = MaterialTheme.typography.bodyLarge)
                     Text(word.replacement, style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
+                    if (word.regex) Text(stringResource(R.string.tts_regex_pattern), style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
                 }
                 Text(stringResource(if (word.bookId == null) R.string.tts_global else R.string.tts_book),
                     style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted)
@@ -242,72 +237,6 @@ internal fun TtsChoice(
 
 internal data class TtsChoiceOption(val id: String, val label: String, val supporting: String? = null)
 
-@Composable
-fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, sentence: TtsSentence?, onDismiss: () -> Unit) {
-    var surface by remember(initial.id) { mutableStateOf(initial.surface) }
-    var replacement by remember(initial.id) { mutableStateOf(initial.replacement) }
-    var global by remember(initial.id) { mutableStateOf(initial.bookId == null) }
-    var error by remember { mutableStateOf<TtsWordError?>(null) }
-    var saving by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val words by viewModel.preferences.collectAsStateWithLifecycle()
-    val busy by viewModel.busy.collectAsStateWithLifecycle()
-    val previewError by viewModel.error.collectAsStateWithLifecycle()
-    fun value() = initial.copy(surface = surface.trim(), replacement = replacement, bookId = if (global) null else bookId)
-    DisposableEffect(Unit) { onDispose { viewModel.stopPreview() } }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(surface, { surface = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.tts_surface)) }, singleLine = true,
-                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            OutlinedTextField(replacement, { replacement = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.tts_replacement)) }, maxLines = 4,
-                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf(true, false).forEachIndexed { index, allBooks ->
-                    SegmentedButton(
-                        selected = global == allBooks,
-                        onClick = { global = allBooks },
-                        enabled = allBooks || bookId != null,
-                        shape = SegmentedButtonDefaults.itemShape(index, 2),
-                        colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = MaterialTheme.colorScheme.primary,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                            inactiveContainerColor = hoshiSurfaces.nested,
-                            inactiveContentColor = hoshiSurfaces.muted,
-                        ),
-                        icon = {},
-                    ) {
-                        Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book))
-                    }
-                }
-            }
-            sentence?.let { Text(it.text) }
-            HoshiButton(onClick = {
-                error = validateTtsWord(value(), words.words.filterNot { it.id == initial.id })
-                if (error == null) viewModel.preview(sentence ?: TtsSentence(0, 0, 0, surface), bookId, value())
-            }, enabled = !busy && !saving, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.tts_preview))
-            }
-            error?.let { Text(stringResource(when (it) { TtsWordError.Surface -> R.string.tts_invalid_surface; TtsWordError.Replacement -> R.string.tts_invalid_replacement; TtsWordError.Duplicate -> R.string.tts_duplicate; TtsWordError.Storage -> R.string.tts_storage_error }), color = MaterialTheme.colorScheme.error) }
-            previewError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
-        }
-    }, confirmButton = {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (words.words.any { it.id == initial.id }) {
-                TextButton(
-                    enabled = !saving,
-                    onClick = { viewModel.delete(initial.id); onDismiss() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text(stringResource(R.string.action_delete)) }
-            }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            TextButton(enabled = !saving, onClick = { scope.launch { saving = true; try { error = viewModel.save(value()); if (error == null) onDismiss() } finally { saving = false } } }) { Text(stringResource(R.string.action_save)) }
-        }
-    })
-}
 
 internal fun TtsFailure.messageRes(): Int = when (this) {
     TtsFailure.PrivateHttp -> R.string.tts_private_http_error

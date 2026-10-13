@@ -925,6 +925,15 @@
     <string name="tts_preview_voice">Preview voice</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">Replace</string>
+    <string name="tts_regex_enabled">Use regular expression</string>
+    <string name="tts_regex_pattern">Pattern</string>
+    <string name="tts_regex_help">RE2 syntax; use $1, $2… for captured text. Escape a literal dollar sign with a backslash. Empty matches are ignored.</string>
+    <string name="tts_invalid_regex">Invalid or unsupported regular expression.</string>
+    <string name="tts_invalid_regex_replacement">Invalid replacement: check group numbers ($1, $2…) and backslash escapes.</string>
+    <string name="tts_replacement_before">Before replacement</string>
+    <string name="tts_replacement_after">Text sent to TTS</string>
+    <string name="tts_replacement_sample">Preview text</string>
+    <string name="tts_replacement_sample_hint">Enter text to try this rule.</string>
     <string name="tts_replacement_title">TTS replacement</string>
     <string name="tts_surface">Original text</string>
     <string name="tts_replacement">Replacement text</string>

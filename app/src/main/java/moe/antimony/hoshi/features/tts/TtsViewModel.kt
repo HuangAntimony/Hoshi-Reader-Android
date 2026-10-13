@@ -188,10 +188,10 @@ class TtsViewModel @Inject constructor(
         return engine.models(source.copy(encryptedKey = encrypted))
     }
     suspend fun save(word: TtsWord): TtsWordError? = try {
-        repository.save(word.copy(surface = word.surface.trim()))
+        repository.save(word.copy(surface = if (word.regex) word.surface else word.surface.trim()))
     } catch (error: CancellationException) { throw error } catch (_: Exception) { TtsWordError.Storage }
     fun delete(id: String) { viewModelScope.launch { try { repository.delete(id) } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } } }
-    fun preview(sentence: TtsSentence, bookId: String?, word: TtsWord? = null) {
+    fun preview(sentence: TtsSentence, bookId: String?, snapshot: TtsPreferences? = null) {
         stopPreview()
         playback.pause()
         mutableError.value = null
@@ -199,8 +199,7 @@ class TtsViewModel @Inject constructor(
         previewJob = viewModelScope.launch {
             mutablePreviewState.value = TtsPreviewState.Preparing
             try {
-                val current = repository.preferences.first()
-                val config = if (word == null) current else current.copy(words = current.words.filterNot { it.id == word.id || it.surface == word.surface && it.bookId == word.bookId } + word)
+                val config = snapshot ?: repository.preferences.first()
                 val file = audio.export(sentence, bookId, config)
                 previewFile = file
                 val playbackRate = repository.preferences.first().settings.playbackRate

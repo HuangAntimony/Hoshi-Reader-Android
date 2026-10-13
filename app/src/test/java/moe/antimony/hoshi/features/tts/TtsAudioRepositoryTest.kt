@@ -140,6 +140,27 @@ class TtsAudioRepositoryTest {
         } finally { repository.clearPlaybackCache(); close(client) }
     }
 
+
+    @Test fun regexPreviewPlaybackAndExportShareTextAndToggleInvalidatesAudio() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { body ->
+            requests += Json.parseToJsonElement(body).jsonObject.getValue("input").jsonObject.getValue("text").jsonPrimitive.content
+        }
+        val repository = repository(client)
+        val sentence = TtsSentence(0, 0, 5, "時々東京。", listOf(TtsRuby(2, 4, "とうきょう")))
+        val rule = TtsWord("regex", "(時)々", "\$1\$1", regex = true)
+        val preview = prepareTtsWordPreview(rule, sentence, "book", preferences)
+        try {
+            val first = repository.audio(sentence, "book", preview.preferences)
+            assertEquals(first, repository.audio(sentence, "book", preview.preferences))
+            repository.export(sentence, "book", preview.preferences).also { assertTrue(it.isFile); it.delete() }
+            val changed = repository.audio(sentence, "book", preview.preferences.copy(words = listOf(rule.copy(regex = false))))
+            assertNotEquals(first, changed)
+            assertEquals("時時とうきょう。", preview.text)
+            assertEquals(listOf("時時とうきょう。", "時時とうきょう。", "時々とうきょう。"), requests)
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun cachedNextSentenceReturnsWhileLaterSynthesisIsStillPending() = runBlocking {
         val pending = CompletableDeferred<Unit>()
         val release = CountDownLatch(1)

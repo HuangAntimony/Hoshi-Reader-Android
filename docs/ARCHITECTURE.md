@@ -831,7 +831,16 @@ QA matrices live in `docs/VALIDATION.md`.
   exports all read this flag through `TtsAudioRepository`, retaining source ruby/ranges for
   later re-enabling. It participates in synthesis invalidation and audio cache identity. Replacement values accept
   any non-blank plain text, preserving whitespace. Matching is a single pass over the
-  original sentence; inserted text is never matched again. Replacements affect synthesis
+  original sentence; inserted text is never matched again. `TtsWord.regex` defaults false for
+  legacy entries. `TtsRegexReplacement` uses RE2/J with a bounded compiled-rule cache,
+  numeric `$0`/`$1` capture templates and backslash escaping. Invalid patterns/templates
+  are rejected on save; zero-width matches are ignored. Literal match ranges and usable
+  ruby are protected from regex matches; each pattern scans the original sentence with
+  non-overlapping matches, then rules at the same start prefer the longest match and book
+  scope on ties (remaining ties retain saved order). Matches across dialogue boundaries
+  retain first-non-quote ownership. Preview computes on Default using the same `TtsText`
+  transform and passes its immutable preferences snapshot to synthesis. Both literal/regex
+  editors display before/after text; settings entry adds editable preview text. Replacements affect synthesis
   only, preserving original sentence boundaries, offsets, lookup text and Anki sentence text. Mining rebases ruby against
   the selected source occurrence, including full
   VN source sentences, rather than looking up the first matching text.

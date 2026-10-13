@@ -1,0 +1,70 @@
+package moe.antimony.hoshi.features.tts
+
+import android.content.Context
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/** In-memory drafts only: no saved reader data or online synthesis. */
+@RunWith(AndroidJUnit4::class)
+class TtsWordEditorTest {
+    @get:Rule val compose = createComposeRule()
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+    private fun text(id: Int) = context.getString(id)
+
+    private fun verify(eink: Boolean) {
+        var played: TtsWordPreview? = null
+        var saved: TtsWord? = null
+        val draft = TtsWord("draft", "(時)々", "\$1\$1")
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = eink, dynamicColor = false) {
+                TtsWordEditorDialog(draft, "book", TtsSentence(0, 0, 4, "時々東京"),
+                    TtsPreferences(words = listOf(TtsWord("tokyo", "東京", "とうきょう"))), false, null,
+                    { played = it }, { saved = it; null }, {}, {})
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_replacement_before)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("時々東京").assertExists()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("時々とうきょう").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(isToggleable()).onFirst().performScrollTo().assertIsOff().performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("時時とうきょう").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("時時とうきょう", played?.text); assertTrue(played!!.word.regex) }
+        compose.onNodeWithText(text(R.string.action_save)).performClick()
+        compose.runOnIdle { assertTrue(saved!!.regex); assertNull(saved!!.bookId) }
+        compose.onNodeWithText(text(R.string.tts_regex_pattern)).performScrollTo().performTextReplacement("[")
+        compose.waitUntil(5000) { compose.onAllNodesWithText(text(R.string.tts_invalid_regex)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("時時とうきょう").assertDoesNotExist()
+    }
+    @Test fun ordinaryAndRegexPreviewShowActualTextAndSaveTheMode() = verify(false)
+    @Test fun regexEditorSupportsEinkWithoutChangingScopeLabels() = verify(true)
+    @Test fun editingRegexWithoutBookContextUsesEditableSampleAndCanReturnToLiteral() {
+        var played: TtsWordPreview? = null
+        var saved: TtsWord? = null
+        val draft = TtsWord("existing", "(時)々", "\$1\$1", regex = true)
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsWordEditorDialog(draft, null, null, TtsPreferences(words = listOf(draft)), false, null,
+                    { played = it }, { saved = it; null }, {}, {})
+            }
+        }
+        compose.onNodeWithText(text(R.string.action_delete)).assertExists()
+        compose.onAllNodes(isToggleable()).onFirst().assertIsOn()
+        compose.onNodeWithText(text(R.string.tts_replacement_sample)).performScrollTo().performTextReplacement("時々")
+        compose.waitUntil(5000) { compose.onAllNodesWithText("時時").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("時々", played?.sentence?.text); assertEquals("時時", played?.text) }
+        compose.onAllNodes(isToggleable()).onFirst().performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.action_save)).performClick()
+        compose.runOnIdle { assertFalse(saved!!.regex); assertEquals("\$1\$1", saved!!.replacement) }
+    }
+
+}

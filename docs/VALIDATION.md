@@ -1238,6 +1238,16 @@ Validate relevant sync/update/Sasayaki changes with:
   never executable SSML, and inserted replacements are not recursively matched.
   Reopen the app with existing pronunciation entries: they must load unchanged; saving
   a replacement or changing synthesis settings must preserve old rules and scopes.
+- In replacement creation/editing, toggle regex for `([\p{Han}])々` → `$1$1`:
+  `時々` becomes `時時`, while an explicit `人々` → `ひとびと` and EPUB ruby keep priority.
+  With ruby disabled, the same base text becomes eligible for regex. Verify original/actual
+  TTS input for both modes, full-source selection context and editable Settings sample text.
+  Test invalid patterns/group references, zero-width matches, supplementary kanji, overlapping
+  patterns, book/global scope, existing entry editing and mode persistence after reopening.
+  The Preview button must not play an obsolete draft while text updates; its configuration
+  snapshot must match the displayed result. Check normal/e-ink dialog scrolling and footer.
+  `TtsRegexReplacementTest`, `TtsRepositoryTest`, `TtsAudioRepositoryTest` and the non-destructive
+  `TtsWordEditorTest` cover matching, persistence, preview/export/cache and Compose controls.
 - Run `TtsTextTest`, `TtsRepositoryTest`, `TtsBookRepositoryTest`, `TtsPlaybackControllerTest`,
   `TtsAudioRepositoryTest`, `TtsExportTest`, and `AnkiSentenceAudioTest` with the JVM suite. They cover source
   ruby/offsets, file-backed chapters, literal scope precedence, long input splitting,

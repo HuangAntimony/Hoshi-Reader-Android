@@ -185,6 +185,7 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     implementation(libs.ankidroid.api)
     implementation(libs.google.dagger.hilt.android)
+    implementation(libs.re2j)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")

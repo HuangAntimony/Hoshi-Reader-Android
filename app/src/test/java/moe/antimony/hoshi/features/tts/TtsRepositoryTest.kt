@@ -196,4 +196,20 @@ class TtsRepositoryTest {
         repository.delete(local.id)
         assertEquals("とうきょう。続く。", TtsText.spoken(sentence, "book", repository.preferences.first().words))
     }
+    @Test fun regexEntriesRoundTripAndLegacyEntriesRemainLiteral() = runTest {
+        val store = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to
+            """{"words":[{"id":"old","surface":"(時)々","reading":"$1$1"}]}"""))
+        val repository = TtsRepository(store)
+        assertFalse(repository.preferences.first().words.single().regex)
+        val regex = TtsWord("new", "(時)々", "\$1\$1", regex = true)
+        assertNull(repository.save(regex))
+        val restored = TtsRepository(store).preferences.first()
+        assertEquals(2, restored.words.size)
+        assertEquals("時時", TtsText.spoken(TtsSentence(0, 0, 2, "時々"), null, restored.words))
+        assertEquals(TtsWordError.Duplicate, repository.save(regex.copy(id = "duplicate")))
+        assertNull(repository.save(regex.copy(id = "book", bookId = "book")))
+        assertEquals(TtsWordError.RegexPattern, repository.save(regex.copy(id = "invalid", surface = "[")))
+        assertEquals(3, repository.preferences.first().words.size)
+    }
+
 }

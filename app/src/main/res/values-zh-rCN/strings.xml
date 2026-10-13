@@ -923,6 +923,15 @@
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">替换</string>
+    <string name="tts_regex_enabled">启用正则表达式</string>
+    <string name="tts_regex_pattern">匹配表达式</string>
+    <string name="tts_regex_help">使用 RE2 语法；$1、$2… 表示捕获的文本。字面美元符号需用反斜杠转义。忽略空匹配。</string>
+    <string name="tts_invalid_regex">正则表达式无效或使用了不支持的语法。</string>
+    <string name="tts_invalid_regex_replacement">替换文本无效，请检查分组编号（$1、$2…）和反斜杠转义。</string>
+    <string name="tts_replacement_before">替换前</string>
+    <string name="tts_replacement_after">送入 TTS 的文本</string>
+    <string name="tts_replacement_sample">预览文本</string>
+    <string name="tts_replacement_sample_hint">输入文本以测试这条规则。</string>
     <string name="tts_replacement_title">TTS 文本替换</string>
     <string name="tts_surface">原文本</string>
     <string name="tts_replacement">替换文本</string>
