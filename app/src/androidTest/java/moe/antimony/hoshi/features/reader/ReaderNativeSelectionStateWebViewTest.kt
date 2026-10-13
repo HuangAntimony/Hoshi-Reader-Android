@@ -121,6 +121,90 @@ class ReaderNativeSelectionStateWebViewTest {
         }
     }
 
+    @Test
+    fun selectionRangeChangesRefreshMenuAnchorWithoutPolling() {
+        val assets = ReaderWebAssets.load(instrumentation.targetContext)
+        lateinit var webView: HoshiReaderWebView
+        composeRule.setContent {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+                HoshiReaderWebView(context).also {
+                    webView = it
+                    it.settings.javaScriptEnabled = true
+                    it.prepareForDocument("anchor-fixture")
+                }
+            })
+        }
+        composeRule.waitForIdle()
+        val loaded = CountDownLatch(1)
+        val providerRect = android.graphics.Rect()
+        val reportedRect = java.util.concurrent.atomic.AtomicReference(android.graphics.Rect())
+        val queries = java.util.concurrent.atomic.AtomicInteger()
+        try {
+            instrumentation.runOnMainSync {
+                webView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                }
+                webView.loadDataWithBaseURL(null,
+                    "<html><head><script>${assets.selectionJs};" +
+                        "hoshiSelection.configure({bridge:'android-reader',nativeSelectionToken:'anchor-fixture'});" +
+                        "</script></head><body><p id='text'>読書の時間です。</p></body></html>",
+                    "text/html", "utf-8", null)
+            }
+            assertTrue(loaded.await(15, TimeUnit.SECONDS))
+            evaluate(webView, """
+                (() => { const t=document.getElementById('text').firstChild;
+                    getSelection().setBaseAndExtent(t,0,t,1);return true; })()
+            """.trimIndent())
+            composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
+            instrumentation.runOnMainSync {
+                // Model WebView creating a menu before its new selection bounds arrive.
+                assertNotNull(webView.startActionMode(object : ActionMode.Callback2() {
+                    override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean = true
+                    override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+                    override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean = false
+                    override fun onDestroyActionMode(mode: ActionMode) = Unit
+                    override fun onGetContentRect(mode: ActionMode, view: android.view.View, outRect: android.graphics.Rect) {
+                        outRect.set(providerRect)
+                        reportedRect.set(android.graphics.Rect(outRect))
+                        queries.incrementAndGet()
+                    }
+                }, ActionMode.TYPE_FLOATING))
+            }
+            awaitFrames(webView)
+            assertTrue("Fixture begins with an empty menu anchor", reportedRect.get().isEmpty)
+            instrumentation.runOnMainSync { providerRect.set(500, 900, 550, 980) }
+            evaluate(webView, """
+                (() => { const t=document.getElementById('text').firstChild;
+                    getSelection().setBaseAndExtent(t,0,t,3);return true; })()
+            """.trimIndent())
+            composeRule.waitUntil(3000) { reportedRect.get() == android.graphics.Rect(500, 900, 550, 980) }
+            assertEquals("Range changes still reach Android while selection stays active", "\"読書の\"", evaluate(webView, "getSelection().toString()"))
+            awaitFrames(webView)
+            val settledQueries = queries.get()
+            awaitFrames(webView)
+            assertEquals("An idle selection does not poll menu geometry", settledQueries, queries.get())
+            evaluate(webView, "HoshiNativeSelection.postMessage(true,'old-document');true")
+            awaitFrames(webView)
+            assertEquals("Stale document events cannot reposition the menu", settledQueries, queries.get())
+        } finally {
+            instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
+        }
+    }
+
+    private fun awaitFrames(webView: WebView) {
+        val done = CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            var remaining = 5
+            val frame = object : Runnable {
+                override fun run() {
+                    if (--remaining == 0) done.countDown() else webView.postOnAnimation(this)
+                }
+            }
+            webView.postOnAnimation(frame)
+        }
+        assertTrue(done.await(5, TimeUnit.SECONDS))
+    }
+
     private fun evaluate(webView: WebView, script: String): String {
         val done = CountDownLatch(1)
         var result = "null"

@@ -917,13 +917,16 @@ let lastHasSelection = false;
 document.addEventListener('selectionchange', () => {
     const s = getSelection();
     const hasSelection = !!s && !s.isCollapsed;
-    if (hasSelection === lastHasSelection) return;
-    lastHasSelection = hasSelection;
+    const stateChanged = hasSelection !== lastHasSelection;
     if (window.hoshiSelection.options.bridge === 'android-reader') {
         // Selection survives native menu dismissal/recreation. Lock locally before
         // notifying Android so handle autoscroll cannot race the bridge callback.
-        window.hoshiReader?.setNativeSelectionActive?.(hasSelection);
+        if (stateChanged) window.hoshiReader?.setNativeSelectionActive?.(hasSelection);
+        // Range changes also invalidate the native menu anchor, even while the
+        // selection remains active. Do not reset the locked page on each drag.
         window.HoshiNativeSelection?.postMessage(hasSelection, window.hoshiSelection.options.nativeSelectionToken);
     }
+    if (!stateChanged) return;
+    lastHasSelection = hasSelection;
     try { window.webkit?.messageHandlers?.selectionState?.postMessage(hasSelection); } catch {}
 });

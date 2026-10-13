@@ -140,6 +140,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 - Keep text selection from unexpectedly turning pages or chapters when the
   native selection menu disappears or is recreated.
+- Refresh the native selection menu anchor when the selected range changes, so
+  a stale empty anchor does not leave the menu at the top of the reader.
 
 ## [v1.4.0] - 2026-09-24
 

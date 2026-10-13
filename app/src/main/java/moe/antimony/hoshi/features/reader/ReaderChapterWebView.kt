@@ -627,6 +627,13 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     private var nativeSelectionContentRect: Rect? = null
     private var highlightColorPopup: PopupWindow? = null
     private var selectionHighlightPending = false
+    private var selectionContentRectRefreshPending = false
+    private val selectionContentRectRefresh = Runnable {
+        selectionContentRectRefreshPending = false
+        if (!isReleased && documentHasSelection) {
+            nativeSelectionActionMode?.invalidateContentRect()
+        }
+    }
 
     init {
         addJavascriptInterface(object {
@@ -636,6 +643,7 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
                     if (!isReleased && tag == restoreToken) {
                         documentHasSelection = active
                         updateNativeSelectionActivity()
+                        if (active) requestSelectionContentRectRefresh()
                     }
                 }
             }
@@ -662,8 +670,12 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
         if (mode == null) {
+            removeCallbacks(selectionContentRectRefresh)
+            selectionContentRectRefreshPending = false
             nativeSelectionContentRect = null
             dismissHighlightColorPopup()
+        } else {
+            requestSelectionContentRectRefresh()
         }
         updateNativeSelectionActivity()
     }
@@ -671,6 +683,14 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     private fun updateNativeSelectionActivity() {
         nativeSelectionActivity.value =
             documentHasSelection || nativeSelectionActionMode != null || selectionHighlightPending || highlightColorPopup != null
+    }
+
+    private fun requestSelectionContentRectRefresh() {
+        if (isReleased || !documentHasSelection || nativeSelectionActionMode == null || selectionContentRectRefreshPending) return
+        // WebView can publish bounds after creating the ActionMode. Re-read them
+        // after selection changes settle, without polling or measuring DOM layout.
+        selectionContentRectRefreshPending = true
+        postOnAnimation(selectionContentRectRefresh)
     }
 
     fun setNativeSelectionContentRect(rect: Rect) {

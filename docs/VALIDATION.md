@@ -175,6 +175,12 @@ node --test app/src/test/js/*.test.mjs
   browser autoscroll rollback, blocked navigation versus chapter boundaries,
   and stale document notification rejection. Run it with the data-preserving
   explicit instrumentation procedure above.
+  Its anchor regression also checks an initially empty menu rectangle updates
+  on range changes, with no idle polling or stale-document repositioning. Verify
+  real menu proximity after dragging, not just menu visibility. For selection
+  flashing, inspect recordings frame by frame for highlight painted on unrelated
+  columns; final scroll position alone is insufficient. Do not run per-frame DOM
+  geometry probes during visual acceptance: forced layout can hide the symptom.
 
 ### Theme
 
