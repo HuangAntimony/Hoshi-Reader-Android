@@ -274,6 +274,7 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
                             inactiveContainerColor = hoshiSurfaces.nested,
                             inactiveContentColor = hoshiSurfaces.muted,
                         ),
+                        icon = {},
                     ) {
                         Text(stringResource(if (allBooks) R.string.tts_global else R.string.tts_book))
                     }
