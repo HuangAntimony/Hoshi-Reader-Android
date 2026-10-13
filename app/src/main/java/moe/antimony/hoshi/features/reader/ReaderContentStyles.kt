@@ -335,6 +335,15 @@ internal object ReaderContentStyles {
                     orphans: 1 !important;
                     widows: 1 !important;
                 }
+                html.hoshi-paged-selection {
+                    overflow: clip !important;
+                }
+                html.hoshi-paged-selection body {
+                    overflow: visible !important;
+                    position: relative !important;
+                    left: var(--hoshi-selection-page-x) !important;
+                    top: var(--hoshi-selection-page-y) !important;
+                }
                 """.trimIndent()
             }
         }

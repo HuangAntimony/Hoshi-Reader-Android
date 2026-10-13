@@ -98,8 +98,8 @@ class ReaderNativeSelectionStateWebViewTest {
             }
             evaluate(webView, "true")
             assertEquals("Selection blocking is not a chapter boundary", 0, chapterChanges)
-            evaluate(webView, "document.body.scrollTop=0;hoshiReader.handlePagedBodyScroll();true")
-            assertEquals("Browser selection autoscroll is rolled back", position, evaluate(webView, "document.body.scrollTop").toDouble(), 1.0)
+            assertEquals("Logical page position survives selection", position,
+                evaluate(webView, "hoshiReader.getPagePosition(hoshiReader.getScrollContext())").toDouble(), 1.0)
             evaluate(webView, "getSelection().removeAllRanges();true")
             composeRule.waitUntil(3000) { !webView.nativeSelectionState.value }
             assertFalse(evaluate(webView, "hoshiReader.nativeSelectionActive").toBoolean())

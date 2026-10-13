@@ -320,6 +320,14 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   three modes. VN captures CSS boundaries before detaching the chapter DOM,
   builds and caches this index from the complete source stream
   and projects expanded raw ranges through its existing screen range map.
+- Paginated/continuous narration uses CSS Custom Highlights when supported,
+  painting Sasayaki/TTS cue ranges without inserting inline text wrappers that
+  interfere with native selection hit testing across page fragments. Range
+  targets also drive cue navigation and image stops; node-offset rebuilds
+  reproject them from saved semantic cue offsets after persistent-highlight
+  edits. Narration has lower highlight priority than lookup/search. E-ink keeps
+  its existing geometry overlay; WebViews without Custom Highlights keep the
+  inline-wrapper fallback. VN keeps its screen-projection implementation.
 - Reader image setup semantics live in `reader-media-semantics.js` and are
   consumed by paginated, continuous, and VN assets for shared gaiji class
   recognition, transparent monochrome inline-image tinting, SVG image
@@ -370,6 +378,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   highlight color workflow. Dismissing a menu alone does not clear a surviving
   selection. Navigation blocked by selection returns `blocked`, never the
   chapter-boundary `limit` result.
+  During paginated selection, CSS `overflow: clip` on the root and a relative
+  body offset preserve the visible page without a scrollable selection ancestor.
+  Logical page offsets stay unchanged; deselection restores the normal body
+  scroll position. This prevents Blink autoscroll and the reader's rollback from
+  moving selection endpoints back and forth. WebViews without overflow-clip
+  support retain the scroll-lock fallback. Native menu placement remains owned
+  by WebView's ActionMode callback.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for

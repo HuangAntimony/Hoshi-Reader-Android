@@ -94,6 +94,10 @@ html:not([data-hoshi-reader-eink-mode="true"]) .hoshi-sasayaki-cue.hoshi-sasayak
     color: var(--hoshi-sasayaki-text-color) !important;
     background-color: var(--hoshi-sasayaki-background-color) !important;
 }
+html:not([data-hoshi-reader-eink-mode="true"]) ::highlight(hoshi-sasayaki) {
+    color: var(--hoshi-sasayaki-text-color);
+    background-color: var(--hoshi-sasayaki-background-color);
+}
 .hoshi-vn-stage {
     height: var(--hoshi-reader-visible-height, var(--page-height, 100vh));
     width: var(--page-width, 100vw);

@@ -106,6 +106,7 @@ __HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
     this.nodeStartRawOffsets = rawOffsets;
     // Wrapping/unwrapping moves text nodes and invalidates live CSS Ranges.
     if (window.hoshiHighlights?.searchRange) window.hoshiHighlights.refreshSearchHighlight();
+    this.refreshSasayakiRangeTargets();
   },
   countCharsBeforeViewport: function(node, vertical) {
     var text = node.textContent || '';

@@ -9,6 +9,7 @@ window.hoshiReader = {
   pageWidth: 0,
   nativeSelectionActive: false,
   nativeSelectionScrollPosition: null,
+  nativeSelectionViewportFrozen: false,
   cueWrappers: new Map(),
   cueSourceRanges: new Map(),
   cueGeometryRanges: new Map(),
@@ -102,6 +103,7 @@ window.hoshiReader = {
     this.nodeStartRawOffsets = rawOffsets;
     // Wrapping/unwrapping moves text nodes and invalidates live CSS Ranges.
     if (window.hoshiHighlights?.searchRange) window.hoshiHighlights.refreshSearchHighlight();
+    this.refreshSasayakiRangeTargets();
     this.paginationMetrics = null;
   },
   countCharsBeforeViewport: function(node, context) {
@@ -294,6 +296,7 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     return { vertical: vertical, scrollEl: scrollEl, pageSize: pageSize, maxScroll: maxScroll };
   },
   getPagePosition: function(context) {
+    if (this.nativeSelectionViewportFrozen) return this.nativeSelectionScrollPosition;
     return context.vertical ? context.scrollEl.scrollTop : context.scrollEl.scrollLeft;
   },
   lockRootViewport: function() {
@@ -331,10 +334,27 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   setNativeSelectionActive: function(active) {
     var context = this.getScrollContext();
     if (active) {
-      this.nativeSelectionActive = true;
+      if (this.nativeSelectionActive) return;
       this.nativeSelectionScrollPosition = this.getPagePosition(context);
+      this.nativeSelectionActive = true;
       window.lastPageScroll = this.nativeSelectionScrollPosition;
+      // Prevent Blink's selection autoscroll instead of undoing it after hit testing
+      // has already used the shifted page. Keep logical offsets unchanged.
+      if (window.CSS && CSS.supports('overflow', 'clip')) {
+        var root = document.documentElement;
+        root.style.setProperty('--hoshi-selection-page-x', (context.vertical ? 0 : -this.nativeSelectionScrollPosition) + 'px');
+        root.style.setProperty('--hoshi-selection-page-y', (context.vertical ? -this.nativeSelectionScrollPosition : 0) + 'px');
+        this.nativeSelectionViewportFrozen = true;
+        root.classList.add('hoshi-paged-selection');
+      }
       return;
+    }
+    if (this.nativeSelectionViewportFrozen) {
+      document.documentElement.classList.remove('hoshi-paged-selection');
+      document.documentElement.style.removeProperty('--hoshi-selection-page-x');
+      document.documentElement.style.removeProperty('--hoshi-selection-page-y');
+      this.nativeSelectionViewportFrozen = false;
+      context = this.getScrollContext();
     }
     if (this.nativeSelectionActive && this.nativeSelectionScrollPosition !== null && this.nativeSelectionScrollPosition !== undefined) {
       var lockedScroll = Math.min(Math.max(0, this.nativeSelectionScrollPosition), context.maxScroll);

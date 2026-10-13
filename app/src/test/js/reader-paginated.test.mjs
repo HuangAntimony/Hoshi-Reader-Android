@@ -501,6 +501,10 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     }
     document.scrollingElement = documentElement;
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
+    if (options.rangeHighlights) {
+        window.CSS = css;
+        window.Highlight = Set;
+    }
     vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
         Highlight: Set,
@@ -1070,6 +1074,44 @@ test('continuous reader re-stabilizes ruby-adjacent text after unwrap normalizes
     assert.deepEqual(textRunAfter(ruby).slice(0, 4), ['。', 'そ', 'れ', '追']);
 });
 
+test('range-based narration preserves selection text nodes when preparing and changing cues', () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        const before = new TestText('前「𠮟 、');
+        const ruby = new TestElement('ruby');
+        const base = new TestText('猫');
+        const rt = new TestElement('rt');
+        rt.appendChild(new TestText('ねこ'));
+        ruby.appendChild(base); ruby.appendChild(rt);
+        const after = new TestText('。」後');
+        body.appendChild(before); body.appendChild(ruby); body.appendChild(after);
+        const registry = new Map();
+        const { reader } = loadReader(body, sourceUrl, { css: { highlights: registry }, rangeHighlights: true });
+        const selectionNodes = [before, base, after];
+        const originalText = selectionNodes.map(node => node.textContent);
+        const highlightedText = () => Array.from(registry.get('hoshi-sasayaki') ?? [], range =>
+            range.startContainer.textContent.slice(range.startOffset, range.endOffset)).join('');
+
+        reader.applySasayakiCues([{ id: 'one', start: 0, length: 3 }, { id: 'two', start: 3, length: 1 }]);
+        assert.deepEqual(selectionNodes.map(node => node.textContent), originalText);
+        assert.equal(before.parentNode, body);
+        assert.equal(base.parentNode, ruby);
+        reader.highlightSasayakiCue('one', false);
+        assert.equal(highlightedText(), '前「𠮟 、猫。」');
+        reader.highlightSasayakiCue('two', false);
+        assert.equal(highlightedText(), '後');
+        reader.applySasayakiCues([{ id: 'two', start: 3, length: 1 }]);
+        assert.equal(highlightedText(), '後');
+        reader.clearSasayakiCue();
+        assert.equal(highlightedText(), '');
+        reader.highlightSasayakiCue({ id: 'tts', start: 1, length: 2 }, false);
+        assert.equal(highlightedText(), '「𠮟 、猫。」');
+        reader.resetSasayakiCues();
+        assert.equal(highlightedText(), '');
+        assert.deepEqual(selectionNodes.map(node => node.textContent), originalText);
+    }
+});
+
 test('Sasayaki highlight applies active DOM state without CSS Highlight API', () => {
     for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         const body = new TestElement('body');
@@ -1097,6 +1139,30 @@ test('Sasayaki highlight applies active DOM state without CSS Highlight API', ()
         assert.equal(wrapper.classList.contains('hoshi-sasayaki-active'), true);
         assert.equal(wrapper.textContent, '蒸し暑い');
         assert.equal(cssHighlightSetCount, 0);
+    }
+});
+
+test('range-based narration follows saved-highlight DOM edits and retains cue navigation', () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('前猫後'));
+        const registry = new Map();
+        const { reader, window } = loadReader(body, sourceUrl, {
+            css: { highlights: registry }, rangeHighlights: true,
+            highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+        });
+        const text = () => Array.from(registry.get('hoshi-sasayaki') ?? [], range =>
+            range.startContainer.textContent.slice(range.startOffset, range.endOffset)).join('');
+        reader.applySasayakiCues([{ id: 'cue', start: 1, length: 1 }]);
+        reader.highlightSasayakiCue('cue', false);
+        window.hoshiHighlights.applyHighlights([{ id: 'saved', color: 'blue', offset: 1, text: '猫' }]);
+        assert.equal(text(), '猫');
+        window.hoshiHighlights.removeHighlight('saved');
+        assert.equal(text(), '猫');
+        let target;
+        reader.scrollToRange = reader.scrollToTarget = range => { target = range; return false; };
+        reader.highlightSasayakiCue('cue', true);
+        assert.equal(target.startContainer.textContent.slice(target.startOffset, target.endOffset), '猫');
     }
 });
 

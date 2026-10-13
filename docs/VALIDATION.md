@@ -172,9 +172,19 @@ node --test app/src/test/js/*.test.mjs
   mode must not treat handle drags as reader gestures. After deselection, normal
   navigation must resume. `ReaderNativeSelectionStateWebViewTest` uses generated
   vertical paginated content and a real ActionMode to check surviving selection,
-  browser autoscroll rollback, blocked navigation versus chapter boundaries,
+  logical page retention, blocked navigation versus chapter boundaries,
   and stale document notification rejection. Run it with the data-preserving
   explicit instrumentation procedure above.
+  `ReaderSelectionViewportWebViewTest` also checks native handle drags with
+  narration cues prepared, selection preservation during cue updates, and
+  immediate scroll prevention, visible/logical position retention, and resumed
+  paging in both writing directions. Repeat real-book ruby handle drags and
+  inspect recordings frame by frame for unrelated columns becoming selected;
+  final scroll position alone cannot validate this. During gesture acceptance,
+  do not poll DOM geometry or suspend threads with JDWP method tracing: both
+  change timing and can mask the bug or stall the UI. If range events are needed,
+  record DOM endpoints/Range text in memory without layout reads, then retrieve
+  them after the gesture. Also run an uninstrumented recording.
 
 ### Theme
 
