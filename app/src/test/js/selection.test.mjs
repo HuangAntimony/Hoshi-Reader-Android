@@ -814,7 +814,7 @@ test('native pronunciation selection uses full source sentence and excludes ruby
 });
 
 
-test('native selection reports range changes without resetting the page lock', () => {
+test('native selection locks the reader before notifying Android, independent of menu visibility', () => {
     const { selection, window, changeNativeSelection } = loadSelection('本文');
     const events = [];
     selection.configure({ bridge: 'android-reader', nativeSelectionToken: 'chapter-a' });
@@ -825,7 +825,6 @@ test('native selection reports range changes without resetting the page lock', (
     changeNativeSelection({ isCollapsed: true });
     assert.deepEqual(events, [
         ['lock', true], ['android', true, 'chapter-a'],
-        ['android', true, 'chapter-a'],
         ['lock', false], ['android', false, 'chapter-a'],
     ]);
 });

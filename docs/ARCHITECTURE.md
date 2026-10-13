@@ -370,11 +370,6 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   highlight color workflow. Dismissing a menu alone does not clear a surviving
   selection. Navigation blocked by selection returns `blocked`, never the
   chapter-boundary `limit` result.
-  Range changes also notify Android without resetting the page lock. Menu
-  creation and range changes coalesce `ActionMode.invalidateContentRect()` on
-  the next animation frame, using WebView's own bounds. There is no idle polling
-  or DOM geometry measurement; menu dismissal/document disposal cancels pending
-  refreshes.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
