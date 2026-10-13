@@ -16,6 +16,9 @@ internal fun String.visibleReaderText(preserveParagraphs: Boolean = false): Stri
     text = text.replace(Regex("(?s)<(rt|rp)[^>]*>.*?</\\1>"), "")
     text = text.replace(Regex("(?s)<(script|style)[^>]*>.*?</\\1>"), "")
     if (preserveParagraphs) {
+        // A line break in the source is only whitespace; paragraphs come from the markup below. Otherwise markup
+        // written across lines, e.g. <ruby>\n<rb>完</rb>\n<rt>かん</rt>\n<rb>膚</rb>…, splits a word into "sentences".
+        text = text.replace(Regex("[\r\n]+"), " ")
         text = text.replace(Regex("(?i)<br[^>]*>|</(p|div|h[1-6]|li|blockquote|section|td|tr)\\s*>"), "\n")
     }
     text = text.replace(Regex("<[^>]+>"), "")
