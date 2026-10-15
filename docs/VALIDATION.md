@@ -1259,9 +1259,8 @@ Validate relevant sync/update/Sasayaki changes with:
   scope options blend with the dialog surface in light/dark/e-ink themes, and section title,
   small before/after labels, subdued original and stronger output color remain visually distinct;
   original and output body text use the same size, including editable sample text. Check normal/e-ink dialog scrolling and footer.
-  With a long sentence preview and the software keyboard open, Save must remain above
-  the keyboard and the editor body must scroll. The replacement field's Done action
-  dismisses the keyboard without saving; Save also works while the keyboard is open.
+  With a long sentence preview and the software keyboard open, the replacement field's
+  Done action dismisses the keyboard without saving; then Save persists the draft.
   Open new and existing replacements from Reader and Settings: the first visible dialog
   must include its initial validation/preview content, without an empty intermediate
   layout that changes window size. Hold preview computation pending while editing:

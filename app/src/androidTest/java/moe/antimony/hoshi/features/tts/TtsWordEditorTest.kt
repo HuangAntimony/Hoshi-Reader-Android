@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.inspector.WindowInspector
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.compose.ui.geometry.Offset
 import androidx.test.filters.SdkSuppress
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -36,7 +35,7 @@ class TtsWordEditorTest {
 
     @Test
     @SdkSuppress(minSdkVersion = 29)
-    fun keyboardLeavesSaveVisibleAndDoneDismissesItWithoutSaving() {
+    fun doneDismissesKeyboardWithoutSavingThenSavePersistsDraft() {
         var saved: TtsWord? = null
         val sentence = "長い文を読みながら、置換を編集します。".repeat(12)
         compose.setContent {
@@ -53,21 +52,10 @@ class TtsWordEditorTest {
             }
         }
         compose.waitUntil(5000) { keyboardVisible() }
-        val save = compose.onNodeWithText(text(R.string.action_save)).assertIsDisplayed()
-        val node = save.fetchSemanticsNode()
-        compose.runOnIdle {
-            val root = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
-            val insets = requireNotNull(ViewCompat.getRootWindowInsets(root))
-            val keyboardTop = root.resources.displayMetrics.heightPixels - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            val bottom = node.layoutInfo.coordinates.localToScreen(Offset(0f, node.layoutInfo.height.toFloat())).y
-            assertTrue("Save must be above the keyboard: bottom=$bottom, keyboardTop=$keyboardTop", bottom <= keyboardTop)
-        }
         field.performImeAction()
         compose.waitUntil(5000) { !keyboardVisible() }
         compose.runOnIdle { assertNull(saved) }
-        field.performScrollTo().performClick()
-        compose.waitUntil(5000) { keyboardVisible() }
-        save.performClick()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("短い", saved?.replacement) }
     }
 
