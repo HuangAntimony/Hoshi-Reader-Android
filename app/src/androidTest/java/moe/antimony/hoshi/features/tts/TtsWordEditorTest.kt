@@ -1,6 +1,11 @@
 package moe.antimony.hoshi.features.tts
 
 import android.content.Context
+import android.view.inspector.WindowInspector
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.compose.ui.geometry.Offset
+import androidx.test.filters.SdkSuppress
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -27,6 +32,43 @@ class TtsWordEditorTest {
         private val tasks = LinkedBlockingQueue<Runnable>()
         override fun dispatch(context: CoroutineContext, block: Runnable) { tasks.add(block) }
         fun completeNext() { requireNotNull(tasks.poll(5, TimeUnit.SECONDS)).run() }
+    }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 29)
+    fun keyboardLeavesSaveVisibleAndDoneDismissesItWithoutSaving() {
+        var saved: TtsWord? = null
+        val sentence = "長い文を読みながら、置換を編集します。".repeat(12)
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsWordEditorDialog(TtsWord("draft", "長い", "短い"), "book", TtsSentence(0, 0, 0, sentence),
+                    TtsPreferences(), false, null, {}, { saved = it; null }, {}, {})
+            }
+        }
+        val field = compose.onNodeWithText(text(R.string.tts_replacement))
+        field.performScrollTo().performClick()
+        fun keyboardVisible(): Boolean = compose.runOnIdle {
+            WindowInspector.getGlobalWindowViews().any { view ->
+                ViewCompat.getRootWindowInsets(view)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+        }
+        compose.waitUntil(5000) { keyboardVisible() }
+        val save = compose.onNodeWithText(text(R.string.action_save)).assertIsDisplayed()
+        val node = save.fetchSemanticsNode()
+        compose.runOnIdle {
+            val root = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
+            val insets = requireNotNull(ViewCompat.getRootWindowInsets(root))
+            val keyboardTop = root.resources.displayMetrics.heightPixels - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val bottom = node.layoutInfo.coordinates.localToScreen(Offset(0f, node.layoutInfo.height.toFloat())).y
+            assertTrue("Save must be above the keyboard: bottom=$bottom, keyboardTop=$keyboardTop", bottom <= keyboardTop)
+        }
+        field.performImeAction()
+        compose.waitUntil(5000) { !keyboardVisible() }
+        compose.runOnIdle { assertNull(saved) }
+        field.performScrollTo().performClick()
+        compose.waitUntil(5000) { keyboardVisible() }
+        save.performClick()
+        compose.runOnIdle { assertEquals("短い", saved?.replacement) }
     }
 
     @Test fun openingWaitsForInitialValidationInsteadOfResizingAnEmptyPreview() {
@@ -58,11 +100,10 @@ class TtsWordEditorTest {
         }
         dispatcher.completeNext()
         compose.onNodeWithText("とうきょうへ。").assertExists()
-        val bounds = compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot
         compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextReplacement("トーキョー")
+        compose.onNodeWithText(text(R.string.tts_replacement)).performImeAction()
         compose.onNode(isDialog()).assertExists()
         compose.onNodeWithText("とうきょうへ。").assertExists()
-        assertEquals(bounds, compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsEnabled().performClick()
         assertNull(played)
         dispatcher.completeNext()
@@ -123,9 +164,9 @@ class TtsWordEditorTest {
         compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextClearance()
         compose.waitUntil(5000) { compose.onAllNodesWithText(text(R.string.tts_replacement_empty_preview)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
-        val delete = compose.onNodeWithText(text(R.string.action_delete)).fetchSemanticsNode().boundsInRoot
-        val save = compose.onNodeWithText(text(R.string.action_save)).fetchSemanticsNode().boundsInRoot
-        assertEquals(delete.center.y, save.center.y, 1f)
+        val delete = compose.onNodeWithText(text(R.string.action_delete)).fetchSemanticsNode()
+        val save = compose.onNodeWithText(text(R.string.action_save)).fetchSemanticsNode()
+        compose.runOnIdle { assertEquals(delete.boundsInRoot.center.y, save.boundsInRoot.center.y, 1f) }
         compose.onNodeWithText(text(R.string.action_save)).assertIsEnabled().performClick()
         compose.runOnIdle { assertEquals("", saved?.replacement) }
     }

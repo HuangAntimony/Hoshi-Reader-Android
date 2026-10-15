@@ -112,7 +112,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and a full-width theme-colored preview button, with
   a destructive Delete action aligned beside Cancel and Save when editing an entry.
   Text-selection creation previews the full original sentence; both fields request
-  Japanese keyboard input. EPUB ruby remains the fallback reading.
+  Japanese keyboard input. The editor keeps its Save action above the keyboard with
+  scrollable content; the replacement field offers Done to dismiss the keyboard.
+  EPUB ruby remains the fallback reading.
   Image-backed characters with ruby are read without freezing or exhausting memory.
 - Add the opt-in Anki `{sentence-audio}` handlebar for audiobook or TTS sentence audio;
   `{sasayaki-audio}` and existing field mappings keep their audiobook-only behavior.

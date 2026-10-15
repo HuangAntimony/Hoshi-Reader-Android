@@ -14,8 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineDispatcher
@@ -78,7 +80,10 @@ internal fun TtsWordEditorDialog(
     // result for display; playback still waits for the current snapshot.
     val displayedPreview = prepared ?: return
     val validation = error ?: displayedPreview.error?.takeUnless { it == TtsWordError.Surface && !surfaceEdited }
-    HoshiAlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
+    HoshiAlertDialog(onDismissRequest = onDismiss,
+        modifier = Modifier.systemBarsPadding().imePadding(),
+        properties = DialogProperties(decorFitsSystemWindows = false),
+        title = { Text(stringResource(R.string.tts_replacement_title)) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,7 +101,8 @@ internal fun TtsWordEditorDialog(
                 lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 4),
                 placeholder = { Text(stringResource(R.string.tts_replacement_delete_hint)) },
                 isError = validation == TtsWordError.RegexReplacement,
-                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese), colors = hoshiOutlinedTextFieldColors())
+                keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese, imeAction = ImeAction.Done),
+                colors = hoshiOutlinedTextFieldColors())
             if (regex) Text(stringResource(R.string.tts_regex_help), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             validation?.let { Text(stringResource(it.messageRes()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
