@@ -54,6 +54,11 @@ For a single JVM unit test, do not use `./gradlew test --tests ...`; the
 ./gradlew :app:testDebugUnitTest --tests fully.qualified.TestClassName.testMethodName
 ```
 
+MockWebServer WebSocket fixtures must reply to peer closure in `onClosing` with
+`webSocket.close(code, reason)`. Otherwise server shutdown can wait indefinitely
+for the close handshake and fail the test during teardown. Do not suppress shutdown
+exceptions or treat a successful rerun as a fix.
+
 For localization changes, run:
 
 ```bash

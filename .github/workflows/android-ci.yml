@@ -82,5 +82,19 @@ jobs:
         shell: bash
         run: |
           python3 tools/build-transcription-audio.py --check
-          ./gradlew --no-daemon -p buildSrc test
-          ./gradlew --no-daemon test lint assembleDebug
+          ./gradlew --no-daemon --stacktrace -p buildSrc test
+          ./gradlew --no-daemon --stacktrace test lint assembleDebug
+
+      - name: Upload failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ci-failure-reports
+          path: |
+            app/build/test-results/
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+            buildSrc/build/test-results/
+            buildSrc/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7

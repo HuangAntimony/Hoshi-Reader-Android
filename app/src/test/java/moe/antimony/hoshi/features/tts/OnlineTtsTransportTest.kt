@@ -63,6 +63,9 @@ class OnlineTtsTransportTest {
                         socket.send("Path:turn.end\r\n\r\n{}")
                     }
                 }
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, reason)
+                }
             }))
             val result = OnlineTtsTransport(client()).edgeAudio(Request.Builder().url(server.url("/edge")).build(), "<speak>日本</speak>")
             assertArrayEquals(byteArrayOf(1, 2, 3, 4), result)
