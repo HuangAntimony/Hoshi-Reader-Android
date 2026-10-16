@@ -6,6 +6,7 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 
 - iOS 用户可见行为和 UI 是唯一真源。开始功能切片或行为修复前，先查看 `reference/Hoshi-Reader-iOS` 中的对应实现，并总结交互、状态流和边界行为。
 - 修复问题时不要叠补丁。先对齐 iOS 行为和状态流；只有平台差异确实需要时，才加入最小 Android 侧适配。
+- 未发布功能以当前数据格式和交互为准，不为开发期旧格式增加迁移、兼容分支或面向用户的迁移提示。
 - 涉及 Android 平台能力、权限、SAF、WebView、Media3、WorkManager、Google/Jetpack API、打包、安装或后台行为时，优先查 Android/Google/Jetpack 官方文档确认当前推荐做法。
 
 ## 工作区与规划产物

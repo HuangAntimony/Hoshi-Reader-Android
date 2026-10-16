@@ -1,8 +1,6 @@
 package moe.antimony.hoshi.features.tts
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.network.isPrivateHttpHost
 import okhttp3.HttpUrl
@@ -14,7 +12,6 @@ enum class TtsCustomProtocol(val labelRes: Int) {
 }
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
 data class TtsCustomSource(
     val id: String,
     val name: String = "",
@@ -23,7 +20,7 @@ data class TtsCustomSource(
     val encryptedKey: String = "",
     val model: String = "",
     val rate: Float = 1f,
-    @EncodeDefault val format: TtsAudioFormat = TtsAudioFormat.Mp3,
+    val format: TtsAudioFormat = TtsAudioFormat.Mp3,
     val preset: String = "",
     val voiceIds: List<String> = emptyList(),
 ) {

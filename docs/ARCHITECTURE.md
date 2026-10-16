@@ -784,19 +784,16 @@ QA matrices live in `docs/VALIDATION.md`.
 - `features/tts` is an independent Hilt feature. `TtsRepository` persists source,
   Japanese voice, engine speech rate, independent Hoshi playback speed, pitch, provider parameters, playback sentence delay, prefetch
   depth, named self-hosted server profiles, the global `useRubyReadings` flag (default true), and scoped text-replacement entries in the `japanese_tts`
-  Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
-  so existing pronunciation entries remain compatible. It does not extend Sasayaki
+  Preferences DataStore. It does not extend Sasayaki
   sidecars or sync payloads. UI events submit setting transforms; the repository applies
   them to the latest preferences inside one DataStore transaction, so independent edits
   do not replace newer settings with a captured UI snapshot.
   `routingBySource` owns voice selection, including when dialogue routing is off;
   `TtsSettings.voice` is derived from its narration entry. Custom profiles own their rate;
-  installed/built-in sources retain the shared rate stored under the existing `rate` key.
-  Legacy top-level/profile voice fields are decoded into source selections without changing
-  credentials, formats, dialogue choices or replacements.
+  installed/built-in sources share the engine speech rate.
   Cloud API keys are AES-GCM ciphertext bound to the provider ID, using a non-exportable
-  Android Keystore key through `TtsCredentialCipher`; restored ciphertext without its
-  device key requires configuration again. UI fields never read keys back or put them
+  Android Keystore key through `TtsCredentialCipher`; an unavailable device key
+  requires the API key to be entered again. UI fields never read keys back or put them
   in saveable state, URLs, logs or visible errors.
 - Optional narration/dialogue routing is stored per Source in `routingBySource`, default
   off. `TtsVoiceRouting.initialized` distinguishes first activation (both voices inherit
@@ -850,8 +847,7 @@ QA matrices live in `docs/VALIDATION.md`.
   The controller traverses these sentences in its cancellable preparation loop, retaining image
   presentation and single-sentence boundaries without adding sentence delays; empty exports
   report `EmptyText` and produce no media file. Matching is a single pass over the
-  original sentence; inserted text is never matched again. `TtsWord.regex` defaults false for
-  legacy entries. `TtsRegexReplacement` uses RE2/J with a bounded compiled-rule cache,
+  original sentence; inserted text is never matched again. Literal replacement is the default. `TtsRegexReplacement` uses RE2/J with a bounded compiled-rule cache,
   numeric `$0`/`$1` capture templates and backslash escaping. Invalid patterns/templates
   are rejected on save; zero-width matches are ignored. Literal match ranges and usable
   ruby are protected from regex matches; each pattern scans the original sentence with
@@ -917,10 +913,8 @@ QA matrices live in `docs/VALIDATION.md`.
   than individual cards; output format/sample rate also use plain rows, and remaining
   parameter cards use compact vertical padding. Shared
   slider heights and existing behavior-setting rows retain their defaults.
-  New cloud/self-hosted synthesis configurations default to MP3. Serialized format fields
-  are always written, including defaults; omitted fields in older stored parameter entries
-  and custom profiles retain their legacy WAV value on decode. Unconfigured sources use
-  the new default; installed Android engines still generate WAV.
+  Cloud/self-hosted synthesis defaults to MP3; users can also choose WAV.
+  Installed Android engines generate WAV.
   Voice owns speaker selection. VITS speaker names come from `/voice/speakers`, with
   model-type/ID retained as secondary labels;
   configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding
@@ -946,7 +940,7 @@ QA matrices live in `docs/VALIDATION.md`.
   request coalescing; network waits do not hold the metadata lock, so cached reads and
   other source requests remain available during refresh. Cancellation/failure retains the
   last successful catalog. `TtsVoiceCatalogStore` owns atomic JSON files on the adapters'
-  IO dispatcher; filenames and fingerprints retain compatibility with existing caches.
+  IO dispatcher.
   Catalogs have no age-based refresh. Source configuration fingerprints prevent reuse after
   region/key changes without storing credentials in catalog files. Missing/corrupt catalogs
   are fetched again, failures are not cached, and explicit error retry/configuration save
@@ -965,10 +959,8 @@ QA matrices live in `docs/VALIDATION.md`.
   advertised styles/roles, intensity and exact silence controls; Google Cloud exposes gain, encoding, sample rate and device profile. Edge
   supports prosody rate/pitch/volume; Google Translate exposes only normal/slow speech.
   Pitch controls use provider units and omit unsupported Google voice families.
-  `TtsPauseSlider` separates the usual UI ranges (provider silence 0–1000 ms, playback
-  sentence delay 0–2000 ms, both in 10 ms increments) from service/storage limits.
-  Existing larger values expand only their own slider until explicitly edited,
-  preserving old preferences and exact synthesis durations.
+  Provider silence is bounded to 0–1000 ms and playback sentence delay to 0–2000 ms.
+  `TtsPauseSlider` uses these fixed ranges in 10 ms increments.
   `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
   removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
 - Cloud configuration, self-hosted configuration and model discovery share credential draft
@@ -980,7 +972,7 @@ QA matrices live in `docs/VALIDATION.md`.
   the key draft and connection-test feedback; failure retains the saved key and permits retry.
   `TtsAzureRegion` lists the supported public-cloud neural TTS regions with stable region codes
   as display labels. Azure configuration uses the shared themed dropdown with compact rows and no
-  default selection; invalid saved IDs require reselection without rewriting preferences.
+  default selection.
   Save/Test are gated by a supported region in both UI and ViewModel, while key deletion
   stays independent. Translator continues using its authorization response's region.
 - `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial

@@ -59,8 +59,6 @@ internal fun TtsProviderConfiguration(
                     region, regions, enabled = !busy, compact = true,
                 ) { region = it; tested = false; failure = null }
                 Text(stringResource(R.string.tts_azure_region_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-                if (region.isNotBlank() && selectedRegion == null) Text(stringResource(R.string.tts_azure_region_invalid),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             OutlinedTextField(apiKey, { apiKey = it; tested = false; failure = null }, modifier = Modifier.fillMaxWidth(),
                 enabled = !busy, singleLine = true, label = { Text(stringResource(R.string.tts_api_key)) },

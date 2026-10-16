@@ -1,15 +1,15 @@
 package moe.antimony.hoshi.features.tts
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
+
+internal const val ttsProviderPauseMaxMs = 1000
+internal const val ttsSentencePauseMaxMs = 2000L
 
 @Serializable
 enum class TtsAudioFormat { Wav, Mp3 }
 
 /** Provider parameters; unsupported controls are neither shown nor added to requests. */
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
 data class TtsSynthesisOptions(
     val volume: Float = 0f,
     val style: String = "",
@@ -21,16 +21,16 @@ data class TtsSynthesisOptions(
     val semicolonMs: Int = -1,
     val enumerationCommaMs: Int = -1,
     val sentenceBoundaryMs: Int = -1,
-    @EncodeDefault val format: TtsAudioFormat = TtsAudioFormat.Mp3,
+    val format: TtsAudioFormat = TtsAudioFormat.Mp3,
     val sampleRate: Int = 24000,
     val effectsProfile: String = "",
 ) {
     fun normalized(source: TtsOnlineSource?) = copy(
         volume = volume.takeIf { it.isFinite() }?.coerceIn(if (source == TtsOnlineSource.GoogleCloud) -96f..16f else -100f..100f) ?: 0f,
         styleDegree = styleDegree.takeIf { it.isFinite() }?.coerceIn(.01f, 2f) ?: 1f,
-        leadingMs = leadingMs.coerceIn(-1, 20000), trailingMs = trailingMs.coerceIn(-1, 20000),
-        commaMs = commaMs.coerceIn(-1, 20000), semicolonMs = semicolonMs.coerceIn(-1, 20000),
-        enumerationCommaMs = enumerationCommaMs.coerceIn(-1, 20000), sentenceBoundaryMs = sentenceBoundaryMs.coerceIn(-1, 20000),
+        leadingMs = leadingMs.coerceIn(-1, ttsProviderPauseMaxMs), trailingMs = trailingMs.coerceIn(-1, ttsProviderPauseMaxMs),
+        commaMs = commaMs.coerceIn(-1, ttsProviderPauseMaxMs), semicolonMs = semicolonMs.coerceIn(-1, ttsProviderPauseMaxMs),
+        enumerationCommaMs = enumerationCommaMs.coerceIn(-1, ttsProviderPauseMaxMs), sentenceBoundaryMs = sentenceBoundaryMs.coerceIn(-1, ttsProviderPauseMaxMs),
         sampleRate = sampleRate.takeIf { it in listOf(16000, 24000, 48000) } ?: 24000,
         effectsProfile = effectsProfile.takeIf { it in googleAudioProfiles } ?: "",
     )

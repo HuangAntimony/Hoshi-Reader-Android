@@ -36,8 +36,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   success/error feedback stay visible in a fixed footer for cloud and self-hosted sources,
   without requiring another scroll after testing. Saved cloud API keys can be deleted
   immediately after confirmation, preserving other source settings. Azure regions use
-  a compact dropdown of region codes, requiring an explicit selection
-  for new or invalid configurations. Source errors
+  a compact dropdown of region codes with no default selection. Source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   the Voice picker provides a manual refresh action at the top for every source,
@@ -85,7 +84,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   anchored at the right-side control, Google device profiles, and
   extra playback pauses between sentences. Pause sliders use 10 ms increments, with
   a normal range of 0–1000 ms for provider silence and 0–2000 ms for extra sentence
-  pauses; previously saved longer pauses remain intact until edited. Changing extra
+  pauses. Changing extra
   sentence pause takes effect at the next boundary without stopping narration or
   regenerating cached audio. Independent setting edits preserve other saved preferences.
   MP3 sources retain MP3 for playback and Anki.
@@ -105,8 +104,7 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Settings. Replacement text accepts readings, other text and punctuation; leaving it empty
   deletes the matching text from speech. Fully deleted sentences are skipped during continuous
   playback without sending empty synthesis requests. Supported substitutions include
-  dashes or ellipses replaced with commas/periods for engine-controlled pauses. Existing
-  pronunciation entries remain compatible and default to literal matching. Add an opt-in
+  dashes or ellipses replaced with commas/periods for engine-controlled pauses. Add an opt-in
   regular-expression switch to replacement creation/editing, with capture-group substitution,
   book/global scope and validation. Explicit literal entries and available ruby take priority
   over regex rules. Both modes show the original and actual TTS input before preview; rules

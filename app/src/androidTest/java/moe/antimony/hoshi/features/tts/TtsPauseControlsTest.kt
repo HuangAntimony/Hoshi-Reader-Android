@@ -60,21 +60,6 @@ class TtsPauseControlsTest {
         compose.runOnIdle { assertEquals(2000L, state.value.sentencePauseMs) }
     }
 
-    @Test fun legacyLongPauseSurvivesOtherEditsAndCanReturnToFineGrainedRange() {
-        val state = controls(TtsSettings(engine = TtsOnlineSource.Azure.id)
-            .withOptions(TtsSynthesisOptions(leadingMs = 12345)))
-        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)).onFirst()
-            .performSemanticsAction(SemanticsActions.SetProgress) { it(6f) }
-        compose.runOnIdle {
-            assertEquals(6, state.value.prefetchSentences)
-            assertEquals(12345, state.value.options().leadingMs)
-        }
-        setProvider(310f)
-        compose.runOnIdle { assertEquals(310, state.value.options().leadingMs) }
-        setProvider(1200f)
-        compose.runOnIdle { assertEquals(1000, state.value.options().leadingMs) }
-    }
-
     private fun enabledPauses(options: TtsSynthesisOptions) = listOf(options.leadingMs, options.trailingMs,
         options.commaMs, options.semicolonMs, options.enumerationCommaMs, options.sentenceBoundaryMs).filter { it >= 0 }
 }

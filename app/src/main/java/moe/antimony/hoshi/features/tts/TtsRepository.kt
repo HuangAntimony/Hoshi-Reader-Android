@@ -10,7 +10,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
 
 @Serializable
 data class TtsSettings(
@@ -40,22 +40,10 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     private val json = Json { ignoreUnknownKeys = true }
     val preferences = store.data.map { decode(it[key]) }
     private fun decode(value: String?): TtsPreferences {
-        val preferences = value?.let {
-            val stored = json.parseToJsonElement(it).jsonObject
-            val settings = (stored["settings"] as? JsonObject)?.let(::restoreTtsVoiceSelections)
-            // Older saved options/profiles omitted the WAV default. New saves always encode format.
-            val restored = settings?.let { fields -> JsonObject(fields.mapValues { (field, entry) -> when (field) {
-                "parameters" -> JsonObject(entry.jsonObject.mapValues { (_, options) -> storedFormat(options) })
-                "customSources" -> JsonArray(entry.jsonArray.map(::storedFormat))
-                else -> entry
-            } }) }
-            json.decodeFromJsonElement<TtsPreferences>(if (restored == null) stored else JsonObject(stored + ("settings" to restored)))
-        } ?: TtsPreferences()
-        return preferences.copy(settings = preferences.settings.copy(playbackRate = normalizeTtsPlaybackRate(preferences.settings.playbackRate)))
-    }
-
-    private fun storedFormat(value: JsonElement): JsonObject = value.jsonObject.let {
-        if ("format" in it) it else JsonObject(it + ("format" to JsonPrimitive(TtsAudioFormat.Wav.name)))
+        val preferences = value?.let { json.decodeFromString<TtsPreferences>(it) } ?: TtsPreferences()
+        return preferences.copy(settings = preferences.settings.copy(
+            playbackRate = normalizeTtsPlaybackRate(preferences.settings.playbackRate),
+            sentencePauseMs = preferences.settings.sentencePauseMs.coerceIn(0, ttsSentencePauseMaxMs)))
     }
 
     suspend fun settings(update: TtsSettingsUpdate): Pair<TtsSettings, TtsSettings> {
@@ -75,7 +63,7 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
             ?: settings.rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
         val pitchRange = if (settings.isCustomSource()) null else ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
-        return settings.withRate(rate).copy(pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
+        return settings.withRate(rate).copy(pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, ttsSentencePauseMaxMs),
             prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
             playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })

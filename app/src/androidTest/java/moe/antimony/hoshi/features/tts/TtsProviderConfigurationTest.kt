@@ -60,7 +60,7 @@ class TtsProviderConfigurationTest {
         compose.onNodeWithText(text(R.string.tts_azure_region_select)).assertDoesNotExist()
     }
 
-    @Test fun invalidSavedRegionRequiresReselectionButStillAllowsKeyDeletion() {
+    @Test fun unsupportedRegionLeavesSelectionEmptyAndKeyDeletionAvailable() {
         val config = mutableStateOf(TtsOnlineConfig("east", "encrypted-fixture"))
         var saves = 0
         compose.setContent {
@@ -72,7 +72,6 @@ class TtsProviderConfigurationTest {
             }
         }
         compose.onNodeWithText(text(R.string.tts_azure_region_select)).assertExists()
-        compose.onNodeWithText(text(R.string.tts_azure_region_invalid)).assertExists()
         compose.onNodeWithText(text(R.string.tts_test_connection)).assertIsNotEnabled()
         compose.onNodeWithText(text(R.string.action_save)).assertIsNotEnabled()
         compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
@@ -80,7 +79,6 @@ class TtsProviderConfigurationTest {
         compose.runOnIdle { assertEquals("", config.value.encryptedKey); assertEquals("east", config.value.region); assertEquals(0, saves) }
         compose.onNodeWithText(text(R.string.tts_azure_region)).performScrollTo().performClick()
         compose.onNodeWithText("eastasia").performScrollTo().performClick()
-        compose.onNodeWithText(text(R.string.tts_azure_region_invalid)).assertDoesNotExist()
         compose.onNodeWithText(text(R.string.action_save)).assertIsEnabled()
         compose.runOnIdle { assertEquals("east", config.value.region); assertEquals(0, saves) }
     }

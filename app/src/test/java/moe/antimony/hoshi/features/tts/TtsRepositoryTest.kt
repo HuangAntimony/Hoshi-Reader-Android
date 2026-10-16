@@ -35,21 +35,6 @@ class TtsRepositoryTest {
         assertEquals(restored, repository.preferences.first())
     }
 
-    @Test fun legacyFlatVoiceAndAutomaticCustomVoiceKeepTheirSelectionsAfterReload() = runTest {
-        val key = stringPreferencesKey("preferences")
-        for ((json, expected) in listOf(
-            """{"settings":{"engine":"system.example","voice":"ja-JP","rate":1.5}}""" to "ja-JP",
-            """{"settings":{"engine":"custom:one","customSources":[{"id":"custom:one","voice":"alice"}]}}""" to "alice",
-            """{"settings":{"engine":"custom:one","voice":"","customSources":[{"id":"custom:one","voice":"alice"}]}}""" to "",
-        )) {
-            val store = MemoryStore(preferencesOf(key to json))
-            val repository = TtsRepository(store)
-            assertEquals(expected, repository.preferences.first().settings.voice)
-            repository.settings { it.copy(playbackRate = 2f) }
-            assertEquals(expected, TtsRepository(store).preferences.first().settings.voice)
-        }
-    }
-
     @Test fun requestLocalVoiceOverrideKeepsSourceConfigurationAndSavedRouting() {
         val profile = TtsCustomSource("custom:test", "Local", rate = 1.5f)
         val original = TtsSettings(engine = profile.id, customSources = listOf(profile))
@@ -92,31 +77,31 @@ class TtsRepositoryTest {
         assertEquals("encrypted", saved.online.getValue(TtsOnlineSource.Azure.id).encryptedKey)
     }
 
-    @Test fun legacyActiveAndInactiveSourceVoicesRatesAndCredentialsSurviveEditingAndReload() = runTest {
-        val key = stringPreferencesKey("preferences")
-        val store = MemoryStore(preferencesOf(key to """{"settings":{
-          "engine":"custom:one","voice":"alice","rate":1.5,"playbackRate":2.5,
-          "online":{"online:azure":{"region":"eastasia","encryptedKey":"cloud-cipher"}},
-          "customSources":[
-            {"id":"custom:one","name":"One","baseUrl":"https://one.example/v1/","model":"tts","voice":"alice","rate":1.5,"encryptedKey":"local-cipher","format":"Mp3"},
-            {"id":"custom:two","name":"Two","baseUrl":"https://two.example/v1/","model":"other","voice":"bob","rate":2.0}],
-          "routingBySource":{"custom:one":{"enabled":true,"narration":"alice","dialogue":"carol"},
-            "online:edge":{"narration":"ja-JP-NanamiNeural"}}
-        },"words":[{"id":"word","surface":"々","reading":"","regex":false}]}"""))
+    @Test fun activeAndInactiveSourceSelectionsSurviveEditingAndReload() = runTest {
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
-        val old = repository.preferences.first().settings
-        assertEquals("alice", old.voice)
-        assertEquals(1.5f, old.rate)
-        assertEquals("carol", old.routing().dialogue)
-        repository.saveSource(old.customSource()!!.copy(name = "Renamed"))
+        val first = TtsCustomSource("custom:one", "One", baseUrl = "https://one.example/v1/",
+            model = "tts", rate = 1.5f, encryptedKey = "local-cipher")
+        val second = TtsCustomSource("custom:two", "Two", baseUrl = "https://two.example/v1/",
+            model = "other", rate = 2f, format = TtsAudioFormat.Wav)
+        repository.saveSource(first)
+        repository.settings { it.withRouting(TtsVoiceRouting(true, "alice", "carol")) }
+        repository.saveSource(second)
+        repository.settings { it.withVoice("bob") }
+        repository.settings { it.selectSource(TtsOnlineSource.Edge.id).withVoice("ja-JP-NanamiNeural") }
+        repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "cloud-cipher"))
+        repository.settings { it.selectSource(first.id).copy(playbackRate = 2.5f) }
+        repository.save(TtsWord("word", "々", ""))
+        repository.saveSource(first.copy(name = "Renamed"))
         val restored = TtsRepository(store).preferences.first()
         assertEquals("alice", restored.settings.voice)
+        assertEquals(1.5f, restored.settings.rate)
         assertEquals("carol", restored.settings.routing().dialogue)
-        assertEquals("bob", restored.settings.selectSource("custom:two").voice)
-        assertEquals(2f, restored.settings.selectSource("custom:two").rate)
-        assertEquals(TtsAudioFormat.Wav, restored.settings.selectSource("custom:two").customSource()!!.format)
-        assertEquals("ja-JP-NanamiNeural", restored.settings.selectSource("online:edge").voice)
-        assertEquals("cloud-cipher", restored.settings.online.getValue("online:azure").encryptedKey)
+        assertEquals("bob", restored.settings.selectSource(second.id).voice)
+        assertEquals(2f, restored.settings.selectSource(second.id).rate)
+        assertEquals(TtsAudioFormat.Wav, restored.settings.selectSource(second.id).customSource()!!.format)
+        assertEquals("ja-JP-NanamiNeural", restored.settings.selectSource(TtsOnlineSource.Edge.id).voice)
+        assertEquals("cloud-cipher", restored.settings.online.getValue(TtsOnlineSource.Azure.id).encryptedKey)
         assertEquals("local-cipher", restored.settings.customSource()!!.encryptedKey)
         assertEquals(2.5f, restored.settings.playbackRate)
         assertEquals("", restored.words.single().replacement)
@@ -200,27 +185,25 @@ class TtsRepositoryTest {
         }
     }
 
-    @Test fun legacyOmittedFormatsStayWavWhileUnconfiguredSourcesUseMp3() = runTest {
+    @Test fun omittedFormatsUseTheSameMp3DefaultForEverySource() = runTest {
         val store = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{
-          "engine":"online:azure","parameters":{"online:azure":{},"online:google-cloud":{"format":"Mp3"}},
-          "customSources":[{"id":"custom:legacy","name":"Legacy","baseUrl":"http://127.0.0.1/v1","model":"tts"}]}}
+          "engine":"online:azure","parameters":{"online:azure":{},"online:google-cloud":{"format":"Wav"}},
+          "customSources":[{"id":"custom:test","name":"Local","baseUrl":"http://127.0.0.1/v1","model":"tts"}]}}
         """))
         val repository = TtsRepository(store)
         val settings = repository.preferences.first().settings
-        assertEquals(TtsAudioFormat.Wav, settings.options().format)
-        assertEquals(TtsAudioFormat.Wav, settings.customSources.single().format)
-        assertEquals(TtsAudioFormat.Mp3, settings.copy(engine = TtsOnlineSource.GoogleCloud.id).options().format)
+        assertEquals(TtsAudioFormat.Mp3, settings.options().format)
+        assertEquals(TtsAudioFormat.Mp3, settings.customSources.single().format)
+        assertEquals(TtsAudioFormat.Wav, settings.copy(engine = TtsOnlineSource.GoogleCloud.id).options().format)
         assertEquals(TtsAudioFormat.Mp3, settings.copy(engine = TtsOnlineSource.MicrosoftTranslator.id).options().format)
-        repository.settings { settings.copy(playbackRate = 2f) }
-        val restored = TtsRepository(store).preferences.first().settings
-        assertEquals(TtsAudioFormat.Wav, restored.options().format)
-        assertEquals(TtsAudioFormat.Wav, restored.customSources.single().format)
+        repository.settings { it.copy(playbackRate = 2f) }
+        assertEquals(settings.copy(playbackRate = 2f), TtsRepository(store).preferences.first().settings)
     }
 
-    @Test fun rubyDefaultsOnForLegacyPreferencesAndIsPersistedGloballyAcrossSourceChanges() = runTest {
-        val key = stringPreferencesKey("preferences")
-        val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))
+    @Test fun rubyDefaultsOnAndIsPersistedGloballyAcrossSourceChanges() = runTest {
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
+        repository.settings { it.withRate(1.5f) }
         assertTrue(repository.preferences.first().settings.useRubyReadings)
         repository.useRubyReadings(false)
         assertNull(repository.save(TtsWord("fixture", "今日", "きょう", "book")))
@@ -231,10 +214,10 @@ class TtsRepositoryTest {
         assertFalse(TtsRepository(store).preferences.first().settings.useRubyReadings)
     }
 
-    @Test fun legacyPlaybackDefaultsToNormalAndPersistsIndependentlyOfEngineRate() = runTest {
-        val key = stringPreferencesKey("preferences")
-        val store = MemoryStore(preferencesOf(key to """{"settings":{"engine":"online:google-translate","rate":0.5}}"""))
+    @Test fun playbackDefaultsToNormalAndPersistsIndependentlyOfEngineRate() = runTest {
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
+        repository.settings { it.selectSource(TtsOnlineSource.GoogleTranslate.id).withRate(.5f) }
         val original = repository.preferences.first().settings
         assertEquals(1f, original.playbackRate)
         repository.settings { original.copy(playbackRate = 2.5f) }
@@ -243,7 +226,7 @@ class TtsRepositoryTest {
         assertEquals(.5f, restored.rate)
     }
 
-    @Test fun invalidRestoredPlaybackRateIsClampedBeforeReachingPlayersOrUi() = runTest {
+    @Test fun outOfRangePlaybackRateIsClampedBeforeReachingPlayersOrUi() = runTest {
         val key = stringPreferencesKey("preferences")
         for ((value, expected) in listOf(-10 to .5f, 10 to 3f)) {
             val repository = TtsRepository(MemoryStore(preferencesOf(key to """{"settings":{"playbackRate":$value}}""")))
@@ -260,16 +243,26 @@ class TtsRepositoryTest {
         }
     }
 
-    @Test fun legacySettingsDefaultToFivePrefetchedSentencesAndConfiguredCountSurvivesReload() = runTest {
-        val key = stringPreferencesKey("preferences")
-        val store = MemoryStore(preferencesOf(key to """{"settings":{"rate":1.5}}"""))
+    @Test fun prefetchDefaultsToFiveAndConfiguredCountSurvivesReload() = runTest {
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
-        val legacy = repository.preferences.first().settings
-        assertEquals(5, legacy.prefetchSentences)
-        repository.settings { legacy.copy(prefetchSentences = 6) }
+        repository.settings { it.withRate(1.5f) }
+        val initial = repository.preferences.first().settings
+        assertEquals(5, initial.prefetchSentences)
+        repository.settings { initial.copy(prefetchSentences = 6) }
         val restored = TtsRepository(store).preferences.first().settings
         assertEquals(6, restored.prefetchSentences)
         assertEquals(1.5f, restored.rate)
+    }
+
+    @Test fun pausesStayWithinTheRangesAvailableInTheControls() = runTest {
+        val repository = TtsRepository(MemoryStore(preferencesOf()))
+        repository.settings { it.copy(engine = TtsOnlineSource.Azure.id, sentencePauseMs = 5000)
+            .withOptions(TtsSynthesisOptions(leadingMs = 20000, trailingMs = -50)) }
+        val settings = repository.preferences.first().settings
+        assertEquals(2000L, settings.sentencePauseMs)
+        assertEquals(1000, settings.options().leadingMs)
+        assertEquals(-1, settings.options().trailingMs)
     }
 
     @Test fun savingPrefetchCountClampsToSupportedBounds() = runTest {
@@ -288,21 +281,19 @@ class TtsRepositoryTest {
         assertEquals(rules, TtsRepository(store).preferences.first().words)
     }
 
-    @Test fun legacyReadingsAndArbitraryReplacementsSurviveSettingsChangesAndReload() = runTest {
+    @Test fun scopedReplacementsPreserveTextAndPersistAcrossSettingsEdits() = runTest {
         val key = stringPreferencesKey("preferences")
-        val store = MemoryStore(preferencesOf(key to """{"words":[{"id":"legacy","surface":"東京","reading":"とうきょう","bookId":"book"}]}"""))
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
-        val legacy = repository.preferences.first().words.single()
-        assertEquals("とうきょう", legacy.replacement)
+        val pronunciation = TtsWord("pronunciation", "東京", "とうきょう", "book")
         val global = TtsWord("global", "――", "。")
         val local = TtsWord("local", "――", " \n、 ", "book")
-        assertNull(repository.save(global))
-        assertNull(repository.save(local))
+        listOf(pronunciation, global, local).forEach { assertNull(repository.save(it)) }
         assertEquals(TtsWordError.Duplicate, repository.save(local.copy(id = "duplicate")))
-        repository.settings { TtsSettings().withRate(1.5f) }
+        repository.settings { it.withRate(1.5f) }
 
         val reloaded = TtsRepository(store).preferences.first()
-        assertEquals(listOf(legacy, global, local), reloaded.words)
+        assertEquals(listOf(pronunciation, global, local), reloaded.words)
         assertEquals(1.5f, reloaded.settings.rate)
         val sentence = TtsText.chapter(0, "<p>東京――続く。</p>").single()
         assertEquals("とうきょう \n、 続く。", TtsText.spoken(sentence, "book", reloaded.words))
@@ -312,10 +303,11 @@ class TtsRepositoryTest {
         repository.delete(local.id)
         assertEquals("とうきょう。続く。", TtsText.spoken(sentence, "book", repository.preferences.first().words))
     }
-    @Test fun regexEntriesRoundTripAndLegacyEntriesRemainLiteral() = runTest {
-        val store = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to
-            """{"words":[{"id":"old","surface":"(時)々","reading":"$1$1"}]}"""))
+
+    @Test fun literalIsTheDefaultAndRegexEntriesPersistIndependently() = runTest {
+        val store = MemoryStore(preferencesOf())
         val repository = TtsRepository(store)
+        assertNull(repository.save(TtsWord("literal", "(時)々", "\$1\$1")))
         assertFalse(repository.preferences.first().words.single().regex)
         val regex = TtsWord("new", "(時)々", "\$1\$1", regex = true)
         assertNull(repository.save(regex))

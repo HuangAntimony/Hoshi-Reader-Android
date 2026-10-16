@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Keys preserve the disk names and configuration fingerprints used by earlier releases. */
+/** Catalog identity combines the source with its connection configuration. */
 internal data class TtsVoiceCatalogKey(val fileName: String, val configuration: String, val allowEmpty: Boolean) {
     companion object {
         fun online(source: TtsOnlineSource, config: TtsOnlineConfig) = TtsVoiceCatalogKey(

@@ -961,7 +961,6 @@
     <string name="tts_azure_region" comment="TTS online source configuration">语音资源区域</string>
     <string name="tts_azure_region_select" comment="Azure Speech resource region selection">请选择区域</string>
     <string name="tts_azure_region_hint" comment="Azure Speech resource region selection">请选择 API 密钥对应的 Azure Speech 资源区域。</string>
-    <string name="tts_azure_region_invalid" comment="Azure Speech resource region selection">已保存的区域不在支持列表中，请重新选择。</string>
     <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
     <string name="tts_key_saved_hint" comment="TTS online source configuration">密钥已配置；留空可保留现有密钥。</string>
     <string name="tts_delete_key">删除密钥</string>
@@ -971,7 +970,7 @@
     <string name="tts_connection_success" comment="TTS online source configuration">连接已验证</string>
     <string name="tts_rate_slow" comment="TTS online source configuration">慢速</string>
     <string name="tts_rate_normal" comment="TTS online source configuration">普通</string>
-    <string name="tts_configuration_error" comment="TTS online source configuration">请先配置此来源，检查区域和 API 密钥；恢复的设置可能需要重新填写密钥。</string>
+    <string name="tts_configuration_error" comment="TTS online source configuration">请检查此来源的配置。</string>
     <string name="tts_authentication_error" comment="TTS online source configuration">服务拒绝访问。请检查凭据与 API 权限；非官方来源可稍后重试。</string>
     <string name="tts_rate_limit_error" comment="TTS online source configuration">已达到服务配额或请求上限，请检查账户或稍后重试。</string>
     <string name="tts_network_error" comment="TTS online source configuration">无法连接语音服务，请检查网络后重试。</string>

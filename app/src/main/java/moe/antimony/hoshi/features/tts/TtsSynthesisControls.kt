@@ -27,7 +27,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         val value = it.roundToInt()
         onChange { current -> current.copy(prefetchSentences = value) }
     }
-    TtsPauseSlider(R.string.tts_sentence_pause, settings.sentencePauseMs.coerceIn(0, 5000).toInt(), usualMaximum = 2000) {
+    TtsPauseSlider(R.string.tts_sentence_pause, settings.sentencePauseMs.coerceIn(0, ttsSentencePauseMaxMs).toInt(), maximum = ttsSentencePauseMaxMs.toInt()) {
         val value = it.toLong()
         onChange { current -> current.copy(sentencePauseMs = value) }
     }
@@ -116,10 +116,8 @@ private fun TtsPauseControl(label: Int, value: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun TtsPauseSlider(label: Int, value: Int, usualMaximum: Int = 1000, onChange: (Int) -> Unit) {
-    // Preserve a previously saved longer pause until the user explicitly changes it.
-    val maximum = ((maxOf(usualMaximum, value) + 9) / 10) * 10
-    TtsParameterSlider(label, value.toFloat(), 0f..maximum.toFloat(), maximum / 10 - 1,
+private fun TtsPauseSlider(label: Int, value: Int, maximum: Int = ttsProviderPauseMaxMs, onChange: (Int) -> Unit) {
+    TtsParameterSlider(label, value.coerceIn(0, maximum).toFloat(), 0f..maximum.toFloat(), maximum / 10 - 1,
         { stringResource(R.string.tts_milliseconds, it.roundToInt()) }) { onChange(it.roundToInt()) }
 }
 

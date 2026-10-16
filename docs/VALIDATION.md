@@ -1054,8 +1054,8 @@ Validate relevant sync/update/Sasayaki changes with:
 
 ## Japanese TTS
 
-- `TtsRepositoryTest` restores legacy active/inactive voices, source rates, dialogue
-  choices, credentials and WAV/MP3 defaults through edit/reload. Deferred independent
+- `TtsRepositoryTest` verifies active/inactive voices, source rates, dialogue
+  choices, credentials and WAV/MP3 selection through edit/reload. Deferred independent
   setting edits must preserve newer credentials and behavior settings. Switching sources
   retains the existing shared rate behavior for installed/built-in engines and independent
   rates for custom servers.
@@ -1108,11 +1108,11 @@ Validate relevant sync/update/Sasayaki changes with:
   missing/invalid credentials, 429/quota and offline errors, draft test/cancel/save,
   Japanese catalogs, WAV/MP3 exports, and supported parameters. Never claim mocked
   response coverage as a successful live account test. Reopening configuration must
-  keep the saved key masked; leaving it empty preserves it. Restored settings without
-  the Keystore key must request reconfiguration.
+  keep the saved key masked; leaving it empty preserves it. An unavailable
+  Keystore key must report a configuration error.
   Azure's region dropdown starts at Choose a region and never preselects the first item.
   Verify compact rows displaying only region codes, scrolling to the end of the list, valid
-  saved selection on reopen, and a reselection warning for invalid saved IDs. Save/Test
+  saved selection on reopen. Save/Test
   require a supported selection; changing it clears previous verification. Cancel leaves
   the saved region unchanged. `TtsProviderConfigurationTest` and `TtsPanelStateTest`
   cover UI drafts and ViewModel validation with isolated preferences.
@@ -1126,13 +1126,12 @@ Validate relevant sync/update/Sasayaki changes with:
   must come from the selected voice, reset when changing voices, and include only valid
   styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
   Verify normal provider pause sliders span 0–1000 ms and extra sentence delay spans
-  0–2000 ms, both allowing 300 → 310 ms. Restored longer values must survive edits
-  to unrelated parameters and return to the usual slider range once reduced. Run
+  0–2000 ms, both allowing 300 → 310 ms. Run
   `TtsPauseControlsTest` explicitly with `am instrument`; it uses isolated Compose
   controls and in-memory preferences without network requests or saved-device changes.
   Google Translate's engine rate offers normal/slow only. Unsupported pitch controls must be hidden.
 - Hoshi playback speed is independent of engine rate, spans 0.5–3.0× in 0.05 steps,
-  and defaults to 1× for existing preferences. Change it during narration, preview,
+  and defaults to 1×. Change it during narration, preview,
   preparation and pause: ready audio and pending prefetch remain reusable, preview
   keeps playing, and paused audio does not resume. Reopen settings/recreate the service
   player to verify persistence; test Google Translate's two engine rates independently.
@@ -1171,7 +1170,7 @@ Validate relevant sync/update/Sasayaki changes with:
   token. `OnlineTtsEngineTest` covers every source, concurrent requests, engine recreation,
   config changes and force retry with fixture responses. `TtsVoiceCatalogCacheTest`
   covers same-configuration request coalescing, independent source requests, cancelled/
-  failed refresh, memory eviction, optional empty lists and reading legacy disk catalogs.
+  failed refresh, memory eviction, optional empty lists and persisted catalog reload.
   During a slow self-hosted refresh, cached catalog reads must return immediately rather
   than wait for the network; `CustomTtsEngineTest` checks this against a local test server.
   `TtsPanelStateTest` checks warm
@@ -1445,7 +1444,6 @@ Validate relevant sync/update/Sasayaki changes with:
 - Select self-hosted WAV/MP3 only under Voice; Source configuration contains
   no duplicate format control. Changing format preserves the selected voice and other
   server profiles, and switching sources restores each server's format.
-- New configurable cloud/self-hosted sources default to MP3. Restore saved WAV and MP3
-  choices, including legacy JSON that omitted default WAV fields, and verify both choices
+- Cloud/self-hosted sources default to MP3. Select WAV and MP3 and verify both choices
   survive an unrelated settings edit and repository recreation. Installed system synthesis
   continues to use WAV. `TtsRepositoryTest` covers these persistence boundaries.
