@@ -297,7 +297,7 @@ class TtsPlaybackControllerTest {
             assertEquals(1, output.playCount)
             assertFalse(cancelled)
             release.complete(Unit); runCurrent()
-            assertEquals(listOf("東京です。", "次です。", "三つです。"), audio.requests)
+            assertEquals(listOf("東京です。", "次です。", "三つです。", "四つです。"), audio.requests)
             controller.pause()
             repository.settings(repository.preferences.first().settings.copy(playbackRate = .5f)); runCurrent()
             assertEquals(.5f, output.appliedRate)
@@ -389,11 +389,11 @@ class TtsPlaybackControllerTest {
             assertEquals(1, output.playCount)
         }
     }
-    @Test fun prefetchIsBoundedAndNavigationUsesSentences() = runTest {
-        fixture { controller, output, audio, _ ->
+    @Test fun defaultPrefetchPreparesFiveFollowingSentencesAndNavigationUsesSentences() = runTest {
+        fixture(fixtureBook = shortSentencesBook) { controller, output, audio, _ ->
             controller.play(); runCurrent()
             assertEquals(1, output.playCount)
-            assertEquals(3, audio.requests.size)
+            assertEquals(listOf("一。", "二。", "三。", "四。", "五。", "六。"), audio.requests)
             output.onEnded(); runCurrent()
             assertEquals(1, controller.state.value.index)
             assertEquals(2, output.playCount)

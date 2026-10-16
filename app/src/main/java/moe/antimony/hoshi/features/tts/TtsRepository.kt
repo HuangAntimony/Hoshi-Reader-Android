@@ -21,7 +21,7 @@ data class TtsSettings(
     val customSources: List<TtsCustomSource> = emptyList(),
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
-    val prefetchSentences: Int = 2, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
+    val prefetchSentences: Int = 5, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
     val routingBySource: Map<String, TtsVoiceRouting> = emptyMap(),
 )
 internal val ttsPlaybackRateRange = .5f..3f

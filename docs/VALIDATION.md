@@ -1121,8 +1121,8 @@ Validate relevant sync/update/Sasayaki changes with:
   Verify extra sentence delay waits only during continuous playback, is cancelled by
   stop/next/book/source changes, and resumes at the next sentence if paused in the gap;
   this application delay must not be inserted into Anki exports.
-- In Voice, verify Preload sentences supports 1–20 and defaults to 2
-  for existing settings. During playback, increase the count to fill the larger window
+- In Voice, verify Preload sentences supports 1–20 and defaults to 5
+  for new settings or settings without a saved count; preserve an explicitly saved count. During playback, increase the count to fill the larger window
   and decrease it to cancel excess pending synthesis. The current sentence must keep
   playing and completed audio must remain reusable. Repeat while paused, at book end,
   after reopening settings and with short sentences. Restore the original count.

@@ -973,7 +973,7 @@ QA matrices live in `docs/VALIDATION.md`.
   Cache lookups use a short metadata lock independently of the serial synthesis queue,
   so ready audio never waits for another sentence's network request. Continuous playback
   keeps valid in-flight prefetch and rolls its horizon forward by the saved 1–20 sentence
-  depth (default 2). Depth changes cancel/rebuild prefetch without pausing the current
+  depth (default 5). Depth changes cancel/rebuild prefetch without pausing the current
   sentence or invalidating completed audio. Hoshi playback speed (0.5–3.0×, default 1×)
   updates the attached player live with unchanged pitch; it preserves pause, preparation and
   prefetch, and is reapplied when the service player is recreated. Synthesis settings/dictionary changes and stop
