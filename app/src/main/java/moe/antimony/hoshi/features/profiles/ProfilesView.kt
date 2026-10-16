@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
@@ -60,6 +63,19 @@ internal fun ProfilesView(
     viewModel: ProfilesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.profileState.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    error?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            },
+        )
+    }
     ProfilesContent(
         state = state,
         onClose = onClose,

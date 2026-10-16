@@ -3,6 +3,10 @@ package moe.antimony.hoshi.features.wallpaper
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.diagnosticMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -78,10 +82,15 @@ enum class BookCoverPublishFailure {
     UnexpectedFailure,
 }
 
+internal class BookCoverTargetException(
+    val reason: BookCoverPublishFailure,
+    cause: Throwable,
+) : Exception(cause.message, cause)
+
 sealed interface BookCoverTargetResult {
     data object Skipped : BookCoverTargetResult
     data object Success : BookCoverTargetResult
-    data class Failed(val reason: BookCoverPublishFailure) : BookCoverTargetResult
+    data class Failed(val reason: BookCoverPublishFailure, val details: String? = null) : BookCoverTargetResult
 }
 
 data class BookCoverPublishResult(
@@ -141,8 +150,8 @@ class DefaultBookCoverPublisher(
             settings.first()
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
-            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable)
+        } catch (error: Exception) {
+            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable, error)
         }
         val lockEnabled = current.updateLockScreen
         val iReaderEnabled = current.updateIReaderBookCover
@@ -161,8 +170,8 @@ class DefaultBookCoverPublisher(
             renderer.render(coverFile, current.scaleMode)
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
-            val failed = BookCoverTargetResult.Failed(BookCoverPublishFailure.RenderFailed)
+        } catch (error: Exception) {
+            val failed = error.toBookCoverTargetFailure(BookCoverPublishFailure.RenderFailed)
             return BookCoverPublishResult(
                 lockScreen = if (lockEnabled) failed else BookCoverTargetResult.Skipped,
                 export = when {
@@ -178,8 +187,8 @@ class DefaultBookCoverPublisher(
                 lockScreenTarget.publish(rendered).toTargetResult()
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
-                BookCoverTargetResult.Failed(BookCoverPublishFailure.WallpaperUpdateFailed)
+            } catch (error: Exception) {
+                error.toBookCoverTargetFailure(BookCoverPublishFailure.WallpaperUpdateFailed)
             }
         } else {
             BookCoverTargetResult.Skipped
@@ -189,8 +198,8 @@ class DefaultBookCoverPublisher(
                 iReaderTarget.publish(rendered).toTargetResult()
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
-                BookCoverTargetResult.Failed(BookCoverPublishFailure.IReaderWriteFailed)
+            } catch (error: Exception) {
+                error.toBookCoverTargetFailure(BookCoverPublishFailure.IReaderWriteFailed)
             }
         } else {
             BookCoverTargetResult.Skipped
@@ -201,8 +210,8 @@ class DefaultBookCoverPublisher(
                 exportTarget.publish(rendered, exportUri).toTargetResult()
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
-                BookCoverTargetResult.Failed(BookCoverPublishFailure.ExportWriteFailed)
+            } catch (error: Exception) {
+                error.toBookCoverTargetFailure(BookCoverPublishFailure.ExportWriteFailed)
             }
             else -> BookCoverTargetResult.Skipped
         }
@@ -216,9 +225,18 @@ class DefaultBookCoverPublisher(
 
 internal fun BookCoverPublishResult.Companion.failedForAll(
     reason: BookCoverPublishFailure,
+    error: Throwable? = null,
 ): BookCoverPublishResult {
-    val failure = BookCoverTargetResult.Failed(reason)
+    val failure = error?.toBookCoverTargetFailure(reason) ?: BookCoverTargetResult.Failed(reason)
     return BookCoverPublishResult(lockScreen = failure, export = failure, iReader = failure)
+}
+
+internal fun Throwable.toBookCoverTargetFailure(defaultReason: BookCoverPublishFailure): BookCoverTargetResult.Failed {
+    val targetFailure = this as? BookCoverTargetException
+    val originalError = targetFailure?.cause ?: this
+    val details = originalError.diagnosticMessage()
+    ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.book_cover_wallpaper_publish_failed), originalError)
+    return BookCoverTargetResult.Failed(targetFailure?.reason ?: defaultReason, details)
 }
 
 private fun BookCoverPublishFailure?.toTargetResult(): BookCoverTargetResult =

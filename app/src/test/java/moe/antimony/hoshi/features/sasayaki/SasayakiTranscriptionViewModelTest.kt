@@ -277,7 +277,7 @@ class SasayakiTranscriptionViewModelTest {
         model.bind(temporary.newFolder(), "audio") {}
         runCurrent()
         assertFalse(model.uiState.value.isLoading)
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_storage), model.uiState.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_storage), UiText.Literal("Unable to read transcript file"))), model.uiState.value.error)
     }
 
     @Test fun downloadConfirmationGatesWorkAndCancellationKeepsSavedTranscriptUntouched() = runTest {
@@ -399,7 +399,7 @@ class SasayakiTranscriptionViewModelTest {
         var finishAlignment: CompletableDeferred<Unit>? = null
         val match = SasayakiMatchData(listOf(SasayakiMatch("1", 2.0, 3.0, "本文", 0, 0, 2)), 0)
         override suspend fun load(root: File): SasayakiTranscript? {
-            if (failLoad) error("Private file path must never reach the UI")
+            if (failLoad) error("Unable to read transcript file")
             return saved
         }
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }

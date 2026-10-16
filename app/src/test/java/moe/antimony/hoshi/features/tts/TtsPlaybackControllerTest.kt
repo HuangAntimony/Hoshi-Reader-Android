@@ -11,11 +11,37 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
 import org.junit.Assert.*
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun synthesisFailureKeepsCategoryAndNestedDiagnosticInPlaybackState() = runTest {
+        fixture { controller, _, audio, _ ->
+            audio.synthesize = { throw TtsException(TtsFailure.Network, cause = java.io.IOException("connection reset", java.io.IOException("proxy refused connection"))) }
+
+            controller.play(); runCurrent()
+
+            assertEquals(TtsFailure.Network, controller.state.value.error?.failure)
+            assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_network_error), UiText.Literal("connection reset\nproxy refused connection"))), controller.state.value.error?.message)
+            assertFalse(controller.state.value.playing)
+        }
+    }
+
+    @Test fun playbackFailureKeepsTheOriginalDecoderDiagnostic() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.play(); runCurrent()
+
+            output.onError(java.io.IOException("decoder initialization failed", IllegalArgumentException("unsupported sample rate 11025")))
+
+            assertEquals(TtsFailure.AudioUnavailable, controller.state.value.error?.failure)
+            assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_failed), UiText.Literal("decoder initialization failed\nunsupported sample rate 11025"))), controller.state.value.error?.message)
+            assertFalse(controller.state.value.playing)
+        }
+    }
+
     @Test fun silentSentencesAdvanceWithoutPlayingEmptyAudioOrAddingPauses() = runTest {
         fixture { controller, output, audio, repository ->
             repository.settings { TtsSettings(sentencePauseMs = 1000) }; runCurrent()
@@ -282,7 +308,7 @@ class TtsPlaybackControllerTest {
     private class Output : TtsPlaybackOutput {
         override var onEnded: () -> Unit = {}
         override var onPaused: () -> Unit = {}
-        override var onError: () -> Unit = {}
+        override var onError: (Throwable) -> Unit = {}
         var appliedRate = 1f
         var playCount = 0
         var prepared = emptyList<File>()
@@ -687,7 +713,7 @@ class TtsPlaybackControllerTest {
         fixture { controller, output, audio, _ ->
             audio.synthesize = { throw TtsException(TtsFailure.MissingJapanese) }
             controller.play(); runCurrent()
-            assertEquals(TtsFailure.MissingJapanese, controller.state.value.error)
+            assertEquals(TtsFailure.MissingJapanese, controller.state.value.error?.failure)
             assertFalse(controller.state.value.playing)
             audio.synthesize = {}
             controller.play(); runCurrent()

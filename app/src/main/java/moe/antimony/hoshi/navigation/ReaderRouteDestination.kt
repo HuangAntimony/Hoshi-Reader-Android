@@ -3,6 +3,9 @@ package moe.antimony.hoshi.navigation
 import android.util.Log
 import android.view.KeyEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +30,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import androidx.compose.material3.TextButton
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.reader.ReaderLoadingPage
 import moe.antimony.hoshi.features.reader.ReaderSettings
@@ -59,7 +64,16 @@ internal fun ReaderRouteDestination(
 ) {
     val appContainer = LocalHoshiUiDependencies.current
     val bookCoverWallpaperViewModel: BookCoverWallpaperViewModel = hiltViewModel()
-    val bookCoverSnackbarHostState = remember { SnackbarHostState() }
+    var operationError by remember { mutableStateOf<String?>(null) }
+    operationError?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = { operationError = null },
+            text = { ErrorDetailsText(message) },
+            confirmButton = {
+                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
     val statisticsSaveFailedMessage = stringResource(R.string.statistics_operation_failed)
     val bookCoverPublishFailedMessage = stringResource(R.string.book_cover_wallpaper_publish_failed)
     val iReaderNotSelectedMessage =
@@ -118,7 +132,7 @@ internal fun ReaderRouteDestination(
     val bookCoverPublicationCoordinator = remember { ReaderBookCoverPublicationCoordinator() }
     val bookCoverPublicationEvent = when (val state = routeState) {
         ReaderRouteRenderState.Loading,
-        ReaderRouteRenderState.Error,
+        is ReaderRouteRenderState.Error,
         -> ReaderBookCoverPublicationEvent.NotReady
         is ReaderRouteRenderState.Ready -> ReaderBookCoverPublicationEvent.Ready(
             bookId = state.loadState.entry.metadata.id,
@@ -136,7 +150,7 @@ internal fun ReaderRouteDestination(
                         iReaderNotSelectedMessage
                     else -> bookCoverPublishFailedMessage
                 }
-                bookCoverSnackbarHostState.showSnackbar(message)
+                operationError = bookCoverPublishFailureMessage(result, message)
             }
         } else if (readyState == null) {
             bookCoverPublicationCoordinator.shouldPublish(ReaderBookCoverPublicationEvent.NotReady)
@@ -195,7 +209,8 @@ internal fun ReaderRouteDestination(
             backgroundColor = Color(readerSettings.backgroundColor(systemDarkTheme)),
             modifier = modifier.fillMaxSize(),
         )
-        ReaderRouteRenderState.Error -> ReaderOpenFailurePage(
+        is ReaderRouteRenderState.Error -> ReaderOpenFailurePage(
+            error = state.cause,
             onClose = onClose,
             modifier = modifier,
         )
@@ -236,8 +251,8 @@ internal fun ReaderRouteDestination(
                                 )
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
-                            } catch (_: Exception) {
-                                bookmarkScope.launch { bookCoverSnackbarHostState.showSnackbar(statisticsSaveFailedMessage) }
+                            } catch (error: Exception) {
+                                bookmarkScope.launch { operationError = statisticsSaveFailedMessage.withErrorDetails(error) }
                             }
                         }
                         scheduleExport(readyState.entry)
@@ -247,10 +262,6 @@ internal fun ReaderRouteDestination(
                     contentLanguageProfile = state.contentLanguageProfile,
                     onClose = onClose,
                     modifier = Modifier.fillMaxSize(),
-                )
-                SnackbarHost(
-                    hostState = bookCoverSnackbarHostState,
-                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
         }
@@ -267,11 +278,12 @@ internal sealed interface ReaderRouteRenderState {
         val loadGeneration: Int = 0,
     ) : ReaderRouteRenderState
 
-    data object Error : ReaderRouteRenderState
+    data class Error(val cause: Throwable) : ReaderRouteRenderState
 }
 
 @Composable
 internal fun ReaderOpenFailurePage(
+    error: Throwable,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -283,7 +295,8 @@ internal fun ReaderOpenFailurePage(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = stringResource(R.string.reader_open_failed),
+            text = stringResource(R.string.reader_open_failed).withErrorDetails(error),
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Button(onClick = onClose) {
@@ -301,18 +314,25 @@ internal suspend fun ReaderRouteLoadState.activateProfileAndPrepareRender(
 ): ReaderRouteRenderState =
     when (this) {
         is ReaderRouteLoadState.Ready -> {
-            beforeProfileActivation()
-            val contentLanguageProfile = activateForBook(entry.metadata)
-            ReaderRouteRenderState.Ready(
-                loadState = this,
-                readerSettings = loadReaderSettings(),
-                contentLanguageProfile = contentLanguageProfile,
-                loadGeneration = loadGeneration,
-            )
+            try {
+                beforeProfileActivation()
+                val contentLanguageProfile = activateForBook(entry.metadata)
+                ReaderRouteRenderState.Ready(
+                    loadState = this,
+                    readerSettings = loadReaderSettings(),
+                    contentLanguageProfile = contentLanguageProfile,
+                    loadGeneration = loadGeneration,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                clearLoadedProfile()
+                ReaderRouteRenderState.Error(error)
+            }
         }
-        ReaderRouteLoadState.Error -> {
+        is ReaderRouteLoadState.Error -> {
             clearLoadedProfile()
-            ReaderRouteRenderState.Error
+            ReaderRouteRenderState.Error(cause)
         }
         ReaderRouteLoadState.Loading -> ReaderRouteRenderState.Loading
     }

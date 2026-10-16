@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 sealed interface SettingsLoadState<out T> {
     data object Loading : SettingsLoadState<Nothing>
@@ -41,7 +42,7 @@ internal fun <A, B, R> combineSettingsLoadStates(
 internal fun <T> Flow<T>.settingsLoadStates(): Flow<SettingsLoadState<T>> =
     map<T, SettingsLoadState<T>> { SettingsLoadState.Loaded(it) }.catch { error ->
         if (error is CancellationException) throw error
-        emit(SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed)))
+        emit(SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)))
     }
 
 internal data class SettingsLoader<T>(val state: SettingsLoadState<T>, val retry: () -> Unit)

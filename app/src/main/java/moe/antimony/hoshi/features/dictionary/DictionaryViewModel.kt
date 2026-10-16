@@ -40,6 +40,7 @@ import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.settings.settingsLoadStates
 import moe.antimony.hoshi.profiles.ProfileRepository
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal interface DictionaryViewModelRepository {
     suspend fun loadDictionaries(): Map<DictionaryType, List<DictionaryInfo>>
@@ -316,10 +317,10 @@ internal class DictionaryViewModel : ViewModel {
                 reloadDictionaries(clearError = true)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 if (generation != profileGeneration) return@launch
                 _uiState.update {
-                    val message = UiText.Resource(R.string.settings_load_failed)
+                    val message = UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)
                     it.copy(
                         dictionariesLoadState = if (it.dictionariesLoadState is SettingsLoadState.Loaded) {
                             it.dictionariesLoadState
@@ -373,9 +374,9 @@ internal class DictionaryViewModel : ViewModel {
                 _uiState.update { it.copy(strokeOrderFontInstalled = true) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _uiState.update {
-                    it.copy(errorMessage = UiText.Resource(R.string.dictionary_stroke_order_font_download_failed))
+                    it.copy(errorMessage = UiText.Resource(R.string.dictionary_stroke_order_font_download_failed).withErrorDetails(error))
                 }
             } finally {
                 _uiState.update {
@@ -393,23 +394,26 @@ internal class DictionaryViewModel : ViewModel {
     ) {
         scope.launch {
             _uiState.update { it.copy(isImporting = true, currentImportMessage = null, errorMessage = null) }
-            runCatching {
-                withContext(ioDispatcher) {
-                    importOperation { progress ->
-                        _uiState.update { state ->
-                            state.copy(currentImportMessage = progress.message())
+            try {
+                runCatching {
+                    withContext(ioDispatcher) {
+                        importOperation { progress ->
+                            _uiState.update { state ->
+                                state.copy(currentImportMessage = progress.message())
+                            }
                         }
                     }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    _uiState.update {
+                        it.copy(
+                            errorMessage = UiText.Resource(R.string.dictionary_download_failed).withErrorDetails(error),
+                        )
+                    }
                 }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.dictionary_download_failed),
-                    )
-                }
+            } finally {
+                _uiState.update { it.copy(isImporting = false, currentImportMessage = null) }
             }
-            _uiState.update { it.copy(isImporting = false, currentImportMessage = null) }
         }
     }
 
@@ -418,36 +422,39 @@ internal class DictionaryViewModel : ViewModel {
     ) {
         scope.launch {
             _uiState.update { it.copy(isUpdating = true, currentImportMessage = null, errorMessage = null) }
-            runCatching {
-                withContext(ioDispatcher) {
-                    updateOperation { progress ->
-                        _uiState.update { state ->
-                            state.copy(currentImportMessage = progress.message())
+            try {
+                runCatching {
+                    withContext(ioDispatcher) {
+                        updateOperation { progress ->
+                            _uiState.update { state ->
+                                state.copy(currentImportMessage = progress.message())
+                            }
                         }
                     }
-                }
-            }.onSuccess { summary ->
-                if (summary.failures.isNotEmpty()) {
+                }.onSuccess { summary ->
+                    if (summary.failures.isNotEmpty()) {
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = UiText.Resource(
+                                    R.string.dictionary_update_failed_list_format,
+                                    summary.failures.joinToString(separator = "\n") { failure ->
+                                        "${failure.title}: ${failure.message}"
+                                    },
+                                ),
+                            )
+                        }
+                    }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
                     _uiState.update {
                         it.copy(
-                            errorMessage = UiText.Resource(
-                                R.string.dictionary_update_failed_list_format,
-                                summary.failures.joinToString(separator = "\n") { failure ->
-                                    "${failure.title}: ${failure.message}"
-                                },
-                            ),
+                            errorMessage = UiText.Resource(R.string.dictionary_update_failed).withErrorDetails(error),
                         )
                     }
                 }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        errorMessage = error.localizedMessage?.let(UiText::Literal)
-                            ?: UiText.Resource(R.string.dictionary_update_failed),
-                    )
-                }
+            } finally {
+                _uiState.update { it.copy(isUpdating = false, currentImportMessage = null) }
             }
-            _uiState.update { it.copy(isUpdating = false, currentImportMessage = null) }
         }
     }
 
@@ -536,8 +543,11 @@ internal class DictionaryViewModel : ViewModel {
             }
             if (result.getOrDefault(false)) continue
 
+            val error = result.exceptionOrNull()
+            if (error is CancellationException) throw error
             _uiState.update {
-                it.copy(errorMessage = UiText.Resource(R.string.dictionary_category_update_failed))
+                val summary = UiText.Resource(R.string.dictionary_category_update_failed)
+                it.copy(errorMessage = error?.let(summary::withErrorDetails) ?: summary)
             }
             reloadDictionaryLists(clearError = false)
         }

@@ -50,6 +50,32 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Hilt only when the current UI path reads it.
 - Many screens use Hilt-backed ViewModels with immutable UI state exposed through
   `StateFlow`.
+- `ui/ErrorDetails.kt` appends distinct exception messages and their cause chain
+  to localized operation/category summaries, using the exception type when a
+  message is absent. Existing error dialogs, snackbars and retry states retain
+  these diagnostics across repository and UI state boundaries; cancellation is
+  propagated rather than rendered as failure. Typed failure categories continue
+  to control recovery without replacing the original reason.
+- Handled runtime errors enter `ErrorDiagnosticEvents` through those adapters or
+  explicit failure-boundary recording before a typed/string result drops the
+  original exception. A Hilt-singleton `NonfatalDiagnosticsLogger` drains the
+  bounded event buffer on the IO dispatcher and atomically persists the latest
+  100 records in app-specific `diagnostics/handled-errors.json`. Records retain
+  timestamp, localized operation, original message/type and causal stack;
+  actual service/platform error responses can be recorded without inventing an
+  exception. Repeated rendering of the same Throwable is deduplicated by weak
+  identity, while distinct retries remain separate. Diagnostics snapshots flush
+  queued events and preserve crash/process-exit history. Once drained, batches
+  finish their bounded IO writes even if the requesting screen is cancelled.
+  Invalid JSON retains its original parse failure in a rebuilt log and keeps one
+  copy of the damaged file; other IO failures do not overwrite history.
+  Report sharing uses a bounded cache of FileProvider-backed text files instead
+  of large Intent text payloads. The Diagnostics overview shows
+  app/WebView metadata and separate typed Nav3 entries for captured crashes,
+  runtime errors and system process-exit history. Lists show short summaries;
+  selecting a record opens its selectable detail dialog, without nested list
+  scrolling. Save/share always use
+  the complete report from either overview or record list.
 - Settings and small persisted preferences are stored behind DataStore-backed
   repositories.
 - Persisted settings controls are composed through the required
@@ -176,7 +202,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Dictionary imports preserve typed native failures through the repository;
   batch results pair each failed file with a `UiText` reason. Error-dialog text
   resolves joined resource fragments in the UI locale, retaining native details
-  without exposing arbitrary exception messages. Cancellation propagates while
+  together with the original diagnostic message and cause chain. Cancellation propagates while
   completed imports still publish the mutation change version.
 - Lookup frequency order and selected dictionary are profile-scoped settings.
   Every lookup entry point passes typed options to the native query; sorting
@@ -631,7 +657,8 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   existing matches; completed transcripts can be realigned without ASR.
   Typed failures distinguish audio access, model/runtime resource preparation,
   speech recognition, book matching, and transcript storage; the UI maps each
-  category to a localized message. Unknown failures show the original exception
+  category to a localized message, followed by the original diagnostic details.
+  Unknown failures also show the original exception
   and cause chain in the UI, and Logcat records the full stack with its operation
   stage and category.
 - Match sidecars record `source` as `subtitles` or `transcription`. Legacy Android

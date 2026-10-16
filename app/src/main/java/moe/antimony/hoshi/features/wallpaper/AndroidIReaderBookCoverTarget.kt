@@ -32,7 +32,7 @@ class AndroidIReaderBookCoverTarget @Inject constructor(
         isSupported = isIReaderDeviceBrand(Build.MANUFACTURER, Build.BRAND) &&
             logoDirectory.isDirectory &&
             logoDirectory.canWrite(),
-        isBookCoverScreenSaverSelected = isIReaderBookCoverScreenSaverSelected(wallpaperSetting()),
+        isBookCoverScreenSaverSelected = isIReaderBookCoverScreenSaverSelected(runCatching { wallpaperSetting() }.getOrNull()),
     )
 
     override suspend fun publish(image: File): BookCoverPublishFailure? {
@@ -58,9 +58,7 @@ class AndroidIReaderBookCoverTarget @Inject constructor(
     )
 
     private fun wallpaperSetting(): String? =
-        runCatching {
-            Settings.System.getString(context.contentResolver, IReaderWallpaperSetting)
-        }.getOrNull()
+        Settings.System.getString(context.contentResolver, IReaderWallpaperSetting)
 }
 
 internal fun isIReaderDeviceBrand(manufacturer: String, brand: String): Boolean {

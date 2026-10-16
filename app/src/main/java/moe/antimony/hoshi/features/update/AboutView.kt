@@ -45,11 +45,14 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.ui.withErrorDetails
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
+import androidx.compose.foundation.text.selection.SelectionContainer
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.settings.rememberSettingsLoader
 import moe.antimony.hoshi.features.storage.StorageCleanupCategoryId
@@ -100,9 +103,9 @@ fun AboutScreen(
                             }.fold(
                                 onSuccess = { StorageCleanupUiState.Ready(it) },
                                 onFailure = { error ->
+                                    if (error is CancellationException) throw error
                                     StorageCleanupUiState.Error(
-                                        error.localizedMessage
-                                            ?: resources.getString(R.string.about_storage_cleanup_failed),
+                                        resources.getString(R.string.about_storage_cleanup_failed).withErrorDetails(error),
                                     )
                                 },
                             )
@@ -145,9 +148,9 @@ fun AboutScreen(
                     }.fold(
                         onSuccess = { AboutUpdateCheckState.Result(it) },
                         onFailure = { error ->
+                            if (error is CancellationException) throw error
                             AboutUpdateCheckState.Error(
-                                error.localizedMessage
-                                    ?: resources.getString(R.string.about_update_download_failed),
+                                resources.getString(R.string.about_update_download_failed).withErrorDetails(error),
                             )
                         },
                     )
@@ -236,10 +239,9 @@ fun AboutScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text(
+                        AboutStatusText(
                             text = storageCleanupStatusText(resources, cleanupState),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            isError = cleanupState is StorageCleanupUiState.Error,
                         )
                         val report = cleanupState.reportOrNull()
                         if (report != null && report.categories.isNotEmpty()) {
@@ -274,9 +276,9 @@ fun AboutScreen(
                                         }.fold(
                                             onSuccess = { StorageCleanupUiState.Ready(it) },
                                             onFailure = { error ->
+                                                if (error is CancellationException) throw error
                                                 StorageCleanupUiState.Error(
-                                                    error.localizedMessage
-                                                        ?: resources.getString(R.string.about_storage_scan_failed),
+                                                    resources.getString(R.string.about_storage_scan_failed).withErrorDetails(error),
                                                 )
                                             },
                                         )
@@ -320,10 +322,9 @@ fun AboutScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text(
+                        AboutStatusText(
                             text = updateStatusText(resources, checkState, actionableRecord),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            isError = checkState.hasError(actionableRecord),
                         )
                         Spacer(Modifier.height(16.dp))
                         Row(
@@ -347,9 +348,9 @@ fun AboutScreen(
                                                 AboutUpdateCheckState.Result(outcome)
                                             },
                                             onFailure = { error ->
+                                                if (error is CancellationException) throw error
                                                 AboutUpdateCheckState.Error(
-                                                    error.localizedMessage
-                                                        ?: resources.getString(R.string.about_update_check_failed),
+                                                    resources.getString(R.string.about_update_check_failed).withErrorDetails(error),
                                                 )
                                             },
                                         )
@@ -389,9 +390,9 @@ fun AboutScreen(
                                             }.fold(
                                                 onSuccess = { AboutUpdateCheckState.Result(it) },
                                                 onFailure = { error ->
+                                                    if (error is CancellationException) throw error
                                                     AboutUpdateCheckState.Error(
-                                                        error.localizedMessage
-                                                            ?: resources.getString(R.string.about_update_download_failed),
+                                                        resources.getString(R.string.about_update_download_failed).withErrorDetails(error),
                                                     )
                                                 },
                                             )
@@ -427,6 +428,29 @@ fun AboutScreen(
 }
 
 @Composable
+private fun AboutStatusText(text: String, isError: Boolean) {
+    if (isError) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.dialog_error_title), style = MaterialTheme.typography.labelLarge)
+                SelectionContainer { Text(text) }
+            }
+        }
+    } else {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun AboutCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -444,6 +468,13 @@ private sealed interface AboutUpdateCheckState {
     data object Checking : AboutUpdateCheckState
     data class Result(val outcome: UpdateCheckOutcome) : AboutUpdateCheckState
     data class Error(val message: String) : AboutUpdateCheckState
+}
+
+private fun AboutUpdateCheckState.hasError(record: UpdateDownloadRecord?): Boolean = when (this) {
+    is AboutUpdateCheckState.Error -> true
+    AboutUpdateCheckState.Idle -> record?.status == UpdateDownloadRecordStatus.Failed
+    is AboutUpdateCheckState.Result -> outcome is UpdateCheckOutcome.Available && record?.status == UpdateDownloadRecordStatus.Failed
+    AboutUpdateCheckState.Checking -> false
 }
 
 private sealed interface StorageCleanupUiState {
@@ -525,7 +556,7 @@ private fun updateStatusText(
             UpdateDownloadRecordStatus.Skipped -> resources.getString(R.string.about_update_skipped_format, record.versionName)
             UpdateDownloadRecordStatus.Downloading -> resources.getString(R.string.about_update_downloading)
             UpdateDownloadRecordStatus.Downloaded -> resources.getString(R.string.about_update_downloaded_format, record.versionName)
-            UpdateDownloadRecordStatus.Failed -> resources.getString(R.string.about_update_last_download_failed)
+            UpdateDownloadRecordStatus.Failed -> record.failureMessage(resources.getString(R.string.about_update_last_download_failed))
             null -> resources.getString(R.string.about_update_check_github)
         }
         AboutUpdateCheckState.Checking -> resources.getString(R.string.about_update_checking_github)
@@ -534,7 +565,9 @@ private fun updateStatusText(
             UpdateCheckOutcome.UpToDate -> resources.getString(R.string.about_update_latest)
             UpdateCheckOutcome.NoInstallableAsset -> resources.getString(R.string.about_update_no_matching_apk)
             is UpdateCheckOutcome.Skipped -> resources.getString(R.string.about_update_skipped_format, outcome.update.versionName)
-            is UpdateCheckOutcome.Available -> resources.getString(R.string.about_update_available_format, outcome.update.versionName)
+            is UpdateCheckOutcome.Available -> if (record?.status == UpdateDownloadRecordStatus.Failed) {
+                record.failureMessage(resources.getString(R.string.about_update_last_download_failed))
+            } else resources.getString(R.string.about_update_available_format, outcome.update.versionName)
             is UpdateCheckOutcome.DownloadStarted -> resources.getString(R.string.about_update_downloading_format, outcome.update.versionName)
             is UpdateCheckOutcome.DownloadInProgress -> resources.getString(
                 R.string.about_update_already_downloading_format,
@@ -546,3 +579,6 @@ private fun updateStatusText(
             )
         }
     }
+
+internal fun UpdateDownloadRecord.failureMessage(summary: String): String =
+    listOfNotNull(summary, failureDetails?.takeIf(String::isNotBlank)).distinct().joinToString("\n")

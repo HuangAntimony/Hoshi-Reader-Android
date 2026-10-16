@@ -9,6 +9,49 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OnlineTtsTransportTest {
+    @Test fun serviceDiagnosticsRedactOnlyTheSubmittedCredential() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(401).setBody("API key echoed-fixture-secret was rejected for this model"))
+            val error = runCatching {
+                OnlineTtsTransport(client()).request(Request.Builder().url(server.url("/speech"))
+                    .header("Authorization", "Bearer echoed-fixture-secret").build())
+            }.exceptionOrNull()!!
+
+            assertFalse(error.toString().contains("echoed-fixture-secret"))
+            val stack = java.io.StringWriter().also { error.printStackTrace(java.io.PrintWriter(it)) }.toString()
+            assertFalse(stack.contains("echoed-fixture-secret"))
+            assertTrue(error.message.orEmpty().contains("401"))
+            assertTrue(error.message.orEmpty().contains("was rejected for this model"))
+        }
+    }
+
+    @Test fun serviceFailurePreservesStatusAndResponseDiagnostic() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(422).setBody("speaker identifier missing"))
+
+            val error = runCatching {
+                OnlineTtsTransport(client()).request(Request.Builder().url(server.url("/speech")).build())
+            }.exceptionOrNull() as TtsException
+
+            assertEquals(TtsFailure.InvalidResponse, error.failure)
+            assertTrue(error.message.orEmpty().contains("422"))
+            assertTrue(error.message.orEmpty().contains("speaker identifier missing"))
+        }
+    }
+
+    @Test fun connectionFailurePreservesTheOriginalNetworkCause() = runBlocking {
+        val unavailable = MockWebServer()
+        unavailable.start()
+        val request = Request.Builder().url(unavailable.url("/speech")).build()
+        unavailable.shutdown()
+
+        val error = runCatching { OnlineTtsTransport(client()).request(request) }.exceptionOrNull() as TtsException
+
+        assertEquals(TtsFailure.Network, error.failure)
+        assertTrue("The connection failure must survive transport classification", error.cause is java.io.IOException)
+        assertTrue(error.cause?.message.orEmpty().isNotBlank())
+    }
+
     private fun client() = OkHttpClient.Builder().callTimeout(3, TimeUnit.SECONDS).build()
 
     @Test fun requestTimeoutIsReportedSeparatelyFromNetworkFailure() = runBlocking {
@@ -22,7 +65,7 @@ class OnlineTtsTransportTest {
         }
     }
 
-    @Test fun mapsServiceFailuresWithoutLeakingResponseOrCredentials() = runBlocking {
+    @Test fun mapsServiceFailuresWithResponseDiagnosticAndWithoutRequestCredentials() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setResponseCode(403).setBody("private key rejected"))
             val transport = OnlineTtsTransport(client())
@@ -32,7 +75,7 @@ class OnlineTtsTransportTest {
             } catch (error: TtsException) {
                 assertEquals(TtsFailure.Authentication, error.failure)
                 assertFalse(error.toString().contains("secret"))
-                assertFalse(error.toString().contains("private"))
+                assertTrue(error.toString().contains("private key rejected"))
             }
             assertEquals(TtsFailure.RateLimited, OnlineTtsTransport.httpFailure(429))
             assertEquals(TtsFailure.Network, OnlineTtsTransport.httpFailure(503))

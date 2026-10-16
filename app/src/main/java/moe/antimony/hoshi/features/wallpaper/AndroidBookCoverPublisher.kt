@@ -21,6 +21,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.CacheDir
 import moe.antimony.hoshi.di.IoDispatcher
@@ -169,7 +170,10 @@ class AndroidBookCoverLockScreenTarget @Inject constructor(
                 onSuccess = { wallpaperId ->
                     if (wallpaperId == 0) BookCoverPublishFailure.WallpaperUpdateFailed else null
                 },
-                onFailure = { BookCoverPublishFailure.WallpaperUpdateFailed },
+                onFailure = { error ->
+                    if (error is CancellationException) throw error
+                    throw BookCoverTargetException(BookCoverPublishFailure.WallpaperUpdateFailed, error)
+                },
             )
         }
     }
@@ -181,8 +185,13 @@ class AndroidBookCoverExportTarget @Inject constructor(
 ) : BookCoverExportTarget {
     override suspend fun publish(image: File, targetUri: String): BookCoverPublishFailure? =
         withContext(ioDispatcher) {
-            val uri = runCatching { Uri.parse(targetUri) }.getOrNull()
-                ?: return@withContext BookCoverPublishFailure.ExportTargetMissing
+            val uri = try {
+                Uri.parse(targetUri)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw BookCoverTargetException(BookCoverPublishFailure.ExportTargetMissing, error)
+            }
             val hasWriteGrant = contentResolver.persistedUriPermissions.any { permission ->
                 permission.uri == uri && permission.isWritePermission
             }
@@ -196,10 +205,12 @@ class AndroidBookCoverExportTarget @Inject constructor(
                     descriptor.fileDescriptor.sync()
                 }
                 null
-            } catch (_: SecurityException) {
-                BookCoverPublishFailure.ExportPermissionLost
-            } catch (_: Exception) {
-                BookCoverPublishFailure.ExportWriteFailed
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: SecurityException) {
+                throw BookCoverTargetException(BookCoverPublishFailure.ExportPermissionLost, error)
+            } catch (error: Exception) {
+                throw BookCoverTargetException(BookCoverPublishFailure.ExportWriteFailed, error)
             }
         }
 }

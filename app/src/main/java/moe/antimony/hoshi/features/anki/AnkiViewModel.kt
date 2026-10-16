@@ -21,6 +21,8 @@ import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.settings.map
 import moe.antimony.hoshi.features.settings.settingsLoadStates
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.withErrorDetails
 
 data class AnkiUiState(
     val profileId: String? = null,
@@ -474,41 +476,69 @@ internal class AnkiViewModel @Inject constructor(
         viewModelScope.launch { repository.updateSettings { it.copy(showAllHandlebars = value) } }
     }
 
-    suspend fun minePreparedEntry(formatId: String?, rawPayload: String, context: AnkiMiningContext): Boolean =
-        repository.mineEntry(rawPayload, context, _uiState.value.availableDecks, _uiState.value.availableNoteTypes, formatId)
+    suspend fun minePreparedEntry(
+        formatId: String?,
+        rawPayload: String,
+        context: AnkiMiningContext,
+        onWarning: (Throwable) -> Unit,
+    ): Boolean {
+        var synchronizationFailure: Throwable? = null
+        val added = repository.mineEntry(
+            rawPayload, context, _uiState.value.availableDecks, _uiState.value.availableNoteTypes, formatId,
+            onSynchronizationFailure = { synchronizationFailure = it },
+        )
+        synchronizationFailure?.let { error ->
+            reportPopupOperationFailure(error, onWarning, UiText.Resource(R.string.anki_sync_failed))
+        }
+        return added
+    }
 
-    fun mineEntryAsync(formatId: String?, rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) {
+    fun mineEntryAsync(
+        formatId: String?, rawPayload: String, context: AnkiMiningContext,
+        onError: (Throwable) -> Unit,
+        onWarning: (Throwable) -> Unit = onError,
+        onResult: (Boolean) -> Unit,
+    ) {
         viewModelScope.launch {
             val mined = runCatching {
-                repository.mineEntry(
-                    rawPayload = rawPayload,
-                    context = context,
-                    decks = _uiState.value.availableDecks,
-                    noteTypes = _uiState.value.availableNoteTypes,
-                    formatId = formatId,
-                )
-            }.getOrDefault(false)
+                minePreparedEntry(formatId, rawPayload, context, onWarning)
+            }.getOrElse { error -> reportPopupOperationFailure(error, onError) }
             onResult(mined)
         }
     }
 
-    fun mineEntryAsync(rawPayload: String, context: AnkiMiningContext, onResult: (Boolean) -> Unit) =
-        mineEntryAsync(null, rawPayload, context, onResult)
+    fun mineEntryAsync(rawPayload: String, context: AnkiMiningContext, onError: (Throwable) -> Unit, onResult: (Boolean) -> Unit) =
+        mineEntryAsync(null, rawPayload, context, onError, onResult = onResult)
 
     fun duplicateStatesAsync(valuesByHandlebar: Map<String, String>, onResult: (Map<String, Boolean>) -> Unit) {
         viewModelScope.launch {
             onResult(runCatching {
                 repository.duplicateStates(valuesByHandlebar, _uiState.value.availableDecks, _uiState.value.availableNoteTypes)
-            }.getOrDefault(emptyMap()))
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+                emptyMap()
+            })
         }
     }
 
-    fun showNotesAsync(formatId: String, valuesByHandlebar: Map<String, String>, onResult: (Boolean) -> Unit) {
+    fun showNotesAsync(formatId: String, valuesByHandlebar: Map<String, String>, onError: (Throwable) -> Unit, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             onResult(runCatching {
                 repository.showNotes(formatId, valuesByHandlebar, _uiState.value.availableDecks, _uiState.value.availableNoteTypes)
-            }.getOrDefault(false))
+            }.getOrElse { error -> reportPopupOperationFailure(error, onError) })
         }
+    }
+
+    private fun reportPopupOperationFailure(
+        error: Throwable,
+        onError: (Throwable) -> Unit,
+        operation: UiText = UiText.Resource(R.string.anki_operation_failed),
+    ): Boolean {
+        if (error is CancellationException) throw error
+        _uiState.update { it.copy(errorMessage = operation.withErrorDetails(error)) }
+        onError(error)
+        return false
     }
 
     fun duplicateCheckAsync(expression: String, onResult: (Boolean) -> Unit) {
@@ -519,7 +549,11 @@ internal class AnkiViewModel @Inject constructor(
                     decks = _uiState.value.availableDecks,
                     noteTypes = _uiState.value.availableNoteTypes,
                 )
-            }.getOrDefault(false)
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+                false
+            }
             onResult(isDuplicate)
         }
     }

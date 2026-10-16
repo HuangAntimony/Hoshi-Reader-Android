@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,15 +34,15 @@ internal fun TtsSourceConfigurationSheet(
 @Composable
 internal fun TtsProviderConfiguration(
     source: TtsOnlineSource, config: TtsOnlineConfig,
-    onTest: suspend (String, String) -> TtsFailure?, onSave: suspend (String, String) -> TtsFailure?, onDismiss: () -> Unit,
-    onDelete: suspend () -> TtsFailure?,
+    onTest: suspend (String, String) -> TtsError?, onSave: suspend (String, String) -> TtsError?, onDismiss: () -> Unit,
+    onDelete: suspend () -> TtsError?,
 ) {
     var region by remember(source) { mutableStateOf(config.region) }
     // Plaintext credentials stay out of saveable state; saved keys are never decrypted into the field.
     var apiKey by remember(source) { mutableStateOf("") }
     var busy by remember(source) { mutableStateOf(false) }
     var testing by remember(source) { mutableStateOf(false) }
-    var failure by remember(source) { mutableStateOf<TtsFailure?>(null) }
+    var failure by remember(source) { mutableStateOf<TtsError?>(null) }
     var tested by remember(source) { mutableStateOf(false) }
     var confirmDelete by remember(source) { mutableStateOf(false) }
     val selectedRegion = TtsAzureRegion.from(region)

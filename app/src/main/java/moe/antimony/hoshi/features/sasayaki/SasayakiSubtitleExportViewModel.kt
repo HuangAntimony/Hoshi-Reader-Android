@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal enum class SasayakiSubtitleExportAction { Save, Share }
 internal data class SasayakiSubtitleExportRequest(val file: File, val action: SasayakiSubtitleExportAction)
@@ -40,7 +41,7 @@ internal class SasayakiSubtitleExportViewModel @Inject constructor(
                 if (action == SasayakiSubtitleExportAction.Save) savedState[PendingSave] = file.path
                 _uiState.value = SasayakiSubtitleExportUiState(busy = true, request = SasayakiSubtitleExportRequest(file, action))
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) { launchFailed() }
+            } catch (error: Exception) { launchFailed(error) }
         }
     }
 
@@ -57,13 +58,14 @@ internal class SasayakiSubtitleExportViewModel @Inject constructor(
                 repository.save(file, destination)
                 _uiState.value = SasayakiSubtitleExportUiState(message = UiText.Resource(R.string.sasayaki_srt_saved))
             } catch (cancelled: CancellationException) { throw cancelled
-            } catch (_: Exception) { launchFailed() }
+            } catch (error: Exception) { launchFailed(error) }
         }
     }
 
-    fun launchFailed() {
+    fun launchFailed(error: Throwable? = null) {
         savedState.remove<String>(PendingSave)
-        _uiState.value = SasayakiSubtitleExportUiState(message = UiText.Resource(R.string.sasayaki_srt_export_failed))
+        val summary = UiText.Resource(R.string.sasayaki_srt_export_failed)
+        _uiState.value = SasayakiSubtitleExportUiState(message = error?.let(summary::withErrorDetails) ?: summary)
     }
 
     fun dismissMessage() { _uiState.value = _uiState.value.copy(message = null) }

@@ -12,6 +12,8 @@ import moe.antimony.hoshi.features.settings.SettingsLoadState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import moe.antimony.hoshi.ui.resolve
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -48,7 +50,7 @@ class DisplaySettingsViewModelTest {
         var attempts = 0
         val source = flow {
             attempts++
-            if (attempts == 1) throw IOException()
+            if (attempts == 1) throw IOException("display preference checksum mismatch")
             finishFirstRead.await()
             emit(persisted)
         }
@@ -56,6 +58,9 @@ class DisplaySettingsViewModelTest {
         val model = newModel()
         runCurrent()
         assertEquals(true, model.uiState.value.loadState is SettingsLoadState.Failed)
+        val failure = model.uiState.value.loadState as SettingsLoadState.Failed
+        assertTrue(failure.message.resolve({ _, _ -> "Load failed" }, { _, _, _ -> "" })
+            .contains("display preference checksum mismatch"))
         assertNull(model.uiState.value.settings)
 
         model.retryLoad()
@@ -193,7 +198,7 @@ class DisplaySettingsViewModelTest {
         val stored = MutableStateFlow(AppDisplaySettings())
         val model = DisplaySettingsViewModel(
             settings = stored,
-            updateSettings = { throw IOException() },
+            updateSettings = { throw IOException("display preference write failed", IOException("disk quota exceeded")) },
             setAutoSwitchValue = { _, _ -> },
             selectPresetValue = { _, _ -> },
             coroutineScope = backgroundScope,
@@ -209,6 +214,9 @@ class DisplaySettingsViewModelTest {
         assertEquals(0xFFFFFFFFL, stored.value.lightPalette.customBackgroundColor)
         assertEquals(0x7F123456L, model.uiState.value.paletteDraft?.backgroundColor)
         assertNotNull(model.uiState.value.error)
+        val message = requireNotNull(model.uiState.value.error).resolve({ _, _ -> "Save failed" }, { _, _, _ -> "" })
+        assertTrue(message.contains("display preference write failed"))
+        assertTrue(message.contains("disk quota exceeded"))
     }
 
     private fun TestScope.viewModel(stored: MutableStateFlow<AppDisplaySettings>) = DisplaySettingsViewModel(

@@ -36,7 +36,7 @@ class ReaderRouteProfileActivationTest {
     @Test
     fun loadingAndFailedBooksDoNotClearDictionary() = runBlocking {
         var resetCount = 0
-        listOf(ReaderRouteLoadState.Loading, ReaderRouteLoadState.Error).forEach { state ->
+        listOf(ReaderRouteLoadState.Loading, ReaderRouteLoadState.Error(IllegalStateException("Book unavailable"))).forEach { state ->
             state.activateProfileAndPrepareRender(
                 beforeProfileActivation = { resetCount++ },
                 activateForBook = { error("Book profile must not be activated") },
@@ -67,7 +67,7 @@ class ReaderRouteProfileActivationTest {
         var activatedMetadata: BookMetadata? = null
         var clearCount = 0
 
-        ReaderRouteLoadState.Error.publishProfileActivation(
+        ReaderRouteLoadState.Error(IllegalStateException("Book unavailable")).publishProfileActivation(
             activateForBook = { metadata -> activatedMetadata = metadata },
             clearLoadedProfile = { clearCount += 1 },
         )

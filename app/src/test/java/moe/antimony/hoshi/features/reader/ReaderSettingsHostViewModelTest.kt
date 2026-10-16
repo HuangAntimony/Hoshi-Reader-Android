@@ -16,6 +16,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.IOException
 import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.ui.resolve
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReaderSettingsHostViewModelTest {
@@ -105,13 +106,15 @@ class ReaderSettingsHostViewModelTest {
     @Test fun failedInitialMigrationRemainsUnloadedUntilRetrySucceeds() = runTest {
         var failed = true
         val model = ReaderSettingsHostViewModel(
-            flow { if (failed) throw IOException() else emit(ReaderSettings(fontSize = 30)) },
+            flow { if (failed) throw IOException("reader settings invalid JSON") else emit(ReaderSettings(fontSize = 30)) },
             {}, backgroundScope,
         )
         runCurrent()
         assertNull(model.uiState.value.settings)
         assertTrue(model.uiState.value.loadState is SettingsLoadState.Failed)
         assertNotNull(model.uiState.value.error)
+        assertTrue(requireNotNull(model.uiState.value.error).resolve({ _, _ -> "Load failed" }, { _, _, _ -> "" })
+            .contains("reader settings invalid JSON"))
         failed = false
         model.retry()
         assertEquals(SettingsLoadState.Loading, model.uiState.value.loadState)
@@ -233,11 +236,14 @@ class ReaderSettingsHostViewModelTest {
 
     @Test fun failedWriteKeepsLastConfirmedSettings() = runTest {
         val stored = MutableStateFlow(ReaderSettings(fontSize = 24))
-        val model = ReaderSettingsHostViewModel(stored, { throw IOException() }, backgroundScope)
+        val model = ReaderSettingsHostViewModel(stored, { throw IOException("reader settings write failed", IOException("permission denied")) }, backgroundScope)
         runCurrent()
         model.update { it.copy(fontSize = 32) }
         runCurrent()
         assertEquals(24, model.uiState.value.settings?.fontSize)
         assertNotNull(model.uiState.value.error)
+        val message = requireNotNull(model.uiState.value.error).resolve({ _, _ -> "Save failed" }, { _, _, _ -> "" })
+        assertTrue(message.contains("reader settings write failed"))
+        assertTrue(message.contains("permission denied"))
     }
 }

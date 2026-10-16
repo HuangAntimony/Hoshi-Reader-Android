@@ -41,7 +41,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
                 TtsWordEditorDialog(TtsWord("draft", "長い", "短い"), "book", TtsSentence(0, 0, 0, sentence),
-                    TtsPreferences(), false, null, {}, { saved = it; null }, {}, {})
+                    TtsPreferences(), false, null, {}, { saved = it; null }, { null }, {})
             }
         }
         val field = compose.onNodeWithText(text(R.string.tts_replacement))
@@ -64,7 +64,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(TtsWord("draft", "々", ""), "book", TtsSentence(0, 0, 1, "瑞々しい。"),
-                    TtsPreferences(), false, null, {}, { null }, {}, {}, previewDispatcher = dispatcher)
+                    TtsPreferences(), false, null, {}, { null }, { null }, {}, previewDispatcher = dispatcher)
             }
         }
         compose.onNode(isDialog()).assertDoesNotExist()
@@ -83,7 +83,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
-                    TtsPreferences(), false, null, { played = it }, { null }, {}, {}, previewDispatcher = dispatcher)
+                    TtsPreferences(), false, null, { played = it }, { null }, { null }, {}, previewDispatcher = dispatcher)
             }
         }
         dispatcher.completeNext()
@@ -107,7 +107,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
-                    TtsPreferences(), false, null, { played = it }, { saved = it; null }, {}, {}, previewDispatcher = dispatcher)
+                    TtsPreferences(), false, null, { played = it }, { saved = it; null }, { null }, {}, previewDispatcher = dispatcher)
             }
         }
         dispatcher.completeNext()
@@ -125,7 +125,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(TtsWord("draft", "東京", "とうきょう"), "book", TtsSentence(0, 0, 2, "東京へ。"),
-                    TtsPreferences(), false, null, { plays++ }, { null }, {}, {}, previewDispatcher = dispatcher)
+                    TtsPreferences(), false, null, { plays++ }, { null }, { null }, {}, previewDispatcher = dispatcher)
             }
         }
         dispatcher.completeNext()
@@ -146,7 +146,7 @@ class TtsWordEditorTest {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(draft, "book", TtsSentence(0, 0, 2, "東京。"),
                     TtsPreferences(words = listOf(draft)), false, null, { fail("Empty preview must not play") },
-                    { saved = it; validateTtsWord(it, listOf(draft)) }, {}, {})
+                    { saved = it; validateTtsWord(it, listOf(draft)) }, { null }, {})
             }
         }
         compose.onNodeWithText(text(R.string.tts_replacement)).performScrollTo().performTextClearance()
@@ -167,7 +167,7 @@ class TtsWordEditorTest {
             HoshiReaderTheme(darkTheme = false, eInkMode = eink, dynamicColor = false) {
                 TtsWordEditorDialog(draft, "book", TtsSentence(0, 0, 4, "時々東京"),
                     TtsPreferences(words = listOf(TtsWord("tokyo", "東京", "とうきょう"))), false, null,
-                    { played = it }, { saved = it; null }, {}, {})
+                    { played = it }, { saved = it; null }, { null }, {})
             }
         }
         compose.onNodeWithText(text(R.string.tts_replacement_before)).performScrollTo().assertIsDisplayed()
@@ -180,7 +180,7 @@ class TtsWordEditorTest {
         compose.onNodeWithText(text(R.string.action_save)).performClick()
         compose.runOnIdle { assertTrue(saved!!.regex); assertNull(saved!!.bookId) }
         compose.onNodeWithText(text(R.string.tts_regex_pattern)).performScrollTo().performTextReplacement("[")
-        compose.waitUntil(5000) { compose.onAllNodesWithText(text(R.string.tts_invalid_regex)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5000) { compose.onAllNodesWithText(text(R.string.tts_invalid_regex), substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(text(R.string.tts_preview)).performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("時時とうきょう").assertDoesNotExist()
     }
@@ -193,7 +193,7 @@ class TtsWordEditorTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsWordEditorDialog(draft, null, null, TtsPreferences(words = listOf(draft)), false, null,
-                    { played = it }, { saved = it; null }, {}, {})
+                    { played = it }, { saved = it; null }, { null }, {})
             }
         }
         compose.onNodeWithText(text(R.string.action_delete)).assertExists()

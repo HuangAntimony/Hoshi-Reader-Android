@@ -8,6 +8,17 @@ import org.junit.Test
 
 class SasayakiTranscriptionFailureTest {
     @Test
+    fun classifiedFailureKeepsItsCategoryAndUnderlyingDiagnostic() {
+        val error = IOException("model download failed", IOException("HTTP 503 Service Unavailable"))
+            .asSasayakiFailure(SasayakiFailureKind.ModelResources)
+
+        assertEquals(
+            UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_resources), UiText.Literal("model download failed\nHTTP 503 Service Unavailable"))),
+            error.toSasayakiFailureText(SasayakiFailureKind.Unknown),
+        )
+    }
+
+    @Test
     fun eachKnownFailureKindHasItsOwnLocalizedMessage() {
         val expected = mapOf(
             SasayakiFailureKind.AudioSource to R.string.sasayaki_transcription_error_audio,
@@ -29,7 +40,7 @@ class SasayakiTranscriptionFailureTest {
         val error = IllegalStateException("recognizer returned no stream", IOException("unsupported codec"))
 
         assertEquals(
-            UiText.Literal("java.lang.IllegalStateException: recognizer returned no stream\nCaused by: java.io.IOException: unsupported codec"),
+            UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_unknown), UiText.Literal("recognizer returned no stream\nunsupported codec"))),
             error.toSasayakiFailureText(SasayakiFailureKind.Unknown),
         )
     }
@@ -42,7 +53,7 @@ class SasayakiTranscriptionFailureTest {
         )
 
         assertEquals(
-            UiText.Literal("java.lang.IllegalStateException: recognizer returned no stream\nCaused by: java.io.IOException: unsupported codec"),
+            UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_unknown), UiText.Literal("recognizer returned no stream\nunsupported codec"))),
             error.toSasayakiFailureText(SasayakiFailureKind.Unknown),
         )
     }
@@ -50,7 +61,7 @@ class SasayakiTranscriptionFailureTest {
     @Test
     fun unknownFailureWithoutMessageStillShowsExceptionType() {
         assertEquals(
-            UiText.Literal("java.lang.IllegalStateException"),
+            UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_unknown), UiText.Literal("IllegalStateException"))),
             IllegalStateException().toSasayakiFailureText(SasayakiFailureKind.Unknown),
         )
     }

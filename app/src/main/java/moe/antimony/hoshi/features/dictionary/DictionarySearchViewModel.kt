@@ -25,6 +25,7 @@ import moe.antimony.hoshi.features.reader.ReaderSelectionData
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal interface DictionarySearchRepository {
     val dictionarySettings: Flow<DictionarySettings>
@@ -225,6 +226,7 @@ internal class DictionarySearchViewModel : ViewModel {
                     }
                 }
             }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 if (requestVersion == lookupVersion) {
                     _uiState.update {
                         it.copy(
@@ -233,8 +235,7 @@ internal class DictionarySearchViewModel : ViewModel {
                             results = emptyList(),
                             hasSearched = true,
                             isSearching = false,
-                            errorMessage = error.localizedMessage?.let(UiText::Literal)
-                                ?: UiText.Resource(R.string.dictionary_lookup_failed),
+                            errorMessage = UiText.Resource(R.string.dictionary_lookup_failed).withErrorDetails(error),
                             dictionaryStyles = emptyMap(),
                             popups = emptyList(),
                             resultClearSelectionSignal = 0,

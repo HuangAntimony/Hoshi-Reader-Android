@@ -143,6 +143,7 @@ import moe.antimony.hoshi.importing.SafImportDirectoryScanner
 import moe.antimony.hoshi.profiles.ProfileState
 import moe.antimony.hoshi.importing.importDisplayName
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
@@ -392,7 +393,7 @@ fun BookshelfView(
         AlertDialog(
             onDismissRequest = booksViewModel::consumeErrorMessage,
             title = { Text(stringResource(R.string.dialog_error_title)) },
-            text = { Text(message.asString()) },
+            text = { ErrorDetailsText(message.asString()) },
             confirmButton = {
                 TextButton(onClick = booksViewModel::consumeErrorMessage) {
                     Text(stringResource(R.string.action_ok))

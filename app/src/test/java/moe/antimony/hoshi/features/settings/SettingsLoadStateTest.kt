@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.resolve
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,8 +51,13 @@ class SettingsLoadStateTest {
 
     @Test
     fun loadFailureIsAnErrorRatherThanDefaultSettings() = runTest {
-        val result = flow<Boolean> { error("storage unavailable") }.settingsLoadStates().first()
-        assertEquals(SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed)), result)
+        val result = flow<Boolean> {
+            throw IllegalStateException("Unable to read preferences", java.io.IOException("disk quota exceeded"))
+        }.settingsLoadStates().first() as SettingsLoadState.Failed
+        val message = result.message.resolve({ _, _ -> "Unable to load settings" }, { _, _, _ -> "" })
+        assertTrue(message.contains("Unable to load settings"))
+        assertTrue(message.contains("Unable to read preferences"))
+        assertTrue(message.contains("disk quota exceeded"))
     }
 
     @Test

@@ -142,7 +142,7 @@ internal fun readerSearchQueryHasMatchableText(query: String): Boolean = query.i
 
 internal sealed interface ReaderSearchLoadResult<out T> {
     data class Success<T>(val value: T) : ReaderSearchLoadResult<T>
-    data object Failure : ReaderSearchLoadResult<Nothing>
+    data class Failure(val cause: Throwable) : ReaderSearchLoadResult<Nothing>
 }
 
 internal suspend fun <T> loadReaderSearchResults(
@@ -152,6 +152,6 @@ internal suspend fun <T> loadReaderSearchResults(
         ReaderSearchLoadResult.Success(search())
     } catch (error: CancellationException) {
         throw error
-    } catch (_: Throwable) {
-        ReaderSearchLoadResult.Failure
+    } catch (error: Throwable) {
+        ReaderSearchLoadResult.Failure(error)
     }

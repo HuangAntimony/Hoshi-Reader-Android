@@ -22,7 +22,7 @@ data class TtsPlaybackState(
     val started: Boolean = false,
     val playing: Boolean = false,
     val preparing: Boolean = false,
-    val error: TtsFailure? = null,
+    val error: TtsError? = null,
 ) {
     val sentence: TtsSentence? get() = sentences.getOrNull(index)
     val canStart: Boolean get() = bookId != null
@@ -73,9 +73,9 @@ class TtsPlaybackController internal constructor(
             }
         }
         output.onPaused = { if (state.value.playing && !state.value.preparing) pause() }
-        output.onError = { fail(TtsFailure.AudioUnavailable) }
+        output.onError = { fail(it.toTtsError(TtsFailure.AudioUnavailable)) }
         scope.launch(Dispatchers.Main.immediate) {
-            repository.preferences.catch { fail(TtsFailure.Storage) }.collect { next ->
+            repository.preferences.catch { fail(it.toTtsError(TtsFailure.Storage)) }.collect { next ->
                 val prefetchChanged = next.settings.prefetchSentences != preferences.settings.prefetchSentences
                 val settingsChanged = next.settings.synthesisSettings() != preferences.settings.synthesisSettings()
                 val wordsChanged = next.words != preferences.words
@@ -139,7 +139,7 @@ class TtsPlaybackController internal constructor(
                 mutableState.value = state.value.copy(preparing = false)
                 if (state.value.started) presentSentence?.invoke(next.sentence, false)
             } catch (error: CancellationException) { throw error }
-            catch (error: Exception) { if (token == generation) fail((error as? TtsException)?.failure ?: TtsFailure.Storage) }
+            catch (error: Exception) { if (token == generation) fail(error.toTtsError(TtsFailure.Storage)) }
         }
     }
 
@@ -201,7 +201,7 @@ class TtsPlaybackController internal constructor(
             job = scope.launch(Dispatchers.Main.immediate) {
                 try { presentSentence?.invoke(sentence, false) }
                 catch (error: CancellationException) { throw error }
-                catch (_: Exception) { if (generation == token) fail(TtsFailure.AudioUnavailable) }
+                catch (error: Exception) { if (generation == token) fail(error.toTtsError(TtsFailure.AudioUnavailable)) }
             }
         }
     }
@@ -276,9 +276,9 @@ class TtsPlaybackController internal constructor(
                     return@launch
                 }
             } catch (error: TimeoutCancellationException) {
-                if (generation == token) fail(TtsFailure.Timeout)
+                if (generation == token) fail(error.toTtsError(TtsFailure.Timeout))
             } catch (error: CancellationException) { throw error }
-            catch (error: Exception) { if (generation == token) fail((error as? TtsException)?.failure ?: TtsFailure.Synthesis) }
+            catch (error: Exception) { if (generation == token) fail(error.toTtsError(TtsFailure.Synthesis)) }
         }
     }
     private fun prefetchAhead() {
@@ -316,7 +316,7 @@ class TtsPlaybackController internal constructor(
         mutableState.value = state.value.copy(playing = false, preparing = false)
         output.pause()
     }
-    private fun fail(failure: TtsFailure) { pause(); mutableState.value = state.value.copy(error = failure) }
+    private fun fail(failure: TtsError) { pause(); mutableState.value = state.value.copy(error = failure) }
     fun stop() {
         sentenceFinished = false
         stopAfterSentence = false

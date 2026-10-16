@@ -1,6 +1,9 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -99,7 +102,7 @@ internal fun TtsProviderPicker(
 @Composable
 internal fun TtsVoicePicker(
     title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
-    failure: TtsFailure?, onSelected: (String) -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit,
+    failure: TtsError?, onSelected: (String) -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit,
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
@@ -110,10 +113,14 @@ internal fun TtsVoicePicker(
         }
         HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = hoshiSurfaces.divider)
         if (busy) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp))
-        failure?.let {
-            Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
-        }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 20.dp)) {
+            failure?.let { error ->
+                item(key = "error") {
+                    SelectionContainer {
+                        Text(error.message.asString(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
+                    }
+                }
+            }
             item(key = "automatic") {
                 TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank()) { onSelected("") }
             }

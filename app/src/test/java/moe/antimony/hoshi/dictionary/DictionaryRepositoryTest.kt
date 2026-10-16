@@ -16,8 +16,36 @@ import kotlinx.coroutines.CancellationException
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.profiles.ProfileRepository
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertSame
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 
 class DictionaryRepositoryTest {
+    @Test
+    fun updateFailureRecordsTheOriginalThrowableBeforeConvertingItToBatchText() {
+        val filesDir = temporaryFolder.newFolder("diagnostic-update-files")
+        val storage = DictionaryStorageDataSource(filesDir)
+        val installed = updatableTestDictionaryIndex()
+        writeDictionary(storage.typeDirectory(DictionaryType.Term), installed.title, installed)
+        storage.saveConfigFromStorage()
+        val original = java.io.IOException("dictionary endpoint unavailable", java.io.IOException("HTTP 503"))
+        val remote = object : DictionaryRemoteDataSource {
+            override fun fetchIndex(url: String): DictionaryIndex = throw original
+            override fun downloadArchive(url: String): InputStream = error("No archive expected")
+        }
+        val bridge = ImportingDictionaryNativeBridge()
+        val repository = DictionaryRepository(filesDir, storage, DictionaryImportDataSource(bridge), DictionaryLookupQueryService(bridge), remote)
+        ErrorDiagnosticEvents.buffer.drain()
+
+        val summary = repository.updateDictionaries()
+        val event = ErrorDiagnosticEvents.buffer.drain().firstOrNull { it.error === original }
+
+        assertSame(original, event?.error)
+        assertEquals(UiText.Resource(R.string.dictionary_update_failed), event?.operation)
+        assertEquals("dictionary endpoint unavailable\nHTTP 503", summary.failures.single().message)
+    }
+
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 

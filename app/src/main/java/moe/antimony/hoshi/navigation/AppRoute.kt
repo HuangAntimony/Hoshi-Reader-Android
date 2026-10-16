@@ -2,6 +2,7 @@ package moe.antimony.hoshi.navigation
 
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
+import moe.antimony.hoshi.features.diagnostics.DiagnosticsRecordKind
 
 @Serializable
 sealed interface AppRoute : NavKey {
@@ -30,6 +31,9 @@ sealed interface AppRoute : NavKey {
     data class SettingsDetailRoute(
         val section: SettingsDetailSection,
     ) : AppRoute
+
+    @Serializable
+    data class DiagnosticsRecordsRoute(val kind: DiagnosticsRecordKind) : AppRoute
 
     @Serializable
     data class AnkiCardFormatRoute(

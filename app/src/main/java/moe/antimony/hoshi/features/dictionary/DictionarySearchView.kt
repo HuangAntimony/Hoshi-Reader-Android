@@ -81,6 +81,7 @@ import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.anki.AnkiOperationErrorDialog
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeMessage
@@ -173,6 +174,10 @@ internal fun DictionarySearchView(
     val ankiViewModel: AnkiViewModel = hiltViewModel()
     val uiState by rememberDictionarySearchState(session, searchViewModel)
     val ankiUiState by ankiViewModel.uiState.collectAsStateWithLifecycle()
+    var ankiOperationError by remember { mutableStateOf<Throwable?>(null) }
+    var ankiSynchronizationWarning by remember { mutableStateOf<Throwable?>(null) }
+    AnkiOperationErrorDialog(ankiOperationError) { ankiOperationError = null }
+    AnkiOperationErrorDialog(ankiSynchronizationWarning, R.string.anki_sync_failed) { ankiSynchronizationWarning = null }
     val profileState by appContainer.profileRepository.state.collectAsStateWithLifecycle()
     var rootIframeAtTop by session.rootAtTop
     var childHistories by session.childHistories
@@ -469,7 +474,8 @@ internal fun DictionarySearchView(
                 } else {
                     popupById(message.popupId)?.state?.ankiContext ?: return
                 }
-                ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, miningContext) { mined ->
+                ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, miningContext,
+                    onError = { ankiOperationError = it }, onWarning = { ankiSynchronizationWarning = it }) { mined ->
                     replyIframeMessage(message.popupId, messageId, mined.toString())
                 }
             }
@@ -481,7 +487,7 @@ internal fun DictionarySearchView(
             }
             is ReaderLookupPopupBridgeMessage.ShowNotes -> {
                 val messageId = message.messageId ?: return
-                ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar) { shown ->
+                ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar, onError = { ankiOperationError = it }) { shown ->
                     replyIframeMessage(message.popupId, messageId, shown.toString())
                 }
             }

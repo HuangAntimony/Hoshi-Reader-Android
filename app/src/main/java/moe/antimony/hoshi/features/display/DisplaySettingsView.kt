@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
@@ -250,7 +251,7 @@ private fun DisplaySettingsContent(
         HoshiAlertDialog(
             onDismissRequest = viewModel::dismissError,
             title = { Text(stringResource(R.string.dialog_error_title)) },
-            text = { Text(error.asString()) },
+            text = { ErrorDetailsText(error.asString()) },
             confirmButton = {
                 TextButton(
                     onClick = viewModel::dismissError,

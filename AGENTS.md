@@ -78,7 +78,9 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - 非 UI 层发出的可见消息应使用 `UiText` 或等价资源引用，不应持有 `Context`。
 - 新增或修改可见文案时，同时更新 `app/src/main/res/values/strings.xml` 和 `app/src/main/res/values-zh-rCN/strings.xml`。保持占位符、plural quantity、CDATA/转义和 `translatable="false"` 语义一致。
 - 新增或替换图标时使用 Material Icons、Material vector asset 或明确的品牌资产；不要手绘、自造或临时拼接图标。
-- 用户可见错误应通过既有弹窗、Snackbar 或明确错误状态展示；不要把原始异常文本直接渲染到主 UI 内容里。
+- 用户可见错误通过既有弹窗、Snackbar 或明确错误状态展示，保留本地化的操作/类别说明，并附上原始异常的非空消息和 cause 链；没有消息时至少保留原始异常类型或平台/服务实际返回的错误码，不得自定义 App 错误码或把内部枚举名称当成原始诊断。复用 `ui/ErrorDetails.kt`，不得用固定失败文案、布尔值、枚举或 `getOrNull()` 丢弃失败原因；跨 repository、backend、controller 和状态边界时保留原始 cause。批量操作逐项保留文件/对象名称和失败原因。技术诊断可显示在错误弹窗或错误详情中，不得直接混入正常主 UI 内容，也不得仅记录日志而不给用户查看。
+- 新增或修改错误处理时，补充带具体消息及嵌套 cause 的行为/state-flow 测试，确认错误详情确实到达可见状态；`CancellationException` 必须继续传播，不作为失败显示。成功恢复的可选读取、缓存回退和明确约定的自动离线静默可以保持安静，但不能因此吞掉手动操作或终止失败的原因。异常诊断属于外部数据；应用自行编写的提示仍必须使用本地化资源，凭据和认证头不得加入可见诊断。
+- 遇到的运行错误还必须进入内置诊断历史：`withErrorDetails` 自动记录原始 Throwable；若失败在到达 UI 前转成字符串、枚举或批量结果，先用 `ErrorDiagnosticEvents.buffer.record(operation, originalError)` 保留原始异常和堆栈。平台/服务只返回错误响应而没有 Throwable 时，用 `recordServiceFailure` 记录实际返回的错误详情，不得伪造异常或 App 错误码。后台任务的失败/重试也保留原始原因；取消和普通输入校验不记为运行错误。诊断持久化由 Hilt 注入的 logger 在 IO dispatcher 执行，记录失败不得覆盖或递归记录原业务错误；相关回归测试同时确认可见提示与诊断记录保留原因。
 
 ## 领域边界
 

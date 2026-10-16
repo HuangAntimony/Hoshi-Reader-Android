@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 class SasayakiAudioAvailabilityState(
     initialHasAudio: Boolean = false,
@@ -16,8 +17,7 @@ class SasayakiAudioAvailabilityState(
         private set
 
     fun markRestoreFailed(error: Throwable) {
-        errorMessage = error.localizedMessage?.let(UiText::Literal)
-            ?: UiText.Resource(R.string.sasayaki_import_audiobook_failed)
+        errorMessage = UiText.Resource(R.string.sasayaki_import_audiobook_failed).withErrorDetails(error)
         hasAudio = false
     }
 

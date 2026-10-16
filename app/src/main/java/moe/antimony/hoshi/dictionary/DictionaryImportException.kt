@@ -5,7 +5,7 @@ internal enum class DictionaryImportFailureKind { Native, FileAccess, InvalidArc
 internal class DictionaryImportException(
     val kind: DictionaryImportFailureKind,
     val detail: String? = null,
-) : java.io.IOException(detail ?: kind.name) {
+) : java.io.IOException(detail) {
     companion object {
         fun fromNative(detail: String): DictionaryImportException = DictionaryImportException(
             kind = when (detail) {

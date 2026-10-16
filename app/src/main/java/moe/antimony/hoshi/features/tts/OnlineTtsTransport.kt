@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.tts
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import moe.antimony.hoshi.ui.diagnosticMessage
 import java.io.InterruptedIOException
 import java.time.Instant
 import java.time.ZoneOffset
@@ -34,12 +35,16 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                continuation.resumeWithException(TtsException(if (e is InterruptedIOException) TtsFailure.Timeout else TtsFailure.Network))
+                continuation.resumeWithException(TtsException(if (e is InterruptedIOException) TtsFailure.Timeout else TtsFailure.Network, cause = redactedTransportError(e, request)))
             }
             override fun onResponse(call: Call, response: Response) {
                 try {
                     val bytes = response.use {
-                        if (!it.isSuccessful) throw TtsException(httpFailure(it.code), statusCode = it.code)
+                        if (!it.isSuccessful) {
+                            val diagnostic = redactRequestCredentials(it.peekBody(4096).string().trim(), request)
+                            throw TtsException(httpFailure(it.code), statusCode = it.code,
+                                message = redactRequestCredentials("HTTP ${it.code} ${it.message}" + if (diagnostic.isNotEmpty()) "\n$diagnostic" else "", request))
+                        }
                         val body = it.body ?: throw TtsException(TtsFailure.InvalidResponse)
                         if (body.contentLength() > maxResponseBytes) throw TtsException(TtsFailure.InvalidResponse)
                         body.byteStream().use { input ->
@@ -57,7 +62,7 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
                     continuation.resume(bytes)
                 } catch (error: Exception) {
                     continuation.resumeWithException(if (error is TtsException) error else TtsException(
-                        if (error is InterruptedIOException) TtsFailure.Timeout else TtsFailure.Network))
+                        if (error is InterruptedIOException) TtsFailure.Timeout else TtsFailure.Network, cause = redactedTransportError(error, request)))
                 }
             }
         })
@@ -91,11 +96,12 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
                 }
             }
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                complete.completeExceptionally(TtsException(TtsFailure.InvalidResponse))
+                complete.completeExceptionally(TtsException(TtsFailure.InvalidResponse, message = "WebSocket closed: $code $reason"))
                 webSocket.close(code, null)
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                complete.completeExceptionally(TtsException(response?.let { httpFailure(it.code) } ?: TtsFailure.Network))
+                complete.completeExceptionally(TtsException(response?.let { httpFailure(it.code) } ?: TtsFailure.Network,
+                    statusCode = response?.code, cause = redactedTransportError(t, request)))
             }
         })
         try { complete.await() } finally { socket.cancel() }
@@ -110,4 +116,22 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
             else -> TtsFailure.InvalidResponse
         }
     }
+}
+
+/** Remove only credentials actually sent by this request, retaining the service's diagnosis. */
+private fun redactRequestCredentials(text: String, request: Request): String {
+    val values = request.headers.names().filter { it.lowercase(Locale.ROOT) in setOf(
+        "authorization", "proxy-authorization", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key",
+    ) }.flatMap { name -> request.headers.values(name).flatMap { value ->
+        if (name.equals("Authorization", true) || name.equals("Proxy-Authorization", true)) listOf(value, value.substringAfter(' ', value))
+        else listOf(value)
+    } }.filter { it.isNotEmpty() }.distinct().sortedByDescending { it.length }
+    return values.fold(text) { result, value -> result.replace(value, "***") }
+}
+
+private fun redactedTransportError(error: Throwable, request: Request): Throwable {
+    val original = error.diagnosticMessage()
+    val safe = redactRequestCredentials(original, request)
+    if (safe == original) return error
+    return IOException(safe).apply { stackTrace = error.stackTrace }
 }

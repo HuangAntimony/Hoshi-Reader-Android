@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal data class DisplayPaletteDraft(
     val slot: DisplayPaletteSlot,
@@ -73,8 +74,8 @@ internal class DisplaySettingsViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                _uiState.update { it.copy(loadState = SettingsLoadState.Failed(UiText.Resource(R.string.display_settings_load_failed))) }
+            } catch (failure: Exception) {
+                _uiState.update { it.copy(loadState = SettingsLoadState.Failed(UiText.Resource(R.string.display_settings_load_failed).withErrorDetails(failure))) }
             }
         }
     }
@@ -203,8 +204,8 @@ internal class DisplaySettingsViewModel internal constructor(
                 onSuccess()
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                _uiState.update { it.copy(error = UiText.Resource(R.string.display_settings_save_failed)) }
+            } catch (failure: Exception) {
+                _uiState.update { it.copy(error = UiText.Resource(R.string.display_settings_save_failed).withErrorDetails(failure)) }
             } finally {
                 _uiState.update { it.copy(isSaving = false) }
             }

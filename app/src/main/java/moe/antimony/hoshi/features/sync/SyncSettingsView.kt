@@ -66,12 +66,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.settings.rememberSettingsLoader
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.withErrorDetails
 import kotlinx.coroutines.flow.combine
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -112,6 +115,7 @@ fun SyncSettingsView(
     var clientSecret by remember { mutableStateOf("") }
     var devicePrompt by remember { mutableStateOf<DeviceCodePrompt?>(null) }
     var pollIntervalSeconds by remember { mutableStateOf(5L) }
+    var operationError by remember { mutableStateOf<UiText?>(null) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
@@ -121,23 +125,30 @@ fun SyncSettingsView(
     val currentAuthStatus = authStatus
     val connectionActions = currentAuthStatus?.let { syncConnectionActions(it, isAuthorizing) }
 
-    fun save(next: SyncSettings) {
+    fun launchOperation(summary: UiText, operation: suspend () -> Unit) {
         scope.launch {
-            repository.update { next }
+            try {
+                operation()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                operationError = summary.withErrorDetails(error)
+            }
         }
     }
 
-    fun saveReaderSettings(next: ReaderSettings) {
-        scope.launch {
-            readerSettingsRepository.update { next }
-        }
+    fun save(next: SyncSettings) = launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+        repository.update { next }
     }
 
-    fun saveSasayakiSettings(update: (SasayakiSettings) -> SasayakiSettings) {
-        scope.launch {
+    fun saveReaderSettings(next: ReaderSettings) = launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+        readerSettingsRepository.update { next }
+    }
+
+    fun saveSasayakiSettings(update: (SasayakiSettings) -> SasayakiSettings) =
+        launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
             sasayakiSettingsRepository.update(update)
         }
-    }
 
     LaunchedEffect(authorizer, authAttempt) {
         authLoadError = null
@@ -149,8 +160,8 @@ fun SyncSettingsView(
             authStatus = authorizer.status()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            authLoadError = UiText.Resource(R.string.settings_load_failed)
+        } catch (error: Exception) {
+            authLoadError = UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)
         }
     }
 
@@ -167,7 +178,7 @@ fun SyncSettingsView(
                 throw error
             } catch (error: Throwable) {
                 DriveAuthorizationResult.Failed(
-                    error.message ?: resources.getString(R.string.sync_google_drive_authorization_failed),
+                    resources.getString(R.string.sync_google_drive_authorization_failed).withErrorDetails(error),
                 )
             }
             when (result) {
@@ -222,8 +233,10 @@ fun SyncSettingsView(
                 message = DeviceCodeDriveAuthorizer.MissingConfigurationMessage
                 return@launch
             }
-            authorizer.saveClient(clientId, clientSecret)
-            runCatching { authorizer.requestDeviceCode() }
+            runCatching {
+                authorizer.saveClient(clientId, clientSecret)
+                authorizer.requestDeviceCode()
+            }
                 .onSuccess { prompt ->
                     pollIntervalSeconds = prompt.intervalSeconds
                     devicePrompt = prompt
@@ -235,11 +248,15 @@ fun SyncSettingsView(
                     )
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(prompt.verificationUrl)))
+                    }.onFailure { error ->
+                        if (error is CancellationException) throw error
+                        operationError = UiText.Resource(R.string.sync_google_drive_authorization_failed).withErrorDetails(error)
                     }
                 }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     isAuthorizing = false
-                    val text = error.message ?: resources.getString(R.string.sync_google_drive_authorization_failed)
+                    val text = resources.getString(R.string.sync_google_drive_authorization_failed).withErrorDetails(error)
                     authStatus = DriveAuthStatus.Failed(text)
                     message = text
                 }
@@ -247,7 +264,7 @@ fun SyncSettingsView(
     }
 
     fun signOut() {
-        scope.launch {
+        launchOperation(UiText.Resource(R.string.action_sign_out)) {
             authorizer.revokeAccess()
             repository.clearGoogleDriveCache()
             authStatus = authorizer.status()
@@ -259,10 +276,21 @@ fun SyncSettingsView(
     }
 
     fun clearCache() {
-        scope.launch {
+        launchOperation(UiText.Resource(R.string.sync_clear_cache)) {
             repository.clearGoogleDriveCache()
             message = resources.getString(R.string.sync_cache_cleared)
         }
+    }
+
+    operationError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { operationError = null },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(error.asString()) },
+            confirmButton = {
+                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
     }
 
     if (showSignOutConfirmation) {

@@ -17,6 +17,22 @@ import java.nio.file.Files
 
 class ReaderRouteStateHolderTest {
     @Test
+    fun cancelledLoadIsNotConvertedToAnErrorState() = runBlocking {
+        val cancelled = kotlinx.coroutines.CancellationException("Reader closed")
+        val stateHolder = ReaderRouteStateHolder(
+            repository = FakeReaderRouteBookRepository(
+                entry = BookEntry(File("book"), BookMetadata("book", "Book", null, "book", 0.0)),
+            ),
+            parser = object : ReaderRouteEpubParser {
+                override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook = throw cancelled
+            },
+        )
+        val failure = runCatching { stateHolder.load("book") }.exceptionOrNull()
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(cancelled.message, failure?.message)
+    }
+
+    @Test
     fun loadReadyParsesBookUpdatesSidecarsAndRestoresBookmark() = runBlocking {
         val root = Files.createTempDirectory("hoshi-reader-route-book").toFile()
         root.resolve("cover.jpg").writeText("cover")
@@ -60,7 +76,7 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
-    fun loadErrorUsesSameGenericStateForMissingAndUnparsableBooks() = runBlocking {
+    fun loadErrorRetainsDistinctMissingAndParserDiagnostics() = runBlocking {
         val missingBookStateHolder = ReaderRouteStateHolder(
             repository = FakeReaderRouteBookRepository(entry = null),
             parser = FakeReaderRouteEpubParser(readerBook()),
@@ -84,7 +100,8 @@ class ReaderRouteStateHolderTest {
         val unparsableBookState = unparsableBookStateHolder.load("broken")
 
         assertTrue(missingBookState is ReaderRouteLoadState.Error)
-        assertEquals(missingBookState, unparsableBookState)
+        assertTrue((missingBookState as ReaderRouteLoadState.Error).cause.message == "Book not found.")
+        assertTrue((unparsableBookState as ReaderRouteLoadState.Error).cause.message == "Parser implementation detail")
     }
 
     @Test

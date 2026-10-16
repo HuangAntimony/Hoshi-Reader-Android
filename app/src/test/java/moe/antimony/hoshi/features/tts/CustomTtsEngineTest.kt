@@ -14,6 +14,31 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class CustomTtsEngineTest {
+    @Test fun manualModelDiscoveryRetainsAuthenticationFailureAndCanRetry() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(401).setBody("API key rejected"))
+            val adapter = engine()
+            val error = runCatching { adapter.models(profile(server)) }.exceptionOrNull()
+
+            assertTrue(error is TtsException)
+            assertEquals(TtsFailure.Authentication, (error as TtsException).failure)
+            assertTrue(error.message.orEmpty().contains("401"))
+            assertTrue(error.message.orEmpty().contains("API key rejected"))
+
+            server.enqueue(MockResponse().setBody("""{"data":[{"id":"restored-model"}]}"""))
+            assertEquals(listOf("restored-model"), adapter.models(profile(server)))
+        }
+    }
+
+    @Test fun unsupportedOptionalModelDiscoveryStillReturnsAnEmptyList() = runBlocking {
+        MockWebServer().use { server ->
+            for (code in listOf(404, 405)) {
+                server.enqueue(MockResponse().setResponseCode(code))
+                assertEquals(emptyList<String>(), engine().models(profile(server)))
+            }
+        }
+    }
+
     @get:Rule val folder = TemporaryFolder()
     private val wav = ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN).apply {
         put("RIFF".toByteArray()); putInt(40); put("WAVEfmt ".toByteArray()); putInt(16)
@@ -206,11 +231,11 @@ class CustomTtsEngineTest {
         }
     }
 
-    @Test fun authenticationFailureCannotReturnAudioOrLeakServerError() = runBlocking {
+    @Test fun authenticationFailureReportsServerErrorAndCannotReturnAudio() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setResponseCode(401).setBody("private key rejected"))
             try { engine().synthesize("日本語。", settings(profile(server)), folder.root); fail("Expected failure") }
-            catch (error: TtsException) { assertEquals(TtsFailure.Authentication, error.failure); assertFalse(error.toString().contains("private")) }
+            catch (error: TtsException) { assertEquals(TtsFailure.Authentication, error.failure); assertTrue(error.toString().contains("private key rejected")) }
             assertTrue(folder.root.listFiles().orEmpty().isEmpty())
         }
     }

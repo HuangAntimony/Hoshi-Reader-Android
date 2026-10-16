@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.audio
 
+import moe.antimony.hoshi.ui.asString
+
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -335,7 +338,7 @@ fun AudioSettingsView(
                                     ListItem(
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         headlineContent = { Text(stringResource(R.string.audio_import_failed)) },
-                                        supportingContent = { Text(message) },
+                                        supportingContent = { SelectionContainer { Text(message) } },
                                     )
                                 }
                             }
@@ -382,12 +385,14 @@ fun AudioSettingsView(
                                                 )
                                             }
                                             if (localAudioSourceState.saveFailed) {
-                                                Text(
-                                                    text = stringResource(R.string.audio_local_source_save_failed),
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    modifier = Modifier.padding(top = 8.dp),
-                                                )
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = localAudioSourceState.errorMessage?.asString() ?: stringResource(R.string.audio_local_source_save_failed),
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        modifier = Modifier.padding(top = 8.dp),
+                                                    )
+                                                }
                                             }
                                         }
                                     },

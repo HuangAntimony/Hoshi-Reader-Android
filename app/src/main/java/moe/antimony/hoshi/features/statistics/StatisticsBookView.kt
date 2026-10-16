@@ -69,6 +69,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
@@ -232,7 +233,7 @@ internal fun StatisticsBookView(
     state.error?.let { error ->
         AlertDialog(
             onDismissRequest = viewModel::dismissError,
-            text = { Text(error.asString()) },
+            text = { ErrorDetailsText(error.asString()) },
             confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) } },
         )
     }

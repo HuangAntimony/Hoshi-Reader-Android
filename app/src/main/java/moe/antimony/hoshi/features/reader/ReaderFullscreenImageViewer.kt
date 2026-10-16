@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.reader
 
-import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
@@ -67,6 +66,13 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.util.UUID
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.withErrorDetails
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
 internal data class ReaderFullscreenImage(
@@ -90,6 +96,16 @@ internal fun ReaderFullscreenImageOverlay(
         ReaderFullscreenImagePanAllowance(
             topPx = (topSafeAreaPadding + 76.dp).toPx(),
             bottomPx = bottomSafeAreaPadding.toPx(),
+        )
+    }
+    var operationError by remember { mutableStateOf<UiText?>(null) }
+    operationError?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = { operationError = null },
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+            },
         )
     }
     BackHandler(onBack = onDismiss)
@@ -124,17 +140,23 @@ internal fun ReaderFullscreenImageOverlay(
             ReaderFullscreenImageButton(
                 icon = Icons.Rounded.ContentCopy,
                 contentDescription = stringResource(R.string.action_copy),
-                onClick = { copyReaderImage(context, image) },
+                onClick = { copyReaderImage(context, image) { error ->
+                    operationError = UiText.Resource(R.string.reader_image_copy_failed).withErrorDetails(error)
+                } },
             )
             ReaderFullscreenImageButton(
                 icon = Icons.Rounded.Download,
                 contentDescription = stringResource(R.string.action_save),
-                onClick = { saveReaderImage(context, image) },
+                onClick = { saveReaderImage(context, image) { error ->
+                    operationError = UiText.Resource(R.string.reader_image_save_failed).withErrorDetails(error)
+                } },
             )
             ReaderFullscreenImageButton(
                 icon = Icons.Rounded.Share,
                 contentDescription = stringResource(R.string.action_share),
-                onClick = { shareReaderImage(context, image) },
+                onClick = { shareReaderImage(context, image) { error ->
+                    operationError = UiText.Resource(R.string.reader_image_share_failed).withErrorDetails(error)
+                } },
             )
             ReaderFullscreenImageButton(
                 icon = Icons.Rounded.Close,
@@ -277,39 +299,43 @@ private fun ReaderFullscreenImageButton(
     }
 }
 
-private fun shareReaderImage(context: Context, image: ReaderFullscreenImage) {
-    val file = readerImageShareFile(context, image)
-    file.writeBytes(image.resource.data)
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND)
-        .setType(image.resource.mediaType)
-        .putExtra(Intent.EXTRA_STREAM, uri)
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    intent.clipData = ClipData.newUri(context.contentResolver, file.name, uri)
+private fun shareReaderImage(context: Context, image: ReaderFullscreenImage, onError: (Throwable) -> Unit) {
     runCatching {
+        val file = readerImageShareFile(context, image)
+        file.writeBytes(image.resource.data)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND)
+            .setType(image.resource.mediaType)
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.clipData = ClipData.newUri(context.contentResolver, file.name, uri)
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.action_share)))
-    }.recoverCatching { error ->
-        if (error is ActivityNotFoundException || error is SecurityException) Unit else throw error
+    }.onFailure { error ->
+        onError(error)
     }
 }
 
-private fun copyReaderImage(context: Context, image: ReaderFullscreenImage) {
-    val file = readerImageShareFile(context, image)
-    file.writeBytes(image.resource.data)
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val clipboard = context.getSystemService(ClipboardManager::class.java)
-    val clip = ClipData.newUri(
-        context.contentResolver,
-        context.getString(R.string.reader_image_clip_label),
-        uri,
-    )
-    clipboard.setPrimaryClip(clip)
-    if (shouldShowReaderImageCopyToast()) {
-        Toast.makeText(context, R.string.reader_image_copied, Toast.LENGTH_SHORT).show()
+private fun copyReaderImage(context: Context, image: ReaderFullscreenImage, onError: (Throwable) -> Unit) {
+    runCatching {
+        val file = readerImageShareFile(context, image)
+        file.writeBytes(image.resource.data)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        val clip = ClipData.newUri(
+            context.contentResolver,
+            context.getString(R.string.reader_image_clip_label),
+            uri,
+        )
+        clipboard.setPrimaryClip(clip)
+        if (shouldShowReaderImageCopyToast()) {
+            Toast.makeText(context, R.string.reader_image_copied, Toast.LENGTH_SHORT).show()
+        }
+    }.onFailure { error ->
+        onError(error)
     }
 }
 
-private fun saveReaderImage(context: Context, image: ReaderFullscreenImage) {
+private fun saveReaderImage(context: Context, image: ReaderFullscreenImage, onError: (Throwable) -> Unit) {
     val name = "hoshi_reader_${UUID.randomUUID()}.${readerImageExtension(image.sourceUrl, image.resource.mediaType)}"
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, name)
@@ -338,9 +364,9 @@ private fun saveReaderImage(context: Context, image: ReaderFullscreenImage) {
         }
     }.onSuccess {
         Toast.makeText(context, R.string.reader_image_saved, Toast.LENGTH_SHORT).show()
-    }.onFailure {
-        uri?.let { failedUri -> resolver.delete(failedUri, null, null) }
-        Toast.makeText(context, R.string.reader_image_save_failed, Toast.LENGTH_SHORT).show()
+    }.onFailure { error ->
+        uri?.let { failedUri -> runCatching { resolver.delete(failedUri, null, null) } }
+        onError(error)
     }
 }
 

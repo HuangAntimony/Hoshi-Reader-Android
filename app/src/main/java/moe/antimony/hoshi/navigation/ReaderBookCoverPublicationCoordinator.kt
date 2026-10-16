@@ -19,6 +19,15 @@ internal fun bookCoverPublishFailureMessageRes(result: BookCoverPublishResult): 
     }
 }
 
+internal fun bookCoverPublishFailureMessage(result: BookCoverPublishResult, summary: String): String =
+    (listOf(summary) + listOf(result.lockScreen, result.export, result.iReader)
+        .filterIsInstance<BookCoverTargetResult.Failed>()
+        .mapNotNull { failure -> failure.details })
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .distinct()
+        .joinToString("\n")
+
 internal sealed interface ReaderBookCoverPublicationEvent {
     data object NotReady : ReaderBookCoverPublicationEvent
 

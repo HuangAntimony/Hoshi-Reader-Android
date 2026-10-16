@@ -10,12 +10,18 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.diagnosticMessage
 import java.security.MessageDigest
 
 @Singleton
@@ -30,36 +36,43 @@ internal class AndroidUpdateDownloadManager @Inject constructor(
         val record = store.load()
         if (record?.matches(update) != true) return UpdateDownloadStatus.None
         val file = updateFile(record.fileName)
-        if (record.status == UpdateDownloadRecordStatus.Downloaded && file.isFile) {
-            return UpdateDownloadStatus.Downloaded(file)
+        if (record.status == UpdateDownloadRecordStatus.Failed) return UpdateDownloadStatus.None
+        if (record.status == UpdateDownloadRecordStatus.Downloaded) {
+            if (file.isFile) return UpdateDownloadStatus.Downloaded(file)
+            record.downloadId?.let { store.recordDownloadFailure(it, FileNotFoundException(file.absolutePath)) }
+            return UpdateDownloadStatus.None
         }
-        if (record.status != UpdateDownloadRecordStatus.Downloading && record.status != UpdateDownloadRecordStatus.Failed) {
+        if (record.status != UpdateDownloadRecordStatus.Downloading) {
             return UpdateDownloadStatus.None
         }
         val downloadId = record.downloadId ?: return UpdateDownloadStatus.None
-        val downloadStatus = downloadManager.queryStatus(downloadId)
-        return when (downloadStatus) {
+        val downloadState = downloadManager.queryDownloadState(downloadId)
+        return when (downloadState?.status) {
             DownloadManager.STATUS_PENDING,
             DownloadManager.STATUS_PAUSED,
             DownloadManager.STATUS_RUNNING,
             -> UpdateDownloadStatus.Downloading(downloadId)
             DownloadManager.STATUS_SUCCESSFUL -> {
-                val valid = file.isFile &&
-                    (record.sha256 == null || file.sha256Hex().equals(record.sha256, ignoreCase = true))
-                if (valid) {
+                try {
+                    validateDownloadedUpdate(file, record.sha256)
                     store.markDownloaded(downloadId)
                     UpdateDownloadStatus.Downloaded(file)
-                } else {
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
                     file.delete()
-                    store.markFailed(downloadId)
+                    store.recordDownloadFailure(downloadId, error)
                     UpdateDownloadStatus.None
                 }
             }
             DownloadManager.STATUS_FAILED -> {
-                store.markFailed(downloadId)
+                store.recordDownloadFailure(downloadId, downloadState.failureDetails(downloadId))
                 UpdateDownloadStatus.None
             }
-            else -> UpdateDownloadStatus.None
+            else -> {
+                store.recordDownloadFailure(downloadId, downloadState.failureDetails(downloadId))
+                UpdateDownloadStatus.None
+            }
         }
     }
 
@@ -129,18 +142,24 @@ internal class UpdateDownloadCompleteReceiver : BroadcastReceiver() {
                     val record = store.load() ?: return@launch
                     if (record.downloadId != downloadId) return@launch
                     val manager = context.applicationContext.getSystemService(DownloadManager::class.java)
-                    if (manager.queryStatus(downloadId) != DownloadManager.STATUS_SUCCESSFUL) {
-                        store.markFailed(downloadId)
+                    val downloadState = manager.queryDownloadState(downloadId)
+                    if (downloadState?.status != DownloadManager.STATUS_SUCCESSFUL) {
+                        store.recordDownloadFailure(downloadId, downloadState.failureDetails(downloadId))
                         return@launch
                     }
                     val file = updateDownloadManager.updateFile(record.fileName)
-                    val valid = record.sha256 == null || file.sha256Hex().equals(record.sha256, ignoreCase = true)
-                    if (valid) {
+                    try {
+                        validateDownloadedUpdate(file, record.sha256)
                         store.markDownloaded(downloadId)
-                    } else {
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
                         file.delete()
-                        store.markFailed(downloadId)
+                        throw error
                     }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    store.recordDownloadFailure(downloadId, error)
                 }
             } finally {
                 pendingResult.finish()
@@ -149,11 +168,41 @@ internal class UpdateDownloadCompleteReceiver : BroadcastReceiver() {
     }
 }
 
-private fun DownloadManager.queryStatus(downloadId: Long): Int? {
+private suspend fun UpdateDownloadStore.recordDownloadFailure(downloadId: Long, error: Throwable) {
+    val details = error.diagnosticMessage()
+    ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_update_download_failed), error)
+    markFailed(downloadId, details)
+}
+
+private suspend fun UpdateDownloadStore.recordDownloadFailure(downloadId: Long, details: String) {
+    ErrorDiagnosticEvents.buffer.recordServiceFailure(UiText.Resource(R.string.about_update_download_failed), details)
+    markFailed(downloadId, details)
+}
+
+private data class AndroidDownloadState(val status: Int, val reason: Int?)
+
+private fun AndroidDownloadState?.failureDetails(downloadId: Long): String =
+    "DownloadManager downloadId=$downloadId status=${this?.status} reason=${this?.reason}"
+
+private fun DownloadManager.queryDownloadState(downloadId: Long): AndroidDownloadState? {
     val cursor = query(DownloadManager.Query().setFilterById(downloadId)) ?: return null
     cursor.use {
         if (!it.moveToFirst()) return null
-        return it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+        val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+        val reason = if (status == DownloadManager.STATUS_FAILED) {
+            it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+        } else null
+        return AndroidDownloadState(status, reason)
+    }
+}
+
+internal suspend fun validateDownloadedUpdate(file: File, expectedSha256: String?) {
+    if (!file.isFile) throw FileNotFoundException(file.absolutePath)
+    if (expectedSha256 != null) {
+        val actualSha256 = file.sha256Hex()
+        if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
+            throw IOException("SHA-256 mismatch: expected $expectedSha256, actual $actualSha256")
+        }
     }
 }
 

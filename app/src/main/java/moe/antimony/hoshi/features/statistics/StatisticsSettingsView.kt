@@ -42,6 +42,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
@@ -76,7 +78,7 @@ internal fun StatisticsSettingsView(
         StatisticsSettingsContent(
             settings = values.settings,
             syncEnabled = values.syncEnabled,
-            archivedBookCount = values.archivedBookCount,
+            archiveSummary = values.archiveSummary,
             isWorking = state.isWorking,
             onSettingsChange = viewModel::update,
             onClearArchive = viewModel::clearArchive,
@@ -86,7 +88,7 @@ internal fun StatisticsSettingsView(
     state.error?.let { error ->
         AlertDialog(
             onDismissRequest = viewModel::dismissError,
-            text = { Text(error.asString()) },
+            text = { ErrorDetailsText(error.asString()) },
             confirmButton = {
                 TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) }
             },
@@ -100,11 +102,12 @@ private fun StatisticsSettingsContent(
     settings: ReaderSettings,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     syncEnabled: Boolean,
-    archivedBookCount: Int,
+    archiveSummary: StatisticsArchiveSummary,
     isWorking: Boolean,
     onClearArchive: () -> Unit,
     contentPadding: PaddingValues,
 ) {
+    val archivedBookCount = archiveSummary.bookCount
     var showClearArchiveConfirmation by remember { mutableStateOf(false) }
     var syncModeMenuExpanded by remember { mutableStateOf(false) }
     var showResetTimePicker by remember { mutableStateOf(false) }
@@ -223,11 +226,14 @@ private fun StatisticsSettingsContent(
                 }
             }
         }
-        if (archivedBookCount > 0) {
+        if (archiveSummary.hasArchivedData) {
             item(key = "archive") {
                 StatisticsSettingsSection(
                     title = stringResource(R.string.statistics_archive_heading),
-                    footer = pluralStringResource(R.plurals.statistics_archived_book_count, archivedBookCount, archivedBookCount),
+                    footer = listOfNotNull(
+                        pluralStringResource(R.plurals.statistics_archived_book_count, archivedBookCount, archivedBookCount),
+                        stringResource(R.string.statistics_partial_unavailable).takeIf { archiveSummary.readErrors.isNotEmpty() },
+                    ).joinToString("\n"),
                 ) {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.statistics_clear_archive)) },
@@ -245,7 +251,7 @@ private fun StatisticsSettingsContent(
         AlertDialog(
             onDismissRequest = { showClearArchiveConfirmation = false },
             title = { Text(stringResource(R.string.statistics_clear_archive)) },
-            text = { Text(stringResource(R.string.statistics_clear_archive_confirmation, archivedBookCount)) },
+            text = { Text(stringResource(R.string.statistics_clear_archive_confirmation, archiveSummary.totalBookCount)) },
             confirmButton = {
                 TextButton(enabled = !isWorking, onClick = {
                     showClearArchiveConfirmation = false

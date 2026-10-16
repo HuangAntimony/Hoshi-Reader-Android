@@ -7,13 +7,15 @@ import org.junit.Test
 
 class BackupFailureMessageTest {
     @Test
-    fun backupFailuresUseStableFallbackInsteadOfRawExceptionText() {
-        val message = RuntimeException("Unsafe TTU bookdata entry: ../bad.zip").stableBackupFailureMessage(
+    fun backupFailuresKeepLocalizedSummaryAndUnderlyingCause() {
+        val message = RuntimeException("Invalid backup archive", java.io.IOException("Unsafe TTU bookdata entry: ../bad.zip")).stableBackupFailureMessage(
             fallback = "Unable to import TTU bookdata backup.",
             unsupportedImportMessage = "Select a .zip TTU bookdata backup file.",
         )
 
-        assertEquals("Unable to import TTU bookdata backup.", message)
+        org.junit.Assert.assertTrue(message.startsWith("Unable to import TTU bookdata backup."))
+        org.junit.Assert.assertTrue(message.contains("Invalid backup archive"))
+        org.junit.Assert.assertTrue(message.contains("Unsafe TTU bookdata entry: ../bad.zip"))
     }
 
     @Test

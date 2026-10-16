@@ -19,6 +19,7 @@ import moe.antimony.hoshi.features.bookshelf.BookCoverFetcher
 import moe.antimony.hoshi.features.bookshelf.BookCoverKeyer
 import moe.antimony.hoshi.features.bookshelf.BookCoverThumbnailStore
 import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
+import moe.antimony.hoshi.features.diagnostics.NonfatalDiagnosticsLogger
 import moe.antimony.hoshi.features.dictionary.DictionaryAutoUpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateApkCleanup
 import moe.antimony.hoshi.features.update.UpdateScheduler
@@ -27,6 +28,7 @@ import moe.antimony.hoshi.features.update.UpdateDownloadStore
 
 @HiltAndroidApp
 class HoshiApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
+    @Inject internal lateinit var nonfatalDiagnosticsLogger: NonfatalDiagnosticsLogger
     @Inject internal lateinit var updateApkCleanup: UpdateApkCleanup
     @Inject internal lateinit var dictionaryAutoUpdateScheduler: Lazy<DictionaryAutoUpdateScheduler>
     @Inject internal lateinit var updateDownloadStore: UpdateDownloadStore
@@ -43,6 +45,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
     override fun onCreate() {
         super.onCreate()
         installCrashDiagnostics(this)
+        nonfatalDiagnosticsLogger.start()
         prepareUpdateStartupState()
         updateScheduler.get().sync()
         dictionaryAutoUpdateScheduler.get().registerProcessForegroundChecks()

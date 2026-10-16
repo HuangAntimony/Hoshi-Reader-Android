@@ -3,6 +3,8 @@ package moe.antimony.hoshi.features.tts
 import com.google.re2j.Matcher
 import com.google.re2j.Pattern
 import com.google.re2j.PatternSyntaxException
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 /** Immutable compiled rules; matchers are local to a sentence, never shared between threads. */
 internal class TtsRegexRule private constructor(val pattern: Pattern, private val template: List<Token>) {
@@ -12,13 +14,14 @@ internal class TtsRegexRule private constructor(val pattern: Pattern, private va
     }
 
     companion object {
-        private val cache = linkedMapOf<Pair<String, String>, TtsRegexRule?>()
-        fun patternError(word: TtsWord): Boolean = try { Pattern.compile(word.surface); false }
-            catch (_: PatternSyntaxException) { true }
+        private val cache = linkedMapOf<Pair<String, String>, Result<TtsRegexRule>>()
+        fun patternError(word: TtsWord): Boolean = failure(word) is PatternSyntaxException
+        fun compile(word: TtsWord): TtsRegexRule? = compilation(word).getOrNull()
+        fun failure(word: TtsWord): Throwable? = compilation(word).exceptionOrNull()
 
-        @Synchronized fun compile(word: TtsWord): TtsRegexRule? {
+        @Synchronized private fun compilation(word: TtsWord): Result<TtsRegexRule> {
             val key = word.surface to word.replacement
-            if (cache.containsKey(key)) return cache[key]
+            cache[key]?.let { return it }
             val compiled = try {
                 val pattern = Pattern.compile(word.surface)
                 val groups = pattern.groupCount()
@@ -43,8 +46,9 @@ internal class TtsRegexRule private constructor(val pattern: Pattern, private va
                     }
                 }
                 if (literal.isNotEmpty()) tokens += Token(literal.toString())
-                TtsRegexRule(pattern, tokens)
-            } catch (_: IllegalArgumentException) { null }
+                Result.success(TtsRegexRule(pattern, tokens))
+            } catch (error: PatternSyntaxException) { Result.failure(error)
+            } catch (error: IllegalArgumentException) { Result.failure(error) }
             cache[key] = compiled
             if (cache.size > 64) cache.remove(cache.keys.first())
             return compiled
@@ -115,11 +119,17 @@ internal data class TtsWordPreview(
     val preferences: TtsPreferences,
     val text: String?,
     val error: TtsWordError?,
+    val errorMessage: UiText? = null,
 )
 
 internal fun prepareTtsWordPreview(word: TtsWord, sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): TtsWordPreview {
     val error = validateTtsWord(word, preferences.words)
     val config = preferences.withPreviewWord(word)
     val text = if (error == null) TtsText.spoken(sentence, bookId, config.words, config.settings.useRubyReadings) else null
-    return TtsWordPreview(word, sentence, preferences, config, text, error)
+    val message = error?.let { category ->
+        val summary = UiText.Resource(category.messageRes())
+        val original = if (category == TtsWordError.RegexPattern || category == TtsWordError.RegexReplacement) TtsRegexRule.failure(word) else null
+        original?.let(summary::withErrorDetails) ?: summary
+    }
+    return TtsWordPreview(word, sentence, preferences, config, text, error, message)
 }

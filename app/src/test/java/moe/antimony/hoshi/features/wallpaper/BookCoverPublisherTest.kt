@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -195,10 +200,9 @@ class BookCoverPublisherTest {
 
         val result = fixture.publisher.publish(fixture.source)
 
-        assertEquals(
-            BookCoverTargetResult.Failed(BookCoverPublishFailure.WallpaperUpdateFailed),
-            result.lockScreen,
-        )
+        val failure = result.lockScreen as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.WallpaperUpdateFailed, failure.reason)
+        assertTrue(failure.details.orEmpty().contains("wallpaper service failed"))
         assertEquals(BookCoverTargetResult.Success, result.export)
         assertEquals(1, fixture.exportTarget.files.size)
     }
@@ -236,8 +240,9 @@ class BookCoverPublisherTest {
 
         val result = fixture.publisher.publish(fixture.source)
 
-        val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.RenderFailed)
-        assertEquals(failure, result.lockScreen)
+        val failure = result.lockScreen as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.RenderFailed, failure.reason)
+        assertTrue(failure.details.orEmpty().contains("render failed"))
         assertEquals(failure, result.export)
     }
 
@@ -254,11 +259,73 @@ class BookCoverPublisherTest {
 
         val result = publisher.publish(tempFolder.newFile("source.jpg"))
 
-        val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.SettingsUnavailable)
+        val failure = result.lockScreen as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.SettingsUnavailable, failure.reason)
+        assertTrue(failure.details.orEmpty().contains("preferences unavailable"))
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
         assertEquals(failure, result.iReader)
         assertEquals(0, renderer.renderCount)
+    }
+
+    @Test
+    fun typedPlatformFailureRetainsItsCategoryAndOnlyTheOriginalCauseDetails() = runBlocking {
+        val publisher = DefaultBookCoverPublisher(
+            settings = MutableStateFlow(BookCoverWallpaperSettings(exportEnabled = true, exportTargetUri = "content://cover")),
+            renderer = BookCoverImageRenderer { source, _ -> source },
+            lockScreenTarget = BookCoverLockScreenTarget { null },
+            exportTarget = BookCoverExportTarget { _, _ ->
+                throw BookCoverTargetException(
+                    BookCoverPublishFailure.ExportPermissionLost,
+                    java.io.IOException("Document write failed", SecurityException("Permission denial: uid 10345")),
+                )
+            },
+            iReaderTarget = BookCoverIReaderTarget { null },
+        )
+        val failure = publisher.publish(tempFolder.newFile("cover.png")).export as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.ExportPermissionLost, failure.reason)
+        assertEquals("Document write failed\nPermission denial: uid 10345", failure.details)
+    }
+
+    @Test
+    fun blankOriginalPlatformErrorDoesNotExposeTheInternalWrapperType() = runBlocking {
+        val publisher = DefaultBookCoverPublisher(
+            settings = MutableStateFlow(BookCoverWallpaperSettings(updateLockScreen = true)),
+            renderer = BookCoverImageRenderer { source, _ -> source },
+            lockScreenTarget = BookCoverLockScreenTarget {
+                throw BookCoverTargetException(BookCoverPublishFailure.WallpaperUpdateFailed, java.io.IOException())
+            },
+            exportTarget = BookCoverExportTarget { _, _ -> null },
+            iReaderTarget = BookCoverIReaderTarget { null },
+        )
+        val failure = publisher.publish(tempFolder.newFile("cover.png")).lockScreen as BookCoverTargetResult.Failed
+        assertEquals("IOException", failure.details)
+    }
+
+    @Test
+    fun typedTargetFailurePublishesTheOriginalThrowableBeforeConvertingDetailsToText() = runBlocking {
+        ErrorDiagnosticEvents.buffer.drain()
+        val cause = SecurityException("Permission denial: uid 10345")
+        val error = IOException("Document write failed", cause)
+        val publisher = DefaultBookCoverPublisher(
+            settings = MutableStateFlow(BookCoverWallpaperSettings(exportEnabled = true, exportTargetUri = "content://cover")),
+            renderer = BookCoverImageRenderer { source, _ -> source },
+            lockScreenTarget = BookCoverLockScreenTarget { null },
+            exportTarget = BookCoverExportTarget { _, _ ->
+                throw BookCoverTargetException(BookCoverPublishFailure.ExportPermissionLost, error)
+            },
+            iReaderTarget = BookCoverIReaderTarget { null },
+        )
+
+        val result = publisher.publish(tempFolder.newFile("cover.png"))
+        val event = ErrorDiagnosticEvents.buffer.drain().singleOrNull()
+
+        assertTrue(result.export is BookCoverTargetResult.Failed)
+        assertNotNull("The real platform failure must reach built-in Diagnostics", event)
+        assertSame(error, event!!.error)
+        assertSame(cause, requireNotNull(event.error).cause)
+        assertEquals("Document write failed", requireNotNull(event.error).message)
+        assertEquals(UiText.Resource(R.string.book_cover_wallpaper_publish_failed), event.operation)
     }
 
     @Test

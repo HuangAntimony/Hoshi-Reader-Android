@@ -1,6 +1,11 @@
 package moe.antimony.hoshi.features.anki
 
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.diagnosticMessage
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -42,7 +47,12 @@ class HttpAnkiConnectTransport : AnkiConnectTransport {
             } else {
                 connection.errorStream ?: throw IOException("AnkiConnect HTTP ${connection.responseCode}")
             }
-            stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            stream.bufferedReader(Charsets.UTF_8).use { it.readText() }.also { responseBody ->
+                if (connection.responseCode !in 200..299) {
+                    val key = runCatching { Json.parseToJsonElement(body).jsonObject["key"]?.jsonPrimitive?.contentOrNull }.getOrNull().orEmpty()
+                    throw IOException("AnkiConnect HTTP ${connection.responseCode}: ${responseBody.withoutAnkiKey(key)}")
+                }
+            }
         } finally {
             connection.disconnect()
         }
@@ -57,8 +67,20 @@ class AnkiConnectBackend(
 ) : AnkiBackend {
     private val endpoint = AnkiConnectUrlValidator.requireValidEndpoint(endpoint).toString()
 
+    override fun checkAvailability(): Boolean {
+        request("version")
+        return true
+    }
+
     override fun isAvailable(): Boolean =
-        runCatching { request("version") }.isSuccess
+        runCatching {
+            request("version")
+            true
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_fetch_connect_ankiconnect_failed), error)
+            false
+        }
 
     override fun fetchDecks(): List<AnkiDeck> =
         wrapFetch {
@@ -111,7 +133,11 @@ class AnkiConnectBackend(
             )
             val first = results.firstOrNull()?.jsonObject ?: return false
             !(first["canAdd"]?.jsonPrimitive?.booleanOrNull ?: true)
-        }.getOrDefault(false)
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+            false
+        }
     }
 
     override fun addNote(
@@ -122,65 +148,62 @@ class AnkiConnectBackend(
         allowDupes: Boolean,
         duplicateScope: AnkiDuplicateScope,
         checkDuplicatesAcrossAllModels: Boolean,
-    ): Boolean =
-        runCatching {
-            val note = ankiConnectNote(
+    ): Boolean {
+        val note = ankiConnectNote(
+            deck = deck,
+            noteType = noteType,
+            fieldsByName = fieldsByName,
+            options = ankiConnectDuplicateOptions(
                 deck = deck,
-                noteType = noteType,
-                fieldsByName = fieldsByName,
-                options = ankiConnectDuplicateOptions(
-                    deck = deck,
-                    allowDupes = allowDupes,
-                    duplicateScope = duplicateScope,
-                    checkDuplicatesAcrossAllModels = checkDuplicatesAcrossAllModels,
-                ),
-            )
-            val noteWithTags = if (tags.isEmpty()) {
-                note
-            } else {
-                buildJsonObject {
-                    note.forEach { (key, value) -> put(key, value) }
-                    put(
-                        "tags",
-                        buildJsonArray {
-                            tags.forEach { tag -> add(JsonPrimitive(tag)) }
-                        },
-                    )
-                }
+                allowDupes = allowDupes,
+                duplicateScope = duplicateScope,
+                checkDuplicatesAcrossAllModels = checkDuplicatesAcrossAllModels,
+            ),
+        )
+        val noteWithTags = if (tags.isEmpty()) {
+            note
+        } else {
+            buildJsonObject {
+                note.forEach { (key, value) -> put(key, value) }
+                put(
+                    "tags",
+                    buildJsonArray {
+                        tags.forEach { tag -> add(JsonPrimitive(tag)) }
+                    },
+                )
             }
-            request(
-                "addNote",
-                buildJsonObject {
-                    put("note", noteWithTags)
-                },
-            )
-            true
-        }.getOrDefault(false)
+        }
+        request(
+            "addNote",
+            buildJsonObject {
+                put("note", noteWithTags)
+            },
+        )
+        return true
+    }
 
     override fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? = null
 
-    override fun addMediaFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? =
-        runCatching {
-            val filename = ankiConnectMediaFilename(preferredName)
-            request(
-                "storeMediaFile",
-                buildJsonObject {
-                    put("filename", filename)
-                    put("data", Base64.getEncoder().encodeToString(bytes))
-                },
-            )
-            when {
-                mimeType.startsWith("audio/") -> "[sound:$filename]"
-                mimeType.startsWith("image/") -> """<img src="$filename">"""
-                else -> filename
-            }
-        }.getOrNull()
+    override fun addMediaFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? {
+        val filename = ankiConnectMediaFilename(preferredName)
+        request(
+            "storeMediaFile",
+            buildJsonObject {
+                put("filename", filename)
+                put("data", Base64.getEncoder().encodeToString(bytes))
+            },
+        )
+        return when {
+            mimeType.startsWith("audio/") -> "[sound:$filename]"
+            mimeType.startsWith("image/") -> """<img src="$filename">"""
+            else -> filename
+        }
+    }
 
-    override fun sync(): Boolean =
-        runCatching {
-            request("sync")
-            true
-        }.getOrDefault(false)
+    override fun sync(): Boolean {
+        request("sync")
+        return true
+    }
 
     override fun openNotes(
         deck: AnkiDeck,
@@ -188,7 +211,7 @@ class AnkiConnectBackend(
         key: String,
         duplicateScope: AnkiDuplicateScope,
         checkDuplicatesAcrossAllModels: Boolean,
-    ): Boolean = runCatching {
+    ): Boolean {
         val query = ankiNoteBrowserQuery(
             deck = deck,
             noteType = noteType,
@@ -198,8 +221,8 @@ class AnkiConnectBackend(
         )
         if (query.isBlank()) return false
         request("guiBrowse", buildJsonObject { put("query", query) })
-        true
-    }.getOrDefault(false)
+        return true
+    }
 
     private fun ankiConnectNote(
         deck: AnkiDeck,
@@ -268,18 +291,28 @@ class AnkiConnectBackend(
                 put("key", apiKey)
             }
         }
-        val response = json.parseToJsonElement(transport.post(endpoint, body.toString(), timeoutMillis)).jsonObject
-        val error = response["error"]
-        if (error != null && error !is JsonNull) {
-            throw AnkiConnectRequestException(error.jsonPrimitive.content)
+        try {
+            val response = json.parseToJsonElement(transport.post(endpoint, body.toString(), timeoutMillis)).jsonObject
+            val error = response["error"]
+            if (error != null && error !is JsonNull) {
+                throw AnkiConnectRequestException(error.jsonPrimitive.content.withoutAnkiKey(apiKey))
+            }
+            return response["result"]?.takeUnless { it is JsonNull }
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error
+        } catch (error: Exception) {
+            val diagnostic = error.diagnosticMessage()
+            val safe = diagnostic.withoutAnkiKey(apiKey)
+            if (safe == diagnostic) throw error
+            throw AnkiConnectRequestException(safe).apply { stackTrace = error.stackTrace }
         }
-        return response["result"]?.takeUnless { it is JsonNull }
     }
 
     private inline fun <T> wrapFetch(block: () -> T): T =
         try {
             block()
         } catch (error: AnkiFetchException) {
+            throw error
+        } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: Throwable) {
             throw AnkiFetchException(
@@ -314,3 +347,5 @@ private fun ankiConnectMediaFilename(preferredName: String): String =
         .substringAfterLast('/')
         .substringAfterLast('\\')
         .ifBlank { "hoshi_media" }
+
+private fun String.withoutAnkiKey(key: String): String = if (key.isEmpty()) this else replace(key, "***")

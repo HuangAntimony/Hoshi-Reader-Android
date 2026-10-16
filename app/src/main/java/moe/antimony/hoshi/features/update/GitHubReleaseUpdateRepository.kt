@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.update
 
 import android.os.Build
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -172,10 +173,11 @@ internal class GitHubReleaseUpdateRepository private constructor(
             }.onSuccess { release ->
                 return release
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 lastError = error
             }
         }
-        throw GitHubReleaseException(lastError?.message ?: "GitHub update check failed.")
+        throw requireNotNull(lastError)
     }
 
     private fun latestReleaseCandidates(): List<String> =

@@ -17,6 +17,17 @@ import org.junit.Test
 
 class AnkiRepositoryFetchTest {
     @Test
+    fun providerFailureKeepsTheSpecificCauseInTheVisibleFetchResult() = runBlocking {
+        val result = repository(backend = FakeAnkiBackend(fetchDecksError = java.io.IOException("provider disconnected", java.io.IOException("database is locked"))))
+            .fetchConfiguration()
+
+        assertEquals(
+            AnkiFetchResult.Error(UiText.Joined(listOf(UiText.Resource(R.string.anki_fetch_provider_failure), UiText.Literal("provider disconnected\ndatabase is locked")))),
+            result,
+        )
+    }
+
+    @Test
     fun cancellingAProfileFetchBeforePersistenceKeepsTheStoredConfiguration() = runBlocking {
         val initial = AnkiSettings(cardFormats = listOf(AnkiCardFormat(id = "saved", name = "Saved", selectedDeckName = "Saved deck")))
         val settingsRepository = InMemoryAnkiSettingsRepository(initial)

@@ -58,7 +58,7 @@ class ReaderSearchSheetStateTest {
             ),
         )
         state.searching = true
-        state.failed = true
+        state.failure = java.io.IOException("Search failed")
 
         state.updateQuery("")
 
@@ -66,7 +66,7 @@ class ReaderSearchSheetStateTest {
         assertEquals("", state.submittedQuery)
         assertEquals(emptyList<ReaderSearchResult>(), state.results)
         assertFalse(state.searching)
-        assertFalse(state.failed)
+        org.junit.Assert.assertNull(state.failure)
         assertEquals(1, state.searchNonce)
     }
 }

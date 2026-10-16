@@ -7,6 +7,20 @@ import org.junit.Test
 
 class GitHubReleaseUpdateRepositoryTest {
     @Test
+    fun exhaustedReleaseCandidatesPreserveUnderlyingCauseChain() = runBlocking {
+        val failure = java.io.IOException("Release request failed", IllegalStateException("TLS certificate expired"))
+        val repository = GitHubReleaseUpdateRepository(
+            apiMirrorPrefixes = emptyList(),
+            httpClient = object : GitHubHttpClient {
+                override fun get(url: String, headers: Map<String, String>): String = throw failure
+            },
+        )
+        val result = runCatching { repository.latestRelease() }
+        org.junit.Assert.assertSame(failure, result.exceptionOrNull())
+        assertEquals("TLS certificate expired", result.exceptionOrNull()?.cause?.message)
+    }
+
+    @Test
     fun parsesGitHubLatestReleaseJsonAndSelectsMatchingApkAsset() {
         val release = GitHubReleaseJson.parse(
             """

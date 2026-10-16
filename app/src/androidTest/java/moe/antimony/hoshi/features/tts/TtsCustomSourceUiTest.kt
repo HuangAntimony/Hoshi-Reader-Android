@@ -21,7 +21,7 @@ class TtsCustomSourceUiTest {
     }
 
     @Test fun connectionResultIsVisibleWithoutScrollingAndKeepsTheTestButtonInPlace() {
-        val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
+        val result = kotlinx.coroutines.CompletableDeferred<TtsError?>()
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsCustomSourceEditor(TtsCustomSource("custom:fixture"), false,

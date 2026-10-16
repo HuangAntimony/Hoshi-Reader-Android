@@ -14,8 +14,60 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import moe.antimony.hoshi.ui.resolve
 
 class StatisticsViewModelTest {
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun snapshotFailuresRetainDiagnosticsAndRetryLoadsData() = runTest {
+        var fail = true
+        val model = StatisticsViewModel(
+            repository = object : StatisticsRepositoryFake() {
+                override suspend fun loadSnapshot(): StatisticsSnapshot {
+                    if (fail) throw java.io.IOException("Statistics directory unavailable")
+                    return StatisticsSnapshot(emptyList(), emptyList())
+                }
+            },
+            settings = MutableStateFlow(StatisticsTargetSettings()),
+            updateSettings = {},
+            resetMinutes = MutableStateFlow(0),
+            dateProvider = object : StatisticsDateProvider {
+                override fun currentDate(resetMinutes: Int) = LocalDate.parse("2026-06-30")
+            },
+            calculationDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+            coroutineScope = backgroundScope,
+        )
+        model.reload()
+        runCurrent()
+        val message = requireNotNull(model.uiState.value.loadError).resolve({ _, _ -> "Unable to read statistics." }, { _, _, _ -> "" })
+        org.junit.Assert.assertTrue(message.contains("Statistics directory unavailable"))
+        fail = false
+        model.reload()
+        runCurrent()
+        assertNull(model.uiState.value.loadError)
+    }
+
+    @Test
+    fun partialSnapshotReportsBookAndUnderlyingReadReason() = runBlocking {
+        moe.antimony.hoshi.ui.ErrorDiagnosticEvents.buffer.drain()
+        val error = java.io.IOException("Malformed statistics sidecar")
+        val snapshot = StatisticsSnapshot(
+            emptyList(), emptyList(), setOf("broken-book"),
+            mapOf("broken-book" to error),
+        )
+        viewModel(snapshot = snapshot).use { vm ->
+            vm.reload()
+            val message = requireNotNull(vm.uiState.value.emptyState?.readError)
+                .resolve({ _, _ -> "Some statistics are unavailable." }, { _, _, _ -> "" })
+            org.junit.Assert.assertTrue(message.contains("broken-book"))
+            org.junit.Assert.assertTrue(message.contains("Malformed statistics sidecar"))
+            val event = moe.antimony.hoshi.ui.ErrorDiagnosticEvents.buffer.drain().single()
+            org.junit.Assert.assertSame(error, event.error)
+        }
+    }
+
     @Test
     fun initialStateShowsCurrentWeekWhileHeatmapRetainsAllHistory() = runBlocking {
         viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 2_000))).use { vm ->

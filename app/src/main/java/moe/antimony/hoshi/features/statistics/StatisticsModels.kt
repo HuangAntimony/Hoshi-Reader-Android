@@ -145,6 +145,7 @@ internal data class StatisticsTargetSettingsUi(
 internal data class StatisticsEmptyState(
     val hasAnyStatistics: Boolean,
     val hasPartialReadError: Boolean,
+    val readError: UiText? = null,
 )
 
 internal data class StatisticsGoalStreak(
@@ -168,6 +169,7 @@ internal data class StatisticsUiState(
     val currentRange: CurrentRangeStatisticsUi,
     val emptyState: StatisticsEmptyState? = null,
     val history: StatisticsHistoryUi = StatisticsHistoryUi(),
+    val loadError: UiText? = null,
 )
 
 internal sealed interface StatisticsEvent {

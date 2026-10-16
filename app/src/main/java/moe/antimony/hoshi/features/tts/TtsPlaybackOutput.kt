@@ -21,7 +21,7 @@ import kotlin.coroutines.resumeWithException
 internal interface TtsPlaybackOutput {
     var onEnded: () -> Unit
     var onPaused: () -> Unit
-    var onError: () -> Unit
+    var onError: (Throwable) -> Unit
     suspend fun connect()
     fun prepare(files: List<File>, title: String, sentence: String)
     fun setPlaybackRate(rate: Float)
@@ -35,7 +35,7 @@ internal interface TtsPlaybackOutput {
 internal class AndroidTtsPlaybackOutput(private val context: Context) : TtsPlaybackOutput {
     override var onEnded: () -> Unit = {}
     override var onPaused: () -> Unit = {}
-    override var onError: () -> Unit = {}
+    override var onError: (Throwable) -> Unit = {}
     private var player: ExoPlayer? = null
     private var connection: MediaController? = null
     private var desiredRate = 1f
@@ -53,7 +53,7 @@ internal class AndroidTtsPlaybackOutput(private val context: Context) : TtsPlayb
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (!playWhenReady && reason != Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) onPaused()
             }
-            override fun onPlayerError(error: PlaybackException) = onError()
+            override fun onPlayerError(error: PlaybackException) = onError(error)
         })
     }
     fun detach() { player = null; connection?.release(); connection = null }

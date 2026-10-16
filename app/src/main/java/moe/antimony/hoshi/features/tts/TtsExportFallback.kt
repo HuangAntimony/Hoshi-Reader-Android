@@ -61,7 +61,7 @@ class AndroidTtsExportFallback @Inject constructor(@param:ApplicationContext pri
                                     if (continuation.isActive) continuation.resume(Unit)
                                 }
                                 override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                                    if (continuation.isActive) continuation.resumeWithException(TtsException(TtsFailure.AudioUnavailable))
+                                    if (continuation.isActive) continuation.resumeWithException(TtsException(TtsFailure.AudioUnavailable, cause = exportException))
                                 }
                             }).build()
                         transformer?.start(composition, target.absolutePath)
@@ -69,8 +69,8 @@ class AndroidTtsExportFallback @Inject constructor(@param:ApplicationContext pri
                 }
             }
             if (!target.isFile || target.length() == 0L) throw TtsException(TtsFailure.AudioUnavailable)
-        } catch (_: TimeoutCancellationException) {
-            throw TtsException(TtsFailure.Timeout)
+        } catch (error: TimeoutCancellationException) {
+            throw TtsException(TtsFailure.Timeout, cause = error)
         } finally {
             // Complete cancellation on Transformer's looper before the caller removes inputs/output.
             withContext(NonCancellable + Dispatchers.Main.immediate) { transformer?.cancel() }

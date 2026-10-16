@@ -1,27 +1,34 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.HoshiButton
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 
 @Composable
 internal fun TtsConnectionTestControls(
-    enabled: Boolean, testing: Boolean, verified: Boolean, failure: TtsFailure?, onTest: () -> Unit,
+    enabled: Boolean, testing: Boolean, verified: Boolean, failure: TtsError?, onTest: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.fillMaxWidth().heightIn(min = 24.dp)) {
-            if (failure != null) Text(stringResource(failure.messageRes()),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            if (failure != null) CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.error) {
+                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+                    ErrorDetailsText(failure.message.asString(), Modifier.heightIn(max = 180.dp))
+                }
+            }
             else if (verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Rounded.CheckCircle, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(stringResource(R.string.tts_connection_success), style = MaterialTheme.typography.bodyMedium)

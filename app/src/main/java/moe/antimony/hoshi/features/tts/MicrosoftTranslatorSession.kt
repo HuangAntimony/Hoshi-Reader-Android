@@ -84,7 +84,7 @@ internal object MicrosoftTranslatorProtocol {
         val expiry = claims.getValue("exp").jsonPrimitive.long
         require(expiry > now)
         MicrosoftTranslatorToken(region, bearer, expiry)
-    } catch (_: Exception) {
-        throw TtsException(TtsFailure.InvalidResponse)
+    } catch (error: Exception) {
+        throw TtsException(TtsFailure.InvalidResponse, cause = error)
     }
 }

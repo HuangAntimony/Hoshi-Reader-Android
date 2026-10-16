@@ -180,7 +180,7 @@ class SasayakiTranscriptionCoordinatorTest {
 
         coordinator.start(temporary.newFolder(), "audio"); runCurrent()
 
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_audio), coordinator.state.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_audio), UiText.Literal("decoder detail"))), coordinator.state.value.error)
     }
 
     @Test fun modelResourceFailureUsesResourceSpecificMessage() = runTest {
@@ -194,7 +194,7 @@ class SasayakiTranscriptionCoordinatorTest {
 
         coordinator.start(temporary.newFolder(), "audio"); runCurrent()
 
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_resources), coordinator.state.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_resources), UiText.Literal("network detail"))), coordinator.state.value.error)
     }
 
     @Test fun checkpointWriteFailureUsesStorageSpecificMessage() = runTest {
@@ -204,7 +204,7 @@ class SasayakiTranscriptionCoordinatorTest {
         coordinator.start(root, "audio"); runCurrent()
         coordinator.pause(root); runCurrent()
 
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_storage), coordinator.state.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_storage), UiText.Literal("save detail"))), coordinator.state.value.error)
     }
 
     @Test fun clearRetainsMatchAndCannotRaceWithActiveTranscription() = runTest {
@@ -304,7 +304,7 @@ class SasayakiTranscriptionCoordinatorTest {
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         coordinator.start(root, "audio"); runCurrent()
         assertEquals(SasayakiTranscriptionStage.Transcribing, coordinator.state.value.stage)
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_match), coordinator.state.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_match), UiText.Literal("match failed"))), coordinator.state.value.error)
         coordinator.pause(root); runCurrent()
         assertNotNull(coordinator.state.value.match)
         assertNull(coordinator.state.value.error)

@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +28,7 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 @Composable
 internal fun TtsVoiceSettings(
     settings: TtsSettings, catalog: TtsCatalog?, engines: List<TtsEngineInfo>, busy: Boolean,
-    preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettingsUpdate) -> Unit,
+    preview: TtsPreviewState, failure: TtsError?, onSettings: (TtsSettingsUpdate) -> Unit,
     onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
     onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier, onCustom: (String?) -> Unit = {},
     catalogLoading: Boolean = busy && preview == TtsPreviewState.Idle,
@@ -75,7 +77,7 @@ internal fun TtsVoiceSettings(
             if (busy && preview == TtsPreviewState.Idle) TtsCatalogLoading(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
             failure?.let {
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                    Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    Text(it.message.asString(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (custom != null) TextButton(onClick = { onCustom(custom.id) }) { Text(stringResource(R.string.tts_configure_source)) }
                         if (source?.needsKey == true) TextButton(onClick = { onConfigure(source) }) { Text(stringResource(R.string.tts_configure_source)) }

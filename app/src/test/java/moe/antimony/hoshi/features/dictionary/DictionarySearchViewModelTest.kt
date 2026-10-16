@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
+import moe.antimony.hoshi.R
+
 import de.manhhao.hoshi.FrequencyEntry
 import de.manhhao.hoshi.GlossaryEntry
 import de.manhhao.hoshi.LookupResult
@@ -435,7 +437,7 @@ class DictionarySearchViewModelTest {
         assertEquals(emptyList<LookupPopupItem>(), state.popups)
         assertTrue(state.hasSearched)
         assertFalse(state.isSearching)
-        assertEquals(UiText.Literal("native lookup failed"), state.errorMessage)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_lookup_failed), UiText.Literal("native lookup failed"))), state.errorMessage)
     }
 
     @Test

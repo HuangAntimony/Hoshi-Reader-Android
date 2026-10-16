@@ -12,6 +12,7 @@ import moe.antimony.hoshi.dictionary.DictionaryImportException
 import moe.antimony.hoshi.dictionary.DictionaryImportFailureKind
 import moe.antimony.hoshi.importing.UnsupportedImportFileTypeException
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal data class DictionaryImportFailure(val item: DictionaryImportItem, val reason: UiText)
 
@@ -37,21 +38,22 @@ internal suspend fun runDictionaryImportBatch(
     return DictionaryImportBatchResult(imported, failed)
 }
 
-internal fun dictionaryImportErrorText(error: Throwable): UiText = when (error) {
-    is DictionaryImportException -> when (error.kind) {
-        DictionaryImportFailureKind.Native -> error.detail?.takeIf { it.isNotBlank() }?.let {
-            UiText.Resource(R.string.dictionary_import_native_error_format, it)
-        } ?: UiText.Resource(R.string.dictionary_import_failed)
-        DictionaryImportFailureKind.FileAccess -> UiText.Resource(R.string.dictionary_import_file_access_error)
-        DictionaryImportFailureKind.InvalidArchive -> UiText.Resource(R.string.dictionary_import_archive_error)
-        DictionaryImportFailureKind.WriteFiles -> UiText.Resource(R.string.dictionary_import_io_error)
-        DictionaryImportFailureKind.InvalidIndex -> UiText.Resource(R.string.dictionary_import_index_error)
-        DictionaryImportFailureKind.UnsupportedContents -> UiText.Resource(R.string.dictionary_import_contents_error)
+internal fun dictionaryImportErrorText(error: Throwable): UiText {
+    val summary = when (error) {
+        is DictionaryImportException -> when (error.kind) {
+            DictionaryImportFailureKind.Native -> UiText.Resource(R.string.dictionary_import_failed)
+            DictionaryImportFailureKind.FileAccess -> UiText.Resource(R.string.dictionary_import_file_access_error)
+            DictionaryImportFailureKind.InvalidArchive -> UiText.Resource(R.string.dictionary_import_archive_error)
+            DictionaryImportFailureKind.WriteFiles -> UiText.Resource(R.string.dictionary_import_io_error)
+            DictionaryImportFailureKind.InvalidIndex -> UiText.Resource(R.string.dictionary_import_index_error)
+            DictionaryImportFailureKind.UnsupportedContents -> UiText.Resource(R.string.dictionary_import_contents_error)
+        }
+        is UnsupportedImportFileTypeException -> UiText.Resource(error.messageRes)
+        is FileNotFoundException, is SecurityException -> UiText.Resource(R.string.dictionary_import_file_access_error)
+        is ZipException -> UiText.Resource(R.string.dictionary_import_archive_error)
+        is SerializationException -> UiText.Resource(R.string.dictionary_import_index_error)
+        is IOException -> UiText.Resource(R.string.dictionary_import_io_error)
+        else -> UiText.Resource(R.string.dictionary_import_failed)
     }
-    is UnsupportedImportFileTypeException -> UiText.Resource(error.messageRes)
-    is FileNotFoundException, is SecurityException -> UiText.Resource(R.string.dictionary_import_file_access_error)
-    is ZipException -> UiText.Resource(R.string.dictionary_import_archive_error)
-    is SerializationException -> UiText.Resource(R.string.dictionary_import_index_error)
-    is IOException -> UiText.Resource(R.string.dictionary_import_io_error)
-    else -> UiText.Resource(R.string.dictionary_import_failed)
+    return if (error is DictionaryImportException && error.detail.isNullOrBlank()) summary else summary.withErrorDetails(error)
 }

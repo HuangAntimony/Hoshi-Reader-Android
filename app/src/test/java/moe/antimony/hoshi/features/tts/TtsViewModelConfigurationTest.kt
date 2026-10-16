@@ -25,6 +25,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
 import okhttp3.OkHttpClient
 import org.junit.Assert.*
 import org.junit.Rule
@@ -33,6 +35,23 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsViewModelConfigurationTest {
+    @Test fun deletingReplacementReturnsItsStorageReasonAndCanBeRetried() = runTest {
+        val store = MemoryStore()
+        fixture(TtsOnlineSource.MicrosoftTranslator, store) { model, repository ->
+            repository.save(TtsWord("stored", "猫", "ねこ"))
+            store.failure = java.io.IOException("replacement store is read only")
+
+            val result: Any? = model.delete("stored")
+
+            assertEquals(TtsError(TtsFailure.Storage, UiText.Joined(listOf(UiText.Resource(R.string.tts_storage_error), UiText.Literal("replacement store is read only")))), result)
+            assertEquals(listOf("stored"), repository.preferences.first().words.map { it.id })
+            assertNull("Replacement errors must not become source-tab errors", model.error.value)
+            store.failure = null
+            assertNull(model.delete("stored"))
+            assertTrue(repository.preferences.first().words.isEmpty())
+        }
+    }
+
     @get:Rule val files = TemporaryFolder()
 
     @Test fun savingUnselectedCloudConfigurationsKeepsTheCurrentCatalogReady() = runTest {
@@ -122,11 +141,12 @@ class TtsViewModelConfigurationTest {
 
     private suspend fun TestScope.fixture(
         selected: TtsOnlineSource,
+        store: MemoryStore = MemoryStore(),
         test: suspend (TtsViewModel, TtsRepository) -> Unit,
     ) {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
-        val repository = TtsRepository(MemoryStore())
+        val repository = TtsRepository(store)
         repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "saved-cipher"))
         repository.configure(TtsOnlineSource.GoogleCloud, TtsOnlineConfig(encryptedKey = "saved-cipher"))
         repository.settings { it.selectSource(selected.id).withVoice("saved-voice") }
@@ -153,7 +173,7 @@ class TtsViewModelConfigurationTest {
         val output = object : TtsPlaybackOutput {
             override var onEnded: () -> Unit = {}
             override var onPaused: () -> Unit = {}
-            override var onError: () -> Unit = {}
+            override var onError: (Throwable) -> Unit = {}
             override suspend fun connect() = Unit
             override fun prepare(files: List<File>, title: String, sentence: String) = Unit
             override fun setPlaybackRate(rate: Float) = Unit
@@ -181,8 +201,9 @@ class TtsViewModelConfigurationTest {
     }
 
     private class MemoryStore : DataStore<Preferences> {
+        var failure: Throwable? = null
         override val data = MutableStateFlow(emptyPreferences())
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
-            transform(data.value).also { data.value = it }
+            failure?.let { throw it } ?: transform(data.value).also { data.value = it }
     }
 }

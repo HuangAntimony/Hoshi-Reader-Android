@@ -8,12 +8,66 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.features.reader.ReaderSettings
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
 import moe.antimony.hoshi.features.settings.SettingsLoadState
 import org.junit.Assert.*
+import moe.antimony.hoshi.ui.resolve
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatisticsSettingsViewModelTest {
+    @Test
+    fun mixedHealthyAndCorruptArchiveKeepsSettingsCountAndClearAction() = verifyCorruptArchiveRecovery(1)
+
+    @Test
+    fun corruptOnlyArchiveKeepsSettingsAndClearAction() = verifyCorruptArchiveRecovery(0)
+
+    private fun verifyCorruptArchiveRecovery(healthyCount: Int) = runTest {
+        val files = java.nio.file.Files.createTempDirectory("hoshi-archive-partial").toFile()
+        try {
+            val archive = files.resolve("Books/statistics_archive")
+            if (healthyCount > 0) {
+                archive.resolve("healthy").apply { mkdirs() }.resolve("statistics.json").writeText(
+                    """[{"title":"Healthy","dateKey":"2026-10-17","charactersRead":10}]""",
+                )
+            }
+            archive.resolve("corrupt-book").apply { mkdirs() }.resolve("statistics.json").writeText("broken")
+            val dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+            val store = moe.antimony.hoshi.epub.BookStatisticsStore(files, dispatcher)
+            val originalError = requireNotNull(runCatching { store.load(archive.resolve("corrupt-book")) }.exceptionOrNull())
+            val repository = AndroidStatisticsRepository(store, dispatcher)
+            val model = StatisticsSettingsViewModel(
+                MutableStateFlow(ReaderSettings(statisticsResetMinutes = 315)),
+                MutableStateFlow(false),
+                {},
+                repository,
+                backgroundScope,
+            )
+            runCurrent()
+            assertTrue(model.uiState.value.loadState is SettingsLoadState.Loaded)
+            assertEquals(315, model.uiState.value.settings?.statisticsResetMinutes)
+            assertEquals(healthyCount, model.uiState.value.archivedBookCount)
+            val loaded = model.uiState.value.loadState as SettingsLoadState.Loaded
+            assertTrue(loaded.value.archiveSummary.hasArchivedData)
+            assertEquals(healthyCount + 1, loaded.value.archiveSummary.totalBookCount)
+            val message = requireNotNull(model.uiState.value.error).resolve(
+                { _, _ -> "Some statistics are unavailable." }, { _, _, _ -> "" },
+            )
+            assertTrue(message.contains("corrupt-book"))
+            assertTrue(message.contains(requireNotNull(originalError.message)))
+            model.dismissError()
+            model.clearArchive()
+            runCurrent()
+            assertFalse(archive.exists())
+            assertEquals(0, model.uiState.value.archivedBookCount)
+            assertFalse((model.uiState.value.loadState as SettingsLoadState.Loaded).value.archiveSummary.hasArchivedData)
+            assertTrue(model.uiState.value.loadState is SettingsLoadState.Loaded)
+            assertNull(model.uiState.value.error)
+        } finally {
+            files.deleteRecursively()
+        }
+    }
+
     @Test
     fun delayedPreferencesWaitForBothStoredSourcesAndArchiveCount() = runTest {
         val firstSettings = CompletableDeferred<ReaderSettings>()
@@ -47,7 +101,7 @@ class StatisticsSettingsViewModelTest {
             MutableStateFlow(false),
             {},
             object : StatisticsRepositoryFake() {
-                override suspend fun loadArchiveSummary() = count.await()
+                override suspend fun loadArchiveSummary() = StatisticsArchiveSummary(count.await())
             },
             backgroundScope,
         )
@@ -66,16 +120,21 @@ class StatisticsSettingsViewModelTest {
             MutableStateFlow(false),
             {},
             object : StatisticsRepositoryFake() {
-                override suspend fun loadArchiveSummary(): Int {
+                override suspend fun loadArchiveSummary(): StatisticsArchiveSummary {
                     attempts++
-                    if (attempts == 1) throw IOException()
-                    return 2
+                    if (attempts == 1) throw IOException("Statistics archive access denied")
+                    return StatisticsArchiveSummary(2)
                 }
             },
             backgroundScope,
         )
         runCurrent()
         assertTrue(model.uiState.value.loadState is SettingsLoadState.Failed)
+        val failure = (model.uiState.value.loadState as SettingsLoadState.Failed).message.resolve(
+            getString = { _, _ -> "Unable to load settings." },
+            getQuantityString = { _, _, _ -> "" },
+        )
+        assertTrue(failure.contains("Statistics archive access denied"))
         model.retryLoad()
         assertEquals(SettingsLoadState.Loading, model.uiState.value.loadState)
         runCurrent()
@@ -124,7 +183,7 @@ class StatisticsSettingsViewModelTest {
             MutableStateFlow(false),
             {},
             object : StatisticsRepositoryFake() {
-                override suspend fun loadArchiveSummary(): Int = throw IOException()
+                override suspend fun loadArchiveSummary(): StatisticsArchiveSummary = throw IOException()
             },
             backgroundScope,
         )
@@ -141,9 +200,9 @@ class StatisticsSettingsViewModelTest {
             MutableStateFlow(false),
             {},
             object : StatisticsRepositoryFake() {
-                override suspend fun loadArchiveSummary(): Int {
+                override suspend fun loadArchiveSummary(): StatisticsArchiveSummary {
                     reads++
-                    return if (reads == 1) 3 else refresh.await()
+                    return StatisticsArchiveSummary(if (reads == 1) 3 else refresh.await())
                 }
             },
             backgroundScope,

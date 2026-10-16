@@ -77,14 +77,14 @@ class TtsContinuousPlaybackDeviceTest {
     private class DirectOutput(private val player: ExoPlayer) : TtsPlaybackOutput {
         override var onEnded: () -> Unit = {}
         override var onPaused: () -> Unit = {}
-        override var onError: () -> Unit = {}
+        override var onError: (Throwable) -> Unit = {}
         val sentences = mutableListOf<String>()
         init {
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) onEnded()
                 }
-                override fun onPlayerError(error: PlaybackException) = onError()
+                override fun onPlayerError(error: PlaybackException) = onError(error)
             })
         }
         override suspend fun connect() = Unit

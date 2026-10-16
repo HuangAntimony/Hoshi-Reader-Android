@@ -1,12 +1,14 @@
 package moe.antimony.hoshi.features.statistics
 
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
+
 internal open class StatisticsRepositoryFake : StatisticsRepository {
     var storedBook: StatisticsBookRecords? = null
     var archiveCount = 0
     var failWrites = false
     override suspend fun loadSnapshot() = StatisticsSnapshot(emptyList(), emptyList())
     override suspend fun loadBookStatistics(folder: String) = storedBook
-    override suspend fun loadArchiveSummary() = archiveCount
+    override suspend fun loadArchiveSummary() = StatisticsArchiveSummary(archiveCount)
     override suspend fun clearArchive() {
         check(!failWrites)
         archiveCount = 0

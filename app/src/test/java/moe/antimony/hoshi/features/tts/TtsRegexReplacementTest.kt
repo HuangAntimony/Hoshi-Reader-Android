@@ -1,10 +1,30 @@
 package moe.antimony.hoshi.features.tts
 
 import kotlinx.serialization.json.*
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.resolve
 import org.junit.Assert.*
 import org.junit.Test
 
 class TtsRegexReplacementTest {
+    @Test fun invalidPatternPreviewKeepsTheOriginalParserDiagnostic() {
+        val preview = prepareTtsWordPreview(rule("[", "a"), TtsSentence(0, 0, 1, "a"), null, TtsPreferences())
+
+        assertEquals(TtsWordError.RegexPattern, preview.error)
+        assertNotNull(preview.errorMessage)
+        val message = preview.errorMessage!!.resolve({ _, _ -> "Invalid pattern" }, { _, _, _ -> "" })
+        assertTrue(message.startsWith("Invalid pattern\n"))
+        assertTrue(message.contains("missing closing ]"))
+    }
+
+    @Test fun invalidReplacementPreviewKeepsTheOriginalGroupValidationDiagnostic() {
+        val preview = prepareTtsWordPreview(rule("(a)", "\$2"), TtsSentence(0, 0, 1, "a"), null, TtsPreferences())
+
+        assertEquals(TtsWordError.RegexReplacement, preview.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_invalid_regex_replacement), UiText.Literal("Failed requirement."))), preview.errorMessage)
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
     @Test fun emptyLiteralAndRegexReplacementsDeleteWithoutChangingSource() {
         val sentence = TtsSentence(3, 8, 6, "前（注）後々。")

@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.settings.SettingsContent
 import moe.antimony.hoshi.features.settings.combineSettingsLoadStates
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
@@ -922,7 +923,7 @@ private fun ReaderAppearanceContent(
                 viewModel.clearError()
             },
             title = { Text(stringResource(R.string.reader_appearance_font)) },
-            text = { Text(requireNotNull(fontUiState.error).asString()) },
+            text = { ErrorDetailsText(requireNotNull(fontUiState.error).asString()) },
             confirmButton = {
                 TextButton(
                     onClick = {

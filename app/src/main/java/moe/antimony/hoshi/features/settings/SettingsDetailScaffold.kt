@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.ui.asString
 
 /** Only confirmed persisted settings reach the controls inside [content]. */
@@ -65,8 +66,12 @@ internal fun <T> SettingsContent(
             Text(stringResource(R.string.loading))
         }
         is SettingsLoadState.Failed -> Box(modifier, contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(state.message.asString())
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ErrorDetailsText(state.message.asString(), Modifier.weight(1f, fill = false))
                 if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.settings_retry)) }
             }
         }

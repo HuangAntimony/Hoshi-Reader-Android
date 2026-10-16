@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.tts
 
+import android.speech.tts.TextToSpeech
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -18,6 +21,50 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AndroidTtsEngineTest {
+    @Test fun terminalAutomaticEngineSelectionKeepsAllOriginalInitializationFailures() = runTest {
+        val error = runCatching {
+            resolveAutomaticTtsEngine(listOf("first.engine", "second.engine"), { id ->
+                throw ttsPlatformError("onInit", if (id == "first.engine") -1 else -7, TtsFailure.EngineUnavailable)
+            }, { true })
+        }.exceptionOrNull()!!.toTtsError(TtsFailure.EngineUnavailable)
+
+        assertEquals(TtsFailure.MissingJapanese, error.failure)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_missing_japanese),
+            UiText.Literal("first.engine: TextToSpeech.onInit: -1\nsecond.engine: TextToSpeech.onInit: -7"))), error.message)
+    }
+
+    @Test fun successfulAutomaticFallbackRemainsUsableAfterAnEarlierEngineFailure() = runTest {
+        val selected = resolveAutomaticTtsEngine(listOf("unavailable", "working"), { id ->
+            if (id == "unavailable") throw ttsPlatformError("onInit", -1, TtsFailure.EngineUnavailable)
+            id
+        }, { true })
+
+        assertEquals("working" to "working", selected)
+    }
+
+    @Test fun platformCallbackAndOperationCodesSurviveTheVisibleErrorMapping() {
+        val callback = ttsPlatformError("onError", TextToSpeech.ERROR_NETWORK, TtsFailure.Synthesis)
+            .toTtsError(TtsFailure.Synthesis)
+        assertEquals(TtsFailure.Synthesis, callback.failure)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_failed), UiText.Literal("TextToSpeech.onError: -6"))), callback.message)
+
+        val initialization = ttsPlatformError("onInit", TextToSpeech.ERROR, TtsFailure.EngineUnavailable)
+            .toTtsError(TtsFailure.Synthesis)
+        assertEquals(TtsFailure.EngineUnavailable, initialization.failure)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_engine_unavailable), UiText.Literal("TextToSpeech.onInit: -1"))), initialization.message)
+
+        val queued = ttsPlatformError("synthesizeToFile", -10123, TtsFailure.Synthesis)
+            .toTtsError(TtsFailure.Synthesis)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_failed), UiText.Literal("TextToSpeech.synthesizeToFile: -10123"))), queued.message)
+    }
+
+    @Test fun classificationWithoutAnOriginalDiagnosticDoesNotInventAnErrorCode() {
+        val error = TtsException(TtsFailure.Synthesis).toTtsError(TtsFailure.Network)
+
+        assertEquals(TtsFailure.Synthesis, error.failure)
+        assertEquals(UiText.Resource(R.string.tts_failed), error.message)
+    }
+
     @get:Rule val folder = TemporaryFolder()
     private val settings = TtsSettings(engine = "device.one")
 

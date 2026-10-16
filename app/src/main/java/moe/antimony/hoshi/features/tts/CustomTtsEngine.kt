@@ -52,7 +52,9 @@ class CustomTtsEngine internal constructor(
             val data = parse(request(source, "models")).jsonObject["data"]?.jsonArray.orEmpty()
             data.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull }.distinct()
         } catch (error: CancellationException) { throw error }
-        catch (_: Exception) { emptyList() }
+        catch (error: TtsException) {
+            if (error.statusCode == 404 || error.statusCode == 405) emptyList() else throw error
+        }
     }
 
     suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> {
@@ -108,7 +110,7 @@ class CustomTtsEngine internal constructor(
     }
 
     private fun parse(bytes: ByteArray): JsonElement = try { Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) }
-        catch (_: Exception) { throw TtsException(TtsFailure.InvalidResponse) }
+        catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
     private fun openAiVoices(bytes: ByteArray): List<TtsVoiceInfo> = try {
         val root = parse(bytes)
         val values = if (root is JsonArray) root else root.jsonObject["voices"] ?: root.jsonObject["data"] ?: JsonArray(emptyList())
@@ -120,7 +122,7 @@ class CustomTtsEngine internal constructor(
                 id?.let { TtsVoiceInfo(it, true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: it) }
             }
         }.filter { it.id.isNotBlank() }.distinctBy { it.id }
-    } catch (_: Exception) { throw TtsException(TtsFailure.InvalidResponse) }
+    } catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
     private fun vitsVoices(bytes: ByteArray): List<TtsVoiceInfo> = try {
         val root = parse(bytes).jsonObject
         vitsModels.keys.flatMap { model -> root[model]?.jsonArray.orEmpty().mapNotNull { value ->
@@ -130,7 +132,7 @@ class CustomTtsEngine internal constructor(
             if (id == null || id < 0 || languages.isNotEmpty() && languages.none { it == "ja" || it == "jpn" || it.startsWith("ja-") }) null
             else TtsVoiceInfo("$model:$id", true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: "$model:$id")
         } }.distinctBy { it.id }
-    } catch (_: Exception) { throw TtsException(TtsFailure.InvalidResponse) }
+    } catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
 }
 
 internal fun validateTtsAudio(bytes: ByteArray, format: TtsAudioFormat) {

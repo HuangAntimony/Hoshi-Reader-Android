@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import moe.antimony.hoshi.ui.withErrorDetails
+
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
@@ -85,7 +87,7 @@ internal fun SasayakiSubtitleMatchSection(
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 matchUiState = matchUiState.finishMatching(
-                    errorMessage = matchFailedMessage,
+                    errorMessage = matchFailedMessage.withErrorDetails(error),
                 )
             }
         }

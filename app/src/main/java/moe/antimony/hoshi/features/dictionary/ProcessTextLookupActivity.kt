@@ -50,6 +50,7 @@ import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.AudioSettingsRepository
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.anki.AnkiOperationErrorDialog
 import moe.antimony.hoshi.features.anki.AnkiMiningContext
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbackHolder
 import moe.antimony.hoshi.features.reader.ReaderLookupPopupBridgeCallbacks
@@ -155,6 +156,10 @@ private fun ProcessTextLookupOverlay(
     var popups by remember(query) { mutableStateOf<List<LookupPopupItem>>(emptyList()) }
     var popupHistories by remember(query) { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var error by remember(query) { mutableStateOf<Throwable?>(null) }
+    var ankiOperationError by remember(query) { mutableStateOf<Throwable?>(null) }
+    var ankiSynchronizationWarning by remember(query) { mutableStateOf<Throwable?>(null) }
+    AnkiOperationErrorDialog(ankiOperationError) { ankiOperationError = null }
+    AnkiOperationErrorDialog(ankiSynchronizationWarning, R.string.anki_sync_failed) { ankiSynchronizationWarning = null }
     var iframeHostWebView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
     val darkMode = MaterialTheme.colorScheme.background.luminanceForPopup() < 0.5f
@@ -383,7 +388,8 @@ private fun ProcessTextLookupOverlay(
                 is ReaderLookupPopupBridgeMessage.MineEntry -> {
                     val popup = popupById(message.popupId) ?: return
                     val messageId = message.messageId ?: return
-                    ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, popup.state.ankiContext) { mined ->
+                    ankiViewModel.mineEntryAsync(message.formatId, message.payloadJson, popup.state.ankiContext,
+                        onError = { ankiOperationError = it }, onWarning = { ankiSynchronizationWarning = it }) { mined ->
                         replyIframeMessage(message.popupId, messageId, mined.toString())
                     }
                 }
@@ -395,7 +401,7 @@ private fun ProcessTextLookupOverlay(
                 }
                 is ReaderLookupPopupBridgeMessage.ShowNotes -> {
                     val messageId = message.messageId ?: return
-                    ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar) { shown ->
+                    ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar, onError = { ankiOperationError = it }) { shown ->
                         replyIframeMessage(message.popupId, messageId, shown.toString())
                     }
                 }

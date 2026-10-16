@@ -22,6 +22,9 @@ import moe.antimony.hoshi.di.DefaultDispatcher
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.diagnosticMessage
+import moe.antimony.hoshi.ui.withErrorDetails
 
 @HiltViewModel
 internal class StatisticsViewModel internal constructor(
@@ -69,27 +72,51 @@ internal class StatisticsViewModel internal constructor(
     val uiState: StateFlow<StatisticsUiState> = _uiState.asStateFlow()
     private var reloadJob: Job? = null
     private var reloadGeneration = 0
+    private var observationJob: Job? = null
+    private val loadError = MutableStateFlow<UiText?>(null)
 
     init {
-        scope.launch {
-            combine(snapshot, settings, resetMinutes, selection, isLoading) { snapshot, settings, resetMinutes, selection, isLoading ->
-                currentResetMinutes = resetMinutes
-                withContext(calculationDispatcher) {
-                    buildStatisticsUiState(
-                        snapshot = snapshot,
-                        settings = settings,
-                        selection = selection,
-                        today = currentDate(),
-                        isLoading = isLoading,
-                    )
+        observeSettings()
+    }
+
+    private fun observeSettings() {
+        observationJob = scope.launch {
+            try {
+                combine(snapshot, settings, resetMinutes, selection, isLoading) { snapshot, settings, resetMinutes, selection, isLoading ->
+                    currentResetMinutes = resetMinutes
+                    withContext(calculationDispatcher) {
+                        buildStatisticsUiState(
+                            snapshot = snapshot,
+                            settings = settings,
+                            selection = selection,
+                            today = currentDate(),
+                            isLoading = isLoading,
+                        )
+                    }
+                }.combine(loadError) { state, error -> state.copy(loadError = error) }.collect { state ->
+                    _uiState.value = state
                 }
-            }.collect { state ->
-                _uiState.value = state
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                showLoadError(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error))
             }
         }
     }
 
+    private fun showLoadError(message: UiText) {
+        loadError.value = message
+        _uiState.update { it.copy(loadError = message, isLoading = false) }
+    }
+
+    fun dismissLoadError() {
+        loadError.value = null
+        _uiState.update { it.copy(loadError = null) }
+    }
+
     fun reload() {
+        dismissLoadError()
+        if (observationJob?.isActive != true) observeSettings()
         val generation = ++reloadGeneration
         reloadJob?.cancel()
         reloadJob = scope.launch {
@@ -98,6 +125,12 @@ internal class StatisticsViewModel internal constructor(
                 val loaded = repository.loadSnapshot()
                 if (generation == reloadGeneration) {
                     snapshot.value = loaded
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (generation == reloadGeneration) {
+                    showLoadError(UiText.Resource(R.string.statistics_operation_failed).withErrorDetails(error))
                 }
             } finally {
                 if (generation == reloadGeneration) {
@@ -150,8 +183,8 @@ internal class StatisticsViewModel internal constructor(
                 selection.update { it.copy(targetError = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                selection.update { it.copy(targetError = UiText.Resource(R.string.statistics_goal_save_failed)) }
+            } catch (error: Exception) {
+                selection.update { it.copy(targetError = UiText.Resource(R.string.statistics_goal_save_failed).withErrorDetails(error)) }
             }
         }
     }
@@ -225,6 +258,15 @@ private fun buildStatisticsUiState(
         emptyState = StatisticsEmptyState(
             hasAnyStatistics = snapshot.days.isNotEmpty(),
             hasPartialReadError = snapshot.skippedCorruptBookIds.isNotEmpty(),
+            readError = snapshot.readErrors.takeIf { it.isNotEmpty() }?.let { errors ->
+                UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable)) + errors.map { (id, error) ->
+                    ErrorDiagnosticEvents.buffer.record(
+                        UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable), UiText.Literal(id))),
+                        error,
+                    )
+                    UiText.Literal("$id: ${error.diagnosticMessage()}")
+                })
+            },
         ),
     )
 }

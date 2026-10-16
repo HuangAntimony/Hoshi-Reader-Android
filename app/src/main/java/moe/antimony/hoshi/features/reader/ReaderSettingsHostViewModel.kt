@@ -19,6 +19,7 @@ import kotlinx.coroutines.sync.withLock
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal data class ReaderSettingsHostState(
     // Retain the app root and theme while loadState gates controls for the current profile.
@@ -68,9 +69,9 @@ internal class ReaderSettingsHostViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 if (generation == loadGeneration) {
-                    val message = UiText.Resource(R.string.display_settings_load_failed)
+                    val message = UiText.Resource(R.string.display_settings_load_failed).withErrorDetails(failure)
                     _uiState.update { it.copy(loadState = SettingsLoadState.Failed(message), error = message) }
                 }
             }
@@ -88,9 +89,9 @@ internal class ReaderSettingsHostViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 if (canUpdate(generation)) {
-                    _uiState.update { it.copy(error = UiText.Resource(R.string.display_settings_save_failed)) }
+                    _uiState.update { it.copy(error = UiText.Resource(R.string.display_settings_save_failed).withErrorDetails(failure)) }
                 }
             }
         }

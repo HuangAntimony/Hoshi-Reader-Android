@@ -33,8 +33,8 @@ class TtsViewModel @Inject constructor(
     val playback: TtsPlaybackController,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
-    private val mutableError = MutableStateFlow<TtsFailure?>(null)
-    private val mutableReadingError = MutableStateFlow<TtsFailure?>(null)
+    private val mutableError = MutableStateFlow<TtsError?>(null)
+    private val mutableReadingError = MutableStateFlow<TtsError?>(null)
     val readingError = mutableReadingError.asStateFlow()
     private val readingLoadAttempt = MutableStateFlow(0)
     val readingSettingsLoadState = readingLoadAttempt.flatMapLatest {
@@ -48,7 +48,7 @@ class TtsViewModel @Inject constructor(
         viewModelScope.launch {
             try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(update) }; mutableReadingError.value = null }
             catch (error: CancellationException) { throw error }
-            catch (_: Exception) { mutableReadingError.value = TtsFailure.Storage }
+            catch (error: Exception) { mutableReadingError.value = error.toTtsError(TtsFailure.Storage) }
         }
     }
 
@@ -57,7 +57,7 @@ class TtsViewModel @Inject constructor(
         viewModelScope.launch {
             try { repository.useRubyReadings(enabled); mutableReadingError.value = null }
             catch (error: CancellationException) { throw error }
-            catch (_: Exception) { mutableReadingError.value = TtsFailure.Storage }
+            catch (error: Exception) { mutableReadingError.value = error.toTtsError(TtsFailure.Storage) }
         }
     }
 
@@ -105,10 +105,10 @@ class TtsViewModel @Inject constructor(
                 catalogBusy.value = refreshCatalog || cached == null
                 mutableEngines.value = engine.installedEngines()
                 mutableCatalog.value = if (!refreshCatalog && cached != null) cached else engine.catalog(settings, refreshCatalog)
-                if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese
-            } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
+                if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese.toError()
+            } catch (error: TimeoutCancellationException) { mutableError.value = error.toTtsError(TtsFailure.Timeout) }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { mutableCatalog.value = fallback; mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.EngineUnavailable }
+            catch (error: Exception) { mutableCatalog.value = fallback; mutableError.value = error.toTtsError(TtsFailure.EngineUnavailable) }
             finally { if (generation == catalogGeneration) catalogBusy.value = false }
         }
     }
@@ -119,7 +119,7 @@ class TtsViewModel @Inject constructor(
             if (!playbackOnly) { stopPreview(); dismissError() }
             previewPlayer?.setPlaybackSpeed(normalizeTtsPlaybackRate(value.playbackRate))
             if (!playbackOnly && (previous.engine != value.engine || previous.voiceCatalogKey() != value.voiceCatalogKey() || catalog.value == null)) refresh()
-        } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
+        } catch (error: CancellationException) { throw error } catch (error: Exception) { mutableError.value = error.toTtsError(TtsFailure.Storage) } }
     }
     private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
         val current = repository.preferences.first().settings.online[source.id] ?: TtsOnlineConfig()
@@ -131,7 +131,7 @@ class TtsViewModel @Inject constructor(
         return TtsOnlineConfig(cleanedRegion, encrypted)
     }
 
-    suspend fun configure(source: TtsOnlineSource, region: String, key: String): TtsFailure? = try {
+    suspend fun configure(source: TtsOnlineSource, region: String, key: String): TtsError? = try {
         val config = configuration(source, region, key)
         repository.configure(source, config)
         if (repository.preferences.first().settings.engine == source.id) {
@@ -140,9 +140,9 @@ class TtsViewModel @Inject constructor(
         }
         null
     } catch (error: CancellationException) { throw error }
-    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
+    catch (error: Exception) { error.toTtsError(TtsFailure.Storage) }
 
-    suspend fun removeKey(source: TtsOnlineSource): TtsFailure? = try {
+    suspend fun removeKey(source: TtsOnlineSource): TtsError? = try {
         repository.removeOnlineKey(source)
         if (repository.preferences.first().settings.engine == source.id) {
             stopPreview()
@@ -150,24 +150,24 @@ class TtsViewModel @Inject constructor(
         }
         null
     } catch (error: CancellationException) { throw error }
-    catch (_: Exception) { TtsFailure.Storage }
+    catch (error: Exception) { error.toTtsError(TtsFailure.Storage) }
 
     /** Tests the draft by synthesizing a sample without saving it or changing the active voice. */
-    suspend fun testConfiguration(source: TtsOnlineSource, region: String, key: String, sample: String): TtsFailure? = try {
+    suspend fun testConfiguration(source: TtsOnlineSource, region: String, key: String, sample: String): TtsError? = try {
         val config = configuration(source, region, key)
         val current = repository.preferences.first()
         val draft = current.copy(settings = current.settings.copy(engine = source.id, sharedRate = 1f, pitch = 0f,
             online = current.settings.online + (source.id to config), parameters = emptyMap(), routingBySource = emptyMap()))
         audio.export(TtsSentence(0, 0, 0, sample), null, draft).delete()
         null
-    } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
+    } catch (error: TimeoutCancellationException) { error.toTtsError(TtsFailure.Timeout) }
     catch (error: CancellationException) { throw error }
-    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
+    catch (error: Exception) { error.toTtsError(TtsFailure.Synthesis) }
     private suspend fun customDraft(source: TtsCustomSource, key: String, removeKey: Boolean): TtsCustomSource {
         val encrypted = cipher.update(key, source.id, source.encryptedKey, removeKey)
         return source.copy(encryptedKey = encrypted).validate()
     }
-    suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsFailure? = try {
+    suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsError? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first().settings
         val created = current.customSources.none { it.id == draft.id }
@@ -179,32 +179,36 @@ class TtsViewModel @Inject constructor(
         if (created || current.engine == draft.id && (changed || previous.voiceIds != draft.voiceIds)) refresh()
         null
     } catch (error: CancellationException) { throw error }
-    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
-    suspend fun testSource(source: TtsCustomSource, key: String, removeKey: Boolean, sample: String): TtsFailure? = try {
+    catch (error: Exception) { error.toTtsError(TtsFailure.Storage) }
+    suspend fun testSource(source: TtsCustomSource, key: String, removeKey: Boolean, sample: String): TtsError? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first()
         val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id)
         audio.export(TtsSentence(0, 0, 0, sample), null, current.copy(settings = settings.forVoice(settings.voice))).delete()
         null
-    } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
+    } catch (error: TimeoutCancellationException) { error.toTtsError(TtsFailure.Timeout) }
     catch (error: CancellationException) { throw error }
-    catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
-    suspend fun deleteSource(id: String): TtsFailure? = try {
+    catch (error: Exception) { error.toTtsError(TtsFailure.Synthesis) }
+    suspend fun deleteSource(id: String): TtsError? = try {
         val current = repository.preferences.first().settings
         if (current.engine == id) { stopPreview(); playback.pause() }
         repository.deleteSource(id)
         if (current.engine == id) refresh()
         null
     } catch (error: CancellationException) { throw error }
-    catch (_: Exception) { TtsFailure.Storage }
+    catch (error: Exception) { error.toTtsError(TtsFailure.Storage) }
     suspend fun sourceModels(source: TtsCustomSource, key: String, removeKey: Boolean): List<String> {
         val encrypted = cipher.update(key, source.id, source.encryptedKey, removeKey)
         return engine.models(source.copy(encryptedKey = encrypted))
     }
     suspend fun save(word: TtsWord): TtsWordError? = try {
         repository.save(word.copy(surface = if (word.regex) word.surface else word.surface.trim()))
-    } catch (error: CancellationException) { throw error } catch (_: Exception) { TtsWordError.Storage }
-    fun delete(id: String) { viewModelScope.launch { try { repository.delete(id) } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } } }
+    } catch (error: CancellationException) { throw error } catch (error: Exception) { mutableError.value = error.toTtsError(TtsFailure.Storage); TtsWordError.Storage }
+    suspend fun delete(id: String): TtsError? = try {
+        repository.delete(id)
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (error: Exception) { error.toTtsError(TtsFailure.Storage) }
     fun preview(sentence: TtsSentence, bookId: String?, snapshot: TtsPreferences? = null) {
         stopPreview()
         playback.pause()
@@ -228,14 +232,14 @@ class TtsViewModel @Inject constructor(
                             if (playbackState == Player.STATE_ENDED && generation == previewGeneration) stopPreview()
                         }
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                            if (generation == previewGeneration) { mutableError.value = TtsFailure.AudioUnavailable; stopPreview() }
+                            if (generation == previewGeneration) { mutableError.value = error.toTtsError(TtsFailure.AudioUnavailable); stopPreview() }
                         }
                     })
                     setMediaItem(MediaItem.fromUri(file.toURI().toString())); prepare(); play()
                 }
-            } catch (error: TimeoutCancellationException) { if (generation == previewGeneration) mutableError.value = TtsFailure.Timeout }
+            } catch (error: TimeoutCancellationException) { if (generation == previewGeneration) mutableError.value = error.toTtsError(TtsFailure.Timeout) }
             catch (error: CancellationException) { throw error }
-            catch (error: Exception) { if (generation == previewGeneration) mutableError.value = (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
+            catch (error: Exception) { if (generation == previewGeneration) mutableError.value = error.toTtsError(TtsFailure.Synthesis) }
             finally { if (generation == previewGeneration && previewPlayer == null) mutablePreviewState.value = TtsPreviewState.Idle }
         }
     }

@@ -65,6 +65,8 @@ import moe.antimony.hoshi.features.settings.settingsLoadStates
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsUpdate
 import moe.antimony.hoshi.features.tts.*
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.BookEntry
 import moe.antimony.hoshi.epub.EpubBook
@@ -78,6 +80,7 @@ import moe.antimony.hoshi.features.audio.AudioSettings
 import moe.antimony.hoshi.features.audio.withLocalizedSourceNames
 import moe.antimony.hoshi.features.audio.WordAudioPlayer
 import moe.antimony.hoshi.features.anki.AnkiViewModel
+import moe.antimony.hoshi.features.anki.AnkiOperationErrorDialog
 import moe.antimony.hoshi.features.dictionary.DictionaryImageRequestHandler
 import moe.antimony.hoshi.features.dictionary.lookupOptions
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
@@ -199,7 +202,8 @@ fun ReaderWebView(
     val hasStartedTtsSession = ttsAvailable && ttsState.bookId == ttsBookId && ttsState.started
     var showTts by remember(bookRoot) { mutableStateOf(false) }
     var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
-    var ttsMiningError by remember { mutableStateOf(false) }
+    var ankiOperationError by remember(bookRoot) { mutableStateOf<Throwable?>(null) }
+    var ankiSynchronizationWarning by remember(bookRoot) { mutableStateOf<Throwable?>(null) }
     val ttsMiningJobs = remember { mutableMapOf<String, Job>() }
     var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
     var preserveSasayakiCueLayout by remember(bookRoot) { mutableStateOf(false) }
@@ -390,15 +394,15 @@ fun ReaderWebView(
     var persistedStatistics by remember(bookRoot) {
         mutableStateOf<List<ReadingStatistics>?>(if (bookRoot == null) emptyList() else null)
     }
-    var statisticsLoadFailed by remember(bookRoot) { mutableStateOf(false) }
+    var statisticsLoadFailure by remember(bookRoot) { mutableStateOf<Throwable?>(null) }
     LaunchedEffect(bookRoot, bookRepository) {
         try {
             persistedStatistics = if (bookRoot != null) bookRepository.loadStatistics(bookRoot) else emptyList()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             // Leave the tracker unavailable so corrupt history cannot be overwritten.
-            statisticsLoadFailed = true
+            statisticsLoadFailure = error
         }
     }
     val statisticsTracker = remember(
@@ -881,11 +885,12 @@ fun ReaderWebView(
                             sasayakiAudioPath = if (needsSasayaki) audiobook?.absolutePath else null,
                             sentenceAudioPath = sentenceAudio?.absolutePath,
                         )
-                        val mined = ankiViewModel.minePreparedEntry(message.formatId, message.payloadJson, ankiContext)
+                        val mined = ankiViewModel.minePreparedEntry(message.formatId, message.payloadJson, ankiContext,
+                            onWarning = { ankiSynchronizationWarning = it })
                         replyReaderPopupMessage(message.popupId, messageId, mined.toString())
                     } catch (error: CancellationException) { throw error }
-                    catch (_: Exception) {
-                        ttsMiningError = true
+                    catch (error: Exception) {
+                        ankiOperationError = error
                         replyReaderPopupMessage(message.popupId, messageId, "false")
                     } finally { generated?.delete() }
                 }
@@ -896,7 +901,11 @@ fun ReaderWebView(
                 }
             }
             is ReaderLookupPopupBridgeMessage.ShowNotes -> {
-                ankiViewModel.showNotesAsync(message.formatId, message.valuesByHandlebar) { shown ->
+                ankiViewModel.showNotesAsync(
+                    message.formatId,
+                    message.valuesByHandlebar,
+                    onError = { ankiOperationError = it },
+                ) { shown ->
                     replyReaderPopupMessage(message.popupId, message.messageId ?: return@showNotesAsync, shown.toString())
                 }
             }
@@ -2200,9 +2209,13 @@ fun ReaderWebView(
                 TtsWordEditor(ttsViewModel, draft, ttsBookId, sentence, onDismiss = { ttsSelection = null })
             }
         }
-        if (ttsMiningError) AlertDialog(onDismissRequest = { ttsMiningError = false },
-            title = { Text(stringResource(R.string.tts_title)) }, text = { Text(stringResource(R.string.tts_failed)) },
-            confirmButton = { TextButton(onClick = { ttsMiningError = false }) { Text(stringResource(R.string.action_back)) } })
+        ankiOperationError?.let { error ->
+            AlertDialog(onDismissRequest = { ankiOperationError = null },
+                title = { Text(stringResource(R.string.dialog_error_title)) },
+                text = { ErrorDetailsText(stringResource(R.string.anki_operation_failed).withErrorDetails(error)) },
+                confirmButton = { TextButton(onClick = { ankiOperationError = null }) { Text(stringResource(R.string.action_back)) } })
+        }
+        AnkiOperationErrorDialog(ankiSynchronizationWarning, R.string.anki_sync_failed) { ankiSynchronizationWarning = null }
         if (showSasayaki && sasayakiPlayer != null && sasayakiAudioRepository != null) {
             val confirmedSasayakiSettings = (sasayakiSettingsState as? SettingsLoadState.Loaded)?.value
             if (confirmedSasayakiSettings == null) {
@@ -2237,12 +2250,12 @@ fun ReaderWebView(
                 )
             }
         }
-        if (statisticsLoadFailed) {
+        statisticsLoadFailure?.let { error ->
             AlertDialog(
-                onDismissRequest = { statisticsLoadFailed = false },
-                text = { Text(stringResource(R.string.statistics_operation_failed)) },
+                onDismissRequest = { statisticsLoadFailure = null },
+                text = { ErrorDetailsText(stringResource(R.string.statistics_operation_failed).withErrorDetails(error)) },
                 confirmButton = {
-                    TextButton(onClick = { statisticsLoadFailed = false }) { Text(stringResource(R.string.action_ok)) }
+                    TextButton(onClick = { statisticsLoadFailure = null }) { Text(stringResource(R.string.action_ok)) }
                 },
             )
         }

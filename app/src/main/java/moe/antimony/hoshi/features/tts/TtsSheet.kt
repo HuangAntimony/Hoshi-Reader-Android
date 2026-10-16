@@ -1,7 +1,10 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -115,7 +118,11 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
                 SettingsContent(readingSettingsState, Modifier.fillMaxWidth().padding(20.dp), viewModel::retryReadingSettings) { settings ->
                     SharedReaderPlaybackSettings(settings, viewModel::readingSettings, { colorRow = it })
                 }
-                readingError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) }
+                readingError?.let { failure ->
+                    SelectionContainer {
+                        Text(failure.message.asString(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp))
+                    }
+                }
             }
         } else {
             TtsVoiceSettings(preferences.settings, catalog, engines, busy, preview, error ?: playback.error,

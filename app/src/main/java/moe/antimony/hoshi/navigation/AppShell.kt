@@ -42,6 +42,7 @@ import moe.antimony.hoshi.features.bookshelf.MainTab
 import moe.antimony.hoshi.features.bookshelf.SettingsDestination
 import moe.antimony.hoshi.features.bookshelf.SettingsTab
 import moe.antimony.hoshi.features.diagnostics.DiagnosticsView
+import moe.antimony.hoshi.features.diagnostics.DiagnosticsRecordKind
 import moe.antimony.hoshi.features.dictionary.DictionarySearchSession
 import moe.antimony.hoshi.features.dictionary.rememberDictionarySearchSession
 import moe.antimony.hoshi.features.dictionary.DictionarySearchView
@@ -343,6 +344,13 @@ fun AppShell(
                     onOpenAnkiFormat = ::openAnkiFormat,
                     onOpenAnkiAdvanced = ::openAnkiAdvanced,
                     onOpenTts = { settingsBackStack.add(AppRoute.TtsSettingsRoute) },
+                    onOpenDiagnosticsRecords = { kind -> settingsBackStack.add(AppRoute.DiagnosticsRecordsRoute(kind)) },
+                )
+                is AppRoute.DiagnosticsRecordsRoute -> DiagnosticsView(
+                    onClose = ::popRoute,
+                    records = route.kind,
+                    onOpenRecords = { kind -> settingsBackStack.add(AppRoute.DiagnosticsRecordsRoute(kind)) },
+                    modifier = Modifier.fillMaxSize(),
                 )
                 is AppRoute.AnkiCardFormatRoute -> AnkiCardFormatView(
                     formatId = route.formatId,
@@ -527,6 +535,7 @@ private fun SettingsDetailDestination(
     onOpenAnkiFormat: (String) -> Unit,
     onOpenAnkiAdvanced: () -> Unit,
     onOpenTts: () -> Unit,
+    onOpenDiagnosticsRecords: (DiagnosticsRecordKind) -> Unit,
 ) {
     when (route.section) {
         SettingsDetailSection.Dictionaries -> DictionaryView(
@@ -574,6 +583,7 @@ private fun SettingsDetailDestination(
         )
         SettingsDetailSection.Diagnostics -> DiagnosticsView(
             onClose = onClose,
+            onOpenRecords = onOpenDiagnosticsRecords,
             modifier = Modifier.fillMaxSize(),
         )
         SettingsDetailSection.About -> AboutScreen(
@@ -607,7 +617,7 @@ private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.StatisticsRoute, AppRoute.StatisticsSettingsRoute, is AppRoute.StatisticsBookRoute -> MainTab.Statistics
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
-    is AppRoute.SettingsDetailRoute -> MainTab.Settings
+    is AppRoute.SettingsDetailRoute, is AppRoute.DiagnosticsRecordsRoute -> MainTab.Settings
     is AppRoute.AnkiCardFormatRoute, AppRoute.AnkiAdvancedRoute, AppRoute.TtsSettingsRoute -> MainTab.Settings
 }
 

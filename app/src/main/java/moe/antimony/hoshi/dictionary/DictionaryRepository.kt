@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.dictionary
 
+import moe.antimony.hoshi.ui.diagnosticMessage
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+
 import android.content.ContentResolver
 import android.net.Uri
 import de.manhhao.hoshi.LookupOptions
@@ -165,9 +170,10 @@ internal class DictionaryRepository @Inject constructor(
                 updatedCount += 1
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.dictionary_update_failed), error)
                 failures += DictionaryUpdateFailure(
                     title = installedIndex.title,
-                    message = error.localizedMessage ?: error::class.java.simpleName,
+                    message = error.diagnosticMessage(),
                 )
             }
         }

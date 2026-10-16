@@ -8,6 +8,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Keep the latest 100 runtime errors in Diagnostics, including the operation,
+  time, original error details and cause stack; retain them across restarts,
+  and copy or export them with crash history.
+  Show app/WebView information on the Diagnostics overview with separate entries
+  for crash, error and process-exit records, opening full details from compact lists.
 - Add Disable Button After Mining under Anki's Allow Duplicates: disable each term/format
   after successful mining until the popup is reopened.
 - Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
@@ -144,6 +149,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Preserve specific error details and underlying causes across imports, settings,
+  Reader, dictionaries, Anki, audio, TTS, Sasayaki, sync, backups, updates and
+  statistics, alongside the localized operation or category description.
 - Keep Japanese names containing middle dots intact when scanning text for lookup.
 - Clear the Dictionary tab's search when opening a book, preventing old word audio
   from replaying when the book's profile is activated or restored.

@@ -15,18 +15,24 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
+import moe.antimony.hoshi.ui.diagnosticMessage
 import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.settings.map
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.sync.SyncSettingsRepository
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal data class StatisticsSettingsValues(
     val settings: ReaderSettings,
     val syncEnabled: Boolean,
-    val archivedBookCount: Int,
-)
+    val archiveSummary: StatisticsArchiveSummary,
+) {
+    val archivedBookCount: Int get() = archiveSummary.bookCount
+}
 
 internal data class StatisticsSettingsPreferences(
     val settings: ReaderSettings,
@@ -35,7 +41,7 @@ internal data class StatisticsSettingsPreferences(
 
 internal data class StatisticsSettingsUiState(
     val preferences: SettingsLoadState<StatisticsSettingsPreferences> = SettingsLoadState.Loading,
-    val archive: SettingsLoadState<Int> = SettingsLoadState.Loading,
+    val archive: SettingsLoadState<StatisticsArchiveSummary> = SettingsLoadState.Loading,
     val isWorking: Boolean = false,
     val error: UiText? = null,
 ) {
@@ -46,11 +52,11 @@ internal data class StatisticsSettingsUiState(
             return when {
                 currentPreferences is SettingsLoadState.Failed -> currentPreferences
                 currentArchive is SettingsLoadState.Failed -> currentArchive
-                currentPreferences is SettingsLoadState.Loaded -> currentArchive.map { count ->
+                currentPreferences is SettingsLoadState.Loaded -> currentArchive.map { summary ->
                     StatisticsSettingsValues(
                         settings = currentPreferences.value.settings,
                         syncEnabled = currentPreferences.value.syncEnabled,
-                        archivedBookCount = count,
+                        archiveSummary = summary,
                     )
                 }
                 else -> SettingsLoadState.Loading
@@ -62,7 +68,7 @@ internal data class StatisticsSettingsUiState(
     val syncEnabled: Boolean
         get() = (preferences as? SettingsLoadState.Loaded)?.value?.syncEnabled == true
     val archivedBookCount: Int
-        get() = (archive as? SettingsLoadState.Loaded)?.value ?: 0
+        get() = (archive as? SettingsLoadState.Loaded)?.value?.bookCount ?: 0
 }
 
 @HiltViewModel
@@ -111,9 +117,9 @@ internal class StatisticsSettingsViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 _uiState.update {
-                    it.copy(preferences = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed)))
+                    it.copy(preferences = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)))
                 }
             }
         }
@@ -125,17 +131,28 @@ internal class StatisticsSettingsViewModel internal constructor(
         reloadJob?.cancel()
         reloadJob = scope.launch {
             try {
-                val count = repository.loadArchiveSummary()
-                if (request == generation) _uiState.update { it.copy(archive = SettingsLoadState.Loaded(count)) }
+                val summary = repository.loadArchiveSummary()
+                if (request == generation) _uiState.update { current ->
+                    val readError = summary.readErrors.takeIf { it.isNotEmpty() }?.let { errors ->
+                        UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable)) + errors.map { (folder, error) ->
+                            ErrorDiagnosticEvents.buffer.record(
+                                UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable), UiText.Literal(folder))),
+                                error,
+                            )
+                            UiText.Literal("$folder: ${error.diagnosticMessage()}")
+                        })
+                    }
+                    current.copy(archive = SettingsLoadState.Loaded(summary), error = current.error ?: readError)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 if (request == generation) {
                     if (_uiState.value.archive is SettingsLoadState.Loaded) {
-                        showError()
+                        showError(error)
                     } else {
                         _uiState.update {
-                            it.copy(archive = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed)))
+                            it.copy(archive = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)))
                         }
                     }
                 }
@@ -150,8 +167,8 @@ internal class StatisticsSettingsViewModel internal constructor(
                 updateSettings(transform)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError()
+            } catch (error: Exception) {
+                showError(error)
             }
         }
     }
@@ -164,11 +181,11 @@ internal class StatisticsSettingsViewModel internal constructor(
         scope.launch {
             try {
                 repository.clearArchive()
-                _uiState.update { it.copy(archive = SettingsLoadState.Loaded(0)) }
+                _uiState.update { it.copy(archive = SettingsLoadState.Loaded(StatisticsArchiveSummary(0)), error = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError()
+            } catch (error: Exception) {
+                showError(error)
             } finally {
                 _uiState.update { it.copy(isWorking = false) }
                 reload()
@@ -178,7 +195,7 @@ internal class StatisticsSettingsViewModel internal constructor(
 
     fun dismissError() = _uiState.update { it.copy(error = null) }
 
-    private fun showError() = _uiState.update {
-        it.copy(error = UiText.Resource(R.string.statistics_operation_failed))
+    private fun showError(error: Throwable) = _uiState.update {
+        it.copy(error = UiText.Resource(R.string.statistics_operation_failed).withErrorDetails(error))
     }
 }

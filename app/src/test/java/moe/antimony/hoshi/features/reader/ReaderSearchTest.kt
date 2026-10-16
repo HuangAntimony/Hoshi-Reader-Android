@@ -14,6 +14,14 @@ import org.junit.Test
 
 class ReaderSearchTest {
     @Test
+    fun failedSearchRetainsDiagnosticReason() = kotlinx.coroutines.runBlocking {
+        val result = loadReaderSearchResults<List<ReaderSearchResult>> {
+            throw java.io.IOException("Chapter resource unreadable")
+        }
+        assertTrue((result as ReaderSearchLoadResult.Failure).cause.message == "Chapter resource unreadable")
+    }
+
+    @Test
     fun koreanSearchUsesCodePointOffsetsAndExcludesRubyFallbackText() {
         val book = EpubBook(
             title = "Korean search",
@@ -241,7 +249,7 @@ class ReaderSearchTest {
             error("broken")
         }
 
-        assertEquals(ReaderSearchLoadResult.Failure, result)
+        assertEquals("broken", (result as ReaderSearchLoadResult.Failure).cause.message)
     }
 
     @Test

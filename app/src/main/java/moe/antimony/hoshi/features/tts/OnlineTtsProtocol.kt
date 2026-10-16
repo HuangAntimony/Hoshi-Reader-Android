@@ -145,5 +145,5 @@ internal object OnlineTtsProtocol {
 
     private inline fun <T> parse(block: () -> T): T = try { block() }
         catch (error: TtsException) { throw error }
-        catch (_: Exception) { throw TtsException(TtsFailure.InvalidResponse) }
+        catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
 }

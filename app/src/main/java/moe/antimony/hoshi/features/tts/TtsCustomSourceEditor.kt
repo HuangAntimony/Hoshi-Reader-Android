@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,9 +31,9 @@ import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 @Composable
 internal fun TtsCustomSourceEditor(
     initial: TtsCustomSource, editing: Boolean,
-    onTest: suspend (TtsCustomSource, String, Boolean) -> TtsFailure?,
-    onSave: suspend (TtsCustomSource, String, Boolean) -> TtsFailure?,
-    onDelete: suspend () -> TtsFailure?,
+    onTest: suspend (TtsCustomSource, String, Boolean) -> TtsError?,
+    onSave: suspend (TtsCustomSource, String, Boolean) -> TtsError?,
+    onDelete: suspend () -> TtsError?,
     onModels: suspend (TtsCustomSource, String, Boolean) -> List<String>,
     onDismiss: () -> Unit,
     selectedVoice: String = "",
@@ -42,7 +44,7 @@ internal fun TtsCustomSourceEditor(
     var removeKey by remember(initial.id) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
-    var failure by remember { mutableStateOf<TtsFailure?>(null) }
+    var failure by remember { mutableStateOf<TtsError?>(null) }
     var verified by remember { mutableStateOf(false) }
     var models by remember { mutableStateOf<List<String>>(emptyList()) }
     var modelsLoaded by remember { mutableStateOf(false) }
@@ -84,13 +86,13 @@ internal fun TtsCustomSourceEditor(
                     trailingIcon = {
                         Box {
                             IconButton(enabled = !busy, onClick = { scope.launch {
-                                busy = true; modelsLoading = true; modelsLoaded = false
+                                busy = true; modelsLoading = true; modelsLoaded = false; failure = null
                                 try {
                                     models = onModels(source, key, removeKey).map { it.trim() }.filter { it.isNotBlank() }.distinct()
                                     modelsLoaded = true
                                     modelsExpanded = models.isNotEmpty()
                                 } catch (error: CancellationException) { throw error }
-                                catch (_: Exception) { models = emptyList(); modelsLoaded = true }
+                                catch (error: Exception) { models = emptyList(); modelsLoaded = false; modelsExpanded = false; failure = error.toTtsError(TtsFailure.Network) }
                                 finally { busy = false; modelsLoading = false }
                             } }) {
                                 if (modelsLoading && !LocalHoshiEInkMode.current)

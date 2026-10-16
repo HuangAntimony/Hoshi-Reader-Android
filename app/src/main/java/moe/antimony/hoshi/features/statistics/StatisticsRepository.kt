@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.BookStatisticsStore
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
 import moe.antimony.hoshi.epub.ReadingStatistics
 
 internal interface StatisticsRepository {
@@ -16,7 +17,7 @@ internal interface StatisticsRepository {
     suspend fun updateDay(folder: String, dateKey: String, characters: Int, totalMinutes: Int)
     suspend fun deleteDay(folder: String, dateKey: String)
     suspend fun deleteAll(folder: String)
-    suspend fun loadArchiveSummary(): Int
+    suspend fun loadArchiveSummary(): StatisticsArchiveSummary
     suspend fun clearArchive()
 }
 
@@ -31,6 +32,7 @@ internal data class StatisticsSnapshot(
     val days: List<StatisticsDayAggregate>,
     val availableYears: List<Int>,
     val skippedCorruptBookIds: Set<String> = emptySet(),
+    val readErrors: Map<String, Throwable> = emptyMap(),
 )
 
 @Singleton
@@ -41,9 +43,14 @@ internal class AndroidStatisticsRepository @Inject constructor(
     override suspend fun loadSnapshot(): StatisticsSnapshot = withContext(ioDispatcher) {
         val stored = statisticsStore.loadSnapshot()
         val contributionsByDate = linkedMapOf<LocalDate, MutableList<StatisticsBookContribution>>()
+        val readErrors = stored.readErrors.toMutableMap()
         stored.books.forEach { book ->
             book.statistics.forEach statisticLoop@ { statistic ->
-                val date = runCatching { LocalDate.parse(statistic.dateKey) }.getOrNull() ?: return@statisticLoop
+                val date = try {
+                    LocalDate.parse(statistic.dateKey)
+                } catch (_: java.time.format.DateTimeParseException) {
+                    return@statisticLoop
+                }
                 contributionsByDate.getOrPut(date) { mutableListOf() } += StatisticsBookContribution(
                     bookId = book.metadata.id,
                     title = book.metadata.displayTitle.ifBlank { statistic.title.ifBlank { book.folder } },
@@ -64,7 +71,7 @@ internal class AndroidStatisticsRepository @Inject constructor(
                 bookContributions = contributions.sortedBy { it.title.lowercase() },
             )
         }
-        StatisticsSnapshot(days, days.map { it.date.year }.distinct().sortedDescending(), stored.corruptBookIds)
+        StatisticsSnapshot(days, days.map { it.date.year }.distinct().sortedDescending(), stored.corruptBookIds + readErrors.keys, readErrors)
     }
 
     override suspend fun loadBookStatistics(folder: String): StatisticsBookRecords? =
@@ -77,6 +84,6 @@ internal class AndroidStatisticsRepository @Inject constructor(
 
     override suspend fun deleteDay(folder: String, dateKey: String) = statisticsStore.deleteDay(folder, dateKey)
     override suspend fun deleteAll(folder: String) = statisticsStore.deleteAll(folder)
-    override suspend fun loadArchiveSummary(): Int = statisticsStore.loadArchiveSummary()
+    override suspend fun loadArchiveSummary(): StatisticsArchiveSummary = statisticsStore.loadArchiveSummary()
     override suspend fun clearArchive() = statisticsStore.clearArchive()
 }

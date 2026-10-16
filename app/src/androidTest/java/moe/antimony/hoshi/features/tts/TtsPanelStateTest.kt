@@ -88,7 +88,7 @@ class TtsPanelStateTest {
         val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO, AndroidTtsExportFallback(context))
         val books = TtsBookRepository(Dispatchers.IO)
         val output = object : TtsPlaybackOutput {
-            override var onEnded: () -> Unit = {}; override var onPaused: () -> Unit = {}; override var onError: () -> Unit = {}
+            override var onEnded: () -> Unit = {}; override var onPaused: () -> Unit = {}; override var onError: (Throwable) -> Unit = {}
             override suspend fun connect() = Unit
             override fun prepare(files: List<File>, title: String, sentence: String) = Unit
             override fun setPlaybackRate(rate: Float) = Unit
@@ -112,7 +112,7 @@ class TtsPanelStateTest {
             return
         }
         compose.waitUntil(15_000) { !model.busy.value && model.readingSettings.value != null &&
-            if (system || online) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value == TtsFailure.Configuration }
+            if (system || online) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value?.failure == TtsFailure.Configuration }
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
@@ -140,8 +140,8 @@ class TtsPanelStateTest {
             val repository = TtsRepository(speech)
             val original = repository.preferences.first()
             for (region in listOf("", "east", "southindia", "spaincentral", "eastus/evil")) {
-                Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.Azure, region, "fixture-key"))
-                Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.Azure, region, "fixture-key", "日本語です。"))
+                Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.Azure, region, "fixture-key")?.failure)
+                Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.Azure, region, "fixture-key", "日本語です。")?.failure)
                 Assert.assertEquals(original, repository.preferences.first())
             }
             Assert.assertNull(model.configure(TtsOnlineSource.Azure, "japaneast", "fixture-key"))
@@ -160,15 +160,15 @@ class TtsPanelStateTest {
             repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "other-cipher"))
             val original = repository.preferences.first()
             speech.failWrites = true
-            Assert.assertEquals(TtsFailure.Storage, model.removeKey(TtsOnlineSource.GoogleCloud))
+            Assert.assertEquals(TtsFailure.Storage, model.removeKey(TtsOnlineSource.GoogleCloud)?.failure)
             Assert.assertEquals(original, repository.preferences.first())
             speech.failWrites = false
             Assert.assertNull(model.removeKey(TtsOnlineSource.GoogleCloud))
             val removed = repository.preferences.first()
             Assert.assertEquals(TtsOnlineConfig("saved-region", ""), removed.settings.online.getValue(TtsOnlineSource.GoogleCloud.id))
             Assert.assertEquals(TtsOnlineConfig("eastasia", "other-cipher"), removed.settings.online.getValue(TtsOnlineSource.Azure.id))
-            Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.GoogleCloud, "", ""))
-            Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.GoogleCloud, "", "", "日本語です。"))
+            Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.GoogleCloud, "", "")?.failure)
+            Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.GoogleCloud, "", "", "日本語です。")?.failure)
             Assert.assertEquals(removed, repository.preferences.first())
         } }
     }
@@ -191,10 +191,10 @@ class TtsPanelStateTest {
         compose.onNodeWithText("Settings").performClick()
         compose.runOnIdle { speech.failWrites = true }
         compose.onAllNodes(isToggleable()).onFirst().performClick()
-        compose.waitUntil(5_000) { model.readingError.value == TtsFailure.Storage }
-        compose.onNodeWithText(context.getString(TtsFailure.Storage.messageRes())).assertExists()
+        compose.waitUntil(5_000) { model.readingError.value?.failure == TtsFailure.Storage }
+        compose.onNodeWithText(context.getString(TtsFailure.Storage.messageRes()), substring = true).assertExists()
         compose.onAllNodes(isToggleable()).onFirst().assertIsOn()
-        compose.runOnIdle { Assert.assertEquals(TtsFailure.Configuration, model.error.value) }
+        compose.runOnIdle { Assert.assertEquals(TtsFailure.Configuration, model.error.value?.failure) }
         compose.runOnIdle { speech.failWrites = false }
         compose.onAllNodes(isToggleable()).onFirst().performClick()
         compose.waitUntil(5_000) { model.preferences.value?.settings?.useRubyReadings == false && model.readingError.value == null }
@@ -360,15 +360,15 @@ class TtsPanelStateTest {
     @Test fun readingWriteFailureAndPreviewFailureRemainIndependent() {
         panel()
         compose.runOnIdle { reading.failWrites = true; model.readingSettings { it.copy(autoScroll = false) } }
-        compose.waitUntil(5_000) { model.readingError.value == TtsFailure.Storage }
+        compose.waitUntil(5_000) { model.readingError.value?.failure == TtsFailure.Storage }
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText(context.getString(R.string.tts_storage_error)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.tts_storage_error), substring = true).assertExists()
         compose.onNodeWithText(configMessage).assertDoesNotExist()
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "日本語です。"), null) }
-        compose.waitUntil(5_000) { model.previewState.value == TtsPreviewState.Idle && model.error.value == TtsFailure.Configuration }
+        compose.waitUntil(5_000) { model.previewState.value == TtsPreviewState.Idle && model.error.value?.failure == TtsFailure.Configuration }
         compose.onNode(hasText("Voice") and hasClickAction() and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab)).performClick()
         compose.onNodeWithText("Preview voice").assertIsEnabled()
         compose.onNodeWithText(configMessage).assertExists()
-        compose.onNodeWithText(context.getString(R.string.tts_storage_error)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.tts_storage_error), substring = true).assertDoesNotExist()
     }
 }

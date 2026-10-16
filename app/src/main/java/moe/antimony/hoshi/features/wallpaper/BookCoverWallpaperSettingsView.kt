@@ -34,9 +34,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.features.settings.SectionTitle
@@ -58,7 +64,18 @@ internal fun BookCoverWallpaperSettingsView(
     var iReaderCapability by remember(viewModel) {
         mutableStateOf(viewModel.iReaderCapability())
     }
-    var targetSelectionFailed by remember { mutableStateOf(false) }
+    var targetSelectionError by remember { mutableStateOf<UiText?>(null) }
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    error?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -78,7 +95,7 @@ internal fun BookCoverWallpaperSettingsView(
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, flags)
         }.onSuccess {
-            targetSelectionFailed = false
+            targetSelectionError = null
             val previousTarget = settings?.exportTargetUri
                 ?.takeIf { it != uri.toString() }
                 ?.let(Uri::parse)
@@ -89,8 +106,8 @@ internal fun BookCoverWallpaperSettingsView(
                     }
                 }
             }
-        }.onFailure {
-            targetSelectionFailed = true
+        }.onFailure { error ->
+            targetSelectionError = UiText.Resource(R.string.book_cover_wallpaper_export_file_failed).withErrorDetails(error)
         }
     }
     val exportTargetName by produceState<String?>(
@@ -204,13 +221,11 @@ internal fun BookCoverWallpaperSettingsView(
                         supportingContent = {
                             Text(
                                 when {
-                                    targetSelectionFailed -> stringResource(
-                                        R.string.book_cover_wallpaper_export_file_failed,
-                                    )
+                                    targetSelectionError != null -> requireNotNull(targetSelectionError).asString()
                                     exportTargetName != null -> exportTargetName.orEmpty()
                                     else -> stringResource(R.string.book_cover_wallpaper_export_file_none)
                                 },
-                                color = if (targetSelectionFailed) {
+                                color = if (targetSelectionError != null) {
                                     MaterialTheme.colorScheme.error
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant

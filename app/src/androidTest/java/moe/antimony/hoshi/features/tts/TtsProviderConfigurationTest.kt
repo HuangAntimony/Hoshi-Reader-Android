@@ -134,7 +134,7 @@ class TtsProviderConfigurationTest {
                 TtsProviderConfiguration(TtsOnlineSource.GoogleCloud, config.value,
                     { _, _ -> null }, { _, _ -> null }, {}, onDelete = {
                         attempts++
-                        if (attempts == 1) TtsFailure.Storage else {
+                        if (attempts == 1) TtsFailure.Storage.toError() else {
                             config.value = config.value.copy(encryptedKey = "")
                             null
                         }
@@ -154,7 +154,7 @@ class TtsProviderConfigurationTest {
     }
 
     @Test fun failedConnectionRemainsVisibleAboveTheFixedButtonInEink() {
-        val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
+        val result = kotlinx.coroutines.CompletableDeferred<TtsError?>()
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
                 TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia"),
@@ -165,7 +165,7 @@ class TtsProviderConfigurationTest {
         val position = button.fetchSemanticsNode().boundsInRoot
         button.performClick()
         button.assertIsNotEnabled()
-        compose.runOnIdle { result.complete(TtsFailure.Authentication) }
+        compose.runOnIdle { result.complete(TtsFailure.Authentication.toError()) }
         compose.onNodeWithText(context.getString(TtsFailure.Authentication.messageRes())).assertIsDisplayed()
         assertEquals(position, button.fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithText(text(R.string.action_save)).assertIsDisplayed()

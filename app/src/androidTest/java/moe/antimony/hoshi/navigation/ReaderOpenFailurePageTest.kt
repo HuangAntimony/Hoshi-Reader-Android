@@ -17,17 +17,18 @@ class ReaderOpenFailurePageTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun genericFailureMessageAndCloseActionAreShown() {
+    fun failureSummaryDiagnosticAndCloseActionAreShown() {
         var closeCount = 0
         composeRule.setContent {
             MaterialTheme {
                 ReaderOpenFailurePage(
+                    error = java.io.IOException("EPUB archive is corrupt"),
                     onClose = { closeCount += 1 },
                 )
             }
         }
 
-        composeRule.onNodeWithText("Couldn't open book").assertIsDisplayed()
+        composeRule.onNodeWithText("Couldn't open book\nEPUB archive is corrupt").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 
         assertEquals(1, closeCount)

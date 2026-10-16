@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.tts
 
+import moe.antimony.hoshi.ui.asString
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -62,8 +64,8 @@ fun TtsWordEditor(viewModel: TtsViewModel, initial: TtsWord, bookId: String?, se
 @Composable
 internal fun TtsWordEditorDialog(
     initial: TtsWord, bookId: String?, sentence: TtsSentence?, preferences: TtsPreferences,
-    busy: Boolean, previewError: TtsFailure?, onPreview: (TtsWordPreview) -> Unit,
-    onSave: suspend (TtsWord) -> TtsWordError?, onDelete: (String) -> Unit, onDismiss: () -> Unit,
+    busy: Boolean, previewError: TtsError?, onPreview: (TtsWordPreview) -> Unit,
+    onSave: suspend (TtsWord) -> TtsWordError?, onDelete: suspend (String) -> TtsError?, onDismiss: () -> Unit,
     previewDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     var surface by remember(initial.id) { mutableStateOf(initial.surface) }
@@ -74,6 +76,7 @@ internal fun TtsWordEditorDialog(
     var sample by remember(initial.id) { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<TtsWordError?>(null) }
     var saving by remember { mutableStateOf(false) }
+    var operationError by remember { mutableStateOf<TtsError?>(null) }
     var surfaceEdited by remember(initial.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val draft = initial.copy(surface = if (regex) surface else surface.trim(), replacement = replacement,
@@ -91,7 +94,7 @@ internal fun TtsWordEditorDialog(
             if (!busy && !saving && !preview.text.isNullOrBlank()) onPreview(preview)
         }
     }
-    LaunchedEffect(draft) { error = null }
+    LaunchedEffect(draft) { error = null; operationError = null }
     // Open with a complete initial layout. Later computations retain the last
     // result for display; playback still waits for the current snapshot.
     val displayedPreview = prepared ?: return
@@ -117,7 +120,12 @@ internal fun TtsWordEditorDialog(
                 keyboardOptions = hoshiContentKeyboardOptions(ContentLanguageProfile.Japanese, imeAction = ImeAction.Done),
                 colors = hoshiOutlinedTextFieldColors())
             if (regex) Text(stringResource(R.string.tts_regex_help), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            validation?.let { Text(stringResource(it.messageRes()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            validation?.let { category ->
+                val message = displayedPreview.errorMessage?.takeIf { displayedPreview.error == category }
+                SelectionContainer {
+                    Text(message?.asString() ?: stringResource(category.messageRes()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.tts_replacement_scope), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -163,12 +171,19 @@ internal fun TtsWordEditorDialog(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.tts_preview))
             }
-            previewError?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
+            (operationError ?: previewError)?.let { failure ->
+                SelectionContainer {
+                    Text(failure.message.asString(), color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }, confirmButton = {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (preferences.words.any { it.id == initial.id }) TextButton(enabled = !saving,
-                onClick = { onDelete(initial.id); onDismiss() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                onClick = { scope.launch {
+                    saving = true; operationError = null
+                    try { operationError = onDelete(initial.id); if (operationError == null) onDismiss() } finally { saving = false }
+                } }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(stringResource(R.string.action_delete)) }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }

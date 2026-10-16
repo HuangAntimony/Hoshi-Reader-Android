@@ -46,7 +46,7 @@ class TtsCredentialCipher @Inject constructor(@param:IoDispatcher private val io
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
             cipher.updateAAD(source.toByteArray())
             cipher.doFinal(bytes.copyOfRange(12, bytes.size)).toString(Charsets.UTF_8)
-        } catch (_: Exception) { throw TtsException(TtsFailure.Configuration) }
+        } catch (error: Exception) { throw TtsException(TtsFailure.Configuration, cause = error) }
     }
 }
 

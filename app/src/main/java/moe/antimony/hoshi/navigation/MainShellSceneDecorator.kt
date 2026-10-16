@@ -34,6 +34,7 @@ internal fun appRouteUsesMainShell(route: AppRoute): Boolean = when (route) {
     AppRoute.StatisticsSettingsRoute,
     is AppRoute.StatisticsBookRoute,
     is AppRoute.SettingsDetailRoute,
+    is AppRoute.DiagnosticsRecordsRoute,
     is AppRoute.AnkiCardFormatRoute,
     AppRoute.TtsSettingsRoute, AppRoute.AnkiAdvancedRoute,
     -> false

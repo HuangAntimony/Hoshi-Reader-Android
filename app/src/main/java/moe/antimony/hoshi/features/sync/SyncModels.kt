@@ -113,6 +113,10 @@ class GoogleDriveApiException(
 ) : Exception(message) {
     val isStaleCacheError: Boolean get() = statusCode == 404
 
+    override fun getLocalizedMessage(): String =
+        if (statusCode == null) super.getLocalizedMessage().orEmpty()
+        else "${super.getLocalizedMessage().orEmpty()}\nHTTP $statusCode"
+
     companion object {
         const val NoInternetConnectionMessage = "No internet connection."
     }

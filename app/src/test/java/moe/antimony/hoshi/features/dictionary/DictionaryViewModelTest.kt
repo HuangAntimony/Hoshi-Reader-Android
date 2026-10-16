@@ -35,6 +35,28 @@ import java.io.File
 import java.io.IOException
 
 class DictionaryViewModelTest {
+    @Test
+    fun cancelledRecommendedImportReleasesProgressWithoutShowingFailure() {
+        val viewModel = DictionaryViewModel(FakeDictionaryRepository(), testScope, Dispatchers.Unconfined)
+
+        viewModel.importRecommendedDictionaries { throw kotlinx.coroutines.CancellationException("cancelled") }
+
+        assertFalse(viewModel.uiState.value.isImporting)
+        assertNull(viewModel.uiState.value.currentImportMessage)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun cancelledDictionaryUpdateReleasesProgressWithoutShowingFailure() {
+        val viewModel = DictionaryViewModel(FakeDictionaryRepository(), testScope, Dispatchers.Unconfined)
+
+        viewModel.updateDictionaries { throw kotlinx.coroutines.CancellationException("cancelled") }
+
+        assertFalse(viewModel.uiState.value.isUpdating)
+        assertNull(viewModel.uiState.value.currentImportMessage)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun settingsWaitForTheFirstStoredValueAndKeepFollowingUpdates() = runTest {
@@ -305,7 +327,7 @@ class DictionaryViewModelTest {
         assertFalse(viewModel.uiState.value.strokeOrderFontInstalled)
         assertTrue(viewModel.uiState.value.canDownloadStrokeOrderFont)
         assertEquals(
-            "resource:${R.string.dictionary_stroke_order_font_download_failed}:",
+            "resource:${R.string.dictionary_stroke_order_font_download_failed}:\nnetwork failure",
             viewModel.uiState.value.errorMessage.testString(),
         )
     }
@@ -605,7 +627,7 @@ class DictionaryViewModelTest {
 
         assertEquals(listOf(updated), viewModel.uiState.value.currentDictionaries)
         assertEquals(emptyList<DictionaryUpdateCandidate>(), viewModel.uiState.value.updatableDictionaries)
-        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed\nbad archive", viewModel.uiState.value.errorMessage.testString())
     }
 
     @Test
@@ -772,7 +794,7 @@ class DictionaryViewModelTest {
 
         assertFalse(viewModel.uiState.value.isImporting)
         assertNull(viewModel.uiState.value.currentImportMessage.testString())
-        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed\nbad archive", viewModel.uiState.value.errorMessage.testString())
         assertEquals(listOf(existing), viewModel.uiState.value.currentDictionaries)
 
         viewModel.importDictionaries(
@@ -807,7 +829,7 @@ class DictionaryViewModelTest {
             },
         )
 
-        assertEquals("Import failed", viewModel.uiState.value.errorMessage.testString())
+        assertEquals("Import failed\nbad archive", viewModel.uiState.value.errorMessage.testString())
 
         viewModel.consumeErrorMessage()
 

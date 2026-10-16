@@ -1,6 +1,9 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.content.Context
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 import androidx.hilt.work.HiltWorker
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
@@ -140,6 +143,7 @@ internal suspend fun runDictionaryAutoUpdateWork(
         ListenableWorker.Result.success()
     } catch (error: CancellationException) {
         throw error
-    } catch (_: Throwable) {
+    } catch (error: Throwable) {
+        ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.dictionary_update_failed), error)
         ListenableWorker.Result.retry()
     }

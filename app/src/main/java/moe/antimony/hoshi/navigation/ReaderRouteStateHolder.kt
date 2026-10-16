@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.navigation
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -52,7 +53,10 @@ internal class ReaderRouteStateHolder(
                 bookCoverFile = bookCoverFile,
                 bookmark = bookmark,
             )
-        }.getOrElse { ReaderRouteLoadState.Error }
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            ReaderRouteLoadState.Error(error)
+        }
     }
 
     suspend fun saveBookmark(
@@ -100,7 +104,7 @@ internal sealed interface ReaderRouteLoadState {
         val bookmark: Bookmark?,
     ) : ReaderRouteLoadState
 
-    data object Error : ReaderRouteLoadState
+    data class Error(val cause: Throwable) : ReaderRouteLoadState
 }
 
 internal fun ReaderRouteLoadState.publishProfileActivation(

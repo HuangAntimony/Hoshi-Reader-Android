@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
 
 class LocalAudioSourceUiStateTest {
     @Test
@@ -18,6 +20,7 @@ class LocalAudioSourceUiStateTest {
 
         assertEquals(config, updated.config)
         assertTrue(updated.saveFailed)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.audio_local_source_save_failed), UiText.Literal("disk full"))), updated.errorMessage)
     }
 
     @Test
@@ -30,5 +33,6 @@ class LocalAudioSourceUiStateTest {
 
         assertEquals(newConfig, updated.config)
         assertFalse(updated.saveFailed)
+        assertEquals(null, updated.errorMessage)
     }
 }
