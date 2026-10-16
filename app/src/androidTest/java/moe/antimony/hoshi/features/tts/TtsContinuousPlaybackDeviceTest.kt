@@ -49,6 +49,7 @@ class TtsContinuousPlaybackDeviceTest {
                     "application/xhtml+xml", "<p>$text</p>")))
                 try {
                     controller.load("continuous-fixture", book, false)
+                    controller.prepareAt(0, 0)
                     val loaded = withTimeout(5000) { controller.state.first { it.sentences.isNotEmpty() } }
                     assertEquals(if (prefetchSentences == 6) 8 else 4, loaded.sentences.size)
                     controller.play()

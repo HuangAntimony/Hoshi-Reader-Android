@@ -68,6 +68,7 @@ class TtsLookupPauseDeviceTest {
                 try {
                     val book = EpubBook("Fixture", chapters = listOf(EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>一。二。</p>")))
                     controller.load("lookup-fixture", book, false)
+                    controller.prepareAt(0, 0)
                     withTimeout(5000) { controller.state.first { it.sentences.size == 2 } }
                     controller.play()
                     withTimeout(5000) { lookupPaused.await() }

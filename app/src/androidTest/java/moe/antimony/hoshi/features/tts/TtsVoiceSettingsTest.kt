@@ -95,7 +95,7 @@ class TtsVoiceSettingsTest {
         val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Edge.id).withVoice("ja-JP-NanamiNeural"))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
-                TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), settings.value.engine, listOf(TtsVoiceInfo("ja-JP-NanamiNeural", true))),
+                TtsVoiceSettings(settings.value, TtsCatalog(settings.value.engine, listOf(TtsVoiceInfo("ja-JP-NanamiNeural", true))),
                     listOf(TtsEngineInfo("third.party", "Third party engine")), false, TtsPreviewState.Idle, null,
                     { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }
@@ -133,7 +133,7 @@ class TtsVoiceSettingsTest {
         val voices = listOf(TtsVoiceInfo("offline-voice", false), TtsVoiceInfo("online-voice", true))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
-                TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), "fixture.engine", voices),
+                TtsVoiceSettings(settings.value, TtsCatalog("fixture.engine", voices),
                     listOf(TtsEngineInfo("fixture.engine", "Fixture engine")), false, TtsPreviewState.Idle, null,
                     { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }

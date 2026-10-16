@@ -133,7 +133,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
         readingSettings?.let { settings ->
             ReaderColorPickerDialog(title = stringResource(row.labelRes), initialColor = row.color(settings),
                 defaultColor = row.defaultColor,
-                onColorChange = { viewModel.readingSettings(row.updated(settings, it)); colorRow = null },
+                onColorChange = { viewModel.readingSettings { current -> row.updated(current, it) }; colorRow = null },
                 onDismiss = { colorRow = null })
         }
     }
@@ -152,11 +152,11 @@ private fun TtsPlaybackControls(
                     Icon(Icons.Rounded.Replay, null)
                 }
             }
-            IconButton(onClick = onPrevious, enabled = state.started && state.index > 0) { Icon(Icons.Rounded.SkipPrevious, null) }
-            IconButton(onClick = onToggle, enabled = !busy && state.sentences.isNotEmpty()) {
+            IconButton(onClick = onPrevious, enabled = state.started && state.hasPrevious) { Icon(Icons.Rounded.SkipPrevious, null) }
+            IconButton(onClick = onToggle, enabled = !busy && state.canStart) {
                 Icon(if (state.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.size(32.dp))
             }
-            IconButton(onClick = onNext, enabled = state.started && state.index < state.sentences.lastIndex) { Icon(Icons.Rounded.SkipNext, null) }
+            IconButton(onClick = onNext, enabled = state.started && state.hasNext) { Icon(Icons.Rounded.SkipNext, null) }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 if (state.preparing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             }

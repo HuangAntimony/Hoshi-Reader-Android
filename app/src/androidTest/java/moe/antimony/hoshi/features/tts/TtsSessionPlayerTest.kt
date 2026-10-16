@@ -43,6 +43,23 @@ class TtsSessionPlayerTest {
             } finally { transport.release(); decoder.release() }
         }
     }
+    @Test fun chapterNeighborsExposeSentenceCommandsAtLocalListBoundaries() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val decoder = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Context>()).build()
+            var state = TtsPlaybackState(bookId = "book", sentences = listOf(TtsSentence(1, 0, 2, "文。")),
+                previousChapter = 0, nextChapter = 2, started = true)
+            val transport = TtsSessionPlayer(decoder, { state }, {}, {}, {}, {}, {})
+            try {
+                assertTrue(transport.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM))
+                assertTrue(transport.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM))
+                state = state.copy(previousChapter = null, nextChapter = null)
+                transport.refresh()
+                assertFalse(transport.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM))
+                assertFalse(transport.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM))
+            } finally { transport.release(); decoder.release() }
+        }
+    }
+
     @Test fun reloadingBookKeepsSessionIdleUntilASentenceIsExplicitlyStarted() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val decoder = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Context>()).build()
@@ -58,7 +75,7 @@ class TtsSessionPlayerTest {
                 transport.refresh()
                 assertEquals(Player.STATE_IDLE, transport.playbackState)
                 assertFalse(transport.isLoading)
-                // load() reads the next book before any sentence or playback intent exists.
+                // Preparing a panel position must not establish playback intent.
                 state = TtsPlaybackState(bookId = "second", preparing = true)
                 transport.refresh()
                 assertEquals(Player.STATE_IDLE, transport.playbackState)

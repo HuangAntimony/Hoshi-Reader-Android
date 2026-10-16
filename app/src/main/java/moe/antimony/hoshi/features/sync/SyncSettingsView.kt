@@ -126,9 +126,9 @@ fun SyncSettingsView(
         }
     }
 
-    fun saveSasayakiSettings(next: SasayakiSettings) {
+    fun saveSasayakiSettings(update: (SasayakiSettings) -> SasayakiSettings) {
         scope.launch {
-            sasayakiSettingsRepository.update { next }
+            sasayakiSettingsRepository.update(update)
         }
     }
 
@@ -414,9 +414,7 @@ fun SyncSettingsView(
                                                             currentReaderSettings.copy(statisticsSyncEnabled = checked),
                                                         )
                                                     SyncSettingsDataRowKind.SyncAudiobookProgress ->
-                                                        saveSasayakiSettings(
-                                                            currentSasayakiSettings.copy(syncEnabled = checked),
-                                                        )
+                                                        saveSasayakiSettings { current -> current.copy(syncEnabled = checked) }
                                                 }
                                             },
                                         )

@@ -827,8 +827,15 @@ QA matrices live in `docs/VALIDATION.md`.
   each part to 24 kHz mono and writes one AAC/M4A file. Transformer cancellation completes
   on its looper before temporary inputs/output are removed; no additional output option
   or Hoshi-speed processing is introduced.
-- `TtsBookRepository` reads complete linear chapter source, including file-backed
-  cached EPUB chapter shells, on the injected IO dispatcher. `TtsText` retains
+- The Hilt-singleton `TtsBookRepository` reads complete chapter source on demand, including
+  file-backed cached EPUB chapter shells, on the injected IO dispatcher. Its four-entry LRU
+  cache is keyed by book instance and chapter, shared by playback, lookup/replacement
+  previews and Anki. A reopened book gets a fresh source identity. Opening Reader only
+  binds the book; opening its TTS sheet prepares the reading position without starting audio.
+  Navigation loads the requested complete chapter and its nearest readable neighbors,
+  skipping empty, non-linear and navigation chapters. Playback state holds one chapter
+  and explicit neighbor indices; prefetch crosses chapters while retaining its sentence bound.
+  `TtsText` retains
   matchable source offsets and UTF-16 ruby ranges, sentences and image boundaries.
   Chapter extraction uses the declared MIME type: XML parsing for XHTML preserves
   self-closing script/style boundaries; ordinary HTML retains HTML error recovery.
@@ -957,6 +964,9 @@ QA matrices live in `docs/VALIDATION.md`.
   preserving old preferences and exact synthesis durations.
   `TtsMp3` preserves MP3 without transcoding, joining long-sentence MPEG frames after
   removing per-file ID3 and seek/duration headers; WAV chunks use `TtsWav`.
+- Cloud configuration, self-hosted configuration and model discovery share credential draft
+  resolution: blank input retains ciphertext, explicit removal clears it, and replacement
+  keys are trimmed/validated before encryption with the existing source-bound Keystore key.
 - `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial
   Translator endpoint using its public client signing protocol. Tokens and their returned
   Speech region stay in memory, never in settings or exported media. A mutex shares token
@@ -1056,8 +1066,10 @@ QA matrices live in `docs/VALIDATION.md`.
   repository from both panels; TTS Settings also exposes its own global Ruby switch above
   the shared controls. Its dedicated field update preserves other TTS preferences and reports
   write errors through the Settings error flow without clearing source errors.
-  TTS merges only shared reading fields, preserving audiobook
-  preferences and keeping its own synthesis settings. Extra sentence delay is owned by
+  Reading controls emit field transformations that run against the latest repository state
+  inside its DataStore update; TTS, Sasayaki, Reader appearance and audiobook sync controls
+  do not write old full-setting snapshots. TTS permits only shared reading fields, preserving
+  audiobook preferences and keeping its own synthesis settings. Extra sentence delay is owned by
   playback, is cancellable and is excluded from preview/Anki audio; provider silence
   controls are part of synthesized audio. Preview uses the Hoshi playback speed and applies
   changes without stopping or re-synthesizing; Anki exports retain the engine-produced audio

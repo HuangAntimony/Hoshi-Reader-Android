@@ -30,8 +30,8 @@ internal class TtsSessionPlayer(
             Player.COMMAND_GET_TIMELINE, Player.COMMAND_GET_METADATA, Player.COMMAND_GET_AUDIO_ATTRIBUTES,
             Player.COMMAND_GET_VOLUME,
         )
-        if (value.index > 0) commands.addAll(Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
-        if (value.index < value.sentences.lastIndex) commands.addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+        if (value.hasPrevious) commands.addAll(Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+        if (value.hasNext) commands.addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
         val playlist = sentence?.let {
             val metadata = MediaMetadata.Builder().setTitle(value.title).setArtist(it.text.take(160)).build()
             listOf(MediaItemData.Builder("${value.bookId}:${it.chapter}:${it.start}")

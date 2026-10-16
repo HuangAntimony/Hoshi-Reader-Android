@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsUpdate
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -38,9 +39,9 @@ class TtsViewModel @Inject constructor(
         .catch { mutableReadingError.value = TtsFailure.Storage; emit(null) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    fun readingSettings(value: SasayakiSettings) {
+    fun readingSettings(update: SasayakiSettingsUpdate) {
         viewModelScope.launch {
-            try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(value) }; mutableReadingError.value = null }
+            try { readingSettingsRepository.update { current -> current.withTtsReadingSettings(update) }; mutableReadingError.value = null }
             catch (error: CancellationException) { throw error }
             catch (_: Exception) { mutableReadingError.value = TtsFailure.Storage }
         }
@@ -84,7 +85,7 @@ class TtsViewModel @Inject constructor(
             try {
                 val settings = repository.preferences.first().settings
                 val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
-                fallback = optional?.let { TtsCatalog(emptyList(), it.id, it.voiceChoices(emptyList(), settings.voice)) }
+                fallback = optional?.let { TtsCatalog(it.id, it.voiceChoices(emptyList(), settings.voice)) }
                 val cached = engine.cachedCatalog(settings)
                 fallback = cached ?: fallback
                 mutableError.value = null
@@ -112,11 +113,7 @@ class TtsViewModel @Inject constructor(
         val current = repository.preferences.first().settings.online[source.id] ?: TtsOnlineConfig()
         val cleanedRegion = region.trim().lowercase(java.util.Locale.ROOT)
         if (source == TtsOnlineSource.Azure) OnlineTtsProtocol.azureBase(cleanedRegion)
-        val encrypted = if (key.isNotBlank()) {
-            val value = key.trim()
-            if (value.any { it <= ' ' || it >= '\u007f' }) throw TtsException(TtsFailure.Configuration)
-            cipher.encrypt(value, source.id)
-        } else current.encryptedKey
+        val encrypted = cipher.update(key, source.id, current.encryptedKey)
         if (source.needsKey && encrypted.isBlank()) throw TtsException(TtsFailure.Configuration)
         return TtsOnlineConfig(cleanedRegion, encrypted)
     }
@@ -142,11 +139,7 @@ class TtsViewModel @Inject constructor(
     catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Synthesis }
     private suspend fun customDraft(source: TtsCustomSource, key: String, removeKey: Boolean): TtsCustomSource {
-        val encrypted = if (removeKey) "" else if (key.isBlank()) source.encryptedKey else {
-            val value = key.trim()
-            if (value.any { it <= ' ' || it >= '\u007f' }) throw TtsException(TtsFailure.Configuration)
-            cipher.encrypt(value, source.id)
-        }
+        val encrypted = cipher.update(key, source.id, source.encryptedKey, removeKey)
         return source.copy(encryptedKey = encrypted).validate()
     }
     suspend fun saveSource(source: TtsCustomSource, key: String, removeKey: Boolean): TtsFailure? = try {
@@ -180,7 +173,7 @@ class TtsViewModel @Inject constructor(
     } catch (error: CancellationException) { throw error }
     catch (_: Exception) { TtsFailure.Storage }
     suspend fun sourceModels(source: TtsCustomSource, key: String, removeKey: Boolean): List<String> {
-        val encrypted = if (removeKey) "" else if (key.isBlank()) source.encryptedKey else cipher.encrypt(key.trim(), source.id)
+        val encrypted = cipher.update(key, source.id, source.encryptedKey, removeKey)
         return engine.models(source.copy(encryptedKey = encrypted))
     }
     suspend fun save(word: TtsWord): TtsWordError? = try {

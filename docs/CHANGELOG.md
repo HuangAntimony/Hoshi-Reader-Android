@@ -55,7 +55,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   preview and Anki sentence audio.
   Read XHTML books containing self-closing script/style tags without losing their
   body text during TTS preparation.
-  Edit shared reading behavior directly in either panel,
+  Book text is prepared by chapter when TTS is used, avoiding full-book TTS parsing
+  when opening Reader. Edit shared reading behavior directly in either panel,
+  preserving consecutive changes to different controls,
   with independent Japanese voice/rate controls, sentence navigation, background playback,
   and shared Reader highlighting, page following, lookup pause, and image holds.
   Control narration from lookup popups: replay the selected sentence once, toggle

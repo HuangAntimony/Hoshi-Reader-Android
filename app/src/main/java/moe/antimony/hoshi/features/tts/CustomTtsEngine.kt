@@ -25,7 +25,7 @@ class CustomTtsEngine internal constructor(
         catalogs: TtsVoiceCatalogCache) : this(transport, cipher::decrypt, io, catalogs)
     private val synthesis = Mutex()
     private fun source(settings: TtsSettings) = settings.customSource()?.validate() ?: throw TtsException(TtsFailure.Configuration)
-    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>, voice: String) = TtsCatalog(emptyList(), source.id, source.voiceChoices(voices, voice))
+    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>, voice: String) = TtsCatalog(source.id, source.voiceChoices(voices, voice))
 
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)

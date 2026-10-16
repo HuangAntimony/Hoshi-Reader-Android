@@ -57,6 +57,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.LocalHoshiUiDependencies
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsUpdate
 import moe.antimony.hoshi.features.tts.*
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.content.ContentLanguageProfile
@@ -691,10 +692,11 @@ fun ReaderWebView(
             showFullscreenImage = { fullscreenImage = it },
         )
     }
-    fun updateSasayakiSettings(settings: SasayakiSettings) {
+    fun updateSasayakiSettings(update: SasayakiSettingsUpdate) {
+        val settings = update(sasayakiSettings)
         sasayakiSettings = settings
         scope.launch {
-            sasayakiSettingsRepository.update { settings }
+            sasayakiSettingsRepository.update(update)
         }
         sasayakiPlayer?.autoScroll = settings.autoScroll
         sasayakiPlayer?.readerSkipButtonAction = settings.readerSkipButtonAction
@@ -1761,10 +1763,12 @@ fun ReaderWebView(
             ReaderSasayakiBottomSkipButtonAction.Forward -> sasayakiPlayer?.nextCue()
         }
     }
-    fun startTtsAtReadingPosition() {
+    fun ttsAtReadingPosition(startPlayback: Boolean) {
         val position = readerPosition.displayedPosition
         val count = book.bookInfo.chapterInfo[book.chapters[position.index].href]?.chapterCount ?: 0
-        ttsViewModel.playback.startAt(position.index, (position.progress * count).toInt())
+        val offset = (position.progress * count).toInt()
+        if (startPlayback) ttsViewModel.playback.startAt(position.index, offset)
+        else ttsViewModel.playback.prepareAt(position.index, offset)
     }
     val topPlaybackControl = readerTopPlaybackControl(
         settings = sasayakiSettings,
@@ -1871,7 +1875,7 @@ fun ReaderWebView(
                     readerLookupPopupViewport,
                     sasayakiWasPausedByLookup,
                     sasayakiPlayer?.isPlaying == true,
-                    ttsAvailable, ttsState.playing, ttsState.sentences.isNotEmpty(), ttsLookupPause.resumeAction,
+                    ttsAvailable, ttsState.playing, ttsState.canStart, ttsLookupPause.resumeAction,
                     readerPopupIframeUrl,
                     rootSelectionHighlight,
                 ) {
@@ -1881,7 +1885,7 @@ fun ReaderWebView(
                         viewport = readerLookupPopupViewport,
                         sasayakiWasPaused = sasayakiWasPausedByLookup,
                         sasayakiIsPlaying = sasayakiPlayer?.isPlaying == true,
-                        ttsAvailable = ttsAvailable && ttsState.sentences.isNotEmpty(),
+                        ttsAvailable = ttsAvailable && ttsState.canStart,
                         ttsIsPlaying = ttsState.playing,
                         ttsWasPaused = ttsLookupPause.pending,
                         iframeUrl = readerPopupIframeUrl,
@@ -2082,7 +2086,7 @@ fun ReaderWebView(
             onDisplaySettings = stateHolder::openDisplaySettingsFromMenu,
             onReadingSettings = stateHolder::openAppearanceFromMenu,
             onStatistics = stateHolder::openStatisticsFromMenu,
-            onTts = if (ttsAvailable) ({ stateHolder.dismissReaderMenu(); showTts = true }) else null,
+            onTts = if (ttsAvailable) ({ stateHolder.dismissReaderMenu(); ttsAtReadingPosition(false); showTts = true }) else null,
             onSasayaki = if (sasayakiSettings.enabled && bookRoot != null) {
                 {
                     stateHolder.openSasayakiFromMenu(
@@ -2167,7 +2171,7 @@ fun ReaderWebView(
             )
         }
         if (showTts && ttsAvailable) {
-            TtsSheet(ttsViewModel, ttsBookId, onStart = ::startTtsAtReadingPosition, onDismiss = { showTts = false })
+            TtsSheet(ttsViewModel, ttsBookId, onStart = { ttsAtReadingPosition(true) }, onDismiss = { showTts = false })
         }
         ttsSelection?.let { selection ->
             val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "") }

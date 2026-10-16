@@ -1201,7 +1201,9 @@ Validate relevant sync/update/Sasayaki changes with:
   Replacements/Settings; failed shared behavior writes still report an error in Settings.
   Compare light/dark, sepia and e-ink layouts, dictionary add/edit/cancel.
   Edit shared behavior and colors
-  in Settings and confirm Sasayaki reflects them, and vice versa; restore original values.
+  in Settings and confirm Sasayaki reflects them, and vice versa; change two different
+  controls without waiting for recomposition and confirm both values persist after reopening.
+  Repeat with Reader appearance and audiobook sync settings; restore original values.
   TTS must not expose seconds-based navigation or change audiobook-only preferences.
   Check long source/voice names wrap without crowding the card and remain complete in
   selection lists; check empty/long dictionaries, e-ink outlines, and standalone TTS
@@ -1221,7 +1223,14 @@ Validate relevant sync/update/Sasayaki changes with:
   overlap, and confirm Sasayaki/shared behavior rows retain their layout.
 - `TtsBookRepositoryTest` covers XHTML self-closing script/style tags in both
   inline and cached chapter sources: body text, ruby, image boundaries and sentence
-  offsets must survive, while ordinary HTML retains malformed-markup recovery.
+  offsets must survive, while ordinary HTML retains malformed-markup recovery. It also
+  covers shared chapter reuse, LRU eviction and separate reopened-book identities.
+  Opening Reader must not prepare all book text or start audio. Open TTS in a middle chapter,
+  start there, and navigate/continue across empty or non-reading chapters: previous/next
+  availability, full-chapter dialogue/ruby, image holds and pause state must remain correct.
+  `TtsPlaybackControllerTest` covers cross-chapter prefetch limits, paused navigation,
+  image holds, deleted sentences and cancelled chapter reads after switching books;
+  `TtsSessionPlayerTest` covers media commands at chapter boundaries.
 - In TTS Settings, Use Ruby readings defaults on for new and existing preferences.
   Toggle it off with a ruby sample such as 今日 annotated キヨウ: playback, full-sentence
   preview and Anki sentence audio must send 今日 to the engine. Re-enable to use キヨウ;

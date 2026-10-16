@@ -114,7 +114,7 @@ internal fun SasayakiSheet(
     selectedTab: SasayakiSheetTab,
     onSelectedTabChange: (SasayakiSheetTab) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     transcriptionState: SasayakiTranscriptionUiState,
@@ -262,7 +262,7 @@ internal fun SasayakiSheet(
             initialColor = row.color(settings),
             defaultColor = row.defaultColor,
             onColorChange = { color ->
-                onSettingsChange(row.updated(settings, color))
+                onSettingsChange { current -> row.updated(current, color) }
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },
@@ -518,7 +518,7 @@ private fun SasayakiResourcesTab(
     onDismissClearTranscription: () -> Unit,
     onConfirmClearTranscription: () -> Unit,
     onAudioAction: () -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -580,7 +580,7 @@ private fun SasayakiResourcesTab(
             SasayakiMatchMode.Transcription -> SasayakiTranscriptionSection(
                 state = transcriptionState,
                 preset = settings.transcriptionPreset,
-                onPresetChange = { onSettingsChange(settings.copy(transcriptionPreset = it)) },
+                onPresetChange = { onSettingsChange { current -> current.copy(transcriptionPreset = it) } },
                 enabled = !isImporting && !subtitleMatching,
                 onStart = onStartTranscription,
                 onPause = onPauseTranscription,
@@ -599,7 +599,7 @@ private fun SasayakiAudiobookResourceCard(
     settings: SasayakiSettings,
     isImporting: Boolean,
     enabled: Boolean,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onAction: () -> Unit,
 ) {
     SasayakiResourceCard {
@@ -650,7 +650,7 @@ private fun SasayakiAudiobookResourceCard(
             Switch(
                 checked = settings.copyAudiobookToPrivateStorage,
                 enabled = enabled && !isImporting,
-                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
+                onCheckedChange = { onSettingsChange { current -> current.copy(copyAudiobookToPrivateStorage = it) } },
             )
         }
     }
@@ -773,7 +773,7 @@ private fun SasayakiSettingsTab(
     settings: SasayakiSettings,
     skipActionMenuExpanded: Boolean,
     onSkipActionMenuExpandedChange: (Boolean) -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onColorRowClick: (SasayakiColorRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -812,7 +812,7 @@ private fun SasayakiSettingsTab(
 @Composable
 internal fun SharedReaderPlaybackSettings(
     settings: SasayakiSettings,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onColorRowClick: (SasayakiColorRow) -> Unit,
     includeAudiobookControls: Boolean = false,
     skipActionMenuExpanded: Boolean = false,
@@ -829,13 +829,13 @@ internal fun SharedReaderPlaybackSettings(
     ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_show_bottom_playback_controls),
         checked = settings.showReaderBottomPlaybackControls,
-        onCheckedChange = { onSettingsChange(settings.copy(showReaderBottomPlaybackControls = it)) },
+        onCheckedChange = { onSettingsChange { current -> current.copy(showReaderBottomPlaybackControls = it) } },
     )
     if (settings.showReaderBottomPlaybackControls) {
         ReaderSheetSwitchRow(
             label = stringResource(R.string.sasayaki_reverse_vertical_skip_buttons),
             checked = settings.reverseVerticalReaderSkipButtons,
-            onCheckedChange = { onSettingsChange(settings.copy(reverseVerticalReaderSkipButtons = it)) },
+            onCheckedChange = { onSettingsChange { current -> current.copy(reverseVerticalReaderSkipButtons = it) } },
         )
     }
     if (includeAudiobookControls) {
@@ -846,7 +846,7 @@ internal fun SharedReaderPlaybackSettings(
             onExpandedChange = onSkipActionMenuExpandedChange,
             onSelected = { action ->
                 onSkipActionMenuExpandedChange(false)
-                onSettingsChange(settings.copy(readerSkipButtonAction = action))
+                onSettingsChange { current -> current.copy(readerSkipButtonAction = action) }
             },
         )
     }
@@ -861,7 +861,7 @@ internal fun SharedReaderPlaybackSettings(
     ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_auto_scroll),
         checked = settings.autoScroll,
-        onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
+        onCheckedChange = { onSettingsChange { current -> current.copy(autoScroll = it) } },
     )
     ReaderSheetSliderRow(
         label = stringResource(R.string.sasayaki_image_hold),
@@ -870,13 +870,13 @@ internal fun SharedReaderPlaybackSettings(
         range = SasayakiImageHoldMinSeconds..SasayakiImageHoldMaxSeconds,
         steps = SasayakiImageHoldSliderSteps,
         onValueChange = {
-            onSettingsChange(settings.copy(imageHoldSeconds = normalizeSasayakiImageHoldSeconds(it)))
+            onSettingsChange { current -> current.copy(imageHoldSeconds = normalizeSasayakiImageHoldSeconds(it)) }
         },
     )
     ReaderSheetSwitchRow(
         label = stringResource(R.string.sasayaki_auto_pause_on_lookup),
         checked = settings.autoPause,
-        onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
+        onCheckedChange = { onSettingsChange { current -> current.copy(autoPause = it) } },
     )
     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     SasayakiColorSheetSection(

@@ -253,7 +253,7 @@ class TtsPanelStateTest {
             KeyEvent.ACTION_DOWN, 0, settings, false, false, hasStartedTts = controller.state.value.started)
         val book = EpubBook("Device fixture", chapters = listOf(
             EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>今日は晴れです。次の文章です。最後の文章です。</p>")))
-        compose.runOnIdle { controller.load("tts-key-fixture", book, false) }
+        compose.runOnIdle { controller.load("tts-key-fixture", book, false); controller.prepareAt(0, 0) }
         compose.waitUntil(5_000) { controller.state.value.sentences.size == 3 }
         compose.runOnIdle { Assert.assertFalse(key().consumed); controller.play() }
         compose.waitUntil(15_000) { !controller.state.value.preparing }
@@ -280,9 +280,18 @@ class TtsPanelStateTest {
         compose.runOnIdle { controller.stop(); controller.load("tts-key-fixture", book, false); Assert.assertFalse(key().consumed) }
     }
 
+    @Test fun consecutiveReadingEditsPreserveBothFields() {
+        panel()
+        compose.runOnIdle {
+            model.readingSettings { it.copy(autoScroll = false) }
+            model.readingSettings { it.copy(autoPause = false) }
+        }
+        compose.waitUntil(5_000) { model.readingSettings.value?.let { !it.autoScroll && !it.autoPause } == true }
+    }
+
     @Test fun readingWriteFailureAndPreviewFailureRemainIndependent() {
         panel()
-        compose.runOnIdle { reading.failWrites = true; model.readingSettings(requireNotNull(model.readingSettings.value).copy(autoScroll = false)) }
+        compose.runOnIdle { reading.failWrites = true; model.readingSettings { it.copy(autoScroll = false) } }
         compose.waitUntil(5_000) { model.readingError.value == TtsFailure.Storage }
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText(context.getString(R.string.tts_storage_error)).assertExists()

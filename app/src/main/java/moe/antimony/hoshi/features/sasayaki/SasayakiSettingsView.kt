@@ -63,9 +63,9 @@ fun SasayakiSettingsView(
     var skipActionMenuExpanded by remember { mutableStateOf(false) }
     var colorDialogRow by remember { mutableStateOf<SasayakiColorRow?>(null) }
 
-    fun save(next: SasayakiSettings) {
+    fun save(update: SasayakiSettingsUpdate) {
         scope.launch {
-            repository.update { next }
+            repository.update(update)
         }
     }
 
@@ -106,7 +106,7 @@ fun SasayakiSettingsView(
                         trailingContent = {
                             Switch(
                                 checked = loadedSettings.enabled,
-                                onCheckedChange = { save(loadedSettings.copy(enabled = it)) },
+                                onCheckedChange = { save { current -> current.copy(enabled = it) } },
                             )
                         },
                     )
@@ -119,7 +119,7 @@ fun SasayakiSettingsView(
                             trailingContent = {
                                 Switch(
                                     checked = loadedSettings.copyAudiobookToPrivateStorage,
-                                    onCheckedChange = { save(loadedSettings.copy(copyAudiobookToPrivateStorage = it)) },
+                                    onCheckedChange = { save { current -> current.copy(copyAudiobookToPrivateStorage = it) } },
                                 )
                             },
                         )
@@ -131,7 +131,7 @@ fun SasayakiSettingsView(
                                 trailingContent = {
                                     Switch(
                                         checked = loadedSettings.syncEnabled,
-                                        onCheckedChange = { save(loadedSettings.copy(syncEnabled = it)) },
+                                        onCheckedChange = { save { current -> current.copy(syncEnabled = it) } },
                                     )
                                 },
                             )
@@ -145,7 +145,7 @@ fun SasayakiSettingsView(
                                 Switch(
                                     checked = loadedSettings.showReaderBottomPlaybackControls,
                                     onCheckedChange = {
-                                        save(loadedSettings.copy(showReaderBottomPlaybackControls = it))
+                                        save { current -> current.copy(showReaderBottomPlaybackControls = it) }
                                     },
                                 )
                             },
@@ -160,7 +160,7 @@ fun SasayakiSettingsView(
                                     Switch(
                                         checked = loadedSettings.reverseVerticalReaderSkipButtons,
                                         onCheckedChange = {
-                                            save(loadedSettings.copy(reverseVerticalReaderSkipButtons = it))
+                                            save { current -> current.copy(reverseVerticalReaderSkipButtons = it) }
                                         },
                                     )
                                 },
@@ -184,7 +184,7 @@ fun SasayakiSettingsView(
                                                 text = { Text(action.labelText()) },
                                                 onClick = {
                                                     skipActionMenuExpanded = false
-                                                    save(loadedSettings.copy(readerSkipButtonAction = action))
+                                                    save { current -> current.copy(readerSkipButtonAction = action) }
                                                 },
                                             )
                                         }
@@ -199,7 +199,7 @@ fun SasayakiSettingsView(
                             trailingContent = {
                                 Switch(
                                     checked = loadedSettings.autoScroll,
-                                    onCheckedChange = { save(loadedSettings.copy(autoScroll = it)) },
+                                    onCheckedChange = { save { current -> current.copy(autoScroll = it) } },
                                 )
                             },
                         )
@@ -207,7 +207,7 @@ fun SasayakiSettingsView(
                         SasayakiImageHoldSettingsRow(
                             settings = loadedSettings,
                             onValueChange = { seconds ->
-                                save(loadedSettings.copy(imageHoldSeconds = seconds))
+                                save { current -> current.copy(imageHoldSeconds = seconds) }
                             },
                         )
                         SettingsDivider()
@@ -217,7 +217,7 @@ fun SasayakiSettingsView(
                             trailingContent = {
                                 Switch(
                                     checked = loadedSettings.autoPause,
-                                    onCheckedChange = { save(loadedSettings.copy(autoPause = it)) },
+                                    onCheckedChange = { save { current -> current.copy(autoPause = it) } },
                                 )
                             },
                         )
@@ -254,7 +254,7 @@ fun SasayakiSettingsView(
             initialColor = currentColorDialogRow.color(currentSettings),
             defaultColor = currentColorDialogRow.defaultColor,
             onColorChange = { color ->
-                save(currentColorDialogRow.updated(currentSettings, color))
+                save { current -> currentColorDialogRow.updated(current, color) }
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },

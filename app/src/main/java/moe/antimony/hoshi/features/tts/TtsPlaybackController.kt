@@ -17,12 +17,17 @@ data class TtsPlaybackState(
     val title: String = "",
     val sentences: List<TtsSentence> = emptyList(),
     val index: Int = 0,
+    val previousChapter: Int? = null,
+    val nextChapter: Int? = null,
     val started: Boolean = false,
     val playing: Boolean = false,
     val preparing: Boolean = false,
     val error: TtsFailure? = null,
 ) {
     val sentence: TtsSentence? get() = sentences.getOrNull(index)
+    val canStart: Boolean get() = bookId != null
+    val hasPrevious: Boolean get() = index > 0 || previousChapter != null
+    val hasNext: Boolean get() = index < sentences.lastIndex || nextChapter != null
 }
 
 @OptIn(UnstableApi::class)
@@ -44,10 +49,11 @@ class TtsPlaybackController internal constructor(
     private val mutableState = MutableStateFlow(TtsPlaybackState())
     val state = mutableState.asStateFlow()
     private var generation = 0L
-    private var loadGeneration = 0L
+    private var book: EpubBook? = null
+    private var position: TtsBookPosition? = null
+    private var pendingPosition: (suspend () -> TtsBookPosition?)? = null
     private var job: Job? = null
     private var prefetch: Job? = null
-    private var loadJob: Job? = null
     private var preparedIndex: Int? = null
     private var preferences = TtsPreferences()
     private var associated = false
@@ -94,53 +100,99 @@ class TtsPlaybackController internal constructor(
         if (state.value.bookId == bookId) return
         stop()
         associated = false
-        mutableState.value = TtsPlaybackState(bookId = bookId, title = book.title, preparing = true)
-        val token = loadGeneration
-        loadJob = scope.launch(Dispatchers.Main.immediate) {
-            try {
-                val sentences = books.sentences(book)
-                if (token == loadGeneration) mutableState.value = state.value.copy(sentences = sentences, preparing = false, error = TtsFailure.EmptyText.takeIf { sentences.isEmpty() })
-            } catch (error: CancellationException) { throw error }
-            catch (_: Exception) { if (token == loadGeneration) fail(TtsFailure.EmptyText) }
+        this.book = book
+        mutableState.value = TtsPlaybackState(bookId = bookId, title = book.title)
+    }
+
+    private fun installPosition(next: TtsBookPosition) {
+        if (position?.sentence?.chapter != next.sentence.chapter) {
+            preparedIndex = null
+            heldImageIndex = null
         }
+        position = next
+        mutableState.value = state.value.copy(sentences = next.sentences, index = next.index,
+            previousChapter = next.previousChapter, nextChapter = next.nextChapter)
+    }
+
+    private fun requestPosition(
+        resolve: suspend () -> TtsBookPosition?, startPlayback: Boolean,
+        singleSentence: Boolean = false, natural: Boolean = false,
+    ) {
+        if (associated || book == null) return
+        pause()
+        if (!natural) { prefetch?.cancel(); prefetch = null }
+        preparedIndex = null
+        sentenceFinished = false
+        output.clear()
+        stopAfterSentence = singleSentence
+        naturalAdvance = natural
+        pendingPosition = resolve
+        if (startPlayback) { play(); return }
+        val token = generation
+        mutableState.value = state.value.copy(preparing = true, error = null)
+        job = scope.launch(Dispatchers.Main.immediate) {
+            try {
+                val next = resolve() ?: throw TtsException(TtsFailure.EmptyText)
+                if (token != generation) return@launch
+                pendingPosition = null
+                installPosition(next)
+                mutableState.value = state.value.copy(preparing = false)
+                if (state.value.started) presentSentence?.invoke(next.sentence, false)
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) { if (token == generation) fail((error as? TtsException)?.failure ?: TtsFailure.Storage) }
+        }
+    }
+
+    fun prepareAt(chapter: Int, offset: Int) {
+        if (state.value.started) return
+        val source = book ?: return
+        requestPosition({ books.at(source, chapter, offset) }, startPlayback = false)
     }
 
     fun attachPlayer(next: ExoPlayer) { (output as? AndroidTtsPlaybackOutput)?.attach(next) }
     fun detachPlayer() { (output as? AndroidTtsPlaybackOutput)?.detach(); pause(); preparedIndex = null }
 
     fun startAt(chapter: Int, offset: Int, singleSentence: Boolean = false) {
-        val values = state.value.sentences
-        val selected = values.indexOfFirst { it.chapter > chapter || it.chapter == chapter && it.start + it.length > offset }
-        if (selected >= 0) seek(selected, singleSentence, startPlayback = true)
-        else if (values.isNotEmpty()) seek(values.lastIndex, singleSentence, startPlayback = true)
+        val source = book ?: return
+        requestPosition({ books.at(source, chapter, offset) }, startPlayback = true, singleSentence = singleSentence)
     }
     fun toggle() { if (state.value.playing) pause() else play() }
-    fun previous() = seek((state.value.index - 1).coerceAtLeast(0))
-    fun next() = seek((state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
+    fun previous() = move(-1)
+    fun next() = move(1)
     fun repeat() = seek(state.value.index, startPlayback = true)
+    private fun move(direction: Int, natural: Boolean = false) {
+        val current = position ?: return
+        val source = book ?: return
+        val index = current.index + direction
+        if (index in current.sentences.indices) seek(index, natural = natural)
+        else requestPosition({ books.adjacent(source, current, direction) ?: current }, state.value.playing, natural = natural)
+    }
     private fun advance() {
-        if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) {
+        if (stopAfterSentence || !state.value.hasNext) {
             sentenceFinished = false
             pause(); preparedIndex = null; return
         }
         val waitMillis = preferences.settings.sentencePauseMs
-        if (waitMillis == 0L) { seek(state.value.index + 1, natural = true); return }
+        if (waitMillis == 0L) { move(1, natural = true); return }
         val token = generation
         sentenceFinished = true
         mutableState.value = state.value.copy(preparing = true)
         job = scope.launch(Dispatchers.Main.immediate) {
             delay(waitMillis)
-            if (token == generation && state.value.playing) seek(state.value.index + 1, natural = true)
+            if (token == generation && state.value.playing) move(1, natural = true)
         }
     }
     private fun seek(index: Int, singleSentence: Boolean = false, natural: Boolean = false, startPlayback: Boolean = state.value.playing) {
         if (index !in state.value.sentences.indices || associated) return
         pause()
+        if (!natural) { prefetch?.cancel(); prefetch = null }
         sentenceFinished = false
         output.clear()
         stopAfterSentence = singleSentence
         naturalAdvance = natural
         preparedIndex = null
+        pendingPosition = null
+        position = position?.copy(index = index)
         mutableState.value = state.value.copy(index = index)
         if (startPlayback) play()
         else if (state.value.started) {
@@ -154,23 +206,36 @@ class TtsPlaybackController internal constructor(
         }
     }
     fun play() {
-        if (associated || state.value.sentence == null || state.value.playing) return
+        if (associated || book == null || state.value.playing) return
+        if (position == null && pendingPosition == null) {
+            val source = requireNotNull(book)
+            pendingPosition = { books.at(source, 0, 0) }
+        }
         if (sentenceFinished) {
             sentenceFinished = false
             preparedIndex = null
             output.clear()
-            if (stopAfterSentence || state.value.index >= state.value.sentences.lastIndex) return
-            mutableState.value = state.value.copy(index = (state.value.index + 1).coerceAtMost(state.value.sentences.lastIndex))
+            if (stopAfterSentence || !state.value.hasNext) return
+            val source = requireNotNull(book)
+            val current = requireNotNull(position)
+            pendingPosition = { books.adjacent(source, current, 1) }
             naturalAdvance = true
         }
         val snapshot = state.value
         val config = preferences
+        job?.cancel()
         val token = ++generation
         mutableState.value = snapshot.copy(started = true, playing = true, preparing = true, error = null)
         job = scope.launch(Dispatchers.Main.immediate) {
             try {
+                pendingPosition?.let { resolve ->
+                    val next = resolve() ?: throw TtsException(TtsFailure.EmptyText)
+                    if (generation != token || associated) return@launch
+                    pendingPosition = null
+                    installPosition(next)
+                }
                 withTimeout(15_000) { output.connect() }
-                var current = snapshot
+                var current = state.value
                 while (generation == token && !associated) {
                     val sentence = requireNotNull(current.sentence)
                     val files = if (preparedIndex != current.index) audio.audio(sentence, current.bookId, config) else null
@@ -189,7 +254,7 @@ class TtsPlaybackController internal constructor(
                     if (files?.isEmpty() == true) {
                         // A deleted sentence has no player completion event. Traverse it here,
                         // retaining image presentation and cancellation, without a sentence pause.
-                        if (stopAfterSentence || current.index == current.sentences.lastIndex) {
+                        if (stopAfterSentence || !current.hasNext) {
                             preparedIndex = null
                             output.clear()
                             pause()
@@ -197,8 +262,11 @@ class TtsPlaybackController internal constructor(
                         }
                         preparedIndex = null
                         naturalAdvance = true
-                        current = state.value.copy(index = current.index + 1)
-                        mutableState.value = current
+                        val next = books.adjacent(requireNotNull(book), requireNotNull(position), 1)
+                            ?: throw TtsException(TtsFailure.EmptyText)
+                        if (generation != token || associated) return@launch
+                        installPosition(next)
+                        current = state.value
                         yield()
                         continue
                     }
@@ -217,14 +285,20 @@ class TtsPlaybackController internal constructor(
         if (prefetch?.isActive == true) return
         prefetch = scope.launch(Dispatchers.Main.immediate) {
             try {
-                var index = state.value.index + 1
+                val source = book ?: return@launch
+                var cursor = position ?: return@launch
+                val queued = mutableListOf<Pair<Int, Int>>()
+                fun key(value: TtsBookPosition) = value.sentence.chapter to value.index
+                fun after(a: Pair<Int, Int>, b: Pair<Int, Int>) =
+                    a.first > b.first || a.first == b.first && a.second > b.second
                 while (true) {
-                    val current = state.value
-                    index = maxOf(index, current.index + 1)
-                    if (index > current.index + preferences.settings.prefetchSentences.coerceIn(ttsPrefetchRange)) break
-                    val sentence = current.sentences.getOrNull(index) ?: break
-                    audio.audio(sentence, current.bookId, preferences)
-                    index++
+                    val current = position ?: break
+                    queued.removeAll { !after(it, key(current)) }
+                    if (after(key(current), key(cursor))) cursor = current
+                    if (queued.size >= preferences.settings.prefetchSentences.coerceIn(ttsPrefetchRange)) break
+                    cursor = books.adjacent(source, cursor, 1) ?: break
+                    audio.audio(cursor.sentence, state.value.bookId, preferences)
+                    queued += key(cursor)
                 }
             } catch (error: CancellationException) { throw error }
             catch (_: Exception) { /* Retry visibly when this sentence is requested. */ }
@@ -246,9 +320,10 @@ class TtsPlaybackController internal constructor(
     fun stop() {
         sentenceFinished = false
         stopAfterSentence = false
-        loadGeneration++
         pause()
-        loadJob?.cancel(); loadJob = null
+        book = null
+        position = null
+        pendingPosition = null
         prefetch?.cancel(); prefetch = null
         preparedIndex = null
         heldImageIndex = null

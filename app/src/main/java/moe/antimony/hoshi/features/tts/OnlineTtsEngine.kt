@@ -29,14 +29,14 @@ class OnlineTtsEngine internal constructor(
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
-        catalogs.cached(TtsVoiceCatalogKey.online(source, config))?.let { TtsCatalog(emptyList(), source.id, it) }
+        catalogs.cached(TtsVoiceCatalogKey.online(source, config))?.let { TtsCatalog(source.id, it) }
     }
 
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
         val voices = catalogs.load(TtsVoiceCatalogKey.online(source, config), force) { fetchVoices(source, config) }
-        TtsCatalog(emptyList(), source.id, voices)
+        TtsCatalog(source.id, voices)
     }
 
     private suspend fun fetchVoices(source: TtsOnlineSource, config: TtsOnlineConfig): List<TtsVoiceInfo> {

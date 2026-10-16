@@ -167,10 +167,118 @@ class TtsPlaybackControllerTest {
         }
     }
 
+    private val chapterBook = EpubBook("Chapters", chapters = (0..5).map { chapter ->
+        EpubChapter("$chapter", "$chapter.xhtml", "application/xhtml+xml", "<img src='image.jpg'/><p>第${chapter}章。</p>")
+    })
+
+    @Test fun prefetchCrossesChaptersWithoutChangingItsSentenceBound() = runTest {
+        fixture(store = MemoryStore(prefetchPreferences(2)), fixtureBook = chapterBook) { controller, output, audio, _ ->
+            controller.imageHoldMillis = 0
+            controller.play(); runCurrent()
+            assertEquals(listOf("第0章。", "第1章。", "第2章。"), audio.requests)
+            assertFalse(controller.state.value.hasPrevious)
+            assertTrue(controller.state.value.hasNext)
+            output.onEnded(); runCurrent()
+            assertEquals(1, controller.state.value.sentence?.chapter)
+            assertTrue(controller.state.value.hasPrevious)
+            assertEquals(2, output.playCount)
+            assertEquals("第3章。", audio.requests.last())
+        }
+    }
+
+    @Test fun pausedCrossChapterNavigationDoesNotPlayOrSynthesize() = runTest {
+        fixture(fixtureBook = chapterBook) { controller, output, audio, _ ->
+            controller.play(); runCurrent(); controller.pause()
+            val requests = audio.requests.size
+            controller.next(); runCurrent()
+            assertEquals(1, controller.state.value.sentence?.chapter)
+            assertFalse(controller.state.value.playing)
+            controller.previous(); runCurrent()
+            assertEquals(0, controller.state.value.sentence?.chapter)
+            assertFalse(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            assertEquals(requests, audio.requests.size)
+            controller.startAt(4, 0); runCurrent()
+            assertEquals(4, controller.state.value.sentence?.chapter)
+            assertEquals(2, output.playCount)
+        }
+    }
+
+    @Test fun chapterBoundaryImageHoldAndLookupResumeRetainNaturalAdvance() = runTest {
+        fixture(fixtureBook = chapterBook) { controller, output, _, _ ->
+            val holds = mutableListOf<Int>()
+            controller.presentSentence = { sentence, hold ->
+                if (hold) { holds += sentence.chapter; delay(1000) }
+            }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertEquals(listOf(1), holds)
+            val resume = controller.pauseForLookup()
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(1, output.playCount)
+            resume(); runCurrent(); advanceTimeBy(1000); runCurrent()
+            assertEquals(2, output.playCount)
+            assertEquals(1, controller.state.value.sentence?.chapter)
+        }
+    }
+
+    @Test fun deletedSentencesCanTraverseChaptersWithoutPlayingEmptyAudio() = runTest {
+        fixture(fixtureBook = chapterBook) { controller, output, audio, _ ->
+            controller.imageHoldMillis = 0
+            audio.silent = { it.chapter < 5 }
+            controller.play(); runCurrent()
+            assertEquals(5, controller.state.value.sentence?.chapter)
+            assertFalse(controller.state.value.hasNext)
+            assertEquals(1, output.playCount)
+            output.onEnded(); runCurrent()
+            assertFalse(controller.state.value.playing)
+        }
+    }
+
+    @Test fun switchingBooksBeforeChapterReadFinishesCannotRestoreOldPosition() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val output = Output()
+            val controller = TtsPlaybackController(TtsBookRepository(StandardTestDispatcher(testScheduler)),
+                TtsRepository(MemoryStore()), Audio(), output, backgroundScope)
+            controller.load("first", chapterBook, false)
+            controller.startAt(4, 0)
+            assertTrue(controller.state.value.preparing)
+            controller.load("second", book, false)
+            runCurrent()
+            assertEquals("second", controller.state.value.bookId)
+            assertTrue(controller.state.value.sentences.isEmpty())
+            assertFalse(controller.state.value.started)
+            assertEquals(0, output.playCount)
+            controller.startAt(0, 0); runCurrent()
+            assertEquals("東京です。", controller.state.value.sentence?.text)
+            assertEquals(1, output.playCount)
+            controller.stop()
+        } finally { backgroundScope.cancel(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     private class MemoryStore(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
         override val data = MutableStateFlow(initial)
         override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences = transform(data.value).also { data.value = it }
     }
+    @Test fun openingBookLeavesTextUnpreparedUntilTtsIsRequested() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val controller = TtsPlaybackController(TtsBookRepository(UnconfinedTestDispatcher(testScheduler)),
+                TtsRepository(MemoryStore()), Audio(), Output(), backgroundScope)
+            controller.load("book", book, false)
+            runCurrent()
+            assertTrue(controller.state.value.sentences.isEmpty())
+            assertFalse(controller.state.value.preparing)
+            assertFalse(controller.state.value.started)
+            controller.startAt(0, 0)
+            runCurrent()
+            assertEquals("東京です。", controller.state.value.sentence?.text)
+            assertTrue(controller.state.value.playing)
+            controller.stop()
+        } finally { backgroundScope.cancel(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     private class Output : TtsPlaybackOutput {
         override var onEnded: () -> Unit = {}
         override var onPaused: () -> Unit = {}
@@ -207,6 +315,7 @@ class TtsPlaybackControllerTest {
             val audio = Audio()
             val controller = TtsPlaybackController(TtsBookRepository(UnconfinedTestDispatcher(testScheduler)), repository, audio, output, fixtureScope)
             controller.load("book", fixtureBook, false)
+            controller.prepareAt(0, 0)
             withTimeout(5_000) { controller.state.first { it.sentences.isNotEmpty() } }
             body(controller, output, audio, repository)
             controller.stop()

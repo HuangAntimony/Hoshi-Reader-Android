@@ -28,6 +28,9 @@ class TtsCredentialCipher @Inject constructor(@param:IoDispatcher private val io
         }.generateKey()
     }
 
+    suspend fun update(value: String, source: String, saved: String, remove: Boolean = false): String =
+        resolveTtsCredential(value, saved, remove) { encrypt(it, source) }
+
     suspend fun encrypt(value: String, source: String): String = withContext(io) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
@@ -45,4 +48,16 @@ class TtsCredentialCipher @Inject constructor(@param:IoDispatcher private val io
             cipher.doFinal(bytes.copyOfRange(12, bytes.size)).toString(Charsets.UTF_8)
         } catch (_: Exception) { throw TtsException(TtsFailure.Configuration) }
     }
+}
+
+/** Blank drafts retain saved ciphertext; removal never re-encrypts or reveals the old key. */
+internal suspend fun resolveTtsCredential(
+    draft: String, saved: String, remove: Boolean,
+    encrypt: suspend (String) -> String,
+): String {
+    if (remove) return ""
+    if (draft.isBlank()) return saved
+    val value = draft.trim()
+    if (value.any { it <= ' ' || it >= '\u007f' }) throw TtsException(TtsFailure.Configuration)
+    return encrypt(value)
 }

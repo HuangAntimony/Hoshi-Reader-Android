@@ -126,10 +126,10 @@ fun AppShell(
         }
     }
 
-    fun updateSasayakiSettings(settings: SasayakiSettings) {
-        sasayakiSettings = settings
+    fun updateSasayakiSettings(update: (SasayakiSettings) -> SasayakiSettings) {
+        sasayakiSettings = update(sasayakiSettings)
         scope.launch {
-            sasayakiSettingsRepository.update { settings }
+            sasayakiSettingsRepository.update(update)
         }
     }
 
@@ -514,7 +514,7 @@ private fun SettingsDetailDestination(
     readerSettings: ReaderSettings,
     onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     sasayakiSettings: SasayakiSettings,
-    onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
+    onSasayakiSettingsChange: ((SasayakiSettings) -> SasayakiSettings) -> Unit,
     readerFontManager: ReaderFontManager,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit,
