@@ -21,11 +21,11 @@ class CustomTtsEngineTest {
         put("data".toByteArray()); putInt(4); putInt(0)
     }.array()
     private fun engine(client: OkHttpClient = OkHttpClient.Builder().followRedirects(false).build(), store: TtsVoiceCatalogStore? = null) =
-        CustomTtsEngine(OnlineTtsTransport(client, client), { _, _ -> "test-key" }, Dispatchers.IO, store)
+        CustomTtsEngine(OnlineTtsTransport(client, client), { _, _ -> "test-key" }, Dispatchers.IO, TtsVoiceCatalogCache(store, 32))
     private fun profile(server: MockWebServer, protocol: TtsCustomProtocol = TtsCustomProtocol.OpenAi) =
         TtsCustomSource(id = "custom:fixture", name = "Fixture", protocol = protocol, baseUrl = server.url("/proxy/v1/").toString(),
-            model = "irodori-tts", voice = "sample", encryptedKey = "ciphertext", format = TtsAudioFormat.Wav)
-    private fun settings(source: TtsCustomSource) = TtsSettings(engine = source.id, customSources = listOf(source))
+            model = "irodori-tts", encryptedKey = "ciphertext", format = TtsAudioFormat.Wav)
+    private fun settings(source: TtsCustomSource, voice: String = "sample") = TtsSettings(engine = source.id, customSources = listOf(source)).withVoice(voice)
 
     @Test fun openAiSynthesisDoesNotRequireCatalogAndPreservesPrefixAndFullJapaneseText() = runBlocking {
         MockWebServer().use { server ->
@@ -49,8 +49,8 @@ class CustomTtsEngineTest {
     @Test fun vitsCatalogKeepsModelAndSpeakerIdentityAndExcludesNonJapaneseAndConversionModels() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("""{"VITS":[{"id":0,"name":"綾地寧々","lang":["ja"]},{"id":1,"name":"Chinese","lang":["zh"]}],"BERT-VITS2":[{"id":0,"name":"Same ID","lang":["ja","zh"]}],"HUBERT-VITS":[{"id":0,"name":"Conversion","lang":["ja"]}]}"""))
-            val source = profile(server, TtsCustomProtocol.Vits).copy(baseUrl = server.url("/proxy/").toString(), voice = "VITS:0")
-            val catalog = engine().catalog(settings(source))
+            val source = profile(server, TtsCustomProtocol.Vits).copy(baseUrl = server.url("/proxy/").toString())
+            val catalog = engine().catalog(settings(source, "VITS:0"))
             assertEquals(listOf("VITS:0", "BERT-VITS2:0"), catalog.voices.map { it.id })
             assertEquals("綾地寧々", catalog.voices.first().label)
             val request = server.takeRequest()
@@ -68,18 +68,18 @@ class CustomTtsEngineTest {
             server.enqueue(MockResponse().setBody(response(0)))
             server.enqueue(MockResponse().setBody(response(1)))
             server.enqueue(MockResponse().setResponseCode(401))
-            val source = profile(server, protocol).copy(voice = "")
+            val source = profile(server, protocol)
             val store = TtsVoiceCatalogStore(folder.newFolder(protocol.name))
             val adapter = engine(store = store)
-            val first = adapter.catalog(settings(source))
-            assertEquals(first, adapter.catalog(settings(source)))
+            val first = adapter.catalog(settings(source, ""))
+            assertEquals(first, adapter.catalog(settings(source, "")))
             assertEquals(1, server.requestCount)
-            val refreshed = adapter.catalog(settings(source), force = true)
+            val refreshed = adapter.catalog(settings(source, ""), force = true)
             assertEquals(if (protocol == TtsCustomProtocol.OpenAi) "voice-1" else "VITS:1", refreshed.voices.single().id)
             assertEquals(2, server.requestCount)
-            try { adapter.catalog(settings(source), force = true); fail("Expected authentication failure") }
+            try { adapter.catalog(settings(source, ""), force = true); fail("Expected authentication failure") }
             catch (error: TtsException) { assertEquals(TtsFailure.Authentication, error.failure) }
-            assertEquals(refreshed, engine(store = store).catalog(settings(source)))
+            assertEquals(refreshed, engine(store = store).catalog(settings(source, "")))
             assertEquals(3, server.requestCount)
         }
     }
@@ -87,8 +87,8 @@ class CustomTtsEngineTest {
     @Test fun vitsUsesInverseLengthAndJapaneseWithoutSendingUnsupportedPitch() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody(Buffer().write(wav)))
-            val source = profile(server, TtsCustomProtocol.Vits).copy(baseUrl = server.url("/prefix/").toString(), voice = "BERT-VITS2:3", rate = 2f)
-            engine().synthesize("こんにちは。", settings(source), folder.root)
+            val source = profile(server, TtsCustomProtocol.Vits).copy(baseUrl = server.url("/prefix/").toString(), rate = 2f)
+            engine().synthesize("こんにちは。", settings(source, "BERT-VITS2:3"), folder.root)
             val request = server.takeRequest()
             assertEquals("/prefix/voice/bert-vits2", request.path)
             assertEquals("application/json", request.getHeader("Content-Type"))
@@ -107,16 +107,16 @@ class CustomTtsEngineTest {
                     if (request.getHeader("Content-Type") == "application/json") MockResponse().setBody(Buffer().write(wav))
                     else MockResponse().setResponseCode(400).setBody("empty form")
             }
-            val source = profile(server, TtsCustomProtocol.Vits).copy(voice = "VITS:0")
-            assertArrayEquals(wav, engine().synthesize("日本語。", settings(source), folder.root).single().readBytes())
+            val source = profile(server, TtsCustomProtocol.Vits)
+            assertArrayEquals(wav, engine().synthesize("日本語。", settings(source, "VITS:0"), folder.root).single().readBytes())
         }
     }
 
     @Test fun gptSoVitsUsesServerPresetAndDoesNotSendLength() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody(Buffer().write(wav)))
-            val source = profile(server, TtsCustomProtocol.Vits).copy(voice = "GPT-SOVITS:2", preset = "narrator", rate = 2f)
-            engine().synthesize("日本語。", settings(source), folder.root)
+            val source = profile(server, TtsCustomProtocol.Vits).copy(preset = "narrator", rate = 2f)
+            engine().synthesize("日本語。", settings(source, "GPT-SOVITS:2"), folder.root)
             val request = server.takeRequest()
             assertEquals("/proxy/v1/voice/gpt-sovits", request.path)
             val body = Json.parseToJsonElement(request.body.readUtf8()).jsonObject
@@ -164,6 +164,30 @@ class CustomTtsEngineTest {
             assertNull(next.cachedCatalog(settings(source.copy(baseUrl = server.url("/other/").toString()))))
             assertNull(next.cachedCatalog(settings(source.copy(encryptedKey = "new-key"))))
             assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun manualRefreshDoesNotBlockReadingTheLastSuccessfulCatalog() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"voices":["alice"]}"""))
+            val adapter = engine()
+            val config = settings(profile(server), "")
+            val old = adapter.catalog(config)
+            val entered = CompletableDeferred<Unit>()
+            val release = java.util.concurrent.CountDownLatch(1)
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                    entered.complete(Unit)
+                    release.await(5, TimeUnit.SECONDS)
+                    return MockResponse().setBody("""{"voices":["bob"]}""")
+                }
+            }
+            val refresh = async { adapter.catalog(config, force = true) }
+            try {
+                withTimeout(2000) { entered.await() }
+                assertEquals(old, withTimeout(500) { adapter.cachedCatalog(config) })
+            } finally { release.countDown(); refresh.await() }
+            assertEquals("bob", adapter.cachedCatalog(config)!!.voices.single().id)
         }
     }
 
@@ -249,10 +273,10 @@ class CustomTtsEngineTest {
             val sentence = TtsText.chapter(0, "<p><ruby>今日<rt>きょう</rt></ruby>は晴れです。</p>").single()
             try {
                 val first = audio.audio(sentence, "book", preferences)
-                val renamed = preferences.copy(settings = preferences.settings.copy(customSources = listOf(source.copy(name = "Renamed"), other.copy(voice = "bob"))))
+                val renamed = preferences.copy(settings = preferences.settings.copy(customSources = listOf(source.copy(name = "Renamed"), other.copy(model = "changed-unused-model"))))
                 assertEquals(first, audio.audio(sentence, "book", renamed))
                 assertEquals(1, server.requestCount)
-                val changed = preferences.copy(settings = preferences.settings.copy(customSources = listOf(source.copy(voice = "bob"), other)))
+                val changed = preferences.copy(settings = preferences.settings.withVoice("bob"))
                 assertNotEquals(first, audio.audio(sentence, "book", changed))
                 assertNotEquals(first, audio.audio(sentence, "book", preferences.copy(settings = preferences.settings.selectSource(other.id))))
                 audio.export(sentence, "book", preferences).also { assertArrayEquals(wav, it.readBytes()); it.delete() }

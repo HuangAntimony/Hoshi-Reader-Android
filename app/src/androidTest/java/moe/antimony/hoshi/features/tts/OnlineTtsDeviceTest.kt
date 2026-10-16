@@ -30,7 +30,7 @@ class OnlineTtsDeviceTest {
         try {
             for (format in listOf(TtsAudioFormat.Wav, TtsAudioFormat.Mp3)) {
                 val sampleRate = if (format == TtsAudioFormat.Wav) 16000 else 48000
-                val settings = initial.copy(voice = voice.id, rate = 1.25f, pitch = 2f).withOptions(
+                val settings = initial.copy(pitch = 2f).withVoice(voice.id).withRate(1.25f).withOptions(
                     TtsSynthesisOptions(style = "cheerful", styleDegree = 1.5f, commaMs = 300,
                         format = format, sampleRate = sampleRate))
                 val sentence = TtsSentence(0, 0, 0, "こんにちは、日本語の音声です。")

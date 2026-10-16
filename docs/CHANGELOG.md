@@ -38,7 +38,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   the Voice picker provides a manual refresh action at the top for every source,
-  retaining known voices during loading or refresh failure.
+  retaining known voices during loading or refresh failure; slow self-hosted refreshes
+  do not block reuse of the previous list.
   E-ink shows readable loading text instead of a solid black progress line.
   Add, edit and delete self-hosted servers from Source; saving a new server selects it
   immediately without starting playback, and each retains its model, voice,
@@ -79,7 +80,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   anchored at the right-side control, Google device profiles, and
   extra playback pauses between sentences. Pause sliders use 10 ms increments, with
   a normal range of 0–1000 ms for provider silence and 0–2000 ms for extra sentence
-  pauses; previously saved longer pauses remain intact until edited.
+  pauses; previously saved longer pauses remain intact until edited. Changing extra
+  sentence pause takes effect at the next boundary without stopping narration or
+  regenerating cached audio. Independent setting edits preserve other saved preferences.
   MP3 sources retain MP3 for playback and Anki.
   Ready sentence audio plays without waiting for later network synthesis, and continuous
   playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20

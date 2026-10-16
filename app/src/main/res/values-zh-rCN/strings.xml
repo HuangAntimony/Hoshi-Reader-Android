@@ -905,20 +905,13 @@
     <string name="tts_global">全局</string>
     <string name="tts_book">本书</string>
     <string name="tts_dictionary_empty">尚未添加文本替换规则。</string>
-    <string name="tts_previous">上一句</string>
-    <string name="tts_next">下一句</string>
-    <string name="tts_pause" comment="Pause synthesized book narration.">暂停</string>
-    <string name="tts_play">播放</string>
-    <string name="tts_repeat">重播本句</string>
     <string name="tts_use_ruby">使用 Ruby 读音</string>
     <string name="tts_loading_voices">正在加载音色…</string>
     <string name="tts_refresh_voices">刷新音色列表</string>
     <string name="tts_source">来源</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>
-    <string name="tts_network">需要联网</string>
     <string name="tts_offline">离线</string>
-    <string name="tts_rate">朗读速度：%1$.2f×</string>
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
@@ -980,7 +973,6 @@
     <string name="tts_response_error" comment="TTS online source configuration">服务未返回可用音频或音色，请检查配置或稍后重试。</string>
     <string name="tts_pitch" comment="TTS synthesis pitch">音高</string>
     <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
-    <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d 半音</string>
     <string name="tts_prefetch_sentences" comment="TTS playback buffering">预加载句数</string>
     <plurals name="tts_sentence_count">
         <item quantity="one">%1$d 句</item>

@@ -26,7 +26,7 @@ class TtsDialogueUiTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = eink, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), settings.value.engine, voices), emptyList(), false,
-                    TtsPreviewState.Idle, null, { settings.value = it }, {}, {}, { refreshes++ }, {}, {}, Modifier)
+                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, { refreshes++ }, {}, {}, Modifier)
             }
         }
         compose.onNodeWithText(context.getString(R.string.tts_dialogue_voice)).assertDoesNotExist()

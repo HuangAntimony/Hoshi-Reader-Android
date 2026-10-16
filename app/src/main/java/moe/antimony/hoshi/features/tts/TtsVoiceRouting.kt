@@ -5,18 +5,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TtsVoiceRouting(val enabled: Boolean = false, val narration: String = "", val dialogue: String = "", val initialized: Boolean = enabled)
 
-internal fun TtsSettings.routing() = routingBySource[engine] ?: TtsVoiceRouting(narration = voice, dialogue = voice)
+internal fun TtsSettings.routing() = routingBySource[engine] ?: TtsVoiceRouting()
 internal fun TtsSettings.withRouting(value: TtsVoiceRouting): TtsSettings {
     val routing = if (value.enabled && !value.initialized) value.copy(dialogue = value.narration, initialized = true) else value
-    return copy(voice = routing.narration, routingBySource = routingBySource + (engine to routing),
-        customSources = customSources.map { if (it.id == engine) it.copy(voice = routing.narration) else it })
+    return copy(routingBySource = routingBySource + (engine to routing))
 }
 
 internal data class TtsSynthesisPart(val text: String, val settings: TtsSettings)
 
-/** Effective voice overrides are request-local, including profiles read directly by custom engines. */
-internal fun TtsSettings.forVoice(id: String): TtsSettings = copy(voice = id,
-    customSources = customSources.map { if (it.id == engine) it.copy(voice = id) else it }, routingBySource = emptyMap())
+/** Effective voice overrides are request-local and leave persisted source selections untouched. */
+internal fun TtsSettings.forVoice(id: String): TtsSettings = copy(routingBySource = mapOf(engine to TtsVoiceRouting(narration = id)))
 
 internal fun TtsSettings.sharedVoice(voices: List<TtsVoiceInfo>): TtsVoiceInfo? {
     fun find(id: String) = if (id.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == id }
@@ -39,7 +37,7 @@ internal fun TtsSettings.sharedPitchRange(voices: List<TtsVoiceInfo>): ClosedFlo
 
 internal fun TtsSettings.supportsSharedRate(voices: List<TtsVoiceInfo>): Boolean {
     val source = customSource() ?: return true
-    fun supported(id: String) = source.copy(voice = id.ifBlank { voices.firstOrNull()?.id.orEmpty() }).supportsRate
+    fun supported(id: String) = source.supportsRate(id.ifBlank { voices.firstOrNull()?.id.orEmpty() })
     return supported(voice) && (!routing().enabled || supported(routing().dialogue))
 }
 

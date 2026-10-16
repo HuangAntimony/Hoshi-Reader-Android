@@ -25,7 +25,7 @@ class TtsCustomDialogueTest {
     @Test fun openAiUsesRequestLocalVoicesWithoutCatalogOrChangingTheSavedProfile() = runBlocking {
         MockWebServer().use { server ->
             repeat(3) { server.enqueue(MockResponse().setBody(Buffer().write(wav))) }
-            val profile = TtsCustomSource("custom:dialogue", "Local", baseUrl = server.url("/v1/").toString(), model = "tts", voice = "n", format = TtsAudioFormat.Wav)
+            val profile = TtsCustomSource("custom:dialogue", "Local", baseUrl = server.url("/v1/").toString(), model = "tts", format = TtsAudioFormat.Wav)
             val preferences = TtsPreferences(TtsSettings(engine = profile.id, customSources = listOf(profile)).withRouting(TtsVoiceRouting(true, "n", "d")))
             val client = OkHttpClient()
             val transport = OnlineTtsTransport(client, client)
@@ -41,7 +41,7 @@ class TtsCustomDialogueTest {
                     assertEquals("/v1/audio/speech", request.path)
                     Json.parseToJsonElement(request.body.readUtf8()).jsonObject.getValue("voice").jsonPrimitive.content
                 })
-                assertEquals("n", preferences.settings.customSource()?.voice)
+                assertEquals("n", preferences.settings.voice)
                 assertEquals(files, audio.audio(sentence, "book", preferences))
                 assertEquals(3, server.requestCount)
             } finally { audio.clearPlaybackCache(); client.connectionPool.evictAll(); client.dispatcher.executorService.shutdown() }

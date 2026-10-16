@@ -1,7 +1,6 @@
 package moe.antimony.hoshi.features.tts
 
 import java.io.File
-import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,50 +19,33 @@ class CustomTtsEngine internal constructor(
     private val transport: OnlineTtsTransport,
     private val decryptKey: suspend (String, String) -> String,
     private val io: CoroutineDispatcher,
-    private val store: TtsVoiceCatalogStore? = null,
+    private val catalogs: TtsVoiceCatalogCache = TtsVoiceCatalogCache(),
 ) {
     @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher,
-        store: TtsVoiceCatalogStore) : this(transport, cipher::decrypt, io, store)
+        catalogs: TtsVoiceCatalogCache) : this(transport, cipher::decrypt, io, catalogs)
     private val synthesis = Mutex()
-    private val catalogs = Mutex()
-    private val voiceCache = linkedMapOf<String, List<TtsVoiceInfo>>()
     private fun source(settings: TtsSettings) = settings.customSource()?.validate() ?: throw TtsException(TtsFailure.Configuration)
-    private fun fingerprint(source: TtsCustomSource): String = MessageDigest.getInstance("SHA-256")
-        .digest("${source.id}\u0000${source.protocol}\u0000${source.baseUrl}\u0000${source.encryptedKey}".toByteArray())
-        .joinToString("") { "%02x".format(it) }
-    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>) = TtsCatalog(emptyList(), source.id, source.voiceChoices(voices))
+    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>, voice: String) = TtsCatalog(emptyList(), source.id, source.voiceChoices(voices, voice))
 
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
-        catalogs.withLock {
-            val key = fingerprint(source)
-            (voiceCache[key] ?: store?.readCustom(source.id, key)?.also { remember(key, it) })?.let { catalog(source, it) }
-        }
+        catalogs.cached(TtsVoiceCatalogKey.custom(source))?.let { catalog(source, it, settings.voice) }
     }
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
         val source = source(settings)
-        catalogs.withLock {
-            val key = fingerprint(source)
-            if (!force) (voiceCache[key] ?: store?.readCustom(source.id, key))?.let {
-                remember(key, it); return@withLock catalog(source, it)
-            }
-            val voices = when (source.protocol) {
+        val voices = catalogs.load(TtsVoiceCatalogKey.custom(source), force) {
+            when (source.protocol) {
                 TtsCustomProtocol.OpenAi -> try {
                     openAiVoices(request(source, "audio/voices"))
                 } catch (error: TtsException) {
-                    // Voice discovery is a non-standard extension; manually configured IDs remain usable.
+                    // Voice discovery is optional; manually configured IDs remain usable.
                     if (error.statusCode != 404 && error.statusCode != 405) throw error
                     emptyList()
                 }
                 TtsCustomProtocol.Vits -> vitsVoices(request(source, "voice/speakers"))
             }
-            remember(key, voices); store?.writeCustom(source.id, key, voices)
-            catalog(source, voices)
         }
-    }
-    private fun remember(key: String, voices: List<TtsVoiceInfo>) {
-        voiceCache[key] = voices
-        if (voiceCache.size > 32) voiceCache.remove(voiceCache.keys.first())
+        catalog(source, voices, settings.voice)
     }
     suspend fun models(source: TtsCustomSource): List<String> = withContext(io) {
         try {
@@ -80,7 +62,7 @@ class CustomTtsEngine internal constructor(
                 val source = source(settings)
                 if (text.isBlank()) throw TtsException(TtsFailure.EmptyText)
                 val speaker = if (source.protocol == TtsCustomProtocol.Vits) {
-                    vitsSpeaker(source.voice.ifBlank { catalog(settings).voices.firstOrNull()?.id.orEmpty() })
+                    vitsSpeaker(settings.voice.ifBlank { catalog(settings).voices.firstOrNull()?.id.orEmpty() })
                         ?: throw TtsException(TtsFailure.MissingJapanese)
                 } else null
                 directory.mkdirs()
@@ -89,12 +71,12 @@ class CustomTtsEngine internal constructor(
                     val body = buildJsonObject {
                         if (source.protocol == TtsCustomProtocol.OpenAi) {
                             put("model", source.model); put("input", part)
-                            if (source.voice.isNotBlank()) put("voice", source.voice)
-                            put("speed", source.normalizeRate(source.rate)); put("response_format", source.format.name.lowercase())
+                            if (settings.voice.isNotBlank()) put("voice", settings.voice)
+                            put("speed", source.normalizeRate(settings.rate, settings.voice)); put("response_format", source.format.name.lowercase())
                         } else {
                             put("text", part); put("id", speaker!!.second); put("lang", "ja")
                             put("format", source.format.name.lowercase()); put("streaming", false)
-                            if (speaker.first != "GPT-SOVITS") put("length", 1f / source.normalizeRate(source.rate))
+                            if (speaker.first != "GPT-SOVITS") put("length", 1f / source.normalizeRate(settings.rate, settings.voice))
                             else if (source.preset.isNotBlank()) put("preset", source.preset)
                         }
                     }

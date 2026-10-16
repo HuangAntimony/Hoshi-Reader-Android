@@ -1052,6 +1052,16 @@ Validate relevant sync/update/Sasayaki changes with:
 
 ## Japanese TTS
 
+- `TtsRepositoryTest` restores legacy active/inactive voices, source rates, dialogue
+  choices, credentials and WAV/MP3 defaults through edit/reload. Deferred independent
+  setting edits must preserve newer credentials and behavior settings. Switching sources
+  retains the existing shared rate behavior for installed/built-in engines and independent
+  rates for custom servers.
+- Change extra sentence pause while narration is playing: keep the current sentence and
+  cached audio, and apply the new delay at the next sentence boundary. It must not pause,
+  restart synthesis or resume previously paused playback. Controller/audio repository
+  tests cover this separately from provider-side synthesis silence parameters.
+
 - Narration/dialogue routing: run `TtsDialogueTest`, `TtsCustomDialogueTest`,
   `TtsRepositoryTest`, `TtsAudioRepositoryTest`, `TtsPlaybackControllerTest` and
   `TtsExportTest` in the JVM suite. Cover paired/nested/unmatched Japanese quotes,
@@ -1145,7 +1155,12 @@ Validate relevant sync/update/Sasayaki changes with:
   Region/key changes must use the new configuration, failed/corrupt loads must be retryable,
   and explicit error retry must fetch again. Catalog files must contain no API key or bearer
   token. `OnlineTtsEngineTest` covers every source, concurrent requests, engine recreation,
-  config changes and force retry with fixture responses; `TtsPanelStateTest` checks warm
+  config changes and force retry with fixture responses. `TtsVoiceCatalogCacheTest`
+  covers same-configuration request coalescing, independent source requests, cancelled/
+  failed refresh, memory eviction, optional empty lists and reading legacy disk catalogs.
+  During a slow self-hosted refresh, cached catalog reads must return immediately rather
+  than wait for the network; `CustomTtsEngineTest` checks this against a local test server.
+  `TtsPanelStateTest` checks warm
   panel lifecycle/state without network. Keep installed-engine resume refresh so new
   Japanese data remains discoverable. In e-ink, check the Voice tab and voice picker show
   Loading voices text while loading; other themes retain the animated progress bar.

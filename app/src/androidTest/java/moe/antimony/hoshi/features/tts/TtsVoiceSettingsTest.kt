@@ -38,13 +38,13 @@ class TtsVoiceSettingsTest {
     }
 
     @Test fun customFormatSelectionPreservesOtherServersAndVoice() {
-        val first = TtsCustomSource("custom:first", "Local", TtsCustomProtocol.Vits, "http://127.0.0.1:8080", voice = "VITS:3", format = TtsAudioFormat.Wav)
+        val first = TtsCustomSource("custom:first", "Local", TtsCustomProtocol.Vits, "http://127.0.0.1:8080", format = TtsAudioFormat.Wav)
         val other = first.copy(id = "custom:other", name = "Other")
-        val settings = mutableStateOf(TtsSettings(engine = first.id, voice = first.voice, customSources = listOf(first, other)))
+        val settings = mutableStateOf(TtsSettings(engine = first.id, customSources = listOf(first, other)).withVoice("VITS:3"))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
-                    { settings.value = it }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText("Audio format").performScrollTo().performClick()
@@ -73,11 +73,11 @@ class TtsVoiceSettingsTest {
     }
 
     @Test fun playbackSpeedRemainsIndependentOfTwoStateEngineRate() {
-        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.GoogleTranslate.id, rate = .5f))
+        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.GoogleTranslate.id).withRate(.5f))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
-                    { settings.value = it }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText("Engine speech rate").assertExists()
@@ -92,12 +92,12 @@ class TtsVoiceSettingsTest {
     }
 
     @Test fun providerPickerGroupsInstalledThirdPartyAndOnlineSourcesAndPreservesSelectionIds() {
-        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Edge.id, voice = "ja-JP-NanamiNeural"))
+        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Edge.id).withVoice("ja-JP-NanamiNeural"))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), settings.value.engine, listOf(TtsVoiceInfo("ja-JP-NanamiNeural", true))),
                     listOf(TtsEngineInfo("third.party", "Third party engine")), false, TtsPreviewState.Idle, null,
-                    { settings.value = it }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText("Source").assertExists()
@@ -129,13 +129,13 @@ class TtsVoiceSettingsTest {
     }
 
     @Test fun installedVoiceSelectionUpdatesItsNetworkRequirement() {
-        val settings = mutableStateOf(TtsSettings(engine = "fixture.engine", voice = "offline-voice"))
+        val settings = mutableStateOf(TtsSettings(engine = "fixture.engine").withVoice("offline-voice"))
         val voices = listOf(TtsVoiceInfo("offline-voice", false), TtsVoiceInfo("online-voice", true))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(emptyList(), "fixture.engine", voices),
                     listOf(TtsEngineInfo("fixture.engine", "Fixture engine")), false, TtsPreviewState.Idle, null,
-                    { settings.value = it }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText("Source").assertExists()
@@ -147,7 +147,7 @@ class TtsVoiceSettingsTest {
         compose.onNodeWithText("online-voice").performClick()
         compose.onNodeWithText("Automatic").performClick()
         compose.onNodeWithText("Voice · Offline").assertExists()
-        compose.runOnIdle { settings.value = settings.value.copy(voice = "unknown-saved-voice") }
+        compose.runOnIdle { settings.value = settings.value.withVoice("unknown-saved-voice") }
         compose.onNodeWithText("Voice").assertExists()
         compose.onNodeWithText("unknown-saved-voice").assertExists()
     }

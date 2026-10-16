@@ -22,26 +22,24 @@ data class TtsCustomSource(
     val baseUrl: String = "",
     val encryptedKey: String = "",
     val model: String = "",
-    val voice: String = "",
     val rate: Float = 1f,
     @EncodeDefault val format: TtsAudioFormat = TtsAudioFormat.Mp3,
     val preset: String = "",
     val voiceIds: List<String> = emptyList(),
 ) {
     fun normalized(): TtsCustomSource = copy(name = name.trim(), baseUrl = customTtsBaseUrl(baseUrl).toString(),
-        model = model.trim(), voice = voice.trim(), preset = preset.trim(), rate = normalizeRate(rate),
+        model = model.trim(), preset = preset.trim(), rate = normalizeRate(rate),
         voiceIds = voiceIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct())
     fun validate(): TtsCustomSource {
         val value = normalized()
         if (!id.startsWith("custom:") || id.length <= 7 || value.name.isBlank() ||
-            protocol == TtsCustomProtocol.OpenAi && value.model.isBlank() ||
-            protocol == TtsCustomProtocol.Vits && value.voice.isNotBlank() && vitsSpeaker(value.voice) == null)
+            protocol == TtsCustomProtocol.OpenAi && value.model.isBlank())
             throw TtsException(TtsFailure.Configuration)
         return value
     }
-    fun normalizeRate(value: Float): Float = if (!value.isFinite() || !supportsRate) 1f else value.coerceIn(rateRange)
+    fun normalizeRate(value: Float, voice: String = ""): Float = if (!value.isFinite() || !supportsRate(voice)) 1f else value.coerceIn(rateRange)
     val rateRange: ClosedFloatingPointRange<Float> get() = if (protocol == TtsCustomProtocol.OpenAi) .25f..4f else .5f..3f
-    val supportsRate: Boolean get() = protocol != TtsCustomProtocol.Vits || !voice.startsWith("GPT-SOVITS:")
+    fun supportsRate(voice: String): Boolean = protocol != TtsCustomProtocol.Vits || !voice.startsWith("GPT-SOVITS:")
 }
 
 internal val vitsModels = linkedMapOf("VITS" to "vits", "W2V2-VITS" to "w2v2-vits", "BERT-VITS2" to "bert-vits2", "GPT-SOVITS" to "gpt-sovits")
@@ -62,25 +60,21 @@ internal fun customTtsBaseUrl(value: String): HttpUrl {
 internal fun TtsSettings.customSource(): TtsCustomSource? = customSources.firstOrNull { it.id == engine }
 internal fun TtsSettings.isCustomSource(): Boolean = engine.startsWith("custom:")
 
-internal fun TtsCustomSource.voiceChoices(discovered: List<TtsVoiceInfo>): List<TtsVoiceInfo> {
+internal fun TtsCustomSource.voiceChoices(discovered: List<TtsVoiceInfo>, voice: String): List<TtsVoiceInfo> {
     val configured = if (protocol == TtsCustomProtocol.OpenAi) voiceIds.map { TtsVoiceInfo(it, true) } else emptyList()
     val choices = (discovered + configured).distinctBy { it.id }
     return if (voice.isNotBlank() && choices.none { it.id == voice }) choices + TtsVoiceInfo(voice, true) else choices
-}
-
-/** Only the selected source influences synthesis; display names and unrelated profiles do not. */
-internal fun TtsSettings.synthesisSettings(): TtsSettings {
-    val custom = customSource()
-    return copy(voice = custom?.voice ?: voice, rate = custom?.rate ?: rate, pitch = if (isCustomSource()) 0f else pitch,
-        online = online.filterKeys { it == engine }, parameters = parameters.filterKeys { it == engine },
-        customSources = listOfNotNull(custom?.copy(name = "", voiceIds = emptyList())), prefetchSentences = 0, playbackRate = 1f,
-        routingBySource = if (routing().enabled) mapOf(engine to routing()) else emptyMap())
 }
 
 internal fun TtsSettings.selectSource(id: String): TtsSettings {
     val custom = customSources.firstOrNull { it.id == id }
     val selectedRate = custom?.rate ?: TtsOnlineSource.from(id)?.normalizeRate(rate)
         ?: rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
-    return copy(engine = id, voice = routingBySource[id]?.narration ?: custom?.voice ?: "", rate = selectedRate, pitch = 0f,
-        routingBySource = routingBySource + (engine to routing().copy(narration = voice)))
+    return copy(engine = id, pitch = 0f).withRate(selectedRate)
 }
+
+internal fun TtsSettings.withRate(value: Float): TtsSettings = if (customSource() != null)
+    copy(customSources = customSources.map { if (it.id == engine) it.copy(rate = value) else it })
+else copy(sharedRate = value)
+
+internal fun TtsSettings.withVoice(value: String): TtsSettings = withRouting(routing().copy(narration = value))

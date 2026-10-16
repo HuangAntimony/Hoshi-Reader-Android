@@ -42,7 +42,7 @@ class CustomTtsDeviceTest {
         val directory = File(context.cacheDir, "custom-tts-device-fixture-${initial.protocol}")
         val cipher = TtsCredentialCipher(Dispatchers.IO)
         val transport = OnlineTtsTransport()
-        val custom = CustomTtsEngine(transport, cipher, Dispatchers.IO, TtsVoiceCatalogStore(File(directory, "voices")))
+        val custom = CustomTtsEngine(transport, cipher, Dispatchers.IO, TtsVoiceCatalogCache(TtsVoiceCatalogStore(File(directory, "voices"))))
         val router = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), custom)
         val audio = TtsAudioRepository(router, directory, Dispatchers.IO, AndroidTtsExportFallback(context))
         val settings = TtsSettings(engine = initial.id, customSources = listOf(initial))
@@ -53,7 +53,7 @@ class CustomTtsDeviceTest {
             assertTrue(catalog.voices.isNotEmpty())
             assertEquals(catalog, router.cachedCatalog(settings))
             for (format in listOf(TtsAudioFormat.Wav, TtsAudioFormat.Mp3)) {
-                val source = initial.copy(voice = catalog.voices.first().id, rate = 1.5f, format = format)
+                val source = initial.copy(rate = 1.5f, format = format)
                 val preferences = TtsPreferences(TtsSettings(engine = source.id, customSources = listOf(source), playbackRate = 2f))
                 val parts = audio.audio(sentence, "fixture", preferences)
                 assertEquals(parts, audio.audio(sentence, "fixture", preferences))

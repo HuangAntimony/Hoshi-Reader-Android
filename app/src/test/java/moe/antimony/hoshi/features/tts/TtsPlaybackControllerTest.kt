@@ -18,7 +18,7 @@ import org.junit.Test
 class TtsPlaybackControllerTest {
     @Test fun silentSentencesAdvanceWithoutPlayingEmptyAudioOrAddingPauses() = runTest {
         fixture { controller, output, audio, repository ->
-            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            repository.settings { TtsSettings(sentencePauseMs = 1000) }; runCurrent()
             val sentences = controller.state.value.sentences
             audio.silent = { it != sentences.last() }
             val presented = mutableListOf<Pair<TtsSentence, Boolean>>()
@@ -68,7 +68,7 @@ class TtsPlaybackControllerTest {
 
     @Test fun lookupDuringSentenceDelayResumesNextSentence() = runTest {
         fixture { controller, output, _, repository ->
-            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            repository.settings { TtsSettings(sentencePauseMs = 1000) }; runCurrent()
             controller.play(); runCurrent()
             output.onEnded(); runCurrent()
             advanceTimeBy(100); runCurrent()
@@ -150,7 +150,7 @@ class TtsPlaybackControllerTest {
         fixture { controller, output, audio, repository ->
             controller.play(); runCurrent()
             val original = repository.preferences.first().settings
-            repository.settings(original.copy(routingBySource = mapOf("unselected" to TtsVoiceRouting(true, "a", "b")))); runCurrent()
+            repository.settings { original.copy(routingBySource = mapOf("unselected" to TtsVoiceRouting(true, "a", "b"))) }; runCurrent()
             assertTrue(controller.state.value.playing)
             controller.pause()
             val release = CompletableDeferred<Unit>()
@@ -159,7 +159,7 @@ class TtsPlaybackControllerTest {
             controller.play(); runCurrent()
             val count = output.playCount
             val current = repository.preferences.first().settings
-            repository.settings(current.withRouting(TtsVoiceRouting(true, current.voice, "different"))); runCurrent()
+            repository.settings { current.withRouting(TtsVoiceRouting(true, current.voice, "different")) }; runCurrent()
             release.complete(Unit); runCurrent()
             assertFalse(controller.state.value.playing)
             assertEquals(count, output.playCount)
@@ -230,10 +230,10 @@ class TtsPlaybackControllerTest {
 
     @Test fun editingOrDeletingUnusedCustomServerPreservesCurrentPlaybackAndDeletingActiveStopsIt() = runTest {
         fixture { controller, output, _, repository ->
-            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts", voice = "alice")
+            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts")
             val second = first.copy(id = "custom:two", name = "Two")
             repository.saveSource(first); repository.saveSource(second)
-            repository.settings(repository.preferences.first().settings.selectSource(first.id)); runCurrent()
+            repository.settings { it.selectSource(first.id) }; runCurrent()
             controller.play(); runCurrent()
             val prepared = output.prepared
             repository.saveSource(second.copy(baseUrl = "http://192.168.1.2/v1")); runCurrent()
@@ -248,8 +248,8 @@ class TtsPlaybackControllerTest {
 
     @Test fun customServerChangeCancelsPendingSynthesisAndLateAudioCannotResumePlayback() = runTest {
         fixture { controller, output, audio, repository ->
-            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts", voice = "alice")
-            repository.saveSource(first); repository.settings(repository.preferences.first().settings.selectSource(first.id)); runCurrent()
+            val first = TtsCustomSource("custom:one", "One", baseUrl = "http://192.168.1.1:8088/v1", model = "irodori-tts")
+            repository.saveSource(first); repository.settings { it.selectSource(first.id) }; runCurrent()
             val release = CompletableDeferred<Unit>()
             audio.synthesize = { if (it.text == "東京です。") withContext(NonCancellable) { release.await() } }
             controller.play(); runCurrent()
@@ -267,7 +267,7 @@ class TtsPlaybackControllerTest {
             audio.synthesize = { if (audio.requests.size == 1) release.await() }
             controller.play(); runCurrent()
             assertEquals(listOf("キヨウです。"), audio.requests)
-            repository.settings(repository.preferences.first().settings.copy(useRubyReadings = false)); runCurrent()
+            repository.settings { it.copy(useRubyReadings = false) }; runCurrent()
             assertFalse(controller.state.value.playing)
             assertFalse(controller.state.value.preparing)
             release.complete(Unit); runCurrent()
@@ -289,7 +289,7 @@ class TtsPlaybackControllerTest {
             }
             controller.play(); runCurrent()
             val prepared = output.prepared
-            repository.settings(repository.preferences.first().settings.copy(playbackRate = 3f)); runCurrent()
+            repository.settings { it.copy(playbackRate = 3f) }; runCurrent()
             assertEquals(3f, output.appliedRate)
             assertTrue(controller.state.value.playing)
             assertFalse(controller.state.value.preparing)
@@ -299,7 +299,7 @@ class TtsPlaybackControllerTest {
             release.complete(Unit); runCurrent()
             assertEquals(listOf("東京です。", "次です。", "三つです。", "四つです。"), audio.requests)
             controller.pause()
-            repository.settings(repository.preferences.first().settings.copy(playbackRate = .5f)); runCurrent()
+            repository.settings { it.copy(playbackRate = .5f) }; runCurrent()
             assertEquals(.5f, output.appliedRate)
             assertFalse(controller.state.value.playing)
             assertEquals(prepared, output.prepared)
@@ -314,7 +314,7 @@ class TtsPlaybackControllerTest {
             val release = CompletableDeferred<Unit>()
             audio.synthesize = { if (it.text == "東京です。") release.await() }
             controller.play(); runCurrent()
-            repository.settings(repository.preferences.first().settings.copy(playbackRate = 2f)); runCurrent()
+            repository.settings { it.copy(playbackRate = 2f) }; runCurrent()
             assertTrue(controller.state.value.playing)
             assertTrue(controller.state.value.preparing)
             assertEquals(0, output.playCount)
@@ -338,6 +338,21 @@ class TtsPlaybackControllerTest {
             controller.play(); runCurrent()
             assertEquals(1, output.playCount)
             assertEquals(listOf("一。", "二。", "三。", "四。", "五。", "六。", "七。"), audio.requests)
+        }
+    }
+
+    @Test fun changingSentencePauseKeepsPlaybackAndAppliesAtNextBoundary() = runTest {
+        fixture { controller, output, _, repository ->
+            controller.play(); runCurrent()
+            repository.settings { it.copy(sentencePauseMs = 700) }; runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals(1, output.playCount)
+            output.onEnded(); runCurrent()
+            advanceTimeBy(699); runCurrent()
+            assertEquals(0, controller.state.value.index)
+            advanceTimeBy(1); runCurrent()
+            assertEquals(1, controller.state.value.index)
+            assertEquals(2, output.playCount)
         }
     }
 
@@ -515,7 +530,7 @@ class TtsPlaybackControllerTest {
     }
     @Test fun sentencePauseWaitsBetweenAutomaticSentencesAndStopCancelsIt() = runTest {
         fixture { controller, output, _, repository ->
-            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            repository.settings { TtsSettings(sentencePauseMs = 1000) }; runCurrent()
             controller.play(); runCurrent()
             output.onEnded(); runCurrent()
             assertEquals(1, output.playCount)
@@ -532,7 +547,7 @@ class TtsPlaybackControllerTest {
     }
     @Test fun resumingDuringSentencePauseStartsNextSentenceAndManualNavigationDoesNotWait() = runTest {
         fixture { controller, output, _, repository ->
-            repository.settings(TtsSettings(sentencePauseMs = 1000)); runCurrent()
+            repository.settings { TtsSettings(sentencePauseMs = 1000) }; runCurrent()
             controller.play(); runCurrent()
             output.onEnded(); runCurrent()
             controller.pause(); controller.play(); runCurrent()
@@ -574,7 +589,7 @@ class TtsPlaybackControllerTest {
     @Test fun changingVoicePausesAndNextPlayUsesNewSettings() = runTest {
         fixture { controller, output, _, repository ->
             controller.play(); runCurrent()
-            repository.settings(TtsSettings(voice = "new")); runCurrent()
+            repository.settings { TtsSettings().withVoice("new") }; runCurrent()
             assertFalse(controller.state.value.playing)
             assertTrue(output.prepared.isEmpty())
             controller.play(); runCurrent()
@@ -584,7 +599,7 @@ class TtsPlaybackControllerTest {
     @Test fun synthesisOptionsPauseAndInvalidatePreparedAudio() = runTest {
         fixture { controller, output, _, repository ->
             controller.play(); runCurrent()
-            repository.settings(TtsSettings(pitch = 3f, parameters = mapOf("" to TtsSynthesisOptions(volume = -10f)))); runCurrent()
+            repository.settings { TtsSettings(pitch = 3f, parameters = mapOf("" to TtsSynthesisOptions(volume = -10f))) }; runCurrent()
             assertFalse(controller.state.value.playing)
             assertTrue(output.prepared.isEmpty())
             controller.play(); runCurrent()

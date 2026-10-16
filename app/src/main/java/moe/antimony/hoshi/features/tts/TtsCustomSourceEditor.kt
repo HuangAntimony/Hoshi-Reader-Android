@@ -34,6 +34,7 @@ internal fun TtsCustomSourceEditor(
     onDelete: suspend () -> TtsFailure?,
     onModels: suspend (TtsCustomSource, String, Boolean) -> List<String>,
     onDismiss: () -> Unit,
+    selectedVoice: String = "",
 ) {
     var source by remember(initial.id) { mutableStateOf(initial) }
     var voiceIds by remember(initial.id) { mutableStateOf(initial.voiceIds.joinToString("\n")) }
@@ -59,7 +60,7 @@ internal fun TtsCustomSourceEditor(
                 if (!busy) {
                     val protocol = TtsCustomProtocol.valueOf(it)
                     if (protocol != source.protocol) {
-                        update(source.copy(protocol = protocol, model = "", voice = "", rate = 1f, preset = "", encryptedKey = "", voiceIds = emptyList()))
+                        update(source.copy(protocol = protocol, model = "", rate = 1f, preset = "", encryptedKey = "", voiceIds = emptyList()))
                         key = ""; removeKey = false; models = emptyList(); modelsLoaded = false; voiceIds = ""
                     }
                 }
@@ -112,7 +113,7 @@ internal fun TtsCustomSourceEditor(
                 }, enabled = !busy, modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6,
                     label = { Text(stringResource(R.string.tts_service_voice_ids)) }, colors = hoshiOutlinedTextFieldColors())
                 Text(stringResource(R.string.tts_service_voice_ids_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
-            } else if (vitsSpeaker(source.voice)?.first == "GPT-SOVITS") {
+            } else if (vitsSpeaker(selectedVoice.takeIf { source.protocol == initial.protocol }.orEmpty())?.first == "GPT-SOVITS") {
                 TtsServiceField(R.string.tts_service_preset, source.preset, !busy) { update(source.copy(preset = it)) }
                 Text(stringResource(R.string.tts_service_preset_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
             }

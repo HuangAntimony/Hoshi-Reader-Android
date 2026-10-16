@@ -22,7 +22,7 @@ private fun TtsVoiceEInkPreview() = TtsVoicePreview(eInk = true)
 
 @Composable
 private fun TtsVoicePreview(dark: Boolean = false, eInk: Boolean = false) {
-    val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, voice = "ja-JP-NanamiNeural", rate = 1.5f)
+    val settings = TtsSettings(engine = TtsOnlineSource.Azure.id).withVoice("ja-JP-NanamiNeural").withRate(1.5f)
     HoshiReaderTheme(darkTheme = dark, eInkMode = eInk, dynamicColor = false) {
         Surface(Modifier.fillMaxSize(), color = hoshiSurfaces.overlay) {
             TtsVoiceSettings(settings, TtsCatalog(emptyList(), settings.engine, listOf(TtsVoiceInfo(settings.voice, true))), emptyList(),

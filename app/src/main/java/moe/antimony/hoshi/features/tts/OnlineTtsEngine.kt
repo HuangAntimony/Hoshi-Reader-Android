@@ -20,42 +20,23 @@ class OnlineTtsEngine internal constructor(
     private val decryptKey: suspend (String, String) -> String,
     private val io: CoroutineDispatcher,
     private val translator: MicrosoftTranslatorSession = MicrosoftTranslatorSession(transport),
-    private val voiceStore: TtsVoiceCatalogStore? = null,
+    private val catalogs: TtsVoiceCatalogCache = TtsVoiceCatalogCache(),
 ) {
     @Inject constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, @IoDispatcher io: CoroutineDispatcher,
-        translator: MicrosoftTranslatorSession, voiceStore: TtsVoiceCatalogStore) : this(transport, cipher::decrypt, io, translator, voiceStore)
+        translator: MicrosoftTranslatorSession, catalogs: TtsVoiceCatalogCache) : this(transport, cipher::decrypt, io, translator, catalogs)
     internal constructor(transport: OnlineTtsTransport, cipher: TtsCredentialCipher, io: CoroutineDispatcher) : this(transport, cipher::decrypt, io)
     private val synthesis = Mutex()
-    private val catalogs = Mutex()
-    private val catalogRequests = Mutex()
-    private val voiceCache = linkedMapOf<Pair<String, TtsOnlineConfig>, List<TtsVoiceInfo>>()
-
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
-        val voices = catalogs.withLock {
-            voiceCache[source.id to config] ?: voiceStore?.read(source, config)?.also { rememberVoices(source, config, it) }
-        }
-        voices?.let { TtsCatalog(emptyList(), source.id, it) }
+        catalogs.cached(TtsVoiceCatalogKey.online(source, config))?.let { TtsCatalog(emptyList(), source.id, it) }
     }
 
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
-        if (!force) cachedCatalog(settings)?.let { return@withContext it }
-        catalogRequests.withLock {
-            // Recheck after waiting: concurrent panels/synthesis share the same successful load.
-            if (!force) cachedCatalog(settings)?.let { return@withLock it }
-            val source = source(settings)
-            val config = settings.online[source.id] ?: TtsOnlineConfig()
-            val voices = fetchVoices(source, config)
-            catalogs.withLock { rememberVoices(source, config, voices) }
-            voiceStore?.write(source, config, voices)
-            TtsCatalog(emptyList(), source.id, voices)
-        }
-    }
-
-    private fun rememberVoices(source: TtsOnlineSource, config: TtsOnlineConfig, voices: List<TtsVoiceInfo>) {
-        voiceCache[source.id to config] = voices
-        if (voiceCache.size > 8) voiceCache.remove(voiceCache.keys.first())
+        val source = source(settings)
+        val config = settings.online[source.id] ?: TtsOnlineConfig()
+        val voices = catalogs.load(TtsVoiceCatalogKey.online(source, config), force) { fetchVoices(source, config) }
+        TtsCatalog(emptyList(), source.id, voices)
     }
 
     private suspend fun fetchVoices(source: TtsOnlineSource, config: TtsOnlineConfig): List<TtsVoiceInfo> {
@@ -68,7 +49,6 @@ class OnlineTtsEngine internal constructor(
                 .url("https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP")
                 .header("X-Goog-Api-Key", key(source, config)).build()).toString(Charsets.UTF_8))
         }
-        if (voices.isEmpty()) throw TtsException(TtsFailure.MissingJapanese)
         return voices
     }
 
@@ -79,8 +59,7 @@ class OnlineTtsEngine internal constructor(
                 if (text.isBlank()) throw TtsException(TtsFailure.EmptyText)
                 val source = source(settings)
                 val config = settings.online[source.id] ?: TtsOnlineConfig()
-                val voices = catalogs.withLock { voiceCache[source.id to config] }
-                    ?: catalog(settings).voices
+                val voices = catalog(settings).voices
                 val voice = if (settings.voice.isBlank()) voices.first().id else settings.voice
                 if (voices.none { it.id == voice }) throw TtsException(TtsFailure.MissingJapanese)
                 val options = settings.options()

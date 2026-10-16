@@ -907,20 +907,13 @@
     <string name="tts_global">All books</string>
     <string name="tts_book">This book</string>
     <string name="tts_dictionary_empty">No text replacements yet.</string>
-    <string name="tts_previous">Previous</string>
-    <string name="tts_next">Next</string>
-    <string name="tts_pause" comment="Pause synthesized book narration.">Pause</string>
-    <string name="tts_play">Play</string>
-    <string name="tts_repeat">Repeat sentence</string>
     <string name="tts_use_ruby">Use Ruby readings</string>
     <string name="tts_loading_voices">Loading voices…</string>
     <string name="tts_refresh_voices">Refresh voices</string>
     <string name="tts_source">Source</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">Voice</string>
     <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">Automatic</string>
-    <string name="tts_network">Network required</string>
     <string name="tts_offline">Offline</string>
-    <string name="tts_rate">Speech rate: %1$.2f×</string>
     <string name="tts_preview">Preview</string>
     <string name="tts_preview_voice">Preview voice</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
@@ -982,7 +975,6 @@
     <string name="tts_response_error" comment="TTS online source configuration">The service did not return usable audio or voices. Check the configuration or retry later.</string>
     <string name="tts_pitch" comment="TTS synthesis pitch">Pitch</string>
     <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
-    <string name="tts_pitch_semitones" comment="TTS synthesis pitch">%1$+d semitones</string>
     <string name="tts_prefetch_sentences" comment="TTS playback buffering">Preload sentences</string>
     <plurals name="tts_sentence_count">
         <item quantity="one">%1$d sentence</item>

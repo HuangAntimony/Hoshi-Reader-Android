@@ -104,7 +104,7 @@ class TtsCustomSourceUiTest {
     @Test fun savedCredentialsStayBlankAndTestingDraftDoesNotSave() {
         var tested: TtsCustomSource? = null
         var saved: TtsCustomSource? = null
-        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://192.168.1.10:8088/v1", model = "irodori-tts", voice = "sample", encryptedKey = "fixture-ciphertext")
+        val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://192.168.1.10:8088/v1", model = "irodori-tts", encryptedKey = "fixture-ciphertext")
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsCustomSourceEditor(source, true, { draft, key, _ -> tested = draft; assertEquals("draft-key", key); null },
@@ -156,10 +156,10 @@ class TtsCustomSourceUiTest {
         compose.runOnIdle { assertTrue(cancelled); assertFalse(saved) }
     }
 
-    @Test fun editingAvailableVoiceIdsKeepsTheSelectedVoice() {
+    @Test fun editingAvailableVoiceIdsSavesTheList() {
         var saved: TtsCustomSource? = null
         val source = TtsCustomSource("custom:fixture", "Local", baseUrl = "http://127.0.0.1:8088/v1",
-            model = "irodori-tts", voice = "selected", voiceIds = listOf("selected"))
+            model = "irodori-tts", voiceIds = listOf("selected"))
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsCustomSourceEditor(source, true, { _, _, _ -> null },
@@ -170,7 +170,6 @@ class TtsCustomSourceUiTest {
         compose.onNodeWithText("Save").performClick()
         compose.runOnIdle {
             assertEquals(listOf("neutral", "bright"), saved?.voiceIds)
-            assertEquals("selected", saved?.voice)
         }
     }
 }

@@ -64,7 +64,7 @@ class TtsEngineDeviceTest {
                     val directory = File(context.cacheDir, "tts-installed-voices-device-test")
                     try {
                         voices.filterNot { it.network }.forEach { voice ->
-                            val files = engine.synthesize("日本語の音声です。", TtsSettings(engine = installed.id, voice = voice.id), directory)
+                            val files = engine.synthesize("日本語の音声です。", TtsSettings(engine = installed.id).withVoice(voice.id), directory)
                             assertTrue(files.isNotEmpty() && files.all { it.length() > 44 })
                             Log.i("HoshiTtsTest", "Synthesized ${installed.id}/${voice.id}")
                         }

@@ -15,26 +15,30 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import kotlin.math.roundToInt
 
 @Composable
-internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, onChange: (TtsSettings) -> Unit) {
+internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, onChange: (TtsSettingsUpdate) -> Unit) {
     val source = TtsOnlineSource.from(settings.engine)
     val options = settings.options()
-    val update: (TtsSynthesisOptions) -> Unit = { onChange(settings.withOptions(it)) }
+    val update: ((TtsSynthesisOptions) -> TtsSynthesisOptions) -> Unit = { change ->
+        onChange { current -> current.withOptions(change(current.options())) }
+    }
     TtsParameterSlider(R.string.tts_prefetch_sentences, settings.prefetchSentences.coerceIn(ttsPrefetchRange).toFloat(),
         ttsPrefetchRange.first.toFloat()..ttsPrefetchRange.last.toFloat(), ttsPrefetchRange.last - ttsPrefetchRange.first - 1,
         { pluralStringResource(R.plurals.tts_sentence_count, it.roundToInt(), it.roundToInt()) }) {
-        onChange(settings.copy(prefetchSentences = it.roundToInt()))
+        val value = it.roundToInt()
+        onChange { current -> current.copy(prefetchSentences = value) }
     }
     TtsPauseSlider(R.string.tts_sentence_pause, settings.sentencePauseMs.coerceIn(0, 5000).toInt(), usualMaximum = 2000) {
-        onChange(settings.copy(sentencePauseMs = it.toLong()))
+        val value = it.toLong()
+        onChange { current -> current.copy(sentencePauseMs = value) }
     }
     Text(stringResource(R.string.tts_sentence_pause_hint), style = MaterialTheme.typography.bodySmall,
         color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     settings.customSource()?.let { custom ->
         Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
             TtsAudioFormatChoice(custom.format) { format ->
-                onChange(settings.copy(customSources = settings.customSources.map { profile ->
+                onChange { current -> current.copy(customSources = current.customSources.map { profile ->
                     if (profile.id == custom.id) profile.copy(format = format) else profile
-                }))
+                }) }
             }
         }
     }
@@ -44,36 +48,36 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
         if (source == TtsOnlineSource.GoogleCloud) -96f..16f else -100f..100f,
         if (source == TtsOnlineSource.GoogleCloud) 111 else 199,
         { stringResource(if (source == TtsOnlineSource.GoogleCloud) R.string.tts_decibels else R.string.tts_relative_percent, it.roundToInt()) },
-    ) { update(options.copy(volume = it)) }
+    ) { value -> update { current -> current.copy(volume = value) } }
 
     if (source.usesAzureRest) {
         if (!voice?.styles.isNullOrEmpty()) {
             ReaderSheetCard(verticalPadding = 4.dp) {
-                TtsParameterChoice(R.string.tts_speaking_style, options.style, voice.styles) {
-                    update(options.copy(style = it, role = if (it.isBlank()) "" else options.role))
+                TtsParameterChoice(R.string.tts_speaking_style, options.style, voice.styles) { value ->
+                    update { current -> current.copy(style = value, role = if (value.isBlank()) "" else current.role) }
                 }
             }
             if (options.style.isNotBlank()) {
                 TtsParameterSlider(R.string.tts_style_degree, options.styleDegree, .01f..2f, 198,
-                    { stringResource(R.string.tts_rate_value, it) }) { update(options.copy(styleDegree = it)) }
+                    { stringResource(R.string.tts_rate_value, it) }) { value -> update { current -> current.copy(styleDegree = value) } }
                 if (voice.roles.isNotEmpty()) ReaderSheetCard(verticalPadding = 4.dp) {
-                    TtsParameterChoice(R.string.tts_speaking_role, options.role, voice.roles) { update(options.copy(role = it)) }
+                    TtsParameterChoice(R.string.tts_speaking_role, options.role, voice.roles) { value -> update { current -> current.copy(role = value) } }
                 }
             }
         }
-        TtsPauseControl(R.string.tts_leading_pause, options.leadingMs) { update(options.copy(leadingMs = it)) }
-        TtsPauseControl(R.string.tts_trailing_pause, options.trailingMs) { update(options.copy(trailingMs = it)) }
-        TtsPauseControl(R.string.tts_comma_pause, options.commaMs) { update(options.copy(commaMs = it)) }
-        TtsPauseControl(R.string.tts_semicolon_pause, options.semicolonMs) { update(options.copy(semicolonMs = it)) }
-        TtsPauseControl(R.string.tts_enumeration_pause, options.enumerationCommaMs) { update(options.copy(enumerationCommaMs = it)) }
-        TtsPauseControl(R.string.tts_boundary_pause, options.sentenceBoundaryMs) { update(options.copy(sentenceBoundaryMs = it)) }
+        TtsPauseControl(R.string.tts_leading_pause, options.leadingMs) { value -> update { current -> current.copy(leadingMs = value) } }
+        TtsPauseControl(R.string.tts_trailing_pause, options.trailingMs) { value -> update { current -> current.copy(trailingMs = value) } }
+        TtsPauseControl(R.string.tts_comma_pause, options.commaMs) { value -> update { current -> current.copy(commaMs = value) } }
+        TtsPauseControl(R.string.tts_semicolon_pause, options.semicolonMs) { value -> update { current -> current.copy(semicolonMs = value) } }
+        TtsPauseControl(R.string.tts_enumeration_pause, options.enumerationCommaMs) { value -> update { current -> current.copy(enumerationCommaMs = value) } }
+        TtsPauseControl(R.string.tts_boundary_pause, options.sentenceBoundaryMs) { value -> update { current -> current.copy(sentenceBoundaryMs = value) } }
     }
     if (source.usesAzureRest || source == TtsOnlineSource.GoogleCloud) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
-            TtsAudioFormatChoice(options.format) { update(options.copy(format = it)) }
+            TtsAudioFormatChoice(options.format) { value -> update { current -> current.copy(format = value) } }
             val rates = listOf(16000, 24000, 48000).map { TtsChoiceOption(it.toString(), stringResource(R.string.tts_sample_rate_hz, it)) }
             TtsChoice(stringResource(R.string.tts_sample_rate), stringResource(R.string.tts_sample_rate_hz, options.sampleRate),
-                options.sampleRate.toString(), rates) { update(options.copy(sampleRate = it.toInt())) }
+                options.sampleRate.toString(), rates) { value -> update { current -> current.copy(sampleRate = value.toInt()) } }
         }
     }
     if (source == TtsOnlineSource.GoogleCloud) ReaderSheetCard(verticalPadding = 4.dp) {
@@ -82,7 +86,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
             R.string.tts_profile_home, R.string.tts_profile_car, R.string.tts_profile_telephone)
         val choices = googleAudioProfiles.mapIndexed { index, id -> TtsChoiceOption(id, stringResource(labels[index])) }
         TtsChoice(stringResource(R.string.tts_audio_profile), choices.first { it.id == options.effectsProfile }.label,
-            options.effectsProfile, choices) { update(options.copy(effectsProfile = it)) }
+            options.effectsProfile, choices) { value -> update { current -> current.copy(effectsProfile = value) } }
     }
 }
 

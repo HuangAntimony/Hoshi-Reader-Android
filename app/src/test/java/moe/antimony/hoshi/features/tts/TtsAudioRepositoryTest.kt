@@ -118,6 +118,18 @@ class TtsAudioRepositoryTest {
         } finally { repository.clearPlaybackCache(); close(client) }
     }
 
+    @Test fun sentencePauseReusesSynthesizedAudio() = runBlocking {
+        val syntheses = AtomicInteger()
+        val client = client { syntheses.incrementAndGet() }
+        val repository = repository(client)
+        try {
+            val first = repository.audio(next, "book", preferences)
+            val changed = preferences.copy(settings = preferences.settings.copy(sentencePauseMs = 700))
+            assertEquals(first, repository.audio(next, "book", changed))
+            assertEquals(1, syntheses.get())
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun deletingEntireSentenceSkipsSynthesisAndRejectsEmptyExport() = runBlocking {
         var requests = 0
         val client = client { requests++ }

@@ -84,7 +84,7 @@ class TtsViewModel @Inject constructor(
             try {
                 val settings = repository.preferences.first().settings
                 val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
-                fallback = optional?.let { TtsCatalog(emptyList(), it.id, it.voiceChoices(emptyList())) }
+                fallback = optional?.let { TtsCatalog(emptyList(), it.id, it.voiceChoices(emptyList(), settings.voice)) }
                 val cached = engine.cachedCatalog(settings)
                 fallback = cached ?: fallback
                 mutableError.value = null
@@ -99,17 +99,13 @@ class TtsViewModel @Inject constructor(
             finally { if (generation == catalogGeneration) catalogBusy.value = false }
         }
     }
-    fun settings(proposed: TtsSettings) {
-        val value = proposed.copy(customSources = proposed.customSources.map { if (it.id == proposed.engine) it.copy(voice = proposed.voice, rate = proposed.rate) else it })
+    fun settings(update: TtsSettingsUpdate) {
         viewModelScope.launch { try {
-            val previous = repository.preferences.first().settings
+            val (previous, value) = repository.settings(update)
             val playbackOnly = previous.synthesisSettings() == value.synthesisSettings()
             if (!playbackOnly) { stopPreview(); dismissError() }
-            repository.settings(value)
             previewPlayer?.setPlaybackSpeed(normalizeTtsPlaybackRate(value.playbackRate))
-            if (!playbackOnly && (previous.engine != value.engine || previous.online[previous.engine] != value.online[value.engine] ||
-                previous.customSource()?.let { it.copy(name = "", rate = 1f, voice = "", format = TtsAudioFormat.Wav, preset = "") } !=
-                value.customSource()?.let { it.copy(name = "", rate = 1f, voice = "", format = TtsAudioFormat.Wav, preset = "") } || catalog.value == null)) refresh()
+            if (!playbackOnly && (previous.engine != value.engine || previous.voiceCatalogKey() != value.voiceCatalogKey() || catalog.value == null)) refresh()
         } catch (error: CancellationException) { throw error } catch (_: Exception) { mutableError.value = TtsFailure.Storage } }
     }
     private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
@@ -138,7 +134,7 @@ class TtsViewModel @Inject constructor(
     suspend fun testConfiguration(source: TtsOnlineSource, region: String, key: String, sample: String): TtsFailure? = try {
         val config = configuration(source, region, key)
         val current = repository.preferences.first()
-        val draft = current.copy(settings = current.settings.copy(engine = source.id, voice = "", rate = 1f, pitch = 0f,
+        val draft = current.copy(settings = current.settings.copy(engine = source.id, sharedRate = 1f, pitch = 0f,
             online = current.settings.online + (source.id to config), parameters = emptyMap(), routingBySource = emptyMap()))
         audio.export(TtsSentence(0, 0, 0, sample), null, draft).delete()
         null
@@ -162,15 +158,15 @@ class TtsViewModel @Inject constructor(
         if (current.engine == draft.id && changed) stopPreview()
         repository.saveSource(draft)
         if (created) stopPreview()
-        if (created || current.engine == draft.id && (changed || previous?.voiceIds != draft.voiceIds)) refresh()
+        if (created || current.engine == draft.id && (changed || previous.voiceIds != draft.voiceIds)) refresh()
         null
     } catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
     suspend fun testSource(source: TtsCustomSource, key: String, removeKey: Boolean, sample: String): TtsFailure? = try {
         val draft = customDraft(source, key, removeKey)
         val current = repository.preferences.first()
-        val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id).copy(routingBySource = emptyMap())
-        audio.export(TtsSentence(0, 0, 0, sample), null, current.copy(settings = settings)).delete()
+        val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { it.id == draft.id } + draft).selectSource(draft.id)
+        audio.export(TtsSentence(0, 0, 0, sample), null, current.copy(settings = settings.forVoice(settings.voice))).delete()
         null
     } catch (error: TimeoutCancellationException) { TtsFailure.Timeout }
     catch (error: CancellationException) { throw error }

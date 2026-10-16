@@ -27,7 +27,7 @@ class OnlineTtsEngineTest {
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(code).message("test")
                 .body(body.toResponseBody()).build()
         }.build()
-        return OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "test-key" }, Dispatchers.IO, voiceStore = store)
+        return OnlineTtsEngine(OnlineTtsTransport(client), { _, _ -> "test-key" }, Dispatchers.IO, catalogs = TtsVoiceCatalogCache(store, 32))
     }
 
     @Test fun repeatedCatalogLoadsReuseVoicesForEveryOnlineSourceDespitePlaybackChanges() = runBlocking {
@@ -47,7 +47,7 @@ class OnlineTtsEngineTest {
             }
             val settings = TtsSettings(engine = source.id, online = mapOf(source.id to TtsOnlineConfig("eastasia", "fixture")))
             val first = engine.catalog(settings)
-            assertEquals(first, engine.catalog(settings.copy(rate = 1.5f, voice = first.voices.first().id, playbackRate = 2f)))
+            assertEquals(first, engine.catalog(settings.copy(playbackRate = 2f).withRate(1.5f).withVoice(first.voices.first().id)))
             assertEquals(first, engine.catalog(settings))
             assertEquals(if (source == TtsOnlineSource.GoogleTranslate) 0 else 1, catalogs)
             assertEquals(if (source == TtsOnlineSource.MicrosoftTranslator) 1 else 0, authorizations)
@@ -156,8 +156,8 @@ class OnlineTtsEngineTest {
                 }
             }
         }
-        val settings = TtsSettings(engine = "online:microsoft-translator", rate = 1.5f, pitch = 2f,
-            parameters = mapOf("online:microsoft-translator" to TtsSynthesisOptions(style = "cheerful", commaMs = 300, format = TtsAudioFormat.Wav)))
+        val settings = TtsSettings(engine = "online:microsoft-translator", pitch = 2f,
+            parameters = mapOf("online:microsoft-translator" to TtsSynthesisOptions(style = "cheerful", commaMs = 300, format = TtsAudioFormat.Wav))).withRate(1.5f)
         assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
         assertArrayEquals(wav, engine.synthesize(text, settings, folder.root).single().readBytes())
         assertEquals(1, authentications)
@@ -196,8 +196,8 @@ class OnlineTtsEngineTest {
             if (request.url.encodedPath.endsWith("list")) 200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray()
             else 200 to wav
         }
-        val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, rate = 1.5f, pitch = 2f,
-            online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastus", "encrypted")))
+        val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, pitch = 2f,
+            online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastus", "encrypted"))).withRate(1.5f)
             .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav))
         val text = "東京……へ‥‥行く...。<x>"
         val files = engine.synthesize(text, settings, folder.root)

@@ -27,7 +27,7 @@ class TtsPauseControlsTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    TtsSynthesisControls(state.value, TtsVoiceInfo("ja-JP-NanamiNeural", true)) { state.value = it }
+                    TtsSynthesisControls(state.value, TtsVoiceInfo("ja-JP-NanamiNeural", true)) { update -> state.value = update(state.value) }
                 }
             }
         }

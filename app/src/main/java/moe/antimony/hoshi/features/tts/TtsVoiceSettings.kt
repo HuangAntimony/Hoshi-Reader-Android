@@ -26,7 +26,7 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 @Composable
 internal fun TtsVoiceSettings(
     settings: TtsSettings, catalog: TtsCatalog?, engines: List<TtsEngineInfo>, busy: Boolean,
-    preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettings) -> Unit,
+    preview: TtsPreviewState, failure: TtsFailure?, onSettings: (TtsSettingsUpdate) -> Unit,
     onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
     onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier, onCustom: (String?) -> Unit = {},
     catalogLoading: Boolean = busy && preview == TtsPreviewState.Idle,
@@ -61,8 +61,8 @@ internal fun TtsVoiceSettings(
             ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
                 TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, null) { sourcePicker = true }
             }
-            ReaderSheetSwitchRow(stringResource(R.string.tts_dialogue_routing), routing.enabled, onCheckedChange = {
-                onSettings(settings.withRouting(routing.copy(enabled = it)).withCompatibleVoiceOptions(voices))
+            ReaderSheetSwitchRow(stringResource(R.string.tts_dialogue_routing), routing.enabled, onCheckedChange = { enabled ->
+                onSettings { it.withRouting(it.routing().copy(enabled = enabled)).withCompatibleVoiceOptions(voices) }
             })
             ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
                 TtsCurrentVoiceRow(stringResource(if (routing.enabled) R.string.tts_narration_voice else R.string.tts_voice), voiceTitle, connection) { voicePicker = TtsTextRole.Narration }
@@ -88,22 +88,22 @@ internal fun TtsVoiceSettings(
                 TtsChoice(stringResource(R.string.tts_rate_label), stringResource(if (rate < 1f) R.string.tts_rate_slow else R.string.tts_rate_normal),
                     if (rate < 1f) "slow" else "normal",
                     listOf(TtsChoiceOption("normal", stringResource(R.string.tts_rate_normal)), TtsChoiceOption("slow", stringResource(R.string.tts_rate_slow))),
-                ) { onSettings(settings.copy(rate = if (it == "slow") .5f else 1f)) }
+                ) { value -> onSettings { it.withRate(if (value == "slow") .5f else 1f) } }
             } else if (settings.supportsSharedRate(voices)) {
                 val range = custom?.rateRange ?: (if (source == TtsOnlineSource.GoogleCloud) .25f else .5f)..(if (source == TtsOnlineSource.GoogleCloud || source?.usesAzureRest == true) 2f else 3f)
                 ReaderSheetSliderRow(stringResource(R.string.tts_rate_label), stringResource(R.string.tts_rate_value, rate), rate, range,
                     steps = if (custom != null) ((range.endInclusive - range.start) * 20).toInt() - 1 else when (source) { TtsOnlineSource.GoogleCloud -> 34; TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> 29; else -> 49 },
-                    onValueChange = { rate = it }, onValueChangeFinished = { onSettings(settings.copy(rate = rate)) }, showTicks = false)
+                    onValueChange = { rate = it }, onValueChangeFinished = { val value = rate; onSettings { it.withRate(value) } }, showTicks = false)
             }
             var playbackRate by remember(settings.playbackRate) { mutableFloatStateOf(settings.playbackRate) }
             ReaderSheetSliderRow(stringResource(R.string.tts_playback_rate), stringResource(R.string.tts_rate_value, playbackRate),
                 playbackRate, ttsPlaybackRateRange, steps = 49, onValueChange = { playbackRate = it },
-                onValueChangeFinished = { onSettings(settings.copy(playbackRate = playbackRate)) }, showTicks = false)
+                onValueChangeFinished = { val value = playbackRate; onSettings { it.copy(playbackRate = value) } }, showTicks = false)
             settings.sharedPitchRange(voices)?.let { range ->
                 var pitch by remember(settings.engine, settings.pitch) { mutableFloatStateOf(settings.pitch) }
                 ReaderSheetSliderRow(stringResource(R.string.tts_pitch), pitchLabel(source, pitch.toInt()), pitch, range,
                     steps = (range.endInclusive - range.start).toInt() - 1, onValueChange = { pitch = it },
-                    onValueChangeFinished = { onSettings(settings.copy(pitch = pitch)) }, showTicks = false)
+                    onValueChangeFinished = { val value = pitch; onSettings { it.copy(pitch = value) } }, showTicks = false)
             }
             TtsSynthesisControls(settings, settings.sharedVoice(voices), onSettings)
             source?.let {
@@ -123,17 +123,21 @@ internal fun TtsVoiceSettings(
             }
         }
     }
-    if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = {
+    if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = { id ->
         sourcePicker = false
-        val next = settings.selectSource(it)
-        onSettings(next.withOptions(next.options().copy(style = "", role = "")))
+        onSettings { current ->
+            val next = current.selectSource(id)
+            next.withOptions(next.options().copy(style = "", role = ""))
+        }
     }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false }, onCustom = { sourcePicker = false; onCustom(it) })
     voicePicker?.let { role -> TtsVoicePicker(sourceTitle, voices, if (role == TtsTextRole.Narration) settings.voice else routing.dialogue, catalogLoading, failure,
-        onSelected = {
+        onSelected = { id ->
             voicePicker = null
-            val next = if (role == TtsTextRole.Dialogue) settings.withRouting(routing.copy(dialogue = it))
-                else settings.withRouting(routing.copy(narration = it))
-            onSettings(next.withCompatibleVoiceOptions(voices))
+            onSettings { current ->
+                val next = if (role == TtsTextRole.Dialogue) current.withRouting(current.routing().copy(dialogue = id))
+                    else current.withVoice(id)
+                next.withCompatibleVoiceOptions(voices)
+            }
         }, onRefresh = onRetry, onDismiss = { voicePicker = null }) }
 }
 

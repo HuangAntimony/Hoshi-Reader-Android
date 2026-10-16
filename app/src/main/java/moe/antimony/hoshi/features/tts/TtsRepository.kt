@@ -12,18 +12,24 @@ import moe.antimony.hoshi.di.IoDispatcher
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.*
 import moe.antimony.hoshi.epub.EpubBook
 
 @Serializable
 data class TtsSettings(
-    val engine: String = "", val voice: String = "", val rate: Float = 1f,
+    val engine: String = "", @SerialName("rate") val sharedRate: Float = 1f,
     val customSources: List<TtsCustomSource> = emptyList(),
     val online: Map<String, TtsOnlineConfig> = emptyMap(), val pitch: Float = 0f,
     val parameters: Map<String, TtsSynthesisOptions> = emptyMap(), val sentencePauseMs: Long = 0,
     val prefetchSentences: Int = 5, val playbackRate: Float = 1f, val useRubyReadings: Boolean = true,
     val routingBySource: Map<String, TtsVoiceRouting> = emptyMap(),
-)
+) {
+    val voice: String get() = routingBySource[engine]?.narration.orEmpty()
+    val rate: Float get() = customSource()?.rate ?: sharedRate
+}
+typealias TtsSettingsUpdate = (TtsSettings) -> TtsSettings
+
 internal val ttsPlaybackRateRange = .5f..3f
 internal fun normalizeTtsPlaybackRate(rate: Float): Float = if (rate.isFinite()) rate.coerceIn(ttsPlaybackRateRange) else 1f
 internal val ttsPrefetchRange = 1..20
@@ -40,7 +46,7 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
     private fun decode(value: String?): TtsPreferences {
         val preferences = value?.let {
             val stored = json.parseToJsonElement(it).jsonObject
-            val settings = stored["settings"] as? JsonObject
+            val settings = (stored["settings"] as? JsonObject)?.let(::restoreTtsVoiceSelections)
             // Older saved options/profiles omitted the WAV default. New saves always encode format.
             val restored = settings?.let { fields -> JsonObject(fields.mapValues { (field, entry) -> when (field) {
                 "parameters" -> JsonObject(entry.jsonObject.mapValues { (_, options) -> storedFormat(options) })
@@ -56,19 +62,27 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
         if ("format" in it) it else JsonObject(it + ("format" to JsonPrimitive(TtsAudioFormat.Wav.name)))
     }
 
-    suspend fun settings(settings: TtsSettings) {
+    suspend fun settings(update: TtsSettingsUpdate): Pair<TtsSettings, TtsSettings> {
+        var result: Pair<TtsSettings, TtsSettings>? = null
+        store.edit {
+            val current = decode(it[key])
+            val next = normalizeSettings(update(current.settings))
+            it[key] = json.encodeToString(current.copy(settings = next))
+            result = current.settings to next
+        }
+        return checkNotNull(result)
+    }
+
+    private fun normalizeSettings(settings: TtsSettings): TtsSettings {
         val custom = settings.customSource()
-        val rate = custom?.normalizeRate(settings.rate) ?: TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
+        val rate = custom?.normalizeRate(settings.rate, settings.voice) ?: TtsOnlineSource.from(settings.engine)?.normalizeRate(settings.rate)
             ?: settings.rate.takeIf { it.isFinite() }?.coerceIn(.5f, 3f) ?: 1f
         val pitchRange = if (settings.isCustomSource()) null else ttsPitchRange(TtsOnlineSource.from(settings.engine), settings.voice.ifBlank { "automatic" })
         val pitch = if (pitchRange != null && settings.pitch.isFinite()) settings.pitch.coerceIn(pitchRange) else 0f
-        val sources = settings.customSources.map { if (it.id == settings.engine) it.copy(voice = settings.voice, rate = rate) else it }
-        val normalized = settings.copy(customSources = sources, rate = rate, pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
-            routingBySource = settings.routingBySource.mapValues { (id, routing) -> if (id == settings.engine) routing.copy(narration = settings.voice) else routing },
+        return settings.withRate(rate).copy(pitch = pitch, sentencePauseMs = settings.sentencePauseMs.coerceIn(0, 5000),
             prefetchSentences = settings.prefetchSentences.coerceIn(ttsPrefetchRange),
             playbackRate = normalizeTtsPlaybackRate(settings.playbackRate),
             parameters = settings.parameters.mapValues { (source, options) -> options.normalized(TtsOnlineSource.from(source)) })
-        store.edit { it[key] = json.encodeToString(decode(it[key]).copy(settings = normalized)) }
     }
     suspend fun useRubyReadings(enabled: Boolean) {
         store.edit {
@@ -88,17 +102,20 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
             val current = decode(it[key])
             val settings = current.settings
             val created = settings.customSources.none { profile -> profile.id == value.id }
+            val protocolChanged = settings.customSources.any { it.id == value.id && it.protocol != value.protocol }
             val sources = settings.customSources.filterNot { profile -> profile.id == value.id } + value
-            val next = settings.copy(customSources = sources).let { if (created || it.engine == value.id) it.selectSource(value.id) else it }
+            val updated = settings.copy(customSources = sources,
+                routingBySource = if (protocolChanged) settings.routingBySource - value.id else settings.routingBySource)
+            val next = if (created || updated.engine == value.id) updated.selectSource(value.id) else updated
             it[key] = json.encodeToString(current.copy(settings = next))
         }
     }
     suspend fun deleteSource(id: String) {
         store.edit {
             val current = decode(it[key])
-            val settings = current.settings.copy(customSources = current.settings.customSources.filterNot { source -> source.id == id },
-                routingBySource = current.settings.routingBySource - id)
-            val next = if (settings.engine == id) settings.selectSource("").copy(routingBySource = settings.routingBySource - id) else settings
+            val selected = if (current.settings.engine == id) current.settings.selectSource("") else current.settings
+            val next = selected.copy(customSources = selected.customSources.filterNot { source -> source.id == id },
+                routingBySource = selected.routingBySource - id)
             it[key] = json.encodeToString(current.copy(settings = next))
         }
     }

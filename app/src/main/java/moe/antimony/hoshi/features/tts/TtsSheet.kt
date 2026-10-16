@@ -124,7 +124,7 @@ internal fun TtsPanel(viewModel: TtsViewModel, bookId: String?, onStart: (() -> 
         TtsCustomSourceEditor(source, preferences.settings.customSources.any { it.id == source.id },
             onTest = { draft, key, remove -> viewModel.testSource(draft, key, remove, sample) },
             onSave = viewModel::saveSource, onDelete = { viewModel.deleteSource(source.id) }, onModels = viewModel::sourceModels,
-            onDismiss = { customEditor = null })
+            onDismiss = { customEditor = null }, selectedVoice = preferences.settings.routingBySource[source.id]?.narration.orEmpty())
     }
     configureSource?.let { source ->
         TtsSourceConfigurationSheet(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }

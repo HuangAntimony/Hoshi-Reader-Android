@@ -786,7 +786,14 @@ QA matrices live in `docs/VALIDATION.md`.
   depth, named self-hosted server profiles, the global `useRubyReadings` flag (default true), and scoped text-replacement entries in the `japanese_tts`
   Preferences DataStore. `TtsWord.replacement` retains the serialized `reading` key
   so existing pronunciation entries remain compatible. It does not extend Sasayaki
-  sidecars or sync payloads.
+  sidecars or sync payloads. UI events submit setting transforms; the repository applies
+  them to the latest preferences inside one DataStore transaction, so independent edits
+  do not replace newer settings with a captured UI snapshot.
+  `routingBySource` owns voice selection, including when dialogue routing is off;
+  `TtsSettings.voice` is derived from its narration entry. Custom profiles own their rate;
+  installed/built-in sources retain the shared rate stored under the existing `rate` key.
+  Legacy top-level/profile voice fields are decoded into source selections without changing
+  credentials, formats, dialogue choices or replacements.
   Cloud API keys are AES-GCM ciphertext bound to the provider ID, using a non-exportable
   Android Keystore key through `TtsCredentialCipher`; restored ciphertext without its
   device key requires configuration again. UI fields never read keys back or put them
@@ -794,7 +801,7 @@ QA matrices live in `docs/VALIDATION.md`.
 - Optional narration/dialogue routing is stored per Source in `routingBySource`, default
   off. `TtsVoiceRouting.initialized` distinguishes first activation (both voices inherit
   the current voice) from reactivation (the dialogue choice is retained). The selected
-  narration voice remains the existing `voice` field. Both routes share credentials,
+  narration voice is read from the same source selection used when routing is off. Both routes share credentials,
   provider parameters and Hoshi speed; Voice presents shared style/role and pitch/rate
   capabilities. Connection tests omit routing and test only the draft source.
   `TtsDialogue` finds complete paired Japanese quotes before chapter sentence slicing,
@@ -808,7 +815,8 @@ QA matrices live in `docs/VALIDATION.md`.
   source character. Original text, highlighter and Anki sentence text stay unchanged.
   `ttsSynthesisPlan` resolves two voices within one Source, coalesces adjacent identical
   effective voices and attaches punctuation-only ranges to spoken content. Custom voice
-  overrides are request-local and update the effective profile as well as `voice`.
+  overrides are request-local source selections; adapters read the effective voice/rate
+  through `TtsSettings`, without copying speaker state into connection profiles.
   OpenAI's omitted voice remains the server default; its first catalog entry is not
   assumed to be that default. Optional discovery is not a synthesis prerequisite.
   Ordered effective configurations/text key one sentence cache entry, preserving the
@@ -910,16 +918,21 @@ QA matrices live in `docs/VALIDATION.md`.
   model-type/ID retained as secondary labels;
   configured OpenAI IDs supplement discovered voices without duplicating IDs or overriding
   server-provided labels. They are available during optional discovery and after failure.
-  The active synthesis snapshot excludes display names, available voice-ID lists and other
-  sources; both playback invalidation and audio caching use it.
+  `TtsSynthesisConfiguration` explicitly identifies the active generation inputs and
+  excludes display names, available voice-ID lists, other sources, prefetch count,
+  Hoshi playback speed and sentence delay. Both playback invalidation and audio caching
+  use it; changing sentence delay affects the next boundary without restarting synthesis.
   Catalogs are stored by profile ID and connection fingerprint without timed refresh.
   Missing `custom:` profiles fail configuration rather than falling through to Android.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
   Samsung's ISO 639-2 locales). TTS panels refresh installed-engine catalogs on resume so
   returning from system voice installation updates their available voices.
-- Online voice lists are shared by panel, preview and synthesis. `OnlineTtsEngine` coalesces
-  concurrent catalog loads and reuses successful catalogs; `TtsVoiceCatalogStore` persists
-  one atomic JSON file per source under app files storage on the engine's IO dispatcher.
+- Online/self-hosted voice lists are shared by panel, preview and synthesis through the
+  Hilt singleton `TtsVoiceCatalogCache`. It owns bounded memory storage and per-configuration
+  request coalescing; network waits do not hold the metadata lock, so cached reads and
+  other source requests remain available during refresh. Cancellation/failure retains the
+  last successful catalog. `TtsVoiceCatalogStore` owns atomic JSON files on the adapters'
+  IO dispatcher; filenames and fingerprints retain compatibility with existing caches.
   Catalogs have no age-based refresh. Source configuration fingerprints prevent reuse after
   region/key changes without storing credentials in catalog files. Missing/corrupt catalogs
   are fetched again, failures are not cached, and explicit error retry/configuration save
