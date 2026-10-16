@@ -122,6 +122,10 @@ node --test app/src/test/js/*.test.mjs
   continuing independent items. Dismiss/retry must still work, and cancellation
   must not publish an error. Preserve explicitly intended automatic offline
   suppression and successful optional/cache fallbacks.
+- Live form validation, including unfinished regex patterns and replacement
+  templates, must retain inline original diagnostics without adding runtime
+  history. Completing the draft must clear validation and restore preview;
+  genuine service or storage failures must still reach the visible state and history.
 - On-device error QA uses existing dialogs, snackbars or retry states. Check a
   malformed EPUB import and one nested IO/service failure; details must remain
   readable instead of being replaced by a generic message or only logged.

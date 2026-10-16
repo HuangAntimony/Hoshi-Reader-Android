@@ -954,7 +954,8 @@ QA matrices live in `docs/VALIDATION.md`.
   report `EmptyText` and produce no media file. Matching is a single pass over the
   original sentence; inserted text is never matched again. Literal replacement is the default. `TtsRegexReplacement` uses RE2/J with a bounded compiled-rule cache,
   numeric `$0`/`$1` capture templates and backslash escaping. Invalid patterns/templates
-  are rejected on save; zero-width matches are ignored. Literal match ranges and usable
+  are rejected on save; draft validation retains the original inline diagnostic through
+  pure formatting, without recording a runtime error. Zero-width matches are ignored. Literal match ranges and usable
   ruby are protected from regex matches; each pattern scans the original sentence with
   non-overlapping matches, then rules at the same start prefer the longest match and book
   scope on ties (remaining ties retain saved order). Matches across dialogue boundaries

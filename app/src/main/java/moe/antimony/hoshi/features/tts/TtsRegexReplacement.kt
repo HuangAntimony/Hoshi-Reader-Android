@@ -4,7 +4,7 @@ import com.google.re2j.Matcher
 import com.google.re2j.Pattern
 import com.google.re2j.PatternSyntaxException
 import moe.antimony.hoshi.ui.UiText
-import moe.antimony.hoshi.ui.withErrorDetails
+import moe.antimony.hoshi.ui.diagnosticMessage
 
 /** Immutable compiled rules; matchers are local to a sentence, never shared between threads. */
 internal class TtsRegexRule private constructor(val pattern: Pattern, private val template: List<Token>) {
@@ -129,7 +129,7 @@ internal fun prepareTtsWordPreview(word: TtsWord, sentence: TtsSentence, bookId:
     val message = error?.let { category ->
         val summary = UiText.Resource(category.messageRes())
         val original = if (category == TtsWordError.RegexPattern || category == TtsWordError.RegexReplacement) TtsRegexRule.failure(word) else null
-        original?.let(summary::withErrorDetails) ?: summary
+        original?.let { UiText.Joined(listOf(summary, UiText.Literal(it.diagnosticMessage()))) } ?: summary
     }
     return TtsWordPreview(word, sentence, preferences, config, text, error, message)
 }
