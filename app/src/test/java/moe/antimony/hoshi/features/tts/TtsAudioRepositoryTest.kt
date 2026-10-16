@@ -24,6 +24,27 @@ class TtsAudioRepositoryTest {
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 
+    @Test fun replayedMultipartAudioSurvivesMaximumPrefetchAndAvoidsNewSynthesis() = runBlocking {
+        val syntheses = AtomicInteger()
+        val client = client { syntheses.incrementAndGet() }
+        val repository = repository(client)
+        val configured = preferences.copy(settings = preferences.settings.withRouting(
+            TtsVoiceRouting(true, "ja-JP-Neural2-B", "ja-JP-Neural2-C")))
+        val repeated = TtsText.chapter(0, "<p>彼は「こんにちは」と言った。</p>").single()
+        fun sentence(index: Int) = TtsSentence(0, index * 10, 4, "文章${index}です。")
+        try {
+            val playing = repository.audio(repeated, "book", configured)
+            val oldestUnused = repository.audio(sentence(1), "book", configured)
+            for (index in 2..31) repository.audio(sentence(index), "book", configured)
+            assertEquals(playing, repository.audio(repeated, "book", configured))
+            for (index in 32..51) repository.audio(sentence(index), "book", configured)
+            assertTrue("All playlist fragments must survive prefetch after a cache hit", playing.all { it.isFile })
+            assertFalse(oldestUnused.any { it.exists() })
+            assertEquals(playing, repository.audio(repeated, "book", configured))
+            assertEquals(54, syntheses.get())
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun dialogueRequestsUseOrderedVoicesAndExportTheWholeSentence() = runBlocking {
         val requests = mutableListOf<Pair<String, String>>()
         val client = client { body ->

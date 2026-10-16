@@ -15,6 +15,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TtsRepositoryTest {
+    @Test fun removingOneCloudKeyPersistsWithoutChangingOtherPreferences() = runTest {
+        val store = MemoryStore(preferencesOf())
+        val repository = TtsRepository(store)
+        repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "azure-cipher"))
+        repository.configure(TtsOnlineSource.GoogleCloud, TtsOnlineConfig(encryptedKey = "google-cipher"))
+        repository.settings { it.selectSource(TtsOnlineSource.Azure.id).withVoice("saved-voice").copy(playbackRate = 2f) }
+        repository.save(TtsWord("word", "今日", "きょう"))
+        val before = repository.preferences.first()
+        repository.removeOnlineKey(TtsOnlineSource.Azure)
+        val restored = TtsRepository(store).preferences.first()
+        assertEquals(TtsOnlineConfig("eastasia", ""), restored.settings.online.getValue(TtsOnlineSource.Azure.id))
+        assertEquals(TtsOnlineConfig(encryptedKey = "google-cipher"), restored.settings.online.getValue(TtsOnlineSource.GoogleCloud.id))
+        assertEquals(before.settings, restored.settings.copy(online = before.settings.online))
+        assertEquals(before.words, restored.words)
+        assertFalse(store.data.value[stringPreferencesKey("preferences")]!!.contains("azure-cipher"))
+        repository.removeOnlineKey(TtsOnlineSource.Azure)
+        repository.removeOnlineKey(TtsOnlineSource.Edge)
+        assertEquals(restored, repository.preferences.first())
+    }
+
     @Test fun legacyFlatVoiceAndAutomaticCustomVoiceKeepTheirSelectionsAfterReload() = runTest {
         val key = stringPreferencesKey("preferences")
         for ((json, expected) in listOf(

@@ -86,6 +86,8 @@ node --test app/src/test/js/*.test.mjs
 ## Device And Emulator Safety
 
 - Preserve app data by default.
+- Device UI tests resolve control labels from the target app's localized resources;
+  do not assume English or change the user's device/app language for a fixture.
 - `am instrument` can exit with shell status 0 despite failing tests. Require its
   final `OK (N tests)` summary; inspect `FAILURES`, `INSTRUMENTATION_FAILED`, and
   test stack traces before reporting a device run as passed.
@@ -1108,6 +1110,12 @@ Validate relevant sync/update/Sasayaki changes with:
   response coverage as a successful live account test. Reopening configuration must
   keep the saved key masked; leaving it empty preserves it. Restored settings without
   the Keystore key must request reconfiguration.
+  Delete key appears only for saved cloud credentials and requires confirmation. Cancel
+  preserves the key; confirm deletes it immediately without Save, retaining region and
+  other preferences and clearing the input/test feedback. A write failure retains the key
+  and draft and permits retry. Subsequent blank Save/Test must report missing credentials
+  rather than restoring or using the removed key. `TtsProviderConfigurationTest`,
+  `TtsPanelStateTest` and `TtsRepositoryTest` cover these paths with isolated settings.
 - Compare default/modified pitch and volume in preview and Anki. Azure/Translator style/role choices
   must come from the selected voice, reset when changing voices, and include only valid
   styles. Test exact leading/trailing/punctuation silence, including zero vs voice default.
@@ -1307,6 +1315,10 @@ Validate relevant sync/update/Sasayaki changes with:
   and manual Refresh voices force discovery. Concurrent misses for one sentence share
   synthesis; clearing requires a fresh file. Advancing playback must retain pending
   prefetch and extend its horizon.
+  Fill the 32-sentence cache, replay an old multipart sentence and prefetch 20 new
+  sentences: all replay files must remain readable and a further replay must reuse them
+  without synthesis. Evict the least recently used sentence instead. This is covered by
+  `TtsAudioRepositoryTest`.
 - With a Japanese engine installed, build `assembleDebugAndroidTest`, install both
   APKs using `adb install -r`, and run only the explicit classes
   `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` (including punctuation replacement

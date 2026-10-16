@@ -961,7 +961,10 @@
     <string name="tts_azure_region" comment="TTS online source configuration">语音资源区域</string>
     <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
     <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
-    <string name="tts_key_saved_hint" comment="TTS online source configuration">此设备已保存密钥；留空可继续使用。</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">密钥已配置；留空可保留现有密钥。</string>
+    <string name="tts_delete_key">删除密钥</string>
+    <string name="tts_delete_key_title">删除 API 密钥？</string>
+    <string name="tts_delete_key_message">删除此设备保存的该服务 API 密钥？删除后需要重新配置才能使用该服务。</string>
     <string name="tts_test_connection" comment="TTS online source configuration">测试连接</string>
     <string name="tts_connection_success" comment="TTS online source configuration">连接已验证</string>
     <string name="tts_rate_slow" comment="TTS online source configuration">慢速</string>
@@ -1023,7 +1026,7 @@
     <string name="tts_online" comment="TTS voice settings">在线</string>
     <string name="tts_stop_preview" comment="TTS voice settings">停止试听</string>
     <string name="tts_configure_source" comment="TTS voice settings">配置来源</string>
-    <string name="tts_key_device_hint" comment="TTS voice settings">凭据保存在此设备上。</string>
+    <string name="tts_key_device_hint" comment="TTS online source configuration">此设备尚未配置 API 密钥。</string>
     <string name="tts_pitch_short" comment="TTS voice settings">%1$+d 半音</string>
     <string name="tts_pitch_zero" comment="TTS voice settings">0 半音</string>
     <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>

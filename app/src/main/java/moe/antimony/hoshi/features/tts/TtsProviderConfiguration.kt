@@ -13,6 +13,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
@@ -24,13 +25,15 @@ internal fun TtsSourceConfigurationSheet(
     val sample = stringResource(R.string.tts_sample)
     TtsProviderConfiguration(source, config,
         onTest = { region, key -> viewModel.testConfiguration(source, region, key, sample) },
-        onSave = { region, key -> viewModel.configure(source, region, key) }, onDismiss = onDismiss)
+        onSave = { region, key -> viewModel.configure(source, region, key) }, onDismiss = onDismiss,
+        onDelete = { viewModel.removeKey(source) })
 }
 
 @Composable
 internal fun TtsProviderConfiguration(
     source: TtsOnlineSource, config: TtsOnlineConfig,
     onTest: suspend (String, String) -> TtsFailure?, onSave: suspend (String, String) -> TtsFailure?, onDismiss: () -> Unit,
+    onDelete: suspend () -> TtsFailure?,
 ) {
     var region by remember(source) { mutableStateOf(config.region) }
     // Plaintext credentials stay out of saveable state; saved keys are never decrypted into the field.
@@ -39,6 +42,7 @@ internal fun TtsProviderConfiguration(
     var testing by remember(source) { mutableStateOf(false) }
     var failure by remember(source) { mutableStateOf<TtsFailure?>(null) }
     var tested by remember(source) { mutableStateOf(false) }
+    var confirmDelete by remember(source) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     TtsSelectionSheet(stringResource(source.labelRes), onDismiss) {
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp, vertical = 16.dp),
@@ -54,6 +58,10 @@ internal fun TtsProviderConfiguration(
                 colors = hoshiOutlinedTextFieldColors())
             Text(stringResource(if (config.encryptedKey.isNotBlank()) R.string.tts_key_saved_hint else R.string.tts_key_device_hint),
                 style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+            if (config.encryptedKey.isNotBlank()) TextButton(enabled = !busy, onClick = { confirmDelete = true },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Text(stringResource(R.string.tts_delete_key))
+            }
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TtsConnectionTestControls(!busy, testing, tested, failure, onTest = { scope.launch {
@@ -73,4 +81,20 @@ internal fun TtsProviderConfiguration(
             }
         }
     }
+    if (confirmDelete) HoshiAlertDialog(onDismissRequest = { confirmDelete = false },
+        title = { Text(stringResource(R.string.tts_delete_key_title)) },
+        text = { Text(stringResource(R.string.tts_delete_key_message)) },
+        confirmButton = {
+            TextButton(onClick = {
+                confirmDelete = false
+                busy = true; tested = false; failure = null
+                scope.launch {
+                    try { failure = onDelete(); if (failure == null) apiKey = "" }
+                    finally { busy = false }
+                }
+            }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Text(stringResource(R.string.action_delete))
+            }
+        },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } })
 }

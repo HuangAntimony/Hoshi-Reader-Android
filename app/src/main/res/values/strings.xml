@@ -963,7 +963,10 @@
     <string name="tts_azure_region" comment="TTS online source configuration">Speech resource region</string>
     <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
     <string name="tts_api_key" comment="TTS online source configuration">Service API key</string>
-    <string name="tts_key_saved_hint" comment="TTS online source configuration">A key is saved on this device. Leave this field empty to keep it.</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">API key configured. Leave this field empty to keep it.</string>
+    <string name="tts_delete_key">Delete key</string>
+    <string name="tts_delete_key_title">Delete API key?</string>
+    <string name="tts_delete_key_message">Delete this service’s API key saved on this device? You will need to configure it again to use this service.</string>
     <string name="tts_test_connection" comment="TTS online source configuration">Test connection</string>
     <string name="tts_connection_success" comment="TTS online source configuration">Connection verified</string>
     <string name="tts_rate_slow" comment="TTS online source configuration">Slow</string>
@@ -1025,7 +1028,7 @@
     <string name="tts_online" comment="TTS voice settings">Online</string>
     <string name="tts_stop_preview" comment="TTS voice settings">Stop preview</string>
     <string name="tts_configure_source" comment="TTS voice settings">Configure source</string>
-    <string name="tts_key_device_hint" comment="TTS voice settings">Credentials are stored on this device.</string>
+    <string name="tts_key_device_hint" comment="TTS online source configuration">No API key is configured on this device.</string>
     <string name="tts_pitch_short" comment="TTS voice settings">%1$+d st</string>
     <string name="tts_pitch_zero" comment="TTS voice settings">0 st</string>
     <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>

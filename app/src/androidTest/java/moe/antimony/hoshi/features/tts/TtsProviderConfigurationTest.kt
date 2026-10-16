@@ -5,6 +5,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.awaitCancellation
+import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import org.junit.Assert.*
 import org.junit.Rule
@@ -14,25 +15,96 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TtsProviderConfigurationTest {
     @get:Rule val compose = createComposeRule()
+    private val context get() = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+    private fun text(resource: Int) = context.getString(resource)
+
+    @Test fun savedCloudKeyDeletionRequiresConfirmationAndCancelKeepsTheForm() {
+        var saved = false
+        var deletions = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "encrypted-fixture"),
+                    { _, _ -> null }, { _, _ -> saved = true; null }, {}, onDelete = { deletions++; null })
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_delete_key_title)).assertIsDisplayed()
+        compose.onNode(hasText(text(R.string.action_cancel)) and hasAnyAncestor(isDialog() and hasAnyDescendant(hasText(text(R.string.tts_delete_key_title))))).performClick()
+        compose.onNodeWithText(text(R.string.tts_delete_key_title)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.tts_delete_key)).assertExists()
+        compose.runOnIdle { assertFalse(saved); assertEquals(0, deletions) }
+    }
+
+    @Test fun confirmedDeletionClearsTheKeyDraftAndTestFeedbackWithoutSavingTheForm() {
+        val config = mutableStateOf(TtsOnlineConfig("eastasia", "encrypted-fixture"))
+        var deletions = 0
+        var saves = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.Azure, config.value,
+                    { _, _ -> null }, { _, _ -> saves++; null }, {}, onDelete = {
+                        deletions++
+                        config.value = config.value.copy(encryptedKey = "")
+                        null
+                    })
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_api_key)).performTextInput("unsaved-draft")
+        compose.onNodeWithText(text(R.string.tts_test_connection)).performClick()
+        compose.onNodeWithText(text(R.string.tts_connection_success)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.action_delete)).performClick()
+        compose.onNodeWithText(text(R.string.tts_delete_key)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.tts_key_device_hint)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_connection_success)).assertDoesNotExist()
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.tts_api_key))).assertTextEquals(text(R.string.tts_api_key), "")
+        compose.runOnIdle { assertEquals(1, deletions); assertEquals(0, saves); assertEquals("eastasia", config.value.region) }
+    }
+
+    @Test fun failedDeletionKeepsTheKeyAndDraftAndCanBeRetried() {
+        val config = mutableStateOf(TtsOnlineConfig(encryptedKey = "encrypted-fixture"))
+        var attempts = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.GoogleCloud, config.value,
+                    { _, _ -> null }, { _, _ -> null }, {}, onDelete = {
+                        attempts++
+                        if (attempts == 1) TtsFailure.Storage else {
+                            config.value = config.value.copy(encryptedKey = "")
+                            null
+                        }
+                    })
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_api_key)).performTextInput("unsaved-draft")
+        compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.action_delete)).performClick()
+        compose.onNodeWithText(context.getString(TtsFailure.Storage.messageRes())).assertIsDisplayed()
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.tts_api_key))).assert(hasText("unsaved-draft"))
+        compose.runOnIdle { assertEquals("encrypted-fixture", config.value.encryptedKey) }
+        compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.action_delete)).performClick()
+        compose.onNodeWithText(text(R.string.tts_delete_key)).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(2, attempts) }
+    }
 
     @Test fun failedConnectionRemainsVisibleAboveTheFixedButtonInEink() {
         val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
                 TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig(),
-                    { _, _ -> result.await() }, { _, _ -> null }, {})
+                    { _, _ -> result.await() }, { _, _ -> null }, {}, onDelete = { null })
             }
         }
-        val button = compose.onNodeWithText("Test connection").assertIsDisplayed()
+        val button = compose.onNodeWithText(text(R.string.tts_test_connection)).assertIsDisplayed()
         val position = button.fetchSemanticsNode().boundsInRoot
         button.performClick()
         button.assertIsNotEnabled()
         compose.runOnIdle { result.complete(TtsFailure.Authentication) }
-        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         compose.onNodeWithText(context.getString(TtsFailure.Authentication.messageRes())).assertIsDisplayed()
         assertEquals(position, button.fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithText("Save").assertIsDisplayed()
-        compose.onNodeWithText("Service API key").performTextReplacement("changed")
+        compose.onNodeWithText(text(R.string.action_save)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_api_key)).performTextReplacement("changed")
         compose.onNodeWithText(context.getString(TtsFailure.Authentication.messageRes())).assertDoesNotExist()
     }
 
@@ -42,17 +114,17 @@ class TtsProviderConfigurationTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "encrypted-fixture"),
-                    { region, key -> tested = region to key; null }, { region, key -> saved = region to key; null }, {})
+                    { region, key -> tested = region to key; null }, { region, key -> saved = region to key; null }, {}, onDelete = { null })
             }
         }
         compose.onNodeWithText("encrypted-fixture").assertDoesNotExist()
-        compose.onNodeWithText("Service API key").performTextInput("draft-key")
-        compose.onNodeWithText("Test connection").performClick()
+        compose.onNodeWithText(text(R.string.tts_api_key)).performTextInput("draft-key")
+        compose.onNodeWithText(text(R.string.tts_test_connection)).performClick()
         compose.runOnIdle { assertEquals("eastasia" to "draft-key", tested); assertNull(saved) }
-        compose.onNodeWithText("Connection verified").assertExists()
-        compose.onNodeWithText("Save").performClick()
+        compose.onNodeWithText(text(R.string.tts_connection_success)).assertExists()
+        compose.onNodeWithText(text(R.string.action_save)).performClick()
         compose.runOnIdle { assertEquals("eastasia" to "draft-key", saved) }
-        compose.onNode(hasSetTextAction() and hasText("Service API key")).assertTextEquals("Service API key", "")
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.tts_api_key))).assertTextEquals(text(R.string.tts_api_key), "")
     }
 
     @Test fun dismissingDuringTestCancelsItWithoutSaving() {
@@ -63,12 +135,12 @@ class TtsProviderConfigurationTest {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 if (open.value) TtsProviderConfiguration(TtsOnlineSource.GoogleCloud, TtsOnlineConfig(),
                     { _, _ -> try { awaitCancellation() } finally { cancelled = true } },
-                    { _, _ -> saved = true; null }, { open.value = false })
+                    { _, _ -> saved = true; null }, { open.value = false }, onDelete = { null })
             }
         }
-        compose.onNodeWithText("Test connection").performClick()
-        compose.onNodeWithText("Save").assertIsNotEnabled()
-        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText(text(R.string.tts_test_connection)).performClick()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.action_cancel)).performClick()
         compose.runOnIdle { assertTrue(cancelled); assertFalse(saved) }
     }
 }

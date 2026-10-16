@@ -34,7 +34,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Anki sentence audio share this behavior while keeping sentence navigation unchanged.
   Cloud credentials use a matching configuration sheet; connection testing and its
   success/error feedback stay visible in a fixed footer for cloud and self-hosted sources,
-  without requiring another scroll after testing. Source errors
+  without requiring another scroll after testing. Saved cloud API keys can be deleted
+  immediately after confirmation, preserving other source settings. Source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   the Voice picker provides a manual refresh action at the top for every source,
@@ -92,6 +93,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   panel. Continuous playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20
   upcoming sentences to preload in Voice (default 5); changes adjust
   buffering without interrupting narration or regenerating cached audio.
+  Replayed sentence audio remains reusable while upcoming sentences are preloaded,
+  including sentences with multiple audio fragments.
   While narration is paused, chapter navigation and returning to Reader keep the selected
   reading position instead of jumping back to the narrated sentence. TTS shares
   Sasayaki's image holds and chapter presentation, keeping images visible for the

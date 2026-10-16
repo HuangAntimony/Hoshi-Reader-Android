@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
@@ -104,6 +105,27 @@ class TtsPanelStateTest {
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
+
+    @Test fun cloudKeyRemovalReportsWriteFailureAndBlankDraftsCannotRestoreIt() {
+        panel()
+        compose.runOnIdle { runBlocking {
+            val repository = TtsRepository(speech)
+            repository.configure(TtsOnlineSource.GoogleCloud, TtsOnlineConfig("saved-region", "saved-cipher"))
+            repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "other-cipher"))
+            val original = repository.preferences.first()
+            speech.failWrites = true
+            Assert.assertEquals(TtsFailure.Storage, model.removeKey(TtsOnlineSource.GoogleCloud))
+            Assert.assertEquals(original, repository.preferences.first())
+            speech.failWrites = false
+            Assert.assertNull(model.removeKey(TtsOnlineSource.GoogleCloud))
+            val removed = repository.preferences.first()
+            Assert.assertEquals(TtsOnlineConfig("saved-region", ""), removed.settings.online.getValue(TtsOnlineSource.GoogleCloud.id))
+            Assert.assertEquals(TtsOnlineConfig("eastasia", "other-cipher"), removed.settings.online.getValue(TtsOnlineSource.Azure.id))
+            Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.GoogleCloud, "", ""))
+            Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.GoogleCloud, "", "", "日本語です。"))
+            Assert.assertEquals(removed, repository.preferences.first())
+        } }
+    }
 
     @Test fun optionalOpenAiDiscoveryDoesNotDisableManualPreview() {
         val discovery = CountDownLatch(1)

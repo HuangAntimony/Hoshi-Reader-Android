@@ -92,6 +92,14 @@ class TtsRepository internal constructor(private val store: androidx.datastore.c
             it[key] = json.encodeToString(old.copy(settings = old.settings.copy(online = old.settings.online + (source.id to config))))
         }
     }
+    suspend fun removeOnlineKey(source: TtsOnlineSource) {
+        store.edit {
+            val current = decode(it[key])
+            val config = current.settings.online[source.id] ?: return@edit
+            it[key] = json.encodeToString(current.copy(settings = current.settings.copy(
+                online = current.settings.online + (source.id to config.copy(encryptedKey = "")))))
+        }
+    }
     suspend fun saveSource(source: TtsCustomSource) {
         val value = source.validate()
         store.edit {

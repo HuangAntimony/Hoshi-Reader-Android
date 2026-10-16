@@ -29,7 +29,7 @@ class TtsAudioRepository internal constructor(
         fallback: AndroidTtsExportFallback) : this(engine, cache, ioDispatcher, fallback as TtsExportFallback)
     private val synthesis = Mutex()
     private val cacheLock = Mutex()
-    private val files = linkedMapOf<String, List<File>>()
+    private val files = LinkedHashMap<String, List<File>>(32, .75f, true)
     override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences): List<File> =
         withContext(ioDispatcher) {
             val plan = plan(sentence, bookId, preferences)
@@ -44,7 +44,8 @@ class TtsAudioRepository internal constructor(
                     withContext(NonCancellable) {
                         cacheLock.withLock {
                             files[key] = generated
-                            // Keep references bounded. Files are pruned after they are no longer part of an active session.
+                            // Cache hits promote the whole sentence, including every playlist fragment.
+                            // The 32-sentence capacity leaves room for the maximum 20-sentence prefetch.
                             if (files.size > 32) files.remove(files.keys.first())?.forEach { old -> old.delete() }
                         }
                     }

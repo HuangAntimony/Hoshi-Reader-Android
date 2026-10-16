@@ -128,6 +128,14 @@ class TtsViewModel @Inject constructor(
     } catch (error: CancellationException) { throw error }
     catch (error: Exception) { (error as? TtsException)?.failure ?: TtsFailure.Storage }
 
+    suspend fun removeKey(source: TtsOnlineSource): TtsFailure? = try {
+        repository.removeOnlineKey(source)
+        stopPreview()
+        refresh(force = true)
+        null
+    } catch (error: CancellationException) { throw error }
+    catch (_: Exception) { TtsFailure.Storage }
+
     /** Tests the draft by synthesizing a sample without saving it or changing the active voice. */
     suspend fun testConfiguration(source: TtsOnlineSource, region: String, key: String, sample: String): TtsFailure? = try {
         val config = configuration(source, region, key)

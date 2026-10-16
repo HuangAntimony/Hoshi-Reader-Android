@@ -974,6 +974,10 @@ QA matrices live in `docs/VALIDATION.md`.
 - Cloud configuration, self-hosted configuration and model discovery share credential draft
   resolution: blank input retains ciphertext, explicit removal clears it, and replacement
   keys are trimmed/validated before encryption with the existing source-bound Keystore key.
+  Cloud configuration exposes a separate confirmed Delete key action. Its repository
+  transaction removes only that provider's saved ciphertext from the latest preferences,
+  retaining region and other settings without submitting unsaved form input. Success clears
+  the key draft and connection-test feedback; failure retains the saved key and permits retry.
 - `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial
   Translator endpoint using its public client signing protocol. Tokens and their returned
   Speech region stay in memory, never in settings or exported media. A mutex shares token
@@ -1001,7 +1005,9 @@ QA matrices live in `docs/VALIDATION.md`.
   configuration (excluding prefetch depth and Hoshi playback speed) and resolved spoken text; independent export
   files are owned by their caller and cleaned on cancellation, including cancelled dispatcher return delivery.
   Cache lookups use a short metadata lock independently of the serial synthesis queue,
-  so ready audio never waits for another sentence's network request. Continuous playback
+  so ready audio never waits for another sentence's network request. The 32-entry audio
+  cache tracks access order; a hit promotes the complete sentence playlist before eviction.
+  This retains just-reused audio through the maximum 20-sentence prefetch horizon. Continuous playback
   keeps valid in-flight prefetch and rolls its horizon forward by the saved 1–20 sentence
   depth (default 5). Depth changes cancel/rebuild prefetch without pausing the current
   sentence or invalidating completed audio. Hoshi playback speed (0.5–3.0×, default 1×)
