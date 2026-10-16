@@ -15,11 +15,11 @@ class TtsEngineRouter @Inject constructor(
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? =
         when { settings.isCustomSource() -> custom.cachedCatalog(settings)
             TtsOnlineSource.from(settings.engine) != null -> online.cachedCatalog(settings)
-            else -> null }
+            else -> android.cachedCatalog(settings) }
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog =
         when { settings.isCustomSource() -> custom.catalog(settings, force)
             TtsOnlineSource.from(settings.engine) != null -> online.catalog(settings, force)
-            else -> android.catalog(settings) }
+            else -> android.catalog(settings, force) }
 
     suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> =
         when { settings.isCustomSource() -> custom.synthesize(text, settings, directory)

@@ -1299,8 +1299,14 @@ Validate relevant sync/update/Sasayaki changes with:
   cleanup and the independent Anki handlebars. JS selection tests include full VN source
   context rather than screen-clone text.
   Hold a later synthesis pending while requesting already cached audio: it must return
-  immediately. Concurrent misses for one sentence share synthesis; clearing requires a
-  fresh file. Advancing playback must retain pending prefetch and extend its horizon.
+  immediately. `AndroidTtsEngineTest` repeats this through the real router/audio repository
+  with narration/dialogue routing and a controlled system-engine synthesis queue. It also
+  covers per-engine/automatic catalog isolation, coalesced cold discovery, forced refresh
+  and cached reads during failed/cancelled/pending refreshes. Installed-engine catalogs
+  must remain memory-only; ordinary playback/preview/export reuse them while panel resume
+  and manual Refresh voices force discovery. Concurrent misses for one sentence share
+  synthesis; clearing requires a fresh file. Advancing playback must retain pending
+  prefetch and extend its horizon.
 - With a Japanese engine installed, build `assembleDebugAndroidTest`, install both
   APKs using `adb install -r`, and run only the explicit classes
   `moe.antimony.hoshi.features.tts.TtsEngineDeviceTest` (including punctuation replacement

@@ -932,8 +932,15 @@ QA matrices live in `docs/VALIDATION.md`.
   Catalogs are stored by profile ID and connection fingerprint without timed refresh.
   Missing `custom:` profiles fail configuration rather than falling through to Android.
   Japanese voice filtering accepts both `ja` and `jpn` locale language codes (including
-  Samsung's ISO 639-2 locales). TTS panels refresh installed-engine catalogs on resume so
-  returning from system voice installation updates their available voices.
+  Samsung's ISO 639-2 locales). `AndroidTtsEngine` caches installed-engine catalogs in memory
+  by requested engine ID, keeping automatic selection separate from explicit packages.
+  Cached catalog reads bypass `AndroidTextToSpeech`'s serial platform synthesis queue;
+  cold discovery is coalesced, and failed/cancelled refreshes retain the last catalog.
+  Playback, preview and export reuse these catalogs, including narration/dialogue routing.
+  The platform adapter also reuses native `Voice` objects until discovery or an engine
+  connection change, avoiding a platform voice-list query for every synthesis request.
+  TTS panels force installed-engine discovery on resume and manual refresh so returning
+  from system voice installation updates their available voices. Device catalogs are not persisted.
 - Online/self-hosted voice lists are shared by panel, preview and synthesis through the
   Hilt singleton `TtsVoiceCatalogCache`. It owns bounded memory storage and per-configuration
   request coalescing; network waits do not hold the metadata lock, so cached reads and

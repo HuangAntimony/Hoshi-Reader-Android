@@ -5,14 +5,18 @@ import android.content.Intent
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -32,12 +36,41 @@ class TtsException(val failure: TtsFailure, internal val statusCode: Int? = null
 // Engines may expose ISO 639-1 (Google) or ISO 639-2 (Samsung) locale language codes.
 internal fun isJapaneseTtsLocale(locale: Locale): Boolean = locale.language == "ja" || locale.language == "jpn"
 
-/** Android engines share one serial queue. Cancellation stops the exact active utterance. */
+internal interface TtsDeviceEngine {
+    suspend fun installedEngines(): List<TtsEngineInfo>
+    suspend fun catalog(settings: TtsSettings): TtsCatalog
+    suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File>
+}
+
 @Singleton
-class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val context: Context) {
+class AndroidTtsEngine internal constructor(private val device: TtsDeviceEngine) {
+    @Inject constructor(@ApplicationContext context: Context) : this(AndroidTextToSpeech(context))
+
+    // Catalog reads must stay independent of the platform's serial synthesis queue.
+    // The empty key retains automatic engine selection separately from explicit engines.
+    private val catalogs = ConcurrentHashMap<String, TtsCatalog>()
+    private val discovery = Mutex()
+    fun cachedCatalog(settings: TtsSettings): TtsCatalog? = catalogs[settings.engine]
+    suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog {
+        if (!force) cachedCatalog(settings)?.let { return it }
+        return discovery.withLock {
+            if (!force) cachedCatalog(settings)?.let { return@withLock it }
+            device.catalog(settings).also {
+                currentCoroutineContext().ensureActive()
+                catalogs[settings.engine] = it
+            }
+        }
+    }
+    suspend fun installedEngines() = device.installedEngines()
+    suspend fun synthesize(text: String, settings: TtsSettings, directory: File) = device.synthesize(text, settings, directory)
+}
+
+/** Android engines share one serial queue. Cancellation stops the exact active utterance. */
+private class AndroidTextToSpeech(private val context: Context) : TtsDeviceEngine {
     private val mutex = Mutex()
     private var instance: TextToSpeech? = null
     private var engineId: String? = null
+    private var voices: List<Voice>? = null
 
     private fun installed(): List<TtsEngineInfo> = context.packageManager
         .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
@@ -49,6 +82,7 @@ class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val
         instance?.shutdown()
         instance = null
         engineId = null
+        voices = null
         val ready = CompletableDeferred<Int>()
         val created = withContext(Dispatchers.Main) { TextToSpeech(context, { ready.complete(it) }, id) }
         try {
@@ -80,20 +114,22 @@ class AndroidTtsEngine @Inject constructor(@param:ApplicationContext private val
         throw TtsException(TtsFailure.MissingJapanese)
     }
 
-    private fun japaneseVoices(tts: TextToSpeech) = tts.voices.orEmpty()
+    private fun japaneseVoices(tts: TextToSpeech): List<Voice> = voices ?: tts.voices.orEmpty()
         .filter { isJapaneseTtsLocale(it.locale) }.sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.name }))
+        .also { voices = it }
 
-    suspend fun catalog(settings: TtsSettings): TtsCatalog = withContext(Dispatchers.IO) {
+    override suspend fun catalog(settings: TtsSettings): TtsCatalog = withContext(Dispatchers.IO) {
         mutex.withLock {
+            voices = null
             val (tts, id) = resolve(settings)
             val voices = japaneseVoices(tts)
             TtsCatalog(id, voices.map { TtsVoiceInfo(it.name, it.isNetworkConnectionRequired) })
         }
     }
 
-    suspend fun installedEngines(): List<TtsEngineInfo> = withContext(Dispatchers.IO) { installed() }
+    override suspend fun installedEngines(): List<TtsEngineInfo> = withContext(Dispatchers.IO) { installed() }
 
-    suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> {
+    override suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> {
         val files = mutableListOf<File>()
         try {
             return withContext(Dispatchers.IO) { mutex.withLock {

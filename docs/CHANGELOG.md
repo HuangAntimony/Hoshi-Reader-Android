@@ -86,8 +86,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   sentence pause takes effect at the next boundary without stopping narration or
   regenerating cached audio. Independent setting edits preserve other saved preferences.
   MP3 sources retain MP3 for playback and Anki.
-  Ready sentence audio plays without waiting for later network synthesis, and continuous
-  playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20
+  Ready sentence audio plays without waiting for later network synthesis, including
+  installed Android engines using separate narration/dialogue voices. Installed-engine
+  voice lists are reused during playback and refreshed manually or when returning to the
+  panel. Continuous playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20
   upcoming sentences to preload in Voice (default 5); changes adjust
   buffering without interrupting narration or regenerating cached audio.
   While narration is paused, chapter navigation and returning to Reader keep the selected

@@ -84,15 +84,16 @@ class TtsViewModel @Inject constructor(
             var fallback: TtsCatalog? = null
             try {
                 val settings = repository.preferences.first().settings
+                val refreshCatalog = force || !settings.isCustomSource() && TtsOnlineSource.from(settings.engine) == null
                 val optional = settings.customSource()?.takeIf { it.protocol == TtsCustomProtocol.OpenAi }
                 fallback = optional?.let { TtsCatalog(it.id, it.voiceChoices(emptyList(), settings.voice)) }
                 val cached = engine.cachedCatalog(settings)
                 fallback = cached ?: fallback
                 mutableError.value = null
                 mutableCatalog.value = cached ?: fallback
-                catalogBusy.value = force || cached == null
+                catalogBusy.value = refreshCatalog || cached == null
                 mutableEngines.value = engine.installedEngines()
-                mutableCatalog.value = if (!force && cached != null) cached else engine.catalog(settings, force)
+                mutableCatalog.value = if (!refreshCatalog && cached != null) cached else engine.catalog(settings, refreshCatalog)
                 if (mutableCatalog.value?.voices.isNullOrEmpty() && settings.customSource()?.protocol != TtsCustomProtocol.OpenAi) mutableError.value = TtsFailure.MissingJapanese
             } catch (error: TimeoutCancellationException) { mutableError.value = TtsFailure.Timeout }
             catch (error: CancellationException) { throw error }

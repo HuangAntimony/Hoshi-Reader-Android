@@ -121,7 +121,7 @@ class TtsEngineDeviceTest {
         } finally { directory.deleteRecursively() }
     }
     @Test fun removedEngineIsExplicitlyRejected() = runBlocking {
-        val engine = AndroidTtsEngine(ApplicationProvider.getApplicationContext())
+        val engine = AndroidTtsEngine(ApplicationProvider.getApplicationContext<Context>())
         try {
             engine.catalog(TtsSettings(engine = "moe.antimony.hoshi.nonexistent.tts"))
             fail("A missing selected engine must not silently use the default")
