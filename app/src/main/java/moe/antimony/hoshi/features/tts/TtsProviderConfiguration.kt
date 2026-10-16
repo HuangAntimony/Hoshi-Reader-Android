@@ -43,15 +43,25 @@ internal fun TtsProviderConfiguration(
     var failure by remember(source) { mutableStateOf<TtsFailure?>(null) }
     var tested by remember(source) { mutableStateOf(false) }
     var confirmDelete by remember(source) { mutableStateOf(false) }
+    val selectedRegion = TtsAzureRegion.from(region)
+    val regionReady = source != TtsOnlineSource.Azure || selectedRegion != null
     val scope = rememberCoroutineScope()
     TtsSelectionSheet(stringResource(source.labelRes), onDismiss) {
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.tts_cloud_credentials_hint), style = MaterialTheme.typography.bodyMedium, color = hoshiSurfaces.muted)
-            if (source == TtsOnlineSource.Azure) OutlinedTextField(region, { region = it; tested = false; failure = null },
-                modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true,
-                label = { Text(stringResource(R.string.tts_azure_region)) }, placeholder = { Text(stringResource(R.string.tts_azure_region_example)) },
-                colors = hoshiOutlinedTextFieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii))
+            if (source == TtsOnlineSource.Azure) {
+                val regions = TtsAzureRegion.entries.map {
+                    TtsChoiceOption(it.id, it.id)
+                }
+                TtsChoice(stringResource(R.string.tts_azure_region),
+                    regions.firstOrNull { it.id == region }?.label ?: stringResource(R.string.tts_azure_region_select),
+                    region, regions, enabled = !busy, compact = true,
+                ) { region = it; tested = false; failure = null }
+                Text(stringResource(R.string.tts_azure_region_hint), style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted)
+                if (region.isNotBlank() && selectedRegion == null) Text(stringResource(R.string.tts_azure_region_invalid),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             OutlinedTextField(apiKey, { apiKey = it; tested = false; failure = null }, modifier = Modifier.fillMaxWidth(),
                 enabled = !busy, singleLine = true, label = { Text(stringResource(R.string.tts_api_key)) },
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -64,14 +74,14 @@ internal fun TtsProviderConfiguration(
             }
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TtsConnectionTestControls(!busy, testing, tested, failure, onTest = { scope.launch {
+            TtsConnectionTestControls(!busy && regionReady, testing, tested, failure, onTest = { scope.launch {
                 busy = true; testing = true; tested = false; failure = null
                 try { failure = onTest(region, apiKey); tested = failure == null }
                 finally { busy = false; testing = false }
             } })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(stringResource(R.string.action_cancel)) }
-                HoshiButton(enabled = !busy, modifier = Modifier.weight(1f).height(48.dp), onClick = {
+                HoshiButton(enabled = !busy && regionReady, modifier = Modifier.weight(1f).height(48.dp), onClick = {
                     scope.launch {
                         busy = true; failure = null
                         try { failure = onSave(region, apiKey); if (failure == null) { apiKey = ""; onDismiss() } }

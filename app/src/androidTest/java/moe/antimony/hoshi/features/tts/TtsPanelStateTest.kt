@@ -106,6 +106,24 @@ class TtsPanelStateTest {
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
 
+    @Test fun azureConfigurationRejectsUnknownRegionsAndPersistsTheSelectedRegion() {
+        panel()
+        compose.runOnIdle { runBlocking {
+            val repository = TtsRepository(speech)
+            val original = repository.preferences.first()
+            for (region in listOf("", "east", "southindia", "spaincentral", "eastus/evil")) {
+                Assert.assertEquals(TtsFailure.Configuration, model.configure(TtsOnlineSource.Azure, region, "fixture-key"))
+                Assert.assertEquals(TtsFailure.Configuration, model.testConfiguration(TtsOnlineSource.Azure, region, "fixture-key", "日本語です。"))
+                Assert.assertEquals(original, repository.preferences.first())
+            }
+            Assert.assertNull(model.configure(TtsOnlineSource.Azure, "japaneast", "fixture-key"))
+            val saved = TtsRepository(speech).preferences.first().settings
+            Assert.assertEquals("japaneast", saved.online.getValue(TtsOnlineSource.Azure.id).region)
+            Assert.assertTrue(saved.online.getValue(TtsOnlineSource.Azure.id).encryptedKey.isNotBlank())
+            Assert.assertEquals(original.settings.engine, saved.engine)
+        } }
+    }
+
     @Test fun cloudKeyRemovalReportsWriteFailureAndBlankDraftsCannotRestoreIt() {
         panel()
         compose.runOnIdle { runBlocking {

@@ -202,7 +202,7 @@ private fun TtsDictionaryList(words: List<TtsWord>, onAdd: () -> Unit, onEdit: (
 @Composable
 internal fun TtsChoice(
     label: String, value: String, selected: String, choices: List<TtsChoiceOption>,
-    supporting: String? = null, singleLine: Boolean = false, enabled: Boolean = true, onSelected: (String) -> Unit,
+    supporting: String? = null, singleLine: Boolean = false, enabled: Boolean = true, compact: Boolean = false, onSelected: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -218,9 +218,10 @@ internal fun TtsChoice(
             }
             Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                 Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp), tint = hoshiSurfaces.muted)
-                DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(max = 320.dp)) {
+                DropdownMenu(expanded, onDismissRequest = { expanded = false }, modifier = Modifier.widthIn(max = 320.dp)
+                    .then(if (compact) Modifier.heightIn(max = 320.dp) else Modifier)) {
                     choices.forEach { choice ->
-                        DropdownMenuItem(text = {
+                        DropdownMenuItem(modifier = if (compact) Modifier.height(40.dp) else Modifier, text = {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(choice.label, style = MaterialTheme.typography.bodyMedium)
                                 choice.supporting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = hoshiSurfaces.muted) }

@@ -113,7 +113,8 @@ class TtsViewModel @Inject constructor(
     private suspend fun configuration(source: TtsOnlineSource, region: String, key: String): TtsOnlineConfig {
         val current = repository.preferences.first().settings.online[source.id] ?: TtsOnlineConfig()
         val cleanedRegion = region.trim().lowercase(java.util.Locale.ROOT)
-        if (source == TtsOnlineSource.Azure) OnlineTtsProtocol.azureBase(cleanedRegion)
+        if (source == TtsOnlineSource.Azure && TtsAzureRegion.from(cleanedRegion) == null)
+            throw TtsException(TtsFailure.Configuration)
         val encrypted = cipher.update(key, source.id, current.encryptedKey)
         if (source.needsKey && encrypted.isBlank()) throw TtsException(TtsFailure.Configuration)
         return TtsOnlineConfig(cleanedRegion, encrypted)

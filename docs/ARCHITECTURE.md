@@ -978,6 +978,11 @@ QA matrices live in `docs/VALIDATION.md`.
   transaction removes only that provider's saved ciphertext from the latest preferences,
   retaining region and other settings without submitting unsaved form input. Success clears
   the key draft and connection-test feedback; failure retains the saved key and permits retry.
+  `TtsAzureRegion` lists the supported public-cloud neural TTS regions with stable region codes
+  as display labels. Azure configuration uses the shared themed dropdown with compact rows and no
+  default selection; invalid saved IDs require reselection without rewriting preferences.
+  Save/Test are gated by a supported region in both UI and ViewModel, while key deletion
+  stays independent. Translator continues using its authorization response's region.
 - `MicrosoftTranslatorSession` obtains ephemeral authorization from the unofficial
   Translator endpoint using its public client signing protocol. Tokens and their returned
   Speech region stay in memory, never in settings or exported media. A mutex shares token

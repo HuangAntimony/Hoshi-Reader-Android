@@ -1110,6 +1110,12 @@ Validate relevant sync/update/Sasayaki changes with:
   response coverage as a successful live account test. Reopening configuration must
   keep the saved key masked; leaving it empty preserves it. Restored settings without
   the Keystore key must request reconfiguration.
+  Azure's region dropdown starts at Choose a region and never preselects the first item.
+  Verify compact rows displaying only region codes, scrolling to the end of the list, valid
+  saved selection on reopen, and a reselection warning for invalid saved IDs. Save/Test
+  require a supported selection; changing it clears previous verification. Cancel leaves
+  the saved region unchanged. `TtsProviderConfigurationTest` and `TtsPanelStateTest`
+  cover UI drafts and ViewModel validation with isolated preferences.
   Delete key appears only for saved cloud credentials and requires confirmation. Cancel
   preserves the key; confirm deletes it immediately without Save, retaining region and
   other preferences and clearing the input/test feedback. A write failure retains the key

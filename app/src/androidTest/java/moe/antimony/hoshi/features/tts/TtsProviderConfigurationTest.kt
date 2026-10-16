@@ -18,6 +18,73 @@ class TtsProviderConfigurationTest {
     private val context get() = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
     private fun text(resource: Int) = context.getString(resource)
 
+    @Test fun newAzureConfigurationRequiresExplicitRegionSelection() {
+        var requests = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig(),
+                    { _, _ -> requests++; null }, { _, _ -> requests++; null }, {}, onDelete = { null })
+            }
+        }
+        compose.onNode(hasSetTextAction() and hasText(text(R.string.tts_azure_region))).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.tts_test_connection)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.tts_azure_region_select)).assertExists()
+        compose.runOnIdle { assertEquals(0, requests) }
+    }
+
+    @Test fun selectingRegionsUpdatesTestAndSaveDraftsAndRestoresTheSavedChoice() {
+        val config = mutableStateOf(TtsOnlineConfig())
+        val open = mutableStateOf(true)
+        var testedRegion: String? = null
+        var saves = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                if (open.value) TtsProviderConfiguration(TtsOnlineSource.Azure, config.value,
+                    { region, _ -> testedRegion = region; null }, { region, _ ->
+                        saves++; config.value = config.value.copy(region = region); open.value = false; null
+                    }, { open.value = false }, onDelete = { null })
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_azure_region)).performClick()
+        compose.onNodeWithText("japaneast").performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_test_connection)).assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals("japaneast", testedRegion); assertEquals(0, saves) }
+        compose.onNodeWithText(text(R.string.tts_connection_success)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_azure_region)).performClick()
+        compose.onNodeWithText("westus3").performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_connection_success)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.action_save)).performClick()
+        compose.runOnIdle { assertEquals("westus3", config.value.region); assertEquals(1, saves); open.value = true }
+        compose.onNodeWithText("westus3").assertExists()
+        compose.onNodeWithText(text(R.string.tts_azure_region_select)).assertDoesNotExist()
+    }
+
+    @Test fun invalidSavedRegionRequiresReselectionButStillAllowsKeyDeletion() {
+        val config = mutableStateOf(TtsOnlineConfig("east", "encrypted-fixture"))
+        var saves = 0
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
+                TtsProviderConfiguration(TtsOnlineSource.Azure, config.value,
+                    { _, _ -> null }, { _, _ -> saves++; null }, {}, onDelete = {
+                        config.value = config.value.copy(encryptedKey = ""); null
+                    })
+            }
+        }
+        compose.onNodeWithText(text(R.string.tts_azure_region_select)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_azure_region_invalid)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_test_connection)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsNotEnabled()
+        compose.onNodeWithText(text(R.string.tts_delete_key)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.action_delete)).performClick()
+        compose.runOnIdle { assertEquals("", config.value.encryptedKey); assertEquals("east", config.value.region); assertEquals(0, saves) }
+        compose.onNodeWithText(text(R.string.tts_azure_region)).performScrollTo().performClick()
+        compose.onNodeWithText("eastasia").performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_azure_region_invalid)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.action_save)).assertIsEnabled()
+        compose.runOnIdle { assertEquals("east", config.value.region); assertEquals(0, saves) }
+    }
+
     @Test fun savedCloudKeyDeletionRequiresConfirmationAndCancelKeepsTheForm() {
         var saved = false
         var deletions = 0
@@ -92,7 +159,7 @@ class TtsProviderConfigurationTest {
         val result = kotlinx.coroutines.CompletableDeferred<TtsFailure?>()
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
-                TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig(),
+                TtsProviderConfiguration(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia"),
                     { _, _ -> result.await() }, { _, _ -> null }, {}, onDelete = { null })
             }
         }

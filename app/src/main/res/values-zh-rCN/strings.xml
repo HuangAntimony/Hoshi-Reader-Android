@@ -959,7 +959,9 @@
     <string name="tts_unofficial_hint" comment="TTS online source configuration">使用非官方在线接口，朗读文本会发送至该服务；可用性可能变化。</string>
     <string name="tts_cloud_source_hint" comment="TTS online source configuration">使用你的云服务账户，朗读文本会发送至该服务，并可能产生费用。</string>
     <string name="tts_azure_region" comment="TTS online source configuration">语音资源区域</string>
-    <string name="tts_azure_region_example" comment="TTS online source configuration">eastus</string>
+    <string name="tts_azure_region_select" comment="Azure Speech resource region selection">请选择区域</string>
+    <string name="tts_azure_region_hint" comment="Azure Speech resource region selection">请选择 API 密钥对应的 Azure Speech 资源区域。</string>
+    <string name="tts_azure_region_invalid" comment="Azure Speech resource region selection">已保存的区域不在支持列表中，请重新选择。</string>
     <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
     <string name="tts_key_saved_hint" comment="TTS online source configuration">密钥已配置；留空可保留现有密钥。</string>
     <string name="tts_delete_key">删除密钥</string>

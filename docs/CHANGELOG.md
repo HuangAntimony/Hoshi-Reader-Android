@@ -35,7 +35,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Cloud credentials use a matching configuration sheet; connection testing and its
   success/error feedback stay visible in a fixed footer for cloud and self-hosted sources,
   without requiring another scroll after testing. Saved cloud API keys can be deleted
-  immediately after confirmation, preserving other source settings. Source errors
+  immediately after confirmation, preserving other source settings. Azure regions use
+  a compact dropdown of region codes, requiring an explicit selection
+  for new or invalid configurations. Source errors
   stay beside the voice card instead of leaking into other tabs. Online voice lists remain
   available across panel openings and app restarts without automatic network refresh;
   the Voice picker provides a manual refresh action at the top for every source,
