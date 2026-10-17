@@ -632,7 +632,6 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     private var nativeSelectionAnchorGeneration = 0
     private data class SelectionMenuRecoveryRequest(val id: Int, val documentToken: String)
     private data class SelectionMenuRecoveryTouch(val downTime: Long, val x: Float, val y: Float)
-    private var selectionMenuRecoveryGeneration = 0
     private var selectionMenuRecoveryRequest: SelectionMenuRecoveryRequest? = null
     private var selectionMenuRecoveryTouch: SelectionMenuRecoveryTouch? = null
     private val finishSelectionMenuRecoveryTouch = Runnable {
@@ -748,14 +747,12 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
         fun discardRequest() {
             if (selectionMenuRecoveryRequest === recoveryRequest) cancelSelectionMenuRecoveryTouch()
         }
-        val recoveryGeneration = selectionMenuRecoveryGeneration
         val mode = nativeSelectionActionMode
         val generation = nativeSelectionAnchorGeneration
         evaluateJavascript(ReaderSelectionCommand.TakeMenuRecovery(request, generation).source) { result ->
             if (selectionMenuRecoveryRequest !== recoveryRequest ||
                 tag != documentToken || nativeSelectionActionMode !== mode ||
                 generation != nativeSelectionAnchorGeneration ||
-                recoveryGeneration != selectionMenuRecoveryGeneration ||
                 selectionMenuRecoveryTouch != null ||
                 !isAttachedToWindow || !hasWindowFocus()) {
                 discardRequest()
@@ -796,7 +793,6 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
 
     private fun cancelSelectionMenuRecoveryTouch() {
         // Cancel queued JS replies as well as an already-started touch.
-        selectionMenuRecoveryGeneration++
         selectionMenuRecoveryRequest?.let { request ->
             selectionMenuRecoveryRequest = null
             if (!isReleased) evaluateJavascript(ReaderSelectionCommand.CancelMenuRecovery(request.id, request.documentToken).source, null)

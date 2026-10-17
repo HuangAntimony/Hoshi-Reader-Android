@@ -451,7 +451,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   bypassing reader page/tap gestures while preserving the selected range and
   WebView's ActionMode ownership. Mouse requests use a separate dropdown on
   Android 14+ large screens and must not be used for touch-menu recovery.
-  Recovery validates both anchor and interaction generations; valid-position and
+  Recovery validates request identity and the anchor generation; valid-position and
   secondary-button requests are never replayed. Native handle requests may report
   `pointerType="mouse"` with `button=-1`, so pointer type does not exclude them.
   Consuming a recovery point arms a document/request-scoped replay guard: the

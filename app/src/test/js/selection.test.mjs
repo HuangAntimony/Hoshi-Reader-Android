@@ -968,15 +968,42 @@ test('invalid touch menu requests recover once at a visible selected character',
     assert.equal(misplaced.prevented,true,'Visible coordinates outside the selected text also need recovery');
     assert.deepEqual(JSON.parse(JSON.stringify(selection.takeNativeMenuRecovery(calls.at(-1)[0], 43))),
         {x:30,y:60,viewportWidth:400});
-    document.caretRangeFromPoint = () => ({startContainer:{},startOffset:0});
-    const count=calls.length;
-    dispatchDocumentEvent('contextmenu',event());
-    assert.equal(calls.length,count,'Do not replay over unselected text inside a block rectangle');
-    document.caretRangeFromPoint = () => ({startContainer:{parentElement:{closest:()=>({})}},startOffset:0});
-    range.comparePoint = () => 0;
-    dispatchDocumentEvent('contextmenu',event());
-    assert.equal(calls.length,count,'Ruby annotations are not a menu recovery target');
 });
+
+for (const {name, target, rangePosition} of [
+    {name:'unselected body text',target:{nodeType:3},rangePosition:1},
+    {name:'ruby annotations',target:{nodeType:3,parentElement:{closest:()=>({})}},rangePosition:0},
+]) {
+    test(`native menu recovery rejects ${name}`, () => {
+        const {selection,window,document,dispatchDocumentEvent} = loadSelection('読書');
+        const textNode = {nodeType:3};
+        const range = {
+            getClientRects:()=>[{left:20,top:40,right:40,bottom:80}],
+            comparePoint:node=>node===textNode?0:rangePosition,
+            cloneRange:()=>({
+                collapse(start) { this.start = start; },
+                getBoundingClientRect() { return {left:20,right:40,top:this.start?40:80,bottom:this.start?40:80}; },
+            }),
+        };
+        window.getSelection = () => ({isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range});
+        document.caretRangeFromPoint = () => ({startContainer:target,startOffset:0});
+        selection.configure({bridge:'android-reader',nativeSelectionToken:'chapter'});
+        const calls = [];
+        window.HoshiNativeSelection = {recoverMenu:id=>calls.push(id)};
+        const request = () => {
+            const event = {isTrusted:true,button:-1,clientX:-1,clientY:-1,preventDefault(){this.prevented=true;}};
+            dispatchDocumentEvent('contextmenu',event);
+            return event;
+        };
+        assert.notEqual(request().prevented,true,'An invalid recovery target leaves the native event untouched');
+        assert.equal(calls.length,0,'An invalid recovery target cannot start a replay');
+        // A selected body target must still recover in the same fixture: the
+        // negative result cannot come from a replay guard or another early exit.
+        document.caretRangeFromPoint = () => ({startContainer:textNode,startOffset:0});
+        assert.equal(request().prevented,true,'A selected body target allows recovery');
+        assert.equal(calls.length,1);
+    });
+}
 
 test('cancelled native replays cannot suppress a later recovery and stale cancellations are ignored', () => {
     const { selection, window, document, dispatchDocumentEvent } = loadSelection('読書');
