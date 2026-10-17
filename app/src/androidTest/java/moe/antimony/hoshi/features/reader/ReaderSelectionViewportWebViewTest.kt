@@ -230,6 +230,60 @@ class ReaderSelectionViewportWebViewTest {
     }
 
     @Test
+    fun draggingStartToRubyBoundaryRecoversThroughSelectedTextInsteadOfHandle() {
+        val webView = createWebView()
+        try {
+            loadFixture(webView, vertical = true, rubyBoundary = true)
+            evaluate(webView, """
+                (()=>{let n=document.getElementById('ruby-body').firstChild;
+                    while(n.length>1)n=n.splitText(1);
+                    window.boundaryMenuEvents=[];
+                    document.addEventListener('contextmenu',e=>{
+                        if(e.isTrusted)boundaryMenuEvents.push({pointer:e.pointerType,prevented:e.defaultPrevented});
+                    });return true;})()
+            """.trimIndent())
+            val location = IntArray(2)
+            var density = 1f
+            instrumentation.runOnMainSync {
+                webView.getLocationOnScreen(location)
+                density = webView.resources.displayMetrics.density
+            }
+            fun x(value: Double) = location[0] + value.toFloat() * density
+            fun y(value: Double) = location[1] + value.toFloat() * density
+            val tail = JSONObject(evaluate(webView, "document.getElementById('tail').getBoundingClientRect().toJSON()"))
+            gesture(x(tail.getDouble("left") + tail.getDouble("width") / 2),
+                y(tail.getDouble("top") + tail.getDouble("height") / 2), duration = 900)
+            composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
+            val start = JSONObject(evaluate(webView, """
+                (()=>{const r=getSelection().getRangeAt(0).cloneRange();r.collapse(true);
+                    return r.getBoundingClientRect().toJSON();})()
+            """.trimIndent()))
+            val target = JSONObject(evaluate(webView, """
+                (()=>{const r=document.createRange();r.selectNodeContents(document.getElementById('ruby-body').firstChild);
+                    return r.getBoundingClientRect().toJSON();})()
+            """.trimIndent()))
+            evaluate(webView, "boundaryMenuEvents.length=0;true")
+            gesture(x(start.getDouble("right") - 6), y(start.getDouble("top") + 10),
+                x(target.getDouble("right") - 6), y(target.getDouble("top") + 10), 900)
+            assertEquals("Dragging starts immediately after ruby and retains the native end",
+                "\"は大学を１年目でやめてしまったので大学時代の知り合いは少なく、大学で知り合った人\"",
+                evaluate(webView, "getSelection().toString()"))
+            assertAppActionsVisible(listOf(R.string.reader_highlight_action))
+            assertTrue("Recovery reaches selected content as a touch, rather than pressing a handle again",
+                evaluate(webView, "boundaryMenuEvents.some(e=>e.pointer==='touch'&&!e.prevented)").toBoolean())
+            SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() * 2 + 300L)
+            assertAppActionsVisible(listOf(R.string.reader_highlight_action))
+            assertTrue("Recovery retains both exact range endpoints at the ruby boundary", evaluate(webView, """
+                (()=>{const r=getSelection().getRangeAt(0);
+                    return r.startContainer===document.getElementById('ruby-body').firstChild&&r.startOffset===0&&
+                    r.endContainer===document.getElementById('tail').firstChild&&r.endOffset===1;})()
+            """.trimIndent()).toBoolean())
+        } finally {
+            destroyFixture(webView)
+        }
+    }
+
+    @Test
     fun pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges() {
         val webView = createWebView()
         try {
@@ -428,7 +482,7 @@ class ReaderSelectionViewportWebViewTest {
         return webView
     }
 
-    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false) {
+    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false, rubyBoundary: Boolean = false) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val loaded = CountDownLatch(1)
         instrumentation.runOnMainSync {
@@ -452,7 +506,11 @@ class ReaderSelectionViewportWebViewTest {
                     "const s=getSelection();if(s.isCollapsed||!s.rangeCount)return;selectionChanges++;" +
                     "const range=s.getRangeAt(0),text=range.toString();" +
                     "if(range.intersectsNode(document.getElementById('before'))||text.length>24)selectionEscapedPage=text;" +
-                    "});</script></head><body>" + (if (crossParagraph)
+                    "});</script></head><body>" + (if (rubyBoundary)
+                        "<p id='before'></p><p><ruby>月<rt>つき</rt></ruby>" +
+                        "<span id='ruby-body'>は大学を１年目でやめてしまったので大学時代の知り合いは少なく、大学で知り合った</span>" +
+                        "<span id='tail'>人</span>です。</p>"
+                    else if (crossParagraph)
                         "<p id='before'></p><p id='reverse-start'>あいう学で知り合った人間で現在も付き合いがあるのは一人だけだった。</p>" +
                         "<p id='reverse-end'>彼女の名前は<ruby>白川京<rt>しらかわみやこ</rt></ruby><span id='tail'>。</span></p>"
                     else if (plain)

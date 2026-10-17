@@ -175,6 +175,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   or offscreen menu coordinates. Keep Highlight and TTS Replace available after
   menu recovery on large-screen devices, and prevent repeated recovery from
   hiding the menu or a selection handle in reverse selections across paragraphs.
+  Recover inside the selection away from its handles, including fragmented text
+  starting immediately after ruby.
 - Create, recolor and remove highlights when native selections begin or end
   inside ruby annotations or at element boundaries, using only selected body text.
 - Keep text selection from unexpectedly turning pages or chapters when the

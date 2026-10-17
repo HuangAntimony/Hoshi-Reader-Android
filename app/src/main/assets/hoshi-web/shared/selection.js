@@ -904,18 +904,31 @@ window.hoshiSelection = {
             selectedCaretAt(event.clientX, event.clientY)) return;
         // Chromium can use a previous column's caret coordinates after a handle
         // drag. Recover only at a visible point verified to belong to this range.
+        const endpoints = [true, false].map(start => {
+            const caret = range.cloneRange();
+            caret.collapse(start);
+            const rect = caret.getBoundingClientRect();
+            return { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
+        });
+        let point = null, clearance = -1;
         for (const rect of range.getClientRects()) {
             const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
             const right = Math.min(innerWidth, rect.right), bottom = Math.min(innerHeight, rect.bottom);
             if (right <= left || bottom <= top) continue;
             const x = (left + right) / 2, y = (top + bottom) / 2;
-            if (!selectedCaretAt(x, y)) continue;
-            const id = ++this.nativeMenuRecoverySequence;
-            this.nativeMenuRecovery = { id, point: { x, y, viewportWidth: innerWidth } };
-            event.preventDefault();
-            bridge.recoverMenu(id, this.options.nativeSelectionToken);
-            return;
+            // A fragmented range's first glyph can overlap the native start
+            // handle. Pressing it re-enters handle dragging and keeps the menu
+            // hidden. Prefer the selected fragment furthest from both carets.
+            const distance = Math.min(...endpoints.map(p => (x - p.x) ** 2 + (y - p.y) ** 2));
+            if (distance <= clearance || !selectedCaretAt(x, y)) continue;
+            point = { x, y, viewportWidth: innerWidth };
+            clearance = distance;
         }
+        if (!point) return;
+        const id = ++this.nativeMenuRecoverySequence;
+        this.nativeMenuRecovery = { id, point };
+        event.preventDefault();
+        bridge.recoverMenu(id, this.options.nativeSelectionToken);
     },
 
     takeNativeMenuRecovery(id, anchorRequest) {

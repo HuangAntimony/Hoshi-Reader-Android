@@ -263,6 +263,12 @@ node --test app/src/test/js/*.test.mjs
   native long-press and drag gestures; DOM-only selections do not establish their
   visibility. A briefly visible menu is insufficient: recovery must settle without
   repeated gestures or a hidden handle.
+  `draggingStartToRubyBoundaryRecoversThroughSelectedTextInsteadOfHandle` drags
+  a native start handle to a single-character text node immediately after ruby.
+  Check that recovery reaches content as a touch context-menu event rather than
+  another handle adjustment, preserves both endpoints, and keeps Highlight visible.
+  Include this boundary in real-book checks; a recovery point at the first selected
+  glyph may overlap the native start handle even though it hits selected DOM text.
   `pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges` checks cancellation
   before the long-press deadline; `menuRecoveryReplyCannotOutliveNewTouch` blocks
   the JS reply while a new touch arrives and rejects a late recovery gesture.

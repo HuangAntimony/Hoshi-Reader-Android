@@ -443,7 +443,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   fallback without rereading layout during the gesture; document, mode, and
   request-generation guards reject stale replies. If Chromium sends a trusted
   touch context-menu request outside the viewport or selected text after a handle drag, shared
-  selection validates a visible point inside the current range. Android consumes
+  selection validates a visible fragment center inside the current range, choosing
+  the one furthest from both endpoint carets. Using the first glyph of fragmented
+  text can hit a native handle instead of content and leave the menu hidden.
+  Android consumes
   that point once and replays a touch long press directly through WebView,
   bypassing reader page/tap gestures while preserving the selected range and
   WebView's ActionMode ownership. Mouse requests use a separate dropdown on
