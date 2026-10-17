@@ -19,8 +19,8 @@ build behavior:
 ./gradlew lint
 ```
 
-For transcription runtime packaging or binding transforms, also run
-`./gradlew -p buildSrc test` and `python3 tools/build-transcription-audio.py --check`.
+For transcription runtime packaging, also run
+`python3 tools/build-transcription-audio.py --check`.
 When changing the FFmpeg decoder or its CMake configuration, build all component
 ABIs with `python3 tools/build-transcription-audio.py --ndk <NDK-29.0.14206865>
 --cmake <CMake-3.31.6>`. Commit the generated
@@ -83,7 +83,7 @@ node --test app/src/test/js/*.test.mjs
 
 ## Nakuru
 
-- Install a debug APK with `adb install -r`, select Nakuru in Resources >
+- Install a debug APK with `adb install -r`, open Resources >
   Transcription and start a transcription once so the app downloads and verifies
   its resources. The device tests below use those files and fail instead of
   downloading.
@@ -95,18 +95,24 @@ node --test app/src/test/js/*.test.mjs
   tokens, then tests cancellation/resume without touching book sidecars. Outputs
   remain in app cache as `nakuru-result-<preset>.json`.
 - Run `TranscriptionBenchmarkDeviceTest#benchmarkExcerpt` explicitly with `clip`,
-  `preset` (1/2/3), and `engine` (`nakuru` or `reazon`). It requires an excerpt
+  `preset` (1/2/3). It requires an excerpt
   of at most 300 seconds, checks valid timed tokens, and records end-to-end
   backend timing and output in app cache. It does not establish recognition
   accuracy.
 - `NakuruTranscriptAlignerTest` compares the aligner with expected results on
   synthetic fixtures; do not change expectations merely to make a failing test
   pass.
-- In Resources > Transcription, select Nakuru, start/pause/resume, then realign a
-  completed transcript. The selected engine locks once a transcript exists;
-  clearing it permits a change. ReazonSpeech must still work in the same
-  process, and its existing incremental matching remains unchanged. Test a real
-  EPUB plus compressed audiobook separately, preserving reading and playback state.
+- In Resources > Transcription, start/pause/resume and realign a completed
+  transcript. Nakuru is the sole engine; only the performance preset is selectable.
+  The first nonempty token batch triggers matching immediately; subsequent starts
+  are at least 15 seconds apart and coalesce the newest snapshot. Keep reading with
+  the sheet closed and verify cues grow without moving the current page or playback.
+- On upgrade, confirm application startup removes only the retired ReazonSpeech
+  model folder and ONNX/sherpa runtime files (including `.part` files), preserving
+  Nakuru, FFmpeg, audiobook files and all sidecars. Repeat startup after an interrupted
+  cleanup. A failed removal must appear in Diagnostics with its path and original
+  cause and be retried on the next startup. Use generated scratch fixtures for failure
+  injection; do not change permissions on user files.
 
 ## Sasayaki Subtitle Export
 
@@ -1138,8 +1144,9 @@ Validate relevant sync/update/Sasayaki changes with:
   Verify a model-only cache requests just the runtime, and fully cached resources
   work offline. Runtime files must be read-only and SHA-256 verified before native
   loading; corrupt or cancelled downloads must not publish a library. Check release
-  APKs contain no FFmpeg/ONNX/sherpa native libraries, and component release assets
-  match the URLs, byte sizes and hashes embedded in `transcription-runtime.json`. Display processed/total
+  APKs contain no FFmpeg or Nakuru native libraries, and component release assets
+  match the URLs, byte sizes and hashes embedded in `transcription-audio-runtime.json`,
+  `nakuru-runtime.json` and `nakuru-model.json`. Display processed/total
   audio time only once, both while running and paused; resuming must retain it
   during preparation so the controls do not jump as the source is loaded. Check model
   download/progress, pause, close/reopen the sheet, and background/foreground the
@@ -1154,14 +1161,15 @@ Validate relevant sync/update/Sasayaki changes with:
   hold/automatic resume. Completion must agree with a fresh full alignment.
   The opt-in `SasayakiIncrementalMatchDeviceTest` accepts `-e matchBookRoot <root>`;
   it reads an existing book/transcript without writing sidecars and places timing
-  and allocation results in `cache/incremental-match-benchmark/report.json`.
+  and allocation results in `cache/incremental-match-benchmark/report.json`,
+  including cancellation latency while a full-snapshot match is running.
   Verify Lightweight/Balanced/Fast defaults to Balanced and persists across restart.
   Preset selection is locked while running; pausing, changing preset and resuming
   must retain committed progress, and closing/reopening the sheet keeps the choice.
-  With cached models, `SasayakiTranscriptionDeviceTest` compares all three presets'
-  native token text/order/timestamps on an explicit scratch `realClip`, and checks
-  cancellation in Fast followed by resume in Lightweight. Pure pipeline tests cover
-  out-of-order completion, bounded work, silence ordering and failure/cancellation.
+  With cached models, `NakuruDeviceTest` compares all three presets' native
+  token text/order/timestamps on an explicit scratch `nakuruClip`, and checks
+  cancellation/resume. Coordinator and reader tests cover bounded pending matching,
+  continued recognition, failure recovery and cancellation.
   After pausing, Resume
   must work without changing tabs to refresh the audio source. Backgrounding
   the app must not actively pause the task; while its process can execute,
@@ -1187,48 +1195,13 @@ Validate relevant sync/update/Sasayaki changes with:
   conversion can change the input gain. Confirm the original token text and
   timestamps on the target device before comparing segment boundaries or padding;
   desktop quantized inference can differ even with identical PCM and model files.
-  Inspect energy scores and actual recognition input ranges to distinguish
-  skipped speech from words omitted by recognition.
   Check quiet openings, changes in background level, expressive loud dialogue,
-  short replies with syllable gaps, and final words just after a 20-second hard
-  cut. Segment rejection must not discard a short continuation of accepted speech.
-  Around silence-separated ASR segments, verify the next word's first character
-  survives even if its model timestamp falls inside leading context. Compare
-  continuous and checkpoint-resumed output for missing or duplicated prefixes;
-  keep hard-cut speech context. Existing transcripts may recover short word
-  fragments between real anchors; short entirely omitted interior cues can share
-  a neighboring highlight but must not receive fabricated independent word times.
-  Partial-word repair must not bridge token-free long silence. Explicitly recognized words after a
-  long pause must retain their token times. Check kana/kanji rewrites around a
-  local exact phrase and punctuation, a missing whole reply beside a recognized
-  prefix, ambiguous readings on either side of a sentence boundary, and a partial
-  ruby reading error sharing one base character. Repaired syllables must preserve
-  the exact syllables' timing; deleted letters inside a spoken word must not allocate
-  a neighbor's token to an independent omitted cue. A single short cue enclosed by reliable
-  anchors and complete speech tokens should retain the book's wording even when ASR
-  mishears it; check rewritten short replies, numeric values, contracted phrases,
-  and `%`/`％` output. Contextual cross-cue allocation must not split a recognized
-  neighboring word to invent a missing interjection. Long estimated token intervals must
-  retain recognized words, sentence endings, and supported rewrites without a fixed
-  duration cap. A short suffix attached to the next sentence's exact anchor must stay
-  with the recognized earlier sentence when its local context supports that ownership;
-  let a wholly omitted interior sentence share a neighbor rather than take that suffix
-  as its own cue. Check one- and two-character
-  endings, a fully or partially recognized middle sentence, and competing endings
-  including ruby readings. Check omitted questions split by commas, missing sentences
-  beside long first/last tokens, and short cries/replies with ordinary token durations,
-  both with and without an inter-cue pause. Include mixed gaps containing a missing
-  sentence-ending character, a whole omitted reply and/or a missing next-word opening:
-  restore edge fragments only to their own cues before assigning the whole reply.
-  Check short neighboring cues with contiguous recognized context; context must stop
-  at missing text or a long audio pause, and inferred text must not become new evidence.
-  Grouping must preserve the opposite cue's timing,
-  keep text/time ranges non-overlapping, update IDs/offsets and unmatched counts, stop
-  at real intervening matches and never propagate across chapter boundaries or book ends.
-  Sparse sentences must retain supported fragments; dense cues must also split around
-  token-free gaps across long silence. Distinguish unmatched ASR wording from silence,
-  including overlapping same-frame multi-character tokens. Incremental matching must
-  agree with full alignment.
+  short replies, repeated text, chapter boundaries and the final audio segment.
+  Compare continuous and checkpoint-resumed output for missing or duplicated words.
+  Reusing the Nakuru aligner across growing token snapshots must match a fresh
+  alignment of each same snapshot; completion must match the unchanged fixture
+  expectations. Exercise cancellation during matching on long transcripts and
+  verify no cancelled result is published or written after book deletion.
   Character coverage and subtitle cue match rate are different metrics; neither
   alone verifies transcript accuracy. Exclude toc/caution/colophon source paths
   for both SRT and transcription, retaining existing SRT multi-volume behavior.
@@ -1248,10 +1221,10 @@ Validate relevant sync/update/Sasayaki changes with:
   `verifiedPrivateLibrariesLoadAndCachedFilesWorkOffline` method uses isolated
   cache storage and accepts `-e runtimePayloads <scratch-directory>` for local
   payloads or `-e downloadRuntime true` for public download verification.
-  `SasayakiTranscriptionDeviceTest` also checks the Kotlin decoder boundary; its optional
-  native ASR test needs verified models and runtime files in the app's no-backup directories
-  and an explicit `-e realClip` scratch audio path; otherwise it is skipped and
-  never downloads models. Build the test APK separately, install with `adb
+  `SasayakiAudioResamplingDeviceTest` also checks the Kotlin decoder boundary.
+  Native Nakuru tests require verified models and runtime files in the app's
+  no-backup directories and an explicit scratch `nakuruClip` path; they never
+  download models. Build the test APK separately, install with `adb
   install -r`, and run the explicit class with `am instrument`. Remove only
   the scratch audio afterwards. Also pause within the final 1.5 seconds: an
   Android checkpoint must still offer Resume until all audio is processed.

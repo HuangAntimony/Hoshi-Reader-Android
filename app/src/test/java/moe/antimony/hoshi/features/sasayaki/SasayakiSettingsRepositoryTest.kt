@@ -88,7 +88,6 @@ class SasayakiSettingsRepositoryTest {
             autoPause = false,
             imageHoldSeconds = 4.5f,
             transcriptionPreset = SasayakiTranscriptionPreset.Fast,
-            transcriptionModel = SasayakiTranscriptionModel.Nakuru,
             lightTextColor = 0xFF010203,
             lightBackgroundColor = 0x44040506,
             darkTextColor = 0xFF070809,

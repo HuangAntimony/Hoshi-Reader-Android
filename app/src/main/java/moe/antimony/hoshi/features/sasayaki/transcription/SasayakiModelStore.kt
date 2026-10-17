@@ -23,20 +23,6 @@ import kotlinx.coroutines.withContext
 @kotlinx.serialization.Serializable
 internal data class SasayakiModelFile(val name: String, val url: String, val bytes: Long, val sha256: String)
 
-internal object ReazonSpeechModelCatalog {
-    private const val BASE = "https://huggingface.co/reazon-research/reazonspeech-k2-v2/resolve/291488c8151be24d7da4bf7af26e533fad96e407/"
-    val files = listOf(
-        SasayakiModelFile("encoder.int8.onnx", BASE + "encoder-epoch-99-avg-1.int8.onnx", 154670139,
-            "2c7bd08a8a99f9ddd0d9e458456577b1f6279214e51426f114f9eced44c54e1d"),
-        SasayakiModelFile("decoder.int8.onnx", BASE + "decoder-epoch-99-avg-1.int8.onnx", 2959337,
-            "8f0bff94d38797b03b762634ed03211a8e303d06cc4603cdd0cf4199d6eb1485"),
-        SasayakiModelFile("joiner.int8.onnx", BASE + "joiner-epoch-99-avg-1.int8.onnx", 2696970,
-            "49cc7ea1d3d35a40a27442db5e89996da64bf0e683a903dce76e99e57a12e4de"),
-        SasayakiModelFile("tokens.txt", BASE + "tokens.txt", 45754,
-            "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def"),
-    )
-}
-
 internal class SasayakiDownloadResponse(
     val input: InputStream,
     val length: Long,
@@ -61,7 +47,7 @@ internal class SasayakiModelStore(
     private val directory: File,
     private val transport: SasayakiModelTransport,
     private val ioDispatcher: CoroutineDispatcher,
-    private val files: List<SasayakiModelFile> = ReazonSpeechModelCatalog.files,
+    private val files: List<SasayakiModelFile>,
     private val readOnly: Boolean = false,
 ) {
     private val mutex = Mutex()

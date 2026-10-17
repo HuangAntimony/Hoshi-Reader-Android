@@ -29,14 +29,20 @@ class SasayakiSrtTest {
         assertEquals(match.matches, SasayakiMatcher.match(book, cues).matches)
     }
 
-    @Test fun transcriptionExportCanBeImportedWithoutTranscriptionData() {
-        val match = SasayakiTranscriptAligner.align(book, listOf(
+    @Test fun transcriptionExportCanBeImportedWithoutTranscriptionData() = kotlinx.coroutines.test.runTest {
+        val match = NakuruTranscriptAligner(book).align(listOf(
             SasayakiToken("雨の降る静かな朝だった", 1.0, 4.0),
             SasayakiToken("私は駅へ向かって歩いた", 5.0, 8.0),
         ))
         assertEquals(SasayakiMatchSource.Transcription, match.source)
         val restored = SasayakiMatcher.match(book, SasayakiParser.parseCues(SasayakiSrt.encode(match).toByteArray()))
-        assertEquals(match.matches.map { it.copy(id = "") }, restored.matches.map { it.copy(id = "") })
+        assertEquals(match.matches.size, restored.matches.size)
+        match.matches.zip(restored.matches).forEach { (expected, actual) ->
+            // SRT carries millisecond precision; binary floating-point tails are not preserved.
+            assertEquals(expected.startTime, actual.startTime, .0005)
+            assertEquals(expected.endTime, actual.endTime, .0005)
+            assertEquals(expected.copy(id = "", startTime = actual.startTime, endTime = actual.endTime), actual.copy(id = ""))
+        }
     }
 
     @Test fun timestampsRoundCarryAndStayAsciiInOtherLocales() {

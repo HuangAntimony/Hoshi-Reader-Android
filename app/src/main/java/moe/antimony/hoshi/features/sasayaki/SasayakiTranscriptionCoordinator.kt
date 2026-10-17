@@ -68,13 +68,13 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
     private val mutableState = MutableStateFlow(SasayakiTranscriptionState())
     val state = mutableState.asStateFlow()
 
-    suspend fun start(root: File, source: String, preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced, model: SasayakiTranscriptionModel = SasayakiTranscriptionModel.ReazonSpeech): Boolean = gate.withLock {
+    suspend fun start(root: File, source: String, preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced): Boolean = gate.withLock {
         if (task?.isCompleted == false) return false
         val deleted = AtomicBoolean(false)
         val entered = AtomicBoolean(false)
         val job = scope.launch(ioDispatcher, start = CoroutineStart.LAZY) {
             entered.set(true)
-            run(root, source, deleted, preset, model)
+            run(root, source, deleted, preset)
         }
         val registration = try {
             workRegistry.register(root) {
@@ -125,8 +125,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         true
     }
 
-    private suspend fun run(root: File, source: String, deleted: AtomicBoolean, preset: SasayakiTranscriptionPreset, requestedModel: SasayakiTranscriptionModel) = coroutineScope {
-        var model = requestedModel
+    private suspend fun run(root: File, source: String, deleted: AtomicBoolean, preset: SasayakiTranscriptionPreset) = coroutineScope {
         var duration = 0.0
         var through = 0.0
         var checkpointNeeded = false
@@ -139,10 +138,10 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         var alignment: SasayakiTranscriptionAlignment? = null
         var alignedCount = -1
         val requests = Channel<List<SasayakiToken>>(Channel.CONFLATED)
-        suspend fun align(snapshot: List<SasayakiToken>, complete: Boolean) {
+        suspend fun align(snapshot: List<SasayakiToken>) {
             try {
-                val active = alignment ?: repository.openAlignment(root, model).also { alignment = it }
-                val matched = active.align(snapshot, complete)
+                val active = alignment ?: repository.openAlignment(root).also { alignment = it }
+                val matched = active.align(snapshot)
                 if (deleted.get()) return
                 alignedCount = snapshot.size
                 result = matched
@@ -165,7 +164,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 val snapshot = requests.tryReceive().getOrNull() ?: pending
                 lastMatchAt = clock.nowNanos()
                 try {
-                    align(snapshot, complete = false)
+                    align(snapshot)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -175,7 +174,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 }
             }
         }
-        fun checkpoint() = SasayakiTranscript(through, duration, tokens.toList(), source, model)
+        fun checkpoint() = SasayakiTranscript(through, duration, tokens.toList(), source)
         try {
             duration = try {
                 backend.duration(source).also { require(it.isFinite() && it > 0) }
@@ -195,7 +194,6 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 kotlin.math.abs(it.duration - duration) < 0.01 && (it.source == null || it.source == source)
             }
             if (saved != null) {
-                model = saved.model
                 through = saved.through
                 tokens.addAll(saved.tokens)
             }
@@ -210,8 +208,8 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             ) }
             if (saved?.isComplete != true) {
                 failureStage = "transcription"
-                backend.forModel(model).transcribe(source, through, parallelism = preset.parallelism,
-                    previousTokens = tokens.takeLastWhile { it.end >= through - 1.0 }, onDownloadRequired = { bytes ->
+                backend.transcribe(source, through, parallelism = preset.parallelism,
+                    onDownloadRequired = { bytes ->
                     val approval = CompletableDeferred<Unit>()
                     downloadApproval = approval
                     try {
@@ -247,7 +245,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                         stage = SasayakiTranscriptionStage.Transcribing, through = through, duration = duration,
                         remainingSeconds = remaining, hasTranscript = true,
                     ) }
-                    if (model == SasayakiTranscriptionModel.ReazonSpeech && batch.tokens.isNotEmpty()) requests.trySend(tokens.toList())
+                    if (batch.tokens.isNotEmpty()) requests.trySend(tokens.toList())
                     if (now - lastPersist >= 15_000_000_000L) {
                         try {
                             failureStage = "checkpoint_save"
@@ -284,7 +282,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                         repository.save(root, checkpoint())
                         if (tokens.isNotEmpty() && !deleted.get() && (completed || alignedCount != tokens.size)) {
                             mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
-                            align(tokens, complete = completed)
+                            align(tokens)
                         }
                     } catch (failure: Exception) { error = reportSasayakiFailure("transcription_finalize", failure, SasayakiFailureKind.Storage) }
                 }

@@ -36,16 +36,15 @@ internal class NakuruTranscriptionBackend @Inject constructor(
         onDownload: suspend (Double) -> Unit,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
         parallelism: Int,
-        previousTokens: List<SasayakiToken>,
     ) = withContext(defaultDispatcher) {
         try {
             val directories = try {
-                prepareSasayakiResources(resources.stores() + runtime.store(includeInference = false), onDownloadRequired, onDownload)
+                prepareSasayakiResources(resources.stores() + runtime.store(), onDownloadRequired, onDownload)
             } catch (error: Exception) {
                 throw error.asSasayakiFailure(SasayakiFailureKind.ModelResources)
             }
             val root = resources.root
-            runtime.load(directories.last(), includeInference = false)
+            runtime.load(directories.last())
             val api = Native.load(File(root, "libnakuru.so").absolutePath, NakuruNative::class.java)
             currentCoroutineContext().ensureActive()
             val duration = decoder.duration(source)

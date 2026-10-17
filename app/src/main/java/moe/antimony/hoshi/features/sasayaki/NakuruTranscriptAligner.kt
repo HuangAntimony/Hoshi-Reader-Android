@@ -2,6 +2,8 @@ package moe.antimony.hoshi.features.sasayaki
 
 import java.text.Normalizer
 import java.util.Locale
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
@@ -36,10 +38,13 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
     }
     private val normalized = text.map(::normalize)
 
-    fun align(tokens: List<SasayakiToken>): SasayakiMatchData {
+    suspend fun align(tokens: List<SasayakiToken>): SasayakiMatchData {
+        val context = currentCoroutineContext()
+        context.ensureActive()
         val speech = mutableListOf<Int>()
         val timings = mutableListOf<Timing>()
         tokens.forEach { token ->
+            context.ensureActive()
             token.text.codePoints().filter { it.isReaderMatchableCodePoint() }.forEach {
                 speech += normalize(it)
                 timings += Timing(token.start, token.end)
@@ -76,6 +81,7 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         }
         anchors += Anchor(speech.size, text.size)
         anchors.zipWithNext().forEach { (anchor, next) ->
+            context.ensureActive()
             if (next.speech > anchor.speech && next.book > anchor.book) {
                 val spoken = speech.subList(anchor.speech, minOf(next.speech, anchor.speech + 2000))
                 val written = normalized.subList(anchor.book, minOf(next.book, anchor.book + 2000))
@@ -92,12 +98,14 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         return cut(times)
     }
 
-    private fun cut(times: Array<Timing?>): SasayakiMatchData {
+    private suspend fun cut(times: Array<Timing?>): SasayakiMatchData {
+        val context = currentCoroutineContext()
         val matches = mutableListOf<SasayakiMatch>()
         var unmatched = 0
         chapters.forEach { chapter ->
             var start = chapter.start
             for (index in chapter.start until chapter.end) {
+                if (index % 256 == 0) context.ensureActive()
                 if (!sentenceEnds[index] && index != chapter.end - 1 &&
                     !(segmentEnds[index] && index > start && index + 2 < chapter.end && !sentenceEnds[index + 1])) continue
                 val span = time(start, index, chapter, times, matches.lastOrNull()?.endTime)
@@ -163,14 +171,21 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         return if (scalar in 0x30A1..0x30F6) scalar - 0x60 else scalar
     }
 
-    private fun find(source: List<Int>, probe: List<Int>, start: Int, end: Int): Int? =
-        (start..end - probe.size).firstOrNull { index -> probe.indices.all { source[index + it] == probe[it] } }
+    private suspend fun find(source: List<Int>, probe: List<Int>, start: Int, end: Int): Int? {
+        val context = currentCoroutineContext()
+        return (start..end - probe.size).firstOrNull { index ->
+            if (index % 256 == 0) context.ensureActive()
+            probe.indices.all { source[index + it] == probe[it] }
+        }
+    }
 
-    private fun difference(old: List<Int>, new: List<Int>): Pair<BooleanArray, BooleanArray> {
+    private suspend fun difference(old: List<Int>, new: List<Int>): Pair<BooleanArray, BooleanArray> {
+        val context = currentCoroutineContext()
         fun slot(diagonal: Int) = if (diagonal <= 0) -diagonal else diagonal - 1
         val trace = mutableListOf<IntArray>()
         var frontier = IntArray(2)
         search@ for (distance in 0..old.size + new.size) {
+            context.ensureActive()
             trace += frontier
             frontier = IntArray(distance + 1)
             val previous = trace.last()
@@ -189,6 +204,7 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         var x = old.size
         var y = new.size
         for (distance in trace.lastIndex downTo 1) {
+            context.ensureActive()
             val previous = trace[distance]
             val diagonal = x - y
             val preceding = if (diagonal == -distance || (diagonal != distance && previous[slot(diagonal - 1)] < previous[slot(diagonal + 1)])) diagonal + 1 else diagonal - 1

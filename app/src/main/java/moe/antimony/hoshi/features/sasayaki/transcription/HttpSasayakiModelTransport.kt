@@ -1,30 +1,9 @@
 package moe.antimony.hoshi.features.sasayaki.transcription
 
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import javax.inject.Inject
-import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.suspendCancellableCoroutine
-import moe.antimony.hoshi.di.IoDispatcher
-
-@Singleton
-internal class SasayakiModelRepository @Inject constructor(
-    @param:ApplicationContext context: Context,
-    @param:IoDispatcher ioDispatcher: CoroutineDispatcher,
-) {
-    val store = SasayakiModelStore(
-        File(context.noBackupFilesDir, "SasayakiModels/reazonspeech-k2-v2-int8-v1"),
-        HttpSasayakiModelTransport(), ioDispatcher,
-    )
-
-    suspend fun ensure(onDownloadRequired: suspend (Long) -> Unit, onProgress: suspend (Double) -> Unit): File =
-        store.ensure(onDownloadRequired, onProgress)
-}
 
 internal class HttpSasayakiModelTransport : SasayakiModelTransport {
     override suspend fun open(url: String): SasayakiDownloadResponse {

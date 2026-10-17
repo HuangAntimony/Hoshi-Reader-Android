@@ -11,6 +11,10 @@ import coil3.memory.MemoryCache
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import moe.antimony.hoshi.di.ApplicationScope
+import moe.antimony.hoshi.features.sasayaki.transcription.LegacySasayakiResourceCleanup
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.di.IoDispatcher
@@ -28,6 +32,8 @@ import moe.antimony.hoshi.features.update.UpdateDownloadStore
 
 @HiltAndroidApp
 class HoshiApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
+    @Inject @ApplicationScope internal lateinit var applicationScope: CoroutineScope
+    @Inject internal lateinit var legacySasayakiResourceCleanup: LegacySasayakiResourceCleanup
     @Inject internal lateinit var nonfatalDiagnosticsLogger: NonfatalDiagnosticsLogger
     @Inject internal lateinit var updateApkCleanup: UpdateApkCleanup
     @Inject internal lateinit var dictionaryAutoUpdateScheduler: Lazy<DictionaryAutoUpdateScheduler>
@@ -46,6 +52,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
         super.onCreate()
         installCrashDiagnostics(this)
         nonfatalDiagnosticsLogger.start()
+        applicationScope.launch { legacySasayakiResourceCleanup.clean() }
         prepareUpdateStartupState()
         updateScheduler.get().sync()
         dictionaryAutoUpdateScheduler.get().registerProcessForegroundChecks()
