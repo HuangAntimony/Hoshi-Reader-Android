@@ -269,6 +269,12 @@ node --test app/src/test/js/*.test.mjs
   another handle adjustment, preserves both endpoints, and keeps Highlight visible.
   Include this boundary in real-book checks; a recovery point at the first selected
   glyph may overlap the native start handle even though it hits selected DOM text.
+  `shortSelectionsRecoverThroughContentAfterDraggingEitherHandle` checks single-
+  and two-character native selections after dragging either handle, including
+  smaller fonts. Verify recovery reaches content as a touch context-menu event
+  and preserves anchor/focus direction as well as the selected text. A menu can
+  reappear even after recovery accidentally grabs a handle, so visibility alone
+  does not validate this case.
   In real books, include the final period of a paragraph that wraps into another
   column, and check menu coordinates beyond the recovery long-press deadline.
   Verify the menu stays near the handles instead of jumping to the bottom of the

@@ -911,11 +911,15 @@ window.hoshiSelection = {
             return { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
         });
         let point = null, clearance = -1;
+        const vertical = this.isVertical();
         for (const rect of range.getClientRects()) {
             const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
             const right = Math.min(innerWidth, rect.right), bottom = Math.min(innerHeight, rect.bottom);
             if (right <= left || bottom <= top) continue;
-            const x = (left + right) / 2, y = (top + bottom) / 2;
+            // A vertical start handle extends into a short selected glyph from
+            // the right. Its left interior stays above the end handle instead.
+            const x = vertical ? Math.min(left + 1, (left + right) / 2) : (left + right) / 2;
+            const y = (top + bottom) / 2;
             // A fragmented range's first glyph can overlap the native start
             // handle. Pressing it re-enters handle dragging and keeps the menu
             // hidden. Prefer the selected fragment furthest from both carets.

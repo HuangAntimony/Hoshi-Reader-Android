@@ -1080,6 +1080,7 @@ test('cancelled native replays cannot suppress a later recovery and stale cancel
 test('menu recovery targets selected text away from both handles regardless of text-node fragmentation', () => {
     for (const vertical of [true, false]) for (const fragmented of [true, false]) {
         const { selection, window, document, dispatchDocumentEvent } = loadSelection('読書の時間です');
+        window.getComputedStyle = () => ({writingMode:vertical?'vertical-rl':'horizontal-tb'});
         const node = {nodeType:3};
         const rect = (from, to) => vertical
             ? {left:100,right:120,top:from,bottom:to}

@@ -178,8 +178,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   menu recovery on large-screen devices, and prevent repeated recovery from
   hiding the menu or a selection handle in reverse selections across paragraphs.
   Recover inside the selection away from its handles, including fragmented text
-  starting immediately after ruby. Keep recovered menus near the selection
-  handles when the range includes a paragraph's final punctuation across columns.
+  starting immediately after ruby, and avoid pressing a handle again when
+  recovering single-character vertical selections. Keep recovered menus near
+  the selection handles when the range includes a paragraph's final punctuation
+  across columns.
 - Create, recolor and remove highlights when native selections begin or end
   inside ruby annotations or at element boundaries, using only selected body text.
 - Keep text selection from unexpectedly turning pages or chapters when the

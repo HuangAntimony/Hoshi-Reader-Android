@@ -144,6 +144,78 @@ class ReaderSelectionViewportWebViewTest {
     }
 
     @Test
+    fun shortSelectionsRecoverThroughContentAfterDraggingEitherHandle() {
+        val webView = createWebView()
+        try {
+            loadFixture(webView, vertical = true, plain = true, fontSize = 18)
+            val location = IntArray(2)
+            var density = 1f
+            instrumentation.runOnMainSync {
+                webView.getLocationOnScreen(location)
+                density = webView.resources.displayMetrics.density
+            }
+            fun x(value: Double) = location[0] + value.toFloat() * density
+            fun y(value: Double) = location[1] + value.toFloat() * density
+            val initial = JSONObject(evaluate(webView, """
+                (()=>{window.shortCaret=offset=>{
+                        const w=document.createTreeWalker(document.getElementById('tail'),NodeFilter.SHOW_TEXT);
+                        let n;while(n=w.nextNode()){
+                            if(!n.length)continue;
+                            if(offset<=n.length){const r=document.createRange();r.setStart(n,offset);r.collapse(true);return r;}
+                            offset-=n.length;
+                        }
+                        throw new Error('Missing short-selection fixture offset');
+                    };
+                    const r=shortCaret(0),end=shortCaret(1);r.setEnd(end.startContainer,end.startOffset);
+                    return r.getBoundingClientRect().toJSON();})()
+            """.trimIndent()))
+            gesture(x((initial.getDouble("left") + initial.getDouble("right")) / 2),
+                y((initial.getDouble("top") + initial.getDouble("bottom")) / 2), duration = 900)
+            composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
+            evaluate(webView, """
+                const recover=hoshiSelection.recoverNativeSelectionMenu;
+                hoshiSelection.recoverNativeSelectionMenu=function(e){return recover.call(this,{
+                    isTrusted:e.isTrusted,pointerType:e.pointerType,button:e.button,clientX:-1,clientY:-1,
+                    preventDefault(){e.preventDefault();}});};
+                document.addEventListener('contextmenu',e=>{
+                    if(!e.isTrusted)return;
+                    const s=getSelection();
+                    if(e.defaultPrevented&&!window.shortEndpoints)
+                        window.shortEndpoints=[s.anchorNode,s.anchorOffset,s.focusNode,s.focusOffset];
+                    shortMenuEvents.push({pointer:e.pointerType,prevented:e.defaultPrevented});
+                });true
+            """.trimIndent())
+            for ((startHandle, offset) in listOf(false to 1, false to 2, true to 1)) {
+                evaluate(webView, "window.shortMenuEvents=[];window.shortEndpoints=null;true")
+                val points = JSONObject(evaluate(webView, """
+                    (()=>{const r=getSelection().getRangeAt(0).cloneRange();r.collapse($startHandle);
+                        return {from:r.getBoundingClientRect().toJSON(),to:shortCaret($offset).getBoundingClientRect().toJSON()};})()
+                """.trimIndent()))
+                val from = points.getJSONObject("from")
+                val to = points.getJSONObject("to")
+                fun handleX(rect: JSONObject) = if (startHandle) rect.getDouble("right") - 6 else rect.getDouble("left") + 6
+                gesture(x(handleX(from)), y(from.getDouble("top") + 10),
+                    x(handleX(to)), y(to.getDouble("top") + 10), 700)
+                composeRule.waitUntil("Short selections recover through content instead of pressing a handle", 4000) {
+                    evaluate(webView, "shortMenuEvents.some(e=>e.pointer==='touch'&&!e.prevented)").toBoolean()
+                }
+                assertAppActionsVisible()
+                SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() * 2 + 300L)
+                assertTrue("Recovery preserves the exact native endpoints and selection direction", evaluate(webView, """
+                    (()=>{const s=getSelection();return shortEndpoints&&shortEndpoints.every((v,i)=>v===
+                        [s.anchorNode,s.anchorOffset,s.focusNode,s.focusOffset][i]);})()
+                """.trimIndent()).toBoolean())
+                val expected = if (startHandle) "間" else if (offset == 1) "時" else "時間"
+                assertEquals("A real handle produces the expected short range", "\"$expected\"",
+                    evaluate(webView, "getSelection().toString()"))
+                assertAppActionsVisible()
+            }
+        } finally {
+            destroyFixture(webView)
+        }
+    }
+
+    @Test
     fun reversedCrossParagraphRecoverySettlesAndKeepsBothHandlesUsable() {
         val webView = createWebView()
         val menuActions = listOf(R.string.reader_highlight_action)
@@ -482,13 +554,13 @@ class ReaderSelectionViewportWebViewTest {
         return webView
     }
 
-    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false, rubyBoundary: Boolean = false) {
+    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false, rubyBoundary: Boolean = false, fontSize: Int = 27) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val loaded = CountDownLatch(1)
         instrumentation.runOnMainSync {
             webView.prepareForDocument("selection-$vertical")
             webView.tag = "selection-$vertical"
-            val settings = ReaderSettings(verticalWriting = vertical, fontSize = 27)
+            val settings = ReaderSettings(verticalWriting = vertical, fontSize = fontSize)
             val density = webView.resources.displayMetrics.density
             val viewport = readerViewportCssLayout(settings,
                 (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()
