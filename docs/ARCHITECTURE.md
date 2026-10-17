@@ -827,7 +827,13 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   state as a device/user restriction rather than an in-process lifecycle
   guarantee.
 - Update checks use WorkManager unique work, with worker dependencies supplied
-  by Hilt's WorkManager integration.
+  by Hilt's WorkManager integration. Release metadata requests try GitHub's API
+  directly, then `ghproxy.vip`; APK download mirrors are configured separately.
+  The HTTP client accepts JSON media types before release parsing and retains
+  the final response URL, HTTP status, content type, rate-limit/retry headers
+  and response body on failure. If every API candidate fails, the repository
+  retains each attempted URL and original cause/stack in the terminal error
+  shown to users and saved in runtime diagnostics.
 
 ## Native And Rust Build
 

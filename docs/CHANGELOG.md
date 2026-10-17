@@ -154,6 +154,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Preserve specific error details and underlying causes across imports, settings,
   Reader, dictionaries, Anki, audio, TTS, Sasayaki, sync, backups, updates and
   statistics, alongside the localized operation or category description.
+  Failed update checks retain each attempted URL, original response and
+  rate-limit details instead of showing only the last source's error.
+- Stop using a file-download proxy that redirects release API requests to its
+  homepage; reject HTML responses before parsing update information as JSON.
 - Keep Japanese names containing middle dots intact when scanning text for lookup.
 - Clear the Dictionary tab's search when opening a book, preventing old word audio
   from replaying when the book's profile is activated or restored.

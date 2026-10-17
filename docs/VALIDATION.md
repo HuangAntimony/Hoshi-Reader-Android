@@ -1019,6 +1019,13 @@ Validate relevant sync/update/Sasayaki changes with:
 - GitHub update prompts, skip-version, manual checks, completed-download
   prompts, user-triggered install, same-version APK cleanup, and split APK
   updates on arm64-v8a and armeabi-v7a targets.
+  Cover API fallback with a local HTTP server: a redirect to a `200 text/html`
+  homepage must retain both request/final URLs, status, content type and body
+  without entering the JSON parser; `403` responses must retain the original
+  body and rate-limit/retry headers. When all candidates fail, the visible
+  diagnostic and saved stack must retain every URL and nested original cause.
+  Cancellation must propagate without trying another source. Verify a normal
+  JSON release response and an on-device manual check against GitHub.
 - Sasayaki defaults, reader toggle visibility, auto-scroll, auto-pause on
   lookup, subtitle cue matching that starts immediately after selecting a valid
   SRT without a separate Match action, lookup taps on active cue text in normal
