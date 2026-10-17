@@ -36,6 +36,10 @@ internal sealed interface ReaderSelectionCommand {
         override val source = "window.hoshiSelection.takeNativeMenuRecovery($request, $generation)"
     }
 
+    data class CancelMenuRecovery(val request: Int, val documentToken: String) : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.cancelNativeMenuRecoveryReplay($request, ${documentToken.javaScriptDoubleQuotedString()})"
+    }
+
     data object NativeContext : ReaderSelectionCommand {
         override val source = "window.hoshiSelection.nativeSelectionContext()"
     }

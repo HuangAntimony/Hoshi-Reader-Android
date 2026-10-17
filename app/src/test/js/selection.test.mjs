@@ -941,6 +941,13 @@ test('invalid touch menu requests recover once at a visible selected character',
     assert.deepEqual(JSON.parse(JSON.stringify(selection.takeNativeMenuRecovery(calls[0][0], 42))),
         {x:30,y:60,viewportWidth:400});
     assert.equal(selection.takeNativeMenuRecovery(calls[0][0]),null,'A request can be consumed only once');
+    const replayed = event({pointerType:'mouse',button:-1});
+    dispatchDocumentEvent('contextmenu', replayed);
+    assert.notEqual(replayed.prevented,true,'Let the recovery gesture open its native menu even if Chromium repeats bad coordinates');
+    const replayedAgain = event({pointerType:'mouse',button:-1});
+    dispatchDocumentEvent('contextmenu', replayedAgain);
+    assert.notEqual(replayedAgain.prevented,true,'Repeated callbacks remain native until a new interaction or invalidation');
+    assert.equal(calls.length,1,'A recovery gesture cannot recursively recover itself');
     changeNativeSelection(native);
     assert.deepEqual(invalidations, [[42, 'chapter']], 'Moving after consumption invalidates the pending native reply');
     dispatchDocumentEvent('contextmenu',event({pointerType:'',button:-1}));
@@ -965,4 +972,31 @@ test('invalid touch menu requests recover once at a visible selected character',
     range.comparePoint = () => 0;
     dispatchDocumentEvent('contextmenu',event());
     assert.equal(calls.length,count,'Ruby annotations are not a menu recovery target');
+});
+
+test('cancelled native replays cannot suppress a later recovery and stale cancellations are ignored', () => {
+    const { selection, window, document, dispatchDocumentEvent } = loadSelection('読書');
+    const node = {nodeType:3};
+    const range = {getClientRects:()=>[{left:20,top:40,right:40,bottom:80}],comparePoint:()=>0};
+    window.getSelection = () => ({isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range});
+    document.caretRangeFromPoint = () => ({startContainer:node,startOffset:0});
+    selection.configure({bridge:'android-reader',nativeSelectionToken:'chapter'});
+    const calls = [];
+    window.HoshiNativeSelection = {recoverMenu:id=>calls.push(id)};
+    const request = () => {
+        const event = {isTrusted:true,pointerType:'mouse',button:-1,clientX:30,clientY:-400,
+            preventDefault(){this.prevented=true;}};
+        dispatchDocumentEvent('contextmenu',event);
+        return event;
+    };
+    request();
+    const cancelled = calls.at(-1);
+    selection.takeNativeMenuRecovery(cancelled, 1);
+    selection.cancelNativeMenuRecoveryReplay(cancelled, 'chapter');
+    assert.equal(request().prevented,true,'A new recovery is allowed after the previous gesture is cancelled');
+    const current = calls.at(-1);
+    selection.takeNativeMenuRecovery(current, 2);
+    selection.cancelNativeMenuRecoveryReplay(cancelled, 'chapter');
+    selection.cancelNativeMenuRecoveryReplay(current, 'old-document');
+    assert.notEqual(request().prevented,true,'Stale cancellation cannot re-enable recursion for the active replay');
 });

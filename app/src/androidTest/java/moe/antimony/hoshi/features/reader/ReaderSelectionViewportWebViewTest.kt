@@ -144,6 +144,92 @@ class ReaderSelectionViewportWebViewTest {
     }
 
     @Test
+    fun reversedCrossParagraphRecoverySettlesAndKeepsBothHandlesUsable() {
+        val webView = createWebView()
+        val menuActions = listOf(R.string.reader_highlight_action)
+        try {
+            loadFixture(webView, vertical = true, crossParagraph = true)
+            val location = IntArray(2)
+            var density = 1f
+            instrumentation.runOnMainSync {
+                webView.getLocationOnScreen(location)
+                density = webView.resources.displayMetrics.density
+            }
+            val tail = JSONObject(evaluate(webView, "document.getElementById('tail').getBoundingClientRect().toJSON()"))
+            val initial = JSONObject(evaluate(webView, """
+                (()=>{const r=document.createRange(),n=document.getElementById('reverse-end').firstChild;
+                    r.setStart(n,3);r.setEnd(n,4);return r.getBoundingClientRect().toJSON();})()
+            """.trimIndent()))
+            // Build the reverse range with native gestures: replacing a selection in
+            // JavaScript can hide its native handles independently of menu recovery.
+            gesture(location[0] + (initial.getDouble("left") + initial.getDouble("width") / 2).toFloat() * density,
+                location[1] + (initial.getDouble("top") + initial.getDouble("height") / 2).toFloat() * density, duration = 900)
+            composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
+            fun dragHandle(start: Boolean, targetX: Double, targetY: Double) {
+                val rect = JSONObject(evaluate(webView, """
+                    (()=>{const rects=[...getSelection().getRangeAt(0).getClientRects()].filter(r=>r.width&&r.height);
+                        return rects[$start?0:rects.length-1].toJSON();})()
+                """.trimIndent()))
+                val x = if (start) rect.getDouble("right") - 6 else rect.getDouble("left") + 6
+                val y = if (start) rect.getDouble("top") + 10 else rect.getDouble("bottom") + 10
+                gesture(location[0] + x.toFloat() * density, location[1] + y.toFloat() * density,
+                    location[0] + targetX.toFloat() * density, location[1] + targetY.toFloat() * density, 700)
+            }
+            dragHandle(false, tail.getDouble("left") + 6, tail.getDouble("bottom") + 10)
+            val first = JSONObject(evaluate(webView, """
+                (()=>{const r=document.createRange(),n=document.getElementById('reverse-start').firstChild;
+                    r.setStart(n,3);r.setEnd(n,4);return r.getBoundingClientRect().toJSON();})()
+            """.trimIndent()))
+            dragHandle(true, first.getDouble("right") - 6, first.getDouble("top") + 10)
+            assertTrue("Fixture is a native backward selection across paragraphs", evaluate(webView, """
+                (()=>{const s=getSelection(),r=s.getRangeAt(0);return s.anchorNode===r.endContainer&&
+                    s.anchorOffset===r.endOffset&&r.startContainer.parentElement.closest('#reverse-start')!==null&&
+                    r.endContainer.parentElement.closest('#reverse-end')!==null;})()
+            """.trimIndent()).toBoolean())
+            val selected = evaluate(webView, "getSelection().toString()")
+            // Reproduce Chromium repeating an invalid anchor for the genuine recovery
+            // contextmenu; generated chapter metrics need not match the user's font.
+            evaluate(webView, """
+                const recover=hoshiSelection.recoverNativeSelectionMenu;
+                hoshiSelection.recoverNativeSelectionMenu=function(e){return recover.call(this,{
+                    isTrusted:e.isTrusted,pointerType:e.pointerType,button:e.button,clientX:-1,clientY:-1,
+                    preventDefault(){e.preventDefault();}});};true
+            """.trimIndent())
+            requestMenuRecovery(webView)
+            assertAppActionsVisible(menuActions)
+            // A repeated replay starts about once per long-press timeout and hides a handle.
+            SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() * 2 + 300L)
+            assertAppActionsVisible(menuActions)
+            assertEquals("One gesture produces one native menu", "1", evaluate(webView, "recoveryMenuEvents.length"))
+            assertEquals("Recovery preserves the reverse cross-paragraph range", selected, evaluate(webView, "getSelection().toString()"))
+            assertTrue("Recovery preserves direction and endpoints", evaluate(webView, """
+                (()=>{const s=getSelection();return recoveryEndpoints.every((v,i)=>v===
+                    [s.anchorNode,s.anchorOffset,s.focusNode,s.focusOffset][i]);})()
+            """.trimIndent()).toBoolean())
+            for (startHandle in listOf(true, false)) {
+                val endpoint = JSONObject(evaluate(webView, """
+                    (()=>{const range=getSelection().getRangeAt(0);
+                        window.beforeHandleDrag=[range.startContainer,range.startOffset,range.endContainer,range.endOffset];
+                        const r=document.createRange();r.setStart($startHandle?range.startContainer:range.endContainer,
+                            $startHandle?range.startOffset:range.endOffset);r.collapse(true);return r.getBoundingClientRect().toJSON();})()
+                """.trimIndent()))
+                val handleX = location[0] + (if (startHandle) endpoint.getDouble("right") - 6 else endpoint.getDouble("left") + 6).toFloat() * density
+                val handleY = location[1] + (endpoint.getDouble("top") + 10).toFloat() * density
+                gesture(handleX, handleY, handleX, handleY + (if (startHandle) 27 else -27) * density, 700)
+                assertTrue("The ${if (startHandle) "start" else "end"} handle can still be dragged", evaluate(webView, """
+                    (()=>{const s=getSelection(),r=s.getRangeAt(0),now=[r.startContainer,r.startOffset,r.endContainer,r.endOffset],
+                        moved=$startHandle?0:2,still=$startHandle?2:0;
+                        return !s.isCollapsed&&(now[moved]!==beforeHandleDrag[moved]||now[moved+1]!==beforeHandleDrag[moved+1])&&
+                            now[still]===beforeHandleDrag[still]&&now[still+1]===beforeHandleDrag[still+1];})()
+                """.trimIndent()).toBoolean())
+                assertAppActionsVisible(menuActions)
+            }
+        } finally {
+            destroyFixture(webView)
+        }
+    }
+
+    @Test
     fun pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges() {
         val webView = createWebView()
         try {
@@ -242,7 +328,7 @@ class ReaderSelectionViewportWebViewTest {
                 window.recoveryMenuEvents=[];
                 document.addEventListener('contextmenu',e=>{
                     if(e.isTrusted) recoveryMenuEvents.push({button:e.button,pointer:e.pointerType});
-                },{once:true});
+                });
                 hoshiSelection.recoverNativeSelectionMenu({isTrusted:true,pointerType:'touch',button:0,
                     clientX:-1,clientY:-1,preventDefault(){}});
                 return true;
@@ -342,7 +428,7 @@ class ReaderSelectionViewportWebViewTest {
         return webView
     }
 
-    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false) {
+    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val loaded = CountDownLatch(1)
         instrumentation.runOnMainSync {
@@ -366,7 +452,10 @@ class ReaderSelectionViewportWebViewTest {
                     "const s=getSelection();if(s.isCollapsed||!s.rangeCount)return;selectionChanges++;" +
                     "const range=s.getRangeAt(0),text=range.toString();" +
                     "if(range.intersectsNode(document.getElementById('before'))||text.length>24)selectionEscapedPage=text;" +
-                    "});</script></head><body>" + (if (plain)
+                    "});</script></head><body>" + (if (crossParagraph)
+                        "<p id='before'></p><p id='reverse-start'>あいう学で知り合った人間で現在も付き合いがあるのは一人だけだった。</p>" +
+                        "<p id='reverse-end'>彼女の名前は<ruby>白川京<rt>しらかわみやこ</rt></ruby><span id='tail'>。</span></p>"
+                    else if (plain)
                         "<p id='before'></p><p>${"あいうえおかきくけこさしすせそ".repeat(45)}<span id='tail'>時間</span>のようだった。</p>"
                     else "<p id='before'>${"前のページの文章。".repeat(60)}</p>" +
                     "<p style='break-before:column'>${"あいうえおかきくけこさしすせそ".repeat(3)}<ruby>濫<rt>らん</rt></ruby>" +

@@ -630,8 +630,10 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     private var nativeSelectionFallbackRect: Rect? = null
     private var nativeSelectionAnchorRequested = false
     private var nativeSelectionAnchorGeneration = 0
+    private data class SelectionMenuRecoveryRequest(val id: Int, val documentToken: String)
     private data class SelectionMenuRecoveryTouch(val downTime: Long, val x: Float, val y: Float)
     private var selectionMenuRecoveryGeneration = 0
+    private var selectionMenuRecoveryRequest: SelectionMenuRecoveryRequest? = null
     private var selectionMenuRecoveryTouch: SelectionMenuRecoveryTouch? = null
     private val finishSelectionMenuRecoveryTouch = Runnable {
         val touch = selectionMenuRecoveryTouch ?: return@Runnable
@@ -741,20 +743,35 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
 
     private fun recoverNativeSelectionMenu(request: Int, documentToken: String) {
         if (selectionMenuRecoveryTouch != null) return
+        val recoveryRequest = SelectionMenuRecoveryRequest(request, documentToken)
+        selectionMenuRecoveryRequest = recoveryRequest
+        fun discardRequest() {
+            if (selectionMenuRecoveryRequest === recoveryRequest) cancelSelectionMenuRecoveryTouch()
+        }
         val recoveryGeneration = selectionMenuRecoveryGeneration
         val mode = nativeSelectionActionMode
         val generation = nativeSelectionAnchorGeneration
         evaluateJavascript(ReaderSelectionCommand.TakeMenuRecovery(request, generation).source) { result ->
-            if (tag != documentToken || nativeSelectionActionMode !== mode ||
+            if (selectionMenuRecoveryRequest !== recoveryRequest ||
+                tag != documentToken || nativeSelectionActionMode !== mode ||
                 generation != nativeSelectionAnchorGeneration ||
                 recoveryGeneration != selectionMenuRecoveryGeneration ||
                 selectionMenuRecoveryTouch != null ||
-                !isAttachedToWindow || !hasWindowFocus()) return@evaluateJavascript
-            val point = ReaderNativeSelectionMenuPoint.fromJavascriptResult(result) ?: return@evaluateJavascript
+                !isAttachedToWindow || !hasWindowFocus()) {
+                discardRequest()
+                return@evaluateJavascript
+            }
+            val point = ReaderNativeSelectionMenuPoint.fromJavascriptResult(result) ?: run {
+                discardRequest()
+                return@evaluateJavascript
+            }
             val scale = width / point.viewportWidth
             val x = (point.x * scale).toFloat()
             val y = (point.y * scale).toFloat()
-            if (x !in 0f..<width.toFloat() || y !in 0f..<height.toFloat()) return@evaluateJavascript
+            if (x !in 0f..<width.toFloat() || y !in 0f..<height.toFloat()) {
+                discardRequest()
+                return@evaluateJavascript
+            }
             // A long press inside the selected range preserves it and lets WebView
             // own its ActionMode. Mouse events instead open a separate dropdown on
             // large screens, bypassing our Highlight/Replace ActionMode callback.
@@ -780,6 +797,10 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
     private fun cancelSelectionMenuRecoveryTouch() {
         // Cancel queued JS replies as well as an already-started touch.
         selectionMenuRecoveryGeneration++
+        selectionMenuRecoveryRequest?.let { request ->
+            selectionMenuRecoveryRequest = null
+            if (!isReleased) evaluateJavascript(ReaderSelectionCommand.CancelMenuRecovery(request.id, request.documentToken).source, null)
+        }
         val touch = selectionMenuRecoveryTouch ?: return
         selectionMenuRecoveryTouch = null
         removeCallbacks(finishSelectionMenuRecoveryTouch)

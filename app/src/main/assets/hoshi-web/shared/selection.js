@@ -879,6 +879,7 @@ window.hoshiSelection = {
 
     nativeMenuAnchorRequest: null,
     nativeMenuRecovery: null,
+    nativeMenuRecoveryReplay: null,
     nativeMenuRecoverySequence: 0,
 
     recoverNativeSelectionMenu(event) {
@@ -887,6 +888,9 @@ window.hoshiSelection = {
         // Exclude actual secondary clicks without filtering native handle requests.
         if (this.options.bridge !== 'android-reader' || !bridge?.recoverMenu ||
             !event.isTrusted || event.button === 2) return;
+        // Chromium can repeat the same bad anchor for the recovery long press.
+        // Let that gesture open its menu instead of recursively replacing it.
+        if (this.nativeMenuRecoveryReplay !== null) return;
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed || !selection.rangeCount || !selection.toString()) return;
         const range = selection.getRangeAt(0);
@@ -919,11 +923,19 @@ window.hoshiSelection = {
         this.nativeMenuAnchorRequest = anchorRequest;
         const point = this.nativeMenuRecovery.point;
         this.nativeMenuRecovery = null;
+        this.nativeMenuRecoveryReplay = id;
         return point;
+    },
+
+    cancelNativeMenuRecoveryReplay(id, documentToken) {
+        if (this.options.nativeSelectionToken !== documentToken) return;
+        if (this.nativeMenuRecoveryReplay === id) this.nativeMenuRecoveryReplay = null;
+        if (this.nativeMenuRecovery?.id === id) this.nativeMenuRecovery = null;
     },
 
     invalidateNativeMenuAnchor() {
         this.nativeMenuRecovery = null;
+        this.nativeMenuRecoveryReplay = null;
         const request = this.nativeMenuAnchorRequest;
         if (request == null) return;
         this.nativeMenuAnchorRequest = null;

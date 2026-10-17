@@ -451,6 +451,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Recovery validates both anchor and interaction generations; valid-position and
   secondary-button requests are never replayed. Native handle requests may report
   `pointerType="mouse"` with `button=-1`, so pointer type does not exclude them.
+  Consuming a recovery point arms a document/request-scoped replay guard: the
+  recovery gesture's context-menu events pass through to WebView even when
+  Chromium repeats invalid coordinates. They cannot recursively request another
+  recovery. Android clears that guard when rejecting or cancelling the request.
   Queued replies and pending touches are cancelled on deselection, anchor expiry,
   document replacement, a new user touch, focus loss or release. Geometry is read
   only at the menu request, not during handle movement.

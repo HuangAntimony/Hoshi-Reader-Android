@@ -173,7 +173,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Restore the text-selection menu after handle drags in paginated paragraphs,
   with or without ruby, and keep it near visible text when WebView reports empty
   or offscreen menu coordinates. Keep Highlight and TTS Replace available after
-  menu recovery on large-screen devices.
+  menu recovery on large-screen devices, and prevent repeated recovery from
+  hiding the menu or a selection handle in reverse selections across paragraphs.
 - Create, recolor and remove highlights when native selections begin or end
   inside ruby annotations or at element boundaries, using only selected body text.
 - Keep text selection from unexpectedly turning pages or chapters when the

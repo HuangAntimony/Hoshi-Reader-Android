@@ -257,6 +257,12 @@ node --test app/src/test/js/*.test.mjs
   actual native handle drag as well as an injected recovery request.
   `recoveredMenuPreservesExactSelectionAndVisibleAppActions` checks the real
   touch menu and unchanged native endpoints in both writing directions;
+  `reversedCrossParagraphRecoverySettlesAndKeepsBothHandlesUsable` repeats an
+  invalid native anchor for a reverse selection across paragraphs, waits past
+  two long-press deadlines, and drags both handles. Create handle fixtures with
+  native long-press and drag gestures; DOM-only selections do not establish their
+  visibility. A briefly visible menu is insufficient: recovery must settle without
+  repeated gestures or a hidden handle.
   `pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges` checks cancellation
   before the long-press deadline; `menuRecoveryReplyCannotOutliveNewTouch` blocks
   the JS reply while a new touch arrives and rejects a late recovery gesture.
