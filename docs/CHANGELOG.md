@@ -112,7 +112,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Sasayaki's image holds and chapter presentation, keeping images visible for the
   configured duration before continuing; manual sentence jumps skip intervening images.
 - Customize TTS text replacements for one book or all books from text selection or
-  Settings. Replacement text accepts readings, other text and punctuation; leaving it empty
+  Settings. Selected text has line breaks removed before filling Matching text, keeping
+  the single-line field consistent with the actual rule. Replacement text accepts readings,
+  other text and punctuation; leaving it empty
   deletes the matching text from speech. Fully deleted sentences are skipped during continuous
   playback without sending empty synthesis requests. Supported substitutions include
   dashes or ellipses replaced with commas/periods for engine-controlled pauses. Add an opt-in

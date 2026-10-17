@@ -1451,7 +1451,11 @@ Validate relevant sync/update/Sasayaki changes with:
   cover these boundaries; `TtsPanelStateTest` covers the actual Settings switch and reopening.
 - Long-press book text and choose Replace beside Highlight: prefill the selected original and
   empty replacement text, and preview the full source sentence including ruby and VN
-  text outside the screen. Include a selection starting inside ruby annotation and ending
+  text outside the screen. Select across paragraphs containing LF/CRLF line breaks: Matching
+  text must contain the complete selection with line breaks removed, without hiding later
+  lines in its single-line field; the saved rule must use that same text. Matching remains
+  sentence-based, so a rule spanning sentences does not replace text across those boundaries.
+  Include a selection starting inside ruby annotation and ending
   in the following base text (for example, only `々` in `瑞々`): Replace must open and
   exclude annotations. `ReaderNativeSelectionContextWebViewTest` exercises real DOM
   ranges and VN source projection in both writing directions, forward/backward selections,

@@ -2196,7 +2196,9 @@ fun ReaderWebView(
             TtsSheet(ttsViewModel, ttsBookId, onStart = { ttsAtReadingPosition(true) }, onDismiss = { showTts = false })
         }
         ttsSelection?.let { selection ->
-            val draft = remember(selection) { TtsWord(java.util.UUID.randomUUID().toString(), selection.text, "") }
+            val draft = remember(selection) {
+                TtsWord(java.util.UUID.randomUUID().toString(), selection.text.lineSequence().joinToString(""), "")
+            }
             val chapter = readerPosition.displayedPosition.index
             val previewSentence by produceState<TtsSentence?>(null, selection) {
                 try { value = ttsViewModel.sourceSentence(book, chapter, selection) }
