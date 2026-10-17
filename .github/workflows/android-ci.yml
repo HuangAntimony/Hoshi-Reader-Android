@@ -83,7 +83,9 @@ jobs:
         run: |
           python3 tools/build-transcription-audio.py --check
           ./gradlew --no-daemon --stacktrace -p buildSrc test
-          ./gradlew --no-daemon --stacktrace test lint assembleDebug
+          ./gradlew --no-daemon --stacktrace \
+            "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            test lint assembleDebug
 
       - name: Upload failure reports
         if: failure()
