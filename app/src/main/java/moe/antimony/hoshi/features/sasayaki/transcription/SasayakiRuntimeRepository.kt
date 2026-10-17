@@ -31,25 +31,21 @@ internal class SasayakiRuntimeRepository @Inject constructor(
     suspend fun load(directory: File) = withContext(ioDispatcher) {
         val catalog = transcriptionRuntimeCatalog(context)
         val files = catalog.getValue(directory.name).map { File(directory, it.name) }
-        SasayakiNativeLibraries.prepare(files)
+        SasayakiNativeLibraries.prepareAudio(files.single())
     }
 }
 
-/** Called by the official bindings whose System.loadLibrary calls are redirected at build time. */
+/** The decoder may only be opened after its verified private library is loaded. */
 internal object SasayakiNativeLibraries {
-    private var loaded: List<String>? = null
+    private var audioLoaded = false
 
-    @Synchronized fun prepare(files: List<File>) {
-        val paths = files.map { it.absolutePath }
-        if (loaded == paths) return
-        check(loaded == null) { "A different runtime is already loaded" }
-        // ONNX must be available before the JNI library's DT_NEEDED dependency resolves.
-        paths.forEach(System::load)
-        loaded = paths
+    @Synchronized fun prepareAudio(file: File) {
+        if (!audioLoaded) System.load(file.absolutePath)
+        audioLoaded = true
     }
 
-    @JvmStatic @Synchronized fun loadLibrary(name: String) {
-        check(name in setOf("sherpa-onnx-jni", "hoshiaudio_jni") && loaded != null) { "Transcription runtime must be prepared first" }
+    @Synchronized fun requireAudio() {
+        check(audioLoaded) { "Transcription audio runtime must be prepared first" }
     }
 }
 
@@ -57,11 +53,7 @@ internal object SasayakiNativeLibraries {
 private data class SasayakiAudioRuntimeCatalog(val sourceSha256: String, val files: Map<String, List<SasayakiModelFile>>)
 
 internal fun transcriptionRuntimeCatalog(context: Context): Map<String, List<SasayakiModelFile>> {
-    val inference = context.assets.open("transcription-runtime.json").bufferedReader().use {
-        Json.decodeFromString<Map<String, List<SasayakiModelFile>>>(it.readText())
-    }
-    val audio = context.assets.open("transcription-audio-runtime.json").bufferedReader().use {
+    return context.assets.open("transcription-audio-runtime.json").bufferedReader().use {
         Json.decodeFromString<SasayakiAudioRuntimeCatalog>(it.readText()).files
     }
-    return inference.mapValues { (abi, files) -> files + audio.getValue(abi) }
 }

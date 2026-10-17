@@ -82,7 +82,6 @@ jobs:
         shell: bash
         run: |
           python3 tools/build-transcription-audio.py --check
-          ./gradlew --no-daemon --stacktrace -p buildSrc test
           ./gradlew --no-daemon --stacktrace \
             "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
             test lint assembleDebug
@@ -96,7 +95,5 @@ jobs:
             app/build/test-results/
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
-            buildSrc/build/test-results/
-            buildSrc/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 7

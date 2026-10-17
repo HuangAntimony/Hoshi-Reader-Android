@@ -20,7 +20,7 @@ internal interface SasayakiTranscriptionRepository {
 }
 
 internal fun interface SasayakiTranscriptionAlignment {
-    suspend fun align(tokens: List<SasayakiToken>, complete: Boolean): SasayakiMatchData
+    suspend fun align(tokens: List<SasayakiToken>): SasayakiMatchData
 }
 
 @Singleton
@@ -39,10 +39,10 @@ internal class AndroidSasayakiTranscriptionRepository @Inject constructor(
             check(root.isDirectory)
             parser.parse(root)
         }
-        val session = withContext(defaultDispatcher) { SasayakiTranscriptAligner.Session(book) }
+        val aligner = withContext(defaultDispatcher) { NakuruTranscriptAligner(book) }
         var previous: SasayakiMatchData? = null
-        return SasayakiTranscriptionAlignment { tokens, complete ->
-            val result = withContext(defaultDispatcher) { session.align(tokens, complete) }
+        return SasayakiTranscriptionAlignment { tokens ->
+            val result = withContext(defaultDispatcher) { aligner.align(tokens) }
             if (result != previous) {
                 withContext(ioDispatcher) {
                     check(root.isDirectory)

@@ -887,9 +887,6 @@
     <string name="sasayaki_transcription_error_match">无法将转写内容与此书匹配。请确认书籍可正常打开且内容与音频相符。</string>
     <string name="sasayaki_transcription_error_storage">无法保存转写进度。请检查可用存储空间，并确认书籍仍可访问。</string>
     <string name="sasayaki_transcription_busy">正在转写另一本书。</string>
-    <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
-    <string name="about_ffmpeg_source">FFmpeg 源代码</string>
-    <string name="about_transcription_license">转写组件许可证</string>
     <string name="sasayaki_transcription_speed">转录速度</string>
     <string name="sasayaki_transcription_light">轻量</string>
     <string name="sasayaki_transcription_balanced">均衡</string>
@@ -1099,4 +1096,6 @@
     <string name="diagnostics_exit_other">其他退出</string>
     <string name="diagnostics_exit_unknown">未知退出</string>
     <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="sasayaki_nakuru_unavailable">此设备不支持 Nakuru。</string>
+    <string name="sasayaki_legacy_resources_cleanup">清理已停用的转录资源：%1$s</string>
 </resources>

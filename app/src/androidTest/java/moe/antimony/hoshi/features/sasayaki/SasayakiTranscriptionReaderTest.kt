@@ -218,7 +218,7 @@ class SasayakiTranscriptionReaderTest {
         @Volatile var needsDownload = false
         @Volatile var downloads = 0
         override suspend fun duration(source: String) = 100.0
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<moe.antimony.hoshi.features.sasayaki.SasayakiToken>) {
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
             resumedFrom = from
             this.parallelism = parallelism
             runs++
@@ -238,6 +238,6 @@ class SasayakiTranscriptionReaderTest {
         override suspend fun load(root: File) = saved
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
         override suspend fun clear(root: File) { saved = null }
-        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _, _ -> SasayakiMatchData(emptyList(), 0) }
+        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _ -> SasayakiMatchData(emptyList(), 0) }
     }
 }

@@ -84,17 +84,13 @@ Validation:
 - `15aadf0`: `reader-paginated.js` already appends its trailing spacer
   unconditionally, including zero vertical padding. Its Android-specific zero
   physical width is intentional.
-- `d24b2fa`: Sasayaki now offers Japanese on-device transcription using
-  ReazonSpeech k2-v2 INT8/sherpa-onnx, model download, progress, pause/resume,
-  transcript clear and complete-transcript realignment. Atomic iOS-compatible
-  checkpoints and book-deletion coordination preserve completed work. Android
-  keeps transcription running with the sheet closed while reading, and pauses
-  when leaving Reader or backgrounding the app; it resumes from fully
-  processed audio and requires EOF for new transcripts. Matching uses real
-  normalized/ruby-aware anchors and bounded gap repair without inventing edge
-  matches. SRT and transcription share toc/caution/colophon exclusions and
-  character coverage. `ReaderSasayakiCues.chapterCuesJson()` retains chapter
-  ranges sorted by `start`.
+- `d24b2fa`: Android provides Japanese on-device transcription through Nakuru,
+  verified resource downloads, pause/resume, transcript clear and realignment.
+  Atomic iOS-compatible checkpoints and book-deletion coordination preserve work.
+  First-batch and throttled matching update cues while reading with the sheet
+  closed. Leaving Reader pauses and saves; backgrounding alone does not actively
+  pause the process-bound task. SRT and transcription share source exclusions
+  and Reader chapter/code-point coordinates.
 - `8ccade5`: Android Chinese resources cover
   the inspected statistics/archive, furigana, search, frequency sorting, Anki
   format and stroke-font controls. The iOS string-table routing fix has no

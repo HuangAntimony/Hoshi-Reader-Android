@@ -191,6 +191,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   native selection menu disappears or is recreated.
 - Reduce text-selection flicker in paginated reading by preventing selection
   autoscroll while dragging selection handles.
+- Use Nakuru for Japanese audiobook transcription, with model and runtime downloads
+  on first use for arm64 and 32-bit ARM devices. Update matched reading cues during
+  transcription so reading and playback can continue without pausing transcription.
+  Automatically remove retired ReazonSpeech models and inference libraries to free
+  storage while keeping existing transcripts, matches and audiobook files.
+  Remove the separate component license buttons from About.
 
 ## [v1.4.0] - 2026-09-24
 
